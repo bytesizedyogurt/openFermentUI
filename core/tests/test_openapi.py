@@ -31,6 +31,49 @@ def test_every_route_carries_its_project_scope():
         assert bool(named) == (op["x-openferment-scope"] == "project"), f"{method} {path}"
 
 
+def test_every_scoped_operation_names_its_project_query_and_its_404():
+    """Alpha 2.2 D.0 (B16): a scoped operation takes `?project=` beside the
+    header and declares the 404 a project the database lacks is answered
+    with; the document's description says how a request names its project
+    and what the guard admits."""
+    doc = api.app.openapi()
+    refusal = {"$ref": "#/components/schemas/Refusal"}
+    assert "Refusal" in doc["components"]["schemas"]
+    for path, method, op in operations(doc):
+        if op["x-openferment-scope"] != "project":
+            assert not any(p.get("name") == projects.QUERY for p in op.get("parameters", [])), f"{method} {path}"
+            continue
+        queries = [p for p in op["parameters"] if p["name"] == projects.QUERY and p["in"] == "query"]
+        assert len(queries) == 1, f"{method} {path}"
+        assert op["responses"]["404"]["content"]["application/json"]["schema"] == refusal, f"{method} {path}"
+    said = doc["info"]["description"]
+    assert projects.HEADER in said and f"?{projects.QUERY}=" in said and "404" in said and "Origin" in said
+    from openferment_core import guard
+
+    assert all(f"`{suffix}`" in said for suffix in guard.OWN_SUFFIXES), "every name the guard admits, as guard.py lists"
+    assert "Tailscale Funnel changes nothing" in said
+
+
+def test_the_catalogue_reads_the_event_streams_and_the_tool_door_say_what_they_take_and_answer():
+    from openferment_core import tools
+
+    doc = api.app.openapi()
+    entry = {"$ref": "#/components/schemas/CatalogueEntry"}
+    one = doc["paths"]["/api/catalogues/{kind}/{entry_id}"]["get"]["responses"]
+    assert one["200"]["content"]["application/json"]["schema"] == entry and "404" in one
+    listed = doc["paths"]["/api/catalogues/{kind}"]["get"]["responses"]["200"]["content"]["application/json"]["schema"]
+    assert listed["items"] == entry
+    assert "agent" in doc["components"]["schemas"]["CatalogueEntry"]["properties"]
+    for path, method in (("/api/events", "get"), ("/api/ask/stream", "post"), ("/api/literature/answer", "post")):
+        assert list(doc["paths"][path][method]["responses"]["200"]["content"]) == ["text/event-stream"], path
+    door = doc["paths"]["/api/tools/{name}"]["post"]
+    assert [p["in"] for p in door["parameters"] if p["name"] == tools.ASSISTANT_HEADER] == ["header"]
+    audit = doc["paths"]["/api/audit"]["get"]["description"]
+    assert "1 to 500" in audit and "+00:00" in audit and "detail.via" in audit
+    row = doc["components"]["schemas"]["AuditEntry"]["properties"]
+    assert all(row[k].get("description") for k in ("at", "askId", "effort", "detail")), "each field said in words"
+
+
 def test_the_committed_document_is_the_services():
     committed = json.loads(DOC.read_text(encoding="utf-8"))
     assert committed == json.loads(json.dumps(api.app.openapi(), sort_keys=True))

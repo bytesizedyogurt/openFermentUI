@@ -508,6 +508,33 @@ def test_the_command_takes_things_inputs_and_a_project_and_refuses_anything_else
         conform._read_inputs(str(path))
 
 
+NO_ADDRESS = ("✗ the checks run on a database of their own, made on the PostgreSQL server the setting names: "
+              "OPENFERMENT_DATABASE_URL is not set")
+
+
+def test_the_command_with_no_database_address_says_so_naming_it_and_exits_2(engines, monkeypatch, capsys):
+    """alpha 2.2 D0.7: no OPENFERMENT_DATABASE_URL, in the environment or in
+    core/.env (which an empty value set here stands over), is said in words
+    naming it, and nothing is made."""
+    monkeypatch.setenv("OPENFERMENT_DATABASE_URL", "")
+    assert conform.main(["sample"]) == 2
+    out = capsys.readouterr().out
+    assert out.startswith(NO_ADDRESS) and "Traceback" not in out, out
+
+
+def test_the_command_on_a_server_that_does_not_answer_says_so_naming_the_setting_and_exits_2(engines, monkeypatch,
+                                                                                             capsys):
+    """alpha 2.2 D0.7: a server that does not answer is said in words naming
+    the setting and its address, the password hidden."""
+    monkeypatch.setenv("OPENFERMENT_DATABASE_URL", "postgresql://openferment:a-placeholder@127.0.0.1:9/openferment_dev")
+    assert conform.main(["sample"]) == 2
+    out = capsys.readouterr().out
+    assert out.startswith("✗ the PostgreSQL server OPENFERMENT_DATABASE_URL names "
+                          "(postgresql+asyncpg://openferment:***@127.0.0.1:9/openferment_dev) could not make the "
+                          "checks' database: "), out
+    assert "Start it (pnpm db:up)" in out and "a-placeholder" not in out and "Traceback" not in out
+
+
 def test_a_check_that_fails_says_which_and_why(engines, monkeypatch):
     real = SAMPLE.parameters
 
@@ -1285,16 +1312,28 @@ def test_a_contract_engines_parameter_with_no_default_waits_for_the_run_to_set_i
     assert "placeholder cannot run yet: 1 parameter waits for the run to set it, having no default: a-parameter" in \
         waits.json()["detail"]
     assert runs.listed("sample") == [] and computed == [], "a run that leaves it unset keeps nothing and reaches no worker"
+    # Check 3 on such a thing names the way on: the values, or a default for each parameter that waits.
+    (waiting,) = [t for t in SAMPLE.things() if t.id == "placeholder"]
+    ran, words, _ = conform._run_twice(SAMPLE, waiting, [], "Ada Moreno")
+    assert not ran and words.endswith("having no default: a-parameter; set its values with --inputs <file>, or give "
+                                      "each such parameter a default"), words
     set_here = client.post("/api/engines/sample/run", json={
         "thing": "placeholder", "by": "Ada Moreno", "inputs": [{"name": "a-parameter", "quantity": person(2.5)}]})
     assert set_here.status_code == 200 and len(computed) == 1
     # Check 2 holds a parameter with no default that a run sets, and names one that says nothing of who sets it.
     held, said = conform._origins(SAMPLE, [t for t in SAMPLE.things() if t.id == "placeholder"])
     assert held and "1 with none, taking a run's value" in said
+    count = len(no_default("placeholder", None))
+    assert said.startswith(f"{count} parameter{'s' if count != 1 else ''} of 1 thing (placeholder)"), said
     monkeypatch.setattr(SAMPLE, "parameters", lambda thing, configuration: [
         p.model_copy(update={"sourceRule": ["library-default"]}) for p in no_default(thing, configuration)])
     held, said = conform._origins(SAMPLE, [t for t in SAMPLE.things() if t.id == "placeholder"])
     assert not held and "placeholder:a-parameter" in said
+    assert said.startswith(f"1 of {count} parameter{'s' if count != 1 else ''} lacks an origin"), said
+    # One parameter alone is said as one.
+    monkeypatch.setattr(SAMPLE, "parameters", lambda thing, configuration: no_default(thing, configuration)[:1])
+    held, said = conform._origins(SAMPLE, [t for t in SAMPLE.things() if t.id == "placeholder"])
+    assert said.startswith("1 parameter of 1 thing (placeholder)"), said
 
 
 # ── the kinetics engine (alpha 2.2 D4; fermos_engine.py, ADR-015) ───────
@@ -1768,6 +1807,78 @@ def test_a_trains_parameters_are_each_places_values_with_the_origins_their_resol
     assert [p["key"] for p in served] == keys
     with pytest.raises(EngineRefused, match="t1 takes no configuration, and 'a-placeholder' was named"):
         TRAIN.parameters("t1", "a-placeholder")
+
+
+def test_the_command_checking_a_project_with_no_database_address_says_so_and_exits_2(train_engines, monkeypatch,
+                                                                                     capsys):
+    """alpha 2.2 D0.7: with --project, the copy's database is made on the
+    server the setting names, so none set is said in words naming it, and
+    nothing is made."""
+    _saved(spec_of())
+    monkeypatch.setenv("OPENFERMENT_DATABASE_URL", "")
+    assert conform.main(["train", "--project", TEST_PROJECT]) == 2
+    out = capsys.readouterr().out
+    assert out.startswith(NO_ADDRESS) and "Traceback" not in out, out
+
+
+def test_a_kept_trains_defaults_each_name_one_of_the_five_default_origins_by_every_path_that_keeps_one(
+        train_engines, monkeypatch):
+    """alpha 2.2 D0.5: a train's own value is a person's (a typed value names
+    its person and day and no origin of its own), so the Builder's train holds
+    person-assumptions beside its class's and its records' defaults, and a
+    model's train, built through the tool, holds ids and words alone; neither
+    holds a model's estimate or a reading, and `parameters()` answers each
+    default with one of models.DEFAULT_ORIGINS, which the train engine's
+    mapping names whole. A value only a run sets is refused in words, should
+    a resolution ever hand one in."""
+    from openferment_core import pureos
+    from openferment_core.models import DEFAULT_ORIGINS, BasisSource, ParameterSpec, ParameterValue, TrainSpec
+    from test_pureos_build_tool import built, stand_in_pool
+
+    monkeypatch.setattr(train_spec, "_pool", stand_in_pool)
+    assert set(train_engine.DEFAULT_OF.values()) == set(DEFAULT_ORIGINS)
+    # The Builder's train, saved through its route, with values typed on its inlet and its units.
+    _saved(spec_of())
+    made = {p.key: p for p in TRAIN.parameters("t1", None)}
+    assert {p.origin.kind for p in made.values() if p.origin} <= set(DEFAULT_ORIGINS)
+    for key in ("inlet.broth_flow", "C1.split.Yeast", "F1.P", "F1.V"):
+        assert (made[key].origin.kind, made[key].origin.by, made[key].origin.at) == ("person-assumption", TRAIN_BY,
+                                                                                    TRAIN_AT), key
+    # A typed value naming an origin of its own is no train's: refused as a train, and a row holding one is no thing.
+    raw = spec_of().model_dump(mode="json")
+    raw["units"][0]["params"]["split.Yeast"]["origin"] = "model-estimate"
+    with pytest.raises(ValidationError, match="Extra inputs are not permitted"):
+        TrainSpec.model_validate(raw)
+    stray = {**raw, "id": "t-estimated"}
+    put = TestClient(api.app).put("/api/state/trains/t-estimated", json={"by": "Ada Moreno", "value": {
+        "train": stray, "savedAt": f"{DAY}T00:00:00Z", "by": "Ada Moreno"}})
+    assert put.status_code == 200, put.text
+    assert "t-estimated" not in {t.id for t in TRAIN.things()}
+    with pytest.raises(EngineRefused, match="runs no thing 't-estimated'"):
+        TRAIN.parameters("t-estimated", None)
+    # A model's train, built through the tool: ids and words, every value its class's, its records' or waiting.
+    run = pureos.run_train(spec_of(), by="Ada Moreno")
+    tid = built(f"{run.artifactId}/F1_liquid", "centrifugation")
+    bound = tools.run("pureos_build", {"action": "set_from_record", "trainId": tid, "unitId": "C1",
+                                       "recordsByParam": {"split.Ethanol": ["r-st-1", "r-st-2"]}},
+                      tools.ToolContext(model=llm.DEFAULT_PRIMARY, pool_factory=stand_in_pool))
+    assert bound.error is None, bound.error
+    kept = TRAIN.parameters(tid, None)
+    kinds = {p.origin.kind for p in kept if p.origin}
+    assert kinds <= set(DEFAULT_ORIGINS) - {"person-assumption"} and "record" in kinds, kinds
+    held, said = conform._origins(TRAIN, TRAIN.things())
+    assert held, said
+    # A value only a run sets, handed in by hand, is refused in words: no default stands on it.
+    spec = ParameterSpec(key="V", label="A placeholder", symbol="", gloss="", dimension="", unit="",
+                         group="parameters", sourceRule=["assumption"], boundsReason="none stated")
+    for origin, source, words in (
+            ("model-estimate", BasisSource(kind="model-estimate", by="a-model", note=f"estimated on {DAY}"),
+             "a model's estimate"),
+            ("measurement", BasisSource(kind="deposition", id="dep-1/de-1", by="Ada Moreno",
+                                        note=f"measured on {DAY}T00:00:00Z"), "a deposition's reading")):
+        v = ParameterValue(key="V", value=0.1, source=source, origin=origin)
+        with pytest.raises(EngineRefused, match=re.escape(f"F1.V holds {words} as the train's own value")):
+            train_engine._parameter("F1", spec, v)
 
 
 def test_a_trains_run_is_one_row_at_every_door_and_the_same_request_twice_is_that_row(train_engines):

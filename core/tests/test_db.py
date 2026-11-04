@@ -366,6 +366,25 @@ def test_the_command_names_the_setting_when_no_address_is_set(capsys, monkeypatc
     assert db.URL_SETTING in capsys.readouterr().err
 
 
+def test_the_command_says_so_in_words_when_the_server_does_not_answer(capsys, monkeypatch):
+    monkeypatch.setattr("openferment_core.migrations.load_dotenv", lambda *a, **k: None)
+    monkeypatch.setenv(db.URL_SETTING, "postgresql://nobody:nothing@127.0.0.1:9/none")
+    assert db_command(["migrate"]) == 2
+    said = capsys.readouterr().err
+    assert said.startswith("refused: the database none on 127.0.0.1:9 could not be reached: ") and "Traceback" not in said
+    assert "nothing" not in said, "the password stays out of the words"
+
+
+def test_the_command_names_the_way_to_make_a_database_the_server_does_not_hold(capsys, monkeypatch, test_database):
+    monkeypatch.setattr("openferment_core.migrations.load_dotenv", lambda *a, **k: None)
+    absent = test_database.server.set(database=f"{test_database.name}_absent")
+    monkeypatch.setenv(db.URL_SETTING, absent.render_as_string(hide_password=False))
+    assert db_command(["migrate"]) == 2
+    said = capsys.readouterr().err
+    assert said.startswith("refused: the server at ") and f"holds no database {test_database.name}_absent (" in said
+    assert "pnpm db:reset <name> makes a database of that name there and migrates it" in said
+
+
 def test_a_plain_postgresql_address_is_given_the_asyncpg_dialect():
     assert db.as_async("postgresql://a:b@127.0.0.1:5432/x").drivername == "postgresql+asyncpg"
     assert db.as_async("postgresql+psycopg://a:b@127.0.0.1/x").drivername == "postgresql+asyncpg"

@@ -39,7 +39,8 @@ from __future__ import annotations
 import re
 from typing import Any, Mapping
 
-from .models import READING_REF, BasisSource, ComputedBasis, EngineInput, Origin, Override, weakest_provenance
+from .models import (READING_REF, BasisSource, ComputedBasis, EngineInput, Origin, Override, non_finite,
+                     weakest_provenance)
 
 # The sources whatever rests on is `assumed`: a named person's value and a
 # model's estimate.
@@ -135,20 +136,6 @@ def resolved(value: EngineInput, unit: str) -> EngineInput:
     return looked_up(value, unit)
 
 
-def reading_refusal(ref: str) -> str | None:
-    """Why the current project holds no reading `ref` (`<deposition id>/<entry
-    id>`), in words; None when it holds one (measurements.reading). What a
-    reader that names a reading checks it against: conformance's check 2 for
-    a default that is a measurement."""
-    from .measurements import MeasurementRefused, reading
-
-    try:
-        reading(ref)
-    except MeasurementRefused as e:
-        return str(e)
-    return None
-
-
 def override_of(scope: str, value: EngineInput, unit: str) -> Override:
     """The Override of `scope` a resolver takes for a value a request sets:
     the one converter from a typed quantity with its origin (alpha 2.2 D2).
@@ -164,8 +151,12 @@ def override_of(scope: str, value: EngineInput, unit: str) -> Override:
     unit, one carrying a basis, one whose origin is a record, an artifact, a
     library default or a convention (the module that runs binds those
     itself), and one that does not say when it was set are each refused in
-    words (InputRefused), as is a reading the lookup refuses."""
+    words (InputRefused), as is a reading the lookup refuses, and a number
+    that is NaN or infinite."""
     name, q = value.name, value.quantity
+    infinite = non_finite(q)
+    if infinite:
+        raise InputRefused(f"{name}: {infinite}, and a number a run sets is finite; nothing runs on it")
     origin = q.origin
     if origin is None or origin.kind not in SET_ORIGINS:
         said = f"a {origin.kind} value" if origin is not None else "a value with no origin"

@@ -244,3 +244,11 @@ task (development plan §8).
   (kind `measured-evidence`, marked `unverified` where nobody read its number back), so
   `module_stores.PARTIAL` holds no runbooks line. Postdoc's rule 18 says how a scenario's value
   names a reading it read there.
+
+### Alpha 2.2 D.0 (2026-11-04): an assistant's estimate at the HTTP door
+
+- `POST /api/tools/{name}` with `X-OpenFerment-Assistant: <name>/<version>` runs the call in the
+  model's lane under that name, so a number it types into a quantity is `model-estimate` by that
+  name, as an MCP client's is in the server's own process (ADR-008, Implementation 12). The MCP
+  server's `--service` mode sends its client's declared name there, and the estimate keeps the
+  same origin whichever way the server reaches the project.

@@ -26,7 +26,9 @@ from pathlib import Path
 from typing import Any
 
 from dotenv import load_dotenv
-from fastapi import FastAPI, File, Form, HTTPException, Query, Request, Response, UploadFile
+from fastapi import FastAPI, File, Form, Header, HTTPException, Query, Request, Response, UploadFile
+from fastapi.encoders import jsonable_encoder
+from fastapi.exceptions import RequestValidationError
 from pydantic import BaseModel
 from fastapi.responses import JSONResponse, StreamingResponse
 from fastapi.staticfiles import StaticFiles
@@ -34,6 +36,7 @@ from fastapi.staticfiles import StaticFiles
 from sqlalchemy.exc import InterfaceError, OperationalError
 
 from . import artifacts, audit, biorepo, checks, db, extract, fermos, geneos, guard, guild, intake, postdoc_agent, practice, projects, tools, witness
+from .catalogues import CatalogueEntry
 from .literature import kit
 from .workers import WorkerCrashed, WorkerError, WorkerTimeout
 from .models import (
@@ -154,36 +157,67 @@ def _discover_engines() -> None:
 
 _discover_engines()
 
-app = FastAPI(title="openferment-core", version="0.1.0")
+# The names the guard admits a changing request under beside an IP address,
+# written from guard.py's own list so the two read the same.
+_OWN_NAMES = ", ".join(f"`{s}`" for s in guard.OWN_SUFFIXES[:-1]) + f" or `{guard.OWN_SUFFIXES[-1]}`"
+DESCRIPTION = (
+    "A request acts in the project its `X-OpenFerment-Project` header or `?project=` names (ADR-005): a project the "
+    "database does not hold is a 404 in words, an id that is no project id a 422, and a request naming none is a 422 "
+    "in words at its first store call; `/api/health` and `/api/projects` act in no project. A request that changes "
+    "something (POST, PUT, PATCH, DELETE) passes the guard when its Host is an IP address, a name with no dot, a "
+    f"name ending {_OWN_NAMES}, or a name `OPENFERMENT_ALLOWED_HOSTS` lists, and its Origin, when it sends one, is "
+    "that same host and port; a script sends none. A request that arrived through Tailscale Funnel changes nothing. "
+    "A refusal is a status with its reason in `detail`, in words.")
+
+app = FastAPI(title="openferment-core", version="0.1.0", description=DESCRIPTION)
 
 
 # What acts in no project: health, and the projects themselves. A page that
 # remembers a project the database no longer holds can still ask these.
 UNSCOPED = ("/api/health", "/api/projects")
+# What a scoped operation answers for a project the database does not hold
+# (act_in_the_named_project), declared on each.
+NO_SUCH_PROJECT = "The project the request names is one the database does not hold, in words."
 
 
 def _scoped_openapi() -> dict[str, Any]:
     """The OpenAPI document (docs/api/openapi.json, `pnpm gen:api`) with every
     route's project scope written on it (ADR-005; acceptance A5): a route that
-    acts in a project says so (`x-openferment-scope: project`) and takes the
-    project's id in the X-OpenFerment-Project header, or `?project=` where a
-    header cannot be sent (an EventSource); the routes that act in none say
+    acts in a project says so (`x-openferment-scope: project`), takes the
+    project's id in the X-OpenFerment-Project header or in `?project=` where a
+    header cannot be sent (an EventSource), and declares the 404 a project the
+    database does not hold is answered with; the routes that act in none say
     `none`."""
     if app.openapi_schema:
         return app.openapi_schema
     from fastapi.openapi.utils import get_openapi
 
     schema = get_openapi(title=app.title, version=app.version, description=app.description, routes=app.routes)
+    refusal = {"application/json": {"schema": {"$ref": "#/components/schemas/Refusal"}}}
     for path, item in schema.get("paths", {}).items():
         scoped = not path.startswith(UNSCOPED)
         for method, operation in item.items():
             if method not in ("get", "post", "put", "patch", "delete"):
                 continue
             operation["x-openferment-scope"] = "project" if scoped else "none"
-            if scoped:
-                operation.setdefault("parameters", []).append({
-                    "name": projects.HEADER, "in": "header", "required": False, "schema": {"type": "string"},
-                    "description": f"The project the request acts in; ?{projects.QUERY}= in its place."})
+            if not scoped:
+                continue
+            parameters = operation.setdefault("parameters", [])
+            parameters.append({
+                "name": projects.HEADER, "in": "header", "required": False, "schema": {"type": "string"},
+                "description": f"The project the request acts in; ?{projects.QUERY}= in its place."})
+            parameters.append({
+                "name": projects.QUERY, "in": "query", "required": False, "schema": {"type": "string"},
+                "description": f"The project the request acts in, where a header cannot be sent (an EventSource); "
+                               f"the {projects.HEADER} header in its place."})
+            responses = operation.setdefault("responses", {})
+            if "404" in responses:
+                said = responses["404"]
+                said["description"] = (f"{said.get('description', '').strip()} A project the request names that the "
+                                       "database does not hold is a 404 too, in words.").strip()
+                said.setdefault("content", refusal)
+            else:
+                responses["404"] = {"description": NO_SUCH_PROJECT, "content": refusal}
     app.openapi_schema = schema
     return schema
 
@@ -274,6 +308,31 @@ async def _no_database(request: Request, e: db.DatabaseUnavailable) -> JSONRespo
 async def _database_unreachable(request: Request, e: Exception) -> JSONResponse:
     log.warning("the database did not answer %s %s: %s", request.method, request.url.path, e)
     return JSONResponse(status_code=503, content={"detail": _database_down(e)})
+
+
+def _json_safe(value: Any) -> Any:
+    """A value JSON can carry: each number that is NaN or infinite written as
+    its words (`NaN`, `Infinity`, `-Infinity`), everything else as it is."""
+    import math
+
+    if isinstance(value, float) and not math.isfinite(value):
+        return "NaN" if math.isnan(value) else ("Infinity" if value > 0 else "-Infinity")
+    if isinstance(value, dict):
+        return {k: _json_safe(v) for k, v in value.items()}
+    if isinstance(value, (list, tuple)):
+        return [_json_safe(v) for v in value]
+    return value
+
+
+@app.exception_handler(RequestValidationError)
+async def _fields_refused(request: Request, e: RequestValidationError) -> JSONResponse:
+    """A request whose own fields are refused: FastAPI's 422 and its list of
+    field errors (`HTTPValidationError`), with each number that is NaN or
+    infinite in the input it echoes written as words. Python reads `NaN`,
+    `Infinity` and a number past a float's range from a JSON body, and a
+    refusal echoing one answered 500, since JSON carries neither (alpha 2.2
+    D0.6)."""
+    return JSONResponse(status_code=422, content={"detail": _json_safe(jsonable_encoder(e.errors()))})
 
 
 @app.middleware("http")
@@ -383,7 +442,19 @@ def _sse(event: str, data: Any) -> str:
     return f"event: {event}\ndata: {json.dumps(data, ensure_ascii=False)}\n\n"
 
 
-@app.post("/api/ask/stream")
+class EventStream(StreamingResponse):
+    """Server-sent events, `text/event-stream`, as the OpenAPI document declares them."""
+
+    media_type = "text/event-stream"
+
+
+def _event_stream(what: str) -> dict[int | str, dict[str, Any]]:
+    """The 200 a route of server-sent events declares: text, one event a block."""
+    return {200: {"description": what, "content": {EventStream.media_type: {"schema": {"type": "string"}}}}}
+
+
+@app.post("/api/ask/stream", response_class=EventStream, responses=_event_stream(
+    "Server-sent events: `turn`, each `step`, then `plan`, or `error`."))
 def ask_stream(request: AskRequest) -> StreamingResponse:
     """The loop's steps as they complete (OF-BLD-014 §5.3), as server-sent
     events: `turn` (the conversation and the turn the service keeps the
@@ -391,8 +462,7 @@ def ask_stream(request: AskRequest) -> StreamingResponse:
     AnswerPlan), or `error` when the service itself failed. A declined plan
     is a `plan`. The same turn is said on the project's event stream
     (`GET /api/events`)."""
-    return StreamingResponse(_stream_events(request), media_type="text/event-stream",
-                             headers={"Cache-Control": "no-cache", "X-Accel-Buffering": "no"})
+    return EventStream(_stream_events(request), headers={"Cache-Control": "no-cache", "X-Accel-Buffering": "no"})
 
 
 def _stream_events(request: AskRequest):
@@ -452,7 +522,8 @@ def conversation_calls(conversation_id: str, turn_id: str) -> list[ToolCallRecor
         raise HTTPException(status_code=404, detail=str(e).strip("'\"")) from e
 
 
-@app.get("/api/events")
+@app.get("/api/events", response_class=EventStream, responses=_event_stream(
+    "Server-sent events: `job.*`, `tool.call`, `tool.result`, `artifact.kept` and `turn.*`, each with its id."))
 def project_events(request: Request, after: int | None = None) -> StreamingResponse:
     """The project's events as they happen (events.py): jobs, tool calls,
     artifacts kept and Postdoc's turns, as server-sent events. `Last-Event-ID`
@@ -463,8 +534,8 @@ def project_events(request: Request, after: int | None = None) -> StreamingRespo
         resume = int(header) if header else after
     except ValueError:
         resume = after
-    return StreamingResponse(event_stream.stream(projects.current(), resume), media_type="text/event-stream",
-                             headers={"Cache-Control": "no-cache", "X-Accel-Buffering": "no"})
+    return EventStream(event_stream.stream(projects.current(), resume),
+                       headers={"Cache-Control": "no-cache", "X-Accel-Buffering": "no"})
 
 
 # ── geneOS (OF-BLD-014 §6.3) ───────────────────────────────────────────
@@ -934,36 +1005,51 @@ def _catalogue_kind(kind: str) -> str:
     return kind
 
 
-@app.get("/api/catalogues/{kind}")
-def catalogue_listed(kind: str) -> list[dict]:
-    """The open project's entries of one catalogue (strain, product, skill, lesson), by id."""
+NO_CATALOGUE = {"model": Refusal, "description": "There is no catalogue of that kind, in words."}
+
+
+@app.get("/api/catalogues/{kind}", response_model=list[CatalogueEntry], responses={404: NO_CATALOGUE})
+def catalogue_listed(kind: str) -> list[CatalogueEntry]:
+    """The open project's entries of one catalogue (strain, product, skill, lesson), by id. Each names who kept
+    it (`by`), in which lane (`agent`: a person's keep or a model's write), through which door a model's write
+    came (`via`: postdoc, mcp or http) and where it came from (`source`)."""
     from . import catalogues
 
-    return [e.model_dump(mode="json") for e in catalogues.listed(_catalogue_kind(kind))]
+    return catalogues.listed(_catalogue_kind(kind))
 
 
-@app.get("/api/catalogues/{kind}/{entry_id}")
-def catalogue_entry(kind: str, entry_id: str) -> dict:
+@app.get("/api/catalogues/{kind}/{entry_id}", response_model=CatalogueEntry, responses={404: {
+    "model": Refusal, "description": "There is no catalogue of that kind, or the project's catalogue holds no entry "
+                                     "of that id, in words."}})
+def catalogue_entry(kind: str, entry_id: str) -> CatalogueEntry:
+    """One entry of the open project's catalogue of `kind`, with who kept it (`by`, `agent`, and for a model's
+    entry the door it came in by, `via`), when (`at`, ISO 8601 in UTC, as the audit writes its rows' times) and
+    where it came from (`source`)."""
     from . import catalogues
 
     try:
-        return catalogues.get(_catalogue_kind(kind), entry_id).model_dump(mode="json")
+        return catalogues.get(_catalogue_kind(kind), entry_id)
     except catalogues.CatalogueEntryNotFound as e:
         raise HTTPException(status_code=404, detail=str(e).strip("'\"")) from e
 
 
-@app.post("/api/catalogues/{kind}")
-def catalogue_keep(kind: str, asked: CatalogueKeep) -> dict:
+@app.post("/api/catalogues/{kind}", response_model=CatalogueEntry, responses={404: NO_CATALOGUE, 422: {
+    "description": "An entry the kind does not take, or a keep that names nobody, in words (a list of field errors "
+                   "when the body is no object of `entry` and `by`).",
+    "content": {"application/json": {"schema": {"anyOf": [
+        {"$ref": "#/components/schemas/Refusal"}, {"$ref": "#/components/schemas/HTTPValidationError"}]}}}}})
+def catalogue_keep(kind: str, asked: CatalogueKeep) -> CatalogueEntry:
     """One entry kept in the open project's catalogue of `kind`, in the name of
-    `by`; an entry already held under its id is replaced. 422 in words for an
-    entry the kind does not take."""
+    `by`, as a person's keep (`agent: person`); an entry already held under its
+    id is replaced, whoever kept it. 422 in words for an entry the kind does
+    not take, and for a keep that names nobody (`by` empty)."""
     from pydantic import ValidationError
 
     from . import catalogues
 
     try:
         entry = catalogues.CatalogueEntry.model_validate({**asked.entry, "kind": _catalogue_kind(kind)})
-        return catalogues.keep(entry, by=asked.by).model_dump(mode="json")
+        return catalogues.keep(entry, by=asked.by)
     except ValidationError as e:
         first = e.errors()[0]
         raise HTTPException(status_code=422, detail=f"{'.'.join(str(x) for x in first.get('loc', ())) or 'the entry'}: "
@@ -1856,7 +1942,8 @@ def literature_search(q: str, topK: int = 10, profile: str = "interactive") -> S
     )
 
 
-@app.post("/api/literature/answer")
+@app.post("/api/literature/answer", response_class=EventStream, responses=_event_stream(
+    "Server-sent events: `delta`, `citations`, `done`, or `error`."))
 def literature_answer(request: LiteratureQuestion) -> StreamingResponse:
     """A cited answer over the project's documents, as server-sent events:
     `delta` (text), `citations` (every source with its passage id and whether
@@ -1869,8 +1956,7 @@ def literature_answer(request: LiteratureQuestion) -> StreamingResponse:
             kind = event.pop("type")
             yield _sse(kind, event)
 
-    return StreamingResponse(events(), media_type="text/event-stream",
-                             headers={"Cache-Control": "no-cache", "X-Accel-Buffering": "no"})
+    return EventStream(events(), headers={"Cache-Control": "no-cache", "X-Accel-Buffering": "no"})
 
 
 class _KitREST:
@@ -2511,37 +2597,81 @@ def state_remove(kind: str, item_id: str, by: str = "") -> dict[str, Any]:
 
 @app.get("/api/audit", response_model=list[AuditEntry])
 def audit_read(limit: int = 200) -> list[AuditEntry]:
-    """The newest rows of the project's audit log, newest last."""
+    """The project's newest `limit` rows of its audit log, newest last:
+    `limit` is held to 1 to 500 (200 by default), a larger one read as 500.
+    `at` is ISO 8601 in UTC (`2026-11-04T09:00:00.123456+00:00`), as a
+    catalogue entry's `at` is; `agent` is `model` for a model's or an
+    assistant's write and `person` for a named person's, and `who` names it
+    (an MCP client by its `<name>/<version>`). A row of the model's lane
+    names the door its write came in by in `detail.via`: `postdoc` for
+    Postdoc's loop, with the `effort` its model ran at and, from an ask, its
+    `askId`; `mcp` for the MCP server in its own process and `http` for the
+    tool door's assistant header, with no effort and no ask."""
     from . import audit
 
     return audit.read(max(1, min(limit, audit.MAX_READ)))
 
 
+def _header_text(raw: str) -> str:
+    """A header's value as the UTF-8 text a client sent; Starlette hands it
+    over read as Latin-1, and a value that is no UTF-8 stays as it reads."""
+    try:
+        return raw.encode("latin-1").decode("utf-8")
+    except (UnicodeEncodeError, UnicodeDecodeError):
+        return raw
+
+
 @app.post("/api/tools/{name}", response_model=ToolResult, responses={
     404: {"model": Refusal, "description": "No tool of that name is registered here, in words."},
-    422: {"description": "A tool that writes, called with no ?by= naming the person calling, in words (a list of "
-                         "field errors when the body is no JSON object).",
+    422: {"description": "A tool that writes, called with neither ?by= naming the person calling nor "
+                         f"{tools.ASSISTANT_HEADER} naming the assistant; a call naming both; an "
+                         f"{tools.ASSISTANT_HEADER} that names nobody: each in words (a list of field errors when "
+                         "the body is no JSON object).",
           "content": {"application/json": {"schema": {"anyOf": [
               {"$ref": "#/components/schemas/Refusal"}, {"$ref": "#/components/schemas/HTTPValidationError"}]}}}}})
-def tools_run(name: str, body: dict[str, Any], by: str = "") -> ToolResult:  # noqa: N803 (the wire name)
+def tools_run(name: str, body: dict[str, Any], by: str = "",  # noqa: N803 (the wire name)
+              assistant: str | None = Header(default=None, alias=tools.ASSISTANT_HEADER, description=(
+                  "The outside assistant calling, `<name>/<version>`, as UTF-8 text: the call runs in the model's lane "
+                  "under that name, its audit row's detail naming this door (`via: http`). The MCP server started "
+                  "with --service sends its client's declared name here."))) -> ToolResult:
     """Run one tool through the registry, the same path Postdoc's loop and
     the MCP server take, in the request's project. A refusal is a result
     with `error` set; an unknown tool is a 404. The body is the tool's
-    input; `?by=` names the person calling, who is the author of any
+    input. The caller is named one of two ways, each name read as the tool
+    door reads one (its control, format and surrogate characters dropped,
+    its whitespace collapsed, at most 200 characters), and a call naming
+    both is a 422 in words. `?by=` names a person, who is the author of any
     quantity the input types (ADR-006) and of any write it makes: the audit
     row, a proposal and what the write keeps are marked as that person's,
     and a store that holds a model's work alone (pureOS's kept trains)
-    refuses the write in its words. A tool that writes (`writes` in
-    docs/TOOLS.md) is run only for a person named so: a call that names
-    nobody is a 422 in words, and nothing runs."""
+    refuses the write in its words. `X-OpenFerment-Assistant` names an
+    outside assistant, and the call runs in the model's lane under that
+    name, through this door (`via: http`): a number it types is that name's
+    estimate, a write is marked with that name (`by`), its audit row names
+    it as `who` with agent `model`, `via` http in its detail and no effort,
+    and a catalogue entry's source reads "<name>/<version>, at the HTTP
+    endpoint". A tool that writes (`writes` in docs/TOOLS.md) is run only for
+    a caller named so: a call that names nobody is a 422 in words, and
+    nothing runs."""
     if name not in tools.REGISTRY:
         raise HTTPException(status_code=404, detail=f"no tool named {name!r}")
-    person = by.strip()[:200]
-    if tools.REGISTRY[name].writes and not person:
+    person = tools.caller_name(by)
+    model = tools.caller_name(_header_text(assistant)) if assistant is not None else ""
+    if assistant is not None and not model:
+        raise HTTPException(status_code=422, detail=(
+            f"{tools.ASSISTANT_HEADER} names nobody: send the assistant's name, <name>/<version>, or leave the "
+            "header out"))
+    if person and model:
+        raise HTTPException(status_code=422, detail=(
+            f"this call names its caller twice, the person {person!r} (?by=) and the assistant {model!r} "
+            f"({tools.ASSISTANT_HEADER}): name one of them"))
+    if tools.REGISTRY[name].writes and not (person or model):
         raise HTTPException(status_code=422, detail=(
             f"{name} keeps something in the project in its caller's name, and this call names nobody: name the "
-            "person calling with ?by=<their name>"))
-    return tools.run(name, body, tools.ToolContext(person=person))
+            f"person calling with ?by=<their name>, or the assistant calling with the {tools.ASSISTANT_HEADER} "
+            "header (<name>/<version>)"))
+    ctx = tools.ToolContext(model=model, via="http") if model else tools.ToolContext(person=person)
+    return tools.run(name, body, ctx)
 
 
 # ── The built app (OF-BLD-012 §B.4) ──────────────────────────────────────

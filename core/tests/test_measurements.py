@@ -673,14 +673,21 @@ def test_a_model_reads_a_reading_through_runbooks_read_and_makes_a_measured_scen
         "measurement", row.detail["reading"], DEPOSITOR)
 
 
-def test_conformance_holds_a_measurement_default_to_a_reading_the_project_holds():
+def test_a_reading_is_a_value_a_run_sets_and_no_defaults_ground():
+    """A default rests on one of five origins (models.DEFAULT_ORIGINS, alpha
+    2.2 D0.5): a deposition's reading reaches a run as a value the run sets,
+    so a parameter whose default names one is refused as it is read, and
+    conformance's check 2 holds no reading as a default's ground, one the
+    project holds among them."""
     from openferment_core.engine import conform
-    from openferment_core.models import Origin
+    from openferment_core.models import DEFAULT_ORIGINS, EngineParameter, Origin
 
     deposit()
-    assert conform._names_its_ground(Origin(kind="measurement", ref="dep-1/de-3", at=TAKEN, by=DEPOSITOR))
-    assert not conform._names_its_ground(Origin(kind="measurement", ref="dep-9/de-3", at=TAKEN, by=DEPOSITOR))
-    assert not conform._names_its_ground(Origin(kind="measurement", ref="dep-1/de-99", at=TAKEN, by=DEPOSITOR))
+    assert "measurement" not in DEFAULT_ORIGINS and "model-estimate" not in DEFAULT_ORIGINS
+    with pytest.raises(ValidationError, match="names the origin measurement"):
+        EngineParameter(key="a-parameter", label="A placeholder", unit="kg/hr", value=3.0, boundsReason="none stated",
+                        origin={"kind": "measurement", "ref": "dep-1/de-3", "at": TAKEN, "by": DEPOSITOR})
+    assert not conform._names_its_ground(Origin(kind="measurement", ref="dep-1/de-3", at=TAKEN, by=DEPOSITOR))
 
 
 def test_a_measurement_reaches_the_basis_only_through_the_lookup():

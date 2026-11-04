@@ -124,6 +124,19 @@ def test_the_routes_load_write_refuse_and_take_back():
     assert c.get("/api/state", headers={projects.HEADER: ""}).status_code == 422
 
 
+@pytest.mark.parametrize("number", ["NaN", "Infinity", "-Infinity", "1e999", "1" + "0" * 400])
+def test_a_row_holding_a_number_json_cannot_carry_is_refused_in_words(number):
+    """Alpha 2.2 D.0: a page's row holding NaN, an infinity or a number past
+    a float's range (each of which Python reads from a JSON body) is a 422 in
+    words naming where it stands, and nothing is kept."""
+    body = '{"by": "Ada Moreno", "value": {"id": "s-nan", "values": [{"key": "a-placeholder", "value": %s}]}}' % number
+    r = client().put("/api/state/scenarios/s-nan", content=body, headers={"content-type": "application/json"})
+    assert r.status_code == 422, r.text
+    assert r.json()["detail"] == ("this scenarios row holds a number that is NaN, infinite or past a float's range at "
+                                  "values[0].value; a row keeps finite numbers alone, so nothing was kept")
+    assert project_state.load()["scenarios"] == [] and audit.read() == []
+
+
 # ── a deposition is the bench's record: appended, never rewritten ──────
 
 # A deposition as the bench keeps it (src/store.ts), with placeholder readings: one read back, one waiting.

@@ -19,6 +19,10 @@ of the `runs` table in the shape every engine's run has (docs/api/runs.md):
                 artifact states, its origin the run's artifact (`values_of`);
                 a library run keeps its price, a flowsheet's own outputs and
                 how the package's test held it beside them
+    its diagnostics  what a contract engine's computation reported about
+                itself (the time it took, the iterations it made), kept on
+                the row beside the outputs and outside the artifact, so a
+                replay compares the outputs alone (`run_engine`)
     its versions  the simulator, its property engine and the package, as
                 its basis names them, or the engine's own `version()`
     its SFF file  (engine/sff.py: a `run` record, validated, scored and
@@ -70,8 +74,8 @@ from ..basis import (InputRefused, assumption_source, estimate_source, is_measur
 from ..db import models as t
 from ..db import rows
 from ..models import (Artifact, BasisInput, BasisSource, EngineInput, EngineParameter, EngineRun, EngineThing, Origin,
-                      Override, ParameterValue, ParamScope, Quantity, ReplayTolerance, RunInput, RunReport, RunSFF,
-                      SFFFlowsheet)
+                      Override, ParameterValue, ParamScope, Quantity, ReplayTolerance, RunDiagnostic, RunInput,
+                      RunReport, RunSFF, SFFFlowsheet, non_finite)
 from ..params import bounds_check
 from ..workers import WorkerError
 from . import Engine, EngineBroken, EngineRefused, contract, library, sff
@@ -96,6 +100,11 @@ TRAIN_TOOL = "pureos.train_run"
 # A Proforma scenario's run (proforma.py), a run of this engine's BioSTEAM
 # (alpha 2.2 D6), read here by its tool's name as fermOS's are.
 PROFORMA_TOOL = "proforma.run"
+
+
+class ValuesWait(EngineRefused):
+    """A run that leaves unset a parameter with no default, in words naming
+    each one that waits: a run sets it, and nothing runs until one does."""
 
 
 class RunNotFound(KeyError):
@@ -401,7 +410,8 @@ def keep_run(engine: Any, thing: str, configuration: str | None, *, tool: str, v
              basis: Sequence[BasisInput], by: str = "", art: Artifact | None = None, refused: str | None = None,
              flowsheet: SFFFlowsheet | None = None, sff_refused: str | None = None,
              scenario_id: str | None = None, seed: int | None = None,
-             versions: Mapping[str, str] | None = None) -> RunReport:
+             versions: Mapping[str, str] | None = None,
+             diagnostics: Sequence[Mapping[str, Any]] | None = None) -> RunReport:
     """Keep one run of any engine's computation as its `runs` row, in the
     shape every run has (docs/api/runs.md, Keeping a run), say so on the
     project's event stream, and answer the run's report.
@@ -429,7 +439,11 @@ def keep_run(engine: Any, thing: str, configuration: str | None, *, tool: str, v
     distributions its basis names, or the engine's own `version()` for a
     basis that names no simulator. `by` is who asked, `this browser` when
     the request names no one; `scenario_id` the study scenario that asked
-    for it."""
+    for it. `diagnostics` are what the computation reported about itself
+    beside its outputs (a contract engine's worker's, `run_engine`), each a
+    name, a value and a unit, kept on a row that is done: a held row's own
+    stand when it has some, so the same request again is the run with its
+    first computation's diagnostics. A receipt keeps none."""
     if (art is None) == (refused is None):
         raise ValueError("a run is kept with the artifact its computation kept, or with the words its engine "
                          "refused it in: one of the two")
@@ -460,8 +474,10 @@ def keep_run(engine: Any, thing: str, configuration: str | None, *, tool: str, v
         db.run(_put(project_id, receipt, first))
         events.publish("job.failed", {**job, "status": "refused", "words": refused}, project=project_id)
         return _report(receipt, None, None)
+    reported = (held.diagnostics if held is not None and held.diagnostics else
+                [RunDiagnostic.model_validate(d) for d in diagnostics or []])
     kept = EngineRun(**base, status="done", provenance=art.provenance, artifactId=art.id, outputs=_outputs(art),
-                     durationMs=art.durationMs, sffRefused=sff_refused,
+                     durationMs=art.durationMs, sffRefused=sff_refused, diagnostics=reported,
                      sff=RunSFF(recordId=flowsheet.id, valid=flowsheet.validation.valid,
                                 score=flowsheet.completeness.score,
                                 tags=sorted(k for k, v in flowsheet.tags.items() if v.earned)) if flowsheet else None)
@@ -693,9 +709,16 @@ def check_inputs(thing: str, parameters: Sequence[EngineParameter], inputs: Sequ
     plant's bounds on the run's parameters, kept as set (`parameters_of`),
     and fermOS flags one on its artifact. A value refused raises
     EngineRefused in words, and nothing is kept. A key the thing lacks is
-    named with the few keys nearest to it, the same for every engine."""
+    named with the few keys nearest to it, the same for every engine. A
+    number that is NaN or infinite is refused first, whatever its key (a
+    request's own fields refuse one as they are read, `EngineInput`; this
+    holds a caller that builds its values in code)."""
     params = {p.key: p for p in parameters}
     seen: set[str] = set()
+    for i in inputs:
+        infinite = non_finite(i.quantity)
+        if infinite:
+            raise EngineRefused(f"{i.name}: {infinite}, and a number a run sets is finite; nothing runs on it")
     for i in inputs:
         p = params.get(i.name)
         if p is None:
@@ -742,8 +765,8 @@ def _checked_values(engine: Any, thing: str, configuration: str | None,
     waiting = sorted(p.key for p in parameters if p.value is None and p.key not in {i.name for i in inputs})
     if waiting:
         n = len(waiting)
-        raise EngineRefused(f"{thing} cannot run yet: {n} parameter{'s wait' if n != 1 else ' waits'} for the run to "
-                            f"set {'them' if n != 1 else 'it'}, having no default: {', '.join(waiting)}")
+        raise ValuesWait(f"{thing} cannot run yet: {n} parameter{'s wait' if n != 1 else ' waits'} for the run to "
+                         f"set {'them' if n != 1 else 'it'}, having no default: {', '.join(waiting)}")
     out: list[BasisInput] = []
     for i in inputs:
         q = i.quantity
@@ -811,7 +834,10 @@ def run_engine(engine: Any, thing: str, configuration: str | None, inputs: Seque
     (EngineBroken), keeps no row: its job is said failed on the event stream
     and the error raised. A failure of the SFF step leaves the run's
     artifact kept, and the next ask answers the computation from it and asks
-    for the file again."""
+    for the file again. The diagnostics the worker's `run` op answers beside
+    its outputs (contract.diagnosed) are kept on the row and nowhere in the
+    artifact; a row kept from an artifact an earlier ask computed (its SFF
+    step failed then) holds none, since nothing computed for it."""
     who = (by or "").strip() or "this browser"
     found, cfg = thing_of(engine, thing, configuration)
     thing_id = found.id
@@ -846,8 +872,12 @@ def run_engine(engine: Any, thing: str, configuration: str | None, inputs: Seque
     job = _job(run_id, engine.name, thing_id, cfg, scenario_id, who)
     events.publish("job.queued", job, project=project_id)
     events.publish("job.running", job, project=project_id)
+    reported: list[dict[str, Any]] = []
     try:
-        art = artifacts.compute(tool, basis)
+        # What the worker's run op reports about its computation beside its
+        # outputs: kept on the row, outside the artifact (contract.diagnosed).
+        with contract.diagnosed() as reported:
+            art = artifacts.compute(tool, basis)
     except EngineRefused as e:
         receipt = keep_run(engine, thing_id, cfg, tool=tool, version=version, basis=basis, by=who, refused=str(e),
                            scenario_id=scenario_id).run
@@ -874,7 +904,7 @@ def run_engine(engine: Any, thing: str, configuration: str | None, inputs: Seque
             _failed(job, e, project_id)
             raise
     return keep_run(engine, thing_id, cfg, tool=tool, version=version, basis=basis, by=who, art=art,
-                    flowsheet=flowsheet, sff_refused=refused, scenario_id=scenario_id)
+                    flowsheet=flowsheet, sff_refused=refused, scenario_id=scenario_id, diagnostics=reported)
 
 
 def run_with(engine: Any, thing: str, configuration: str | None, inputs: Sequence[EngineInput] = (), *,

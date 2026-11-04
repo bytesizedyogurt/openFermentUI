@@ -269,7 +269,7 @@
         "type": "object"
       },
       "AuditEntry": {
-        "description": "One row of the audit table (OF-BLD-015 §7.3): a write a model\nmade, or a proposal a person carried out or dismissed.",
+        "description": "One row of the audit table (OF-BLD-015 §7.3): a write a model, an MCP\nclient or a named person made, a proposal a person carried out or\ndismissed, or a request that named its own key. `agent` is `model` for a\nmodel's or an assistant's write and `person` for a person's; `who` names\nit, an MCP client by its `<name>/<version>`. A row of the model's lane\nnames the door its write came in by in `detail.via`: `postdoc` (Postdoc's\nloop), `mcp` (the MCP server in its own process) or `http` (the tool\ndoor's X-OpenFerment-Assistant header).",
         "properties": {
           "action": {
             "title": "Action",
@@ -292,14 +292,17 @@
                 "type": "null"
               }
             ],
+            "description": "The ask of Postdoc's the write was part of; empty for a write from outside an ask.",
             "title": "Askid"
           },
           "at": {
+            "description": "When the row was written, ISO 8601 in UTC (`+00:00`).",
             "title": "At",
             "type": "string"
           },
           "detail": {
             "additionalProperties": true,
+            "description": "What the write was, by the action's own names (the tool, the kind, a note), and, for a write of the model's lane, the door it came in by (`via`: postdoc, mcp or http).",
             "title": "Detail",
             "type": "object"
           },
@@ -312,6 +315,7 @@
                 "type": "null"
               }
             ],
+            "description": "The effort the service's model ran at, for a write of Postdoc's; empty for a person's write and for an outside assistant's, since no model of the service ran for it.",
             "title": "Effort"
           },
           "module": {
@@ -901,6 +905,213 @@
           "si"
         ],
         "title": "Candidate",
+        "type": "object"
+      },
+      "CatalogueEntry": {
+        "description": "One entry of a project's catalogue; the fields a kind does not use stay empty.",
+        "properties": {
+          "agent": {
+            "anyOf": [
+              {
+                "enum": [
+                  "model",
+                  "person"
+                ],
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Agent"
+          },
+          "aliases": {
+            "items": {
+              "type": "string"
+            },
+            "maxItems": 40,
+            "title": "Aliases",
+            "type": "array"
+          },
+          "at": {
+            "default": "",
+            "title": "At",
+            "type": "string"
+          },
+          "by": {
+            "default": "",
+            "maxLength": 200,
+            "title": "By",
+            "type": "string"
+          },
+          "category": {
+            "anyOf": [
+              {
+                "maxLength": 80,
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Category"
+          },
+          "family": {
+            "anyOf": [
+              {
+                "maxLength": 80,
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Family"
+          },
+          "id": {
+            "pattern": "^[A-Za-z0-9][A-Za-z0-9._:-]{0,79}$",
+            "title": "Id",
+            "type": "string"
+          },
+          "kind": {
+            "enum": [
+              "strain",
+              "product",
+              "skill",
+              "lesson"
+            ],
+            "title": "Kind",
+            "type": "string"
+          },
+          "mastery": {
+            "items": {
+              "type": "string"
+            },
+            "maxItems": 40,
+            "title": "Mastery",
+            "type": "array"
+          },
+          "name": {
+            "maxLength": 200,
+            "minLength": 1,
+            "title": "Name",
+            "type": "string"
+          },
+          "note": {
+            "anyOf": [
+              {
+                "maxLength": 2000,
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Note"
+          },
+          "program": {
+            "anyOf": [
+              {
+                "maxLength": 80,
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Program"
+          },
+          "sequence": {
+            "anyOf": [
+              {
+                "maxLength": 20000,
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Sequence"
+          },
+          "sequenceSource": {
+            "anyOf": [
+              {
+                "maxLength": 400,
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Sequencesource"
+          },
+          "skills": {
+            "items": {
+              "type": "string"
+            },
+            "maxItems": 40,
+            "title": "Skills",
+            "type": "array"
+          },
+          "source": {
+            "anyOf": [
+              {
+                "maxLength": 400,
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Source"
+          },
+          "species": {
+            "anyOf": [
+              {
+                "maxLength": 200,
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Species"
+          },
+          "summary": {
+            "anyOf": [
+              {
+                "maxLength": 2000,
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Summary"
+          },
+          "via": {
+            "anyOf": [
+              {
+                "enum": [
+                  "postdoc",
+                  "mcp",
+                  "http"
+                ],
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Via"
+          }
+        },
+        "required": [
+          "kind",
+          "id",
+          "name"
+        ],
+        "title": "CatalogueEntry",
         "type": "object"
       },
       "CatalogueKeep": {
@@ -2372,6 +2583,13 @@
               }
             ],
             "title": "Configuration"
+          },
+          "diagnostics": {
+            "items": {
+              "$ref": "#/components/schemas/RunDiagnostic"
+            },
+            "title": "Diagnostics",
+            "type": "array"
           },
           "durationMs": {
             "anyOf": [
@@ -7481,6 +7699,39 @@
         "title": "ReviewDecision",
         "type": "object"
       },
+      "RunDiagnostic": {
+        "description": "A value a run's computation reports about itself, the time it took or\nthe iterations it made, as a contract engine's worker answers it beside\nits outputs (docs/api/workers.md, `run`): a name, a finite number or\nwords, and a unit. The run keeps it beside its outputs; its artifact,\nits replay and every reader of `outputs.values` leave it out, so a\nreplay compares the outputs alone.",
+        "properties": {
+          "name": {
+            "maxLength": 200,
+            "minLength": 1,
+            "title": "Name",
+            "type": "string"
+          },
+          "unit": {
+            "title": "Unit",
+            "type": "string"
+          },
+          "value": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "string"
+              }
+            ],
+            "title": "Value"
+          }
+        },
+        "required": [
+          "name",
+          "value",
+          "unit"
+        ],
+        "title": "RunDiagnostic",
+        "type": "object"
+      },
       "RunInput": {
         "description": "One input of an engine run: its name, and its value as a quantity\nwith its origin (ADR-006).",
         "properties": {
@@ -10376,6 +10627,7 @@
     }
   },
   "info": {
+    "description": "A request acts in the project its `X-OpenFerment-Project` header or `?project=` names (ADR-005): a project the database does not hold is a 404 in words, an id that is no project id a 422, and a request naming none is a 422 in words at its first store call; `/api/health` and `/api/projects` act in no project. A request that changes something (POST, PUT, PATCH, DELETE) passes the guard when its Host is an IP address, a name with no dot, a name ending `.local`, `.localhost` or `.ts.net`, or a name `OPENFERMENT_ALLOWED_HOSTS` lists, and its Origin, when it sends one, is that same host and port; a script sends none. A request that arrived through Tailscale Funnel changes nothing. A refusal is a status with its reason in `detail`, in words.",
     "title": "openferment-core",
     "version": "0.1.0"
   },
@@ -10390,6 +10642,15 @@
             "description": "The project the request acts in; ?project= in its place.",
             "in": "header",
             "name": "X-OpenFerment-Project",
+            "required": false,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "description": "The project the request acts in, where a header cannot be sent (an EventSource); the X-OpenFerment-Project header in its place.",
+            "in": "query",
+            "name": "project",
             "required": false,
             "schema": {
               "type": "string"
@@ -10416,6 +10677,16 @@
               }
             },
             "description": "Successful Response"
+          },
+          "404": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Refusal"
+                }
+              }
+            },
+            "description": "The project the request names is one the database does not hold, in words."
           },
           "422": {
             "content": {
@@ -10445,6 +10716,15 @@
             "schema": {
               "type": "string"
             }
+          },
+          {
+            "description": "The project the request acts in, where a header cannot be sent (an EventSource); the X-OpenFerment-Project header in its place.",
+            "in": "query",
+            "name": "project",
+            "required": false,
+            "schema": {
+              "type": "string"
+            }
           }
         ],
         "requestBody": {
@@ -10460,11 +10740,23 @@
         "responses": {
           "200": {
             "content": {
-              "application/json": {
-                "schema": {}
+              "text/event-stream": {
+                "schema": {
+                  "type": "string"
+                }
               }
             },
-            "description": "Successful Response"
+            "description": "Server-sent events: `turn`, each `step`, then `plan`, or `error`."
+          },
+          "404": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Refusal"
+                }
+              }
+            },
+            "description": "The project the request names is one the database does not hold, in words."
           },
           "422": {
             "content": {
@@ -10483,7 +10775,7 @@
     },
     "/api/audit": {
       "get": {
-        "description": "The newest rows of the project's audit log, newest last.",
+        "description": "The project's newest `limit` rows of its audit log, newest last:\n`limit` is held to 1 to 500 (200 by default), a larger one read as 500.\n`at` is ISO 8601 in UTC (`2026-11-04T09:00:00.123456+00:00`), as a\ncatalogue entry's `at` is; `agent` is `model` for a model's or an\nassistant's write and `person` for a named person's, and `who` names it\n(an MCP client by its `<name>/<version>`). A row of the model's lane\nnames the door its write came in by in `detail.via`: `postdoc` for\nPostdoc's loop, with the `effort` its model ran at and, from an ask, its\n`askId`; `mcp` for the MCP server in its own process and `http` for the\ntool door's assistant header, with no effort and no ask.",
         "operationId": "audit_read_api_audit_get",
         "parameters": [
           {
@@ -10504,6 +10796,15 @@
             "schema": {
               "type": "string"
             }
+          },
+          {
+            "description": "The project the request acts in, where a header cannot be sent (an EventSource); the X-OpenFerment-Project header in its place.",
+            "in": "query",
+            "name": "project",
+            "required": false,
+            "schema": {
+              "type": "string"
+            }
           }
         ],
         "responses": {
@@ -10520,6 +10821,16 @@
               }
             },
             "description": "Successful Response"
+          },
+          "404": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Refusal"
+                }
+              }
+            },
+            "description": "The project the request names is one the database does not hold, in words."
           },
           "422": {
             "content": {
@@ -10562,6 +10873,15 @@
             "schema": {
               "type": "string"
             }
+          },
+          {
+            "description": "The project the request acts in, where a header cannot be sent (an EventSource); the X-OpenFerment-Project header in its place.",
+            "in": "query",
+            "name": "project",
+            "required": false,
+            "schema": {
+              "type": "string"
+            }
           }
         ],
         "responses": {
@@ -10578,6 +10898,16 @@
               }
             },
             "description": "Successful Response"
+          },
+          "404": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Refusal"
+                }
+              }
+            },
+            "description": "The project the request names is one the database does not hold, in words."
           },
           "422": {
             "content": {
@@ -10615,6 +10945,15 @@
             "schema": {
               "type": "string"
             }
+          },
+          {
+            "description": "The project the request acts in, where a header cannot be sent (an EventSource); the X-OpenFerment-Project header in its place.",
+            "in": "query",
+            "name": "project",
+            "required": false,
+            "schema": {
+              "type": "string"
+            }
           }
         ],
         "responses": {
@@ -10627,6 +10966,16 @@
               }
             },
             "description": "Successful Response"
+          },
+          "404": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Refusal"
+                }
+              }
+            },
+            "description": "The project the request names is one the database does not hold, in words."
           },
           "422": {
             "content": {
@@ -10665,6 +11014,15 @@
             "schema": {
               "type": "string"
             }
+          },
+          {
+            "description": "The project the request acts in, where a header cannot be sent (an EventSource); the X-OpenFerment-Project header in its place.",
+            "in": "query",
+            "name": "project",
+            "required": false,
+            "schema": {
+              "type": "string"
+            }
           }
         ],
         "responses": {
@@ -10686,7 +11044,7 @@
                 }
               }
             },
-            "description": "The project holds no artifact of that id, in words."
+            "description": "The project holds no artifact of that id, in words. A project the request names that the database does not hold is a 404 too, in words."
           },
           "409": {
             "content": {
@@ -10726,6 +11084,15 @@
             "schema": {
               "type": "string"
             }
+          },
+          {
+            "description": "The project the request acts in, where a header cannot be sent (an EventSource); the X-OpenFerment-Project header in its place.",
+            "in": "query",
+            "name": "project",
+            "required": false,
+            "schema": {
+              "type": "string"
+            }
           }
         ],
         "requestBody": {
@@ -10748,6 +11115,16 @@
               }
             },
             "description": "Successful Response"
+          },
+          "404": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Refusal"
+                }
+              }
+            },
+            "description": "The project the request names is one the database does not hold, in words."
           },
           "422": {
             "content": {
@@ -10777,6 +11154,15 @@
             "schema": {
               "type": "string"
             }
+          },
+          {
+            "description": "The project the request acts in, where a header cannot be sent (an EventSource); the X-OpenFerment-Project header in its place.",
+            "in": "query",
+            "name": "project",
+            "required": false,
+            "schema": {
+              "type": "string"
+            }
           }
         ],
         "requestBody": {
@@ -10799,6 +11185,16 @@
               }
             },
             "description": "Successful Response"
+          },
+          "404": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Refusal"
+                }
+              }
+            },
+            "description": "The project the request names is one the database does not hold, in words."
           },
           "422": {
             "content": {
@@ -10828,6 +11224,15 @@
             "schema": {
               "type": "string"
             }
+          },
+          {
+            "description": "The project the request acts in, where a header cannot be sent (an EventSource); the X-OpenFerment-Project header in its place.",
+            "in": "query",
+            "name": "project",
+            "required": false,
+            "schema": {
+              "type": "string"
+            }
           }
         ],
         "responses": {
@@ -10840,6 +11245,16 @@
               }
             },
             "description": "Successful Response"
+          },
+          "404": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Refusal"
+                }
+              }
+            },
+            "description": "The project the request names is one the database does not hold, in words."
           }
         },
         "summary": "Biorepo Overlay",
@@ -10848,7 +11263,7 @@
     },
     "/api/catalogues/{kind}": {
       "get": {
-        "description": "The open project's entries of one catalogue (strain, product, skill, lesson), by id.",
+        "description": "The open project's entries of one catalogue (strain, product, skill, lesson), by id. Each names who kept\nit (`by`), in which lane (`agent`: a person's keep or a model's write), through which door a model's write\ncame (`via`: postdoc, mcp or http) and where it came from (`source`).",
         "operationId": "catalogue_listed_api_catalogues__kind__get",
         "parameters": [
           {
@@ -10868,6 +11283,15 @@
             "schema": {
               "type": "string"
             }
+          },
+          {
+            "description": "The project the request acts in, where a header cannot be sent (an EventSource); the X-OpenFerment-Project header in its place.",
+            "in": "query",
+            "name": "project",
+            "required": false,
+            "schema": {
+              "type": "string"
+            }
           }
         ],
         "responses": {
@@ -10876,8 +11300,7 @@
               "application/json": {
                 "schema": {
                   "items": {
-                    "additionalProperties": true,
-                    "type": "object"
+                    "$ref": "#/components/schemas/CatalogueEntry"
                   },
                   "title": "Response Catalogue Listed Api Catalogues  Kind  Get",
                   "type": "array"
@@ -10885,6 +11308,16 @@
               }
             },
             "description": "Successful Response"
+          },
+          "404": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Refusal"
+                }
+              }
+            },
+            "description": "There is no catalogue of that kind, in words. A project the request names that the database does not hold is a 404 too, in words."
           },
           "422": {
             "content": {
@@ -10901,7 +11334,7 @@
         "x-openferment-scope": "project"
       },
       "post": {
-        "description": "One entry kept in the open project's catalogue of `kind`, in the name of\n`by`; an entry already held under its id is replaced. 422 in words for an\nentry the kind does not take.",
+        "description": "One entry kept in the open project's catalogue of `kind`, in the name of\n`by`, as a person's keep (`agent: person`); an entry already held under its\nid is replaced, whoever kept it. 422 in words for an entry the kind does\nnot take, and for a keep that names nobody (`by` empty).",
         "operationId": "catalogue_keep_api_catalogues__kind__post",
         "parameters": [
           {
@@ -10917,6 +11350,15 @@
             "description": "The project the request acts in; ?project= in its place.",
             "in": "header",
             "name": "X-OpenFerment-Project",
+            "required": false,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "description": "The project the request acts in, where a header cannot be sent (an EventSource); the X-OpenFerment-Project header in its place.",
+            "in": "query",
+            "name": "project",
             "required": false,
             "schema": {
               "type": "string"
@@ -10938,23 +11380,38 @@
             "content": {
               "application/json": {
                 "schema": {
-                  "additionalProperties": true,
-                  "title": "Response Catalogue Keep Api Catalogues  Kind  Post",
-                  "type": "object"
+                  "$ref": "#/components/schemas/CatalogueEntry"
                 }
               }
             },
             "description": "Successful Response"
           },
+          "404": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Refusal"
+                }
+              }
+            },
+            "description": "There is no catalogue of that kind, in words. A project the request names that the database does not hold is a 404 too, in words."
+          },
           "422": {
             "content": {
               "application/json": {
                 "schema": {
-                  "$ref": "#/components/schemas/HTTPValidationError"
+                  "anyOf": [
+                    {
+                      "$ref": "#/components/schemas/Refusal"
+                    },
+                    {
+                      "$ref": "#/components/schemas/HTTPValidationError"
+                    }
+                  ]
                 }
               }
             },
-            "description": "Validation Error"
+            "description": "An entry the kind does not take, or a keep that names nobody, in words (a list of field errors when the body is no object of `entry` and `by`)."
           }
         },
         "summary": "Catalogue Keep",
@@ -10963,6 +11420,7 @@
     },
     "/api/catalogues/{kind}/{entry_id}": {
       "get": {
+        "description": "One entry of the open project's catalogue of `kind`, with who kept it (`by`, `agent`, and for a model's\nentry the door it came in by, `via`), when (`at`, ISO 8601 in UTC, as the audit writes its rows' times) and\nwhere it came from (`source`).",
         "operationId": "catalogue_entry_api_catalogues__kind___entry_id__get",
         "parameters": [
           {
@@ -10991,6 +11449,15 @@
             "schema": {
               "type": "string"
             }
+          },
+          {
+            "description": "The project the request acts in, where a header cannot be sent (an EventSource); the X-OpenFerment-Project header in its place.",
+            "in": "query",
+            "name": "project",
+            "required": false,
+            "schema": {
+              "type": "string"
+            }
           }
         ],
         "responses": {
@@ -10998,13 +11465,21 @@
             "content": {
               "application/json": {
                 "schema": {
-                  "additionalProperties": true,
-                  "title": "Response Catalogue Entry Api Catalogues  Kind   Entry Id  Get",
-                  "type": "object"
+                  "$ref": "#/components/schemas/CatalogueEntry"
                 }
               }
             },
             "description": "Successful Response"
+          },
+          "404": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Refusal"
+                }
+              }
+            },
+            "description": "There is no catalogue of that kind, or the project's catalogue holds no entry of that id, in words. A project the request names that the database does not hold is a 404 too, in words."
           },
           "422": {
             "content": {
@@ -11034,6 +11509,15 @@
             "schema": {
               "type": "string"
             }
+          },
+          {
+            "description": "The project the request acts in, where a header cannot be sent (an EventSource); the X-OpenFerment-Project header in its place.",
+            "in": "query",
+            "name": "project",
+            "required": false,
+            "schema": {
+              "type": "string"
+            }
           }
         ],
         "responses": {
@@ -11050,6 +11534,16 @@
               }
             },
             "description": "Successful Response"
+          },
+          "404": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Refusal"
+                }
+              }
+            },
+            "description": "The project the request names is one the database does not hold, in words."
           }
         },
         "summary": "Conversations Listed",
@@ -11077,6 +11571,15 @@
             "schema": {
               "type": "string"
             }
+          },
+          {
+            "description": "The project the request acts in, where a header cannot be sent (an EventSource); the X-OpenFerment-Project header in its place.",
+            "in": "query",
+            "name": "project",
+            "required": false,
+            "schema": {
+              "type": "string"
+            }
           }
         ],
         "responses": {
@@ -11089,6 +11592,16 @@
               }
             },
             "description": "Successful Response"
+          },
+          "404": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Refusal"
+                }
+              }
+            },
+            "description": "The project the request names is one the database does not hold, in words."
           },
           "422": {
             "content": {
@@ -11136,6 +11649,15 @@
             "schema": {
               "type": "string"
             }
+          },
+          {
+            "description": "The project the request acts in, where a header cannot be sent (an EventSource); the X-OpenFerment-Project header in its place.",
+            "in": "query",
+            "name": "project",
+            "required": false,
+            "schema": {
+              "type": "string"
+            }
           }
         ],
         "responses": {
@@ -11152,6 +11674,16 @@
               }
             },
             "description": "Successful Response"
+          },
+          "404": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Refusal"
+                }
+              }
+            },
+            "description": "The project the request names is one the database does not hold, in words."
           },
           "422": {
             "content": {
@@ -11197,6 +11729,15 @@
             "schema": {
               "type": "string"
             }
+          },
+          {
+            "description": "The project the request acts in, where a header cannot be sent (an EventSource); the X-OpenFerment-Project header in its place.",
+            "in": "query",
+            "name": "project",
+            "required": false,
+            "schema": {
+              "type": "string"
+            }
           }
         ],
         "responses": {
@@ -11213,6 +11754,16 @@
               }
             },
             "description": "Successful Response"
+          },
+          "404": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Refusal"
+                }
+              }
+            },
+            "description": "The project the request names is one the database does not hold, in words."
           },
           "422": {
             "content": {
@@ -11242,6 +11793,15 @@
             "schema": {
               "type": "string"
             }
+          },
+          {
+            "description": "The project the request acts in, where a header cannot be sent (an EventSource); the X-OpenFerment-Project header in its place.",
+            "in": "query",
+            "name": "project",
+            "required": false,
+            "schema": {
+              "type": "string"
+            }
           }
         ],
         "responses": {
@@ -11258,6 +11818,16 @@
               }
             },
             "description": "Successful Response"
+          },
+          "404": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Refusal"
+                }
+              }
+            },
+            "description": "The project the request names is one the database does not hold, in words."
           }
         },
         "summary": "Engines List",
@@ -11311,6 +11881,15 @@
             "schema": {
               "type": "string"
             }
+          },
+          {
+            "description": "The project the request acts in, where a header cannot be sent (an EventSource); the X-OpenFerment-Project header in its place.",
+            "in": "query",
+            "name": "project",
+            "required": false,
+            "schema": {
+              "type": "string"
+            }
           }
         ],
         "responses": {
@@ -11336,7 +11915,7 @@
                 }
               }
             },
-            "description": "No engine of that name is registered here, or BioSTEAM's shelf holds no plant of that id: in words, naming what is here."
+            "description": "No engine of that name is registered here, or BioSTEAM's shelf holds no plant of that id: in words, naming what is here. A project the request names that the database does not hold is a 404 too, in words."
           },
           "422": {
             "content": {
@@ -11392,6 +11971,15 @@
             "schema": {
               "type": "string"
             }
+          },
+          {
+            "description": "The project the request acts in, where a header cannot be sent (an EventSource); the X-OpenFerment-Project header in its place.",
+            "in": "query",
+            "name": "project",
+            "required": false,
+            "schema": {
+              "type": "string"
+            }
           }
         ],
         "requestBody": {
@@ -11423,7 +12011,7 @@
                 }
               }
             },
-            "description": "No engine of that name is registered here, or BioSTEAM's shelf holds no plant of that id: in words, naming what is here."
+            "description": "No engine of that name is registered here, or BioSTEAM's shelf holds no plant of that id: in words, naming what is here. A project the request names that the database does not hold is a 404 too, in words."
           },
           "422": {
             "content": {
@@ -11486,16 +12074,37 @@
             "schema": {
               "type": "string"
             }
+          },
+          {
+            "description": "The project the request acts in, where a header cannot be sent (an EventSource); the X-OpenFerment-Project header in its place.",
+            "in": "query",
+            "name": "project",
+            "required": false,
+            "schema": {
+              "type": "string"
+            }
           }
         ],
         "responses": {
           "200": {
             "content": {
-              "application/json": {
-                "schema": {}
+              "text/event-stream": {
+                "schema": {
+                  "type": "string"
+                }
               }
             },
-            "description": "Successful Response"
+            "description": "Server-sent events: `job.*`, `tool.call`, `tool.result`, `artifact.kept` and `turn.*`, each with its id."
+          },
+          "404": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Refusal"
+                }
+              }
+            },
+            "description": "The project the request names is one the database does not hold, in words."
           },
           "422": {
             "content": {
@@ -11634,6 +12243,15 @@
             "schema": {
               "type": "string"
             }
+          },
+          {
+            "description": "The project the request acts in, where a header cannot be sent (an EventSource); the X-OpenFerment-Project header in its place.",
+            "in": "query",
+            "name": "project",
+            "required": false,
+            "schema": {
+              "type": "string"
+            }
           }
         ],
         "responses": {
@@ -11648,6 +12266,16 @@
               }
             },
             "description": "Successful Response"
+          },
+          "404": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Refusal"
+                }
+              }
+            },
+            "description": "The project the request names is one the database does not hold, in words."
           },
           "422": {
             "content": {
@@ -11677,6 +12305,15 @@
             "schema": {
               "type": "string"
             }
+          },
+          {
+            "description": "The project the request acts in, where a header cannot be sent (an EventSource); the X-OpenFerment-Project header in its place.",
+            "in": "query",
+            "name": "project",
+            "required": false,
+            "schema": {
+              "type": "string"
+            }
           }
         ],
         "responses": {
@@ -11694,6 +12331,16 @@
               }
             },
             "description": "Successful Response"
+          },
+          "404": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Refusal"
+                }
+              }
+            },
+            "description": "The project the request names is one the database does not hold, in words."
           }
         },
         "summary": "Fermos Families",
@@ -11722,6 +12369,15 @@
             "schema": {
               "type": "string"
             }
+          },
+          {
+            "description": "The project the request acts in, where a header cannot be sent (an EventSource); the X-OpenFerment-Project header in its place.",
+            "in": "query",
+            "name": "project",
+            "required": false,
+            "schema": {
+              "type": "string"
+            }
           }
         ],
         "responses": {
@@ -11736,6 +12392,16 @@
               }
             },
             "description": "Successful Response"
+          },
+          "404": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Refusal"
+                }
+              }
+            },
+            "description": "The project the request names is one the database does not hold, in words."
           },
           "422": {
             "content": {
@@ -11765,6 +12431,15 @@
             "schema": {
               "type": "string"
             }
+          },
+          {
+            "description": "The project the request acts in, where a header cannot be sent (an EventSource); the X-OpenFerment-Project header in its place.",
+            "in": "query",
+            "name": "project",
+            "required": false,
+            "schema": {
+              "type": "string"
+            }
           }
         ],
         "requestBody": {
@@ -11787,6 +12462,16 @@
               }
             },
             "description": "Successful Response"
+          },
+          "404": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Refusal"
+                }
+              }
+            },
+            "description": "The project the request names is one the database does not hold, in words."
           },
           "422": {
             "content": {
@@ -11825,6 +12510,15 @@
             "schema": {
               "type": "string"
             }
+          },
+          {
+            "description": "The project the request acts in, where a header cannot be sent (an EventSource); the X-OpenFerment-Project header in its place.",
+            "in": "query",
+            "name": "project",
+            "required": false,
+            "schema": {
+              "type": "string"
+            }
           }
         ],
         "responses": {
@@ -11842,6 +12536,16 @@
               }
             },
             "description": "Successful Response"
+          },
+          "404": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Refusal"
+                }
+              }
+            },
+            "description": "The project the request names is one the database does not hold, in words."
           },
           "422": {
             "content": {
@@ -11871,6 +12575,15 @@
             "schema": {
               "type": "string"
             }
+          },
+          {
+            "description": "The project the request acts in, where a header cannot be sent (an EventSource); the X-OpenFerment-Project header in its place.",
+            "in": "query",
+            "name": "project",
+            "required": false,
+            "schema": {
+              "type": "string"
+            }
           }
         ],
         "requestBody": {
@@ -11893,6 +12606,16 @@
               }
             },
             "description": "Successful Response"
+          },
+          "404": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Refusal"
+                }
+              }
+            },
+            "description": "The project the request names is one the database does not hold, in words."
           },
           "422": {
             "content": {
@@ -11947,6 +12670,15 @@
             "schema": {
               "type": "string"
             }
+          },
+          {
+            "description": "The project the request acts in, where a header cannot be sent (an EventSource); the X-OpenFerment-Project header in its place.",
+            "in": "query",
+            "name": "project",
+            "required": false,
+            "schema": {
+              "type": "string"
+            }
           }
         ],
         "responses": {
@@ -11961,6 +12693,16 @@
               }
             },
             "description": "Successful Response"
+          },
+          "404": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Refusal"
+                }
+              }
+            },
+            "description": "The project the request names is one the database does not hold, in words."
           },
           "422": {
             "content": {
@@ -11990,6 +12732,15 @@
             "schema": {
               "type": "string"
             }
+          },
+          {
+            "description": "The project the request acts in, where a header cannot be sent (an EventSource); the X-OpenFerment-Project header in its place.",
+            "in": "query",
+            "name": "project",
+            "required": false,
+            "schema": {
+              "type": "string"
+            }
           }
         ],
         "requestBody": {
@@ -12014,6 +12765,16 @@
               }
             },
             "description": "Successful Response"
+          },
+          "404": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Refusal"
+                }
+              }
+            },
+            "description": "The project the request names is one the database does not hold, in words."
           },
           "422": {
             "content": {
@@ -12043,6 +12804,15 @@
             "schema": {
               "type": "string"
             }
+          },
+          {
+            "description": "The project the request acts in, where a header cannot be sent (an EventSource); the X-OpenFerment-Project header in its place.",
+            "in": "query",
+            "name": "project",
+            "required": false,
+            "schema": {
+              "type": "string"
+            }
           }
         ],
         "responses": {
@@ -12060,6 +12830,16 @@
               }
             },
             "description": "Successful Response"
+          },
+          "404": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Refusal"
+                }
+              }
+            },
+            "description": "The project the request names is one the database does not hold, in words."
           }
         },
         "summary": "Fermos Simulations",
@@ -12075,6 +12855,15 @@
             "description": "The project the request acts in; ?project= in its place.",
             "in": "header",
             "name": "X-OpenFerment-Project",
+            "required": false,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "description": "The project the request acts in, where a header cannot be sent (an EventSource); the X-OpenFerment-Project header in its place.",
+            "in": "query",
+            "name": "project",
             "required": false,
             "schema": {
               "type": "string"
@@ -12101,6 +12890,16 @@
               }
             },
             "description": "Successful Response"
+          },
+          "404": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Refusal"
+                }
+              }
+            },
+            "description": "The project the request names is one the database does not hold, in words."
           },
           "422": {
             "content": {
@@ -12178,6 +12977,15 @@
             "schema": {
               "type": "string"
             }
+          },
+          {
+            "description": "The project the request acts in, where a header cannot be sent (an EventSource); the X-OpenFerment-Project header in its place.",
+            "in": "query",
+            "name": "project",
+            "required": false,
+            "schema": {
+              "type": "string"
+            }
           }
         ],
         "responses": {
@@ -12192,6 +13000,16 @@
               }
             },
             "description": "Successful Response"
+          },
+          "404": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Refusal"
+                }
+              }
+            },
+            "description": "The project the request names is one the database does not hold, in words."
           },
           "422": {
             "content": {
@@ -12221,6 +13039,15 @@
             "schema": {
               "type": "string"
             }
+          },
+          {
+            "description": "The project the request acts in, where a header cannot be sent (an EventSource); the X-OpenFerment-Project header in its place.",
+            "in": "query",
+            "name": "project",
+            "required": false,
+            "schema": {
+              "type": "string"
+            }
           }
         ],
         "responses": {
@@ -12238,6 +13065,16 @@
               }
             },
             "description": "Successful Response"
+          },
+          "404": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Refusal"
+                }
+              }
+            },
+            "description": "The project the request names is one the database does not hold, in words."
           }
         },
         "summary": "Fermos Vessels",
@@ -12253,6 +13090,15 @@
             "description": "The project the request acts in; ?project= in its place.",
             "in": "header",
             "name": "X-OpenFerment-Project",
+            "required": false,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "description": "The project the request acts in, where a header cannot be sent (an EventSource); the X-OpenFerment-Project header in its place.",
+            "in": "query",
+            "name": "project",
             "required": false,
             "schema": {
               "type": "string"
@@ -12273,6 +13119,16 @@
               }
             },
             "description": "Successful Response"
+          },
+          "404": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Refusal"
+                }
+              }
+            },
+            "description": "The project the request names is one the database does not hold, in words."
           }
         },
         "summary": "Flowsheets Listed",
@@ -12288,6 +13144,15 @@
             "description": "The project the request acts in; ?project= in its place.",
             "in": "header",
             "name": "X-OpenFerment-Project",
+            "required": false,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "description": "The project the request acts in, where a header cannot be sent (an EventSource); the X-OpenFerment-Project header in its place.",
+            "in": "query",
+            "name": "project",
             "required": false,
             "schema": {
               "type": "string"
@@ -12314,6 +13179,16 @@
               }
             },
             "description": "Successful Response"
+          },
+          "404": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Refusal"
+                }
+              }
+            },
+            "description": "The project the request names is one the database does not hold, in words."
           },
           "422": {
             "content": {
@@ -12343,6 +13218,15 @@
             "schema": {
               "type": "string"
             }
+          },
+          {
+            "description": "The project the request acts in, where a header cannot be sent (an EventSource); the X-OpenFerment-Project header in its place.",
+            "in": "query",
+            "name": "project",
+            "required": false,
+            "schema": {
+              "type": "string"
+            }
           }
         ],
         "requestBody": {
@@ -12365,6 +13249,16 @@
               }
             },
             "description": "Successful Response"
+          },
+          "404": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Refusal"
+                }
+              }
+            },
+            "description": "The project the request names is one the database does not hold, in words."
           },
           "422": {
             "content": {
@@ -12394,6 +13288,15 @@
             "schema": {
               "type": "string"
             }
+          },
+          {
+            "description": "The project the request acts in, where a header cannot be sent (an EventSource); the X-OpenFerment-Project header in its place.",
+            "in": "query",
+            "name": "project",
+            "required": false,
+            "schema": {
+              "type": "string"
+            }
           }
         ],
         "requestBody": {
@@ -12416,6 +13319,16 @@
               }
             },
             "description": "Successful Response"
+          },
+          "404": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Refusal"
+                }
+              }
+            },
+            "description": "The project the request names is one the database does not hold, in words."
           },
           "413": {
             "content": {
@@ -12482,6 +13395,15 @@
             "schema": {
               "type": "string"
             }
+          },
+          {
+            "description": "The project the request acts in, where a header cannot be sent (an EventSource); the X-OpenFerment-Project header in its place.",
+            "in": "query",
+            "name": "project",
+            "required": false,
+            "schema": {
+              "type": "string"
+            }
           }
         ],
         "responses": {
@@ -12498,6 +13420,16 @@
               }
             },
             "description": "Successful Response"
+          },
+          "404": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Refusal"
+                }
+              }
+            },
+            "description": "The project the request names is one the database does not hold, in words."
           }
         },
         "summary": "Flowsheets Library",
@@ -12526,6 +13458,15 @@
             "schema": {
               "type": "string"
             }
+          },
+          {
+            "description": "The project the request acts in, where a header cannot be sent (an EventSource); the X-OpenFerment-Project header in its place.",
+            "in": "query",
+            "name": "project",
+            "required": false,
+            "schema": {
+              "type": "string"
+            }
           }
         ],
         "requestBody": {
@@ -12548,6 +13489,16 @@
               }
             },
             "description": "Successful Response"
+          },
+          "404": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Refusal"
+                }
+              }
+            },
+            "description": "The project the request names is one the database does not hold, in words."
           },
           "422": {
             "content": {
@@ -12586,6 +13537,15 @@
             "schema": {
               "type": "string"
             }
+          },
+          {
+            "description": "The project the request acts in, where a header cannot be sent (an EventSource); the X-OpenFerment-Project header in its place.",
+            "in": "query",
+            "name": "project",
+            "required": false,
+            "schema": {
+              "type": "string"
+            }
           }
         ],
         "responses": {
@@ -12598,6 +13558,16 @@
               }
             },
             "description": "Successful Response"
+          },
+          "404": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Refusal"
+                }
+              }
+            },
+            "description": "The project the request names is one the database does not hold, in words."
           },
           "422": {
             "content": {
@@ -12636,6 +13606,15 @@
             "schema": {
               "type": "string"
             }
+          },
+          {
+            "description": "The project the request acts in, where a header cannot be sent (an EventSource); the X-OpenFerment-Project header in its place.",
+            "in": "query",
+            "name": "project",
+            "required": false,
+            "schema": {
+              "type": "string"
+            }
           }
         ],
         "responses": {
@@ -12646,6 +13625,16 @@
               }
             },
             "description": "Successful Response"
+          },
+          "404": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Refusal"
+                }
+              }
+            },
+            "description": "The project the request names is one the database does not hold, in words."
           },
           "422": {
             "content": {
@@ -12674,6 +13663,15 @@
             "schema": {
               "type": "string"
             }
+          },
+          {
+            "description": "The project the request acts in, where a header cannot be sent (an EventSource); the X-OpenFerment-Project header in its place.",
+            "in": "query",
+            "name": "project",
+            "required": false,
+            "schema": {
+              "type": "string"
+            }
           }
         ],
         "requestBody": {
@@ -12696,6 +13694,16 @@
               }
             },
             "description": "Successful Response"
+          },
+          "404": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Refusal"
+                }
+              }
+            },
+            "description": "The project the request names is one the database does not hold, in words."
           },
           "422": {
             "content": {
@@ -12724,6 +13732,15 @@
             "schema": {
               "type": "string"
             }
+          },
+          {
+            "description": "The project the request acts in, where a header cannot be sent (an EventSource); the X-OpenFerment-Project header in its place.",
+            "in": "query",
+            "name": "project",
+            "required": false,
+            "schema": {
+              "type": "string"
+            }
           }
         ],
         "requestBody": {
@@ -12746,6 +13763,16 @@
               }
             },
             "description": "Successful Response"
+          },
+          "404": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Refusal"
+                }
+              }
+            },
+            "description": "The project the request names is one the database does not hold, in words."
           },
           "422": {
             "content": {
@@ -12774,6 +13801,15 @@
             "schema": {
               "type": "string"
             }
+          },
+          {
+            "description": "The project the request acts in, where a header cannot be sent (an EventSource); the X-OpenFerment-Project header in its place.",
+            "in": "query",
+            "name": "project",
+            "required": false,
+            "schema": {
+              "type": "string"
+            }
           }
         ],
         "requestBody": {
@@ -12796,6 +13832,16 @@
               }
             },
             "description": "Successful Response"
+          },
+          "404": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Refusal"
+                }
+              }
+            },
+            "description": "The project the request names is one the database does not hold, in words."
           },
           "422": {
             "content": {
@@ -12824,6 +13870,15 @@
             "schema": {
               "type": "string"
             }
+          },
+          {
+            "description": "The project the request acts in, where a header cannot be sent (an EventSource); the X-OpenFerment-Project header in its place.",
+            "in": "query",
+            "name": "project",
+            "required": false,
+            "schema": {
+              "type": "string"
+            }
           }
         ],
         "responses": {
@@ -12840,6 +13895,16 @@
               }
             },
             "description": "Successful Response"
+          },
+          "404": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Refusal"
+                }
+              }
+            },
+            "description": "The project the request names is one the database does not hold, in words."
           }
         },
         "summary": "Geneos Models",
@@ -12859,6 +13924,15 @@
             "schema": {
               "type": "string"
             }
+          },
+          {
+            "description": "The project the request acts in, where a header cannot be sent (an EventSource); the X-OpenFerment-Project header in its place.",
+            "in": "query",
+            "name": "project",
+            "required": false,
+            "schema": {
+              "type": "string"
+            }
           }
         ],
         "responses": {
@@ -12871,6 +13945,16 @@
               }
             },
             "description": "Successful Response"
+          },
+          "404": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Refusal"
+                }
+              }
+            },
+            "description": "The project the request names is one the database does not hold, in words."
           }
         },
         "summary": "Guild Ledger",
@@ -12886,6 +13970,15 @@
             "description": "The project the request acts in; ?project= in its place.",
             "in": "header",
             "name": "X-OpenFerment-Project",
+            "required": false,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "description": "The project the request acts in, where a header cannot be sent (an EventSource); the X-OpenFerment-Project header in its place.",
+            "in": "query",
+            "name": "project",
             "required": false,
             "schema": {
               "type": "string"
@@ -12912,6 +14005,16 @@
               }
             },
             "description": "Successful Response"
+          },
+          "404": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Refusal"
+                }
+              }
+            },
+            "description": "The project the request names is one the database does not hold, in words."
           },
           "422": {
             "content": {
@@ -12940,6 +14043,15 @@
             "schema": {
               "type": "string"
             }
+          },
+          {
+            "description": "The project the request acts in, where a header cannot be sent (an EventSource); the X-OpenFerment-Project header in its place.",
+            "in": "query",
+            "name": "project",
+            "required": false,
+            "schema": {
+              "type": "string"
+            }
           }
         ],
         "responses": {
@@ -12952,6 +14064,16 @@
               }
             },
             "description": "Successful Response"
+          },
+          "404": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Refusal"
+                }
+              }
+            },
+            "description": "The project the request names is one the database does not hold, in words."
           }
         },
         "summary": "Checks Read",
@@ -12966,6 +14088,15 @@
             "description": "The project the request acts in; ?project= in its place.",
             "in": "header",
             "name": "X-OpenFerment-Project",
+            "required": false,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "description": "The project the request acts in, where a header cannot be sent (an EventSource); the X-OpenFerment-Project header in its place.",
+            "in": "query",
+            "name": "project",
             "required": false,
             "schema": {
               "type": "string"
@@ -12997,6 +14128,16 @@
             },
             "description": "Successful Response"
           },
+          "404": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Refusal"
+                }
+              }
+            },
+            "description": "The project the request names is one the database does not hold, in words."
+          },
           "422": {
             "content": {
               "application/json": {
@@ -13024,6 +14165,15 @@
             "schema": {
               "type": "string"
             }
+          },
+          {
+            "description": "The project the request acts in, where a header cannot be sent (an EventSource); the X-OpenFerment-Project header in its place.",
+            "in": "query",
+            "name": "project",
+            "required": false,
+            "schema": {
+              "type": "string"
+            }
           }
         ],
         "requestBody": {
@@ -13046,6 +14196,16 @@
               }
             },
             "description": "Successful Response"
+          },
+          "404": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Refusal"
+                }
+              }
+            },
+            "description": "The project the request names is one the database does not hold, in words."
           },
           "422": {
             "content": {
@@ -13084,6 +14244,15 @@
             "schema": {
               "type": "string"
             }
+          },
+          {
+            "description": "The project the request acts in, where a header cannot be sent (an EventSource); the X-OpenFerment-Project header in its place.",
+            "in": "query",
+            "name": "project",
+            "required": false,
+            "schema": {
+              "type": "string"
+            }
           }
         ],
         "requestBody": {
@@ -13106,6 +14275,16 @@
               }
             },
             "description": "Successful Response"
+          },
+          "404": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Refusal"
+                }
+              }
+            },
+            "description": "The project the request names is one the database does not hold, in words."
           },
           "422": {
             "content": {
@@ -13143,6 +14322,15 @@
             "schema": {
               "type": "string"
             }
+          },
+          {
+            "description": "The project the request acts in, where a header cannot be sent (an EventSource); the X-OpenFerment-Project header in its place.",
+            "in": "query",
+            "name": "project",
+            "required": false,
+            "schema": {
+              "type": "string"
+            }
           }
         ],
         "requestBody": {
@@ -13165,6 +14353,16 @@
               }
             },
             "description": "Successful Response"
+          },
+          "404": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Refusal"
+                }
+              }
+            },
+            "description": "The project the request names is one the database does not hold, in words."
           },
           "422": {
             "content": {
@@ -13202,6 +14400,15 @@
             "schema": {
               "type": "string"
             }
+          },
+          {
+            "description": "The project the request acts in, where a header cannot be sent (an EventSource); the X-OpenFerment-Project header in its place.",
+            "in": "query",
+            "name": "project",
+            "required": false,
+            "schema": {
+              "type": "string"
+            }
           }
         ],
         "requestBody": {
@@ -13224,6 +14431,16 @@
               }
             },
             "description": "Successful Response"
+          },
+          "404": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Refusal"
+                }
+              }
+            },
+            "description": "The project the request names is one the database does not hold, in words."
           },
           "422": {
             "content": {
@@ -13261,6 +14478,15 @@
             "schema": {
               "type": "string"
             }
+          },
+          {
+            "description": "The project the request acts in, where a header cannot be sent (an EventSource); the X-OpenFerment-Project header in its place.",
+            "in": "query",
+            "name": "project",
+            "required": false,
+            "schema": {
+              "type": "string"
+            }
           }
         ],
         "requestBody": {
@@ -13283,6 +14509,16 @@
               }
             },
             "description": "Successful Response"
+          },
+          "404": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Refusal"
+                }
+              }
+            },
+            "description": "The project the request names is one the database does not hold, in words."
           },
           "422": {
             "content": {
@@ -13311,6 +14547,15 @@
             "schema": {
               "type": "string"
             }
+          },
+          {
+            "description": "The project the request acts in, where a header cannot be sent (an EventSource); the X-OpenFerment-Project header in its place.",
+            "in": "query",
+            "name": "project",
+            "required": false,
+            "schema": {
+              "type": "string"
+            }
           }
         ],
         "requestBody": {
@@ -13333,6 +14578,16 @@
               }
             },
             "description": "Successful Response"
+          },
+          "404": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Refusal"
+                }
+              }
+            },
+            "description": "The project the request names is one the database does not hold, in words."
           },
           "422": {
             "content": {
@@ -13361,6 +14616,15 @@
             "schema": {
               "type": "string"
             }
+          },
+          {
+            "description": "The project the request acts in, where a header cannot be sent (an EventSource); the X-OpenFerment-Project header in its place.",
+            "in": "query",
+            "name": "project",
+            "required": false,
+            "schema": {
+              "type": "string"
+            }
           }
         ],
         "requestBody": {
@@ -13383,6 +14647,16 @@
               }
             },
             "description": "Successful Response"
+          },
+          "404": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Refusal"
+                }
+              }
+            },
+            "description": "The project the request names is one the database does not hold, in words."
           },
           "422": {
             "content": {
@@ -13411,6 +14685,15 @@
             "schema": {
               "type": "string"
             }
+          },
+          {
+            "description": "The project the request acts in, where a header cannot be sent (an EventSource); the X-OpenFerment-Project header in its place.",
+            "in": "query",
+            "name": "project",
+            "required": false,
+            "schema": {
+              "type": "string"
+            }
           }
         ],
         "requestBody": {
@@ -13433,6 +14716,16 @@
               }
             },
             "description": "Successful Response"
+          },
+          "404": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Refusal"
+                }
+              }
+            },
+            "description": "The project the request names is one the database does not hold, in words."
           },
           "422": {
             "content": {
@@ -13461,6 +14754,15 @@
             "schema": {
               "type": "string"
             }
+          },
+          {
+            "description": "The project the request acts in, where a header cannot be sent (an EventSource); the X-OpenFerment-Project header in its place.",
+            "in": "query",
+            "name": "project",
+            "required": false,
+            "schema": {
+              "type": "string"
+            }
           }
         ],
         "requestBody": {
@@ -13483,6 +14785,16 @@
               }
             },
             "description": "Successful Response"
+          },
+          "404": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Refusal"
+                }
+              }
+            },
+            "description": "The project the request names is one the database does not hold, in words."
           },
           "422": {
             "content": {
@@ -13534,6 +14846,15 @@
             "schema": {
               "type": "string"
             }
+          },
+          {
+            "description": "The project the request acts in, where a header cannot be sent (an EventSource); the X-OpenFerment-Project header in its place.",
+            "in": "query",
+            "name": "project",
+            "required": false,
+            "schema": {
+              "type": "string"
+            }
           }
         ],
         "requestBody": {
@@ -13558,6 +14879,16 @@
               }
             },
             "description": "Successful Response"
+          },
+          "404": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Refusal"
+                }
+              }
+            },
+            "description": "The project the request names is one the database does not hold, in words."
           },
           "422": {
             "content": {
@@ -13587,6 +14918,15 @@
             "schema": {
               "type": "string"
             }
+          },
+          {
+            "description": "The project the request acts in, where a header cannot be sent (an EventSource); the X-OpenFerment-Project header in its place.",
+            "in": "query",
+            "name": "project",
+            "required": false,
+            "schema": {
+              "type": "string"
+            }
           }
         ],
         "requestBody": {
@@ -13609,6 +14949,16 @@
               }
             },
             "description": "Successful Response"
+          },
+          "404": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Refusal"
+                }
+              }
+            },
+            "description": "The project the request names is one the database does not hold, in words."
           },
           "422": {
             "content": {
@@ -13638,6 +14988,15 @@
             "schema": {
               "type": "string"
             }
+          },
+          {
+            "description": "The project the request acts in, where a header cannot be sent (an EventSource); the X-OpenFerment-Project header in its place.",
+            "in": "query",
+            "name": "project",
+            "required": false,
+            "schema": {
+              "type": "string"
+            }
           }
         ],
         "requestBody": {
@@ -13660,6 +15019,16 @@
               }
             },
             "description": "Successful Response"
+          },
+          "404": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Refusal"
+                }
+              }
+            },
+            "description": "The project the request names is one the database does not hold, in words."
           },
           "422": {
             "content": {
@@ -13689,6 +15058,15 @@
             "schema": {
               "type": "string"
             }
+          },
+          {
+            "description": "The project the request acts in, where a header cannot be sent (an EventSource); the X-OpenFerment-Project header in its place.",
+            "in": "query",
+            "name": "project",
+            "required": false,
+            "schema": {
+              "type": "string"
+            }
           }
         ],
         "requestBody": {
@@ -13711,6 +15089,16 @@
               }
             },
             "description": "Successful Response"
+          },
+          "404": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Refusal"
+                }
+              }
+            },
+            "description": "The project the request names is one the database does not hold, in words."
           },
           "422": {
             "content": {
@@ -13759,6 +15147,15 @@
             "schema": {
               "type": "string"
             }
+          },
+          {
+            "description": "The project the request acts in, where a header cannot be sent (an EventSource); the X-OpenFerment-Project header in its place.",
+            "in": "query",
+            "name": "project",
+            "required": false,
+            "schema": {
+              "type": "string"
+            }
           }
         ],
         "responses": {
@@ -13771,6 +15168,16 @@
               }
             },
             "description": "Successful Response"
+          },
+          "404": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Refusal"
+                }
+              }
+            },
+            "description": "The project the request names is one the database does not hold, in words."
           },
           "422": {
             "content": {
@@ -13800,6 +15207,15 @@
             "schema": {
               "type": "string"
             }
+          },
+          {
+            "description": "The project the request acts in, where a header cannot be sent (an EventSource); the X-OpenFerment-Project header in its place.",
+            "in": "query",
+            "name": "project",
+            "required": false,
+            "schema": {
+              "type": "string"
+            }
           }
         ],
         "responses": {
@@ -13812,6 +15228,16 @@
               }
             },
             "description": "Successful Response"
+          },
+          "404": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Refusal"
+                }
+              }
+            },
+            "description": "The project the request names is one the database does not hold, in words."
           }
         },
         "summary": "Library Shelf",
@@ -13856,6 +15282,15 @@
             "schema": {
               "type": "string"
             }
+          },
+          {
+            "description": "The project the request acts in, where a header cannot be sent (an EventSource); the X-OpenFerment-Project header in its place.",
+            "in": "query",
+            "name": "project",
+            "required": false,
+            "schema": {
+              "type": "string"
+            }
           }
         ],
         "responses": {
@@ -13868,6 +15303,16 @@
               }
             },
             "description": "Successful Response"
+          },
+          "404": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Refusal"
+                }
+              }
+            },
+            "description": "The project the request names is one the database does not hold, in words."
           },
           "422": {
             "content": {
@@ -13922,6 +15367,15 @@
             "schema": {
               "type": "string"
             }
+          },
+          {
+            "description": "The project the request acts in, where a header cannot be sent (an EventSource); the X-OpenFerment-Project header in its place.",
+            "in": "query",
+            "name": "project",
+            "required": false,
+            "schema": {
+              "type": "string"
+            }
           }
         ],
         "responses": {
@@ -13942,6 +15396,16 @@
               }
             },
             "description": "Successful Response"
+          },
+          "404": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Refusal"
+                }
+              }
+            },
+            "description": "The project the request names is one the database does not hold, in words."
           },
           "422": {
             "content": {
@@ -13980,6 +15444,15 @@
             "schema": {
               "type": "string"
             }
+          },
+          {
+            "description": "The project the request acts in, where a header cannot be sent (an EventSource); the X-OpenFerment-Project header in its place.",
+            "in": "query",
+            "name": "project",
+            "required": false,
+            "schema": {
+              "type": "string"
+            }
           }
         ],
         "requestBody": {
@@ -14011,7 +15484,7 @@
                 }
               }
             },
-            "description": "The library's shelf holds no plant of that id: in words, naming what it holds."
+            "description": "The library's shelf holds no plant of that id: in words, naming what it holds. A project the request names that the database does not hold is a 404 too, in words."
           },
           "422": {
             "content": {
@@ -14051,6 +15524,15 @@
             "schema": {
               "type": "string"
             }
+          },
+          {
+            "description": "The project the request acts in, where a header cannot be sent (an EventSource); the X-OpenFerment-Project header in its place.",
+            "in": "query",
+            "name": "project",
+            "required": false,
+            "schema": {
+              "type": "string"
+            }
           }
         ],
         "requestBody": {
@@ -14066,11 +15548,23 @@
         "responses": {
           "200": {
             "content": {
-              "application/json": {
-                "schema": {}
+              "text/event-stream": {
+                "schema": {
+                  "type": "string"
+                }
               }
             },
-            "description": "Successful Response"
+            "description": "Server-sent events: `delta`, `citations`, `done`, or `error`."
+          },
+          "404": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Refusal"
+                }
+              }
+            },
+            "description": "The project the request names is one the database does not hold, in words."
           },
           "422": {
             "content": {
@@ -14100,6 +15594,15 @@
             "schema": {
               "type": "string"
             }
+          },
+          {
+            "description": "The project the request acts in, where a header cannot be sent (an EventSource); the X-OpenFerment-Project header in its place.",
+            "in": "query",
+            "name": "project",
+            "required": false,
+            "schema": {
+              "type": "string"
+            }
           }
         ],
         "responses": {
@@ -14116,6 +15619,16 @@
               }
             },
             "description": "Successful Response"
+          },
+          "404": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Refusal"
+                }
+              }
+            },
+            "description": "The project the request names is one the database does not hold, in words."
           }
         },
         "summary": "Literature Documents",
@@ -14164,6 +15677,15 @@
             "schema": {
               "type": "string"
             }
+          },
+          {
+            "description": "The project the request acts in, where a header cannot be sent (an EventSource); the X-OpenFerment-Project header in its place.",
+            "in": "query",
+            "name": "project",
+            "required": false,
+            "schema": {
+              "type": "string"
+            }
           }
         ],
         "responses": {
@@ -14176,6 +15698,16 @@
               }
             },
             "description": "Successful Response"
+          },
+          "404": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Refusal"
+                }
+              }
+            },
+            "description": "The project the request names is one the database does not hold, in words."
           },
           "422": {
             "content": {
@@ -14205,6 +15737,15 @@
             "schema": {
               "type": "string"
             }
+          },
+          {
+            "description": "The project the request acts in, where a header cannot be sent (an EventSource); the X-OpenFerment-Project header in its place.",
+            "in": "query",
+            "name": "project",
+            "required": false,
+            "schema": {
+              "type": "string"
+            }
           }
         ],
         "responses": {
@@ -14219,6 +15760,16 @@
               }
             },
             "description": "Successful Response"
+          },
+          "404": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Refusal"
+                }
+              }
+            },
+            "description": "The project the request names is one the database does not hold, in words."
           }
         },
         "summary": "Literature Stats",
@@ -14471,6 +16022,15 @@
             "schema": {
               "type": "string"
             }
+          },
+          {
+            "description": "The project the request acts in, where a header cannot be sent (an EventSource); the X-OpenFerment-Project header in its place.",
+            "in": "query",
+            "name": "project",
+            "required": false,
+            "schema": {
+              "type": "string"
+            }
           }
         ],
         "responses": {
@@ -14485,6 +16045,16 @@
               }
             },
             "description": "Successful Response"
+          },
+          "404": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Refusal"
+                }
+              }
+            },
+            "description": "The project the request names is one the database does not hold, in words."
           },
           "422": {
             "content": {
@@ -14523,6 +16093,15 @@
             "schema": {
               "type": "string"
             }
+          },
+          {
+            "description": "The project the request acts in, where a header cannot be sent (an EventSource); the X-OpenFerment-Project header in its place.",
+            "in": "query",
+            "name": "project",
+            "required": false,
+            "schema": {
+              "type": "string"
+            }
           }
         ],
         "requestBody": {
@@ -14547,6 +16126,16 @@
               }
             },
             "description": "Successful Response"
+          },
+          "404": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Refusal"
+                }
+              }
+            },
+            "description": "The project the request names is one the database does not hold, in words."
           },
           "422": {
             "content": {
@@ -14575,6 +16164,15 @@
             "schema": {
               "type": "string"
             }
+          },
+          {
+            "description": "The project the request acts in, where a header cannot be sent (an EventSource); the X-OpenFerment-Project header in its place.",
+            "in": "query",
+            "name": "project",
+            "required": false,
+            "schema": {
+              "type": "string"
+            }
           }
         ],
         "responses": {
@@ -14587,6 +16185,16 @@
               }
             },
             "description": "Successful Response"
+          },
+          "404": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Refusal"
+                }
+              }
+            },
+            "description": "The project the request names is one the database does not hold, in words."
           }
         },
         "summary": "Practice Read",
@@ -14602,6 +16210,15 @@
             "description": "The project the request acts in; ?project= in its place.",
             "in": "header",
             "name": "X-OpenFerment-Project",
+            "required": false,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "description": "The project the request acts in, where a header cannot be sent (an EventSource); the X-OpenFerment-Project header in its place.",
+            "in": "query",
+            "name": "project",
             "required": false,
             "schema": {
               "type": "string"
@@ -14628,6 +16245,16 @@
               }
             },
             "description": "Successful Response"
+          },
+          "404": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Refusal"
+                }
+              }
+            },
+            "description": "The project the request names is one the database does not hold, in words."
           },
           "422": {
             "content": {
@@ -14657,6 +16284,15 @@
             "schema": {
               "type": "string"
             }
+          },
+          {
+            "description": "The project the request acts in, where a header cannot be sent (an EventSource); the X-OpenFerment-Project header in its place.",
+            "in": "query",
+            "name": "project",
+            "required": false,
+            "schema": {
+              "type": "string"
+            }
           }
         ],
         "requestBody": {
@@ -14679,6 +16315,16 @@
               }
             },
             "description": "Successful Response"
+          },
+          "404": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Refusal"
+                }
+              }
+            },
+            "description": "The project the request names is one the database does not hold, in words."
           },
           "422": {
             "content": {
@@ -14708,6 +16354,15 @@
             "schema": {
               "type": "string"
             }
+          },
+          {
+            "description": "The project the request acts in, where a header cannot be sent (an EventSource); the X-OpenFerment-Project header in its place.",
+            "in": "query",
+            "name": "project",
+            "required": false,
+            "schema": {
+              "type": "string"
+            }
           }
         ],
         "requestBody": {
@@ -14730,6 +16385,16 @@
               }
             },
             "description": "Successful Response"
+          },
+          "404": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Refusal"
+                }
+              }
+            },
+            "description": "The project the request names is one the database does not hold, in words."
           },
           "422": {
             "content": {
@@ -14848,6 +16513,15 @@
             "schema": {
               "type": "string"
             }
+          },
+          {
+            "description": "The project the request acts in, where a header cannot be sent (an EventSource); the X-OpenFerment-Project header in its place.",
+            "in": "query",
+            "name": "project",
+            "required": false,
+            "schema": {
+              "type": "string"
+            }
           }
         ],
         "responses": {
@@ -14862,6 +16536,16 @@
               }
             },
             "description": "Successful Response"
+          },
+          "404": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Refusal"
+                }
+              }
+            },
+            "description": "The project the request names is one the database does not hold, in words."
           },
           "422": {
             "content": {
@@ -14964,6 +16648,15 @@
             "schema": {
               "type": "string"
             }
+          },
+          {
+            "description": "The project the request acts in, where a header cannot be sent (an EventSource); the X-OpenFerment-Project header in its place.",
+            "in": "query",
+            "name": "project",
+            "required": false,
+            "schema": {
+              "type": "string"
+            }
           }
         ],
         "responses": {
@@ -14978,6 +16671,16 @@
               }
             },
             "description": "Successful Response"
+          },
+          "404": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Refusal"
+                }
+              }
+            },
+            "description": "The project the request names is one the database does not hold, in words."
           },
           "422": {
             "content": {
@@ -15007,6 +16710,15 @@
             "schema": {
               "type": "string"
             }
+          },
+          {
+            "description": "The project the request acts in, where a header cannot be sent (an EventSource); the X-OpenFerment-Project header in its place.",
+            "in": "query",
+            "name": "project",
+            "required": false,
+            "schema": {
+              "type": "string"
+            }
           }
         ],
         "requestBody": {
@@ -15031,6 +16743,16 @@
               }
             },
             "description": "Successful Response"
+          },
+          "404": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Refusal"
+                }
+              }
+            },
+            "description": "The project the request names is one the database does not hold, in words."
           },
           "422": {
             "content": {
@@ -15087,6 +16809,15 @@
             "schema": {
               "type": "string"
             }
+          },
+          {
+            "description": "The project the request acts in, where a header cannot be sent (an EventSource); the X-OpenFerment-Project header in its place.",
+            "in": "query",
+            "name": "project",
+            "required": false,
+            "schema": {
+              "type": "string"
+            }
           }
         ],
         "responses": {
@@ -15101,6 +16832,16 @@
               }
             },
             "description": "Successful Response"
+          },
+          "404": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Refusal"
+                }
+              }
+            },
+            "description": "The project the request names is one the database does not hold, in words."
           },
           "422": {
             "content": {
@@ -15146,6 +16887,15 @@
             "schema": {
               "type": "string"
             }
+          },
+          {
+            "description": "The project the request acts in, where a header cannot be sent (an EventSource); the X-OpenFerment-Project header in its place.",
+            "in": "query",
+            "name": "project",
+            "required": false,
+            "schema": {
+              "type": "string"
+            }
           }
         ],
         "responses": {
@@ -15163,6 +16913,16 @@
               }
             },
             "description": "Successful Response"
+          },
+          "404": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Refusal"
+                }
+              }
+            },
+            "description": "The project the request names is one the database does not hold, in words."
           },
           "422": {
             "content": {
@@ -15192,6 +16952,15 @@
             "schema": {
               "type": "string"
             }
+          },
+          {
+            "description": "The project the request acts in, where a header cannot be sent (an EventSource); the X-OpenFerment-Project header in its place.",
+            "in": "query",
+            "name": "project",
+            "required": false,
+            "schema": {
+              "type": "string"
+            }
           }
         ],
         "responses": {
@@ -15209,6 +16978,16 @@
               }
             },
             "description": "Successful Response"
+          },
+          "404": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Refusal"
+                }
+              }
+            },
+            "description": "The project the request names is one the database does not hold, in words."
           }
         },
         "summary": "Proforma Shelf",
@@ -15228,6 +17007,15 @@
             "schema": {
               "type": "string"
             }
+          },
+          {
+            "description": "The project the request acts in, where a header cannot be sent (an EventSource); the X-OpenFerment-Project header in its place.",
+            "in": "query",
+            "name": "project",
+            "required": false,
+            "schema": {
+              "type": "string"
+            }
           }
         ],
         "responses": {
@@ -15242,6 +17030,16 @@
               }
             },
             "description": "Successful Response"
+          },
+          "404": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Refusal"
+                }
+              }
+            },
+            "description": "The project the request names is one the database does not hold, in words."
           }
         },
         "summary": "Proforma Status",
@@ -15379,6 +17177,15 @@
             "schema": {
               "type": "string"
             }
+          },
+          {
+            "description": "The project the request acts in, where a header cannot be sent (an EventSource); the X-OpenFerment-Project header in its place.",
+            "in": "query",
+            "name": "project",
+            "required": false,
+            "schema": {
+              "type": "string"
+            }
           }
         ],
         "responses": {
@@ -15395,6 +17202,16 @@
               }
             },
             "description": "Successful Response"
+          },
+          "404": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Refusal"
+                }
+              }
+            },
+            "description": "The project the request names is one the database does not hold, in words."
           },
           "422": {
             "content": {
@@ -15433,6 +17250,15 @@
             "schema": {
               "type": "string"
             }
+          },
+          {
+            "description": "The project the request acts in, where a header cannot be sent (an EventSource); the X-OpenFerment-Project header in its place.",
+            "in": "query",
+            "name": "project",
+            "required": false,
+            "schema": {
+              "type": "string"
+            }
           }
         ],
         "requestBody": {
@@ -15455,6 +17281,16 @@
               }
             },
             "description": "Successful Response"
+          },
+          "404": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Refusal"
+                }
+              }
+            },
+            "description": "The project the request names is one the database does not hold, in words."
           },
           "422": {
             "content": {
@@ -15492,6 +17328,15 @@
             "schema": {
               "type": "string"
             }
+          },
+          {
+            "description": "The project the request acts in, where a header cannot be sent (an EventSource); the X-OpenFerment-Project header in its place.",
+            "in": "query",
+            "name": "project",
+            "required": false,
+            "schema": {
+              "type": "string"
+            }
           }
         ],
         "requestBody": {
@@ -15514,6 +17359,16 @@
               }
             },
             "description": "Successful Response"
+          },
+          "404": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Refusal"
+                }
+              }
+            },
+            "description": "The project the request names is one the database does not hold, in words."
           },
           "422": {
             "content": {
@@ -15553,6 +17408,15 @@
             "schema": {
               "type": "string"
             }
+          },
+          {
+            "description": "The project the request acts in, where a header cannot be sent (an EventSource); the X-OpenFerment-Project header in its place.",
+            "in": "query",
+            "name": "project",
+            "required": false,
+            "schema": {
+              "type": "string"
+            }
           }
         ],
         "responses": {
@@ -15567,6 +17431,16 @@
               }
             },
             "description": "Successful Response"
+          },
+          "404": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Refusal"
+                }
+              }
+            },
+            "description": "The project the request names is one the database does not hold, in words."
           },
           "422": {
             "content": {
@@ -15594,6 +17468,15 @@
             "schema": {
               "type": "string"
             }
+          },
+          {
+            "description": "The project the request acts in, where a header cannot be sent (an EventSource); the X-OpenFerment-Project header in its place.",
+            "in": "query",
+            "name": "project",
+            "required": false,
+            "schema": {
+              "type": "string"
+            }
           }
         ],
         "requestBody": {
@@ -15616,6 +17499,16 @@
               }
             },
             "description": "Successful Response"
+          },
+          "404": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Refusal"
+                }
+              }
+            },
+            "description": "The project the request names is one the database does not hold, in words."
           },
           "422": {
             "content": {
@@ -15645,6 +17538,15 @@
             "schema": {
               "type": "string"
             }
+          },
+          {
+            "description": "The project the request acts in, where a header cannot be sent (an EventSource); the X-OpenFerment-Project header in its place.",
+            "in": "query",
+            "name": "project",
+            "required": false,
+            "schema": {
+              "type": "string"
+            }
           }
         ],
         "responses": {
@@ -15662,6 +17564,16 @@
               }
             },
             "description": "Successful Response"
+          },
+          "404": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Refusal"
+                }
+              }
+            },
+            "description": "The project the request names is one the database does not hold, in words."
           }
         },
         "summary": "Pureos Catalogue",
@@ -15690,6 +17602,15 @@
             "schema": {
               "type": "string"
             }
+          },
+          {
+            "description": "The project the request acts in, where a header cannot be sent (an EventSource); the X-OpenFerment-Project header in its place.",
+            "in": "query",
+            "name": "project",
+            "required": false,
+            "schema": {
+              "type": "string"
+            }
           }
         ],
         "responses": {
@@ -15704,6 +17625,16 @@
               }
             },
             "description": "Successful Response"
+          },
+          "404": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Refusal"
+                }
+              }
+            },
+            "description": "The project the request names is one the database does not hold, in words."
           },
           "422": {
             "content": {
@@ -15733,6 +17664,15 @@
             "schema": {
               "type": "string"
             }
+          },
+          {
+            "description": "The project the request acts in, where a header cannot be sent (an EventSource); the X-OpenFerment-Project header in its place.",
+            "in": "query",
+            "name": "project",
+            "required": false,
+            "schema": {
+              "type": "string"
+            }
           }
         ],
         "requestBody": {
@@ -15757,6 +17697,16 @@
               }
             },
             "description": "Successful Response"
+          },
+          "404": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Refusal"
+                }
+              }
+            },
+            "description": "The project the request names is one the database does not hold, in words."
           },
           "422": {
             "content": {
@@ -15786,6 +17736,15 @@
             "schema": {
               "type": "string"
             }
+          },
+          {
+            "description": "The project the request acts in, where a header cannot be sent (an EventSource); the X-OpenFerment-Project header in its place.",
+            "in": "query",
+            "name": "project",
+            "required": false,
+            "schema": {
+              "type": "string"
+            }
           }
         ],
         "responses": {
@@ -15803,6 +17762,16 @@
               }
             },
             "description": "Successful Response"
+          },
+          "404": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Refusal"
+                }
+              }
+            },
+            "description": "The project the request names is one the database does not hold, in words."
           }
         },
         "summary": "Pureos Train Runs",
@@ -15818,6 +17787,15 @@
             "description": "The project the request acts in; ?project= in its place.",
             "in": "header",
             "name": "X-OpenFerment-Project",
+            "required": false,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "description": "The project the request acts in, where a header cannot be sent (an EventSource); the X-OpenFerment-Project header in its place.",
+            "in": "query",
+            "name": "project",
             "required": false,
             "schema": {
               "type": "string"
@@ -15847,6 +17825,16 @@
             },
             "description": "Successful Response"
           },
+          "404": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Refusal"
+                }
+              }
+            },
+            "description": "The project the request names is one the database does not hold, in words."
+          },
           "422": {
             "content": {
               "application/json": {
@@ -15871,6 +17859,15 @@
             "description": "The project the request acts in; ?project= in its place.",
             "in": "header",
             "name": "X-OpenFerment-Project",
+            "required": false,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "description": "The project the request acts in, where a header cannot be sent (an EventSource); the X-OpenFerment-Project header in its place.",
+            "in": "query",
+            "name": "project",
             "required": false,
             "schema": {
               "type": "string"
@@ -15900,6 +17897,16 @@
             },
             "description": "Successful Response"
           },
+          "404": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Refusal"
+                }
+              }
+            },
+            "description": "The project the request names is one the database does not hold, in words."
+          },
           "422": {
             "content": {
               "application/json": {
@@ -15924,6 +17931,15 @@
             "description": "The project the request acts in; ?project= in its place.",
             "in": "header",
             "name": "X-OpenFerment-Project",
+            "required": false,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "description": "The project the request acts in, where a header cannot be sent (an EventSource); the X-OpenFerment-Project header in its place.",
+            "in": "query",
+            "name": "project",
             "required": false,
             "schema": {
               "type": "string"
@@ -15953,6 +17969,16 @@
             },
             "description": "Successful Response"
           },
+          "404": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Refusal"
+                }
+              }
+            },
+            "description": "The project the request names is one the database does not hold, in words."
+          },
           "422": {
             "content": {
               "application/json": {
@@ -15981,6 +18007,15 @@
             "schema": {
               "type": "string"
             }
+          },
+          {
+            "description": "The project the request acts in, where a header cannot be sent (an EventSource); the X-OpenFerment-Project header in its place.",
+            "in": "query",
+            "name": "project",
+            "required": false,
+            "schema": {
+              "type": "string"
+            }
           }
         ],
         "requestBody": {
@@ -16005,6 +18040,16 @@
               }
             },
             "description": "Successful Response"
+          },
+          "404": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Refusal"
+                }
+              }
+            },
+            "description": "The project the request names is one the database does not hold, in words."
           },
           "422": {
             "content": {
@@ -16043,6 +18088,15 @@
             "schema": {
               "type": "string"
             }
+          },
+          {
+            "description": "The project the request acts in, where a header cannot be sent (an EventSource); the X-OpenFerment-Project header in its place.",
+            "in": "query",
+            "name": "project",
+            "required": false,
+            "schema": {
+              "type": "string"
+            }
           }
         ],
         "responses": {
@@ -16057,6 +18111,16 @@
               }
             },
             "description": "Successful Response"
+          },
+          "404": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Refusal"
+                }
+              }
+            },
+            "description": "The project the request names is one the database does not hold, in words."
           },
           "422": {
             "content": {
@@ -16086,6 +18150,15 @@
             "schema": {
               "type": "string"
             }
+          },
+          {
+            "description": "The project the request acts in, where a header cannot be sent (an EventSource); the X-OpenFerment-Project header in its place.",
+            "in": "query",
+            "name": "project",
+            "required": false,
+            "schema": {
+              "type": "string"
+            }
           }
         ],
         "responses": {
@@ -16103,6 +18176,16 @@
               }
             },
             "description": "Successful Response"
+          },
+          "404": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Refusal"
+                }
+              }
+            },
+            "description": "The project the request names is one the database does not hold, in words."
           }
         },
         "summary": "Pureos Trains",
@@ -16118,6 +18201,15 @@
             "description": "The project the request acts in; ?project= in its place.",
             "in": "header",
             "name": "X-OpenFerment-Project",
+            "required": false,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "description": "The project the request acts in, where a header cannot be sent (an EventSource); the X-OpenFerment-Project header in its place.",
+            "in": "query",
+            "name": "project",
             "required": false,
             "schema": {
               "type": "string"
@@ -16139,6 +18231,16 @@
               }
             },
             "description": "Successful Response"
+          },
+          "404": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Refusal"
+                }
+              }
+            },
+            "description": "The project the request names is one the database does not hold, in words."
           }
         },
         "summary": "Pureos Trains Kept",
@@ -16174,6 +18276,15 @@
             "schema": {
               "type": "string"
             }
+          },
+          {
+            "description": "The project the request acts in, where a header cannot be sent (an EventSource); the X-OpenFerment-Project header in its place.",
+            "in": "query",
+            "name": "project",
+            "required": false,
+            "schema": {
+              "type": "string"
+            }
           }
         ],
         "responses": {
@@ -16190,6 +18301,16 @@
               }
             },
             "description": "Successful Response"
+          },
+          "404": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Refusal"
+                }
+              }
+            },
+            "description": "The project the request names is one the database does not hold, in words."
           },
           "422": {
             "content": {
@@ -16228,6 +18349,15 @@
             "schema": {
               "type": "string"
             }
+          },
+          {
+            "description": "The project the request acts in, where a header cannot be sent (an EventSource); the X-OpenFerment-Project header in its place.",
+            "in": "query",
+            "name": "project",
+            "required": false,
+            "schema": {
+              "type": "string"
+            }
           }
         ],
         "responses": {
@@ -16249,7 +18379,7 @@
                 }
               }
             },
-            "description": "The project holds no run of that id, in words."
+            "description": "The project holds no run of that id, in words. A project the request names that the database does not hold is a 404 too, in words."
           },
           "422": {
             "content": {
@@ -16279,6 +18409,15 @@
             "schema": {
               "type": "string"
             }
+          },
+          {
+            "description": "The project the request acts in, where a header cannot be sent (an EventSource); the X-OpenFerment-Project header in its place.",
+            "in": "query",
+            "name": "project",
+            "required": false,
+            "schema": {
+              "type": "string"
+            }
           }
         ],
         "responses": {
@@ -16293,6 +18432,16 @@
               }
             },
             "description": "Successful Response"
+          },
+          "404": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Refusal"
+                }
+              }
+            },
+            "description": "The project the request names is one the database does not hold, in words."
           }
         },
         "summary": "State Load",
@@ -16339,6 +18488,15 @@
             "schema": {
               "type": "string"
             }
+          },
+          {
+            "description": "The project the request acts in, where a header cannot be sent (an EventSource); the X-OpenFerment-Project header in its place.",
+            "in": "query",
+            "name": "project",
+            "required": false,
+            "schema": {
+              "type": "string"
+            }
           }
         ],
         "responses": {
@@ -16353,6 +18511,16 @@
               }
             },
             "description": "Successful Response"
+          },
+          "404": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Refusal"
+                }
+              }
+            },
+            "description": "The project the request names is one the database does not hold, in words."
           },
           "422": {
             "content": {
@@ -16397,6 +18565,15 @@
             "schema": {
               "type": "string"
             }
+          },
+          {
+            "description": "The project the request acts in, where a header cannot be sent (an EventSource); the X-OpenFerment-Project header in its place.",
+            "in": "query",
+            "name": "project",
+            "required": false,
+            "schema": {
+              "type": "string"
+            }
           }
         ],
         "requestBody": {
@@ -16421,6 +18598,16 @@
               }
             },
             "description": "Successful Response"
+          },
+          "404": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Refusal"
+                }
+              }
+            },
+            "description": "The project the request names is one the database does not hold, in words."
           },
           "422": {
             "content": {
@@ -16450,6 +18637,15 @@
             "schema": {
               "type": "string"
             }
+          },
+          {
+            "description": "The project the request acts in, where a header cannot be sent (an EventSource); the X-OpenFerment-Project header in its place.",
+            "in": "query",
+            "name": "project",
+            "required": false,
+            "schema": {
+              "type": "string"
+            }
           }
         ],
         "responses": {
@@ -16466,6 +18662,16 @@
               }
             },
             "description": "Successful Response"
+          },
+          "404": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Refusal"
+                }
+              }
+            },
+            "description": "The project the request names is one the database does not hold, in words."
           }
         },
         "summary": "Study Comparisons",
@@ -16479,6 +18685,15 @@
             "description": "The project the request acts in; ?project= in its place.",
             "in": "header",
             "name": "X-OpenFerment-Project",
+            "required": false,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "description": "The project the request acts in, where a header cannot be sent (an EventSource); the X-OpenFerment-Project header in its place.",
+            "in": "query",
+            "name": "project",
             "required": false,
             "schema": {
               "type": "string"
@@ -16505,6 +18720,16 @@
               }
             },
             "description": "Successful Response"
+          },
+          "404": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Refusal"
+                }
+              }
+            },
+            "description": "The project the request names is one the database does not hold, in words."
           },
           "422": {
             "content": {
@@ -16542,6 +18767,15 @@
             "schema": {
               "type": "string"
             }
+          },
+          {
+            "description": "The project the request acts in, where a header cannot be sent (an EventSource); the X-OpenFerment-Project header in its place.",
+            "in": "query",
+            "name": "project",
+            "required": false,
+            "schema": {
+              "type": "string"
+            }
           }
         ],
         "responses": {
@@ -16554,6 +18788,16 @@
               }
             },
             "description": "Successful Response"
+          },
+          "404": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Refusal"
+                }
+              }
+            },
+            "description": "The project the request names is one the database does not hold, in words."
           },
           "422": {
             "content": {
@@ -16593,11 +18837,30 @@
             "schema": {
               "type": "string"
             }
+          },
+          {
+            "description": "The project the request acts in, where a header cannot be sent (an EventSource); the X-OpenFerment-Project header in its place.",
+            "in": "query",
+            "name": "project",
+            "required": false,
+            "schema": {
+              "type": "string"
+            }
           }
         ],
         "responses": {
           "200": {
             "description": "Successful Response"
+          },
+          "404": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Refusal"
+                }
+              }
+            },
+            "description": "The project the request names is one the database does not hold, in words."
           },
           "422": {
             "content": {
@@ -16627,6 +18890,15 @@
             "schema": {
               "type": "string"
             }
+          },
+          {
+            "description": "The project the request acts in, where a header cannot be sent (an EventSource); the X-OpenFerment-Project header in its place.",
+            "in": "query",
+            "name": "project",
+            "required": false,
+            "schema": {
+              "type": "string"
+            }
           }
         ],
         "responses": {
@@ -16643,6 +18915,16 @@
               }
             },
             "description": "Successful Response"
+          },
+          "404": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Refusal"
+                }
+              }
+            },
+            "description": "The project the request names is one the database does not hold, in words."
           }
         },
         "summary": "Study Runbooks",
@@ -16656,6 +18938,15 @@
             "description": "The project the request acts in; ?project= in its place.",
             "in": "header",
             "name": "X-OpenFerment-Project",
+            "required": false,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "description": "The project the request acts in, where a header cannot be sent (an EventSource); the X-OpenFerment-Project header in its place.",
+            "in": "query",
+            "name": "project",
             "required": false,
             "schema": {
               "type": "string"
@@ -16682,6 +18973,16 @@
               }
             },
             "description": "Successful Response"
+          },
+          "404": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Refusal"
+                }
+              }
+            },
+            "description": "The project the request names is one the database does not hold, in words."
           },
           "422": {
             "content": {
@@ -16719,6 +19020,15 @@
             "schema": {
               "type": "string"
             }
+          },
+          {
+            "description": "The project the request acts in, where a header cannot be sent (an EventSource); the X-OpenFerment-Project header in its place.",
+            "in": "query",
+            "name": "project",
+            "required": false,
+            "schema": {
+              "type": "string"
+            }
           }
         ],
         "responses": {
@@ -16731,6 +19041,16 @@
               }
             },
             "description": "Successful Response"
+          },
+          "404": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Refusal"
+                }
+              }
+            },
+            "description": "The project the request names is one the database does not hold, in words."
           },
           "422": {
             "content": {
@@ -16769,6 +19089,15 @@
             "schema": {
               "type": "string"
             }
+          },
+          {
+            "description": "The project the request acts in, where a header cannot be sent (an EventSource); the X-OpenFerment-Project header in its place.",
+            "in": "query",
+            "name": "project",
+            "required": false,
+            "schema": {
+              "type": "string"
+            }
           }
         ],
         "requestBody": {
@@ -16791,6 +19120,16 @@
               }
             },
             "description": "Successful Response"
+          },
+          "404": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Refusal"
+                }
+              }
+            },
+            "description": "The project the request names is one the database does not hold, in words."
           },
           "422": {
             "content": {
@@ -16820,6 +19159,15 @@
             "schema": {
               "type": "string"
             }
+          },
+          {
+            "description": "The project the request acts in, where a header cannot be sent (an EventSource); the X-OpenFerment-Project header in its place.",
+            "in": "query",
+            "name": "project",
+            "required": false,
+            "schema": {
+              "type": "string"
+            }
           }
         ],
         "responses": {
@@ -16836,6 +19184,16 @@
               }
             },
             "description": "Successful Response"
+          },
+          "404": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Refusal"
+                }
+              }
+            },
+            "description": "The project the request names is one the database does not hold, in words."
           }
         },
         "summary": "Study Scenarios",
@@ -16849,6 +19207,15 @@
             "description": "The project the request acts in; ?project= in its place.",
             "in": "header",
             "name": "X-OpenFerment-Project",
+            "required": false,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "description": "The project the request acts in, where a header cannot be sent (an EventSource); the X-OpenFerment-Project header in its place.",
+            "in": "query",
+            "name": "project",
             "required": false,
             "schema": {
               "type": "string"
@@ -16875,6 +19242,16 @@
               }
             },
             "description": "Successful Response"
+          },
+          "404": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Refusal"
+                }
+              }
+            },
+            "description": "The project the request names is one the database does not hold, in words."
           },
           "422": {
             "content": {
@@ -16912,6 +19289,15 @@
             "schema": {
               "type": "string"
             }
+          },
+          {
+            "description": "The project the request acts in, where a header cannot be sent (an EventSource); the X-OpenFerment-Project header in its place.",
+            "in": "query",
+            "name": "project",
+            "required": false,
+            "schema": {
+              "type": "string"
+            }
           }
         ],
         "responses": {
@@ -16924,6 +19310,16 @@
               }
             },
             "description": "Successful Response"
+          },
+          "404": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Refusal"
+                }
+              }
+            },
+            "description": "The project the request names is one the database does not hold, in words."
           },
           "422": {
             "content": {
@@ -16962,6 +19358,15 @@
             "schema": {
               "type": "string"
             }
+          },
+          {
+            "description": "The project the request acts in, where a header cannot be sent (an EventSource); the X-OpenFerment-Project header in its place.",
+            "in": "query",
+            "name": "project",
+            "required": false,
+            "schema": {
+              "type": "string"
+            }
           }
         ],
         "requestBody": {
@@ -16984,6 +19389,16 @@
               }
             },
             "description": "Successful Response"
+          },
+          "404": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Refusal"
+                }
+              }
+            },
+            "description": "The project the request names is one the database does not hold, in words."
           },
           "422": {
             "content": {
@@ -17077,6 +19492,15 @@
             "schema": {
               "type": "string"
             }
+          },
+          {
+            "description": "The project the request acts in, where a header cannot be sent (an EventSource); the X-OpenFerment-Project header in its place.",
+            "in": "query",
+            "name": "project",
+            "required": false,
+            "schema": {
+              "type": "string"
+            }
           }
         ],
         "responses": {
@@ -17091,6 +19515,16 @@
               }
             },
             "description": "Successful Response"
+          },
+          "404": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Refusal"
+                }
+              }
+            },
+            "description": "The project the request names is one the database does not hold, in words."
           },
           "422": {
             "content": {
@@ -17118,6 +19552,15 @@
             "schema": {
               "type": "string"
             }
+          },
+          {
+            "description": "The project the request acts in, where a header cannot be sent (an EventSource); the X-OpenFerment-Project header in its place.",
+            "in": "query",
+            "name": "project",
+            "required": false,
+            "schema": {
+              "type": "string"
+            }
           }
         ],
         "requestBody": {
@@ -17140,6 +19583,16 @@
               }
             },
             "description": "Successful Response"
+          },
+          "404": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Refusal"
+                }
+              }
+            },
+            "description": "The project the request names is one the database does not hold, in words."
           },
           "422": {
             "content": {
@@ -17179,6 +19632,15 @@
             "schema": {
               "type": "string"
             }
+          },
+          {
+            "description": "The project the request acts in, where a header cannot be sent (an EventSource); the X-OpenFerment-Project header in its place.",
+            "in": "query",
+            "name": "project",
+            "required": false,
+            "schema": {
+              "type": "string"
+            }
           }
         ],
         "responses": {
@@ -17193,6 +19655,16 @@
               }
             },
             "description": "Successful Response"
+          },
+          "404": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Refusal"
+                }
+              }
+            },
+            "description": "The project the request names is one the database does not hold, in words."
           },
           "422": {
             "content": {
@@ -17220,6 +19692,15 @@
             "schema": {
               "type": "string"
             }
+          },
+          {
+            "description": "The project the request acts in, where a header cannot be sent (an EventSource); the X-OpenFerment-Project header in its place.",
+            "in": "query",
+            "name": "project",
+            "required": false,
+            "schema": {
+              "type": "string"
+            }
           }
         ],
         "requestBody": {
@@ -17242,6 +19723,16 @@
               }
             },
             "description": "Successful Response"
+          },
+          "404": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Refusal"
+                }
+              }
+            },
+            "description": "The project the request names is one the database does not hold, in words."
           },
           "422": {
             "content": {
@@ -17271,6 +19762,15 @@
             "schema": {
               "type": "string"
             }
+          },
+          {
+            "description": "The project the request acts in, where a header cannot be sent (an EventSource); the X-OpenFerment-Project header in its place.",
+            "in": "query",
+            "name": "project",
+            "required": false,
+            "schema": {
+              "type": "string"
+            }
           }
         ],
         "responses": {
@@ -17287,6 +19787,16 @@
               }
             },
             "description": "Successful Response"
+          },
+          "404": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Refusal"
+                }
+              }
+            },
+            "description": "The project the request names is one the database does not hold, in words."
           }
         },
         "summary": "Tools List",
@@ -17295,7 +19805,7 @@
     },
     "/api/tools/{name}": {
       "post": {
-        "description": "Run one tool through the registry, the same path Postdoc's loop and\nthe MCP server take, in the request's project. A refusal is a result\nwith `error` set; an unknown tool is a 404. The body is the tool's\ninput; `?by=` names the person calling, who is the author of any\nquantity the input types (ADR-006) and of any write it makes: the audit\nrow, a proposal and what the write keeps are marked as that person's,\nand a store that holds a model's work alone (pureOS's kept trains)\nrefuses the write in its words. A tool that writes (`writes` in\ndocs/TOOLS.md) is run only for a person named so: a call that names\nnobody is a 422 in words, and nothing runs.",
+        "description": "Run one tool through the registry, the same path Postdoc's loop and\nthe MCP server take, in the request's project. A refusal is a result\nwith `error` set; an unknown tool is a 404. The body is the tool's\ninput. The caller is named one of two ways, each name read as the tool\ndoor reads one (its control, format and surrogate characters dropped,\nits whitespace collapsed, at most 200 characters), and a call naming\nboth is a 422 in words. `?by=` names a person, who is the author of any\nquantity the input types (ADR-006) and of any write it makes: the audit\nrow, a proposal and what the write keeps are marked as that person's,\nand a store that holds a model's work alone (pureOS's kept trains)\nrefuses the write in its words. `X-OpenFerment-Assistant` names an\noutside assistant, and the call runs in the model's lane under that\nname, through this door (`via: http`): a number it types is that name's\nestimate, a write is marked with that name (`by`), its audit row names\nit as `who` with agent `model`, `via` http in its detail and no effort,\nand a catalogue entry's source reads \"<name>/<version>, at the HTTP\nendpoint\". A tool that writes (`writes` in docs/TOOLS.md) is run only for\na caller named so: a call that names nobody is a 422 in words, and\nnothing runs.",
         "operationId": "tools_run_api_tools__name__post",
         "parameters": [
           {
@@ -17318,9 +19828,36 @@
             }
           },
           {
+            "description": "The outside assistant calling, `<name>/<version>`, as UTF-8 text: the call runs in the model's lane under that name, its audit row's detail naming this door (`via: http`). The MCP server started with --service sends its client's declared name here.",
+            "in": "header",
+            "name": "X-OpenFerment-Assistant",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "description": "The outside assistant calling, `<name>/<version>`, as UTF-8 text: the call runs in the model's lane under that name, its audit row's detail naming this door (`via: http`). The MCP server started with --service sends its client's declared name here.",
+              "title": "X-Openferment-Assistant"
+            }
+          },
+          {
             "description": "The project the request acts in; ?project= in its place.",
             "in": "header",
             "name": "X-OpenFerment-Project",
+            "required": false,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "description": "The project the request acts in, where a header cannot be sent (an EventSource); the X-OpenFerment-Project header in its place.",
+            "in": "query",
+            "name": "project",
             "required": false,
             "schema": {
               "type": "string"
@@ -17358,7 +19895,7 @@
                 }
               }
             },
-            "description": "No tool of that name is registered here, in words."
+            "description": "No tool of that name is registered here, in words. A project the request names that the database does not hold is a 404 too, in words."
           },
           "422": {
             "content": {
@@ -17375,7 +19912,7 @@
                 }
               }
             },
-            "description": "A tool that writes, called with no ?by= naming the person calling, in words (a list of field errors when the body is no JSON object)."
+            "description": "A tool that writes, called with neither ?by= naming the person calling nor X-OpenFerment-Assistant naming the assistant; a call naming both; an X-OpenFerment-Assistant that names nobody: each in words (a list of field errors when the body is no JSON object)."
           }
         },
         "summary": "Tools Run",
@@ -17391,6 +19928,15 @@
             "description": "The project the request acts in; ?project= in its place.",
             "in": "header",
             "name": "X-OpenFerment-Project",
+            "required": false,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "description": "The project the request acts in, where a header cannot be sent (an EventSource); the X-OpenFerment-Project header in its place.",
+            "in": "query",
+            "name": "project",
             "required": false,
             "schema": {
               "type": "string"
@@ -17411,6 +19957,16 @@
               }
             },
             "description": "Successful Response"
+          },
+          "404": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Refusal"
+                }
+              }
+            },
+            "description": "The project the request names is one the database does not hold, in words."
           }
         },
         "summary": "Witness Runs",

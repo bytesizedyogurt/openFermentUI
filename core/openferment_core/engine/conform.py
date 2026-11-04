@@ -36,7 +36,8 @@ table of the configured database (`keep`), where `GET /api/engines` and `pnpm
 ready` read it: the checks' one write there, and the row is the machine's, so
 the verdict of a project's things keeps counts in its words (`_counted`) and
 the command's own table gives each thing's words. Exits 1 when any check
-fails.
+fails, and 2, in words naming OPENFERMENT_DATABASE_URL, when no address is
+set or its server does not answer (`_configured`, `_unanswered`).
 
 `checks(engine, ...)` runs the eight in whatever database and project are
 current: a test's, or the copy's of a project.
@@ -58,7 +59,8 @@ from typing import Any, Callable
 
 from .. import db, projects
 from ..db import models as t
-from ..models import EngineCheck, EngineConformance, EngineInput, EnginePrecision, EngineRun, EngineThing, Origin, Quantity
+from ..models import (MAX_DIAGNOSTICS, EngineCheck, EngineConformance, EngineInput, EnginePrecision, EngineRun,
+                      EngineThing, Origin, Quantity)
 from . import EngineRefused
 from .contract import version_string
 
@@ -66,7 +68,8 @@ CHECKS: dict[int, str] = {
     1: "a JSON number outside a quantity is refused in words before the worker is reached",
     2: "every default carries an origin naming what it rests on (a library-default, a record or an artifact its ref, "
        "a convention its note, a person's assumption its by), and a parameter with none takes a run's value",
-    3: "a run writes one runs row keyed by its basis, and the same request twice is that one row",
+    3: "a run writes one runs row keyed by its basis, and the same request twice is that one row, with its "
+       "diagnostics in their shape when it reports some",
     4: "a replay holds every output within the precision the thing states",
     5: "the run's SFF file validates and scores, or sffRefused holds words",
     6: "importing the module the entry point names imports neither the worker module nor what the engine computes with",
@@ -195,17 +198,14 @@ def _bare_number(engine: Any, thing: str, by: str) -> tuple[bool, str]:
 
 
 def _names_its_ground(o: Any) -> bool:
-    """Whether a default's origin names what it rests on: a library-default
-    its package and version, a record the records, an artifact the artifact,
-    a measurement its reading (each `ref`), a reading the project holds
-    (basis.reading_refusal); a convention what it is (`note`); a person's
-    assumption the person who typed it (`by`)."""
+    """Whether a default's origin names what it rests on, as one of the five
+    a default may rest on (models.DEFAULT_ORIGINS): a library-default its
+    package and version, a record the records, an artifact the artifact
+    (each `ref`); a convention what it is (`note`); a person's assumption the
+    person who typed it (`by`). A model's estimate and a deposition's
+    reading are values a run sets, and no default's ground."""
     if o is None:
         return False
-    if o.kind == "measurement":
-        from ..basis import reading_refusal
-
-        return reading_refusal(o.ref or "") is None
     if o.kind in ("library-default", "record", "artifact"):
         return bool((o.ref or "").strip())
     if o.kind == "convention":
@@ -236,11 +236,13 @@ def _origins(engine: Any, things: list[Any]) -> tuple[bool, str]:
                 wrong.append(f"{th.id}:{p.key}")
     names = ", ".join(th.id for th in things)
     if wrong:
-        return False, (f"{len(wrong)} of {count} parameters lack an origin with what it names, or a run's value where "
-                       f"they have no default: {', '.join(wrong[:6])}")
-    return True, (f"{count} parameters of {len(things)} thing{'s' if len(things) != 1 else ''} ({names}), each in its "
-                  f"default configuration or its first: {count - unset} default{'s' if count - unset != 1 else ''}, "
-                  f"each with its origin, and {unset} with none, {'each ' if unset != 1 else ''}taking a run's value")
+        lack = "lacks" if len(wrong) == 1 else "lack"
+        return False, (f"{len(wrong)} of {count} parameter{'s' if count != 1 else ''} {lack} an origin with what it "
+                       f"names, or a run's value where it has no default: {', '.join(wrong[:6])}")
+    return True, (f"{count} parameter{'s' if count != 1 else ''} of {len(things)} thing{'s' if len(things) != 1 else ''} "
+                  f"({names}), each in its default configuration or its first: {count - unset} "
+                  f"default{'s' if count - unset != 1 else ''}, each with its origin, and {unset} with none, "
+                  f"{'each ' if unset != 1 else ''}taking a run's value")
 
 
 def _row_count(run_id: str) -> int:
@@ -408,10 +410,32 @@ def _model_path(engine: Any, chosen: list[Any], first: Any, inputs: list[EngineI
         f"asked by {MODEL!r}")
 
 
+def _diagnosed(a: EngineRun, b: EngineRun, art: Any) -> tuple[bool, str]:
+    """Check 3 on a run that answers diagnostics: each a name, a finite
+    number or words and a unit, every name its own, at most MAX_DIAGNOSTICS
+    of them, kept on the row and nowhere in its artifact, and the same
+    request again answering the first computation's. Its words, empty for a
+    run that answers none."""
+    if not a.diagnostics and not b.diagnostics:
+        return True, ""
+    names = [d.name for d in a.diagnostics]
+    shaped = len(names) == len(set(names)) and len(names) <= MAX_DIAGNOSTICS
+    outside = art is None or "diagnostics" not in (art.output or {})
+    same = [d.model_dump() for d in b.diagnostics] == [d.model_dump() for d in a.diagnostics]
+    n = len(names)
+    said = (f"; it reports {n} diagnostic{'s' if n != 1 else ''} beside its outputs ({_cut(', '.join(names), 160)}), "
+            + ("each a name, a value and a unit, kept on its row" if shaped else
+               f"and these hold two of one name or more than the {MAX_DIAGNOSTICS} a row keeps")
+            + (" and nowhere in its artifact" if outside else ", and its artifact holds them too")
+            + ("; asked again, the first computation's" if same else "; asked again, other diagnostics"))
+    return shaped and outside and same, said
+
+
 def _run_twice(engine: Any, thing: Any, inputs: list[EngineInput], by: str) -> tuple[bool, str, EngineRun | None]:
     """Check 3 on one thing: its run, asked twice, is one row keyed by its
-    basis. The run comes back with the words when it is done, for checks 4, 5
-    and 8."""
+    basis, and a run that answers diagnostics keeps them in their shape on
+    its row (`_diagnosed`). The run comes back with the words when it is
+    done, for checks 4, 5 and 8."""
     from .. import artifacts
     from ..engine import runs
 
@@ -420,10 +444,12 @@ def _run_twice(engine: Any, thing: Any, inputs: list[EngineInput], by: str) -> t
         b = runs.run_with(engine, thing.id, _configuration_of(thing), inputs, by=by).run
         rows = _row_count(a.id)
         keyed = False
+        art = None
         if a.artifactId is not None:
             art = artifacts.get(a.artifactId)
             keyed = artifacts.artifact_id(art.tool, art.toolVersion, art.inputs, art.seed) == a.id
-        ok = a.id == b.id and rows == 1 and a.status == "done" and a.engine == engine.name and keyed
+        diagnosed, reported = _diagnosed(a, b, art)
+        ok = a.id == b.id and rows == 1 and a.status == "done" and a.engine == engine.name and keyed and diagnosed
         said = (f"run {a.id} of {thing.id}" + (f" with {len(inputs)} value{'s' if len(inputs) != 1 else ''} set"
                                                 if inputs else "")
                 + f", asked twice, is {rows} row{'s' if rows != 1 else ''}; engine {a.engine}, status {a.status}; "
@@ -432,8 +458,13 @@ def _run_twice(engine: Any, thing: Any, inputs: list[EngineInput], by: str) -> t
                 + (f"; refused: {a.refused}" if a.refused else "")
                 # A run kept done that answers no output (a Proforma run whose samples priced nothing) says so.
                 + ("; it answers no output: its outputs.values are empty" if a.status == "done"
-                   and not (a.outputs or {}).get("values") else ""))
+                   and not (a.outputs or {}).get("values") else "")
+                + reported)
         return ok, said, a if a.status == "done" else None
+    except runs.ValuesWait as e:
+        # A thing whose parameters wait for a run's values: the way on is the values, or a default for each.
+        return False, (f"{thing.id} could not be run: {type(e).__name__}: {_words(e)}; set its values with "
+                       "--inputs <file>, or give each such parameter a default"), None
     except Exception as e:  # a check that cannot be made fails in words
         return False, f"{thing.id} could not be run: {type(e).__name__}: {_words(e)}", None
 
@@ -703,6 +734,38 @@ def _drop_or_say(migrate: Any, scratch: str, server: Any) -> None:
               f"python -m openferment_core.migrations drop {scratch} drops it", file=sys.stderr)
 
 
+def _no_address(e: BaseException) -> ConformRefused:
+    """No database address, or one naming no PostgreSQL server, in words
+    naming the setting (the store's own words, `db.DatabaseUnavailable`)."""
+    return ConformRefused(f"the checks run on a database of their own, made on the PostgreSQL server the setting "
+                          f"names: {_words(e)}")
+
+
+def _configured() -> Any:
+    """The configured database's address (OPENFERMENT_DATABASE_URL, the
+    environment first, then core/.env), or ConformRefused in words naming
+    the setting when none is set or it names no PostgreSQL server."""
+    from ..db.engine import DatabaseUnavailable, database_url
+
+    try:
+        return database_url()
+    except DatabaseUnavailable as e:
+        raise _no_address(e) from None
+
+
+def _unanswered(server: Any, e: BaseException, what: str) -> ConformRefused:
+    """What the server the setting names could not do for the checks
+    (`what`), in words naming the setting and the address it holds, its
+    password hidden, and the server's own words: a server that does not
+    answer among them."""
+    from ..db.engine import URL_SETTING
+
+    return ConformRefused(f"the PostgreSQL server {URL_SETTING} names ({server.render_as_string(hide_password=True)}) "
+                          f"could not {what}: {type(e).__name__}: {_cut(_words(e), 200)}. Start it (pnpm db:up), or "
+                          f"set {URL_SETTING} in the environment or in core/.env to a server with pgvector that "
+                          "answers")
+
+
 @contextlib.contextmanager
 def _scratch(name: str) -> Iterator[Any]:
     """A database of the checks' own on the server the configured address
@@ -713,16 +776,21 @@ def _scratch(name: str) -> Iterator[Any]:
     beginning SCRATCH and holding the migrated schema and no row, since every
     row the checks write stays in a transaction they never commit; `python -m
     openferment_core.migrations drop <name>` drops it. A database the server
-    refuses to make is never dropped, since nothing of the checks' stands."""
+    refuses to make is never dropped, since nothing of the checks' stands. No
+    address set, and a server that does not answer as the database is made,
+    are refused in words naming OPENFERMENT_DATABASE_URL (ConformRefused),
+    before the block runs."""
     from ..db import migrate
-    from ..db.engine import database_url
 
-    server = database_url()
+    server = _configured()
     scratch = f"{SCRATCH}_{name.replace('-', '_')[:SCRATCH_NAME_MAX]}_{secrets.token_hex(4)}"
     made = dropped = False
     with _signals_end_the_block():
         try:
-            url = migrate.create(scratch, server)
+            try:
+                url = migrate.create(scratch, server)
+            except Exception as e:  # the server's own words, with the setting that names it
+                raise _unanswered(server, e, "make the checks' database") from None
             made = True
             migrate.upgrade(url)
             yield url
@@ -933,11 +1001,18 @@ def in_project(name: str, project_id: str, *, by: str, things: list[str] | None 
     does not hold, and one that holds no thing that can run, are refused in
     words (ConformRefused), with nothing kept, the engine's last verdict
     standing. The production database is read as any other."""
-    from ..db.engine import database_url
     from . import registry
 
-    if projects.get(project_id) is None:
-        raise ConformRefused(f"database {database_url().database or ''!r} holds no project {project_id!r}: name a "
+    from ..db.engine import DatabaseUnavailable
+
+    try:
+        held = projects.get(project_id)
+    except DatabaseUnavailable as e:  # no address set: said in words naming the setting
+        raise _no_address(e) from None
+    except Exception as e:  # a server that does not answer, said with the setting that names it
+        raise _unanswered(_configured(), e, f"read project {project_id!r} from its database") from None
+    if held is None:
+        raise ConformRefused(f"database {_configured().database or ''!r} holds no project {project_id!r}: name a "
                              "project it holds")
     engine = registry.get(name)
     entry = registry.found()[name].entry
@@ -1027,10 +1102,14 @@ def main(argv: list[str]) -> int:
               f"checks run in a copy of a project of the configured database (core/.env) that holds one: python -m "
               f"openferment_core.engine.conform {name} --project <id>")
         return 2
-    with _scratch(name) as url:
-        env = {**os.environ, "OPENFERMENT_DATABASE_URL": url.render_as_string(hide_password=False)}
-        done = subprocess.run([sys.executable, "-m", "openferment_core.engine.conform", "--inside", name, by, *options],
-                              capture_output=True, text=True, cwd=str(CORE), env=env, timeout=1800)
+    try:
+        with _scratch(name) as url:
+            env = {**os.environ, "OPENFERMENT_DATABASE_URL": url.render_as_string(hide_password=False)}
+            done = subprocess.run([sys.executable, "-m", "openferment_core.engine.conform", "--inside", name, by,
+                                   *options], capture_output=True, text=True, cwd=str(CORE), env=env, timeout=1800)
+    except ConformRefused as e:  # no address set, or a server that does not answer: in words, exit 2
+        print(f"✗ {_words(e)}")
+        return 2
     lines = [ln for ln in done.stdout.strip().splitlines() if ln.startswith("{")]
     if done.returncode != 0 or not lines:
         tail = (done.stderr or done.stdout).strip().splitlines()[-1:] or ["no words"]

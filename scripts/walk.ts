@@ -11,12 +11,17 @@
  * back → a scenario made from the run through NewScenarioDialog with that
  * reading chosen and nothing typed, and run → the run's page: its provenance
  * measured, the reading's origin in words with a link that opens its
- * deposition, the parameter's chip measured (alpha 2.2 C.5).
+ * deposition, the parameter's chip measured (alpha 2.2 C.5) → for each engine
+ * WALK_ENGINES names (the proof's: those a package under examples/engines/
+ * registers), its first thing run on its own defaults from the Runs screen,
+ * the engine chosen on Studies' run card, and the run's page opened: its
+ * provenance, its outputs and its diagnostics as the service keeps them
+ * (alpha 2.2 D0.8). The walk names no engine of its own.
  *
  *   WALK_ORIGIN=http://127.0.0.1:PORT WALK_PROJECT=<id> WALK_RUN=<run id> \
  *   WALK_CONVERSATION=<id> WALK_RUNBOOK=<id> WALK_PERSON=<name> \
  *   WALK_READING=<placeholder> WALK_READING_UNIT=<unit> WALK_READING_PARAMETER=<key> \
- *   npx tsx scripts/walk.ts
+ *   [WALK_ENGINES=<name>,<name>] npx tsx scripts/walk.ts
  *
  * One line a check, ✓ or ✗ with what it saw; exit 1 when one fails. A console
  * error or an uncaught exception on any page is a failed check.
@@ -47,6 +52,11 @@ const PERSON = process.env.WALK_PERSON?.trim() || 'Walk Reviewer';
 const READING = env('WALK_READING');
 const READING_UNIT = env('WALK_READING_UNIT');
 const PARAMETER = env('WALK_READING_PARAMETER');
+// The engines whose first thing the walk runs from the Runs screen, comma-separated; none when unset.
+const ENGINES = (process.env.WALK_ENGINES ?? '')
+  .split(',')
+  .map((name) => name.trim())
+  .filter(Boolean);
 const TIMEOUT = 60_000;
 // How long a scenario's run may take, BioSTEAM building its plant fresh in the warm worker.
 const RUN_TIMEOUT = 600_000;
@@ -59,6 +69,17 @@ function check(ok: boolean, words: string): void {
 }
 
 let current: Page | null = null;
+
+/** A run as the service keeps it (GET /api/runs/{id}), as far as the walk reads it. */
+interface HeldRun {
+  id: string;
+  engine: string;
+  plant: string;
+  status: string;
+  provenance: string | null;
+  outputs: { values?: unknown[] };
+  diagnostics?: unknown[];
+}
 
 /** A reading as the service lists it (GET /api/depositions/readings). */
 interface Reading {
@@ -291,6 +312,49 @@ async function main(): Promise<void> {
     await page.locator(`[data-testid="deposition-entry"][data-entry="${entry}"][data-confirmed="true"]`).waitFor();
     return `run ${measured}: measured; ${PARAMETER} reads "${words}", its parameter's chip measured, and its link opens deposition ${deposition} at reading ${entry}`;
   });
+
+  // alpha 2.2 D0.8: each engine the walk is given, its first thing run on its own defaults from the Runs screen.
+  for (const name of ENGINES) {
+    await step(`The ${name} engine from the Runs screen`, async () => {
+      await at(page, '/proforma/studies');
+      const pick = page.getByTestId('run-plant-engine');
+      await pick.waitFor();
+      const offered = await pick.locator('option').evaluateAll((options) => options.map((o) => (o as HTMLOptionElement).value));
+      if (!offered.includes(name)) throw new Error(`the run card offers ${offered.join(', ') || 'no engine'}, and no ${name}`);
+      await pick.selectOption(name);
+      const thing = page.getByTestId('run-engine-thing');
+      await thing.waitFor();
+      const first = await thing.inputValue();
+      await page.getByTestId('run-engine-go').click();
+      const ran = page.locator(`[data-testid="run-plant-ran"][data-engine="${name}"]`);
+      // A thing that needs a value no default gives is refused on the card in the service's words: every thing of an
+      // engine under examples/engines/ runs on its own defaults, with no value set (docs/api/engines.md).
+      const refused = page.getByTestId('run-plant-problem');
+      await ran.or(refused).first().waitFor({ timeout: RUN_TIMEOUT });
+      if (await refused.count())
+        throw new Error(
+          `${first} on the ${name} engine's own defaults: ${((await refused.first().textContent()) ?? '').trim()}. ` +
+            'Every thing of an engine under examples/engines/ runs on its own defaults, with no value set: give each of its parameters a default',
+        );
+      const id = (await ran.getAttribute('data-run')) ?? '';
+      if ((await ran.getAttribute('data-status')) !== 'done') throw new Error(`run ${id} of ${first}: ${(await ran.innerText()).trim()}`);
+      await ran.getByRole('link', { name: `Run ${id}` }).click();
+      await page.locator(`[data-testid="proforma-run"][data-run="${id}"][data-status="done"]`).waitFor();
+      const answered = await page.request.get(`${ORIGIN}/api/runs/${id}`, { headers: { 'X-OpenFerment-Project': PROJECT } });
+      if (!answered.ok()) throw new Error(`GET /api/runs/${id} answered ${answered.status()}`);
+      const held = ((await answered.json()) as { run: HeldRun }).run;
+      const provenance = await page.getByTestId('run-provenance').getAttribute('data-provenance');
+      if (held.engine !== name || held.plant !== first || provenance !== held.provenance)
+        throw new Error(`the page reads ${provenance} for run ${id}, which the service keeps as ${held.engine}'s run of ${held.plant}, ${held.provenance}`);
+      const outputs = Array.isArray(held.outputs?.values) ? held.outputs.values.length : 0;
+      const drawn = await page.getByTestId('run-output').count();
+      if (drawn !== outputs) throw new Error(`the page shows ${drawn} outputs of the ${outputs} the run keeps`);
+      const reported = (held.diagnostics ?? []).length;
+      const listed = await page.getByTestId('run-diagnostic').count();
+      if (listed !== reported) throw new Error(`the page shows ${listed} diagnostics of the ${reported} the run keeps`);
+      return `${first} run on the ${name} engine's own defaults from Studies' run card as run ${id}; its page reads it ${provenance}, with its ${outputs} output${outputs === 1 ? '' : 's'} and ${reported} diagnostic${reported === 1 ? '' : 's'} as the service keeps them`;
+    });
+  }
 
   check(errors.length === 0, errors.length ? `console: ${errors.slice(0, 3).join(' | ')}` : 'no console error on any page');
   await browser.close();

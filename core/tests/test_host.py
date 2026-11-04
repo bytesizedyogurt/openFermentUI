@@ -9,6 +9,7 @@ from __future__ import annotations
 import importlib.util
 import os
 import plistlib
+import re
 import shutil
 import subprocess
 from pathlib import Path
@@ -164,3 +165,110 @@ def test_a_reinstall_never_keeps_a_wide_host_unasked(tmp_path, asked, expected):
     out = subprocess.run(["bash", "-c", script], env=env, capture_output=True, text=True, check=True).stdout
     assert out.splitlines()[-1].split() == ["=", expected, "8123"]
     assert ("will now listen on 127.0.0.1" in out) is (asked is None)
+
+
+# ── the engines a machine keeps beside core/uv.lock (alpha 2.2 D0.11) ────
+
+SCRIPTS = HOST_DIR.parent
+CORE = SCRIPTS.parent / "core"
+
+
+# What the stand-in's `uv export` answers: the lock's versions, a placeholder pin.
+PINS = "placeholder-pin==1.0"
+
+
+def _uv_stand_in(tmp_path: Path, *, export_fails: bool = False) -> tuple[Path, Path]:
+    """A stand-in for uv that writes where it was run and what it was asked,
+    answers `export` with PINS (or fails it), writes the constraints file an
+    install names beside the install, and fails for a directory named
+    `fails`; the file it writes to."""
+    asked = tmp_path / "asked"
+    stub = tmp_path / "uv"
+    export = "exit 1" if export_fails else f'echo "{PINS}"; exit 0'
+    stub.write_text(f'#!/bin/bash\nprintf "%s\\n" "$PWD $*" >> "{asked}"\n'
+                    f'if [ "$1" = export ]; then {export}; fi\n'
+                    f'[ "$5" = -c ] && printf "constraints: %s\\n" "$(cat "$6")" >> "{asked}"\n'
+                    f'[ "$(basename "${{@: -1}}")" != fails ]\n')
+    stub.chmod(0o755)
+    return stub, asked
+
+
+EXPORT = "export --frozen --all-extras --no-hashes --no-emit-project --quiet"
+
+
+def _installs(asked: Path) -> list[str]:
+    """The installs the stand-in was asked for, each constraints file named
+    `<c>`, after the one export they follow; each install's constraints the
+    export's pins."""
+    lines = asked.read_text().splitlines()
+    assert lines[0] == f"{CORE} {EXPORT}", lines
+    installs = [re.sub(r" -c \S+ ", " -c <c> ", line) for line in lines[1:] if not line.startswith("constraints: ")]
+    assert [line for line in lines[1:] if line.startswith("constraints: ")] == [f"constraints: {PINS}"] * len(installs)
+    return installs
+
+
+def _engines_local(listed: Path, stub: Path) -> subprocess.CompletedProcess:
+    env = {**os.environ, "OPENFERMENT_ENGINES_LOCAL": str(listed), "OPENFERMENT_UV": str(stub)}
+    return subprocess.run(["bash", str(SCRIPTS / "engines-local.sh")], env=env, capture_output=True, text=True)
+
+
+@pytest.mark.skipif(shutil.which("bash") is None, reason="no bash on this machine")
+def test_each_engine_core_engines_local_names_is_installed_again_into_cores_environment(tmp_path):
+    assert os.access(SCRIPTS / "engines-local.sh", os.X_OK), "chmod +x scripts/engines-local.sh"
+    subprocess.run(["bash", "-n", str(SCRIPTS / "engines-local.sh")], check=True)
+    stub, asked = _uv_stand_in(tmp_path)
+    engine = tmp_path / "an-engine"
+    engine.mkdir()
+    listed = tmp_path / "engines.local"
+    listed.write_text(f"# the engines this machine keeps beside the lock\n\n   {engine}   \n  # another note\ntests/fixtures\n")
+    done = _engines_local(listed, stub)
+    assert done.returncode == 0, done.stdout + done.stderr
+    install = "pip install --python .venv/bin/python -c <c> -e"
+    assert _installs(asked) == [f"{CORE} {install} {engine}", f"{CORE} {install} {CORE}/tests/fixtures"], \
+        "each install held to the lock's versions"
+    assert done.stdout.splitlines() == [f"installed {engine} into core's environment, beside core/uv.lock",
+                                        "installed tests/fixtures into core's environment, beside core/uv.lock"]
+
+
+@pytest.mark.skipif(shutil.which("bash") is None, reason="no bash on this machine")
+def test_a_line_naming_no_directory_or_one_that_fails_to_install_is_said_and_the_rest_installed(tmp_path):
+    stub, asked = _uv_stand_in(tmp_path)
+    fails, engine = tmp_path / "fails", tmp_path / "an-engine"
+    fails.mkdir()
+    engine.mkdir()
+    listed = tmp_path / "engines.local"
+    listed.write_text(f"{tmp_path}/nowhere\n{fails}\n{engine}")
+    done = _engines_local(listed, stub)
+    assert done.returncode == 1
+    assert done.stdout.splitlines() == [
+        f"✗ core/engines.local names {tmp_path}/nowhere, and no directory is there",
+        f"✗ {fails} did not install (uv pip install -e, each package core/uv.lock pins held at its locked version); "
+        "the lines above say why",
+        f"installed {engine} into core's environment, beside core/uv.lock"]
+    assert len(_installs(asked)) == 2, "the missing directory asks uv nothing"
+    assert _engines_local(tmp_path / "absent.local", stub).stdout.strip() == (
+        "no core/engines.local, so no engine is installed beside core/uv.lock")
+
+
+@pytest.mark.skipif(shutil.which("bash") is None, reason="no bash on this machine")
+def test_a_lock_that_cannot_be_read_as_the_constraints_installs_nothing_and_says_so(tmp_path):
+    stub, asked = _uv_stand_in(tmp_path, export_fails=True)
+    engine = tmp_path / "an-engine"
+    engine.mkdir()
+    listed = tmp_path / "engines.local"
+    listed.write_text(f"{engine}\n")
+    done = _engines_local(listed, stub)
+    assert done.returncode == 1
+    assert done.stdout.strip() == ("✗ core/uv.lock could not be read as the installs' constraints (uv export --frozen), "
+                                   "so no engine was installed")
+    assert asked.read_text().splitlines() == [f"{CORE} {EXPORT}"], "nothing installed unheld"
+
+
+def test_a_session_and_a_deploy_install_the_engines_again_after_their_sync_and_git_ignores_the_list():
+    for script, sync, call in (
+            (SCRIPTS / "session-start.sh", "(cd core && uv sync --all-extras)", "\nbash scripts/engines-local.sh"),
+            (HOST_DIR / "deploy.sh", "(cd core && uv sync --frozen --all-extras)", '\n"$REPO/scripts/engines-local.sh"')):
+        text = script.read_text(encoding="utf-8")
+        assert text.count(call) == 1 and text.index(sync) < text.index(call), script.name
+    ignored = subprocess.run(["git", "check-ignore", "-q", "core/engines.local"], cwd=SCRIPTS.parent)
+    assert ignored.returncode == 0, "core/engines.local is ignored by git"

@@ -31,6 +31,7 @@
 - R: `pnpm test:core` green before every commit; push after every step; never force-push; never commit `core/.env` or a database dump (§11.2).
 - C: `test:sim` and `test:lit` green before a push that touches what they test (§11.2 held them to each stage gate of the build).
 - C: Run a long suite in the background with its log in a file and wait for it; edit no Python while a suite runs.
+- C: A builder working from a handoff brief in a worktree of its own reads the files the brief names, keeps its work under `examples/`, and commits and pushes nothing, as the brief settles, which sets aside for it the Resume read and the commit and push rules above; every other rule here, each R rule and stop condition among them, holds for its work too.
 
 ## Verified constraints and sources
 

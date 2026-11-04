@@ -10,8 +10,9 @@ module's own write function, where the module's rules already live:
 `extract.add_candidate` (anchoring, §2.4), `intake.collect`,
 `extract.extract_paper`, and `checks.request` in a person's name. A module
 with no write function on the service refuses in words with the reason
-(Primer holds no lessons yet; pureOS's vocabulary and unit catalogue are
-curated; a person writes protocols and depositions on their pages), and that
+(a Primer lesson is a catalogue entry, kept with catalogue_write; pureOS's
+vocabulary and unit catalogue are curated; a person writes protocols and
+depositions on their pages), and that
 refusal is a result Postdoc reports in `gaps`. `check:tools` greps this file for a store write and fails on one.
 
 THE MARK. Every write that goes through carries `agent: model`, the model
@@ -155,14 +156,15 @@ ACTIONS: dict[str, dict[str, tuple[str, tuple[str, ...]]]] = {
 }
 
 NO_WRITE = {
-    "primer": "Primer holds no lessons yet, and the service has no write function for them",
+    "primer": "primer_write keeps nothing and has no write function, since a lesson is a catalogue entry kept with "
+              "catalogue_write",
 }
 # What a module that writes some things keeps curated beside them, said when an
 # action is not one of its own (OF-BLD-020 §5.4: pureOS keeps a model's train,
 # and its vocabulary and catalogue stay curated).
 CURATED_NOTE = {
-    "pureos": "pureOS's unit operations and its unit catalogue are curated (schema/vocabulary.yaml, "
-              "core/openferment_core/pureos/catalogue.py); the service has no write function for them",
+    "pureos": "pureOS's unit operations and its unit catalogue are curated (core/openferment_core/schema/"
+              "vocabulary.yaml, core/openferment_core/pureos/catalogue.py); the service has no write function for them",
 }
 NO_WRITE_ACTION = {
     ("runbooks", "revise_protocol"): "a protocol is revised by a person in the protocol editor; the service has no "
@@ -177,7 +179,8 @@ NO_WRITE_ACTION = {
                            "you would decide and why",
     ("intake", "add"): "a document enters the project's literature through intake_write fetch, by its identifier; "
                        "a file or pasted text is added by a person on Intake",
-    ("primer", "lesson"): "Primer holds no lessons yet, and the service has no write function for them",
+    ("primer", "lesson"): "a lesson is a catalogue entry kept with catalogue_write, and primer_write has no write "
+                          "function for one",
     ("guild", "record_check"): "a check is run by an assessor at the bench (/guild/checks/:id/run), one criterion at a "
                                "time, and its entries are written in their name; a model may propose a check and never "
                                "record one",
@@ -212,9 +215,18 @@ def _actor(ctx: ToolContext) -> tuple[str, str]:
     return "model", _who(ctx)[0]
 
 
-def _effort(agent: str) -> str | None:
-    """The effort a model's write ran at; a person's carries none."""
-    return llm.effort() if agent == "model" else None
+def _effort(ctx: ToolContext, agent: str) -> str | None:
+    """The effort the service's own model ran at, for a write of Postdoc's;
+    a person's write carries none, and so does an outside assistant's
+    (`ToolContext.via`), since no model of the service ran for it."""
+    return llm.effort() if agent == "model" and not getattr(ctx, "via", "") else None
+
+
+def _detail(ctx: ToolContext, agent: str, detail: dict[str, Any]) -> dict[str, Any]:
+    """An audit row's detail, with the door a write in the model's lane came
+    in by (`via`: postdoc, mcp or http; ToolContext.door)."""
+    door = ctx.door() if agent == "model" else None
+    return {**detail, "via": door} if door else detail
 
 
 def _audit_as(ctx: ToolContext, module: str, action: str, state: str, target: str | None,
@@ -223,7 +235,8 @@ def _audit_as(ctx: ToolContext, module: str, action: str, state: str, target: st
 
     agent, who = _actor(ctx)
     audit.append(agent=agent, who=who, module=module, action=action, state=state, target=target,
-                 ask_id=getattr(ctx, "ask_id", None) or None, effort=_effort(agent), detail=detail)
+                 ask_id=getattr(ctx, "ask_id", None) or None, effort=_effort(ctx, agent),
+                 detail=_detail(ctx, agent, detail))
 
 
 def _audit(ctx: ToolContext, module: str, action: str, state: str, target: str | None, detail: dict[str, Any]) -> None:
@@ -241,7 +254,8 @@ def _propose(ctx: ToolContext, module: str, action: str, gate: gates.Gate, inp: 
         # proposal waits for a person to carry it out, whoever proposed it.
         made = proposals.propose(module=module, action=action, gate=gate, title=title, why=why, by=who, agent=agent,
                                  target=inp.target or None, fields=inp.fields, note=inp.note,
-                                 ask_id=getattr(ctx, "ask_id", None), effort=_effort(agent))
+                                 ask_id=getattr(ctx, "ask_id", None), effort=_effort(ctx, agent),
+                                 via=ctx.door() if agent == "model" else None)
     except proposals.ProposalRefused as e:
         return ToolResult(error=f"{module}_write refused {action}: {e}. Nothing was proposed. Say so in gaps.")
     return ToolResult(summary={
@@ -516,12 +530,21 @@ def import_flowsheet(tool: str, file_id: str, note: str, ctx: ToolContext) -> To
 
 
 CATALOGUE_MODULES = {"strain": "geneos", "product": "pureos", "skill": "guild", "lesson": "primer"}
+# What a kept entry's source says of the door it came in by (ToolContext.door).
+CATALOGUE_SOURCES = {"postdoc": "Postdoc ({who})", "mcp": "{who}, over MCP", "http": "{who}, at the HTTP endpoint"}
+CATALOGUE_KEPT = ("kept in the project's catalogue, marked as yours: a person may replace it, and so may a later write "
+                  "of yours through the same kind of door under the same name.")
 
 
 def keep_catalogue(tool: str, inp: Any, ctx: ToolContext) -> ToolResult:
     """One entry kept in the project's catalogue of its kind (alpha 2.1,
-    debt 1), marked as the caller's and audited under the module that reads
-    that kind; refused in words when the kind does not take it."""
+    debt 1), marked as the caller's, in the caller's lane and through the
+    door it came in by, and audited under the module that reads that kind;
+    refused in words when the kind does not take it, and, for a model's write
+    (alpha 2.2 D.0), when the id holds an entry a person or another caller
+    kept (catalogues.keep). Its summary is the entry as kept, a protein's
+    sequence left to catalogue_read, with `state` and the service's word on
+    the keep (`meaning`)."""
     from .. import catalogues
 
     kind = str(inp.kind).strip().lower()
@@ -529,15 +552,16 @@ def keep_catalogue(tool: str, inp: Any, ctx: ToolContext) -> ToolResult:
         return ToolResult(error=f"{tool} refused: there is no catalogue of {kind!r}; the catalogues are "
                                 f"{', '.join(catalogues.KINDS)}")
     agent, who = _actor(ctx)
+    door = ctx.door() if agent == "model" else None
     fields = {k: v for k, v in inp.model_dump().items() if k != "kind" and v not in ("", [], None)}
     try:
-        source = f"{who}, over MCP" if ctx.via == "mcp" else f"Postdoc ({who})" if agent == "model" else who
-        kept = catalogues.keep_fields(kind, fields, by=who, source=source)
+        source = CATALOGUE_SOURCES[door].format(who=who) if door else who
+        kept = catalogues.keep_fields(kind, fields, by=who, source=source, agent=agent, via=door)
     except catalogues.CatalogueRefused as e:
         return ToolResult(error=f"{tool} refused: {e}")
     _audit_as(ctx, CATALOGUE_MODULES[kind], tool, "open", f"{kind}/{kept.id}", {"tool": tool, "kind": kind})
-    return ToolResult(summary={"state": "open", "kind": kind, "id": kept.id, "name": kept.name, "by": kept.by,
-                               "note": "kept in the project's catalogue, marked as yours; a person may replace it."})
+    entry = kept.model_dump(mode="json", exclude_none=True, exclude={"sequence"})
+    return ToolResult(summary={"state": "open", **entry, "meaning": CATALOGUE_KEPT})
 
 
 def make_scenario(tool: str, inp: Any, ctx: ToolContext) -> ToolResult:
@@ -871,7 +895,7 @@ def new_train(tool: str, product: str, inlet_ref: str, note: str, ctx: ToolConte
     agent, who = _actor(ctx)
     try:
         k = kept.keep_train(None, lambda _: spec, who, agent, ask_id=getattr(ctx, "ask_id", None) or None,
-                            effort=_effort(agent))
+                            effort=_effort(ctx, agent))
     except kept.KeptTrainRefused as e:
         return _train_refused(tool, e)
     return _kept_result(tool, "new_train", k, note, ctx, {"read": said})
@@ -893,7 +917,7 @@ def add_unit(tool: str, train_id: str, unit_type: str, after: str, note: str, ct
     try:
         build.kept_or_refuse(train_id)
         k = kept.keep_train(train_id.strip(), change, who, agent, ask_id=getattr(ctx, "ask_id", None) or None,
-                            effort=_effort(agent))
+                            effort=_effort(ctx, agent))
     except (build.BuildRefused, kept.KeptTrainRefused) as e:
         return _train_refused(tool, e)
     return _kept_result(tool, "add_unit", k, note, ctx, {"added": made[-1]})
@@ -908,7 +932,7 @@ def remove_unit(tool: str, train_id: str, unit_id: str, note: str, ctx: ToolCont
     try:
         build.kept_or_refuse(train_id)
         k = kept.keep_train(train_id.strip(), lambda cur: build.without_unit(cur, unit_id), who, agent,
-                            ask_id=getattr(ctx, "ask_id", None) or None, effort=_effort(agent))
+                            ask_id=getattr(ctx, "ask_id", None) or None, effort=_effort(ctx, agent))
     except (build.BuildRefused, kept.KeptTrainRefused) as e:
         return _train_refused(tool, e)
     return _kept_result(tool, "remove_unit", k, note, ctx, {"removed": unit_id.strip()})
@@ -941,7 +965,7 @@ def set_from_record(tool: str, train_id: str, unit_id: str, records_by_param: di
     agent, who = _actor(ctx)
     try:
         k = kept.keep_train(base.id, change, who, agent, ask_id=getattr(ctx, "ask_id", None) or None,
-                            effort=_effort(agent))
+                            effort=_effort(ctx, agent))
     except (build.BuildRefused, kept.KeptTrainRefused) as e:
         return _train_refused(tool, e)
     return _kept_result(tool, "set_from_record", k, note, ctx, {"unit": unit_id.strip(), "bound": bound})
@@ -1034,7 +1058,7 @@ def propose_train(tool: str, product: str, host: str, inlet_ref: str, note: str,
     agent, who = _actor(ctx)
     try:
         k = kept.keep_train(None, lambda _: spec, who, agent, ask_id=getattr(ctx, "ask_id", None) or None,
-                            effort=_effort(agent))
+                            effort=_effort(ctx, agent))
     except kept.KeptTrainRefused as e:
         return _train_refused(tool, e)
     words = [r.model_dump(mode="json") if hasattr(r, "model_dump") else r for r in reasons]

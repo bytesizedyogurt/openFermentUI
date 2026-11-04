@@ -5,27 +5,39 @@ core/openferment_core/tools/. Edit a tool's registration, never this file: `pnpm
 when the two differ. -->
 
 One registry, three callers: Postdoc's loop, the HTTP endpoints (`GET /api/tools`, `POST
-/api/tools/{name}`) and the MCP server (`openferment`) run every tool through `tools.run`, so a rule
-the registry holds, it holds for each of them.
+/api/tools/{name}`) and the MCP server (`openferment`) run every tool through `tools.run`
+(`core/openferment_core/tools/__init__.py`), so a rule the registry holds, it holds for each of them.
 
 - **Inputs** carry ids, words and quantities (ADR-006). A number stands only inside a quantity, an
   object of `value` and `unit` (and `low` and `high` for a range), where a tool asks for one; a
-  number anywhere else, outside the count fields `k` and `limit`, refuses the call. The service
-  writes each quantity's origin from who called: the answering model's estimate with its id, or the
-  named person's assumption (`?by=` at the HTTP endpoint); a quantity nobody can be named for is
-  refused.
-- **Outputs** are a summary a model reads, at most 9,000 characters, and beside it what a
-  claim may cite (records, passages, evidence, module rows); the whole of a large output travels in
-  `data`, which no model reads.
+  number anywhere else, outside the count fields `k` and `limit`, refuses the call. A number is a
+  JSON number: digits inside a string, an id or a name among them, are words. The service writes
+  each quantity's origin from who called: the answering model's estimate with its id, an
+  assistant's estimate under the name it declares (over MCP its `clientInfo`, at the HTTP endpoint
+  the `X-OpenFerment-Assistant` header), or the named person's assumption (`?by=` at the HTTP
+  endpoint); a quantity nobody can be named for is refused, and over MCP a client that declares no
+  name is named `an assistant over MCP`.
+- **Outputs** are a `summary` object a model reads, at most 9,000 characters as JSON, and
+  beside it what a claim may cite: records (`recordIds`), passages, evidence and module rows
+  (`rows`; `moduleRefs` are the module rows a claim of Postdoc's plan cites, each by its `ref`). The
+  whole of a large output travels in `data`, which no model reads, and a refusal is `error`, in
+  words.
 - **Scope**: every tool acts in one project (ADR-005): the request's, the question's, or the one the
   MCP server was started in.
 - **Writes**: a tool marked *writes* keeps something new in the project, audited as its caller's,
-  through `tools/writes.py`; a read keeps nothing but the computations it caches. At the HTTP
-  endpoint a write names the person calling with `?by=`, and a call that names nobody is a 422 in
-  words, with nothing run. The person named is the write's author: its audit row (agent `person`),
-  a proposal it makes (which waits for a person to carry it out, as every proposal does) and what
-  it keeps; pureOS's kept trains hold a model's work alone, and a person's call to keep one is
-  refused in the store's words.
+  through `core/openferment_core/tools/writes.py`; a read keeps nothing but the computations it
+  caches. At the HTTP endpoint a write names its caller: a person with `?by=<their name>`, or an
+  assistant with the `X-OpenFerment-Assistant` header (`<name>/<version>`, UTF-8 text), whose
+  call runs in the model's lane under that name, as over MCP. A call that names nobody, or names
+  both, is a 422 in words, with nothing run. A write of the model's lane names the door it came in by
+  on its audit row (`detail.via`: `postdoc` for Postdoc's loop, `mcp` for the MCP server in its own
+  process, `http` for the header), and only Postdoc's carries an `effort`. The person named is the write's author: its audit row
+  (agent `person`), a proposal it makes (which waits for a person to carry it out, as every
+  proposal does) and what it keeps; pureOS's kept trains hold a model's work alone, and a person's
+  call to keep one is refused in the store's words.
+- *strict* or *loose* says how Postdoc's model is offered a tool: strict holds the model to the
+  schema as it writes the call; the registry validates every caller's input alike, an MCP client's
+  among them.
 
 48 tools.
 
@@ -103,33 +115,33 @@ Search the records Postdoc may cite: the candidates extracted from the project's
 
 *read · scope: project · loose*
 
-Read one of the project's catalogues: its strains (each with its species, the chemical set its trains use and the other names papers give it), its products (each with its class and a protein's sequence), Guild's skills or Primer's lessons. Narrow by words. Returns the entries in words; a pureOS proposal's host is a strain read here.
+Read one of the project's catalogues: its strains (each with its species, the chemical set its trains use and the other names papers give it), its products (each with its class and a protein's sequence), Guild's skills or Primer's lessons. Narrow by words. Returns {kind, matched, entries, note}: matched counts every entry the words match, and entries holds the first limit of them (20 when limit is left out, at most 40), in id order, each an entry with its fields as kept and its null fields left out: its kind, id, name and the fields of its kind, who kept it (by), the lane it was kept in (agent: person or model), the door a model's entry came in by (via: postdoc, mcp or http), where it came from (source) and when it was kept (at, ISO 8601 in UTC, as the audit writes its rows' times). A pureOS proposal's host is a strain read here.
 
 | Field | Type | Required | What it is |
 |---|---|---|---|
 | `kind` | string | yes | Which catalogue: strain, product, skill or lesson. |
 | `words` | string | no | Words to narrow the entries by: an id, a name, an alias; empty for all. |
-| `limit` | integer | no | How many rows at most. A count. |
+| `limit` | integer | no | How many entries at most, 1 to 40, 20 when left out; a limit outside those bounds refuses the call. A count. |
 
 ### `catalogue_write`
 
 *writes · scope: project · loose*
 
-Keep one entry in the project's catalogue of strains, products, skills or lessons, marked as yours: a strain a document describes, with its species and the names papers give it; a product with its class; a skill or a lesson. Names and words only, never a measured value: a number a paper reports is a record. An entry already kept under the id is replaced; say in the note what the entry rests on.
+Keep one entry in the project's catalogue of strains, products, skills or lessons, marked as yours: a strain a document describes, with its species and the names papers give it; a product with its class; a skill or a lesson. Names and words only, never a measured value: a number a paper reports is a record. An entry you kept yourself under the id, in your own name and through the same kind of door (Postdoc's loop, or an outside assistant's: MCP or the HTTP endpoint's assistant header), is replaced; an entry a person or another caller kept under it stays as it is, and the call is refused in words naming the entry and who kept it, so keep yours under an id of its own, one that starts with your name, its / written as a dot (example-agent.0.1-a-skill for example-agent/0.1). Say in the note what the entry rests on. A strain's own fields are species, program and aliases; a product's are sequence and sequenceSource; a skill's are family and mastery; a lesson's is skills; every kind takes name, summary, category and note, and a field of another kind is refused in words. The result's summary is the entry as kept, its null fields left out and a protein's sequence left to catalogue_read: its kind, id, name and fields, its own note, by (the name you are kept under), agent (model), via (the door: postdoc, mcp or http), source and at, beside state (open) and meaning (the service's word on the keep). Its audit row names the module that reads the kind (geneos for a strain, pureos a product, guild a skill, primer a lesson), action catalogue_write, state open, target <kind>/<id>, the caller as agent and who, and the door as detail.via.
 
 | Field | Type | Required | What it is |
 |---|---|---|---|
 | `kind` | string | yes | Which catalogue: strain, product, skill or lesson. |
-| `id` | string | yes | The entry's id: letters, digits, '.', '_', ':' or '-'. |
+| `id` | string | yes | The entry's id: a letter or a digit first, then letters, digits, '.', '_', ':' or '-', at most 80 characters. |
 | `name` | string | yes | Its name as a person reads it. |
 | `species` | string | no | A strain's species. |
 | `program` | string | no | A strain's chemical set, as pureOS names it. |
 | `aliases` | list of string | no | A strain's other names, as papers give them. |
-| `category` | string | no | A product's class, as the proposer's rules read it. |
+| `category` | string | no | The entry's class, in words; a product's as the proposer's rules read it. |
 | `sequence` | string | no | A protein product's sequence, one letter a residue. |
 | `sequenceSource` | string | no | Where the sequence was read, in words; a sequence needs it. |
 | `family` | string | no | A skill's family. |
-| `summary` | string | no | What a skill is. |
+| `summary` | string | no | What the entry is, in words; a skill's what the skill is. |
 | `mastery` | list of string | no | What mastery of a skill means, a criterion an item. |
 | `skills` | list of string | no | The skill ids a lesson counts toward. |
 | `note` | string | no | What the entry rests on, in words: the document or record it came from. |
@@ -228,7 +240,7 @@ Run a plant from the library shelf at the library's defaults, or a study scenari
 
 *read · scope: project · loose*
 
-Read a kept engine run by its id: what ran, the values it set with their origins, its provenance, and each number its price block, its flowsheet's outputs and its TEA breakdown hold as an evidence id to cite; with words in `parameters`, the parameters the run read back from the plant (its feed's composition, moisture and price, the chemicals' prices, the finance terms), each as an evidence id with its origin. For a refused run, the plant's own words.
+Read a kept engine run by its id: what ran, the values it set with their origins, its provenance, and each number its price block, its flowsheet's outputs and its TEA breakdown hold as an evidence id to cite; with words in `parameters`, the parameters the run read back from the plant (its feed's composition, moisture and price, the chemicals' prices, the finance terms), each as an evidence id with its origin. A run whose engine reports what its computation did (the time it took, say) names those diagnostics as words beside its outputs. For a refused run, the plant's own words.
 
 | Field | Type | Required | What it is |
 |---|---|---|---|
@@ -370,7 +382,7 @@ Forecast a run like a fitted one: biomass, product and substrate as bands for re
 
 | Field | Type | Required | What it is |
 |---|---|---|---|
-| `fitArtifactId` | string | yes | The artifact id of a kept kinetic fit (tool kinetic_fit). |
+| `fitArtifactId` | string | yes | The artifact id of a kept kinetic fit (the artifact tool kinetic_fit). |
 
 ### `fermos_simulate`
 
@@ -458,7 +470,7 @@ Density, heat capacity, viscosity, and bubble and dew points of a mixture alread
 
 | Field | Type | Required | What it is |
 |---|---|---|---|
-| `artifactId` | string | yes | A Proforma run's artifact id (tool proforma.run), with streamId; or an empty string. |
+| `artifactId` | string | yes | A Proforma run's artifact id (the artifact tool proforma.run), with streamId; or an empty string. |
 | `streamId` | string | yes | One stream of that run's stream table, by its id; or an empty string. |
 | `preset` | string | yes | ethanol-water-azeotrope (the composition thermosteam's own vapour-liquid equilibrium gives), or beer-at-titre-of with recordId (water and ethanol at that record's titre); or an empty string when a stream is named. |
 | `recordId` | string | yes | An ethanol titre record's id (field ethanol_titre), for beer-at-titre-of; or an empty string. |
@@ -503,7 +515,7 @@ Draft a runbook from what this run found: a title, a product id and a strain id 
 
 *read · scope: project · loose*
 
-Read Runbooks: the runbooks (their status, lock and what they predict), the protocols (their versions), the depositions made at the bench (kind deposition: its runbook, state, how many readings it holds and how many a person confirmed, and the ids of the readings a run may take), each reading a run may take as a measurement (kind reading, read by its id <deposition id>/<entry id>: the measure it is of, its value and unit as the bench kept them, who deposited it and when it was taken; a scenario's value names it as {"value": <value>, "unit": "<unit>", "origin": {"kind": "measurement", "ref": "<its id>"}}), and the measured evidence a reconciliation released (kind measured-evidence: the prediction it tests, its value, unit and conditions). Kinds: runbook, protocol, deposition, reading, measured-evidence. Pass ids or refs, words, a kind and a state to narrow; pass an empty list and empty strings to list the module. Returns at most 20 rows, each with its ref (cite it in moduleRefs), label, state (open, fenced, approved, locked, proposed, retired; computed by the service), the module's own status word and its provenance; and the count of every match by state.
+Read Runbooks: the runbooks (their status, lock and what they predict), the protocols (their versions), the depositions made at the bench (kind deposition: its runbook, state, how many readings it holds and how many a person confirmed, and the ids of the readings a run may take), each reading a run may take as a measurement (kind reading, read by its id <deposition id>/<entry id>: the measure it is of, its value and unit as the bench kept them, who deposited it and when it was taken; a scenario's value names it as {"value": <value>, "unit": "<unit>", "origin": {"kind": "measurement", "ref": "<its id>"}}), and the measured evidence a reconciliation released (kind measured-evidence: the prediction it tests, its value, unit and conditions). Kinds: runbook, protocol, deposition, reading, measured-evidence. Pass ids or refs, words, a kind and a state to narrow; pass an empty list and empty strings to list the module. Returns at most 20 rows (a larger limit is read as 20), in the summary's rows and the result's rows, each with its ref (cite it in moduleRefs), label, state (open, fenced, approved, locked, proposed, retired; computed by the service), the module's own status word and its provenance. The summary holds module, rows, count (every match), returned (the rows shown) and states (the count of every match by state), a note when rows were left out so that the result stays readable, and partial when the module is read in part; narrow by ids, state or words to read the rest.
 
 | Field | Type | Required | What it is |
 |---|---|---|---|
@@ -511,13 +523,13 @@ Read Runbooks: the runbooks (their status, lock and what they predict), the prot
 | `words` | string | yes | Words to search the module for, or an empty string for no word search. |
 | `kind` | string | yes | One of the module's kinds, named in the tool's description, or an empty string for every kind. |
 | `state` | one of empty, `open`, `fenced`, `approved`, `locked`, `proposed`, `retired` | yes | One of open, fenced, approved, locked, proposed, retired; or an empty string for every state. |
-| `limit` | integer | yes | How many rows to return, at most 20. A count. |
+| `limit` | integer | yes | How many rows to return, at most 20; a larger limit is read as 20. A count. |
 
 ### `geneos_read`
 
 *read · scope: project · loose*
 
-Read geneOS: the hosts, the pathways, the genome-scale models on the shelf and the ceilings computed on them. Kinds: host, pathway, model, artifact. Pass ids or refs, words, a kind and a state to narrow; pass an empty list and empty strings to list the module. Returns at most 20 rows, each with its ref (cite it in moduleRefs), label, state (open, fenced, approved, locked, proposed, retired; computed by the service), the module's own status word and its provenance; and the count of every match by state.
+Read geneOS: the hosts, the pathways, the genome-scale models on the shelf and the ceilings computed on them. Kinds: host, pathway, model, artifact. Pass ids or refs, words, a kind and a state to narrow; pass an empty list and empty strings to list the module. Returns at most 20 rows (a larger limit is read as 20), in the summary's rows and the result's rows, each with its ref (cite it in moduleRefs), label, state (open, fenced, approved, locked, proposed, retired; computed by the service), the module's own status word and its provenance. The summary holds module, rows, count (every match), returned (the rows shown) and states (the count of every match by state), a note when rows were left out so that the result stays readable, and partial when the module is read in part; narrow by ids, state or words to read the rest.
 
 | Field | Type | Required | What it is |
 |---|---|---|---|
@@ -525,13 +537,13 @@ Read geneOS: the hosts, the pathways, the genome-scale models on the shelf and t
 | `words` | string | yes | Words to search the module for, or an empty string for no word search. |
 | `kind` | string | yes | One of the module's kinds, named in the tool's description, or an empty string for every kind. |
 | `state` | one of empty, `open`, `fenced`, `approved`, `locked`, `proposed`, `retired` | yes | One of open, fenced, approved, locked, proposed, retired; or an empty string for every state. |
-| `limit` | integer | yes | How many rows to return, at most 20. A count. |
+| `limit` | integer | yes | How many rows to return, at most 20; a larger limit is read as 20. A count. |
 
 ### `fermos_read`
 
 *read · scope: project · loose*
 
-Read fermOS: the growth fits and forecasts computed from deposited runs (kind artifact), the kept simulations of a model family (kind simulation: its family, strain, product and sugar, and what bound each parameter, in words; its numbers stay in the artifact, cited by the row's ref or the evidence id fermos_simulate returns), the vessels BioSTEAM designed for kept simulations (kind vessel, read by the design's artifact id or the simulation's), and the depositions kept with the runbooks, whose series fermOS fits (kind deposition: its runbook, its readings and series, and the fits made from it). Kinds: artifact, simulation, vessel, deposition. Pass ids or refs, words, a kind and a state to narrow; pass an empty list and empty strings to list the module. Returns at most 20 rows, each with its ref (cite it in moduleRefs), label, state (open, fenced, approved, locked, proposed, retired; computed by the service), the module's own status word and its provenance; and the count of every match by state.
+Read fermOS: the growth fits and forecasts computed from deposited runs (kind artifact), the kept simulations of a model family (kind simulation: its family, strain, product and sugar, and what bound each parameter, in words; its numbers stay in the artifact, cited by the row's ref or the evidence id fermos_simulate returns), the vessels BioSTEAM designed for kept simulations (kind vessel, read by the design's artifact id or the simulation's), and the depositions kept with the runbooks, whose series fermOS fits (kind deposition: its runbook, its readings and series, and the fits made from it). Kinds: artifact, simulation, vessel, deposition. Pass ids or refs, words, a kind and a state to narrow; pass an empty list and empty strings to list the module. Returns at most 20 rows (a larger limit is read as 20), in the summary's rows and the result's rows, each with its ref (cite it in moduleRefs), label, state (open, fenced, approved, locked, proposed, retired; computed by the service), the module's own status word and its provenance. The summary holds module, rows, count (every match), returned (the rows shown) and states (the count of every match by state), a note when rows were left out so that the result stays readable, and partial when the module is read in part; narrow by ids, state or words to read the rest.
 
 | Field | Type | Required | What it is |
 |---|---|---|---|
@@ -539,13 +551,13 @@ Read fermOS: the growth fits and forecasts computed from deposited runs (kind ar
 | `words` | string | yes | Words to search the module for, or an empty string for no word search. |
 | `kind` | string | yes | One of the module's kinds, named in the tool's description, or an empty string for every kind. |
 | `state` | one of empty, `open`, `fenced`, `approved`, `locked`, `proposed`, `retired` | yes | One of open, fenced, approved, locked, proposed, retired; or an empty string for every state. |
-| `limit` | integer | yes | How many rows to return, at most 20. A count. |
+| `limit` | integer | yes | How many rows to return, at most 20; a larger limit is read as 20. A count. |
 
 ### `pureos_read`
 
 *read · scope: project · loose*
 
-Read pureOS: the downstream unit operations, by stage (each with the BioSTEAM classes it is), and the trains Proforma's runs simulated (kind train, one a scenario: read by the scenario id or the run's artifact id); kind train-unit is one unit of a train, in run order, with the product in and out and the recovery read from the run's stream table. Kind train also holds the trains a model built with pureos_build (read by the train's id: its product, inlet and units in words and ids, who made it, its runs' ids), and kind train-run is one kept run of such a train (pureos/train-run/<artifact id>, read by its id or its train's: its train, product, units and product stream in words; its numbers stay in the artifact, cited by the row's ref or the evidence id pureos_build returns). Kinds: unit-operation, train, train-unit, train-run. Pass ids or refs, words, a kind and a state to narrow; pass an empty list and empty strings to list the module. Returns at most 20 rows, each with its ref (cite it in moduleRefs), label, state (open, fenced, approved, locked, proposed, retired; computed by the service), the module's own status word and its provenance; and the count of every match by state.
+Read pureOS: the downstream unit operations, by stage (each with the BioSTEAM classes it is), and the trains Proforma's runs simulated (kind train, one a scenario: read by the scenario id or the run's artifact id); kind train-unit is one unit of a train, in run order, with the product in and out and the recovery read from the run's stream table. Kind train also holds the trains a model built with pureos_build (read by the train's id: its product, inlet and units in words and ids, who made it, its runs' ids), and kind train-run is one kept run of such a train (pureos/train-run/<artifact id>, read by its id or its train's: its train, product, units and product stream in words; its numbers stay in the artifact, cited by the row's ref or the evidence id pureos_build returns). Kinds: unit-operation, train, train-unit, train-run. Pass ids or refs, words, a kind and a state to narrow; pass an empty list and empty strings to list the module. Returns at most 20 rows (a larger limit is read as 20), in the summary's rows and the result's rows, each with its ref (cite it in moduleRefs), label, state (open, fenced, approved, locked, proposed, retired; computed by the service), the module's own status word and its provenance. The summary holds module, rows, count (every match), returned (the rows shown) and states (the count of every match by state), a note when rows were left out so that the result stays readable, and partial when the module is read in part; narrow by ids, state or words to read the rest.
 
 | Field | Type | Required | What it is |
 |---|---|---|---|
@@ -553,13 +565,13 @@ Read pureOS: the downstream unit operations, by stage (each with the BioSTEAM cl
 | `words` | string | yes | Words to search the module for, or an empty string for no word search. |
 | `kind` | string | yes | One of the module's kinds, named in the tool's description, or an empty string for every kind. |
 | `state` | one of empty, `open`, `fenced`, `approved`, `locked`, `proposed`, `retired` | yes | One of open, fenced, approved, locked, proposed, retired; or an empty string for every state. |
-| `limit` | integer | yes | How many rows to return, at most 20. A count. |
+| `limit` | integer | yes | How many rows to return, at most 20; a larger limit is read as 20. A count. |
 
 ### `proforma_read`
 
 *read · scope: project · loose*
 
-Read Proforma: the cost scenarios and the runs kept as artifacts: each scenario's runs, the library plants' runs, the corn stover and dry-grind corn reference plants among them, and the runs kept from the retired reference entries (a reference run, the benchmark), listed as kept (stream_table reads a run's streams; engine_report reads a library run's numbers as evidence ids). Kinds: scenario, artifact. Pass ids or refs, words, a kind and a state to narrow; pass an empty list and empty strings to list the module. Returns at most 20 rows, each with its ref (cite it in moduleRefs), label, state (open, fenced, approved, locked, proposed, retired; computed by the service), the module's own status word and its provenance; and the count of every match by state.
+Read Proforma: the cost scenarios and the runs kept as artifacts: each scenario's runs, the library plants' runs, the corn stover and dry-grind corn reference plants among them, and the runs kept from the retired reference entries (a reference run, the benchmark), listed as kept (stream_table reads a run's streams; engine_report reads a library run's numbers as evidence ids). Kinds: scenario, artifact. Pass ids or refs, words, a kind and a state to narrow; pass an empty list and empty strings to list the module. Returns at most 20 rows (a larger limit is read as 20), in the summary's rows and the result's rows, each with its ref (cite it in moduleRefs), label, state (open, fenced, approved, locked, proposed, retired; computed by the service), the module's own status word and its provenance. The summary holds module, rows, count (every match), returned (the rows shown) and states (the count of every match by state), a note when rows were left out so that the result stays readable, and partial when the module is read in part; narrow by ids, state or words to read the rest.
 
 | Field | Type | Required | What it is |
 |---|---|---|---|
@@ -567,13 +579,13 @@ Read Proforma: the cost scenarios and the runs kept as artifacts: each scenario'
 | `words` | string | yes | Words to search the module for, or an empty string for no word search. |
 | `kind` | string | yes | One of the module's kinds, named in the tool's description, or an empty string for every kind. |
 | `state` | one of empty, `open`, `fenced`, `approved`, `locked`, `proposed`, `retired` | yes | One of open, fenced, approved, locked, proposed, retired; or an empty string for every state. |
-| `limit` | integer | yes | How many rows to return, at most 20. A count. |
+| `limit` | integer | yes | How many rows to return, at most 20; a larger limit is read as 20. A count. |
 
 ### `biorepo_read`
 
 *read · scope: project · loose*
 
-Read BioRepo: the records, the extractor's candidates, the computed artifacts and the Witness runs that score the extractor. Kinds: record, candidate, artifact, witness-run. Pass ids or refs, words, a kind and a state to narrow; pass an empty list and empty strings to list the module. Returns at most 20 rows, each with its ref (cite it in moduleRefs), label, state (open, fenced, approved, locked, proposed, retired; computed by the service), the module's own status word and its provenance; and the count of every match by state. Read in part: review decisions a browser has not posted yet wait in that browser.
+Read BioRepo: the records, the extractor's candidates, the computed artifacts and the Witness runs that score the extractor. Kinds: record, candidate, artifact, witness-run. Pass ids or refs, words, a kind and a state to narrow; pass an empty list and empty strings to list the module. Returns at most 20 rows (a larger limit is read as 20), in the summary's rows and the result's rows, each with its ref (cite it in moduleRefs), label, state (open, fenced, approved, locked, proposed, retired; computed by the service), the module's own status word and its provenance. The summary holds module, rows, count (every match), returned (the rows shown) and states (the count of every match by state), a note when rows were left out so that the result stays readable, and partial when the module is read in part; narrow by ids, state or words to read the rest. Read in part: review decisions a browser has not posted yet wait in that browser.
 
 | Field | Type | Required | What it is |
 |---|---|---|---|
@@ -581,13 +593,13 @@ Read BioRepo: the records, the extractor's candidates, the computed artifacts an
 | `words` | string | yes | Words to search the module for, or an empty string for no word search. |
 | `kind` | string | yes | One of the module's kinds, named in the tool's description, or an empty string for every kind. |
 | `state` | one of empty, `open`, `fenced`, `approved`, `locked`, `proposed`, `retired` | yes | One of open, fenced, approved, locked, proposed, retired; or an empty string for every state. |
-| `limit` | integer | yes | How many rows to return, at most 20. A count. |
+| `limit` | integer | yes | How many rows to return, at most 20; a larger limit is read as 20. A count. |
 
 ### `guild_read`
 
 *read · scope: project · loose*
 
-Read Guild: the people on the ledger (name, role, whether active) and the competence checks on skills; no level is stored and none is read. Kinds: person, check. Pass ids or refs, words, a kind and a state to narrow; pass an empty list and empty strings to list the module. Returns at most 20 rows, each with its ref (cite it in moduleRefs), label, state (open, fenced, approved, locked, proposed, retired; computed by the service), the module's own status word and its provenance; and the count of every match by state.
+Read Guild: the people on the ledger (name, role, whether active) and the competence checks on skills; no level is stored and none is read. Kinds: person, check. Pass ids or refs, words, a kind and a state to narrow; pass an empty list and empty strings to list the module. Returns at most 20 rows (a larger limit is read as 20), in the summary's rows and the result's rows, each with its ref (cite it in moduleRefs), label, state (open, fenced, approved, locked, proposed, retired; computed by the service), the module's own status word and its provenance. The summary holds module, rows, count (every match), returned (the rows shown) and states (the count of every match by state), a note when rows were left out so that the result stays readable, and partial when the module is read in part; narrow by ids, state or words to read the rest.
 
 | Field | Type | Required | What it is |
 |---|---|---|---|
@@ -595,13 +607,13 @@ Read Guild: the people on the ledger (name, role, whether active) and the compet
 | `words` | string | yes | Words to search the module for, or an empty string for no word search. |
 | `kind` | string | yes | One of the module's kinds, named in the tool's description, or an empty string for every kind. |
 | `state` | one of empty, `open`, `fenced`, `approved`, `locked`, `proposed`, `retired` | yes | One of open, fenced, approved, locked, proposed, retired; or an empty string for every state. |
-| `limit` | integer | yes | How many rows to return, at most 20. A count. |
+| `limit` | integer | yes | How many rows to return, at most 20; a larger limit is read as 20. A count. |
 
 ### `primer_read`
 
 *read · scope: project · loose*
 
-Read Primer: the lessons, by module, and the skills each counts toward. Kinds: lesson. Pass ids or refs, words, a kind and a state to narrow; pass an empty list and empty strings to list the module. Returns at most 20 rows, each with its ref (cite it in moduleRefs), label, state (open, fenced, approved, locked, proposed, retired; computed by the service), the module's own status word and its provenance; and the count of every match by state.
+Read Primer: the lessons, by module, and the skills each counts toward. Kinds: lesson. Pass ids or refs, words, a kind and a state to narrow; pass an empty list and empty strings to list the module. Returns at most 20 rows (a larger limit is read as 20), in the summary's rows and the result's rows, each with its ref (cite it in moduleRefs), label, state (open, fenced, approved, locked, proposed, retired; computed by the service), the module's own status word and its provenance. The summary holds module, rows, count (every match), returned (the rows shown) and states (the count of every match by state), a note when rows were left out so that the result stays readable, and partial when the module is read in part; narrow by ids, state or words to read the rest.
 
 | Field | Type | Required | What it is |
 |---|---|---|---|
@@ -609,13 +621,13 @@ Read Primer: the lessons, by module, and the skills each counts toward. Kinds: l
 | `words` | string | yes | Words to search the module for, or an empty string for no word search. |
 | `kind` | string | yes | One of the module's kinds, named in the tool's description, or an empty string for every kind. |
 | `state` | one of empty, `open`, `fenced`, `approved`, `locked`, `proposed`, `retired` | yes | One of open, fenced, approved, locked, proposed, retired; or an empty string for every state. |
-| `limit` | integer | yes | How many rows to return, at most 20. A count. |
+| `limit` | integer | yes | How many rows to return, at most 20; a larger limit is read as 20. A count. |
 
 ### `intake_read`
 
 *read · scope: project · loose*
 
-Read Intake: the documents the project holds in its literature: title, year, where each came from, its licence class and passages. Kinds: source. Pass ids or refs, words, a kind and a state to narrow; pass an empty list and empty strings to list the module. Returns at most 20 rows, each with its ref (cite it in moduleRefs), label, state (open, fenced, approved, locked, proposed, retired; computed by the service), the module's own status word and its provenance; and the count of every match by state.
+Read Intake: the documents the project holds in its literature: title, year, where each came from, its licence class and passages. Kinds: source. Pass ids or refs, words, a kind and a state to narrow; pass an empty list and empty strings to list the module. Returns at most 20 rows (a larger limit is read as 20), in the summary's rows and the result's rows, each with its ref (cite it in moduleRefs), label, state (open, fenced, approved, locked, proposed, retired; computed by the service), the module's own status word and its provenance. The summary holds module, rows, count (every match), returned (the rows shown) and states (the count of every match by state), a note when rows were left out so that the result stays readable, and partial when the module is read in part; narrow by ids, state or words to read the rest.
 
 | Field | Type | Required | What it is |
 |---|---|---|---|
@@ -623,13 +635,13 @@ Read Intake: the documents the project holds in its literature: title, year, whe
 | `words` | string | yes | Words to search the module for, or an empty string for no word search. |
 | `kind` | string | yes | One of the module's kinds, named in the tool's description, or an empty string for every kind. |
 | `state` | one of empty, `open`, `fenced`, `approved`, `locked`, `proposed`, `retired` | yes | One of open, fenced, approved, locked, proposed, retired; or an empty string for every state. |
-| `limit` | integer | yes | How many rows to return, at most 20. A count. |
+| `limit` | integer | yes | How many rows to return, at most 20; a larger limit is read as 20. A count. |
 
 ### `home_read`
 
 *read · scope: project · loose*
 
-Read Home: what waits for a person: candidates awaiting review and open checks. Kinds: review, check, proposal. Pass ids or refs, words, a kind and a state to narrow; pass an empty list and empty strings to list the module. Returns at most 20 rows, each with its ref (cite it in moduleRefs), label, state (open, fenced, approved, locked, proposed, retired; computed by the service), the module's own status word and its provenance; and the count of every match by state.
+Read Home: what waits for a person: candidates awaiting review and open checks. Kinds: review, check, proposal. Pass ids or refs, words, a kind and a state to narrow; pass an empty list and empty strings to list the module. Returns at most 20 rows (a larger limit is read as 20), in the summary's rows and the result's rows, each with its ref (cite it in moduleRefs), label, state (open, fenced, approved, locked, proposed, retired; computed by the service), the module's own status word and its provenance. The summary holds module, rows, count (every match), returned (the rows shown) and states (the count of every match by state), a note when rows were left out so that the result stays readable, and partial when the module is read in part; narrow by ids, state or words to read the rest.
 
 | Field | Type | Required | What it is |
 |---|---|---|---|
@@ -637,7 +649,7 @@ Read Home: what waits for a person: candidates awaiting review and open checks. 
 | `words` | string | yes | Words to search the module for, or an empty string for no word search. |
 | `kind` | string | yes | One of the module's kinds, named in the tool's description, or an empty string for every kind. |
 | `state` | one of empty, `open`, `fenced`, `approved`, `locked`, `proposed`, `retired` | yes | One of open, fenced, approved, locked, proposed, retired; or an empty string for every state. |
-| `limit` | integer | yes | How many rows to return, at most 20. A count. |
+| `limit` | integer | yes | How many rows to return, at most 20; a larger limit is read as 20. A count. |
 
 ## Module writes
 
@@ -684,7 +696,7 @@ Write to fermOS, through the module's own write function. Actions — forecast: 
 
 *writes · scope: project · loose*
 
-Write to pureOS, through the module's own write function. Actions — new_train: start a train for a product (its id) from the inlet a kept artifact gives (inletRef: a kept simulation's artifact id, a kept vessel design's, or a kept run's stream as <artifact id>/<stream id>), kept on the service as the model's, as pureos_build's new does (fields: product, inletRef); add_unit: add a unit of a catalogue type to the train named in target, after the unit named (inlet for the first place; empty for the end) (fields: unitType, afterUnitId); remove_unit: take a unit out of the train named in target (fields: unitId); set_from_record: bind a unit's parameter to exactly the records named for it (records.<parameter key>, their ids separated by commas or spaces), each held to the parameter's field, the aggregate gate and its unit; refused naming a record that cannot bind and why (fields: unitId, records.<key>); run_train: run the train named in target in the Proforma worker as the service binds it and keep the run; refused naming each value that waits for a person's. pureOS's unit operations and its unit catalogue are curated (schema/vocabulary.yaml, core/openferment_core/pureos/catalogue.py); the service has no write function for them: every other call is refused in words. Pass action, target (an id), fields (names to words) and note (why). What is written lands in the open lane marked as its caller's, in the audit log, until a person promotes it; a refusal says why, and goes in gaps.
+Write to pureOS, through the module's own write function. Actions — new_train: start a train for a product (its id) from the inlet a kept artifact gives (inletRef: a kept simulation's artifact id, a kept vessel design's, or a kept run's stream as <artifact id>/<stream id>), kept on the service as the model's, as pureos_build's new does (fields: product, inletRef); add_unit: add a unit of a catalogue type to the train named in target, after the unit named (inlet for the first place; empty for the end) (fields: unitType, afterUnitId); remove_unit: take a unit out of the train named in target (fields: unitId); set_from_record: bind a unit's parameter to exactly the records named for it (records.<parameter key>, their ids separated by commas or spaces), each held to the parameter's field, the aggregate gate and its unit; refused naming a record that cannot bind and why (fields: unitId, records.<key>); run_train: run the train named in target in the Proforma worker as the service binds it and keep the run; refused naming each value that waits for a person's. pureOS's unit operations and its unit catalogue are curated (core/openferment_core/schema/vocabulary.yaml, core/openferment_core/pureos/catalogue.py); the service has no write function for them: every other call is refused in words. Pass action, target (an id), fields (names to words) and note (why). What is written lands in the open lane marked as its caller's, in the audit log, until a person promotes it; a refusal says why, and goes in gaps.
 
 | Field | Type | Required | What it is |
 |---|---|---|---|
@@ -736,7 +748,7 @@ Write to Guild, through the module's own write function. Actions — propose_che
 
 *writes · scope: project · loose*
 
-Write to Primer, through the module's own write function. Actions — lesson: refused, every call (Primer holds no lessons yet, and the service has no write function for them). Primer holds no lessons yet, and the service has no write function for them: every other call is refused in words. Pass action, target (an id), fields (names to words) and note (why). What is written lands in the open lane marked as its caller's, in the audit log, until a person promotes it; a refusal says why, and goes in gaps.
+Write to Primer, through the module's own write function. Actions — lesson: refused, every call (a lesson is a catalogue entry kept with catalogue_write, and primer_write has no write function for one). primer_write keeps nothing and has no write function, since a lesson is a catalogue entry kept with catalogue_write: every other call is refused in words. Pass action, target (an id), fields (names to words) and note (why). What is written lands in the open lane marked as its caller's, in the audit log, until a person promotes it; a refusal says why, and goes in gaps.
 
 | Field | Type | Required | What it is |
 |---|---|---|---|
@@ -773,7 +785,7 @@ Write to Home, through the module's own write function. Actions — note: propos
 
 ## The gates (OF-BLD-015 §7.4)
 
-A write tool whose module and action a gate names writes nothing: the call becomes a proposal with `state: proposed`, and Home shows it with the one button a person presses (`tools/gates.py`).
+A write tool whose module and action a gate names writes nothing: the call becomes a proposal with `state: proposed`, and Home shows it with the one button a person presses (`core/openferment_core/tools/gates.py`).
 
 | Gate | Covers | Actions | The button |
 |---|---|---|---|
@@ -789,4 +801,37 @@ A write tool whose module and action a gate names writes nothing: the call becom
 
 `openferment` (`core/openferment_core/mcp_server.py`, started by `.mcp.json`) lists every tool above under its own name, description and input schema, and adds `ask_postdoc` and `get_artifact`: Postdoc's loop on a question, and a kept artifact by its id. It acts in one project, the one `--project` names or else `OPENFERMENT_PROJECT`.
 
-A client is known by the name it declares when it connects: MCP's `clientInfo`, written `<name>/<version>` (a client of the Python `mcp` package passes `client_info=Implementation(name=..., version=...)`). A number it types into a quantity is that name's estimate, and every write it makes is audited under that name: the entry or the run it keeps names it as `by`, and the audit line (`GET /api/audit`) as `who`. A client that declares no name, or only the SDK's default, is marked `an assistant over MCP`.
+### `ask_postdoc`
+
+Ask Postdoc a question. It runs its bounded loop over openFerment's tools and returns the plan: claims that carry no numbers of their own, each citing records, quoted sentences or computed values.
+
+| Field | Type | Required | What it is |
+|---|---|---|---|
+| `question` | string | yes | The question, in words. |
+
+### `get_artifact`
+
+Read one kept artifact by its id: what was computed, from which inputs, with its provenance.
+
+| Field | Type | Required | What it is |
+|---|---|---|---|
+| `id` | string | yes | The artifact's id, sixteen hex digits, as a tool's result names it (an artifactId). |
+
+### Starting it
+
+- Start it from the repository's root. `.mcp.json` names no project: a client appends `--project <id>` after the module, `uv run --project core --all-extras python -m openferment_core.mcp_server --project <id>` (the first `--project`, uv's, names the directory `core`), or sets `OPENFERMENT_PROJECT` in the server's environment.
+- **Through a running service**: add `--service <origin>`, the running openFerment service's own address: `uv run --project core --all-extras python -m openferment_core.mcp_server --project <id> --service http://127.0.0.1:<port>`. The origin is `http://` or `https://`, the host `127.0.0.1`, `[::1]` or `localhost`, and an explicit port, with nothing after the port and no user or password: the service binds loopback, and the server sends to that address alone (`localhost` as `127.0.0.1`), through no proxy, following no redirect. Every call then goes to that service, in the project named: a tool above as `POST <origin>/api/tools/<name>` with the arguments as the client sent them, the project in `X-OpenFerment-Project` and the client's name in `X-OpenFerment-Assistant`; `ask_postdoc` as `POST <origin>/api/ask`; `get_artifact` as `GET <origin>/api/biorepo/artifacts/<id>`. In this mode the server opens no database, needs no `OPENFERMENT_DATABASE_URL`, and reads `core/.env` for `OPENFERMENT_PROJECT` alone, when `--project` names none. What it writes is what that service's `GET /api/audit` reads. An origin outside that rule is refused in words when the server starts, and every call then answers with those words; a service that does not answer is said in words at each call. A call waits up to 15 minutes for the service's answer, the longest one tool may take there, and `ask_postdoc` up to 21, Postdoc's whole loop; past that the call answers in words that the service did not answer, and the service may carry on with it.
+- **In its own process**: with no `--service`, the server opens the database `OPENFERMENT_DATABASE_URL` names (its environment, then `core/.env`) at its first call, and runs every call there.
+- With no project, or one its store does not hold, the server connects and answers every call with words saying which, and nothing is read or made; through a service, a project it does not hold comes back in the service's own words.
+- In its own process it reads `OPENFERMENT_DATABASE_URL` and `OPENFERMENT_PROJECT` from its environment, else from `core/.env`, and `ask_postdoc` runs on the key its environment holds (`ANTHROPIC_API_KEY`); through a service, `ask_postdoc` runs on the service's own key. uv reads the proxy variables. A Python client passes its own environment (`StdioServerParameters(command="uv", args=[...], cwd=<root>, env=dict(os.environ))`), since the SDK otherwise hands the server `HOME`, `PATH` and four names more.
+- In a fresh checkout the first start syncs core's environment with every extra from PyPI, which takes minutes; `uv sync --project core --all-extras` from the repository's root beforehand leaves a start of a few seconds. Once the environment is built the server answers `initialize` in a few seconds (about 4 s here) and opens nothing until its first call; it needs no key, and `ask_postdoc` alone spends.
+
+### A client
+
+- The server runs on `mcp` 2.3 (`core/uv.lock`). A client of that SDK imports `ClientSession` and `StdioServerParameters` from `mcp`, `stdio_client` from `mcp.client.stdio` and `Implementation` from `mcp.types`. It opens `stdio_client(params)` as `(read, write)` and `ClientSession(read, write, client_info=Implementation(name=..., version=...))` inside it, calls `await session.initialize()` first (2.3 sends the handshake there, and a call before it is refused as invalid request parameters), then `await session.list_tools()` and `await session.call_tool(<name>, <arguments>)`; a tool's JSON is `result.content[0].text`. 2.3 spells the SDK's fields in snake case: a result's `content`, `is_error` and `structured_content`, a listed tool's `input_schema`.
+- A client runs in core's environment, `uv run --project core --all-extras python <script>` from the repository's root, or in one of its own naming `mcp>=2.3,<3` (a PEP 723 header and `uv run <script>`).
+- Over MCP each tool answers one text block holding its result as JSON, its null fields left out: a tool above its ToolResult, `ask_postdoc` an `AnswerPlan`, `get_artifact` an `Artifact` (`docs/api/openapi.json` holds each schema). A tool's refusal is its ToolResult with `error` set, and `ask_postdoc`'s an `AnswerPlan` whose `declined` holds the words. A refusal the server writes itself (no project, a project its store lacks, an origin refused, a service that did not answer or refused the call, an artifact id of no artifact's shape) is `{"error": <words>}` alone for a tool and for `get_artifact`, and an `AnswerPlan` holding the question and `declined` for `ask_postdoc`, so a client reads every other key with a default. `is_error` stays false, and no `structured_content` is sent.
+- A client is known by the name it declares when it connects: MCP's `clientInfo`, written `<name>/<version>`. A number it types into a quantity is that name's estimate, and every write it makes is audited under that name: the entry or the run it keeps names it as `by`, and the audit row as `who`, with agent `model`, the door in `detail.via` (`mcp` in the server's own process; `http` through a service, the door the service saw) and no `effort`, since no model of the service ran. A catalogue entry it keeps reads `<name>/<version>, over MCP` as its source in the server's own process and `<name>/<version>, at the HTTP endpoint` through a service. A client that declares no name, or only the SDK's own (`mcp` 0.1.0), is marked `an assistant over MCP`.
+- No tool reads the audit: a client reads it at the service's `GET /api/audit` with the project header, newest row last, `who` the client's `<name>/<version>`, `at` ISO 8601 in UTC as a catalogue entry's `at` is.
+- An example client in this repository writes placeholder words alone: an entry named as a placeholder (`A placeholder skill`) with a note saying it is one. Its files and its writes name no real strain, species or product, since the repository ships software alone.
+- The server has no offline stand-in: a client is checked against a migrated store, and `pnpm prove --keep` leaves one running behind a service, printing its address, project and database.

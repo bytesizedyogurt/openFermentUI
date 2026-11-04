@@ -31,7 +31,7 @@ MAX_COMPONENTS = 12
 class ThermoPropsInput(BaseModel):
     model_config = ConfigDict(extra="forbid")
 
-    artifactId: str = Field(description="A Proforma run's artifact id (tool proforma.run), with streamId; or an empty string.")
+    artifactId: str = Field(description="A Proforma run's artifact id (the artifact tool proforma.run), with streamId; or an empty string.")
     streamId: str = Field(description="One stream of that run's stream table, by its id; or an empty string.")
     preset: str = Field(description=(
         f"{thermo.AZEOTROPE} (the composition thermosteam's own vapour-liquid equilibrium gives), or {thermo.BEER} "

@@ -183,7 +183,9 @@ def test_the_server_offers_pureos_propose_as_the_registry_does(store):
 
 def test_the_server_acts_in_the_project_it_was_started_in(monkeypatch):
     from openferment_core import projects
+    from openferment_core.models import ProjectCreate
 
+    projects.create(ProjectCreate(name="Another project", id="another-project", by="test"))
     monkeypatch.setattr(intake, "held", lambda project_id=None: {"doc-1": {"title": projects.current()}})
     out = _text(asyncio.run(mcp_server.build("another-project").call_tool("literature_sources", {})))
     assert out["summary"]["documents"] == [{"documentId": "doc-1", "title": "another-project"}]
@@ -200,6 +202,35 @@ def test_a_server_started_in_no_project_says_how_to_start_it_in_one(monkeypatch)
     assert "--project" in _text(asyncio.run(server.call_tool("search_records", {"query": "x"})))["error"]
     assert "--project" in _text(asyncio.run(server.call_tool("ask_postdoc", {"question": "q?"})))["declined"]
     assert "--project" in _text(asyncio.run(server.call_tool("get_artifact", {"id": "0000000000000000"})))["error"]
+
+
+def test_a_project_its_store_does_not_hold_is_said_at_every_call(monkeypatch):
+    """Alpha 2.2 D.0 (B5): in its own process the server checks the project
+    at its first call, and while the database lacks it every call says so,
+    naming the project, with nothing read or made."""
+    from openferment_core import catalogues, projects
+    from openferment_core.models import ProjectCreate
+
+    server = mcp_server.build("no-such-project")
+    for name, args, field in (("catalogue_write", {"kind": "skill", "id": "s-1", "name": "S"}, "error"),
+                              ("ask_postdoc", {"question": "q?"}, "declined"),
+                              ("get_artifact", {"id": "0000000000000000"}, "error")):
+        said = _text(asyncio.run(server.call_tool(name, args)))[field]
+        assert "holds no project named 'no-such-project'" in said and "--service <origin>" in said, said
+    assert catalogues.listed("skill") == []
+    projects.create(ProjectCreate(name="Now held", id="no-such-project", by="test"))
+    asked: list[str] = []
+    held = projects.held
+
+    async def counted(project_id: str) -> bool:
+        asked.append(project_id)
+        return await held(project_id)
+
+    monkeypatch.setattr(projects, "held", counted)
+    for _ in range(2):
+        out = _text(asyncio.run(server.call_tool("catalogue_read", {"kind": "skill"})))
+        assert "error" not in out and out["summary"]["matched"] == 0
+    assert asked == ["no-such-project"], "a project held is checked once"
 
 
 def test_an_outside_assistants_numbers_are_its_estimates(monkeypatch):
@@ -233,8 +264,12 @@ def test_a_clients_writes_are_marked_with_the_name_it_declares(monkeypatch):
     with projects.using(TEST_PROJECT):
         (row,) = [e for e in catalogues.listed("strain") if e.id == "placeholder-strain"]
         line = next(a for a in audit.read() if a.target == "strain/placeholder-strain")
-    assert row.by == "example-agent/0.1" and "over MCP" in (row.source or "")
+    assert row.by == "example-agent/0.1" and "over MCP" in (row.source or "") and row.agent == "model"
     assert (line.agent, line.who) == ("model", "example-agent/0.1")
+    # Alpha 2.2 D.0: another caller's write leaves this entry as it is, in words naming who kept it.
+    taken = asyncio.run(write(None))["error"]
+    assert taken.startswith("catalogue_write refused:") and "kept by example-agent/0.1" in taken
+    entry = {**entry, "id": "placeholder-strain-2"}
     assert asyncio.run(write(None))["summary"]["by"] == mcp_server.AUTHOR, "the SDK's default is no name"
 
 

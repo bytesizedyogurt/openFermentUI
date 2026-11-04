@@ -6,11 +6,56 @@ engine as one row of one shape (`docs/api/runs.md`), replays it within the preci
 states, writes its SFF file where the engine has a plant (`docs/api/sff.md`), and shows it on the
 Runs screen. ADR-015 records why the contract has this shape.
 
-This page is enough to build an engine. It uses three more pages: `docs/api/workers.md` (the
-JSON-lines protocol an engine's worker speaks), `docs/api/runs.md` (the row a run becomes) and
-`docs/api/openapi.json` (the routes and every model by name). Every example value below is a
-placeholder in a placeholder unit; an engine package carries no composition, yield, price, titre
-or finding of a paper, as the service carries none.
+This page and the three it names are enough to build an engine with no plant that takes typed
+values: `docs/api/workers.md` (the JSON-lines protocol an engine's worker speaks),
+`docs/api/runs.md` (the row a run becomes) and `docs/api/openapi.json` (the routes and every model
+by name). An engine that writes SFF files also reads `docs/api/sff.md`; a run that takes a bench
+reading, `docs/api/studies.md` (Measurements); and the tools' inputs are in `docs/TOOLS.md` and
+`GET /api/tools`. A whole engine, short, stands at the end (A skeleton: the placeholder engine
+`example`). Every example value below is a placeholder in a placeholder unit; an engine package
+carries no composition, yield, price, titre or finding of a paper, as the service carries none.
+
+The modules this page names are under `core/openferment_core/`: `engine/registry.py` is
+`openferment_core.engine.registry`; `EngineBroken` and `EngineRefused` are
+`openferment_core.engine`'s; `WorkerEngine`, written in `engine/contract.py`, is imported from
+`openferment_core.engine`. An engine package's modules import `openferment_core.workers.serve` and
+`openferment_core.engine.WorkerEngine` alone, and its handlers return plain JSON objects; its tests
+may also import `SimWorker` and `WorkerError` from `openferment_core.workers`, and `EngineRefused`
+and `EngineBroken` from `openferment_core.engine` (An engine's own tests, below).
+
+A request for an engine may name the contract in words of its own, which read here so:
+
+- "Installable with `pip install -e`": a PEP 660 editable install into the service's
+  environment, the install of What an engine is, below (`uv pip install -e`, held to
+  `core/uv.lock`'s versions).
+- "Given typed quantities, it returns them": a run hands the worker the values it sets for the
+  parameters the thing declares, each as a name, a value and a unit, in key order (The worker,
+  below); a parameter the run leaves alone reaches the worker as nothing, and the worker's own
+  default stands for it, so a run on the engine's own defaults hands the worker no values (the
+  skeleton's run then answers its default). Every parameter carries a default, since the proof
+  runs every thing with no value set (What an engine is, `pnpm prove`).
+- "Returns them as typed outputs": the worker answers each output's name, value and unit, and the
+  service keeps each as a typed quantity whose origin is the run's artifact, each value the run
+  set keeping its own origin in the run's `inputs` (What the service does with an engine,
+  Outputs).
+- "The time it took": the service measures every run's `durationMs`, and a worker that reports
+  its own computation's time answers it as a diagnostic beside its outputs (The worker), since a
+  replay compares every output and a clock reading moves on every run.
+- "Tests that run with `pytest` from the package's directory": `<repository>/core/.venv/bin/python
+  -m pytest` there, the service's interpreter, which holds pytest and `openferment_core`, or
+  `pytest` with `core/.venv/bin` first on `PATH`; a `pytest` of another environment holds no
+  `openferment_core`, and its tests stop at their first import (An engine's own tests, below).
+- "Replays identically": the thing states its precision as `{"rtol": 0, "atol": 0}`, which holds
+  a replay to the outputs it was kept with, and every output is a function of the request alone,
+  so the same request answers the same outputs in the same order (The worker, below); the
+  package's own tests hold that at the worker, and conformance check 4 at the service.
+- "The project's `CLAUDE.md` ... as house rules": its working rules (`docs/PROGRESS.md` read
+  first, `pnpm test:core` green before every commit, a push after every step) hold for the
+  repository's own work. A builder working from a request in a worktree of its own follows the
+  request: it reads the files the request names, keeps its package under `examples/`, commits and
+  pushes nothing, and holds the package with the package's own tests, which need no database and
+  no `node_modules` (An engine's own tests, below). Every other rule of `CLAUDE.md`, its
+  constraints and stop conditions among them, holds for the builder's work too.
 
 ## What an engine is
 
@@ -28,14 +73,59 @@ example = "openferment_engine_example.engine:ENGINE"
 - Two packages that register one name are both set aside, said in words; when one of them is
   the service's own distribution (`openferment-core`), its engine keeps the name and the other is
   set aside.
-- The package installs into the service's Python environment, beside the service:
-  `cd core && uv pip install -e <path to the package>`, then restart the service. `uv sync`
-  keeps only what `core/uv.lock` names, so after a sync install it again; `uv run`, which every
-  `pnpm` command uses, keeps it.
+- The package installs into the service's Python environment, beside the service, as a PEP 660
+  editable install, then the service restarts (in bash or zsh, which read `<(…)`):
+
+  ```bash
+  cd core && uv pip install --python .venv/bin/python \
+    -c <(uv export --frozen --all-extras --no-hashes --no-emit-project --quiet) \
+    -e <path to the package>
+  ```
+
+  `--python .venv/bin/python` names the service's environment, whatever environment the shell
+  has activated. `-c` holds every package `core/uv.lock` pins at its locked version (BioSTEAM,
+  thermosteam and biorefineries among them), so a package whose dependencies would move one is
+  refused in uv's words and installs nothing; a dependency the lock does not name installs beside
+  it. `scripts/engines-local.sh` and `pnpm prove` install the same way. `core/.venv` is uv's and
+  holds no pip, so the command is uv's; a bare `pip install -e` installs into the environment that
+  pip belongs to, which the service never reads.
+- An engine package lists no dependency on `openferment-core`: it installs into the service's
+  environment, where `uv sync` installed the core from this repository, and its entry module and
+  worker import `openferment_core` from there.
+- Any build backend that makes an editable install serves, setuptools or hatchling:
+  `uv pip install -e` fetches it once from PyPI or uv's cache, and a package whose backend is
+  setuptools also installs offline with `--no-build-isolation` added to the install above, from
+  the setuptools `core/.venv` holds. An editable install with setuptools writes
+  `<module>.egg-info/` into the package's directory, the install's own record, which git ignores.
+- In a fresh checkout make the service's environment first, `cd core && uv sync --all-extras`
+  (uv on PATH, PyPI reachable once), then install the engine. The `pnpm` commands need
+  `pnpm install --frozen-lockfile` first. The service needs `OPENFERMENT_DATABASE_URL` (the
+  environment, then `core/.env`) naming a migrated database, and `conform` the PostgreSQL server
+  that address names, keeping its verdict once the named database is migrated (Conformance,
+  below); an engine's own tests need neither (An engine's own tests, below). A database of your own
+  is made and migrated with `pnpm db:reset <name>` on the server `OPENFERMENT_DATABASE_URL` names
+  (the production database, `openferment`, is refused), which the service and `conform` read once
+  `OPENFERMENT_DATABASE_URL` names it, and dropped with `cd core && uv run python -m
+  openferment_core.migrations drop <name>`; `pnpm db:migrate` against a database the server does
+  not hold says so in words and names that command.
+- `uv sync` keeps only what `core/uv.lock` names, so it takes an installed engine out; `uv run`,
+  which every `pnpm` command uses, keeps it. `pnpm session:start`, `pnpm prototype:up` and a
+  host's deploy (`scripts/host/deploy.sh`) each sync, then run `scripts/engines-local.sh`, which
+  installs again each package directory `core/engines.local` names, as the install above does,
+  held to the lock's versions: one a line, relative to `core/` or absolute, a line beginning `#` a
+  comment; git ignores the file. Name a package there to keep it installed across a sync. To take
+  an engine out, delete its line and run `cd core && uv pip uninstall <distribution>`.
+- Start the service with `cd core && uv run uvicorn openferment_core.api:app --host 127.0.0.1
+  --port 8000`. It reads `OPENFERMENT_DATABASE_URL` (the environment, then `core/.env`) naming a
+  migrated database, and after `pnpm build` it serves the app at the same address: the project's
+  runs at `http://127.0.0.1:8000/#/p/<project>/proforma/studies` and a run at
+  `http://127.0.0.1:8000/#/p/<project>/proforma/runs/<id>`. A project is made with
+  `POST /api/projects` `{name, by}`. The group is read once per process: stop the service and
+  start it again after an install.
 - A new version takes effect when the package is installed again: raise the version in the
-  package's `pyproject.toml`, run `cd core && uv pip install -e <path to the package>` again, then
-  restart the service. An installed package's version is the one its metadata recorded when it
-  was installed, and an edit of its code alone leaves that version as it was.
+  package's `pyproject.toml`, run the install above again, then restart the service. An installed
+  package's version is the one its metadata recorded when it was installed, and an edit of its
+  code alone leaves that version as it was.
 - The module the entry point names is imported by the service process, during startup, with no
   time limit of its own: its import returns promptly and imports nothing heavy. An engine's
   computation happens in its **worker**, a process of its own. An entry module whose import brings
@@ -45,7 +135,43 @@ example = "openferment_engine_example.engine:ENGINE"
   service had already imported; conformance check 6, in a process of its own, holds every one
   out.
 - Installing an engine trusts its code with whatever the service's user can read, `core/.env`
-  included: its entry module runs in the service's process, and its worker runs as the same user.
+  included. The install runs the package's build backend in the installing shell's environment,
+  every variable of it, a key among them. Its entry module runs in the service's process, with the
+  service's key in reach. Its worker runs as the same user, with the variables `workers.withheld`
+  names left out of its environment (The worker, below), and the same files in reach.
+- A package under `examples/` is the project's own and declares no licence (ADR-012: a licence for
+  the project is the owner's choice). Installed beside the service, an engine is listed by
+  `pnpm ready`, held by `core/tests/test_boundaries.py` to the heavy modules it declares, and
+  conformed by `pnpm prove` step 10, so an engine that fails to load or fails a check fails the
+  proof. `pnpm check:licences` reads every distribution installed in `core/.venv` that registers
+  an engine and that `core/uv.lock` does not name: one installed from under this checkout's own
+  `examples/` passes declaring no licence and fails in words declaring one, and any other (one
+  installed from another checkout's `examples/` among them), with each dependency it brings that
+  the lock does not name, is held to `core/licences.toml` as any dependency is.
+  `test_no_seed` scans `src/` and `core/openferment_core/`, and `pnpm check:secrets` reads every
+  tracked file, `examples/` among them. The core's own tests hold with an engine installed beside
+  the core.
+- `pnpm prove` installs every package directory under `examples/engines/` (one holding a
+  `pyproject.toml`) before its service starts, as the install above does, held to the lock's
+  versions, each said with the engines its `pyproject.toml` registers. A package that leads
+  outside `examples/engines/` (a symbolic link elsewhere), one whose `pyproject.toml` cannot be
+  read and one that fails to install each fail the proof in words. The proof names no engine of
+  `examples/`: a package placed there is picked up as it stands.
+- **Every thing of an engine under `examples/engines/` runs on its own defaults, with no value
+  set, so every parameter of every thing carries a default.** The walk (step 9) runs the first
+  thing of each such engine from the Runs screen, the engine chosen on Studies' run card, and
+  reads the run's provenance, outputs and diagnostics on its page. Step 10 conforms every engine
+  the service lists, an engine of `examples/` with no `--inputs` and no `--project`: checks 3, 4
+  and 5 run its first thing at its defaults, and check 8 runs a second thing or configuration at
+  its defaults, or the first thing with one of its defaults set as a model's estimate
+  (Conformance, below). A thing with a parameter that waits for a run's value is refused in words
+  naming the parameter (EngineParameter, below), and the walk and step 10 fail in those words.
+- The proof leaves core's environment as it found it, however it ends (a failure, Ctrl-C,
+  `SIGTERM`), one line a package: a package it installed is uninstalled at its end, unless the
+  environment held its distribution before the proof began (a person's install, or one
+  `core/engines.local` names, which keeps an engine installed beside the service); one held from
+  another directory is installed from there again. With `--keep` each stays installed while the
+  kept service runs, said with the command that takes it out.
 - The engines in the repository register the same way, from `core/pyproject.toml`: `biosteam`
   (the library plants, openFerment's composed flowsheet and the shelf's scenario flowsheets),
   `kinetics` (fermOS's model families, its forecasts of a kept fit and its vessel designs) and
@@ -55,7 +181,8 @@ example = "openferment_engine_example.engine:ENGINE"
 ## What it declares
 
 An engine from outside the core is built on `openferment_core.engine.WorkerEngine` (below), which
-implements every method over four worker ops: the package declares the engine's name, its worker,
+answers `version()` from installed metadata and `export_sff()` from the record the run kept, and
+every other method over four worker ops: the package declares the engine's name, its worker,
 its distributions and the heavy modules its worker computes with (`heavy`, which conformance
 check 6 holds), and writes the worker. The table lists what the service asks of every engine, the
 core's own `biosteam`, `kinetics` and `train` among them. A package whose things are a project's
@@ -68,7 +195,7 @@ object, which runs in the service's process.
 | `worker` | `str` or `None` | The dotted module of the engine's worker: the service runs it as `python -m <worker>` would (The worker, below) and speaks the protocol of `docs/api/workers.md`. Heavy imports live here alone. `None` for an engine that computes in the service's own process with nothing heavy, whose `heavy` is then `()`, as the core's `kinetics` is; `GET /api/engines` lists its worker's status as `none`. Such an engine's computation may call a worker of the core's own (the kinetics engine's vessel design runs in the Proforma worker), and a route that worker cannot answer is a 503 naming the worker its computation called |
 | `heavy` | `tuple[str, ...]` | The modules the worker computes with, which the service keeps out of its process (conformance check 6); each name covers its module and every module below it (`a.b` covers `a.b` and `a.b.c`). `()` for an engine that computes with nothing heavy. The service keeps `biosteam`, `thermosteam`, `biorefineries`, `pisces_sff` and `cobra` out for every engine, whatever it declares |
 | `version()` | `dict[str, str]` | The distributions the engine runs on, each with the version its installed metadata records: `{"openferment-engine-example": "0.1.0"}`; a distribution that is not installed reads `"not installed"`, and enters the version string so. It is the run's `versions`, and it enters every run's id. It changes whenever the engine's computation changes: an editable install keeps its version across edits of its code, so a new version goes with every change to what a run computes (installed again, as above), and the service then computes the request afresh |
-| `things()` | `list[EngineThing]` | What the engine can run, each with its configurations and its precision. The service asks it afresh on every listing and every run, in the request's project, so an engine may list what the project holds: the kinetics engine lists its forecast while the project keeps a fit, and the train engine lists each train the project holds. A `WorkerEngine` keeps its worker's first answer for the life of the process (below) |
+| `things()` | `list[EngineThing]` | What the engine can run, each with its configurations and its precision. The service asks it afresh on every listing and every run, in the request's project, so an engine may list what the project holds: the kinetics engine lists its forecast while the project keeps a fit, and the train engine lists each train the project holds. A `WorkerEngine` answers every ask from its worker's first answer, kept for the life of the process (below) |
 | `things_are` | `str`, optional | Words saying what the engine's things are, declared by an engine every one of whose things is a project's own: the train engine's are `a project's trains, each saved in pureOS's Builder or built by a model`. `GET /api/engines` lists them as `thingsAre`, so a project that holds none of the things says what one would be. A database made for the checks holds none of them, so such an engine is checked in a copy of a project the command names (`--project`, Conformance, below), and `pnpm ready` names that command on every database, the production one among them. An engine that declares none is checked on a database of its own |
 | `rests_on()` | `dict[str, dict[str, list[str]] \| None]`, required beside `things_are` | What the current project's things rest on, as rows by table. Each key is a table of the `openferment` schema that holds a project's rows, one with a `project_id` column (`core/openferment_core/db/models.py`); its value is `None` for every row of the project in the table, or the columns that pick the rows, each with the values it holds (`{"id": [...]}`). Conformance copies those rows into a database of its own, the project's own row always among them (Conformance, below). It reads the store and writes nothing. An engine that declares `things_are` with no `rests_on` loads and runs; conformance refuses it in words, and `pnpm ready` says those words in its row |
 | `unready(thing, inputs)` | `str` or `None`, optional, beside `things_are` | Why a thing cannot be checked as it stands, in words saying what it is, or `None` when a run of it with `inputs` would compute; it runs nothing and keeps nothing. Conformance leaves out each thing it gives words for, and lists the thing with them; with no `unready`, every thing is checked. The train engine says `a saved draft, which cannot be built as it stands`, with its validation's words; `a train whose values wait for a source`, with the words of its run's check; or `a train whose run is refused before it computes`, with the run's words |
@@ -129,16 +256,19 @@ origin:
   parameter chosen from words, or a convention's words in a unit for a term the default leaves
   off (the kinetics engine's `ki_substrate` is `off` in g L⁻¹), which a run replaces with a
   number in that unit.
-- `origin` says where the default comes from: `library-default` with `ref` naming the package
+- `origin` says where the default comes from, and every default carries one of five
+  (`models.DEFAULT_ORIGINS`). A worker's are two: `library-default` with `ref` naming the package
   and version it was read from, or `convention` with a `note` for a software setting (a step
-  count, a tolerance). Every default carries one. A thing the project holds (The core's `train`,
-  below) has defaults the project holds too: `record` with `ref` naming the records that bound
-  it, its `sourceRule` naming the field it binds from (`record:<field id>`); `artifact` with
-  `ref` naming the run, simulation or design it was read from; `person-assumption` with `by`
-  naming the person who typed it into the thing, and `at` the day; or `measurement` with `ref`
-  naming the reading (`<deposition id>/<entry id>`) and `at` its time, for a thing the project
-  holds whose value a person set to a deposition's reading. Those six are a default's origins; a
-  model's estimate reaches a run as a value the run sets (`EngineInput`, below).
+  count, a tolerance). An engine's own default is a `library-default` whose `ref` is
+  `<distribution>@<installed version>`, read with `importlib.metadata.version` so it follows each
+  new version, or a `convention` whose `note` says what the setting is; check 2 holds that `ref`
+  or `note` to be non-empty. A thing the project holds (The core's `train`, below) has defaults
+  the project holds too: `record` with `ref` naming the records that bound it, its `sourceRule`
+  naming the field it binds from (`record:<field id>`); `artifact` with `ref` naming the run,
+  simulation, fit or design it was read from; `person-assumption` with `by` naming the person who
+  typed it into the thing, and `at` the day. A model's estimate and a deposition's reading reach a
+  run as values the run sets (`EngineInput`, below), each with its origin on the run's `inputs`,
+  and a parameter whose default names either is refused as it is read.
 - A parameter with no default has `value` and `origin` null, and its `sourceRule` names
   `assumption` (given when the parameter names no rule): a run sets it, the engine binds it
   from what the project holds (the kinetics engine binds a family's parameter from the project's
@@ -147,12 +277,24 @@ origin:
   (the train engine's: a value the unit's class decides at run time, a component the inlet
   does not carry, a split left to the class). A run that leaves unset a parameter none of
   these gives is refused in words and keeps nothing.
+- For an engine built on `WorkerEngine`, a parameter with no default is one every run sets: the
+  service refuses in words, before the worker is asked, a run that leaves it unset
+  (`docs/api/workers.md`, `run`), whatever its `note` says. Binding a value from what the project
+  holds and filling it in the thing are ways of the core's own engines (The core's `kinetics`,
+  The core's `train`). An engine under `examples/engines/` gives every parameter a default (What
+  an engine is, `pnpm prove`).
 - `min` and `max`, when given, bound what a run may set; `boundsReason` says why, in words, and
   every parameter carries one, a parameter with no bounds included.
 - The panel's other fields may be left out: `symbol`, `gloss`, `dimension`, `step`, `scale`
   (`linear` or `log`), `group` (`parameters`) and `note`. `sourceRule` defaults to the rule
   entry the origin's kind stands for (`assumption` for a person's), and a record's default
-  names it (`record:<field id>`).
+  names it (`record:<field id>`). Leave `sourceRule` out, and the service writes the entry the
+  default's origin stands for; a rule a worker writes names entries from `fit`, `record:<field
+  id>`, `artifact`, `simulation`, `assumption`, `convention` and `library-default`, and any other
+  entry breaks the contract (`EngineBroken`), so every `parameters` read and every run of the
+  thing answers 503. `convention` holds a stated convention for a parameter whose
+  source rule names `convention`, its reason in `note`; a contract engine leaves it out, its
+  default carried by `value` and `origin`.
 
 ### `EngineInput`
 
@@ -196,9 +338,19 @@ origin:
   it is kept as the run's receipt (The core's `biosteam`, below). The kinetics engine checks
   its values the same way, and keeps a range in the run's basis as `<key> low` and `<key> high`
   beside the value, which the run integrates at (The core's `kinetics`, below).
+- A number that is NaN or infinite, as Python reads `NaN`, `Infinity` and a number past a
+  float's range from JSON, is refused in words at every door that takes a run's values (this
+  engine's run route, the library's, Proforma's, pureOS's and fermOS's, a study scenario, the
+  tools, `conform --inputs`), and nothing runs: the worker receives finite numbers alone.
 - A number is accepted only inside a `quantity`. A bare JSON number anywhere in a request, a
   field the request or a quantity does not name, and a `value`, `low` or `high` that is `true` or
   `false` are each refused in words before the engine's worker is reached.
+- A request whose own fields are refused (a bare number, a stray field, a wrong type, a number
+  that is NaN or infinite) answers 422 with FastAPI's list of field errors
+  (`HTTPValidationError`), each echoing the input it refused, a number JSON cannot carry written
+  as its words; every other refusal answers `{detail: <words>}` (`Refusal`). A quantity or an
+  origin holding a field it does not name, and a value whose origin has no `at`, are refused in
+  words, rules `docs/api/openapi.json`'s schemas leave unstated.
 
 ## The worker
 
@@ -245,7 +397,13 @@ if __name__ == "__main__":
 `serve` answers `ping` itself. A handler refuses a request by raising an exception whose class is
 named `Refused`; its words reach the person as they are written, with no traceback. Every op that
 names a thing refuses one it does not run, by raising `Refused`. Any other exception is a failure
-of the worker, said as `<ExceptionType>: <words>`.
+of the worker, said as `<ExceptionType>: <words>`. `serve(handlers, *, name='worker', stdin=None,
+stdout=None)` answers one request a line, skips a blank line and returns when stdin closes, so the
+worker's process ends with its input; `name` is what `ping` answers as `worker`, and a test may
+hand it text streams for `stdin` and `stdout`. A test hands it both: with `stdout` left out,
+`serve` points the calling process's descriptor 1 at stderr and sets `sys.stdout` to
+`sys.stderr`, as a worker's own process needs, so a test that hands it `stdin` alone moves its own
+output.
 
 ### `WorkerEngine`
 
@@ -256,6 +414,12 @@ ENGINE = WorkerEngine(name="example", worker="openferment_engine_example.worker"
                       distributions=("openferment-engine-example",),
                       heavy=("a_placeholder_library",), timeout_s=120.0)
 ```
+
+`WorkerEngine(*, name, worker, distributions=(), heavy=(), timeout_s=120.0)` takes these five by
+keyword; `name` is the entry point's name, or the registry sets the engine aside in words; the
+object reads them back as attributes, beside `status` (`cold` or `ready`). Importing the entry
+module runs the package's `__init__.py` first, so that file imports neither the worker nor anything
+heavy.
 
 `version()` reads each named distribution's installed version. `things()` asks the worker's
 `things` op once per process and keeps its first answer; `parameters()` asks the `parameters` op;
@@ -268,21 +432,39 @@ default; a worker that takes longer is stopped, and the next call starts it agai
 |---|---|---|
 | `things` | `{}` | `{"things": [EngineThing, …]}` |
 | `parameters` | `{"thing", "configuration"}`, the configuration a run would use | `{"parameters": [EngineParameter, …]}` |
-| `run` | `{"thing", "configuration", "inputs": [{"name", "value", "unit"}, …]}` | `{"outputs": [{"name", "value", "unit"}, …]}`: every output a finite number or a string in a unit, each name its own and at most 200 characters, in the same order on every run of one request |
+| `run` | `{"thing", "configuration", "inputs": [{"name", "value", "unit"}, …]}` | `{"outputs": [{"name", "value", "unit"}, …], "diagnostics": [{"name", "value", "unit"}, …]}`: every output a finite number or a string in a unit (`""` for a pure number or for words, as a parameter's is), each name its own and at most 200 characters, in the same order on every run of one request; `diagnostics` in the same shape, at most 50, which a worker may leave out (The worker, above) |
 | `sff_export` | `{"thing", "configuration", "inputs": […]}` | `{"flowsheet": <an SFF document>}`, or `Refused: <words>` when the engine has no plant |
+
+The worker's `run` and `sff_export` receive `inputs` in key order, the order the run's basis keeps
+them, each number as a JSON float (a value typed `2` arrives as `2.0`), on the first run and on
+every replay.
 
 The worker receives the values a run sets, already checked against the parameters: each
 `name` a key of the thing, each `unit` the parameter's, each number inside its bounds. A
 parameter a run leaves alone is the worker's default. Every output is a function of the request
 alone: the same request gives the same outputs, in the same order, within the precision the thing
 states, since a replay compares the outputs in order. The service measures each run's
-`durationMs` itself and keeps it beside the outputs.
+`durationMs` itself and keeps it beside the outputs: the run's `durationMs` on `GET
+/api/runs/{id}` and on its artifact, and a replay's own on its `ReplayResult`.
+
+A value the computation reports about itself, the time it took or the iterations it made, is a
+**diagnostic**: the `run` op answers it in `diagnostics` beside its `outputs`, `[{"name",
+"value", "unit"}, …]`, at most 50, each a finite number or words in a unit, each name its own
+among them and at most 200 characters. The service keeps them on the run (`EngineRun.diagnostics`)
+and shows them on the run's page under its outputs, and `engine_report` names them as words; the
+run's id, its artifact, its outputs and its replay stand without them, so a replay compares the
+outputs alone. An engine that reports the time its computation took answers it as a diagnostic:
+an output that moves between two runs of one request, a clock reading among them, makes the
+replay differ and fails conformance check 4, and `pnpm prove` with it wherever the engine is
+installed. The same request asked again is the kept run, with its first computation's
+diagnostics.
 
 A worker that answers outside this table (a result key missing, `outputs` that are no list, an
 output that is no name, value and unit, a number that is NaN or infinite, two outputs of one name,
-an output's name blank or longer than 200 characters, a flowsheet that is no JSON object) breaks
-the contract: the service raises `EngineBroken`, keeps no runs row, says on the event stream that
-the job failed, and answers 503 in words. A break in the `run` op keeps nothing, so the next ask
+an output's name blank or longer than 200 characters, `diagnostics` outside the outputs' shape or
+more than 50 of them, a flowsheet that is no JSON object) breaks the contract: the service raises
+`EngineBroken`, keeps no runs row, says on the event stream that the job failed, and answers 503
+in words. A break in the `run` op keeps nothing, so the next ask
 after the worker is mended computes afresh. A break in `sff_export` comes after the run's
 computation is kept as its artifact: the next ask after the worker is mended answers the
 computation from that artifact and asks `sff_export` for the file again.
@@ -297,9 +479,10 @@ computation from that artifact and asks `sff_export` for the file again.
   registry while it is imported is answered as though no engine were found yet: at once from its
   own thread, and after `registry.DISCOVERY_WAIT_S` (10 s) from a thread it starts and waits on.
   Discovery itself runs with no time limit.
-- **`GET /api/engines`**: each engine's name, version, worker module and status, things, the
-  error that keeps it from loading (when one does) and its last conformance verdict. The things
-  are read in the request's project, afresh on each listing. The listing gives a cold worker
+- **`GET /api/engines`**: each engine's `name`, `entryPoint`, `version`, `worker` and
+  `workerStatus`, `heavy`, `things`, `thingsAre` (for an engine whose things are a project's own),
+  `conformance` (its last verdict) and `error` (what keeps it from use, when something does), as
+  `EngineInfo`. The things are read in the request's project, afresh on each listing. The listing gives a cold worker
   30 s to answer `things` first; an engine whose things fail or time out is listed with the
   words.
 - **`GET /api/engines/{name}/parameters?thing=&configuration=`**: the thing's parameters, the
@@ -320,7 +503,12 @@ computation from that artifact and asks `sff_export` for the file again.
   the version string; `inputs` is the run's basis in order, each `{"name", "value", "unit",
   "source"}` and each source `{"kind", "id", "note", "by"}`, `null` where unset: `engine`,
   `thing`, `configuration` (when there is one), `precision.rtol` and `precision.atol` (numbers),
-  each a source of kind `convention` with the note `engine/runs.py` writes, then `value <key>` for
+  each a source of kind `convention` with the note `engine/runs.py` writes: `engine` (unit `""`,
+  note `the engine that ran it`), `thing` (unit `""`, note `what the <name> engine ran`),
+  `configuration` (unit `""`, note `the configuration it ran in`), `precision.rtol` (unit `1`, note
+  `the relative precision the engine states for the thing`) and `precision.atol` (unit `1`, note
+  `the absolute precision the engine states, in each output's unit`), each source `{"kind":
+  "convention", "id": null, "note": <note>, "by": null}`; then `value <key>` for
   each value set, in key order, its source of kind `assumption` with `by` the person and the note
   `typed on <at>: <note>` (`typed on <at>` with no note); a model's estimate is of kind
   `model-estimate`, its note `estimated on <at>: <note>`; a deposition's reading is of kind
@@ -330,14 +518,18 @@ computation from that artifact and asks `sff_export` for the file again.
   service changes how it keys a run or shapes its outputs; a run kept before then keeps its own
   id, and its replay names the version it was kept at (below). The same request twice is one
   row, answered as it was first kept: its `by` and `created_by` are the first asker's, whoever
-  asks again. `created_by` is the request's person or model, and a request naming no `by` is kept
-  as `this browser`. Provenance is computed from the inputs' origins (`basis.py`): `computed` for
+  asks again. `created_by` is the `runs` table's column for the asker, the request's person or
+  model, served on every run as `EngineRun.by`, and check 8 reads both; a request naming no `by`
+  is kept as `this browser`. A run's diagnostics stay out of its basis, so they move no id. Provenance is computed from the inputs' origins (`basis.py`): `computed` for
   a run at the engine's own defaults, `assumed` when any input is a person's assumption or a
   model's estimate, `measured` when the values it sets are readings and none is a person's or a
   model's.
-- **Outputs.** Each output is kept as a typed quantity, its origin the run's own artifact:
-  `outputs.values` is `[{"name", "quantity": {"value", "unit", "origin": {"kind": "artifact",
-  "ref": "<the run's artifact id>"}}}, …]`.
+- **Outputs.** A worker answers each output's name, value and unit; the service keeps each as a
+  typed quantity, its origin the run's own artifact: `outputs.values` is `[{"name", "quantity":
+  {"value", "unit", "origin": {"kind": "artifact", "ref": "<the run's artifact id>"}}}, …]`. Each
+  value a run sets keeps its own origin in the run's `inputs` (`GET /api/runs/{id}`). A run's
+  `diagnostics` stand beside its outputs, as the worker answered them, and no reader of
+  `outputs.values` (a comparison, a runbook, a tool's evidence) reads them.
 - **The SFF file.** After the run, the worker's `sff_export` is asked once. A document is
   validated and scored by the vendored toolkit in the service's own Proforma worker and kept as
   the flowsheet record `run-<id>` (`docs/api/sff.md`); words are kept as the run's `sffRefused`.
@@ -351,7 +543,12 @@ computation from that artifact and asks `sff_export` for the file again.
   every run and filters by it, and a run's page shows each output with its origin.
 - **Tools.** `engine_plants`, `engine_parameters`, `engine_run` and `engine_report` take `engine`
   (default `biosteam`), so Postdoc and any MCP client list, read and report every engine's things
-  and runs the same way. Whichever engine it is asked for, `engine_plants` lists every engine
+  and runs the same way. The tools name a thing `plant`: `engine_run` takes `{engine, plant,
+  configuration, scenario, note}`, `engine_parameters` `{engine, plant, configuration, words,
+  limit}`, `engine_report` `{engine, run, parameters, limit}` and `engine_plants` `{engine, words,
+  limit}`; `GET /api/tools` serves every tool's input schema. `engine_report` and `engine_run`
+  name a run's diagnostics as words (`diagnostics`: how many, each name, value and unit, and what
+  they are), and cite its outputs alone. Whichever engine it is asked for, `engine_plants` lists every engine
   registered here (`engines`): its version, its worker and the worker's state, its last
   conformance verdict, and the ids of the project's runs it made, newest first (`runs` counts
   them, `runIds` names the newest twenty); a project's runs of an engine registered here no longer
@@ -362,8 +559,14 @@ computation from that artifact and asks `sff_export` for the file again.
   no default gives, so `engine_run` on one answers its refusal naming each parameter that waits; a
   person sets those values on fermOS's screens or at `POST /api/engines/kinetics/run` (The core's
   `kinetics`, below). At the HTTP endpoint (`POST /api/tools/{name}`) a tool that writes,
-  `engine_run` among them, names its caller with `?by=`, who is then the write's author; a call
-  that names nobody is a 422 in words.
+  `engine_run` among them, names its caller with `?by=`, a person who is then the write's author,
+  or with the `X-OpenFerment-Assistant` header, an assistant's `<name>/<version>`, the call then
+  running in the model's lane under that name; a call that names nobody, or names both, is a 422
+  in words. A run through `engine_run` keeps one audit row (`GET
+  /api/audit`): module `proforma`, action `engine_run`, state `open` (`refused` for a receipt),
+  target the run's id, `agent` and `who` the caller, and for a caller of the model's lane the door
+  it came in by in `detail.via` (`postdoc`, `mcp` or `http`); a run through `POST
+  /api/engines/{name}/run` keeps none, and its row's `by` names who asked.
 - **`pnpm ready`** prints one row per engine: its version, its worker and its conformance verdict.
 
 ## The core's `biosteam`
@@ -527,7 +730,11 @@ resolution reads, Conformance, below) and `unready`.
   (`library-default`, its `ref` naming thermosteam), a convention (its note), the records that
   bound it (`record`, its `ref` naming them), the inlet's run, simulation or design (`artifact`,
   its `ref` naming it), or a value a person typed into the train (`person-assumption`, naming
-  the person and the day).
+  the person and the day). A train's own values are a person's: a typed value names its person
+  and its day and no origin of its own, so the Builder's train and a model's (which holds ids
+  and words, `pureos_build`) hold no model's estimate and no reading, and those two reach a
+  train's run as values the run sets. A resolution handing in one as a default is refused in
+  words (`pureos/engine.py` `DEFAULT_OF`, the five a default may rest on).
 - A parameter with no default is one of two. A value that waits for what would bind it: a run
   sets it, or the run is refused naming what would bind it. A value the train fills itself when
   a run leaves it unset: one the unit's class decides at run time (a flash's temperature beside
@@ -569,7 +776,13 @@ resolution reads, Conformance, below) and `unready`.
 `python -m openferment_core.engine.conform <name>` checks an installed engine against this page
 and prints one row per check, on a database of its own that it drops after; it exits 1 when any
 check fails, and keeps its verdict for `GET /api/engines`. `pnpm prove` runs it for every engine
-registered.
+registered. Run it as `cd core && uv run python -m openferment_core.engine.conform <name>`. It
+makes its database on the PostgreSQL 16 or later server with pgvector that
+`OPENFERMENT_DATABASE_URL` names (the environment first, then `core/.env`), needs no running
+service and no key, and keeps its verdict in that address's database's `engine_checks`, with
+`--project` or without, once that database is migrated (`pnpm db:migrate`); a verdict it cannot
+keep is printed with the words why. With no address set, or a server that does not answer, it
+says so in words naming `OPENFERMENT_DATABASE_URL`, and exits 2.
 
 - `--thing <id>`, as often as needed, narrows the checks to those things, in the order named;
   the first named is the one run, and an id the engine runs none of is refused in words. With
@@ -651,19 +864,28 @@ registered.
   with `--project` there.
 - Each thing is checked in its default configuration, or in the first it names when it has no
   default.
-- Check 2 holds every default to an origin naming what it rests on (a library-default, a record
-  or an artifact its `ref`, a convention its `note`, a person's assumption its `by`, a measurement
-  a reading the project holds, `basis.reading_refusal`), and every
+- Check 1 needs nothing of the engine beyond a first thing: its numbers stand where the route's
+  and the tool's own fields refuse them. Check 2 holds every default to an origin naming what it
+  rests on, one of the five a default may rest on (a library-default, a record or an artifact its
+  `ref`, a convention its `note`, a person's assumption its `by`), and every
   parameter with no default to a source rule naming `assumption`: it takes a run's value, which a
-  run sets, the engine binds or the thing fills itself (`EngineParameter`). Check 3 holds the
+  run sets, the engine binds or the thing fills itself (`EngineParameter`); for an engine built
+  on `WorkerEngine`, a run sets it. Check 3 holds the
   run's id to the artifact id of its basis (its seed joining it where the computation takes
-  one). Check 6 imports the entry point's module in a
+  one); a run that answers no output holds it, its words saying the outputs are empty; and a run
+  that answers diagnostics holds it when they stand in their shape on its row and nowhere in its
+  artifact, the same request again answering the first computation's, its words naming each.
+  Check 6 imports the entry point's module in a
   process of its own and holds out of it the worker module, every module `heavy` covers, and the
   five libraries the service keeps out for every engine, an engine whose worker is `None` among
   them. Check 7 offers a
-  WorkerEngine's worker the thing `conform-no-such-thing` as one of its own: the first ask reaches
-  the worker's `run` op once, its `Refused` is kept as a receipt in its words, and the same request
-  asked again is answered from the receipt with the worker's `run` op never asked. A hand-written
+  WorkerEngine's worker the thing `conform-no-such-thing` as one of its own, standing in for the
+  engine's `things` and `parameters` in the service's process (the thing listed, with no
+  parameters), so the worker's `run` op alone meets it: the first ask reaches the worker's `run`
+  op once, its `Refused` is kept as a receipt in its words, and the same request asked again is
+  answered from the receipt with the worker's `run` op never asked. At the routes the service
+  refuses an unknown thing from the worker's `things` answer before any other op is asked, and
+  the worker's own refusal in `parameters` and `sff_export` is reached when a test calls them. A hand-written
   engine (the core's three, `biosteam`, `kinetics` and `train`) computes in code of its own, with
   no `compute` the check can offer a thing to, so check 7 holds the refusal it reaches there: the
   unknown thing refused in words before any run, keeping nothing, and its words say so. A refusal
@@ -675,18 +897,202 @@ registered.
   no second basis, or with every thing checked (`--project`: check 3 has run each thing already),
   through the run itself, the checked run's values as the model's estimates, or, with none set,
   one parameter at its own default: the first whose source rule takes a run's value
-  (`assumption`), else the first with a default. Each estimate is dated the day the check runs.
+  (`assumption`), else the first with a default. Each estimate is dated the day the check runs. A
+  thing with one configuration or none, no second thing and no default holds check 8, its words
+  saying the model's path had nothing to set.
 
 | # | Check |
 |---|---|
 | 1 | A JSON number outside a `quantity` is refused in words before the worker is reached |
-| 2 | Every default carries an origin naming what it rests on (`library-default`, `record` or `artifact` with `ref`, `convention` with `note`, `person-assumption` with `by`, `measurement` with `ref` naming a reading the project holds), and a parameter with none takes a run's value |
-| 3 | A run writes one `runs` row keyed by its basis, and the same request twice is that one row |
+| 2 | Every default carries an origin naming what it rests on (`library-default`, `record` or `artifact` with `ref`, `convention` with `note`, `person-assumption` with `by`), and a parameter with none takes a run's value |
+| 3 | A run writes one `runs` row keyed by its basis, and the same request twice is that one row, with its diagnostics in their shape when it reports some |
 | 4 | A replay holds every output within the precision the thing states |
 | 5 | The run's SFF file validates and scores, or `sffRefused` holds words |
 | 6 | Importing the module the entry point names imports neither the worker module nor what the engine computes with |
 | 7 | A request the engine refuses is kept as a receipt in its words, with no traceback |
 | 8 | `created_by` on every run is the person or the model that asked for it |
+
+## An engine's own tests
+
+An engine's tests need neither the service nor its database. `openferment_core.workers` and
+`openferment_core.engine` import with no `core/.env`; `ENGINE.version()` reads installed
+metadata; `ENGINE.things()` and `ENGINE.parameters(<thing id>, <configuration or None>)` start the
+worker and answer `EngineThing` and `EngineParameter` (`openferment_core.models`), the thing named
+by its id; `serve(HANDLERS, name=..., stdin=..., stdout=...)` answers the text streams a test hands
+it (both of them, The worker, above); and `SimWorker('<worker module>',
+withhold_secrets=True).call(op, args)` speaks to the worker as the service does, a refusal raising
+`WorkerError` whose words begin `Refused: `. Through `ENGINE`, a worker's refusal raises
+`EngineRefused` (`openferment_core.engine`) in the words after `Refused: `, and an answer outside
+the protocol raises `EngineBroken`. `WorkerEngine` has no method that stops its worker: the worker
+`ENGINE` starts runs until the test's process ends and its input closes, and a test that wants it
+gone uses `SimWorker` and its `close()`. `run()`, `replay()` and `export_sff()` keep or read the
+store, and `conform` holds them.
+
+An engine's own tests hold its replay at the worker: the same `run` request asked twice answers the
+same outputs in the same order. The service's replay, held to the thing's precision, is
+conformance check 4's, and `conform` needs a PostgreSQL server (Conformance, below); a builder
+working from a request that names no database address leaves `conform` to the base, which runs it
+on the base's own server, as `pnpm prove` step 10 does.
+
+Install the package first (What an engine is, above), so its entry point and its version stand and
+its worker's module imports in a process of its own. Then run its tests from the package's
+directory with the service's interpreter, `<repository>/core/.venv/bin/python -m pytest`, which
+holds pytest and `openferment_core`. `[tool.pytest.ini_options]` with `testpaths = ["tests"]` in
+the package's `pyproject.toml` has `python -m pytest`, run in the package's directory, collect
+`tests/`; `core/tests/conftest.py` lies outside the package's directory tree, so pytest loads none
+of the core's conftest files there. `uv run` in the package's directory makes an environment of the
+package's own, which holds no `openferment_core`.
+
+## A skeleton: the placeholder engine `example`
+
+A whole engine in four files, every value a placeholder in a placeholder unit: one thing, one
+parameter with its default, two outputs, the time its run took as a diagnostic, and no plant. Its
+one parameter carries a default, so its run on the engine's own defaults computes, as the proof's
+walk and checks ask (What an engine is, `pnpm prove`). The core's three (above) are this page's
+other examples.
+
+```
+openferment-engine-example/
+  pyproject.toml
+  openferment_engine_example/__init__.py      empty
+  openferment_engine_example/engine.py        the object the entry point names
+  openferment_engine_example/worker.py        the four ops and serve
+  tests/test_worker.py                        the worker driven as the service drives it
+```
+
+`pyproject.toml`: the entry point in the group, a backend that makes an editable install, and
+where pytest collects. It declares no licence, as a package under `examples/` declares none. An
+editable install with setuptools writes `openferment_engine_example.egg-info/` beside these files,
+the install's own record, which git ignores.
+
+```toml
+[build-system]
+requires = ["setuptools>=70"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "openferment-engine-example"
+version = "0.1.0"
+description = "A placeholder engine for openFerment's engine contract"
+requires-python = ">=3.12"
+
+[project.entry-points."openferment.engines"]
+example = "openferment_engine_example.engine:ENGINE"
+
+[tool.setuptools]
+packages = ["openferment_engine_example"]
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+```
+
+`openferment_engine_example/engine.py`: the engine, its worker and the distribution its version is
+read from; it computes with nothing heavy, so `heavy` is left at `()`.
+
+```python
+"""The example engine: the one object its entry point names."""
+from openferment_core.engine import WorkerEngine
+
+ENGINE = WorkerEngine(name="example", worker="openferment_engine_example.worker",
+                      distributions=("openferment-engine-example",))
+```
+
+`openferment_engine_example/worker.py`: each op a handler taking the request's `args`, a refusal
+in the engine's words, the default's origin naming the installed distribution and version, and the
+time the run took answered as a diagnostic beside the outputs.
+
+```python
+"""The example engine's worker: its four ops over placeholders, one JSON request a line."""
+import time
+from importlib.metadata import version
+
+from openferment_core.workers import serve
+
+THINGS = [{"id": "a-thing", "title": "A placeholder thing", "kind": "placeholder", "configurations": [],
+           "precision": {"rtol": 0, "atol": 0}}]
+
+
+class Refused(Exception):
+    """A request the example engine refuses, said in its words."""
+
+
+def _thing(args):
+    if args.get("thing") not in {t["id"] for t in THINGS}:
+        raise Refused(f"the example engine runs no thing {args.get('thing')!r}")
+
+
+def things(args):
+    return {"things": THINGS}
+
+
+def parameters(args):
+    _thing(args)
+    ref = f"openferment-engine-example@{version('openferment-engine-example')}"
+    return {"parameters": [
+        {"key": "a-parameter", "label": "A placeholder parameter", "unit": "placeholder-unit", "value": 1.5,
+         "origin": {"kind": "library-default", "ref": ref}, "min": 0, "max": 10,
+         "boundsReason": "placeholder bounds, so a value outside them is refused"}]}
+
+
+def run(args):
+    started = time.perf_counter()
+    _thing(args)
+    given = {v["name"]: v["value"] for v in args["inputs"]}
+    outputs = [{"name": "a-placeholder-output", "value": given.get("a-parameter", 1.5), "unit": "placeholder-unit"},
+               {"name": "values set", "value": len(given), "unit": ""}]
+    took = (time.perf_counter() - started) * 1000
+    return {"outputs": outputs, "diagnostics": [{"name": "time taken", "value": took, "unit": "ms"}]}
+
+
+def sff_export(args):
+    _thing(args)
+    raise Refused("the example engine has no plant, so it writes no SFF file")
+
+
+HANDLERS = {"things": things, "parameters": parameters, "run": run, "sff_export": sff_export}
+
+if __name__ == "__main__":
+    serve(HANDLERS, name="example")
+```
+
+`tests/test_worker.py`: one test, the worker started and asked as the service asks it, with no
+database.
+
+```python
+"""The worker driven as the service drives it: SimWorker, one JSON request a line."""
+import pytest
+
+from openferment_core.workers import SimWorker, WorkerError
+
+
+@pytest.fixture
+def worker():
+    w = SimWorker("openferment_engine_example.worker", withhold_secrets=True)
+    yield w
+    w.close()
+
+
+def test_the_worker_answers_its_four_ops_as_the_service_asks_them(worker):
+    (thing,) = worker.call("things", {})["things"]
+    (parameter,) = worker.call("parameters", {"thing": thing["id"], "configuration": None})["parameters"]
+    assert parameter["origin"] == {"kind": "library-default", "ref": "openferment-engine-example@0.1.0"}
+    asked = {"thing": thing["id"], "configuration": None,
+             "inputs": [{"name": "a-parameter", "value": 2.0, "unit": "placeholder-unit"}]}
+    answer = worker.call("run", asked)
+    assert answer["outputs"] == [{"name": "a-placeholder-output", "value": 2.0, "unit": "placeholder-unit"},
+                                 {"name": "values set", "value": 1, "unit": ""}]
+    assert [d["name"] for d in answer["diagnostics"]] == ["time taken"]
+    with pytest.raises(WorkerError, match="^Refused: the example engine has no plant"):
+        worker.call("sff_export", asked)
+    with pytest.raises(WorkerError, match="^Refused: the example engine runs no thing 'nothing'"):
+        worker.call("run", {**asked, "thing": "nothing"})
+```
+
+Install it with the install of What an engine is (above), its path
+`<path to openferment-engine-example>`, and restart the service; run its test from its directory
+with `<repository>/core/.venv/bin/python -m pytest`; and check it with `cd core && uv run python -m
+openferment_core.engine.conform example` on a PostgreSQL server (Conformance), whose eight checks
+hold, check 3 naming its one diagnostic and check 4 its replay identical.
 
 ## What is deliberately absent
 

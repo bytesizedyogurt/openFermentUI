@@ -18,6 +18,21 @@ where it would call a model, and step 6 asks Postdoc through its evaluation's of
 Its last check reads the proof's own spend table: offline it holds no call. Every check prints ✓
 or ✗ with what it saw; the proof exits 1 when a check fails, 2 when it cannot start.
 
+Before its service starts, the proof installs every package directory under examples/engines/
+(one holding a pyproject.toml) into core's environment with `uv pip install -e`, each said with the
+engines its pyproject.toml registers, and every package core/uv.lock pins held at its locked
+version (the lock's versions are the install's constraints, so a package that would move one is
+refused in uv's words). A package that leads outside examples/engines/, one whose pyproject.toml
+cannot be read and one that fails to install each fail the proof in words; with none there one
+line says so. Step 9 runs the first thing of each of their engines on its own defaults from the
+Runs screen and step 10 checks each, as it checks every engine the service lists, with no value
+set: the proof names no example engine, so a builder's package is picked up with no change under
+scripts/. At its end, however it ends (a failure, Ctrl-C, SIGTERM), the proof leaves core's
+environment as it found it: each package it installed whose distribution was installed nowhere
+before is uninstalled, one installed before from the same directory stays, and one installed
+before from another directory is installed from there again, one line a package. With --keep the
+packages stay installed while the kept service runs, each said with the command that takes it out.
+
     1  a fresh database, migrated to its head; `ready --offline` green
     2  a project made through the API
     3  Sci RAG Kit's demo corpus (five fictional documents, CC0) taken in through Intake's upload:
@@ -57,7 +72,11 @@ or ✗ with what it saw; the proof exits 1 when a check fails, 2 when it cannot 
        that reading chosen and nothing typed, and run; its run's page read: provenance measured,
        the reading's origin linked to its deposition. The service then holds each as the walk
        left it: the deposition, the reading with its depositor and time, the scenario resting
-       on the reading alone, and its run `measured` with the measurement among its inputs
+       on the reading alone, and its run `measured` with the measurement among its inputs; then,
+       for each engine a package under examples/engines/ registers, its first thing run on its own
+       defaults from the Runs screen (Studies' run card, the engine chosen), the run's page opened,
+       and its provenance, its outputs and its diagnostics read there as the service keeps them;
+       with no such package, one line says so and the walk checks nothing more
    10  every engine of the entry-point group `openferment.engines` listed by the service with its
        version and its worker's state, none with an error, every engine core/pyproject.toml registers
        among them (biosteam, kinetics and train), and every engine the step sets values or a project
@@ -151,7 +170,7 @@ TITLES = {
        "its history",
     7: "a reference SFF file imported; it draws",
     8: "the service restarted: everything reloads; an artifact replays within its tolerance",
-    9: "the UI walk: Home, the project, ingest, search, a run report and its SFF graph, a scenario begun from it, the plants Studies offers, the SFF flowsheets, a conversation, a runbook; a reading at the bench, a scenario on it, its run measured",
+    9: "the UI walk: Home, the project, ingest, search, a run report and its SFF graph, a scenario begun from it, the plants Studies offers, the SFF flowsheets, a conversation, a runbook; a reading at the bench, a scenario on it, its run measured; each example engine's first thing run from the Runs screen",
     10: "the engines: each registered one listed, the core's three among them, the eight conformance checks made on "
         "it, its verdict kept, the proof's project as it was; a train made on step 4's run for the train engine's",
 }
@@ -180,6 +199,11 @@ IN_PROJECT = ("train",)
 WRITE_PLACEHOLDERS = ("import importlib, sys; getattr(importlib.import_module(sys.argv[1]), sys.argv[2])"
                       "(sys.argv[3], by=sys.argv[4], at=sys.argv[5])")
 RUN_TIMEOUT_S = 1800.0
+
+# The engine packages a builder keeps in the repository (stage D's), each a directory holding a pyproject.toml,
+# installed into core's environment before the service starts; and the group each registers its engines under.
+EXAMPLES = ROOT / "examples" / "engines"
+ENGINE_GROUP = "openferment.engines"
 
 # Opens the export package with the standard library alone (run with -I -S, from a directory of its own).
 READER = '''\
@@ -235,6 +259,8 @@ class Proof:
     made: dict[str, Any] = field(default_factory=dict)
     service: subprocess.Popen | None = None
     log: Path = Path()
+    # The packages installed from examples/engines/, each with how core's environment held it before (D0.8a).
+    installed: list[Any] = field(default_factory=list)
 
     def check(self, ok: bool, words: str) -> bool:
         print(f"  {'✓' if ok else '✗'} {words}")
@@ -273,6 +299,14 @@ def conformed(command: list[str], env: dict[str, str]) -> subprocess.CompletedPr
                 p.kill()
                 out, err = p.communicate()
             err = f"{err or ''}\nthe checks ran past {CONFORM_TIMEOUT_S:.0f} s and were asked to end"
+        except BaseException:
+            # The proof itself ends (Ctrl-C, SIGTERM): the checks are asked to end with it, dropping their database.
+            p.terminate()
+            try:
+                p.wait(timeout=CONFORM_END_S)
+            except subprocess.TimeoutExpired:
+                p.kill()
+            raise
     return subprocess.CompletedProcess(command, p.returncode, out, err)
 
 
@@ -350,6 +384,184 @@ def api(proof: Proof, method: str, path: str, body: Any = None, *, expect: int =
 
 def within_digits(a: float, b: float, digits: int = DIGITS) -> bool:
     return abs(a - b) <= 10.0 ** (1 - digits) * max(abs(a), abs(b))
+
+
+# ── the example engines (alpha 2.2 D0.8, D0.8a) ─────────────────────────
+
+# Where core's environment holds a distribution from, read by its own interpreter: null when it holds none, else its
+# version and its direct_url.json (the directory an install named, and whether it was editable).
+HELD_FROM = """\
+import json, sys
+from importlib import metadata
+try:
+    d = metadata.distribution(sys.argv[1])
+except metadata.PackageNotFoundError:
+    print("null")
+else:
+    print(json.dumps({"version": d.version, "from": json.loads(d.read_text("direct_url.json") or "null")}))
+"""
+
+
+@dataclass
+class Installed:
+    """A package the proof installed from examples/engines/, its distribution, the engines it registers, and how
+    core's environment held that distribution before the proof began: None when it held none."""
+    package: Path
+    distribution: str
+    engines: list[str]
+    before: dict[str, Any] | None
+
+
+def shown(path: Path) -> Path:
+    return path.relative_to(ROOT) if path.is_relative_to(ROOT) else path
+
+
+def example_packages(root: Path = EXAMPLES) -> list[Path]:
+    """Each package directory under examples/engines/, one holding a pyproject.toml, in name order, each as it is
+    named there (install_examples refuses one that leads outside the directory)."""
+    if not root.is_dir():
+        return []
+    return sorted(p for p in root.iterdir() if p.is_dir() and (p / "pyproject.toml").is_file())
+
+
+def example_project(package: Path) -> tuple[str, list[str]]:
+    """A package's distribution and the engines its pyproject.toml registers in the group `openferment.engines`, in
+    name order; ValueError in words for a pyproject.toml that names no distribution, and the parser's own error for
+    one that is no TOML."""
+    import tomllib
+
+    project = tomllib.loads((package / "pyproject.toml").read_text(encoding="utf-8")).get("project") or {}
+    name = str(project.get("name") or "").strip()
+    if not name:
+        raise ValueError("its pyproject.toml names no distribution ([project] name)")
+    return name, sorted((project.get("entry-points") or {}).get(ENGINE_GROUP) or {})
+
+
+def held_from(distribution: str, run: Callable[..., Any] = subprocess.run) -> dict[str, Any] | None:
+    """How core's environment holds `distribution` (HELD_FROM): None when it holds none."""
+    done = run([sys.executable, "-c", HELD_FROM, distribution], cwd=CORE, text=True, capture_output=True, timeout=60)
+    if done.returncode != 0:
+        raise OSError(f"core's interpreter could not say whether it holds {distribution}: "
+                      f"{(done.stderr or done.stdout or '').strip()[-200:] or 'no words'}")
+    return json.loads(done.stdout.strip() or "null")
+
+
+def lock_constraints(path: Path, run: Callable[..., Any] = subprocess.run) -> None:
+    """core/uv.lock's versions written to `path` as an install's constraints (`uv export --frozen`), so an install
+    moves no package the lock pins: one whose dependencies would is refused in uv's words. OSError in words when
+    the lock cannot be read so."""
+    done = run(["uv", "export", "--frozen", "--all-extras", "--no-hashes", "--no-emit-project", "--quiet"], cwd=CORE,
+               text=True, capture_output=True, timeout=120)
+    if done.returncode != 0:
+        said = (done.stderr or done.stdout or "").strip().splitlines()
+        raise OSError(f"core/uv.lock could not be read as the installs' constraints (uv export --frozen exited "
+                      f"{done.returncode}): {said[-1] if said else 'no words'}")
+    path.write_text(done.stdout, encoding="utf-8")
+
+
+def install_examples(proof: Proof, root: Path = EXAMPLES, run: Callable[..., Any] = subprocess.run,
+                     constraints: Path | None = None) -> list[str]:
+    """Each package under examples/engines/ installed into core's environment (`uv pip install -e`, the
+    interpreter the proof runs on, every package core/uv.lock pins held at its locked version), before the service
+    starts: one check a package, naming the engines it registers. A package that leads outside examples/engines/
+    (a symbolic link elsewhere), a pyproject.toml that cannot be read, an install uv refuses and one that outlives
+    its time each fail in words, and the rest are installed; with none, one line saying so. Each package installed
+    is kept in `proof.installed` with how core's environment held its distribution before (leave_as_found). The
+    engines the installed packages register, for the walk (step 9)."""
+    packages = example_packages(root)
+    if not packages:
+        print(f"  no package under {shown(root)}, so none is installed and no example engine is walked")
+        return []
+    held = constraints or proof.data_dir / "constraints.txt"
+    try:
+        lock_constraints(held, run)
+    except (OSError, subprocess.TimeoutExpired) as e:
+        proof.check(False, f"no package under {shown(root)} was installed: {e}")
+        return []
+    names: list[str] = []
+    inside = root.resolve()
+    for package in packages:
+        where = shown(package)
+        if not package.resolve().is_relative_to(inside):
+            proof.check(False, f"{where} leads to {package.resolve()}, outside {shown(root)}; the proof installs "
+                               f"from {shown(root)} alone, so this one was not installed")
+            continue
+        try:
+            distribution, engines = example_project(package)
+            before = held_from(distribution, run)
+        except (OSError, UnicodeDecodeError, ValueError, subprocess.TimeoutExpired) as e:
+            # tomllib's TOMLDecodeError is a ValueError.
+            proof.check(False, f"{where} was not installed: {type(e).__name__}: {e}")
+            continue
+        try:
+            done = run(["uv", "pip", "install", "--python", sys.executable, "-c", str(held), "-e", str(package)],
+                       cwd=CORE, text=True, capture_output=True, timeout=RUN_TIMEOUT_S)
+        except (OSError, subprocess.TimeoutExpired) as e:
+            proof.check(False, f"{where} did not install (uv pip install -e): {type(e).__name__}: {e}")
+            continue
+        said = (done.stderr or done.stdout or "").strip().splitlines()
+        if proof.check(done.returncode == 0,
+                       f"{where} installed into core's environment (uv pip install -e, each package core/uv.lock "
+                       "pins held at its locked version), registering "
+                       + (", ".join(engines) or "no engine in the group openferment.engines")
+                       if done.returncode == 0 else
+                       f"{where} did not install (uv pip install -e exited {done.returncode}, each package "
+                       f"core/uv.lock pins held at its locked version): " + (said[-1] if said else "no words")):
+            proof.installed.append(Installed(package, distribution, engines, before))
+            names += engines
+    return sorted(set(names))
+
+
+def _source_of(before: dict[str, Any]) -> tuple[Path | None, bool]:
+    """The directory an earlier install of a distribution named, and whether it was editable; None for one
+    installed from anywhere else (an index, a URL)."""
+    url = ((before.get("from") or {}).get("url") or "")
+    if not url.startswith("file://"):
+        return None, False
+    from urllib.parse import unquote
+
+    editable = bool(((before.get("from") or {}).get("dir_info") or {}).get("editable"))
+    return Path(unquote(urlsplit(url).path)), editable
+
+
+def leave_as_found(proof: Proof, run: Callable[..., Any] = subprocess.run, *, kept: bool = False) -> None:
+    """Core's environment as the proof found it (D0.8a), one line a package: each package the proof installed
+    whose distribution the environment held none of before is uninstalled; one it held from that same directory
+    stays; one it held from another directory is installed from there again, as it was. With the service kept
+    (--keep), each stays installed while the service runs, with the command that takes it out."""
+    for done in proof.installed:
+        where = shown(done.package)
+        if kept:
+            print(f"  {done.distribution} stays installed from {where} while the kept service runs; "
+                  f"cd core && uv pip uninstall {done.distribution} takes it out")
+            continue
+        if done.before is None:
+            out = run(["uv", "pip", "uninstall", "--python", sys.executable, done.distribution], cwd=CORE, text=True,
+                      capture_output=True, timeout=300)
+            said = (out.stderr or out.stdout or "").strip().splitlines()
+            print(f"  {done.distribution} uninstalled, as the proof found core's environment without it"
+                  if out.returncode == 0 else
+                  f"  ✗ {done.distribution} could not be uninstalled (uv pip uninstall exited {out.returncode}): "
+                  f"{said[-1] if said else 'no words'}; cd core && uv pip uninstall {done.distribution} takes it out")
+            continue
+        source, editable = _source_of(done.before)
+        if source is not None and source.resolve() == done.package.resolve():
+            print(f"  {done.distribution} stays installed from {where}, as it was before the proof")
+            continue
+        if source is None or not source.is_dir():
+            print(f"  {done.distribution} stays installed from {where}; before the proof it was installed from "
+                  f"{source or (done.before.get('from') or {}).get('url') or 'an index'}, which the proof cannot "
+                  "install it from again")
+            continue
+        constraints = proof.data_dir / "constraints.txt"
+        out = run(["uv", "pip", "install", "--python", sys.executable, "-c", str(constraints),
+                   *(["-e"] if editable else []), str(source)], cwd=CORE, text=True, capture_output=True,
+                  timeout=RUN_TIMEOUT_S)
+        said = (out.stderr or out.stdout or "").strip().splitlines()
+        print(f"  {done.distribution} installed again from {source}, as it was before the proof"
+              if out.returncode == 0 else
+              f"  ✗ {done.distribution} could not be installed again from {source}: {said[-1] if said else 'no words'}; "
+              f"it stays installed from {where}")
 
 
 # ── the steps ──────────────────────────────────────────────────────────
@@ -762,10 +974,13 @@ def step_9(proof: Proof) -> None:
         if READING_UNIT not in units:
             raise Stop(f"runbook {runbook[0]} measures in {', '.join(sorted(units))}, and the walk's reading is for "
                        f"{READING_PARAMETER}, in {READING_UNIT}")
+    examples = proof.made.get("examples") or []
+    if not examples:
+        print("  no engine installed from examples/engines/, so the walk runs none of theirs")
     env = {**os.environ, "WALK_ORIGIN": proof.origin, "WALK_PROJECT": proof.project, "WALK_RUN": proof.made["flowsheet"],
            "WALK_CONVERSATION": proof.made["conversation"], "WALK_RUNBOOK": runbook[0] if runbook else "",
            "WALK_PERSON": PERSON, "WALK_READING": f"{READING_VALUE:g}", "WALK_READING_UNIT": READING_UNIT,
-           "WALK_READING_PARAMETER": READING_PARAMETER}
+           "WALK_READING_PARAMETER": READING_PARAMETER, "WALK_ENGINES": ",".join(examples)}
     walked = subprocess.run(["npx", "tsx", "scripts/walk.ts"], cwd=ROOT, text=True, capture_output=True, env=env,
                             timeout=1500)
     lines = [line.strip() for line in walked.stdout.splitlines() if line.strip().startswith(("✓", "✗"))]
@@ -1156,7 +1371,17 @@ def main(argv: list[str]) -> int:
     print(f"openFerment proof{' (live)' if proof.live else ''}: steps {', '.join(map(str, order(asked)))} "
           f"on database {proof.database}\n")
     started = time.monotonic()
+
+    def ended(signum: int, _frame: Any) -> None:
+        # SIGTERM ends the proof as Ctrl-C does: the finally below stops the service, drops the database and leaves
+        # core's environment as the proof found it.
+        raise SystemExit(128 + signum)
+
+    previous = signal.signal(signal.SIGTERM, ended)
     try:
+        print("── the engines under examples/engines/, installed before the service starts")
+        proof.made["examples"] = install_examples(proof)
+        print()
         for n in order(asked):
             print(f"── {n}  {TITLES[n]}")
             t0 = time.monotonic()
@@ -1174,7 +1399,8 @@ def main(argv: list[str]) -> int:
             spent(proof)
             print()
     finally:
-        if args.keep and proof.service is not None and proof.service.poll() is None:
+        kept = args.keep and proof.service is not None and proof.service.poll() is None
+        if kept:
             print(f"kept: the service at {proof.origin} (project {proof.project}), database {proof.database}, "
                   f"data {proof.data_dir}; stop it with kill -TERM -{proof.service.pid}")
         else:
@@ -1182,8 +1408,12 @@ def main(argv: list[str]) -> int:
             dropped = migrations("drop", proof.database)
             if dropped.returncode != 0:
                 print(f"(database {proof.database} was left behind: {(dropped.stderr or dropped.stdout).strip()[-200:]})")
-            if not proof.failed:
-                shutil.rmtree(proof.data_dir, ignore_errors=True)
+        if proof.installed:
+            print("── core's environment as the proof found it")
+            leave_as_found(proof, kept=kept)
+        if not kept and not proof.failed:
+            shutil.rmtree(proof.data_dir, ignore_errors=True)
+        signal.signal(signal.SIGTERM, previous)
     print(f"{proof.passed + proof.failed} checks in {time.monotonic() - started:.0f} s: "
           + (f"{proof.failed} failed. The service's log: {proof.log}" if proof.failed else "every one holds."))
     return 1 if proof.failed else 0

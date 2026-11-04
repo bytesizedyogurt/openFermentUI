@@ -39,6 +39,7 @@ which a page's write is laid onto.
 from __future__ import annotations
 
 import json
+import math
 import re
 from collections.abc import Callable
 from dataclasses import dataclass, field
@@ -74,6 +75,23 @@ OBSERVATION_FIELDS = ("stepId", "at", "raw")
 
 class StateRefused(ValueError):
     """A write that is not a row of its kind, in words."""
+
+
+def _non_finite(value: Any, path: str = "") -> list[str]:
+    """Where a number that is NaN, infinite or past a float's range stands
+    in a row a page sends (each as a path into it, `value` for the row
+    itself), anywhere in it."""
+    from .models import float_holds
+
+    if isinstance(value, float) and not math.isfinite(value):
+        return [path or "value"]
+    if isinstance(value, int) and not isinstance(value, bool) and not float_holds(value):
+        return [path or "value"]
+    if isinstance(value, dict):
+        return [p for k, v in value.items() for p in _non_finite(v, f"{path}.{k}" if path else str(k))]
+    if isinstance(value, list):
+        return [p for n, v in enumerate(value) for p in _non_finite(v, f"{path}[{n}]")]
+    return []
 
 
 @dataclass(frozen=True)
@@ -123,6 +141,12 @@ def _checked(kind: str, item_id: str, value: Any) -> Any:
         raise StateRefused(f"{kind!r} is not something a project keeps; it keeps {', '.join(NAMES)}")
     if not ID.match(item_id):
         raise StateRefused(f"{item_id!r} is not an id: letters, digits and . _ : | -, at most 200")
+    infinite = _non_finite(value)
+    if infinite:
+        # JSON carries finite numbers alone, and the database keeps JSON: a
+        # page's NaN or Infinity is refused in words, nothing kept (alpha 2.2 D.0).
+        raise StateRefused(f"this {kind} row holds a number that is NaN, infinite or past a float's range at "
+                           f"{', '.join(infinite[:5])}; a row keeps finite numbers alone, so nothing was kept")
     if len(json.dumps(value)) > MAX_BYTES:
         raise StateRefused(f"this {kind} row is over {MAX_BYTES // 1_000_000} MB; a page sends less")
     if kind in RECORD_KINDS:

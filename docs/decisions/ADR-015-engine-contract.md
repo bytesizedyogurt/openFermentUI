@@ -250,6 +250,28 @@ Stage C put the core's other two engines behind the contract and every run on on
   routes; it prints checks 3, 5 and 7's words under each engine's line, and holds the proof's
   project the same after the checks.
 
+## Implementation (alpha 2.2 D.0, 2026-11-04)
+
+- **Diagnostics** (D0.1). The handoff's pre-read found an engine asked for the time its run took
+  as an output and for a run that replays identically, two asks the contract could not hold
+  together: a replay compares every output, and a clock reading moves on every run. The worker's
+  `run` op may now answer `diagnostics` beside its `outputs`: what the computation reports about
+  itself, the time it took or the iterations it made, each a name, a finite number or words, and a
+  unit, each name its own and at most 200 characters, at most 50 of them, held to the outputs'
+  shape (`WorkerEngine.compute`: a break is `EngineBroken`, a 503 that keeps nothing). The
+  service keeps them on the run's row, `EngineRun.diagnostics` beside `durationMs`, from the
+  computation that made the row (`engine/contract.diagnosed`, which `runs.run_engine` holds open
+  around its computation, hands them to `keep_run`); the same request asked again is the kept row
+  with its first computation's diagnostics. They enter neither the artifact (its output, its hash,
+  its id, its replay, the pins) nor `outputs.values`, comparisons, runbooks or evidence: a result
+  is an output, and an output is a function of the request alone. The run's page shows them under
+  its outputs, saying a replay leaves them uncompared, and `engine_report` and `engine_run` name
+  them as words beside the outputs they cite. Conformance check 3 also holds their shape when a
+  run answers some. The name keeps clear of the provenance class `measured`, a run resting on
+  bench readings. No core engine answers diagnostics, and every pin of
+  `core/tests/test_engine_pins.py` holds; a row kept from an artifact an earlier ask computed (its
+  SFF step failed then) holds none, since nothing computed for it.
+
 ## Revisit condition
 
 A second scientific engine arriving beyond the three in the tree, or the SFF toolkit shipping an
@@ -324,3 +346,12 @@ importer (ADR-003).
   toolkit's schema requires a TEA year. `core/tests/test_engine_pins.py` holds the train's
   artifact id through the inputs. `pnpm prove` step 10 makes the eight checks on `train` in the
   proof's project.
+- `core/tests/test_engine_diagnostics.py` (D.0): a run keeps the diagnostics its worker answers
+  on its row, its artifact, hash and pin the same bit for bit; a run with none keeps an empty
+  list, and an older row reads so; `engine_report` names them as words within its room and cites
+  the outputs alone; diagnostics outside their shape break the contract and keep nothing; check 3
+  holds their shape and fails a row that answers others when asked again; and a worker of its own
+  speaking the protocol reports the time its run took, replays identically and holds all eight
+  checks. `core/tests/test_finite_inputs.py` (D.0): a number that is NaN or infinite refused in
+  words at every door, the tool door, a scenario, the bind reads' query, a caller in code and
+  `conform --inputs`, each a 422 where a route answers.

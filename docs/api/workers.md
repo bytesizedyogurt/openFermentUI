@@ -61,8 +61,9 @@ and returns the result object. The shapes of `EngineThing` and `EngineParameter`
 
 Every op that names a thing refuses one it does not run, by raising `Refused`. An answer outside
 the shapes below (a result key missing, outputs that are no list of names, values and units, a
-number that is NaN or infinite, two outputs of one name, a flowsheet that is no JSON object)
-breaks the contract: the service raises `EngineBroken`, keeps no runs row and answers 503 in
+number that is NaN or infinite, two outputs of one name, an output's name blank or longer than
+200 characters, diagnostics outside the outputs' shape or more than 50 of them, a flowsheet that
+is no JSON object) breaks the contract: the service raises `EngineBroken`, keeps no runs row and answers 503 in
 words. A break in `run` keeps nothing; a break in `sff_export` comes after the run's artifact is
 kept, and the next ask answers the computation from it and asks `sff_export` again.
 
@@ -77,21 +78,29 @@ asks it once per process and keeps the answer.
 `{"thing", "configuration"}` → `{"parameters": [EngineParameter, …]}`: what the thing takes, each a
 `ParameterSpec` with its default `value` and the default's `origin` (`library-default` with `ref`,
 or `convention` with `note`), or, for a parameter with no default, `value` and `origin` null and
-a `sourceRule` naming `assumption`: a run sets it. The service sends the configuration a run of
+a `sourceRule` naming `assumption`: a run sets it. These two are a worker's; the other origins a
+default may rest on (`record`, `artifact`, `person-assumption`) belong to things a project holds
+(`docs/api/engines.md`, `EngineParameter`). The service sends the configuration a run of
 the thing would use: the one named, else the thing's default, and `null` for a thing that takes
 none. An unknown thing is refused in words.
 
 ### `run`
 
 `{"thing", "configuration", "inputs": [{"name", "value", "unit"}, …]}` → `{"outputs": [{"name",
-"value", "unit"}, …]}`. The inputs are the values the run sets, already checked by the service
-against the thing's parameters, a value for every parameter with no default among them: the
-service refuses in words, keeping nothing, a run that leaves one unset. Each output is a finite
-number or a string in a unit, each name its own and at most 200 characters, and every output a
-function of the request alone, in the same order on every run of it, since a replay compares the
-outputs in order. A run the engine cannot
-make, an unknown thing among them, is refused in words (`Refused: …`), and the service keeps the
-refusal as the run's receipt.
+"value", "unit"}, …], "diagnostics": [{"name", "value", "unit"}, …]}`, the `diagnostics` left out
+by a worker that reports none. The inputs are the values the run sets, already checked by the
+service against the thing's parameters, a value for every parameter with no default among them:
+the service refuses in words, keeping nothing, a run that leaves one unset. They arrive in key
+order, each number a JSON float and each finite. Each output is a finite number or a string in a
+unit (`""` for a pure number or for words), each name its own and at most 200 characters, and
+every output a function of the request alone, in the same order on every run of it, since a
+replay compares the outputs in order. The `diagnostics` are what the computation reports about
+itself, the time it took or the iterations it made: at most 50, each a finite number or a string
+in a unit, each name its own among them and at most 200 characters. The service keeps them on
+the run's row and outside its artifact, so a replay compares the outputs alone; the time a
+computation took goes here, since an output that moves between two runs of one request makes the
+replay differ. A run the engine cannot make, an unknown thing among them, is refused in words
+(`Refused: …`), and the service keeps the refusal as the run's receipt.
 
 ### `sff_export`
 

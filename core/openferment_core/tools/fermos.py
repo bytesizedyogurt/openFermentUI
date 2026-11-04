@@ -56,7 +56,7 @@ NAME = "growth_forecast"
 class GrowthForecastInput(BaseModel):
     model_config = ConfigDict(extra="forbid")
 
-    fitArtifactId: str = Field(description="The artifact id of a kept kinetic fit (tool kinetic_fit).")
+    fitArtifactId: str = Field(description="The artifact id of a kept kinetic fit (the artifact tool kinetic_fit).")
 
 
 def _run(inp: GrowthForecastInput, ctx: ToolContext) -> ToolResult:

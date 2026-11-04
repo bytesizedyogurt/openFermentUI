@@ -9,7 +9,15 @@ core/uv.lock names, through its own metadata: the `License` field, the
 states an expression is decided by it alone, as PEP 639 makes the expression
 the licence; for any other package, any of the License field and the
 classifiers can decide. JavaScript: every production dependency, as
-`pnpm licenses list --json --prod` reports it.
+`pnpm licenses list --json --prod` reports it. Beside the lock: every
+distribution installed in core/.venv that registers an entry point in the
+group `openferment.engines` and that core/uv.lock does not name, and each
+dependency of one that the lock does not name (`engine_side`). An engine
+installed from under examples/ is the project's own and declares no licence
+(ADR-012: a declared one fails the stage in words); any other engine, and
+every such dependency, is held to the ledger as any dependency is. They are
+reported here and left out of THIRD_PARTY.md, which lists what the lock
+installs, so the listing reads the same with an engine installed or not.
 
 A string passes when core/licences.toml allows it, in the spelling the
 metadata uses, or when a named person accepted that package under that same
@@ -41,6 +49,11 @@ POLICY = CORE / "licences.toml"
 LOCK = CORE / "uv.lock"
 LISTING = REPO / "THIRD_PARTY.md"
 SRC = REPO / "src"
+# The examples the repository's builders keep (stage D's engine among them):
+# the project's own packages, which declare no licence (ADR-012).
+EXAMPLES = REPO / "examples"
+# The entry-point group an engine registers under (docs/api/engines.md).
+ENGINE_GROUP = "openferment.engines"
 # The project's own distribution, skipped by name: it is what the listing is
 # about, and it carries no licence metadata.
 SELF = "openferment-core"
@@ -297,6 +310,91 @@ def python_side(policy: Policy, lock_path: Path = LOCK) -> list[Package]:
     return sorted(found.values(), key=lambda p: canonical(p.name))
 
 
+# ── Python: an engine installed beside the lock (alpha 2.2 D0.10) ───────
+
+
+def _source_dir(dist) -> Path | None:
+    """The directory an installed distribution was installed from, as its
+    PEP 610 `direct_url.json` names it (an editable install's, `uv pip
+    install -e <path>`); None for one installed from an index or an archive."""
+    try:
+        raw = dist.read_text("direct_url.json")
+    except (OSError, ValueError):
+        return None
+    if not raw:
+        return None
+    try:
+        url = str(json.loads(raw).get("url") or "")
+    except (ValueError, AttributeError):
+        return None
+    if not url.startswith("file://"):
+        return None
+    from urllib.parse import unquote, urlsplit
+
+    return Path(unquote(urlsplit(url).path)).resolve()
+
+
+def _requirement_names(dist) -> list[str]:
+    """The distributions `dist` requires on its own, its extras' left out,
+    each in its canonical spelling."""
+    out = []
+    for req in dist.requires or []:
+        if re.search(r"""extra\s*==""", req):
+            continue
+        found = re.match(r"\s*([A-Za-z0-9][A-Za-z0-9._-]*)", req)
+        if found:
+            out.append(canonical(found.group(1)))
+    return out
+
+
+def engine_side(policy: Policy, lock_path: Path = LOCK, distributions=None, examples: Path = EXAMPLES) -> list[Package]:
+    """Every distribution installed in core/.venv that registers an entry
+    point in the group `openferment.engines` and that core/uv.lock does not
+    name, then each distribution one of them requires that the lock does not
+    name. An engine installed from a directory under examples/ is the
+    project's own and declares no licence: a declared one fails in words,
+    since a licence for the project is the owner's choice (ADR-012). Any
+    other engine, and every such dependency, is held to the ledger as any
+    dependency is. None of them enters THIRD_PARTY.md, which lists what
+    core/uv.lock installs."""
+    lock = tomllib.loads(lock_path.read_text(encoding="utf-8"))
+    locked = {canonical(e["name"]) for e in lock["package"]}
+    installed: dict[str, object] = {}
+    for dist in (md.distributions() if distributions is None else distributions):
+        installed.setdefault(canonical(dist.metadata["Name"] or ""), dist)
+    engines = sorted(name for name, d in installed.items() if name not in locked and name != SELF
+                     and any(ep.group == ENGINE_GROUP for ep in d.entry_points))
+    out: list[Package] = []
+    for name in engines:
+        d = installed[name]
+        strings = python_strings(d.metadata)
+        where = _source_dir(d)
+        own = where is not None and where.is_relative_to(examples.resolve())
+        if not own:
+            verdict = decide(name, deciding_strings(d.metadata), policy)
+        elif strings:
+            verdict = Verdict(False, None, f"a package under examples/ is the project's own, and this one declares "
+                                           f"{', '.join(strings)}: a licence for the project is the owner's choice "
+                                           "(ADR-012), so the package declares none")
+        else:
+            verdict = Verdict(True, None, "the project's own, under examples/, declaring no licence (ADR-012)")
+        part = f"an engine installed from {where}" if where is not None else "an engine installed beside the lock"
+        out.append(Package("python", d.metadata["Name"], d.version, strings, part, verdict))
+    seen = set(engines)
+    stack = [(dep, name) for name in engines for dep in _requirement_names(installed[name])]
+    while stack:
+        dep, by = stack.pop()
+        if dep in seen or dep in locked or dep == SELF or dep not in installed:
+            continue
+        seen.add(dep)
+        d = installed[dep]
+        out.append(Package("python", d.metadata["Name"], d.version, python_strings(d.metadata),
+                           f"a dependency of the engine {by}, beside the lock",
+                           decide(dep, deciding_strings(d.metadata), policy)))
+        stack += [(x, by) for x in _requirement_names(d)]
+    return out
+
+
 # ── JavaScript: the production dependencies ─────────────────────────────
 
 
@@ -460,11 +558,14 @@ def distinct(packages: list[Package]) -> dict[str, list[str]]:
 
 
 def check(python: list[Package], javascript: list[Package], policy: Policy,
-          listing: Path = LISTING) -> tuple[int, list[str]]:
-    """The verdict on both sides and the listing. Returns the exit code and
-    the report's lines. Rewrites `listing` when it is stale and every
-    package passes; a failing tree leaves it as it was."""
-    failed = [p for p in python + javascript if not p.verdict.ok]
+          listing: Path = LISTING, engines: list[Package] | None = None) -> tuple[int, list[str]]:
+    """The verdict on both sides, the engines installed beside the lock
+    (`engines`, from `engine_side`) and the listing, which leaves the engines
+    out. Returns the exit code and the report's lines. Rewrites `listing`
+    when it is stale and every package passes; a failing tree leaves it as it
+    was."""
+    engines = list(engines or [])
+    failed = [p for p in python + javascript + engines if not p.verdict.ok]
     accepted = [p for p in python + javascript if p.verdict.ok and p.verdict.how != "allowed"]
     text = render(python, javascript, policy)
     stale = not listing.exists() or listing.read_text(encoding="utf-8") != text
@@ -482,6 +583,8 @@ def check(python: list[Package], javascript: list[Package], policy: Policy,
     report += [f"  accepted     {p.name} {p.version} ({p.verdict.string}): {p.verdict.how}" for p in accepted]
     report += [f"  accepted     {a.package} ({a.licence}): not installed here"
                for key, a in sorted(policy.accepted.items()) if key not in installed]
+    report += [f"  beside lock  {p.name} {p.version} ({shown_licence(p)}), {p.part}: {p.verdict.how}"
+               for p in engines if p.verdict.ok]
     report += [f"  data         {d.id} ({d.licence}): accepted by {d.by} on {d.date}" for d in policy.data]
     report += [f"  vendored     {v.id} ({v.licence}) at {v.revision[:12]} in {v.path}" for v in policy.vendored]
     report.append(f"  listing      {listing.name} " + (
@@ -511,12 +614,12 @@ def main(argv: list[str]) -> int:
         print("usage: check-licences.py [--list]")
         return 2
     policy = load_policy()
-    python, javascript = python_side(policy), javascript_side(policy)
+    python, javascript, engines = python_side(policy), javascript_side(policy), engine_side(policy)
     if "--list" in argv:
-        for string, holders in distinct(python + javascript).items():
+        for string, holders in distinct(python + javascript + engines).items():
             print(f"{string}\n    {', '.join(holders)}")
         return 0
-    code, report = check(python, javascript, policy)
+    code, report = check(python, javascript, policy, engines=engines)
     print("\n".join(report), file=sys.stdout if code == 0 else sys.stderr)
     return code
 

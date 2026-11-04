@@ -115,6 +115,33 @@ def test_question_13_expects_the_engine_reads_and_every_engine_the_core_register
     assert set(q.cites) == {"evidence", "row"} and q.estimate is False and q.follows is None
 
 
+def test_question_13_seeded_expects_every_engine_the_registry_holds_the_cores_three_among_them(monkeypatch):
+    """alpha 2.2 D0.12: an engine installed beside the core is expected
+    beside the core's three when the suite is seeded; the code names the
+    core's three alone."""
+    from importlib.metadata import EntryPoint
+
+    from openferment_core.engine import registry
+
+    points = [EntryPoint(name=n, value=v, group=registry.GROUP) for n, v in (
+        ("biosteam", "openferment_core.engine.biosteam:ENGINE"), ("sample", "openferment_core.engine.sample:SAMPLE"))]
+    monkeypatch.setattr(registry, "entry_points", lambda: points)
+    registry.reset()
+    try:
+        assert evaluate.engines_here() == ("biosteam", "kinetics", "sample", "train")
+        evaluate.seed(suite=evaluate.ETHANOL)
+        held = {q.id: q for q in evaluate.questions(evaluate.ETHANOL)}["eq-eth-13"]
+        assert "Names each engine registered here (biosteam, kinetics, sample and train)" in held.expects
+        code = {q.id: q for q in evaluate.ETHANOL_QUESTIONS}["eq-eth-13"]
+        assert "Names each engine registered here (biosteam, kinetics and train)" in code.expects
+        assert held.expects.replace("sample and train", "train").replace("kinetics, train", "kinetics and train") == \
+            code.expects, "the seed changes the names alone"
+        assert {q.id: q.expects for q in evaluate.questions(evaluate.ETHANOL) if q.id != "eq-eth-13"} == {
+            q.id: q.expects for q in evaluate.ETHANOL_QUESTIONS if q.id != "eq-eth-13"}
+    finally:
+        registry.reset()
+
+
 def test_question_14_expects_a_measurement_origin_a_provenance_with_its_reason_and_a_comparison():
     q = {q.id: q for q in evaluate.ETHANOL_QUESTIONS}["eq-eth-14"]
     assert q.question == ("Take the ethanol yield measured in this project's most recent deposition, set it as the "

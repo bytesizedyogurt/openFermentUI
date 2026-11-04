@@ -339,7 +339,9 @@ def test_a_number_that_is_not_finite_and_a_negative_seed_are_refused_in_words(st
                 + ", ".join(__import__("json").dumps(x) for x in (a, *typed(ASSUMED[1:])))
                 + "]}").replace('"INF"', "Infinity")
         r = client.post("/api/proforma/run", content=body, headers={"Content-Type": "application/json"})
-        assert r.status_code == 422 and "plant_scale" in r.json()["detail"] and "finite" in r.json()["detail"], (field, r.text)
+        # Refused as the request's fields are read (alpha 2.2 D0.6): a 422 whose field errors say it in words.
+        said = __import__("json").dumps(r.json()["detail"])
+        assert r.status_code == 422 and "plant_scale" in said and "finite" in said, (field, r.text)
     called = []
     real = proforma.call
     proforma.call = lambda op, args: called.append(op) or real(op, args)

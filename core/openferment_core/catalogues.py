@@ -24,6 +24,20 @@ Entries arrive by the route (`POST /api/catalogues/{kind}`), by Postdoc's
 `catalogue_write` (marked as the model's), or by Intake from a file of entries
 (`POST /api/intake/catalogue`, JSON or CSV). Nothing here deletes an entry:
 taking a person's entry out of a live instance is the owner's call.
+
+WHO KEPT AN ENTRY (alpha 2.2 D.0). Each entry names its keeper (`by`), the
+lane it was kept in (`agent`): `person` for the route, a file and a call
+naming `?by=`, `model` for a model's or an outside assistant's
+`catalogue_write`; and, in the model's lane, the door it came in by (`via`:
+`postdoc` for Postdoc's loop, `mcp` for the MCP server in its own process,
+`http` for the HTTP endpoint's assistant header). A person's keep replaces
+whatever the id holds. A model's write replaces an entry kept in the model's
+lane under its own name through the same kind of door, Postdoc's entry by
+Postdoc and an outside assistant's by that assistant, and refuses every other
+in words naming the entry and who kept it, with nothing written: a model
+never replaces an entry a person kept, and an assistant that declares
+Postdoc's model id leaves Postdoc's entries as they are. A keeper's name is
+read as `tools.caller_name` writes one, at every door.
 """
 from __future__ import annotations
 
@@ -81,6 +95,16 @@ class CatalogueEntry(BaseModel):
     # Where the entry came from, in words: a person, a document, a file.
     source: str | None = Field(default=None, max_length=400)
     by: str = Field(default="", max_length=200)
+    # The lane it was kept in, as the audit names one: `person` for a
+    # person's keep, `model` for a model's or an outside assistant's write.
+    # The service writes it over whatever an entry sent holds; an entry
+    # kept before the service wrote it reads it from its source (`keeper`).
+    agent: Literal["model", "person"] | None = None
+    # The door a model's write came in by, as its audit row names it:
+    # `postdoc`, `mcp` or `http` (tools.ToolContext.door); none for a
+    # person's keep. The service writes it too; an entry kept before reads
+    # it from its source (`door`).
+    via: Literal["postdoc", "mcp", "http"] | None = None
     at: str = ""
 
     @field_validator("aliases", "mastery", "skills")
@@ -111,7 +135,18 @@ class CatalogueEntry(BaseModel):
 
 
 def _now() -> str:
-    return datetime.now(timezone.utc).isoformat().replace("+00:00", "Z")
+    """A keep's time, ISO 8601 in UTC, written as the audit writes its rows'
+    (`+00:00`), so a client sets the two side by side."""
+    return datetime.now(timezone.utc).isoformat()
+
+
+def _name(by: str | None) -> str:
+    """A keeper's name as every door reads one (tools.caller_name): control,
+    format and surrogate characters dropped, whitespace collapsed, at most
+    200 characters."""
+    from .tools import caller_name
+
+    return caller_name(by or "")
 
 
 def _row_id(kind: str, entry_id: str) -> str:
@@ -127,14 +162,57 @@ def _kind(kind: str) -> str:
 # ── the store ──────────────────────────────────────────────────────────
 
 
+def _door_of_source(entry: CatalogueEntry) -> str | None:
+    """The door a model's entry kept before the service wrote `via` came in
+    by, read from its source as catalogue_write wrote one then."""
+    if entry.source == f"Postdoc ({entry.by})":
+        return "postdoc"
+    if entry.source == f"{entry.by}, over MCP":
+        return "mcp"
+    if entry.source == f"{entry.by}, at the HTTP endpoint":
+        return "http"
+    return None
+
+
+def keeper(entry: CatalogueEntry) -> str:
+    """The lane an entry was kept in, `model` or `person`: its `agent`. An
+    entry kept before the service wrote that field holds a model's write in
+    its source alone, as catalogue_write wrote one then (`<name>, over MCP`,
+    `Postdoc (<name>)`); every other such entry is a person's."""
+    if entry.agent is not None:
+        return entry.agent
+    return "model" if _door_of_source(entry) else "person"
+
+
+def door(entry: CatalogueEntry) -> str | None:
+    """The door a model's entry came in by (`postdoc`, `mcp` or `http`), its
+    `via`, else read from its source; None for a person's entry."""
+    if keeper(entry) != "model":
+        return None
+    return entry.via or _door_of_source(entry) or "postdoc"
+
+
+def _side(entry: CatalogueEntry) -> str:
+    """Whose an entry of the model's lane is: Postdoc's, or an outside
+    assistant's, through either of the assistant's doors."""
+    return "postdoc" if door(entry) == "postdoc" else "assistant"
+
+
+def _as_kept(body: dict[str, Any]) -> CatalogueEntry:
+    entry = CatalogueEntry.model_validate(body)
+    if entry.agent is not None and (entry.agent == "person" or entry.via is not None):
+        return entry
+    return entry.model_copy(update={"agent": keeper(entry), "via": door(entry)})
+
+
 async def _listed(project_id: str, kind: str) -> list[CatalogueEntry]:
     async with db.session() as s:
         bodies = await rows.bodies(s, t.catalogue, project_id, t.catalogue.c.kind == kind)
-    return sorted((CatalogueEntry.model_validate(b) for b in bodies), key=lambda e: e.id)
+    return sorted((_as_kept(b) for b in bodies), key=lambda e: e.id)
 
 
 def listed(kind: str) -> list[CatalogueEntry]:
-    """The open project's entries of one kind, by id."""
+    """The open project's entries of one kind, by id, each with the lane it was kept in."""
     return db.run(_listed(projects.current(), _kind(kind)))
 
 
@@ -145,20 +223,43 @@ def get(kind: str, entry_id: str) -> CatalogueEntry:
     return found
 
 
+def _taken(held: CatalogueEntry) -> str:
+    lane = ("a person's" if keeper(held) == "person" else "Postdoc's" if _side(held) == "postdoc"
+            else "an outside assistant's")
+    return (f"the project's {held.kind} catalogue holds {held.id}, kept by {held.by} in {lane} name; a model's write "
+            "replaces only an entry it kept itself, under its own name and through its own kind of door (Postdoc's "
+            "loop, or an outside assistant's), so nothing was written. Keep this entry under an id of its own")
+
+
 async def _keep(project_id: str, entries: list[CatalogueEntry]) -> None:
     async with db.session() as s:
+        # One keep at a time in the project's catalogues: a person's keep
+        # never lands between a model's check and its write.
+        await db.lock(s, "catalogue", project_id)
         for e in entries:
-            await rows.put(s, t.catalogue, project_id, _row_id(e.kind, e.id), e.model_dump(mode="json"), by=e.by,
-                           kind=e.kind)
+            row_id = _row_id(e.kind, e.id)
+            if e.agent == "model":
+                held = await rows.body(s, t.catalogue, project_id, row_id)
+                if held is not None:
+                    was = CatalogueEntry.model_validate(held)
+                    if keeper(was) != "model" or was.by != e.by or _side(was) != _side(e):
+                        raise CatalogueRefused(_taken(was))
+            await rows.put(s, t.catalogue, project_id, row_id, e.model_dump(mode="json"), by=e.by, kind=e.kind)
 
 
-def keep(entry: CatalogueEntry, *, by: str) -> CatalogueEntry:
+def keep(entry: CatalogueEntry, *, by: str, agent: Literal["model", "person"] = "person",
+         via: str | None = None) -> CatalogueEntry:
     """An entry kept in the open project's catalogue of its kind, in the name
-    of `by`; an entry already held under the id is replaced by it."""
-    who = (by or "").strip()
+    of `by` (read as `_name` reads one), in the lane `agent` names, a model's
+    through the door `via` names (postdoc when it names none). A person's
+    keep replaces an entry already held under the id. A model's replaces one
+    it kept itself under the same name through the same kind of door, and is
+    refused in words for any other (CatalogueRefused), nothing written."""
+    who = _name(by)
     if not who:
         raise CatalogueRefused("a catalogue entry is kept in a person's or a model's name")
-    kept = entry.model_copy(update={"by": who, "at": _now()})
+    through = (via or "postdoc") if agent == "model" else None
+    kept = entry.model_copy(update={"by": who, "at": _now(), "agent": agent, "via": through})
     db.run(_keep(projects.current(), [kept]))
     return kept
 
@@ -169,15 +270,18 @@ def _first_error(err: ValidationError) -> str:
     return f"{where}: {first.get('msg')}"
 
 
-def keep_fields(kind: str, fields: dict[str, Any], *, by: str, source: str) -> CatalogueEntry:
-    """An entry made from fields and kept, for a caller that holds no entry
-    (Postdoc's `catalogue_write`): refused in words when the kind does not
-    take them."""
+def keep_fields(kind: str, fields: dict[str, Any], *, by: str, source: str,
+                agent: Literal["model", "person"], via: str | None = None) -> CatalogueEntry:
+    """An entry made from fields and kept in the lane `agent` names, through
+    the door `via` names, for a caller that holds no entry
+    (`catalogue_write`): refused in words when the kind does not take them,
+    and, for a model's write, when the id holds an entry another kept
+    (`keep`)."""
     try:
         entry = CatalogueEntry.model_validate({**fields, "kind": _kind(kind), "source": source})
     except ValidationError as e:
         raise CatalogueRefused(_first_error(e)) from None
-    return keep(entry, by=by)
+    return keep(entry, by=by, agent=agent, via=via)
 
 
 # ── from a file (Intake) ───────────────────────────────────────────────
@@ -228,7 +332,7 @@ def intake(kind: str, data: bytes, filename: str, *, by: str) -> CatalogueIntake
     source, every other row refused with its reason. A list holds its items
     in JSON; in CSV it is one column with the items split by `;`."""
     _kind(kind)
-    who = (by or "").strip()
+    who = _name(by)
     if not who:
         raise CatalogueRefused("a catalogue file is taken in a person's name")
     found = _rows_of(data, filename or "the file")
@@ -239,7 +343,7 @@ def intake(kind: str, data: bytes, filename: str, *, by: str) -> CatalogueIntake
     at = _now()
     for i, r in enumerate(found, start=1):
         try:
-            e = CatalogueEntry.model_validate({**r, "kind": kind, "by": who, "at": at,
+            e = CatalogueEntry.model_validate({**r, "kind": kind, "by": who, "at": at, "agent": "person", "via": None,
                                                "source": r.get("source") or f"the file {filename}"})
         except ValidationError as err:
             out.refused.append(f"row {i}: {_first_error(err)}")

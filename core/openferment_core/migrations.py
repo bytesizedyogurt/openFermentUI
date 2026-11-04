@@ -12,6 +12,10 @@ One database holds two histories: ours in schema `openferment`
 (literature/kit_alembic/). `db` imports nothing of the service (§7.2), so
 the two are run together here, ours first. The address is
 OPENFERMENT_DATABASE_URL, from the environment or core/.env.
+
+A command that cannot run says why in words and exits 2: no address set, the
+production database named, a server that does not answer, and a database the
+server does not hold, which `reset NAME` (pnpm db:reset NAME) makes.
 """
 from __future__ import annotations
 
@@ -24,7 +28,7 @@ from alembic.config import Config
 from alembic.script import ScriptDirectory
 from dotenv import load_dotenv
 from sqlalchemy.engine import URL
-from sqlalchemy.exc import ProgrammingError
+from sqlalchemy.exc import DBAPIError, ProgrammingError
 
 from .db import migrate
 from .db.engine import DatabaseUnavailable, as_async, database_url
@@ -88,6 +92,23 @@ def _revisions(url: URL) -> str:
     return ", ".join(f"{schema} at {at or 'none'}" for schema, (at, _) in at_head(url).items())
 
 
+def _unreadable(e: BaseException) -> str:
+    """Why the configured database could not be reached, in words: a
+    database its server does not hold, with the command that makes one, or
+    the error's own first line."""
+    try:
+        url = database_url()
+        where, server, name = (f"the database {url.database} on {url.host}:{url.port or 5432}",
+                               f"the server at {url.host}:{url.port or 5432}", url.database)
+    except DatabaseUnavailable:
+        where, server, name = "the configured database", "its server", "of that name"
+    first = (str(getattr(e, "orig", None) or e).strip().splitlines() or [type(e).__name__])[0]
+    if "does not exist" in first:
+        return (f"{server} holds no database {name} ({first}): pnpm db:reset <name> makes a database of that name "
+                "there and migrates it")
+    return f"{where} could not be reached: {type(e).__name__}: {first}"
+
+
 def main(argv: list[str]) -> int:
     load_dotenv(Path(__file__).parent.parent / ".env", override=False)
     command_, rest = (argv[0], argv[1:]) if argv else ("", [])
@@ -110,6 +131,9 @@ def main(argv: list[str]) -> int:
             return 0
     except (DatabaseUnavailable, migrate.ResetRefused) as e:
         print(f"refused: {e}", file=sys.stderr)
+        return 2
+    except (DBAPIError, OSError) as e:
+        print(f"refused: {_unreadable(e)}", file=sys.stderr)
         return 2
     print(__doc__, file=sys.stderr)
     return 2

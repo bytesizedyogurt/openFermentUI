@@ -26,24 +26,29 @@ session continues from this file and `git log` alone.
      OPENFERMENT_MODEL -u OPENFERMENT_FALLBACK_MODEL -u OPENFERMENT_INDEX_MODEL -u
      OPENFERMENT_EFFORT <command>`).
 3. First tests to run: `pnpm test:core`, then `pnpm test:sim`.
-4. **Next step: stage D, the handoff by strangers** (the alpha 2.2 prompt's stage D; the mirror
-   engine and the record-reader agent, each built by a builder who reads the contract pages
-   alone, and the proof's step that installs the engine and checks it). Stage C is done: every
-   run one shape (C.1 the pins in `core/tests/test_engine_pins.py`, the handler mismatches,
-   `engine/runs.keep_run`; C.2 the `kinetics` engine over fermOS's families; C.3 and C.3b the
-   `train` engine over pureOS's trains, `conform --project` on a copy of the project; C.4
-   Proforma and the library door on typed inputs, Proforma's runs as rows of `biosteam`; C.5 the
-   `measurement` origin end to end; C.6 the shelf's hand-written entries and Proforma's split
-   retired, import from a URL; C.7 the gate, below). Every pin holds through each step. Stage B
-   (the engine contract) is done: `docs/api/engines.md`, ADR-015, `engine/registry.py`, `python
-   -m openferment_core.engine.conform <name>`, proof step 10. Then stage E in the prompt's order.
-   `pnpm ready --probe` found the account answering at 23:50 UTC on 2 November, so stage F, the
-   live work, follows E. Alpha 2.1's Ethanol project is in this container's `openferment_dev`; a
-   fresh container makes it again on Home from `docs/corpus/ethanol-sources.txt` through Intake
-   (about twenty minutes), then extracts.
-5. Files in flight: none; the stage C gate's commit holds every file of C.7 and its review round.
+4. **Next step: stage D's first record, D.1**: write `CORE=$(git rev-parse HEAD)` (the D.0 commit)
+   here and in stage D's log, then the two handoff rounds by strangers (the prompt's stage D;
+   Appendix A's mirror engine and Appendix B's record-reader, each built by a builder who reads
+   the contract pages alone, in a worktree made at `CORE`, since the harness cuts an isolated
+   agent's worktree from `origin/main`). D.0 is done: the pages read as the strangers will read
+   them and every gap the pre-read found closed before the core is frozen (the MCP server's
+   `--service` mode, a run's diagnostics, the proof installing every package under
+   `examples/engines/` and walking one thing of each, the installs held to `core/uv.lock`, the
+   pages' fixes; the stage D log). Stage C is done: every run one shape (C.1 the pins, C.2
+   `kinetics`, C.3 and C.3b `train`, C.4 Proforma and the library door on typed inputs, C.5 the
+   `measurement` origin, C.6 the shelf's hand-written entries retired and import from a URL, C.7
+   the gate). Then stage E in the prompt's order (its plan of eighteen commits is drafted outside
+   the tree). `pnpm ready --probe` found the account answering at 23:50 UTC on 2 November, so
+   stage F, the live work, follows E. Alpha 2.1's Ethanol project is in this container's
+   `openferment_dev`; a fresh container makes it again on Home from
+   `docs/corpus/ethanol-sources.txt` through Intake (about twenty minutes), then extracts.
+5. Files in flight: none; the D.0 commit holds every file of D.0 and its review round.
 
 ## Current stage
+
+Alpha 2.2, stage D (2026-11-04, in progress): the handoff by strangers. D.0 read the handoff
+pages as the two strangers will and closed every gap before the core is frozen (the stage D log);
+D.1 records the core's commit, then each stranger builds from the pages alone.
 
 Alpha 2.2, stage C (2026-11-03 to 2026-11-04, done): every run one shape. C.1 pinned sixteen computations to their ids
 and output hashes before anything moved, fixed the worker's handler mismatches, and gave every
@@ -225,6 +230,9 @@ DOI or PMID. Each now reads the project's rows.
 | 2026-11-04 07:06 | C.7, before its review round: `pnpm build`, `pnpm prove`, offline, steps 1 to 10; `pnpm verify`, all sixteen stages | 82 of 82 checks, no call in the proof's spend table; every stage green: `test:core` 2681 passed, 1 skipped, 175 deselected; `test:sim` 142 passed; `test:lit` 10 passed; `smoke` 12 of 12 screens | 273 s (the proof); 16 min 31 s (verify) | `f5405f8` and C.7 |
 | 2026-11-04 10:07 | C.7's review round: the touched files and the pins; `pnpm test:sim`; `pnpm test:core`; `gen:api`, `gen:tools` and `gen:components`; `typecheck`, `check:secrets`, `check:plan`, `check:state`, `check:figures`, `check:licences`, `check:guild`, `check:tools`, `test:reconcile`; `build`; `pnpm prove`, offline, steps 1 to 10; `pnpm verify`, all sixteen stages | 463 passed, the pins 13 of 13; 142 passed, 2721 deselected; 2687 passed, 1 skipped, 175 deselected; TOOLS.md and COMPONENTS.md regenerated, the OpenAPI document as it was; every check green; green; 83 of 83 checks, `conform biosteam`, `conform kinetics` and `conform train` each 8 of 8, no call in the proof's spend table; every stage green: `test:core` 2687 passed, 1 skipped, 175 deselected; `test:sim` 142 passed, 2721 deselected; `test:lit` 10 passed; `smoke` 12 of 12 screens | 4 min 5 s (the touched files); 8 min 57 s (`test:sim`); 7 min 17 s (`test:core`); 295 s (the proof); 18 min 0 s (verify) | C.7 |
 | 2026-11-04 10:18 | The stage C gate: `pnpm test:core` on `466d10e` with C.7; `test_proforma_runs` with the simulator's state left ready, and as the suite runs it; the changed tests on Python 3.12 with the database address empty | 2687 passed, 1 skipped, 175 deselected; 11 passed each way; 241 passed | 7 min 43 s; 7 s; 3 min 3 s | `466d10e` and C.7 |
+| 2026-11-04 10:43 | CI on `1243e81` (C.7), run 41814877309: `pnpm verify`, then `pnpm prove` | every stage green: `test:core` 2687 passed, `test:sim` 142 passed, `test:lit` 10 passed, `smoke` 12 of 12 screens; every proof check holds | 7 min 44 s (verify); 126 s (the proof) | `1243e81` |
+| 2026-11-04 16:04 | D.0 and its review round, on the final tree: `gen:api`, `gen:tools`, `gen:components`; the touched files and the pins; the changed tests with the database address empty and on Python 3.12; `pnpm test:sim`; `pnpm test:core`; `build`; `pnpm prove`, offline, steps 1 to 10, with no `examples/`; `pnpm verify`, all sixteen stages | regenerated; 868 passed; 530 passed each way; 142 passed; 2865 passed, 1 skipped, 175 deselected; green; 83 of 83 checks, no call in the proof's spend table; every stage green | 459 s; 458 s; 269 s (the proof); 17 min 50 s (verify) | `1243e81` and D.0 |
+| 2026-11-04 16:15 | The D.0 commit: `pnpm test:core` again after the guard in `test_prove_examples.py` names the engine-package form | 2865 passed, 1 skipped, 175 deselected | 7 min 45 s | `1243e81` and D.0 |
 | 2026-10-30 06:47 | `test:core` with 2.2; `check:tools`; `pnpm smoke` (own database, project made through the API) | 1920 passed, 2 skipped, 128 deselected; passed; 11 of 11 rail entries open in the project | 4 min 26 s | 2.2 |
 
 ## Spend (alpha 2.1)
@@ -324,6 +332,10 @@ prompt's §4).
 | alpha 2.2 D2, C.7 | D2 moves the run requests to typed inputs: fermOS's, pureOS's, Proforma's and the library door's. Two shapes keep the resolvers' `Override` form, a bare value with `by`, `at` and a note and no unit: a train's own carried values (`TrainParam`, in `TrainInlet.params` and `TrainUnitSpec.params`, which `POST /api/pureos/train/run`, `/check`, `/validate` and `PUT /api/state/trains/{id}` carry, and `train_spec._as_overrides` lays under a request's inputs key by key), and the project's stored panel overrides (`PUT /api/state/overrides/{scope}`, checked for scope and key, then read as `Override`s and sent as typed inputs in each parameter's unit by `project_state.run_request` and `proforma.inputs_of`) | A train is hashed whole into its run's basis input `train`, so a train carrying typed quantities moves every train run's artifact id (D1); and the stored overrides are the browser's Durable snapshot's writes the service has not acknowledged (ADR-014). A request's input set on the same key replaces a carried value, converted at pureOS's door in the parameter's unit. Revisit: a train spec version that moves the ids, or accounts giving pending writes a home on the service (Known debts) |
 | alpha 2.2 D5, C.7 | A train read from a run (`POST /api/pureos/train/from-run`) starts where the stream carrying the most product enters it from outside it, by the run's stream table: a feed, or a stream from no unit taken and no unit the train's own outlets reach going forward in run order; a unit taken before that one is listed among the units the train leaves out, with why, and the notes name every other stream entering the train from outside it with its product kg/hr. The Builder says in words when a run-stream inlet entered another unit than the train's first in its run, with each stream the first unit took there a click away (`builder-inlet-away`) | The rule took the first unit taken and its first inlet: on step 4's corn stover run that was a vent's mixer, M304, on a stream of gases carrying no ethanol, and a train cut to its tail ran on gas. The corn stover run now reads from M401 on the broth, s24 (the review round of C.7, the stranger's walk) |
 | alpha 2.2 §6.1, C.7 | Conformance check 7 on a hand-written engine (the core's three) holds the refusal it reaches, a thing the engine lacks refused in words before any run with nothing kept, and its words say so; the receipt half of the check runs on a `WorkerEngine`, and a refusal inside a hand-written engine's own computation is a receipt its own tests hold (`test_engines.py`, `test_runs.py`) | A hand-written engine has no `compute` for the check to offer a thing to; the check's words read "kept as a receipt" above a refusal that kept nothing (the review round of C.7). A probe an engine declares, a request its own computation refuses, would hold the receipt by code (Known debts) |
+| alpha 2.2 D0.1, D.0 | The worker's `run` op may answer `diagnostics` beside its outputs: what the computation reports about itself (the time it took, the iterations it made), each `{name, value, unit}`, a finite number or words, at most 50, held to the outputs' shape (`EngineBroken` on a break). The service keeps them on the run as `EngineRun.diagnostics` beside `durationMs`, from the computation that made the row; the run's page shows them under its outputs and `engine_report` names them as words. They enter neither the artifact (its output, hash, id and replay, the pins) nor `outputs.values`, comparisons, runbooks or evidence, and conformance check 3 holds their shape when a run answers some | The handoff's pre-read found the engine brief asking for the time a run took as an output and for a run that replays identically: a replay compares every output, so a clock reading among them fails check 4, and the proof with it. The contract named outputs and `durationMs` alone, and no channel for what a computation reports about itself; a result stays an output, a function of the request alone. No core engine answers diagnostics, and every pin holds (ADR-015, Implementation D.0) |
+| alpha 2.2 D0.8, D.0 | `pnpm prove` installs every package directory under `examples/engines/` (one holding a `pyproject.toml`) into core's environment with `uv pip install -e` before its service starts, one check a package, and step 9's walk runs the first thing of each engine those packages register from the Runs screen, the engine chosen on Studies' run card, reading the run's provenance, outputs and diagnostics on its page; with no package there, one line says so and the walk checks nothing more. Step 10 conforms every engine the service lists, as at C.7. The proof names no engine of `examples/`. After the review (D0.8a, D0.8b): every install, the proof's and `scripts/engines-local.sh`'s, is held to `core/uv.lock`'s versions (`uv export --frozen` as its constraints), so a package that would move a pin is refused in uv's words; a package that leads outside `examples/engines/`, a `pyproject.toml` that cannot be read and a hung build each fail the proof in words; every thing of an example engine runs at its own defaults, and the walk fails at once in the service's words for one that waits; and at its end, however it ends, the proof leaves core's environment as it found it, uninstalling what it installed there, with `--keep` leaving the packages while the kept service runs | The stage's proof step installs the stranger's engine and checks it, and the core is frozen before the strangers work: a step written generic over engines picks the stranger's package up with no change under `scripts/`. An install resolved from PyPI with no lock could move BioSTEAM, thermosteam or biorefineries under the proof or a live service, and an engine left installed after the proof was listed with its import's error once its directory went, failing the next proof |
+| alpha 2.2 D.0 (M, B1, B5) | The MCP server takes `--service <origin>` and acts through a running service on loopback (`http://` or `https://`, 127.0.0.1, [::1] or localhost, an explicit port, nothing after it), sending each call to the service's own routes with the project and the client's declared name in `X-OpenFerment-Assistant`, opening no database, through no proxy; `POST /api/tools/{name}` reads the header and runs the call in the model's lane under that name. In its own process the server checks its project at the first call and says at every call, in words, a project its database lacks | The agent stranger gets a project id and a running service's address in a worktree with no `core/.env`, and the proof's kept service runs on a database of its own whose address the brief cannot carry; the server read its own database alone, and acted unchecked in a project its store lacked. The header gives an HTTP caller the model's lane under the name it declares: a number it types is that name's estimate, which every record store refuses; its `catalogue_write` replaces only an entry that name kept through an assistant's door; and it writes the stores that hold a model's work alone, pureOS's kept trains among them, where a `?by=` call is refused. A loopback caller reaches that lane already through `POST /api/ask`, and an MCP client in the server's own process with the database's address; the header is one more door to it, `guard.py` holds it as it holds every POST, and no listener, host or CORS rule is added (ADR-008, Implementation 12) |
+| alpha 2.2 D.0 (D0.4, B11) | A model's `catalogue_write` (Postdoc or an MCP client) replaces only an entry kept in the model's lane under its own name through the same kind of door, Postdoc's loop or an outside assistant's (MCP, or the tool door's assistant header); a person's entry, and another caller's, stays as it is, and the call is refused in words naming the entry and who kept it, nothing written. A person's keep (the route, a file, `?by=`) replaces whatever the id holds. Each entry records its lane and its door (`CatalogueEntry.agent` and `via`); an entry kept before reads both from its source | The tool replaced whatever entry held the id, a person's included, and no tool or route takes an entry out. D0.4 names a person's entry and lets a caller replace its own; an entry another model or client kept is refused too, so a client cannot rewrite Postdoc's entries, or another client's, under its own name. A model whose name changes (a fallback model, a client's new version) keeps its next entry under an id of its own |
 | alpha 2.2 §6.1, B.2 | `run(thing, configuration, inputs, by)` takes `inputs` as a list of `EngineInput`, each a parameter's key and a `Quantity` (the shape a run's inputs have, `RunInput`), where §6.1 writes `inputs: list[Quantity]` | A `Quantity` carries no name, so the parameter each value sets is named beside it |
 | alpha 2.2 §6.1, B.2 and B.6 | An engine declares `heavy` beside `worker`: the modules its worker alone imports. The registry and conformance check 6 keep the worker module, each module `heavy` names (with every module below it) and `workers.WORKER_LIBRARIES` (BioSTEAM, thermosteam, biorefineries, the SFF toolkit, cobra) out of the service's process for every engine; `worker` may be `None` only with `heavy` empty | §6.1's `worker` names one module, and its name alone cannot say which of the libraries it imports are heavy; check 6 needs the list to hold them out |
 | alpha 2.2 §6.1, B.2 | `engine → api` and `engine → tools` join the package map's exceptions (`test_boundaries.py`) | Conformance check 1 sends a bare number through the service's own route and its tool, the two doors a number enters by, and §6.1 names the command `openferment_core.engine.conform` |
@@ -405,7 +417,9 @@ prompt's §4).
 | A train's own carried values (`TrainParam`) and the project's stored panel overrides (`PUT /api/state/overrides/{scope}`) keep the resolvers' `Override` shape, a bare value with no unit: a saved train cannot hold a measurement, and a value a person typed into a train is checked against its parameter's unit only as its parameter's own (Departures, C.7) | a train spec version that moves the train runs' ids, its values typed quantities with their origins; and accounts giving the Durable snapshot's pending writes a home on the service (ADR-014) |
 | Words stored in bases that a run's page shows: decision tags (`(D5)`, `(D9)`, `D8: …`, `(OF-BLD-020 §3.2 …)`, `(Appendix 2 §A)`, `(CARBON_RULE)`) and a doubled word in a train's input name and note (`T701 outlet outlet`, a port named `outlet` after the word). The run's page drops the tags as it shows a note (`ProformaRun.plainNote`), and the CSV keeps the words whole; editing them moves the pinned ids (D1) | the next change that may move ids: a train spec version, or a basis version of each tool |
 | Conformance check 7 holds a hand-written engine (the core's three) to a refusal before any run alone (Departures, C.7) | a probe a hand-written engine declares, a request its own computation refuses, which check 7 asks twice: a kinetics family run whose integration refuses, a train the Proforma worker refuses, a scenario flowsheet's value past its bound |
-
+| A contract engine's run whose SFF step failed (a worker that crashed or broke the protocol in `sff_export`) keeps its artifact and no row, and the next ask keeps the row from that artifact with no diagnostics, since nothing computed for it (`runs.run_engine`; D0.1) | when an engine's diagnostics must outlive a failed file step: kept beside the artifact, or the row kept before the file |
+| A kept train (pureOS's, `pureos/kept.py`) is changed by any caller of the model's lane, an outside assistant's through MCP or the tool door's header among them, and keeps `madeBy` and its row's `created_by` as the model that made it; the audit row of each change names who changed it and its door (`detail.via`). A catalogue entry stays its keeper's by name and door (D.0's review) | when a kept train is to stay its maker's: the catalogue's rule of name and door applied to `kept.keep_train` |
+| An outside assistant names itself (MCP's `clientInfo`, the tool door's header), so one assistant may declare another's name and act in that name's lane, and a name past 200 characters is cut, two such names reading as one; the door tells Postdoc's loop from every outside assistant (D.0's review) | accounts (ADR-005), when a caller is known by more than the name it declares |
 | A train run's SFF file: a train carries no TEA, and the schema the toolkit ships at `e236e32` requires every file's `metadata.TEA_year`, which its exporter reads from the system's TEA, so the Proforma worker refuses every train run's file before building it and the run keeps the words as `sffRefused`; the Flowsheets screen lists no record for a train run (Departures, C.3) | when the toolkit's schema leaves the TEA year to a file whose system no TEA prices and its exporter writes one (an upstream change to `export/_export.py` and `sff_schema.json`, offered with the writer's adaptation), or a train carries a TEA of its own |
 | The proof's train (`scripts/prove.py`, `make_train`) is the tail of the train read from step 4's corn stover run: at these pins the four units from T701 on, none a separation, each passing the whole of the product on, so `conform train` in the proof exercises no distillation and no sieve (Departures, C.3) | when a train read from a library run binds its units' values from the run's own read-back parameters, or from a `readFrom` of a library plant's unit (D8, C.6), so the proof's train keeps the distillation and the sieve |
 | Paid: the train engine's `rests_on` names the project's depositions, which a train's value set to a reading is looked up in, and the completeness test's project holds a measured value, so the test fails when the copy leaves the depositions out | alpha 2.2, C.5 |
@@ -1633,3 +1647,312 @@ holds the numbers, the tables and the judgements).
     status the same before and after, so it holds whatever state an earlier test in the process left
     (made to fail first with the worker's state left ready, then green); the changed tests again on
     Python 3.12 with the database address empty.
+
+### Alpha 2.2 — Stage D — 2026-11-04
+
+- D.0, the engine side. The handoff pages read before the core is frozen: two readers confined to
+  the engine brief's files planned the mirror from the pages alone, and every gap they found (the
+  merged list's A1 to A36) is fixed on its page, and in the core where the page showed a gap the
+  code has (the plan's D0.1 and D0.5 to D0.13). The two briefs stand verbatim; `docs/api/engines.md`
+  says how a brief's words read on the contract.
+  - Diagnostics (D0.1, A1). The worker's `run` op may answer `diagnostics` beside its `outputs`,
+    what the computation reports about itself (the time it took, the iterations it made), each a
+    name, a finite number or words, and a unit, at most 50, held to the outputs' shape; a break is
+    `EngineBroken`, a 503 that keeps nothing. `runs.run_engine` holds `contract.diagnosed` open
+    around its computation and `keep_run` keeps them on the row, `EngineRun.diagnostics` beside
+    `durationMs`; the same request again is the kept row with its first computation's
+    diagnostics. They enter neither the artifact (its output, its hash, its id, its replay) nor
+    `outputs.values`, comparisons, runbooks or evidence. The run's page shows them under its
+    outputs (`ProformaRun.tsx`, `Diagnostics`), `engine_report` and `engine_run` name them as words
+    within a budget, and conformance check 3 holds their shape. A worker of its own speaking the
+    protocol (`test_engine_diagnostics.py`) reports the time its run took, replays identically and
+    holds all eight checks; every pin holds, the sample's id and output hash bit for bit with
+    diagnostics answered (Departures; ADR-015, Implementation D.0; a debt for a failed SFF step).
+  - The train engine's defaults (D0.5, A12). By every path that keeps a train, a train's own value
+    is a person's: a typed value (`TrainParam`) carries its person and day and no origin of its
+    own, the Builder's route keeps it so, a row whose typed value names an origin is no train and
+    no thing, and a model's train built through `pureos_build` holds ids and words alone. So the
+    default origins stay the five `models.DEFAULT_ORIGINS` names; `pureos/engine.py` maps each
+    origin a resolution names onto them (`DEFAULT_OF`, a fit an artifact as Proforma's mapping
+    has it) and refuses in words a value only a run sets, should a resolution hand one in.
+    Check 2's measurement branch and `basis.reading_refusal`, which only it read, went with the
+    sixth origin engines.md had named; the pages name the five, and workers.md says the worker's
+    two are `library-default` and `convention`.
+  - NaN and infinity (D0.6, A14). `EngineInput` refuses a number that is NaN or infinite as it is
+    read (`models.non_finite`), so every door that takes a run's values refuses one before
+    anything computes: the engine, library, Proforma, pureOS and fermOS routes, the params
+    resolver, `?inputs=` on the bind reads, a study scenario (which refused one already), the tool
+    door in its own words, and `conform --inputs`; `runs.check_inputs` and `basis.override_of`
+    hold a caller that builds its values in code. A refusal echoing such a number answered 500,
+    since JSON carries neither; the app's handler for a request's refused fields writes each as
+    words, and every one is a 422 (`test_finite_inputs.py`, 69 cases).
+  - `conform` with no database (D0.7, A20): no `OPENFERMENT_DATABASE_URL`, or a server that does
+    not answer, is said in words naming it and the address, its password hidden, and the command
+    exits 2, with `--project` or without.
+  - The proof, generic over engines (D0.8): `pnpm prove` installs every package directory under
+    `examples/engines/` with `uv pip install -e` before its service starts, one check a package,
+    and the walk runs the first thing of each engine they register from the Runs screen and reads
+    its run's page; with none, one line says so (Departures). The tree holds no `examples/`, and
+    `pnpm prove` here takes the line at the install and at the walk: 83 of 83 checks in 296 s,
+    no call in its spend table.
+  - Every core test with an outside engine installed (D0.9): the skeleton engine `example` (below)
+    made in the scratchpad, installed into `core/.venv`, its own test green from its directory
+    with no database, `conform example` eight of eight on a database of its own; then `pnpm
+    test:core` with it installed beside the core's three: 2788 passed, 1 skipped, 1 failed, the
+    failure D0.6's own (a non-finite value at Proforma's door is now refused as the request's fields
+    are read, its words in the field errors, and `test_proforma_ethanol` reads them there). No test
+    assumed the registry holds the core's three alone. `pnpm prove` then ran with the skeleton
+    placed under `examples/engines/` for the run: the package installed before the service started,
+    the walk ran `a-thing` from Studies' run card and read its page (computed, two outputs, one
+    diagnostic), step 10 held `example` eight of eight beside the core's three, and the licence
+    check read it as the project's own; 86 of 86 checks in 319 s with no call in its spend table.
+    `examples/` was removed and the engine uninstalled after, `core/.venv` holding what
+    `core/uv.lock` names alone, and `pnpm test:core` ran again green (The suites, below).
+  - `pnpm check:licences` (D0.10) reads every distribution in `core/.venv` that registers an
+    engine and that `core/uv.lock` does not name, and each dependency of one the lock does not
+    name: one installed from under `examples/` passes declaring no licence and fails declaring
+    one (ADR-012); any other is held to `core/licences.toml`. They are reported and kept off
+    THIRD_PARTY.md, so the listing reads the same with an engine installed or not.
+  - `core/engines.local` (D0.11, A21): one package directory a line, ignored by git;
+    `scripts/engines-local.sh` installs each again, and `scripts/session-start.sh` and
+    `scripts/host/deploy.sh` run it after their `uv sync` (so `pnpm session:start` and `pnpm
+    prototype:up` keep an installed engine).
+  - Question 13 (D0.12): seeded, its expectation names every engine the registry holds, the core's
+    three among them (`evaluate.engines_here`, read through `tools.engine.registered_names`, as the
+    package map has Postdoc reach the engines); the code's own names the core's three alone.
+  - The pages (D0.13): engines.md, workers.md and runs.md take A2 to A36 where the merged list
+    puts each: how a brief's words read (the house rules a builder in its own worktree follows
+    among them, A36), the install and its backends, a fresh checkout, the sync and
+    `core/engines.local`, starting and restarting the service, the licence and the checks over
+    an installed engine, `WorkerEngine`'s constructor, `serve`'s, the order and form of a run's
+    inputs, an output's unit, the five default origins, the refusal shapes, the row's conventions,
+    `created_by` and `by`, the listing's fields, the tools' inputs and the audit of a run, the
+    conform command and checks 1, 3, 7 and 8, the basis kinds a run's inputs read as origins; and
+    two new sections, an engine's own tests and a skeleton of the placeholder engine `example`
+    (its `pyproject.toml`, its engine, its worker and one test), whose files are the package D0.9
+    installed, tested and conformed.
+  - The suites: the touched files, 594 passed in 190 s (nineteen files, the core's markers); the
+    changed and new tests again with `OPENFERMENT_DATABASE_URL` empty and on Python 3.12, 359
+    passed each; `check:tools` (48 tools), `gen:api`, `gen:tools` and `gen:components` with
+    `--check`, `typecheck`, `check:plan`, `check:secrets`, `check:licences` (with the skeleton
+    installed from `examples/` and without it) and `build` pass; `pnpm test:core` 2790 passed, 1
+    skipped, 175 deselected in 496 s with no engine beside the lock; `pnpm test:sim` 142 passed,
+    2824 deselected in 481 s; `pnpm prove` 83 of 83 checks in 296 s with no `examples/`.
+
+- D.0, the client side (section M of the plan, D0.2 to D0.4, B2 to B28), done in a worktree of its
+  own and merged onto the engine side's.
+  - The MCP server takes `--service <origin>` and acts through a running service: each registry call
+    is `POST <origin>/api/tools/<name>` with the arguments as the client sent them, the project in
+    `X-OpenFerment-Project` and the client's declared name in `X-OpenFerment-Assistant`;
+    `ask_postdoc` is `POST <origin>/api/ask`, its `by` the client's name, and `get_artifact` is `GET
+    <origin>/api/biorepo/artifacts/<id>`. The origin is `http://` or `https://`, the host 127.0.0.1,
+    [::1] or localhost, an explicit port and nothing after it (`mcp_server.service_origin`, the same
+    answers on Python 3.12 and 3.13); anything else is refused in words at start, on stderr and in
+    the server's instructions, and at every call, and a password a refused origin holds is never
+    repeated. In this mode the server opens no database, reads `core/.env` for `OPENFERMENT_PROJECT`
+    alone when `--project` names none, sends through `httpx.Client(trust_env=False)`, and waits up
+    to the Proforma worker's start and one call of it and a minute more (900 s). The service's
+    refusal comes back as the call's `error` in its own words, and a silent service as "the service
+    at <origin> did not answer: <words>".
+  - `POST /api/tools/{name}` reads `X-OpenFerment-Assistant` as UTF-8 text (`tools.caller_name`:
+    control, format and surrogate characters dropped, whitespace collapsed, at most 200 characters)
+    and runs the call in the model's lane under that name, `ToolContext(model=<name>,
+    via="http")`: a number it types is that name's estimate, a write is marked with that name, its
+    audit row names it as `who` with agent `model` and the door in `detail.via`, and a catalogue
+    entry's source reads "<name>, at the HTTP endpoint" (the review's fixes, below). `?by=` and the
+    header together are a 422 in words, so is a header naming nobody, and a writing tool's call
+    naming neither is the existing 422, its words naming both ways. The OpenAPI document carries
+    the header.
+  - In its own process the server checks its project against its database at the first call and,
+    while the database lacks it, answers every call with words naming the project and the database
+    (B5); a project held is asked once.
+  - A model's `catalogue_write` (Postdoc or an MCP client) replaces an entry kept in the model's
+    lane under its own name through the same kind of door (the review's fixes, below) and is
+    refused for any other, in words naming the entry and who kept it, nothing written (D0.4); a
+    person's keep through the route, a file or `?by=` replaces whatever the id holds. Each entry
+    records its lane and its door (`CatalogueEntry.agent` and `via`, written by the service; an
+    entry kept before reads both from its source), and a project's catalogue keeps take one
+    advisory lock, so a person's keep never lands between a model's check and its write.
+  - The pages. `docs/TOOLS.md` (written by `tools/reference.py` and the tools' registrations) says
+    how the server starts, both ways it reaches a project, the two extra tools' inputs, the SDK's
+    names, an answer's shape over MCP, where the audit row is read and that no stand-in serves a
+    store (B2 to B9, B13, B17, B19 to B21, B24, B28), and the catalogue, module read, primer and two
+    field descriptions say what B10 to B12, B14, B15, B23 and B27 asked. The OpenAPI document
+    declares `?project=` and the 404 on every scoped operation, `CatalogueEntry` on the catalogue
+    routes, `text/event-stream` on the three event streams, the audit's limit and times, the audit
+    row's lanes, the keep's 422 for a keep naming nobody, and the app's description of how a request
+    names its project and what the guard admits (B14, B16, B18, B22, B25, B26). CLAUDE.md gains the
+    line for a builder working from a handoff brief (D0.3). ADR-005, ADR-006 and ADR-008 record the
+    service mode and the header.
+  - Security, as reviewed: no listener, host or CORS rule is added, and `guard.py` is unchanged,
+    holding the forwarded POSTs as it holds any. The header gives an HTTP caller the model's lane
+    under the name it declares: a number it types is that name's estimate, which every record store
+    refuses; its `catalogue_write` replaces only an entry that name kept through an assistant's
+    door; and it writes the stores that hold a model's work alone, pureOS's kept trains among them,
+    where a `?by=` call is refused. A loopback caller reaches that lane already through
+    `POST /api/ask`, and an MCP client in the server's own process with the database's address, so
+    the header is one more door to it (ADR-008, Implementation 12). The server sends to a loopback
+    origin alone, through no proxy.
+  - Tests: `test_mcp_service.py` (the origin rule's shapes, the flags, the forwarding through a
+    stand-in transport with each failure's words, the tool door's header, and one test that starts
+    the real server over stdio with `--service` against the app on a free loopback port, uvicorn in
+    a thread on the test's database, a client declaring `example-test/0.1` writing a catalogue entry
+    and reading the audit row that names it, with `OPENFERMENT_DATABASE_URL` empty in the server's
+    environment); `test_mcp.py` (a project its store lacks; a second client's write over another's
+    entry); `test_catalogues.py` (both lanes, and an entry kept before the lane was written);
+    `test_openapi.py` (the query, the 404s, the response models, the streams, the header).
+  - The suites in the worktree: the touched files 79 passed, the wider touched set 385; the changed
+    tests again with the database address empty and on Python 3.12; `check:tools`, `typecheck`,
+    `check:secrets`, `check:plan` and each generator's `--check` green; `pnpm test:core` 2734
+    passed, 1 skipped, 175 deselected (8 min 16 s).
+- D.0, the two sides merged. The client side's worktree diff against `1243e81`, its new test among
+  it, applied onto the engine side's tree with `git apply --3way`. One file conflicted, `api.py`'s
+  imports, and both sides' lines stand: FastAPI's `Header` (the client side's) beside
+  `jsonable_encoder` and `RequestValidationError` (the engine side's). Every other file merged as
+  each side wrote it, the three generated ones among them, and `gen:api`, `gen:tools` and
+  `gen:components` then wrote the generated files again from the merged code, each the same as the
+  merge and `COMPONENTS.md` as it stood. `docs/api/engines.md`'s tool door names its caller with
+  `?by=` or the `X-OpenFerment-Assistant` header, and CLAUDE.md's line for a builder working from a
+  handoff brief agrees with engines.md's reading of the brief's house rules. The suites on the
+  merged tree: both sides' touched files, 886 passed in 241 s (thirty-five files, the core's
+  markers); the changed and new tests of both sides again with `OPENFERMENT_DATABASE_URL` empty and
+  on Python 3.12, 438 passed each; `typecheck`, `check:tools` (48 tools), `check:licences`,
+  `check:plan`, `check:secrets` and each generator's `--check` pass; `pnpm test:core` 2837 passed, 1
+  skipped, 175 deselected in 477 s, the base's 2687 with the engine side's 103 new and the client
+  side's 47.
+- D.0, the review's fixes: the engine pages, the proof's installs and the house rules. Two fixers
+  worked the reviewers' findings by file; this entry is the one that held CLAUDE.md,
+  `.gitignore`, the scripts, `engine/conform.py`, `engine/runs.py`, `migrations.py` and the engine
+  pages, and the other's lines follow it.
+  - CLAUDE.md's line for a builder working from a handoff brief (S3, D0.3a): the brief settles what
+    the builder reads and that it commits and pushes nothing, which sets aside for it the Resume
+    read and the commit and push rules above; every other rule, each R rule and stop condition
+    among them, holds for its work too, and the line names no file the briefs forbid.
+    `docs/api/engines.md`'s reading of the brief's house rules says the same.
+  - `.gitignore` (D0.14) ignores `*.egg-info/`, the record a setuptools editable install writes
+    beside a package's code, and `.claude/worktrees/`, the worktrees a session's workflows and the
+    handoff's builders work in.
+  - Every engine install held to the lock (S2, the amendment): `scripts/engines-local.sh`, which
+    `session-start.sh` and `host/deploy.sh` run after their sync, and the proof's install read
+    `core/uv.lock`'s versions (`uv export --frozen --all-extras --no-hashes --no-emit-project`) and
+    install with them as constraints, so a package whose dependencies would move a pin (BioSTEAM,
+    thermosteam, biorefineries, fastapi, httpx) is refused in uv's words and installs nothing, and
+    a lock that cannot be read so installs nothing, said in words. In a throwaway environment an
+    engine requiring a newer version of an installed pin was refused that way, the pin left at
+    its version. engines.md's install is the same command, `cd core && uv pip install --python
+    .venv/bin/python -c <(uv export …) -e <path>`, and says what an install trusts: the build
+    backend runs in the installing shell's environment, the entry module in the service's process
+    with the key in reach, the worker as the same user with the withheld variables left out.
+  - The proof's installs (S11, D0.8a): a package that leads outside `examples/engines/` (a
+    symbolic link elsewhere), a `pyproject.toml` that cannot be read or names no distribution, and
+    an install that outlives its time each fail a check in words while the rest install. The
+    install runs inside the proof's `try`; `SIGTERM` ends the proof as Ctrl-C does, and a `conform`
+    the proof waits on is asked to end with it. At its end, however it ends, the proof leaves
+    core's environment as it found it, one line a package: each package it installed whose
+    distribution was installed nowhere before is uninstalled, one installed before from the same
+    directory stays, and one installed before from another directory is installed from there
+    again; with `--keep` each stays while the kept service runs, said with the command that takes
+    it out.
+  - Every thing of an example engine at its own defaults (D0.8b, C2, R1): engines.md says so in
+    bold beside the proof's bullet, with what the walk and step 10 run. The walk waits for the run
+    or the card's refusal and fails at once in the service's words, the rule beside them. Check 3
+    names the way on for a thing whose values wait (`--inputs <file>`, or a default for each such
+    parameter), the refusal now `runs.ValuesWait`, a subclass of `EngineRefused`; check 2's words
+    agree in number (R8).
+  - `python -m openferment_core.migrations` (R4) says in words, exit 2, a server that does not
+    answer and a database its server does not hold, the latter with `pnpm db:reset <name>`.
+  - The pages (the re-reader's 1 to 13, R2 to R5, C13). engines.md says what a package's modules
+    and its tests import; maps the brief's "given typed quantities, it returns them", "tests that
+    run with pytest" and "replays identically"; gives the install held to the lock with
+    `--python .venv/bin/python`, `--no-build-isolation` added to it, and the egg-info record; how a
+    database of one's own is made, migrated and dropped, the service needing a migrated database
+    and `conform` a server; that a `WorkerEngine`'s parameter with no default is one every run
+    sets (check 2's sentence too); the entries a `sourceRule` may name, any other breaking the
+    contract; `serve` handed both streams; `ENGINE.parameters` by the thing's id, `EngineRefused`
+    and `EngineBroken` through `ENGINE`, and the worker's life; an engine's own tests holding its
+    replay at the worker, `conform` left to the base without a database address; what
+    `[tool.pytest.ini_options]` does; `check:licences` reading this checkout's own `examples/`; and
+    the proof's uninstall at its end.
+  - The header's security property (S1) stands as the code holds it in ADR-008, Implementation 12,
+    and in this file's two D.0 places (Departures, and the client side's entry above).
+  - Left: `docs/BASE.md`'s handoff section waits for D.4 as planned (C11); the worktree under
+    `.claude/worktrees/` is the workflow's, ignored now and left in place; the three leftover
+    databases were gone from the test server when looked for.
+  - Checks: the page's skeleton, cut from engines.md's code blocks, installed with the page's own
+    command, its test green from its directory with `core/.venv/bin/python -m pytest` (1 passed),
+    then uninstalled, `uv sync --frozen --dry-run` making no changes after. The touched files
+    (`test_host`, `test_prove_examples`, `test_engines`, `test_db`, `test_guidance`, the core's
+    markers) 211 passed in 72 s; again with `OPENFERMENT_DATABASE_URL` empty 211 passed, and on
+    Python 3.12 211 passed. The generated files, `test:sim`, `test:core`, build, prove and verify
+    run on the final tree once both fixers have stopped.
+- D.0, the review's fixes, the client side. Four reviewers (security, the two re-readers, correctness)
+  and a rehearsal read the merged tree; every finding on the MCP server, the tool door, the
+  catalogues and docs/TOOLS.md is fixed in the code and the page that code writes.
+  - The door a write came in by. `ToolContext.via` is `mcp` in the MCP server's own process and
+    `http` at the tool door's `X-OpenFerment-Assistant` header, and `ToolContext.door()` names
+    Postdoc's loop `postdoc`. Every audit row of the model's lane carries the door in
+    `detail.via`, a proposal's among them, and only Postdoc's carries an `effort`: an outside
+    assistant's row named the service's own effort, and no model of the service ran for it. A
+    catalogue entry keeps its door (`CatalogueEntry.via`, read from the source for an entry kept
+    before), and its source reads `Postdoc (<name>)`, `<name>, over MCP` or `<name>, at the HTTP
+    endpoint`. A model's `catalogue_write` replaces an entry kept under its own name through the
+    same kind of door, so an assistant that declares Postdoc's model id is refused over Postdoc's
+    entries in words, and an assistant keeps its own through MCP and the header alike.
+  - A name read one way at every door: `?by=` at the tool door, the catalogue route's `by` and
+    Intake's pass through `tools.caller_name` as the header does, so a newline or a bidi override
+    reads as nothing in an audit row.
+  - The MCP server through a service: a value holding `@` is refused before it is parsed, in words
+    that repeat nothing of it (a password written with `/`, `?` or `#` was repeated); `localhost`
+    is sent to `127.0.0.1`, the address the service binds; the client follows no redirect, a 307
+    answered as the service's words; `get_artifact` refuses an id of no artifact's shape before
+    anything is sent, so `.` and `..` steer no read; an ask waits `ASK_TIMEOUT_S` (21 minutes,
+    Postdoc's wall time beside the longest tool), a tool call 15; httpx's line a request stays
+    off the server's stderr; the refusal for an unreadable database reads as whole sentences.
+  - Answers over MCP leave their null fields out in both modes (`AnswerPlan`, `Artifact`), so an
+    answer holds no `declined`; `catalogue_write`'s summary is the entry as kept (its own note,
+    `agent`, `via`, `source`, `at`) beside `state` and `meaning`; `catalogue_read` keeps each
+    entry's `at`, and a keep's time is written as the audit writes its rows' (`+00:00`).
+  - `PUT /api/state/{kind}/{id}` refuses a row holding NaN, an infinity or an integer past a
+    float's range, a 422 in words naming where it stands (it answered 500 from PostgreSQL); the
+    engine contract breaks on an output or a diagnostic past a float's range before anything is
+    kept (`models.float_holds`), and a diagnostic's refusal reads "a finite number or words; a
+    boolean is refused".
+  - The pages, through the code that writes them: docs/TOOLS.md's client recipe for `mcp` 2.3
+    (`stdio_client`, `initialize()` first, `call_tool`, `result.content[0].text`, the snake-case
+    fields), the shape of a refusal the server writes itself, the doors and the timeouts, a rule
+    for an example's placeholder words, `catalogue_read`'s answer and bounds, `catalogue_write`'s
+    id advice for a `<name>/<version>` caller and its fields for every kind, and the module reads'
+    summary keys (`partial` among them). The OpenAPI document names the guard's own names from
+    `guard.OWN_SUFFIXES` (`.localhost` among them), the door on the audit route, and each field
+    of `AuditEntry`. ADR-005 and ADR-008 (Implementation 12) record the door and the loopback rule.
+  - Two debts (Debts): a kept train is changed by any caller of the model's lane and keeps the
+    name of the model that made it, the audit row naming who changed it; and an outside assistant
+    names itself, so one may declare another's name, which the door tells from Postdoc's alone.
+  - Tests: `test_mcp_service.py` (the `@` forms, localhost, a redirect, the waits, the log line,
+    the dot ids, the null fields, the header door's `via` and effort, an assistant under Postdoc's
+    name refused, `?by=` read as a name, the end-to-end row's `via` and the server's stderr),
+    `test_catalogues.py` (an assistant's entry through either door, the entry as kept, the legacy
+    doors), `test_project_state.py` (five numbers JSON cannot carry), `test_openapi.py` (the
+    guard's names, the audit row's words), `test_engine_diagnostics.py` (a number past a float's
+    range in an output and a diagnostic).
+  - The suites on the final tree, both fixers' work together, run once both had stopped:
+    `gen:api`, `gen:tools` and `gen:components` regenerated (COMPONENTS.md as it stood); the
+    touched files with the pins, thirty files, 868 passed in 210 s (the core's markers); the
+    changed and new tests of the stage, sixteen files, again with `OPENFERMENT_DATABASE_URL` empty
+    530 passed and on Python 3.12 530 passed; `typecheck` and `check:secrets` green; `pnpm
+    test:sim` 142 passed in 459 s; `pnpm test:core` 2865 passed, 1 skipped, 175 deselected in 458
+    s; `pnpm build` green; `pnpm prove` 83 of 83 checks in 269 s with no `examples/`, the install
+    and the walk each saying so in one line, and no call in its spend table; `pnpm verify`, all
+    sixteen stages green in 17 min 50 s. The tree holds no `examples/`, and `core/.venv` holds
+    what `core/uv.lock` names alone (`uv sync --frozen --dry-run` makes no change; the engine
+    group lists biosteam, kinetics and train).
+- D.0, at its commit. `test_prove_examples.py`'s guard that the proof and the walk name no
+  example engine holds them to naming no distribution or module of the engine-package form the
+  contract page gives (`openferment-engine-…`, `openferment_engine_…`), so the core names no
+  example engine of its own; `core/tests/test_licences.py` loses a blank line at its end
+  (`git diff --check` clean). `pnpm test:core` 2865 passed, 1 skipped, 175 deselected (7 min 45 s).
+  The three databases left on the test server by runs a restart ended (`check_tools_25136_a40333`,
+  `check_tools_32254_ccf87b`, `openferment_test_29588_792e52`) are dropped. A note on how the
+  review ran: a message to the review's fixer while it worked started a second copy of it beside
+  the first; the two split the findings by file between them, neither ran a suite while the other
+  edited, and one carried every gate on the final tree.

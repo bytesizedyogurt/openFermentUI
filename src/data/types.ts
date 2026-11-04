@@ -4223,6 +4223,17 @@ export interface RunSFF {
   tags: string[];
 }
 
+/**
+ * A value a run's computation reports about itself (the time it took, the iterations it made), as a contract engine's
+ * worker answers it beside its outputs: kept on the run, outside its outputs and its artifact, so a replay compares the
+ * outputs alone (docs/api/workers.md, `run`).
+ */
+export interface RunDiagnostic {
+  name: string;
+  value: number | string;
+  unit: string;
+}
+
 /** One engine run in a project: a row of `runs` (GET /api/runs). */
 export interface EngineRun {
   /** Its computation's id: the artifact id of its basis. */
@@ -4252,6 +4263,8 @@ export interface EngineRun {
   by: string;
   at: string;
   durationMs: number | null;
+  /** What its computation reported about itself, kept from the computation that made the row; empty for a run whose engine reports none. */
+  diagnostics: RunDiagnostic[];
 }
 
 /** GET /api/runs/{id}: a run, its computation, its SFF record, and its parameters as the panel reads them. */

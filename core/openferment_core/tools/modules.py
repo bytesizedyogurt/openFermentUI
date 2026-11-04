@@ -86,7 +86,7 @@ class ModuleReadInput(BaseModel):
     kind: str = Field(description="One of the module's kinds, named in the tool's description, or an empty string for every kind.")
     state: Literal["", "open", "fenced", "approved", "locked", "proposed", "retired"] = Field(
         description="One of open, fenced, approved, locked, proposed, retired; or an empty string for every state.")
-    limit: int = Field(description=f"How many rows to return, at most {MAX_ROWS}.")
+    limit: int = Field(description=f"How many rows to return, at most {MAX_ROWS}; a larger limit is read as {MAX_ROWS}.")
 
     @field_validator("kind", "state", mode="before")
     @classmethod
@@ -148,9 +148,13 @@ def _description(module: str) -> str:
     partial = module_stores.PARTIAL.get(module)
     return (
         f"Read {label}: {WHAT[module]}. Kinds: {kinds}. Pass ids or refs, words, a kind and a state to narrow; pass an "
-        f"empty list and empty strings to list the module. Returns at most {MAX_ROWS} rows, each with its "
+        f"empty list and empty strings to list the module. Returns at most {MAX_ROWS} rows (a larger limit is read "
+        f"as {MAX_ROWS}), in the summary's rows and the result's rows, each with its "
         "ref (cite it in moduleRefs), label, state (open, fenced, approved, locked, proposed, retired; computed by the "
-        "service), the module's own status word and its provenance; and the count of every match by state."
+        "service), the module's own status word and its provenance. The summary holds module, rows, count (every "
+        "match), returned (the rows shown) and states (the count of every match by state), a note when rows were "
+        "left out so that the result stays readable, and partial when the module is read in part; narrow by ids, "
+        "state or words to read the rest."
         + (f" Read in part: {partial}." if partial else "")
     )
 

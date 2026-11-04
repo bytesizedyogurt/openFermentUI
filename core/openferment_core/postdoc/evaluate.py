@@ -166,15 +166,44 @@ def _eth(n: int, question: str, expects: str, tools: list[list[str]], cites: lis
                         estimate=estimate, follows=f"eq-eth-{follows:02d}" if follows else None, suite=ETHANOL)
 
 
-# The engines question 13 expects named: the three the core registers
-# (core/pyproject.toml's entry points in the group `openferment.engines`).
-# Stage D adds the stranger's engine once it is installed.
+# The engines question 13 expects named in the code: the three the core
+# registers (core/pyproject.toml's entry points in the group
+# `openferment.engines`). Seeded, its expectation names every engine the
+# registry holds then (`engines_here`), the core's three among them, so an
+# engine installed beside the core is expected too; the core names no other.
 ENGINES_EXPECTED = ("biosteam", "kinetics", "train")
+ENGINES_QUESTION = "eq-eth-13"
 
 
 def _named(names: tuple[str, ...]) -> str:
     """Names in words: `a`, `a and b`, `a, b and c`."""
     return names[0] if len(names) == 1 else f"{', '.join(names[:-1])} and {names[-1]}"
+
+
+def _engines_expected(names: tuple[str, ...]) -> str:
+    """What a good answer to question 13 does, naming `names`."""
+    return (f"Names each engine registered here ({_named(names)}) from the engine reads: what each runs, what "
+            "each takes (its parameters, each with its unit and the origin of its default, or that a run sets it) and "
+            "what each gives (the outputs a run of it keeps), and which of the project's runs came from each, set out "
+            "as one table with a row for each engine, its cells the ids, units and origins the reads returned, and each "
+            "run named by its id and cited by the evidence id or the module row a read returned.")
+
+
+def engines_here() -> tuple[str, ...]:
+    """The engines question 13 expects when its suite is seeded: every name
+    the registry holds (the group read in this process, as `engine_plants`
+    lists it) and the core's three, in name order."""
+    from ..tools.engine import registered_names
+
+    return tuple(sorted({*ENGINES_EXPECTED, *registered_names()}))
+
+
+def as_seeded(q: EvalQuestion) -> EvalQuestion:
+    """A question as a seed keeps it: question 13's expectation names the
+    engines here (`engines_here`); every other question as the code holds it."""
+    if q.id != ENGINES_QUESTION:
+        return q
+    return q.model_copy(update={"expects": _engines_expected(engines_here())})
 
 
 # The owner's twelve (alpha 2.1 execution prompt §5), asked of a project that
@@ -239,11 +268,7 @@ ETHANOL_QUESTIONS = (
          [["yield_ceiling", "geneos_read"]], ["evidence", "record"]),
     _eth(13, "Which engines are registered here, what does each take and give, and which of this project's runs came "
              "from each?",
-         f"Names each engine registered here ({_named(ENGINES_EXPECTED)}) from the engine reads: what each runs, what "
-         "each takes (its parameters, each with its unit and the origin of its default, or that a run sets it) and "
-         "what each gives (the outputs a run of it keeps), and which of the project's runs came from each, set out "
-         "as one table with a row for each engine, its cells the ids, units and origins the reads returned, and each "
-         "run named by its id and cited by the evidence id or the module row a read returned.",
+         _engines_expected(ENGINES_EXPECTED),
          [["engine_plants"], ["engine_parameters"],
           ["engine_report", "study_read", "proforma_read", "fermos_read", "pureos_read"]],
          ["evidence", "row"], estimate=False),
@@ -280,10 +305,10 @@ def questions(suite: str | None = None) -> list[EvalQuestion]:
     return [q for q in db.run(_questions(projects.current())) if suite is None or q.suite == suite]
 
 
-async def _seed(project_id: str, by: str, suite: str) -> list[str]:
+async def _seed(project_id: str, by: str, asked: list[EvalQuestion]) -> list[str]:
     made = []
     async with db.session() as s:
-        for q in SUITES[suite]:
+        for q in asked:
             if await rows.body(s, t.eval_questions, project_id, q.id) is None:
                 await rows.put(s, t.eval_questions, project_id, q.id, q.model_copy(update={"by": by, "at": _now()})
                                .model_dump(mode="json"), by=by)
@@ -292,10 +317,12 @@ async def _seed(project_id: str, by: str, suite: str) -> list[str]:
 
 
 def seed(by: str = BY, suite: str = DEFAULT) -> list[str]:
-    """A suite's questions kept in the project, those it lacks; their ids."""
+    """A suite's questions kept in the project, those it lacks, each as a
+    seed keeps it (`as_seeded`: question 13 names the engines registered
+    here now); their ids."""
     if suite not in SUITES:
         raise ValueError(f"there is no suite {suite!r}: the suites are {', '.join(SUITES)}")
-    return db.run(_seed(projects.current(), by, suite))
+    return db.run(_seed(projects.current(), by, [as_seeded(q) for q in SUITES[suite]]))
 
 
 async def _keep(project_id: str, run: EvalRun) -> None:

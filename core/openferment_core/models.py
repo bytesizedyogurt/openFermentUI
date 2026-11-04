@@ -201,21 +201,32 @@ class ModuleRow(BaseModel):
 
 
 class AuditEntry(BaseModel):
-    """One row of the audit table (OF-BLD-015 §7.3): a write a model
-    made, or a proposal a person carried out or dismissed."""
+    """One row of the audit table (OF-BLD-015 §7.3): a write a model, an MCP
+    client or a named person made, a proposal a person carried out or
+    dismissed, or a request that named its own key. `agent` is `model` for a
+    model's or an assistant's write and `person` for a person's; `who` names
+    it, an MCP client by its `<name>/<version>`. A row of the model's lane
+    names the door its write came in by in `detail.via`: `postdoc` (Postdoc's
+    loop), `mcp` (the MCP server in its own process) or `http` (the tool
+    door's X-OpenFerment-Assistant header)."""
 
-    at: str
+    at: str = Field(description="When the row was written, ISO 8601 in UTC (`+00:00`).")
     agent: Literal["model", "person"]
-    # The model id, or the person's name.
+    # The model id, an assistant's declared name, or the person's name.
     who: str
     module: ModuleName
     action: str
     # The state the write left behind, or `proposed`, `done`, `dismissed`.
     state: str
     target: str | None = None
-    askId: str | None = None
-    effort: str | None = None
-    detail: dict[str, Any] = Field(default_factory=dict)
+    askId: str | None = Field(default=None, description=(
+        "The ask of Postdoc's the write was part of; empty for a write from outside an ask."))
+    effort: str | None = Field(default=None, description=(
+        "The effort the service's model ran at, for a write of Postdoc's; empty for a person's write and for an "
+        "outside assistant's, since no model of the service ran for it."))
+    detail: dict[str, Any] = Field(default_factory=dict, description=(
+        "What the write was, by the action's own names (the tool, the kind, a note), and, for a write of the "
+        "model's lane, the door it came in by (`via`: postdoc, mcp or http)."))
 
 
 ProposalState = Literal["proposed", "done", "dismissed"]
@@ -760,6 +771,32 @@ class RunInput(BaseModel):
     quantity: Quantity
 
 
+def non_finite(q: Quantity) -> str | None:
+    """Which of a quantity's numbers is NaN or infinite, in words (`its value
+    is NaN`, `its high is infinite`); None when each is finite. A JSON
+    request can carry either (Python reads `NaN`, `Infinity` and a number
+    past a float's range), and every door that takes a run's values refuses
+    one before anything computes (alpha 2.2 D0.6)."""
+    for k in ("value", "low", "high"):
+        v = getattr(q, k)
+        if isinstance(v, float) and not math.isfinite(v):
+            return f"its {k} is {'NaN' if math.isnan(v) else 'infinite'}"
+    return None
+
+
+# The smallest integer a float cannot hold: the midpoint between a float's
+# largest value (2**1024 - 2**971) and 2**1024, which rounds up past the range.
+FLOAT_EDGE = 2**1024 - 2**970
+
+
+def float_holds(n: int) -> bool:
+    """Whether a JSON integer fits a float, as every number the service
+    keeps does: Python reads an integer literal of any length, and one past
+    a float's range is no number a run's output, a diagnostic or a quantity
+    can hold (`float(n)` raises OverflowError exactly when this is False)."""
+    return abs(n) < FLOAT_EDGE
+
+
 # What a quantity and its origin hold, and nothing beside: a request that
 # carries any other field, a number among them, is refused (docs/api/engines.md).
 QUANTITY_FIELDS = frozenset({"value", "unit", "basis", "low", "high", "origin"})
@@ -807,6 +844,9 @@ class EngineInput(RunInput):
 
     @model_validator(mode="after")
     def _names_who_set_it(self) -> "EngineInput":
+        infinite = non_finite(self.quantity)
+        if infinite:
+            raise ValueError(f"{self.name}: {infinite}, and a number a run sets is finite; nothing runs on it")
         origin = self.quantity.origin
         if origin is None or origin.kind not in ("person-assumption", "model-estimate", "measurement"):
             raise ValueError(f"{self.name}: a value a run sets is a person's assumption or a model's estimate, its "
@@ -4185,6 +4225,36 @@ class RunSFF(BaseModel):
     tags: list[str] = Field(default_factory=list)
 
 
+# The most diagnostics one run keeps, and the longest name each may have (an
+# output's longest, engine/contract.py MAX_OUTPUT_NAME).
+MAX_DIAGNOSTICS = 50
+MAX_DIAGNOSTIC_NAME = 200
+
+
+class RunDiagnostic(BaseModel):
+    """A value a run's computation reports about itself, the time it took or
+    the iterations it made, as a contract engine's worker answers it beside
+    its outputs (docs/api/workers.md, `run`): a name, a finite number or
+    words, and a unit. The run keeps it beside its outputs; its artifact,
+    its replay and every reader of `outputs.values` leave it out, so a
+    replay compares the outputs alone."""
+
+    name: str = Field(min_length=1, max_length=MAX_DIAGNOSTIC_NAME)
+    value: float | str
+    unit: str
+
+    @field_validator("value", mode="before")
+    @classmethod
+    def _finite_number_or_words(cls, v: Any) -> Any:
+        if isinstance(v, bool):
+            raise ValueError("a diagnostic's value is a finite number or words; a boolean is refused")
+        if isinstance(v, float) and not math.isfinite(v):
+            raise ValueError("a diagnostic's number is finite")
+        if isinstance(v, int) and not float_holds(v):
+            raise ValueError("a diagnostic's number is finite, inside a float's range")
+        return v
+
+
 class EngineRun(BaseModel):
     """One engine run in a project: a row of `runs` (GET /api/runs)."""
 
@@ -4219,6 +4289,12 @@ class EngineRun(BaseModel):
     by: str
     at: str
     durationMs: int | None = None
+    # What its computation reported about itself (the time it took, the
+    # iterations it made), as its engine's worker answered it beside the
+    # outputs, kept from the computation that made the row. They stand on
+    # the run beside its outputs, and a replay compares the outputs alone.
+    # Empty for a run whose engine reports none, the core's three among them.
+    diagnostics: list[RunDiagnostic] = Field(default_factory=list)
 
 
 class RunReport(BaseModel):

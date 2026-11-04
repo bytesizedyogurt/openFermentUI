@@ -12,12 +12,19 @@ dist/
 core/.env
 core/.env.*
 !core/.env.example
+# The engines this machine keeps installed beside core/uv.lock, one package
+# directory a line (scripts/engines-local.sh); `*.local` above holds it too.
+core/engines.local
 .venv/
 core/.venv/
 __pycache__/
 *.py[cod]
 .pytest_cache/
 .ruff_cache/
+# The record an editable install with setuptools writes beside a package's
+# code (an engine package under examples/engines/ installed into core's
+# environment); every install writes it again.
+*.egg-info/
 
 # Written by `pnpm test:core` from the client's TypeScript before the suite
 # runs (scripts/export-*.ts); a committed copy would be a second source that
@@ -67,3 +74,6 @@ core/data/pureos-trains.json.lock
 # A build spec or a session's prompt copied to the root.
 /OF-BLD-*.md
 /PROMPT*.md
+# The worktrees a session's workflows and the handoff's builders work in,
+# each a checkout of its own.
+.claude/worktrees/

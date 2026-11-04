@@ -16,6 +16,10 @@
 //                   the run's artifact; each number shown to a few digits,
 //                   in full in its title and the CSV; a BioSTEAM run's numbers
 //                   are in its sections below;
+//   its diagnostics what a contract engine's computation reported about
+//                   itself beside its outputs (the time it took, the
+//                   iterations it made), kept with the run and left
+//                   uncompared by a replay;
 //   its parameters  every value the run was bound with, in the parameter panel,
 //                   read-only: a person's assumption or a model's estimate where
 //                   the run set one, the library's own default elsewhere, each
@@ -233,6 +237,49 @@ function Outputs({ report }: { report: EngineRunReport }) {
           </table>
         </div>
       </OutputsTable>
+    </Card>
+  );
+}
+
+/**
+ * What a run's computation reported about itself (`run.diagnostics`: the time it took, the iterations it made), as its
+ * engine's worker answered it beside the outputs. The run keeps them from the computation that made it; a replay
+ * compares the outputs alone and leaves these uncompared.
+ */
+function Diagnostics({ run }: { run: EngineRunReport['run'] }) {
+  const reported = run.diagnostics ?? [];
+  if (!reported.length) return null;
+  return (
+    <Card className="p-4" data-testid="run-diagnostics" data-engine={run.engine}>
+      <h2 className="font-serif text-section-title font-semibold mb-1">What the computation reported about itself</h2>
+      <p className="text-caption text-ink-soft mb-2">
+        Each value the {run.engine} engine&rsquo;s computation reported beside its outputs, kept with the run as its first computation
+        answered it. A replay compares the outputs alone and leaves these uncompared.
+      </p>
+      <div className="overflow-x-auto">
+        <table className="w-full text-caption">
+          <thead>
+            <tr className="border-b border-line text-ink-soft">
+              {['Diagnostic', 'Value', 'Unit'].map((h) => (
+                <th key={h} className="text-left py-1 pr-2 font-medium">
+                  {h}
+                </th>
+              ))}
+            </tr>
+          </thead>
+          <tbody>
+            {reported.map((d) => (
+              <tr key={d.name} className="border-b border-line/50 align-top" data-testid="run-diagnostic">
+                <td className="py-1 pr-2 font-num">{d.name}</td>
+                <td className="py-1 pr-2 font-num" title={String(d.value)} data-testid="run-diagnostic-value">
+                  {shown(d.value)}
+                </td>
+                <td className="py-1 pr-2 font-num">{d.unit || '—'}</td>
+              </tr>
+            ))}
+          </tbody>
+        </table>
+      </div>
     </Card>
   );
 }
@@ -663,6 +710,7 @@ export default function ProformaRun({ runId }: { runId: string }) {
           )}
           {report.parameters && <Parameters runId={run.id} data={report.parameters} />}
           <Outputs report={report} />
+          <Diagnostics run={run} />
           <Inputs report={report} />
           <PackageTest report={report} />
           {view && (

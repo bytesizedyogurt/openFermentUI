@@ -46,6 +46,17 @@ alone is kept. A quantity nobody can be named for is refused.
 EVERY TOOL ACTS IN ONE PROJECT (ADR-005): the request's, the question's, or
 the one the MCP server was started in (`ToolContext.project`).
 
+AN ASSISTANT IS NAMED AS IT DECLARES ITSELF (alpha 2.2 D.0). Over MCP a
+client's `clientInfo` names it; at the HTTP endpoint the
+`X-OpenFerment-Assistant` header (ASSISTANT_HEADER) does, which the MCP
+server sends when it acts through a running service. Either way the call runs
+in the model's lane under that name, the name as `caller_name` writes it, and
+the context records the door it came in by (`ToolContext(model=<name>,
+via="mcp")` in the MCP server's own process, `via="http"` at the endpoint):
+its audit rows name that door and record no effort, since no model of the
+service ran, and a catalogue entry it keeps is replaced only by an outside
+assistant of the same name (catalogues.py).
+
 TOOL OUTPUT DISCIPLINE. A tool summarises in code before a model reads
 anything. `summary` is at most `MAX_SUMMARY_CHARS` as JSON; a tool that
 returns more is a defect in the tool, and the result says so in place of the
@@ -60,6 +71,7 @@ import functools
 import json
 import math
 import re
+import unicodedata
 from dataclasses import dataclass, field
 from datetime import datetime, timezone
 from typing import Annotated, Any, Callable
@@ -145,6 +157,24 @@ COUNT_FIELDS = frozenset({"k", "limit"})
 # The fields a number may stand in inside a quantity (ADR-006): its value and its range.
 QUANTITY_FIELDS = frozenset({"value", "low", "high"})
 MAX_SUMMARY_CHARS = 9_000
+# The header an assistant names itself in at `POST /api/tools/{name}`, as
+# `<name>/<version>`, its value UTF-8 text; the MCP server's --service mode
+# sends its client's declared name in it.
+ASSISTANT_HEADER = "X-OpenFerment-Assistant"
+# The longest name an assistant's writes and typed numbers are marked with.
+MAX_CALLER = 200
+# The characters a name keeps none of: controls, format characters (a bidi
+# override among them, which would make an audit row read as another name)
+# and surrogates, which UTF-8 text holds none of.
+_UNNAMED = frozenset({"Cc", "Cf", "Cs"})
+
+
+def caller_name(raw: str) -> str:
+    """A name an assistant declared, as its writes and its typed numbers are
+    marked: control, format and surrogate characters dropped, whitespace
+    collapsed to one space, at most MAX_CALLER characters."""
+    kept = "".join(c for c in str(raw or "") if c.isspace() or unicodedata.category(c) not in _UNNAMED)
+    return " ".join(kept.split())[:MAX_CALLER]
 
 
 @dataclass
@@ -175,9 +205,23 @@ class ToolContext:
     # The project the call acts in; None acts in the current one (the
     # request's or the command's, projects.current).
     project: str | None = None
-    # The door the call came in by: "mcp" for the MCP server, whose `model` is
-    # the name its client declared; empty for Postdoc's loop and the endpoint.
+    # The door an outside assistant's call came in by, its `model` the name
+    # the assistant declared: "mcp" for the MCP server in its own process,
+    # "http" for the HTTP endpoint's ASSISTANT_HEADER (which the MCP server
+    # started with --service sends). Empty for Postdoc's loop and for a
+    # person named with `?by=`.
     via: str = ""
+
+    def door(self) -> str | None:
+        """The door a call in the model's lane came in by, as its audit row
+        and a catalogue entry it keeps record it: `postdoc` for Postdoc's
+        loop, `mcp` or `http` for an outside assistant; None for a call a
+        person makes."""
+        if self.via:
+            return self.via
+        if self.person.strip() and not self.model.strip():
+            return None
+        return "postdoc"
 
     def author(self) -> Origin | None:
         """The origin of a number this call types into a tool (ADR-006): the
@@ -374,6 +418,19 @@ def numbers_in(value: Any, path: str = "", quantities: frozenset[str] = frozense
     return found
 
 
+def non_finite_in(value: Any, path: str = "") -> list[str]:
+    """Where a number that is NaN or infinite stands in `value`, anywhere in
+    it (alpha 2.2 D0.6: every door that takes a run's values refuses one
+    before anything runs)."""
+    if isinstance(value, float) and not math.isfinite(value):
+        return [path or "input"]
+    if isinstance(value, dict):
+        return [p for k, v in value.items() for p in non_finite_in(v, f"{path}.{k}" if path else str(k))]
+    if isinstance(value, list):
+        return [p for n, v in enumerate(value) for p in non_finite_in(v, f"{path}[{n}]")]
+    return []
+
+
 def quantities_in(value: Any, quantities: frozenset[str], path: str = "") -> bool:
     """Whether a quantity stands in `value` where the tool asks for one."""
     if _shape(path) in quantities and is_quantity(value):
@@ -446,6 +503,11 @@ def run(name: str, raw: Any, ctx: ToolContext | None = None) -> ToolResult:
         return ToolResult(error=f"There is no tool named {name!r}. The tools are: {', '.join(sorted(REGISTRY))}.")
     if not isinstance(raw, dict):
         return ToolResult(error=f"{name} takes an object of named fields.")
+    infinite = non_finite_in(raw)
+    if infinite:
+        held = "holds a number that is" if len(infinite) == 1 else "hold numbers that are"
+        return ToolResult(error=f"{name} refused: {', '.join(infinite)} {held} NaN or infinite, and a number a tool "
+                                "takes is finite; nothing ran")
     quantities = _quantity_paths_of(name)
     numbers = numbers_in(raw, quantities=quantities)
     if numbers:

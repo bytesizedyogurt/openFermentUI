@@ -193,6 +193,36 @@ answer. Postdoc's loop needs a model that calls tools, so `converse` passes a lo
 words. With no endpoint named, a local model in a route is passed over and `pnpm ready` names the
 setting; another provider's model still waits for the owner.
 
+## Implementation 12 (alpha 2.2 D.0: an assistant named at the tool door)
+
+- `POST /api/tools/{name}` reads `X-OpenFerment-Assistant` (`tools.ASSISTANT_HEADER`): with it the
+  call runs in the model's lane under that name, `ToolContext(model=<name>, via="http")` in the
+  request's project, the name read as UTF-8 text, whitespace-collapsed, its control, format and
+  surrogate characters dropped and cut to `tools.MAX_CALLER` characters (`tools.caller_name`,
+  which an MCP client's declared name and a person's `?by=` pass through too). A number it types
+  is that name's estimate, a write is marked with that name (`by`), its audit row names it as
+  `who` with agent `model`, and a catalogue entry's source reads `<name>, at the HTTP endpoint`. A
+  call naming both `?by=` and the header is a 422 in words, and so is a writing tool's call naming
+  neither.
+- Every write of the model's lane names the door it came in by: `detail.via` on its audit row and
+  `via` on a catalogue entry it keeps, `postdoc` for Postdoc's loop, `mcp` for the MCP server in
+  its own process, `http` for the header. Only Postdoc's row carries an `effort`, the one its
+  model ran at, since no model of the service runs for an outside assistant's write.
+- The header gives an HTTP caller the model's lane under the name it declares. A number it types
+  is that name's estimate, which every record store refuses (ADR-006); its `catalogue_write`
+  replaces only an entry that name kept in the model's lane through an assistant's door, so it
+  replaces neither a person's entry nor Postdoc's; and it writes the stores that hold a model's
+  work alone, pureOS's kept trains among them, where a `?by=` call is refused. A gated action
+  becomes a proposal in either lane, since `writes._runner` checks the gate before the lane, and
+  what a write at the tool door makes lands in the open lane whoever calls (THE MARK,
+  `tools/writes.py`). A caller on loopback reaches the model's lane already through
+  `POST /api/ask`, and an MCP client in the server's own process reaches it with the database's
+  address; the header is one more door to it, `guard.py` holds it as it holds every POST, and no
+  listener, host or CORS rule is added. The MCP server's `--service` mode sends its client's name
+  here (ADR-005).
+- `docs/TOOLS.md` says how the server starts, both ways it reaches a project, and what a client
+  reads: the SDK's names, the shape of an answer over MCP, and where the audit row is read.
+
 ## Evidence
 
 - `postdoc_agent.py`, `llm.py`, `spend.py`, `tools/__init__.py` at `alpha-1.0`.

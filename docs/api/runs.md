@@ -18,12 +18,13 @@ to. The code is `core/openferment_core/engine/runs.py`; BioSTEAM's computation i
 | `plant`, `configuration` | What the engine ran and the configuration it ran in: for `biosteam` the plant on the shelf (`/api/library`), a flowsheet's default named, or a Proforma scenario's flowsheet (A Proforma run, below); for `kinetics` a family, `forecast` with the kept fit it drew from, or `vessel` with the kept simulation, fit or forecast it was designed for; for `train` the train's id, with no configuration; for another engine one of its things |
 | `status` | `done`, or `refused` with the engine's own words in `refused` (a receipt: BioSTEAM's InfeasibleRegion naming its unit, a gate the values failed) |
 | `tool`, `toolVersion` | The artifact tool its computation is kept and replayed as, and the tool's version: `library.run` and its version for a library plant's run, `proforma.run` and its own for a Proforma scenario's, both BioSTEAM's; `fermos.simulation`, `growth_forecast` or `fermos.vessel` at the artifact's own version for a kinetics run; `pureos.train_run` at its own version for a train run |
-| `inputs` | Every input of the basis as `{name, quantity}`, the quantity carrying its origin (ADR-006): `library-default` (the plant, the simulator, the settings, all read from the package), `person-assumption` (a value a named person set), `model-estimate` (a value a named model estimated), `measurement` (a reading a person deposited at the bench: `ref` the reading, `<deposition id>/<entry id>`, `by` the person who deposited it, `at` the time it was taken, and in `note` any conversion into the parameter's unit; `docs/api/studies.md`, Measurements), `convention` (a change the plant needs to build here, the precision kept) |
+| `inputs` | Every input of the basis as `{name, quantity}`, the quantity carrying its origin (ADR-006): `library-default` (the plant, the simulator, the settings, all read from the package), `person-assumption` (a value a named person set), `model-estimate` (a value a named model estimated), `measurement` (a reading a person deposited at the bench: `ref` the reading, `<deposition id>/<entry id>`, `by` the person who deposited it, `at` the time it was taken, and in `note` any conversion into the parameter's unit; `docs/api/studies.md`, Measurements), `convention` (a change the plant needs to build here, the precision kept). A basis names each source in its own words, and a run's `inputs` read each as an origin (`basis.origin_of`): `assumption` is `person-assumption`, `deposition` naming one reading is `measurement` and a series `record`, `model` is `library-default`, and `record`, `artifact`, `convention` and `model-estimate` keep their names |
 | `provenance`, `artifactId` | The artifact the run's own tool kept (`library.run` for a library plant's run and `proforma.run` for a Proforma scenario's, both BioSTEAM's, `engine.<name>` for a contract engine's, fermOS's for a kinetics run, pureOS's for a train run) and the provenance computed on its basis: `assumed` when any input is a person's assumption or a model's estimate, or rests on one; else `measured` when any input is a measurement; a run at the package's own settings is `computed`. A row held done follows its artifact's provenance when a record the basis rests on is reviewed or demoted since (Keeping a run, below). None for a refused run |
 | `outputs` | `values`: each output as `{name, quantity}`, the quantity in the unit the run's artifact states, its origin the artifact (Outputs, below); a library run also keeps its price block, a flowsheet's own outputs (its MESP and yields) and, for a run with no value of its own, how many of the package test's values it holds. A receipt computed nothing, and its `outputs` is `{}` |
 | `versions` | The distributions it ran on: biosteam, thermosteam and biorefineries as a library run's basis names them; for a kinetics run, what its thing ran on (A kinetics run, below); for a train run, the versions its basis names, the worker's (A train run, below); for a basis that names no simulator, the engine's own `version()` |
 | `sff` | The SFF file the run wrote: its flowsheet record (`run-<id>`, `docs/api/sff.md`), whether it validates, its completeness score and the tags it earns. `sffRefused` holds the words when no file could be written; the run stands |
-| `by`, `at`, `durationMs` | Who asked for the run first, when it was first kept, how long its computation took |
+| `by`, `at`, `durationMs` | Who asked for the run first, when it was first kept, how long its computation took (the service's own measure, its artifact's `durationMs`) |
+| `diagnostics` | What the run's computation reported about itself, as a contract engine's worker answered it beside the outputs (`docs/api/workers.md`, `run`): each `{name, value, unit}`, at most 50, kept from the computation that made the row, the time it took or the iterations it made among them. They stand outside its artifact, its id and its replay, and no reader of `outputs.values` reads them. Empty for a run whose engine reports none, the core's three among them, and for a row kept from an artifact an earlier ask computed (its SFF step failed then), since nothing computed for it |
 | `scenarioId` | The study scenario that asked for it first (`docs/api/studies.md`), or the Proforma scenario a Proforma run belongs to (A Proforma run, below); null for a run asked for directly |
 
 Where a row above names BioSTEAM, a contract engine's run fills it as the next section says. The
@@ -45,6 +46,7 @@ An engine built on `WorkerEngine` (`docs/api/engines.md`) keeps each run as a ro
 | `toolVersion` | The engine's version string: the contract's stem, the engine's name and every distribution it runs on with its version (`engine run 1 · example · openferment-engine-example 0.1.0`) |
 | `inputs` | `engine`, `thing`, `configuration` (when the thing takes one), `precision.rtol` and `precision.atol` (the precision the thing states), each a `convention`, then `value <key>` for each value the run sets, its origin the person's assumption or the model's estimate with its day, or the deposition's reading with its depositor and time, set in the parameter's unit before its bounds are checked |
 | `outputs` | `values`: each output as `{name, quantity}`, the quantity in the output's unit, its origin the run's artifact (`{"kind": "artifact", "ref": "<artifact id>"}`) |
+| `diagnostics` | What the worker's `run` op answered beside its outputs, in their order: the run's page shows them under its outputs, and `engine_report` names them as words |
 | `versions` | The engine's `version()`: each distribution it runs on, with its installed version |
 | `sff`, `sffRefused` | The file the engine's `sff_export` wrote, validated and scored in the Proforma worker, or the engine's words for why it wrote none |
 | `status`, `refused` | `done`, or `refused` with the engine's own words (a receipt the same request is answered from) |
@@ -147,7 +149,7 @@ output moving with it where the sensitivity reads the estimate's kind.
 ## Keeping a run
 
 `keep_run(engine, thing, configuration, *, tool, version, basis, by, art | refused, flowsheet |
-sff_refused, scenario_id, seed, versions)` keeps one run of any engine's computation as its row,
+sff_refused, scenario_id, seed, versions, diagnostics)` keeps one run of any engine's computation as its row,
 the one public way a row is kept: the library path (`runs.run`), every contract engine's run
 (`run_engine`), the kinetics engine's computations, the train engine's runs and Proforma's
 scenario runs (`compute_kept`, below) keep theirs through it.
@@ -162,6 +164,7 @@ scenario runs (`compute_kept`, below) keep theirs through it.
 | `flowsheet`, `sff_refused` | For a run that computed, one of the two: the run's SFF record (`sff`), or the words for why none was written (`sffRefused`). A run with no plant passes its words. A receipt passes neither |
 | `by`, `scenario_id` | Who asked (`this browser` when the request names no one), and the study scenario that asked for it |
 | `versions` | What the thing's computation ran on, when the keeper names it (the kinetics engine names each thing's); otherwise the distributions the basis names, or the engine's own `version()` |
+| `diagnostics` | What the computation reported about itself beside its outputs (`run_engine` hands on a contract engine's worker's), kept on a row that is done; a held row's own stand when it has some, so the same request again is the run with its first computation's diagnostics. A receipt keeps none |
 
 `compute_kept(engine, thing, configuration, *, tool, basis, refusal, sff_refused | write_sff, by,
 seed, records_by_id, scenario_id, versions)` is the library path's shape for an engine that
@@ -210,7 +213,8 @@ no row.
 | any other tool | an empty list, or what the module that registered the tool reads (`values_of`) | nothing |
 
 A row kept before `values` existed lacks the key, and so does a receipt (`outputs` `{}`); a reader
-reads its absence as no outputs. A comparison sets runs' outputs side by side, and a runbook
+reads its absence as no outputs. A run's `diagnostics` stand beside `outputs`, and `values_of`
+reads none of them. A comparison sets runs' outputs side by side, and a runbook
 predicts an entry by `values.<name>` (`docs/api/studies.md`).
 
 ## Replay

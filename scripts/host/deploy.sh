@@ -46,6 +46,12 @@ pnpm install --frozen-lockfile
 # and Proforma, lit for the literature layer, agent for the MCP servers), and
 # a sync is exact, so naming one extra would remove the others.
 (cd core && uv sync --frozen --all-extras)
+# A sync keeps only what core/uv.lock names: each engine this machine keeps
+# beside it, named in core/engines.local, is installed again, every package
+# the lock pins held at its locked version, so an engine moves no pin under
+# the live service.
+"$REPO/scripts/engines-local.sh" ||
+  die "an engine core/engines.local names did not install again; the lines above say which. Mend its line, or take the engine out with its line and cd core && uv pip uninstall <distribution>"
 
 say "Bringing the database to the newest schema"
 (cd core && .venv/bin/python -m openferment_core.migrations migrate) ||

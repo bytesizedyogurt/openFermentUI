@@ -67,7 +67,16 @@ export interface paths {
         };
         /**
          * Audit Read
-         * @description The newest rows of the project's audit log, newest last.
+         * @description The project's newest `limit` rows of its audit log, newest last:
+         *     `limit` is held to 1 to 500 (200 by default), a larger one read as 500.
+         *     `at` is ISO 8601 in UTC (`2026-11-04T09:00:00.123456+00:00`), as a
+         *     catalogue entry's `at` is; `agent` is `model` for a model's or an
+         *     assistant's write and `person` for a named person's, and `who` names it
+         *     (an MCP client by its `<name>/<version>`). A row of the model's lane
+         *     names the door its write came in by in `detail.via`: `postdoc` for
+         *     Postdoc's loop, with the `effort` its model ran at and, from an ask, its
+         *     `askId`; `mcp` for the MCP server in its own process and `http` for the
+         *     tool door's assistant header, with no effort and no ask.
          */
         get: operations["audit_read_api_audit_get"];
         put?: never;
@@ -224,15 +233,18 @@ export interface paths {
         };
         /**
          * Catalogue Listed
-         * @description The open project's entries of one catalogue (strain, product, skill, lesson), by id.
+         * @description The open project's entries of one catalogue (strain, product, skill, lesson), by id. Each names who kept
+         *     it (`by`), in which lane (`agent`: a person's keep or a model's write), through which door a model's write
+         *     came (`via`: postdoc, mcp or http) and where it came from (`source`).
          */
         get: operations["catalogue_listed_api_catalogues__kind__get"];
         put?: never;
         /**
          * Catalogue Keep
          * @description One entry kept in the open project's catalogue of `kind`, in the name of
-         *     `by`; an entry already held under its id is replaced. 422 in words for an
-         *     entry the kind does not take.
+         *     `by`, as a person's keep (`agent: person`); an entry already held under its
+         *     id is replaced, whoever kept it. 422 in words for an entry the kind does
+         *     not take, and for a keep that names nobody (`by` empty).
          */
         post: operations["catalogue_keep_api_catalogues__kind__post"];
         delete?: never;
@@ -248,7 +260,12 @@ export interface paths {
             path?: never;
             cookie?: never;
         };
-        /** Catalogue Entry */
+        /**
+         * Catalogue Entry
+         * @description One entry of the open project's catalogue of `kind`, with who kept it (`by`, `agent`, and for a model's
+         *     entry the door it came in by, `via`), when (`at`, ISO 8601 in UTC, as the audit writes its rows' times) and
+         *     where it came from (`source`).
+         */
         get: operations["catalogue_entry_api_catalogues__kind___entry_id__get"];
         put?: never;
         post?: never;
@@ -2647,13 +2664,22 @@ export interface paths {
          * @description Run one tool through the registry, the same path Postdoc's loop and
          *     the MCP server take, in the request's project. A refusal is a result
          *     with `error` set; an unknown tool is a 404. The body is the tool's
-         *     input; `?by=` names the person calling, who is the author of any
+         *     input. The caller is named one of two ways, each name read as the tool
+         *     door reads one (its control, format and surrogate characters dropped,
+         *     its whitespace collapsed, at most 200 characters), and a call naming
+         *     both is a 422 in words. `?by=` names a person, who is the author of any
          *     quantity the input types (ADR-006) and of any write it makes: the audit
          *     row, a proposal and what the write keeps are marked as that person's,
          *     and a store that holds a model's work alone (pureOS's kept trains)
-         *     refuses the write in its words. A tool that writes (`writes` in
-         *     docs/TOOLS.md) is run only for a person named so: a call that names
-         *     nobody is a 422 in words, and nothing runs.
+         *     refuses the write in its words. `X-OpenFerment-Assistant` names an
+         *     outside assistant, and the call runs in the model's lane under that
+         *     name, through this door (`via: http`): a number it types is that name's
+         *     estimate, a write is marked with that name (`by`), its audit row names
+         *     it as `who` with agent `model`, `via` http in its detail and no effort,
+         *     and a catalogue entry's source reads "<name>/<version>, at the HTTP
+         *     endpoint". A tool that writes (`writes` in docs/TOOLS.md) is run only for
+         *     a caller named so: a call that names nobody is a 422 in words, and
+         *     nothing runs.
          */
         post: operations["tools_run_api_tools__name__post"];
         delete?: never;
@@ -2781,8 +2807,14 @@ export interface components {
         };
         /**
          * AuditEntry
-         * @description One row of the audit table (OF-BLD-015 §7.3): a write a model
-         *     made, or a proposal a person carried out or dismissed.
+         * @description One row of the audit table (OF-BLD-015 §7.3): a write a model, an MCP
+         *     client or a named person made, a proposal a person carried out or
+         *     dismissed, or a request that named its own key. `agent` is `model` for a
+         *     model's or an assistant's write and `person` for a person's; `who` names
+         *     it, an MCP client by its `<name>/<version>`. A row of the model's lane
+         *     names the door its write came in by in `detail.via`: `postdoc` (Postdoc's
+         *     loop), `mcp` (the MCP server in its own process) or `http` (the tool
+         *     door's X-OpenFerment-Assistant header).
          */
         AuditEntry: {
             /** Action */
@@ -2792,15 +2824,27 @@ export interface components {
              * @enum {string}
              */
             agent: "model" | "person";
-            /** Askid */
+            /**
+             * Askid
+             * @description The ask of Postdoc's the write was part of; empty for a write from outside an ask.
+             */
             askId?: string | null;
-            /** At */
+            /**
+             * At
+             * @description When the row was written, ISO 8601 in UTC (`+00:00`).
+             */
             at: string;
-            /** Detail */
+            /**
+             * Detail
+             * @description What the write was, by the action's own names (the tool, the kind, a note), and, for a write of the model's lane, the door it came in by (`via`: postdoc, mcp or http).
+             */
             detail?: {
                 [key: string]: unknown;
             };
-            /** Effort */
+            /**
+             * Effort
+             * @description The effort the service's model ran at, for a write of Postdoc's; empty for a person's write and for an outside assistant's, since no model of the service ran for it.
+             */
             effort?: string | null;
             /**
              * Module
@@ -3002,6 +3046,59 @@ export interface components {
             value: number | string;
             /** Valuebasis */
             valueBasis?: ("exact" | "converted" | "range-midpoint" | "range-low" | "range-high" | "negation") | null;
+        };
+        /**
+         * CatalogueEntry
+         * @description One entry of a project's catalogue; the fields a kind does not use stay empty.
+         */
+        CatalogueEntry: {
+            /** Agent */
+            agent?: ("model" | "person") | null;
+            /** Aliases */
+            aliases?: string[];
+            /**
+             * At
+             * @default
+             */
+            at: string;
+            /**
+             * By
+             * @default
+             */
+            by: string;
+            /** Category */
+            category?: string | null;
+            /** Family */
+            family?: string | null;
+            /** Id */
+            id: string;
+            /**
+             * Kind
+             * @enum {string}
+             */
+            kind: "strain" | "product" | "skill" | "lesson";
+            /** Mastery */
+            mastery?: string[];
+            /** Name */
+            name: string;
+            /** Note */
+            note?: string | null;
+            /** Program */
+            program?: string | null;
+            /** Sequence */
+            sequence?: string | null;
+            /** Sequencesource */
+            sequenceSource?: string | null;
+            /** Skills */
+            skills?: string[];
+            /** Source */
+            source?: string | null;
+            /** Species */
+            species?: string | null;
+            /** Summary */
+            summary?: string | null;
+            /** Via */
+            via?: ("postdoc" | "mcp" | "http") | null;
         };
         /**
          * CatalogueKeep
@@ -3661,6 +3758,8 @@ export interface components {
             by: string;
             /** Configuration */
             configuration?: string | null;
+            /** Diagnostics */
+            diagnostics?: components["schemas"]["RunDiagnostic"][];
             /** Durationms */
             durationMs?: number | null;
             /**
@@ -5602,6 +5701,23 @@ export interface components {
             status: "unverified" | "verified" | "rejected";
         };
         /**
+         * RunDiagnostic
+         * @description A value a run's computation reports about itself, the time it took or
+         *     the iterations it made, as a contract engine's worker answers it beside
+         *     its outputs (docs/api/workers.md, `run`): a name, a finite number or
+         *     words, and a unit. The run keeps it beside its outputs; its artifact,
+         *     its replay and every reader of `outputs.values` leave it out, so a
+         *     replay compares the outputs alone.
+         */
+        RunDiagnostic: {
+            /** Name */
+            name: string;
+            /** Unit */
+            unit: string;
+            /** Value */
+            value: number | string;
+        };
+        /**
          * RunInput
          * @description One input of an engine run: its name, and its value as a quantity
          *     with its origin (ADR-006).
@@ -6755,7 +6871,10 @@ export type $defs = Record<string, never>;
 export interface operations {
     ask_api_ask_post: {
         parameters: {
-            query?: never;
+            query?: {
+                /** @description The project the request acts in, where a header cannot be sent (an EventSource); the X-OpenFerment-Project header in its place. */
+                project?: string;
+            };
             header?: {
                 /** @description The project the request acts in; ?project= in its place. */
                 "X-OpenFerment-Project"?: string;
@@ -6778,6 +6897,15 @@ export interface operations {
                     "application/json": components["schemas"]["AnswerPlan"];
                 };
             };
+            /** @description The project the request names is one the database does not hold, in words. */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Refusal"];
+                };
+            };
             /** @description Validation Error */
             422: {
                 headers: {
@@ -6791,7 +6919,10 @@ export interface operations {
     };
     ask_stream_api_ask_stream_post: {
         parameters: {
-            query?: never;
+            query?: {
+                /** @description The project the request acts in, where a header cannot be sent (an EventSource); the X-OpenFerment-Project header in its place. */
+                project?: string;
+            };
             header?: {
                 /** @description The project the request acts in; ?project= in its place. */
                 "X-OpenFerment-Project"?: string;
@@ -6805,13 +6936,22 @@ export interface operations {
             };
         };
         responses: {
-            /** @description Successful Response */
+            /** @description Server-sent events: `turn`, each `step`, then `plan`, or `error`. */
             200: {
                 headers: {
                     [name: string]: unknown;
                 };
                 content: {
-                    "application/json": unknown;
+                    "text/event-stream": string;
+                };
+            };
+            /** @description The project the request names is one the database does not hold, in words. */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Refusal"];
                 };
             };
             /** @description Validation Error */
@@ -6829,6 +6969,8 @@ export interface operations {
         parameters: {
             query?: {
                 limit?: number;
+                /** @description The project the request acts in, where a header cannot be sent (an EventSource); the X-OpenFerment-Project header in its place. */
+                project?: string;
             };
             header?: {
                 /** @description The project the request acts in; ?project= in its place. */
@@ -6848,6 +6990,15 @@ export interface operations {
                     "application/json": components["schemas"]["AuditEntry"][];
                 };
             };
+            /** @description The project the request names is one the database does not hold, in words. */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Refusal"];
+                };
+            };
             /** @description Validation Error */
             422: {
                 headers: {
@@ -6863,6 +7014,8 @@ export interface operations {
         parameters: {
             query?: {
                 tool?: string[];
+                /** @description The project the request acts in, where a header cannot be sent (an EventSource); the X-OpenFerment-Project header in its place. */
+                project?: string;
             };
             header?: {
                 /** @description The project the request acts in; ?project= in its place. */
@@ -6882,6 +7035,15 @@ export interface operations {
                     "application/json": components["schemas"]["Artifact"][];
                 };
             };
+            /** @description The project the request names is one the database does not hold, in words. */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Refusal"];
+                };
+            };
             /** @description Validation Error */
             422: {
                 headers: {
@@ -6895,7 +7057,10 @@ export interface operations {
     };
     artifacts_read_api_biorepo_artifacts__artifact_id__get: {
         parameters: {
-            query?: never;
+            query?: {
+                /** @description The project the request acts in, where a header cannot be sent (an EventSource); the X-OpenFerment-Project header in its place. */
+                project?: string;
+            };
             header?: {
                 /** @description The project the request acts in; ?project= in its place. */
                 "X-OpenFerment-Project"?: string;
@@ -6916,6 +7081,15 @@ export interface operations {
                     "application/json": components["schemas"]["Artifact"];
                 };
             };
+            /** @description The project the request names is one the database does not hold, in words. */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Refusal"];
+                };
+            };
             /** @description Validation Error */
             422: {
                 headers: {
@@ -6929,7 +7103,10 @@ export interface operations {
     };
     artifacts_replay_api_biorepo_artifacts__artifact_id__replay_post: {
         parameters: {
-            query?: never;
+            query?: {
+                /** @description The project the request acts in, where a header cannot be sent (an EventSource); the X-OpenFerment-Project header in its place. */
+                project?: string;
+            };
             header?: {
                 /** @description The project the request acts in; ?project= in its place. */
                 "X-OpenFerment-Project"?: string;
@@ -6950,7 +7127,7 @@ export interface operations {
                     "application/json": components["schemas"]["ReplayResult"];
                 };
             };
-            /** @description The project holds no artifact of that id, in words. */
+            /** @description The project holds no artifact of that id, in words. A project the request names that the database does not hold is a 404 too, in words. */
             404: {
                 headers: {
                     [name: string]: unknown;
@@ -6981,7 +7158,10 @@ export interface operations {
     };
     biorepo_check_api_biorepo_check_post: {
         parameters: {
-            query?: never;
+            query?: {
+                /** @description The project the request acts in, where a header cannot be sent (an EventSource); the X-OpenFerment-Project header in its place. */
+                project?: string;
+            };
             header?: {
                 /** @description The project the request acts in; ?project= in its place. */
                 "X-OpenFerment-Project"?: string;
@@ -7004,6 +7184,15 @@ export interface operations {
                     "application/json": components["schemas"]["DecisionCheck"];
                 };
             };
+            /** @description The project the request names is one the database does not hold, in words. */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Refusal"];
+                };
+            };
             /** @description Validation Error */
             422: {
                 headers: {
@@ -7017,7 +7206,10 @@ export interface operations {
     };
     biorepo_decisions_api_biorepo_decisions_post: {
         parameters: {
-            query?: never;
+            query?: {
+                /** @description The project the request acts in, where a header cannot be sent (an EventSource); the X-OpenFerment-Project header in its place. */
+                project?: string;
+            };
             header?: {
                 /** @description The project the request acts in; ?project= in its place. */
                 "X-OpenFerment-Project"?: string;
@@ -7040,6 +7232,15 @@ export interface operations {
                     "application/json": components["schemas"]["ReviewDecision"];
                 };
             };
+            /** @description The project the request names is one the database does not hold, in words. */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Refusal"];
+                };
+            };
             /** @description Validation Error */
             422: {
                 headers: {
@@ -7053,7 +7254,10 @@ export interface operations {
     };
     biorepo_overlay_api_biorepo_overlay_get: {
         parameters: {
-            query?: never;
+            query?: {
+                /** @description The project the request acts in, where a header cannot be sent (an EventSource); the X-OpenFerment-Project header in its place. */
+                project?: string;
+            };
             header?: {
                 /** @description The project the request acts in; ?project= in its place. */
                 "X-OpenFerment-Project"?: string;
@@ -7072,11 +7276,23 @@ export interface operations {
                     "application/json": components["schemas"]["Overlay"];
                 };
             };
+            /** @description The project the request names is one the database does not hold, in words. */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Refusal"];
+                };
+            };
         };
     };
     catalogue_listed_api_catalogues__kind__get: {
         parameters: {
-            query?: never;
+            query?: {
+                /** @description The project the request acts in, where a header cannot be sent (an EventSource); the X-OpenFerment-Project header in its place. */
+                project?: string;
+            };
             header?: {
                 /** @description The project the request acts in; ?project= in its place. */
                 "X-OpenFerment-Project"?: string;
@@ -7094,9 +7310,16 @@ export interface operations {
                     [name: string]: unknown;
                 };
                 content: {
-                    "application/json": {
-                        [key: string]: unknown;
-                    }[];
+                    "application/json": components["schemas"]["CatalogueEntry"][];
+                };
+            };
+            /** @description There is no catalogue of that kind, in words. A project the request names that the database does not hold is a 404 too, in words. */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Refusal"];
                 };
             };
             /** @description Validation Error */
@@ -7112,7 +7335,10 @@ export interface operations {
     };
     catalogue_keep_api_catalogues__kind__post: {
         parameters: {
-            query?: never;
+            query?: {
+                /** @description The project the request acts in, where a header cannot be sent (an EventSource); the X-OpenFerment-Project header in its place. */
+                project?: string;
+            };
             header?: {
                 /** @description The project the request acts in; ?project= in its place. */
                 "X-OpenFerment-Project"?: string;
@@ -7134,25 +7360,35 @@ export interface operations {
                     [name: string]: unknown;
                 };
                 content: {
-                    "application/json": {
-                        [key: string]: unknown;
-                    };
+                    "application/json": components["schemas"]["CatalogueEntry"];
                 };
             };
-            /** @description Validation Error */
+            /** @description There is no catalogue of that kind, in words. A project the request names that the database does not hold is a 404 too, in words. */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Refusal"];
+                };
+            };
+            /** @description An entry the kind does not take, or a keep that names nobody, in words (a list of field errors when the body is no object of `entry` and `by`). */
             422: {
                 headers: {
                     [name: string]: unknown;
                 };
                 content: {
-                    "application/json": components["schemas"]["HTTPValidationError"];
+                    "application/json": components["schemas"]["Refusal"] | components["schemas"]["HTTPValidationError"];
                 };
             };
         };
     };
     catalogue_entry_api_catalogues__kind___entry_id__get: {
         parameters: {
-            query?: never;
+            query?: {
+                /** @description The project the request acts in, where a header cannot be sent (an EventSource); the X-OpenFerment-Project header in its place. */
+                project?: string;
+            };
             header?: {
                 /** @description The project the request acts in; ?project= in its place. */
                 "X-OpenFerment-Project"?: string;
@@ -7171,9 +7407,16 @@ export interface operations {
                     [name: string]: unknown;
                 };
                 content: {
-                    "application/json": {
-                        [key: string]: unknown;
-                    };
+                    "application/json": components["schemas"]["CatalogueEntry"];
+                };
+            };
+            /** @description There is no catalogue of that kind, or the project's catalogue holds no entry of that id, in words. A project the request names that the database does not hold is a 404 too, in words. */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Refusal"];
                 };
             };
             /** @description Validation Error */
@@ -7189,7 +7432,10 @@ export interface operations {
     };
     conversations_listed_api_conversations_get: {
         parameters: {
-            query?: never;
+            query?: {
+                /** @description The project the request acts in, where a header cannot be sent (an EventSource); the X-OpenFerment-Project header in its place. */
+                project?: string;
+            };
             header?: {
                 /** @description The project the request acts in; ?project= in its place. */
                 "X-OpenFerment-Project"?: string;
@@ -7208,11 +7454,23 @@ export interface operations {
                     "application/json": components["schemas"]["LiveConversation"][];
                 };
             };
+            /** @description The project the request names is one the database does not hold, in words. */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Refusal"];
+                };
+            };
         };
     };
     conversation_api_conversations__conversation_id__get: {
         parameters: {
-            query?: never;
+            query?: {
+                /** @description The project the request acts in, where a header cannot be sent (an EventSource); the X-OpenFerment-Project header in its place. */
+                project?: string;
+            };
             header?: {
                 /** @description The project the request acts in; ?project= in its place. */
                 "X-OpenFerment-Project"?: string;
@@ -7233,6 +7491,15 @@ export interface operations {
                     "application/json": components["schemas"]["LiveConversation"];
                 };
             };
+            /** @description The project the request names is one the database does not hold, in words. */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Refusal"];
+                };
+            };
             /** @description Validation Error */
             422: {
                 headers: {
@@ -7246,7 +7513,10 @@ export interface operations {
     };
     conversation_calls_api_conversations__conversation_id__turns__turn_id__calls_get: {
         parameters: {
-            query?: never;
+            query?: {
+                /** @description The project the request acts in, where a header cannot be sent (an EventSource); the X-OpenFerment-Project header in its place. */
+                project?: string;
+            };
             header?: {
                 /** @description The project the request acts in; ?project= in its place. */
                 "X-OpenFerment-Project"?: string;
@@ -7268,6 +7538,15 @@ export interface operations {
                     "application/json": components["schemas"]["ToolCallRecord"][];
                 };
             };
+            /** @description The project the request names is one the database does not hold, in words. */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Refusal"];
+                };
+            };
             /** @description Validation Error */
             422: {
                 headers: {
@@ -7283,6 +7562,8 @@ export interface operations {
         parameters: {
             query?: {
                 unit?: string | null;
+                /** @description The project the request acts in, where a header cannot be sent (an EventSource); the X-OpenFerment-Project header in its place. */
+                project?: string;
             };
             header?: {
                 /** @description The project the request acts in; ?project= in its place. */
@@ -7302,6 +7583,15 @@ export interface operations {
                     "application/json": components["schemas"]["DepositionReading"][];
                 };
             };
+            /** @description The project the request names is one the database does not hold, in words. */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Refusal"];
+                };
+            };
             /** @description Validation Error */
             422: {
                 headers: {
@@ -7315,7 +7605,10 @@ export interface operations {
     };
     engines_list_api_engines_get: {
         parameters: {
-            query?: never;
+            query?: {
+                /** @description The project the request acts in, where a header cannot be sent (an EventSource); the X-OpenFerment-Project header in its place. */
+                project?: string;
+            };
             header?: {
                 /** @description The project the request acts in; ?project= in its place. */
                 "X-OpenFerment-Project"?: string;
@@ -7334,6 +7627,15 @@ export interface operations {
                     "application/json": components["schemas"]["EngineInfo"][];
                 };
             };
+            /** @description The project the request names is one the database does not hold, in words. */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Refusal"];
+                };
+            };
         };
     };
     engine_parameters_api_engines__name__parameters_get: {
@@ -7341,6 +7643,8 @@ export interface operations {
             query: {
                 thing: string;
                 configuration?: string | null;
+                /** @description The project the request acts in, where a header cannot be sent (an EventSource); the X-OpenFerment-Project header in its place. */
+                project?: string;
             };
             header?: {
                 /** @description The project the request acts in; ?project= in its place. */
@@ -7362,7 +7666,7 @@ export interface operations {
                     "application/json": components["schemas"]["EngineParameter"][];
                 };
             };
-            /** @description No engine of that name is registered here, or BioSTEAM's shelf holds no plant of that id: in words, naming what is here. */
+            /** @description No engine of that name is registered here, or BioSTEAM's shelf holds no plant of that id: in words, naming what is here. A project the request names that the database does not hold is a 404 too, in words. */
             404: {
                 headers: {
                     [name: string]: unknown;
@@ -7393,7 +7697,10 @@ export interface operations {
     };
     engine_run_api_engines__name__run_post: {
         parameters: {
-            query?: never;
+            query?: {
+                /** @description The project the request acts in, where a header cannot be sent (an EventSource); the X-OpenFerment-Project header in its place. */
+                project?: string;
+            };
             header?: {
                 /** @description The project the request acts in; ?project= in its place. */
                 "X-OpenFerment-Project"?: string;
@@ -7418,7 +7725,7 @@ export interface operations {
                     "application/json": components["schemas"]["RunReport"];
                 };
             };
-            /** @description No engine of that name is registered here, or BioSTEAM's shelf holds no plant of that id: in words, naming what is here. */
+            /** @description No engine of that name is registered here, or BioSTEAM's shelf holds no plant of that id: in words, naming what is here. A project the request names that the database does not hold is a 404 too, in words. */
             404: {
                 headers: {
                     [name: string]: unknown;
@@ -7451,6 +7758,8 @@ export interface operations {
         parameters: {
             query?: {
                 after?: number | null;
+                /** @description The project the request acts in, where a header cannot be sent (an EventSource); the X-OpenFerment-Project header in its place. */
+                project?: string;
             };
             header?: {
                 /** @description The project the request acts in; ?project= in its place. */
@@ -7461,13 +7770,22 @@ export interface operations {
         };
         requestBody?: never;
         responses: {
-            /** @description Successful Response */
+            /** @description Server-sent events: `job.*`, `tool.call`, `tool.result`, `artifact.kept` and `turn.*`, each with its id. */
             200: {
                 headers: {
                     [name: string]: unknown;
                 };
                 content: {
-                    "application/json": unknown;
+                    "text/event-stream": string;
+                };
+            };
+            /** @description The project the request names is one the database does not hold, in words. */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Refusal"];
                 };
             };
             /** @description Validation Error */
@@ -7492,6 +7810,8 @@ export interface operations {
                 startFrom?: string;
                 durationPreset?: string;
                 inputs?: string | null;
+                /** @description The project the request acts in, where a header cannot be sent (an EventSource); the X-OpenFerment-Project header in its place. */
+                project?: string;
             };
             header?: {
                 /** @description The project the request acts in; ?project= in its place. */
@@ -7513,6 +7833,15 @@ export interface operations {
                     };
                 };
             };
+            /** @description The project the request names is one the database does not hold, in words. */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Refusal"];
+                };
+            };
             /** @description Validation Error */
             422: {
                 headers: {
@@ -7526,7 +7855,10 @@ export interface operations {
     };
     fermos_families_api_fermos_families_get: {
         parameters: {
-            query?: never;
+            query?: {
+                /** @description The project the request acts in, where a header cannot be sent (an EventSource); the X-OpenFerment-Project header in its place. */
+                project?: string;
+            };
             header?: {
                 /** @description The project the request acts in; ?project= in its place. */
                 "X-OpenFerment-Project"?: string;
@@ -7547,11 +7879,23 @@ export interface operations {
                     }[];
                 };
             };
+            /** @description The project the request names is one the database does not hold, in words. */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Refusal"];
+                };
+            };
         };
     };
     fermos_family_api_fermos_families__family_id__get: {
         parameters: {
-            query?: never;
+            query?: {
+                /** @description The project the request acts in, where a header cannot be sent (an EventSource); the X-OpenFerment-Project header in its place. */
+                project?: string;
+            };
             header?: {
                 /** @description The project the request acts in; ?project= in its place. */
                 "X-OpenFerment-Project"?: string;
@@ -7574,6 +7918,15 @@ export interface operations {
                     };
                 };
             };
+            /** @description The project the request names is one the database does not hold, in words. */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Refusal"];
+                };
+            };
             /** @description Validation Error */
             422: {
                 headers: {
@@ -7587,7 +7940,10 @@ export interface operations {
     };
     fermos_fit_api_fermos_fit_post: {
         parameters: {
-            query?: never;
+            query?: {
+                /** @description The project the request acts in, where a header cannot be sent (an EventSource); the X-OpenFerment-Project header in its place. */
+                project?: string;
+            };
             header?: {
                 /** @description The project the request acts in; ?project= in its place. */
                 "X-OpenFerment-Project"?: string;
@@ -7610,6 +7966,15 @@ export interface operations {
                     "application/json": components["schemas"]["FermosFitResponse"];
                 };
             };
+            /** @description The project the request names is one the database does not hold, in words. */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Refusal"];
+                };
+            };
             /** @description Validation Error */
             422: {
                 headers: {
@@ -7625,6 +7990,8 @@ export interface operations {
         parameters: {
             query: {
                 flowsheet: string;
+                /** @description The project the request acts in, where a header cannot be sent (an EventSource); the X-OpenFerment-Project header in its place. */
+                project?: string;
             };
             header?: {
                 /** @description The project the request acts in; ?project= in its place. */
@@ -7646,6 +8013,15 @@ export interface operations {
                     }[];
                 };
             };
+            /** @description The project the request names is one the database does not hold, in words. */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Refusal"];
+                };
+            };
             /** @description Validation Error */
             422: {
                 headers: {
@@ -7659,7 +8035,10 @@ export interface operations {
     };
     fermos_forecast_api_fermos_forecast_post: {
         parameters: {
-            query?: never;
+            query?: {
+                /** @description The project the request acts in, where a header cannot be sent (an EventSource); the X-OpenFerment-Project header in its place. */
+                project?: string;
+            };
             header?: {
                 /** @description The project the request acts in; ?project= in its place. */
                 "X-OpenFerment-Project"?: string;
@@ -7682,6 +8061,15 @@ export interface operations {
                     "application/json": components["schemas"]["ForecastResult"];
                 };
             };
+            /** @description The project the request names is one the database does not hold, in words. */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Refusal"];
+                };
+            };
             /** @description Validation Error */
             422: {
                 headers: {
@@ -7698,6 +8086,8 @@ export interface operations {
             query: {
                 simulation: string;
                 hour?: number | null;
+                /** @description The project the request acts in, where a header cannot be sent (an EventSource); the X-OpenFerment-Project header in its place. */
+                project?: string;
             };
             header?: {
                 /** @description The project the request acts in; ?project= in its place. */
@@ -7719,6 +8109,15 @@ export interface operations {
                     };
                 };
             };
+            /** @description The project the request names is one the database does not hold, in words. */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Refusal"];
+                };
+            };
             /** @description Validation Error */
             422: {
                 headers: {
@@ -7732,7 +8131,10 @@ export interface operations {
     };
     fermos_simulate_api_fermos_simulate_post: {
         parameters: {
-            query?: never;
+            query?: {
+                /** @description The project the request acts in, where a header cannot be sent (an EventSource); the X-OpenFerment-Project header in its place. */
+                project?: string;
+            };
             header?: {
                 /** @description The project the request acts in; ?project= in its place. */
                 "X-OpenFerment-Project"?: string;
@@ -7757,6 +8159,15 @@ export interface operations {
                     };
                 };
             };
+            /** @description The project the request names is one the database does not hold, in words. */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Refusal"];
+                };
+            };
             /** @description Validation Error */
             422: {
                 headers: {
@@ -7770,7 +8181,10 @@ export interface operations {
     };
     fermos_simulations_api_fermos_simulations_get: {
         parameters: {
-            query?: never;
+            query?: {
+                /** @description The project the request acts in, where a header cannot be sent (an EventSource); the X-OpenFerment-Project header in its place. */
+                project?: string;
+            };
             header?: {
                 /** @description The project the request acts in; ?project= in its place. */
                 "X-OpenFerment-Project"?: string;
@@ -7791,11 +8205,23 @@ export interface operations {
                     }[];
                 };
             };
+            /** @description The project the request names is one the database does not hold, in words. */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Refusal"];
+                };
+            };
         };
     };
     fermos_vessel_api_fermos_vessel_post: {
         parameters: {
-            query?: never;
+            query?: {
+                /** @description The project the request acts in, where a header cannot be sent (an EventSource); the X-OpenFerment-Project header in its place. */
+                project?: string;
+            };
             header?: {
                 /** @description The project the request acts in; ?project= in its place. */
                 "X-OpenFerment-Project"?: string;
@@ -7818,6 +8244,15 @@ export interface operations {
                     "application/json": components["schemas"]["VesselDesign"];
                 };
             };
+            /** @description The project the request names is one the database does not hold, in words. */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Refusal"];
+                };
+            };
             /** @description Validation Error */
             422: {
                 headers: {
@@ -7835,6 +8270,8 @@ export interface operations {
                 simulation?: string | null;
                 fit?: string | null;
                 vesselType?: string | null;
+                /** @description The project the request acts in, where a header cannot be sent (an EventSource); the X-OpenFerment-Project header in its place. */
+                project?: string;
             };
             header?: {
                 /** @description The project the request acts in; ?project= in its place. */
@@ -7856,6 +8293,15 @@ export interface operations {
                     };
                 };
             };
+            /** @description The project the request names is one the database does not hold, in words. */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Refusal"];
+                };
+            };
             /** @description Validation Error */
             422: {
                 headers: {
@@ -7869,7 +8315,10 @@ export interface operations {
     };
     fermos_vessels_api_fermos_vessels_get: {
         parameters: {
-            query?: never;
+            query?: {
+                /** @description The project the request acts in, where a header cannot be sent (an EventSource); the X-OpenFerment-Project header in its place. */
+                project?: string;
+            };
             header?: {
                 /** @description The project the request acts in; ?project= in its place. */
                 "X-OpenFerment-Project"?: string;
@@ -7890,11 +8339,23 @@ export interface operations {
                     }[];
                 };
             };
+            /** @description The project the request names is one the database does not hold, in words. */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Refusal"];
+                };
+            };
         };
     };
     flowsheets_listed_api_flowsheets_get: {
         parameters: {
-            query?: never;
+            query?: {
+                /** @description The project the request acts in, where a header cannot be sent (an EventSource); the X-OpenFerment-Project header in its place. */
+                project?: string;
+            };
             header?: {
                 /** @description The project the request acts in; ?project= in its place. */
                 "X-OpenFerment-Project"?: string;
@@ -7913,11 +8374,23 @@ export interface operations {
                     "application/json": components["schemas"]["SFFFlowsheet"][];
                 };
             };
+            /** @description The project the request names is one the database does not hold, in words. */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Refusal"];
+                };
+            };
         };
     };
     flowsheets_export_api_flowsheets_export_post: {
         parameters: {
-            query?: never;
+            query?: {
+                /** @description The project the request acts in, where a header cannot be sent (an EventSource); the X-OpenFerment-Project header in its place. */
+                project?: string;
+            };
             header?: {
                 /** @description The project the request acts in; ?project= in its place. */
                 "X-OpenFerment-Project"?: string;
@@ -7940,6 +8413,15 @@ export interface operations {
                     "application/json": components["schemas"]["SFFFlowsheet"];
                 };
             };
+            /** @description The project the request names is one the database does not hold, in words. */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Refusal"];
+                };
+            };
             /** @description Validation Error */
             422: {
                 headers: {
@@ -7953,7 +8435,10 @@ export interface operations {
     };
     flowsheets_import_api_flowsheets_import_post: {
         parameters: {
-            query?: never;
+            query?: {
+                /** @description The project the request acts in, where a header cannot be sent (an EventSource); the X-OpenFerment-Project header in its place. */
+                project?: string;
+            };
             header?: {
                 /** @description The project the request acts in; ?project= in its place. */
                 "X-OpenFerment-Project"?: string;
@@ -7976,6 +8461,15 @@ export interface operations {
                     "application/json": components["schemas"]["SFFFlowsheet"];
                 };
             };
+            /** @description The project the request names is one the database does not hold, in words. */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Refusal"];
+                };
+            };
             /** @description Validation Error */
             422: {
                 headers: {
@@ -7989,7 +8483,10 @@ export interface operations {
     };
     flowsheets_import_url_api_flowsheets_import_url_post: {
         parameters: {
-            query?: never;
+            query?: {
+                /** @description The project the request acts in, where a header cannot be sent (an EventSource); the X-OpenFerment-Project header in its place. */
+                project?: string;
+            };
             header?: {
                 /** @description The project the request acts in; ?project= in its place. */
                 "X-OpenFerment-Project"?: string;
@@ -8010,6 +8507,15 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["SFFFlowsheet"];
+                };
+            };
+            /** @description The project the request names is one the database does not hold, in words. */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Refusal"];
                 };
             };
             /** @description The file the address serves is larger than an import takes: in words, nothing kept. */
@@ -8052,7 +8558,10 @@ export interface operations {
     };
     flowsheets_library_api_flowsheets_library_get: {
         parameters: {
-            query?: never;
+            query?: {
+                /** @description The project the request acts in, where a header cannot be sent (an EventSource); the X-OpenFerment-Project header in its place. */
+                project?: string;
+            };
             header?: {
                 /** @description The project the request acts in; ?project= in its place. */
                 "X-OpenFerment-Project"?: string;
@@ -8071,11 +8580,23 @@ export interface operations {
                     "application/json": components["schemas"]["SFFLibraryEntry"][];
                 };
             };
+            /** @description The project the request names is one the database does not hold, in words. */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Refusal"];
+                };
+            };
         };
     };
     flowsheets_library_import_api_flowsheets_library__file_id__post: {
         parameters: {
-            query?: never;
+            query?: {
+                /** @description The project the request acts in, where a header cannot be sent (an EventSource); the X-OpenFerment-Project header in its place. */
+                project?: string;
+            };
             header?: {
                 /** @description The project the request acts in; ?project= in its place. */
                 "X-OpenFerment-Project"?: string;
@@ -8100,6 +8621,15 @@ export interface operations {
                     "application/json": components["schemas"]["SFFFlowsheet"];
                 };
             };
+            /** @description The project the request names is one the database does not hold, in words. */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Refusal"];
+                };
+            };
             /** @description Validation Error */
             422: {
                 headers: {
@@ -8113,7 +8643,10 @@ export interface operations {
     };
     flowsheets_record_api_flowsheets__record_id__get: {
         parameters: {
-            query?: never;
+            query?: {
+                /** @description The project the request acts in, where a header cannot be sent (an EventSource); the X-OpenFerment-Project header in its place. */
+                project?: string;
+            };
             header?: {
                 /** @description The project the request acts in; ?project= in its place. */
                 "X-OpenFerment-Project"?: string;
@@ -8134,6 +8667,15 @@ export interface operations {
                     "application/json": components["schemas"]["SFFFlowsheet"];
                 };
             };
+            /** @description The project the request names is one the database does not hold, in words. */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Refusal"];
+                };
+            };
             /** @description Validation Error */
             422: {
                 headers: {
@@ -8147,7 +8689,10 @@ export interface operations {
     };
     flowsheets_file_api_flowsheets__record_id__file_get: {
         parameters: {
-            query?: never;
+            query?: {
+                /** @description The project the request acts in, where a header cannot be sent (an EventSource); the X-OpenFerment-Project header in its place. */
+                project?: string;
+            };
             header?: {
                 /** @description The project the request acts in; ?project= in its place. */
                 "X-OpenFerment-Project"?: string;
@@ -8168,6 +8713,15 @@ export interface operations {
                     "application/json": unknown;
                 };
             };
+            /** @description The project the request names is one the database does not hold, in words. */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Refusal"];
+                };
+            };
             /** @description Validation Error */
             422: {
                 headers: {
@@ -8181,7 +8735,10 @@ export interface operations {
     };
     geneos_ceiling_api_geneos_ceiling_post: {
         parameters: {
-            query?: never;
+            query?: {
+                /** @description The project the request acts in, where a header cannot be sent (an EventSource); the X-OpenFerment-Project header in its place. */
+                project?: string;
+            };
             header?: {
                 /** @description The project the request acts in; ?project= in its place. */
                 "X-OpenFerment-Project"?: string;
@@ -8202,6 +8759,15 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["GeneosResult"];
+                };
+            };
+            /** @description The project the request names is one the database does not hold, in words. */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Refusal"];
                 };
             };
             /** @description Validation Error */
@@ -8217,7 +8783,10 @@ export interface operations {
     };
     geneos_frontier_api_geneos_frontier_post: {
         parameters: {
-            query?: never;
+            query?: {
+                /** @description The project the request acts in, where a header cannot be sent (an EventSource); the X-OpenFerment-Project header in its place. */
+                project?: string;
+            };
             header?: {
                 /** @description The project the request acts in; ?project= in its place. */
                 "X-OpenFerment-Project"?: string;
@@ -8240,6 +8809,15 @@ export interface operations {
                     "application/json": components["schemas"]["GeneosResult"];
                 };
             };
+            /** @description The project the request names is one the database does not hold, in words. */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Refusal"];
+                };
+            };
             /** @description Validation Error */
             422: {
                 headers: {
@@ -8253,7 +8831,10 @@ export interface operations {
     };
     geneos_mix_api_geneos_mix_post: {
         parameters: {
-            query?: never;
+            query?: {
+                /** @description The project the request acts in, where a header cannot be sent (an EventSource); the X-OpenFerment-Project header in its place. */
+                project?: string;
+            };
             header?: {
                 /** @description The project the request acts in; ?project= in its place. */
                 "X-OpenFerment-Project"?: string;
@@ -8276,6 +8857,15 @@ export interface operations {
                     "application/json": components["schemas"]["GeneosResult"];
                 };
             };
+            /** @description The project the request names is one the database does not hold, in words. */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Refusal"];
+                };
+            };
             /** @description Validation Error */
             422: {
                 headers: {
@@ -8289,7 +8879,10 @@ export interface operations {
     };
     geneos_models_api_geneos_models_get: {
         parameters: {
-            query?: never;
+            query?: {
+                /** @description The project the request acts in, where a header cannot be sent (an EventSource); the X-OpenFerment-Project header in its place. */
+                project?: string;
+            };
             header?: {
                 /** @description The project the request acts in; ?project= in its place. */
                 "X-OpenFerment-Project"?: string;
@@ -8308,11 +8901,23 @@ export interface operations {
                     "application/json": components["schemas"]["GeneosModelInfo"][];
                 };
             };
+            /** @description The project the request names is one the database does not hold, in words. */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Refusal"];
+                };
+            };
         };
     };
     guild_ledger_api_guild_get: {
         parameters: {
-            query?: never;
+            query?: {
+                /** @description The project the request acts in, where a header cannot be sent (an EventSource); the X-OpenFerment-Project header in its place. */
+                project?: string;
+            };
             header?: {
                 /** @description The project the request acts in; ?project= in its place. */
                 "X-OpenFerment-Project"?: string;
@@ -8331,11 +8936,23 @@ export interface operations {
                     "application/json": components["schemas"]["Guild"];
                 };
             };
+            /** @description The project the request names is one the database does not hold, in words. */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Refusal"];
+                };
+            };
         };
     };
     guild_check_api_guild_check_post: {
         parameters: {
-            query?: never;
+            query?: {
+                /** @description The project the request acts in, where a header cannot be sent (an EventSource); the X-OpenFerment-Project header in its place. */
+                project?: string;
+            };
             header?: {
                 /** @description The project the request acts in; ?project= in its place. */
                 "X-OpenFerment-Project"?: string;
@@ -8358,6 +8975,15 @@ export interface operations {
                     "application/json": components["schemas"]["DecisionCheck"];
                 };
             };
+            /** @description The project the request names is one the database does not hold, in words. */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Refusal"];
+                };
+            };
             /** @description Validation Error */
             422: {
                 headers: {
@@ -8371,7 +8997,10 @@ export interface operations {
     };
     checks_read_api_guild_checks_get: {
         parameters: {
-            query?: never;
+            query?: {
+                /** @description The project the request acts in, where a header cannot be sent (an EventSource); the X-OpenFerment-Project header in its place. */
+                project?: string;
+            };
             header?: {
                 /** @description The project the request acts in; ?project= in its place. */
                 "X-OpenFerment-Project"?: string;
@@ -8390,11 +9019,23 @@ export interface operations {
                     "application/json": components["schemas"]["Checks"];
                 };
             };
+            /** @description The project the request names is one the database does not hold, in words. */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Refusal"];
+                };
+            };
         };
     };
     checks_propose_api_guild_checks_propose_post: {
         parameters: {
-            query?: never;
+            query?: {
+                /** @description The project the request acts in, where a header cannot be sent (an EventSource); the X-OpenFerment-Project header in its place. */
+                project?: string;
+            };
             header?: {
                 /** @description The project the request acts in; ?project= in its place. */
                 "X-OpenFerment-Project"?: string;
@@ -8417,6 +9058,15 @@ export interface operations {
                     "application/json": components["schemas"]["Check"][];
                 };
             };
+            /** @description The project the request names is one the database does not hold, in words. */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Refusal"];
+                };
+            };
             /** @description Validation Error */
             422: {
                 headers: {
@@ -8430,7 +9080,10 @@ export interface operations {
     };
     checks_request_api_guild_checks_request_post: {
         parameters: {
-            query?: never;
+            query?: {
+                /** @description The project the request acts in, where a header cannot be sent (an EventSource); the X-OpenFerment-Project header in its place. */
+                project?: string;
+            };
             header?: {
                 /** @description The project the request acts in; ?project= in its place. */
                 "X-OpenFerment-Project"?: string;
@@ -8453,6 +9106,15 @@ export interface operations {
                     "application/json": components["schemas"]["Check"];
                 };
             };
+            /** @description The project the request names is one the database does not hold, in words. */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Refusal"];
+                };
+            };
             /** @description Validation Error */
             422: {
                 headers: {
@@ -8466,7 +9128,10 @@ export interface operations {
     };
     checks_brief_api_guild_checks__check_id__brief_post: {
         parameters: {
-            query?: never;
+            query?: {
+                /** @description The project the request acts in, where a header cannot be sent (an EventSource); the X-OpenFerment-Project header in its place. */
+                project?: string;
+            };
             header?: {
                 /** @description The project the request acts in; ?project= in its place. */
                 "X-OpenFerment-Project"?: string;
@@ -8491,6 +9156,15 @@ export interface operations {
                     "application/json": components["schemas"]["Check"];
                 };
             };
+            /** @description The project the request names is one the database does not hold, in words. */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Refusal"];
+                };
+            };
             /** @description Validation Error */
             422: {
                 headers: {
@@ -8504,7 +9178,10 @@ export interface operations {
     };
     checks_dismiss_api_guild_checks__check_id__dismiss_post: {
         parameters: {
-            query?: never;
+            query?: {
+                /** @description The project the request acts in, where a header cannot be sent (an EventSource); the X-OpenFerment-Project header in its place. */
+                project?: string;
+            };
             header?: {
                 /** @description The project the request acts in; ?project= in its place. */
                 "X-OpenFerment-Project"?: string;
@@ -8529,6 +9206,15 @@ export interface operations {
                     "application/json": components["schemas"]["Check"];
                 };
             };
+            /** @description The project the request names is one the database does not hold, in words. */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Refusal"];
+                };
+            };
             /** @description Validation Error */
             422: {
                 headers: {
@@ -8542,7 +9228,10 @@ export interface operations {
     };
     checks_record_api_guild_checks__check_id__record_post: {
         parameters: {
-            query?: never;
+            query?: {
+                /** @description The project the request acts in, where a header cannot be sent (an EventSource); the X-OpenFerment-Project header in its place. */
+                project?: string;
+            };
             header?: {
                 /** @description The project the request acts in; ?project= in its place. */
                 "X-OpenFerment-Project"?: string;
@@ -8567,6 +9256,15 @@ export interface operations {
                     "application/json": components["schemas"]["Check"];
                 };
             };
+            /** @description The project the request names is one the database does not hold, in words. */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Refusal"];
+                };
+            };
             /** @description Validation Error */
             422: {
                 headers: {
@@ -8580,7 +9278,10 @@ export interface operations {
     };
     checks_schedule_api_guild_checks__check_id__schedule_post: {
         parameters: {
-            query?: never;
+            query?: {
+                /** @description The project the request acts in, where a header cannot be sent (an EventSource); the X-OpenFerment-Project header in its place. */
+                project?: string;
+            };
             header?: {
                 /** @description The project the request acts in; ?project= in its place. */
                 "X-OpenFerment-Project"?: string;
@@ -8605,6 +9306,15 @@ export interface operations {
                     "application/json": components["schemas"]["Check"];
                 };
             };
+            /** @description The project the request names is one the database does not hold, in words. */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Refusal"];
+                };
+            };
             /** @description Validation Error */
             422: {
                 headers: {
@@ -8618,7 +9328,10 @@ export interface operations {
     };
     guild_evidence_api_guild_evidence_post: {
         parameters: {
-            query?: never;
+            query?: {
+                /** @description The project the request acts in, where a header cannot be sent (an EventSource); the X-OpenFerment-Project header in its place. */
+                project?: string;
+            };
             header?: {
                 /** @description The project the request acts in; ?project= in its place. */
                 "X-OpenFerment-Project"?: string;
@@ -8641,6 +9354,15 @@ export interface operations {
                     "application/json": components["schemas"]["GuildEvidence"];
                 };
             };
+            /** @description The project the request names is one the database does not hold, in words. */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Refusal"];
+                };
+            };
             /** @description Validation Error */
             422: {
                 headers: {
@@ -8654,7 +9376,10 @@ export interface operations {
     };
     guild_people_api_guild_people_post: {
         parameters: {
-            query?: never;
+            query?: {
+                /** @description The project the request acts in, where a header cannot be sent (an EventSource); the X-OpenFerment-Project header in its place. */
+                project?: string;
+            };
             header?: {
                 /** @description The project the request acts in; ?project= in its place. */
                 "X-OpenFerment-Project"?: string;
@@ -8677,6 +9402,15 @@ export interface operations {
                     "application/json": components["schemas"]["GuildPerson"];
                 };
             };
+            /** @description The project the request names is one the database does not hold, in words. */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Refusal"];
+                };
+            };
             /** @description Validation Error */
             422: {
                 headers: {
@@ -8690,7 +9424,10 @@ export interface operations {
     };
     guild_policy_api_guild_policy_post: {
         parameters: {
-            query?: never;
+            query?: {
+                /** @description The project the request acts in, where a header cannot be sent (an EventSource); the X-OpenFerment-Project header in its place. */
+                project?: string;
+            };
             header?: {
                 /** @description The project the request acts in; ?project= in its place. */
                 "X-OpenFerment-Project"?: string;
@@ -8713,6 +9450,15 @@ export interface operations {
                     "application/json": components["schemas"]["GuildPolicy"];
                 };
             };
+            /** @description The project the request names is one the database does not hold, in words. */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Refusal"];
+                };
+            };
             /** @description Validation Error */
             422: {
                 headers: {
@@ -8726,7 +9472,10 @@ export interface operations {
     };
     guild_withdraw_api_guild_withdraw_post: {
         parameters: {
-            query?: never;
+            query?: {
+                /** @description The project the request acts in, where a header cannot be sent (an EventSource); the X-OpenFerment-Project header in its place. */
+                project?: string;
+            };
             header?: {
                 /** @description The project the request acts in; ?project= in its place. */
                 "X-OpenFerment-Project"?: string;
@@ -8747,6 +9496,15 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["GuildEvidence"];
+                };
+            };
+            /** @description The project the request names is one the database does not hold, in words. */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Refusal"];
                 };
             };
             /** @description Validation Error */
@@ -8784,7 +9542,10 @@ export interface operations {
     };
     catalogue_intake_api_intake_catalogue_post: {
         parameters: {
-            query?: never;
+            query?: {
+                /** @description The project the request acts in, where a header cannot be sent (an EventSource); the X-OpenFerment-Project header in its place. */
+                project?: string;
+            };
             header?: {
                 /** @description The project the request acts in; ?project= in its place. */
                 "X-OpenFerment-Project"?: string;
@@ -8809,6 +9570,15 @@ export interface operations {
                     };
                 };
             };
+            /** @description The project the request names is one the database does not hold, in words. */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Refusal"];
+                };
+            };
             /** @description Validation Error */
             422: {
                 headers: {
@@ -8822,7 +9592,10 @@ export interface operations {
     };
     intake_collect_api_intake_collect_post: {
         parameters: {
-            query?: never;
+            query?: {
+                /** @description The project the request acts in, where a header cannot be sent (an EventSource); the X-OpenFerment-Project header in its place. */
+                project?: string;
+            };
             header?: {
                 /** @description The project the request acts in; ?project= in its place. */
                 "X-OpenFerment-Project"?: string;
@@ -8845,6 +9618,15 @@ export interface operations {
                     "application/json": components["schemas"]["CollectOutcome"];
                 };
             };
+            /** @description The project the request names is one the database does not hold, in words. */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Refusal"];
+                };
+            };
             /** @description Validation Error */
             422: {
                 headers: {
@@ -8858,7 +9640,10 @@ export interface operations {
     };
     intake_paste_api_intake_paste_post: {
         parameters: {
-            query?: never;
+            query?: {
+                /** @description The project the request acts in, where a header cannot be sent (an EventSource); the X-OpenFerment-Project header in its place. */
+                project?: string;
+            };
             header?: {
                 /** @description The project the request acts in; ?project= in its place. */
                 "X-OpenFerment-Project"?: string;
@@ -8881,6 +9666,15 @@ export interface operations {
                     "application/json": components["schemas"]["CollectOutcome"];
                 };
             };
+            /** @description The project the request names is one the database does not hold, in words. */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Refusal"];
+                };
+            };
             /** @description Validation Error */
             422: {
                 headers: {
@@ -8894,7 +9688,10 @@ export interface operations {
     };
     intake_upload_api_intake_upload_post: {
         parameters: {
-            query?: never;
+            query?: {
+                /** @description The project the request acts in, where a header cannot be sent (an EventSource); the X-OpenFerment-Project header in its place. */
+                project?: string;
+            };
             header?: {
                 /** @description The project the request acts in; ?project= in its place. */
                 "X-OpenFerment-Project"?: string;
@@ -8917,6 +9714,15 @@ export interface operations {
                     "application/json": components["schemas"]["CollectOutcome"];
                 };
             };
+            /** @description The project the request names is one the database does not hold, in words. */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Refusal"];
+                };
+            };
             /** @description Validation Error */
             422: {
                 headers: {
@@ -8932,6 +9738,8 @@ export interface operations {
         parameters: {
             query?: {
                 force?: boolean;
+                /** @description The project the request acts in, where a header cannot be sent (an EventSource); the X-OpenFerment-Project header in its place. */
+                project?: string;
             };
             header?: {
                 /** @description The project the request acts in; ?project= in its place. */
@@ -8953,6 +9761,15 @@ export interface operations {
                     "application/json": components["schemas"]["ExtractResponse"];
                 };
             };
+            /** @description The project the request names is one the database does not hold, in words. */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Refusal"];
+                };
+            };
             /** @description Validation Error */
             422: {
                 headers: {
@@ -8966,7 +9783,10 @@ export interface operations {
     };
     library_shelf_api_library_get: {
         parameters: {
-            query?: never;
+            query?: {
+                /** @description The project the request acts in, where a header cannot be sent (an EventSource); the X-OpenFerment-Project header in its place. */
+                project?: string;
+            };
             header?: {
                 /** @description The project the request acts in; ?project= in its place. */
                 "X-OpenFerment-Project"?: string;
@@ -8985,12 +9805,23 @@ export interface operations {
                     "application/json": components["schemas"]["LibraryShelf"];
                 };
             };
+            /** @description The project the request names is one the database does not hold, in words. */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Refusal"];
+                };
+            };
         };
     };
     library_parameters_api_library__plant__parameters_get: {
         parameters: {
             query?: {
                 configuration?: string | null;
+                /** @description The project the request acts in, where a header cannot be sent (an EventSource); the X-OpenFerment-Project header in its place. */
+                project?: string;
             };
             header?: {
                 /** @description The project the request acts in; ?project= in its place. */
@@ -9012,6 +9843,15 @@ export interface operations {
                     "application/json": components["schemas"]["LibraryParameters"];
                 };
             };
+            /** @description The project the request names is one the database does not hold, in words. */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Refusal"];
+                };
+            };
             /** @description Validation Error */
             422: {
                 headers: {
@@ -9027,6 +9867,8 @@ export interface operations {
         parameters: {
             query?: {
                 configuration?: string | null;
+                /** @description The project the request acts in, where a header cannot be sent (an EventSource); the X-OpenFerment-Project header in its place. */
+                project?: string;
             };
             header?: {
                 /** @description The project the request acts in; ?project= in its place. */
@@ -9048,6 +9890,15 @@ export interface operations {
                     "application/json": components["schemas"]["PackageRegression"] | null;
                 };
             };
+            /** @description The project the request names is one the database does not hold, in words. */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Refusal"];
+                };
+            };
             /** @description Validation Error */
             422: {
                 headers: {
@@ -9061,7 +9912,10 @@ export interface operations {
     };
     library_run_api_library__plant__run_post: {
         parameters: {
-            query?: never;
+            query?: {
+                /** @description The project the request acts in, where a header cannot be sent (an EventSource); the X-OpenFerment-Project header in its place. */
+                project?: string;
+            };
             header?: {
                 /** @description The project the request acts in; ?project= in its place. */
                 "X-OpenFerment-Project"?: string;
@@ -9086,7 +9940,7 @@ export interface operations {
                     "application/json": components["schemas"]["RunReport"];
                 };
             };
-            /** @description The library's shelf holds no plant of that id: in words, naming what it holds. */
+            /** @description The library's shelf holds no plant of that id: in words, naming what it holds. A project the request names that the database does not hold is a 404 too, in words. */
             404: {
                 headers: {
                     [name: string]: unknown;
@@ -9117,7 +9971,10 @@ export interface operations {
     };
     literature_answer_api_literature_answer_post: {
         parameters: {
-            query?: never;
+            query?: {
+                /** @description The project the request acts in, where a header cannot be sent (an EventSource); the X-OpenFerment-Project header in its place. */
+                project?: string;
+            };
             header?: {
                 /** @description The project the request acts in; ?project= in its place. */
                 "X-OpenFerment-Project"?: string;
@@ -9131,13 +9988,22 @@ export interface operations {
             };
         };
         responses: {
-            /** @description Successful Response */
+            /** @description Server-sent events: `delta`, `citations`, `done`, or `error`. */
             200: {
                 headers: {
                     [name: string]: unknown;
                 };
                 content: {
-                    "application/json": unknown;
+                    "text/event-stream": string;
+                };
+            };
+            /** @description The project the request names is one the database does not hold, in words. */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Refusal"];
                 };
             };
             /** @description Validation Error */
@@ -9153,7 +10019,10 @@ export interface operations {
     };
     literature_documents_api_literature_documents_get: {
         parameters: {
-            query?: never;
+            query?: {
+                /** @description The project the request acts in, where a header cannot be sent (an EventSource); the X-OpenFerment-Project header in its place. */
+                project?: string;
+            };
             header?: {
                 /** @description The project the request acts in; ?project= in its place. */
                 "X-OpenFerment-Project"?: string;
@@ -9172,6 +10041,15 @@ export interface operations {
                     "application/json": components["schemas"]["LiteratureDocument"][];
                 };
             };
+            /** @description The project the request names is one the database does not hold, in words. */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Refusal"];
+                };
+            };
         };
     };
     literature_search_api_literature_search_get: {
@@ -9180,6 +10058,8 @@ export interface operations {
                 q: string;
                 topK?: number;
                 profile?: string;
+                /** @description The project the request acts in, where a header cannot be sent (an EventSource); the X-OpenFerment-Project header in its place. */
+                project?: string;
             };
             header?: {
                 /** @description The project the request acts in; ?project= in its place. */
@@ -9199,6 +10079,15 @@ export interface operations {
                     "application/json": components["schemas"]["SearchResponse"];
                 };
             };
+            /** @description The project the request names is one the database does not hold, in words. */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Refusal"];
+                };
+            };
             /** @description Validation Error */
             422: {
                 headers: {
@@ -9212,7 +10101,10 @@ export interface operations {
     };
     literature_stats_api_literature_stats_get: {
         parameters: {
-            query?: never;
+            query?: {
+                /** @description The project the request acts in, where a header cannot be sent (an EventSource); the X-OpenFerment-Project header in its place. */
+                project?: string;
+            };
             header?: {
                 /** @description The project the request acts in; ?project= in its place. */
                 "X-OpenFerment-Project"?: string;
@@ -9231,6 +10123,15 @@ export interface operations {
                     "application/json": {
                         [key: string]: unknown;
                     };
+                };
+            };
+            /** @description The project the request names is one the database does not hold, in words. */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Refusal"];
                 };
             };
         };
@@ -9252,6 +10153,8 @@ export interface operations {
                 train?: string | null;
                 vessel?: string | null;
                 trainRun?: string | null;
+                /** @description The project the request acts in, where a header cannot be sent (an EventSource); the X-OpenFerment-Project header in its place. */
+                project?: string;
             };
             header?: {
                 /** @description The project the request acts in; ?project= in its place. */
@@ -9275,6 +10178,15 @@ export interface operations {
                     };
                 };
             };
+            /** @description The project the request names is one the database does not hold, in words. */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Refusal"];
+                };
+            };
             /** @description Validation Error */
             422: {
                 headers: {
@@ -9288,7 +10200,10 @@ export interface operations {
     };
     params_resolve_api_params__scope__resolve_post: {
         parameters: {
-            query?: never;
+            query?: {
+                /** @description The project the request acts in, where a header cannot be sent (an EventSource); the X-OpenFerment-Project header in its place. */
+                project?: string;
+            };
             header?: {
                 /** @description The project the request acts in; ?project= in its place. */
                 "X-OpenFerment-Project"?: string;
@@ -9315,6 +10230,15 @@ export interface operations {
                     };
                 };
             };
+            /** @description The project the request names is one the database does not hold, in words. */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Refusal"];
+                };
+            };
             /** @description Validation Error */
             422: {
                 headers: {
@@ -9328,7 +10252,10 @@ export interface operations {
     };
     practice_read_api_practice_get: {
         parameters: {
-            query?: never;
+            query?: {
+                /** @description The project the request acts in, where a header cannot be sent (an EventSource); the X-OpenFerment-Project header in its place. */
+                project?: string;
+            };
             header?: {
                 /** @description The project the request acts in; ?project= in its place. */
                 "X-OpenFerment-Project"?: string;
@@ -9347,11 +10274,23 @@ export interface operations {
                     "application/json": components["schemas"]["Practice"];
                 };
             };
+            /** @description The project the request names is one the database does not hold, in words. */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Refusal"];
+                };
+            };
         };
     };
     practice_draft_api_practice_draft_post: {
         parameters: {
-            query?: never;
+            query?: {
+                /** @description The project the request acts in, where a header cannot be sent (an EventSource); the X-OpenFerment-Project header in its place. */
+                project?: string;
+            };
             header?: {
                 /** @description The project the request acts in; ?project= in its place. */
                 "X-OpenFerment-Project"?: string;
@@ -9374,6 +10313,15 @@ export interface operations {
                     "application/json": components["schemas"]["PracticeScenario"];
                 };
             };
+            /** @description The project the request names is one the database does not hold, in words. */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Refusal"];
+                };
+            };
             /** @description Validation Error */
             422: {
                 headers: {
@@ -9387,7 +10335,10 @@ export interface operations {
     };
     practice_record_api_practice_record_post: {
         parameters: {
-            query?: never;
+            query?: {
+                /** @description The project the request acts in, where a header cannot be sent (an EventSource); the X-OpenFerment-Project header in its place. */
+                project?: string;
+            };
             header?: {
                 /** @description The project the request acts in; ?project= in its place. */
                 "X-OpenFerment-Project"?: string;
@@ -9410,6 +10361,15 @@ export interface operations {
                     "application/json": components["schemas"]["PracticeSession"];
                 };
             };
+            /** @description The project the request names is one the database does not hold, in words. */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Refusal"];
+                };
+            };
             /** @description Validation Error */
             422: {
                 headers: {
@@ -9423,7 +10383,10 @@ export interface operations {
     };
     practice_turn_api_practice_turn_post: {
         parameters: {
-            query?: never;
+            query?: {
+                /** @description The project the request acts in, where a header cannot be sent (an EventSource); the X-OpenFerment-Project header in its place. */
+                project?: string;
+            };
             header?: {
                 /** @description The project the request acts in; ?project= in its place. */
                 "X-OpenFerment-Project"?: string;
@@ -9446,6 +10409,15 @@ export interface operations {
                     "application/json": components["schemas"]["PracticeSession"];
                 };
             };
+            /** @description The project the request names is one the database does not hold, in words. */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Refusal"];
+                };
+            };
             /** @description Validation Error */
             422: {
                 headers: {
@@ -9466,6 +10438,8 @@ export interface operations {
                 inputs?: string | null;
                 vessel?: string | null;
                 trainRun?: string | null;
+                /** @description The project the request acts in, where a header cannot be sent (an EventSource); the X-OpenFerment-Project header in its place. */
+                project?: string;
             };
             header?: {
                 /** @description The project the request acts in; ?project= in its place. */
@@ -9485,6 +10459,15 @@ export interface operations {
                     "application/json": {
                         [key: string]: unknown;
                     };
+                };
+            };
+            /** @description The project the request names is one the database does not hold, in words. */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Refusal"];
                 };
             };
             /** @description Validation Error */
@@ -9506,6 +10489,8 @@ export interface operations {
                 host?: string | null;
                 fits?: string | null;
                 inputs?: string | null;
+                /** @description The project the request acts in, where a header cannot be sent (an EventSource); the X-OpenFerment-Project header in its place. */
+                project?: string;
             };
             header?: {
                 /** @description The project the request acts in; ?project= in its place. */
@@ -9527,6 +10512,15 @@ export interface operations {
                     };
                 };
             };
+            /** @description The project the request names is one the database does not hold, in words. */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Refusal"];
+                };
+            };
             /** @description Validation Error */
             422: {
                 headers: {
@@ -9540,7 +10534,10 @@ export interface operations {
     };
     proforma_run_api_proforma_run_post: {
         parameters: {
-            query?: never;
+            query?: {
+                /** @description The project the request acts in, where a header cannot be sent (an EventSource); the X-OpenFerment-Project header in its place. */
+                project?: string;
+            };
             header?: {
                 /** @description The project the request acts in; ?project= in its place. */
                 "X-OpenFerment-Project"?: string;
@@ -9563,6 +10560,15 @@ export interface operations {
                     "application/json": {
                         [key: string]: unknown;
                     };
+                };
+            };
+            /** @description The project the request names is one the database does not hold, in words. */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Refusal"];
                 };
             };
             /** @description The scenario cannot run as asked, in words (a list of field errors when the request's own fields are refused): an input that waits for a source, a value its input cannot take, or a refusal inside the run, its receipt kept. */
@@ -9589,6 +10595,8 @@ export interface operations {
         parameters: {
             query?: {
                 scenarioId?: string;
+                /** @description The project the request acts in, where a header cannot be sent (an EventSource); the X-OpenFerment-Project header in its place. */
+                project?: string;
             };
             header?: {
                 /** @description The project the request acts in; ?project= in its place. */
@@ -9608,6 +10616,15 @@ export interface operations {
                     "application/json": {
                         [key: string]: unknown;
                     };
+                };
+            };
+            /** @description The project the request names is one the database does not hold, in words. */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Refusal"];
                 };
             };
             /** @description Validation Error */
@@ -9625,6 +10642,8 @@ export interface operations {
         parameters: {
             query?: {
                 host?: string | null;
+                /** @description The project the request acts in, where a header cannot be sent (an EventSource); the X-OpenFerment-Project header in its place. */
+                project?: string;
             };
             header?: {
                 /** @description The project the request acts in; ?project= in its place. */
@@ -9644,6 +10663,15 @@ export interface operations {
                     "application/json": {
                         [key: string]: unknown;
                     }[];
+                };
+            };
+            /** @description The project the request names is one the database does not hold, in words. */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Refusal"];
                 };
             };
             /** @description Validation Error */
@@ -9659,7 +10687,10 @@ export interface operations {
     };
     proforma_shelf_api_proforma_shelf_get: {
         parameters: {
-            query?: never;
+            query?: {
+                /** @description The project the request acts in, where a header cannot be sent (an EventSource); the X-OpenFerment-Project header in its place. */
+                project?: string;
+            };
             header?: {
                 /** @description The project the request acts in; ?project= in its place. */
                 "X-OpenFerment-Project"?: string;
@@ -9680,11 +10711,23 @@ export interface operations {
                     }[];
                 };
             };
+            /** @description The project the request names is one the database does not hold, in words. */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Refusal"];
+                };
+            };
         };
     };
     proforma_status_api_proforma_status_get: {
         parameters: {
-            query?: never;
+            query?: {
+                /** @description The project the request acts in, where a header cannot be sent (an EventSource); the X-OpenFerment-Project header in its place. */
+                project?: string;
+            };
             header?: {
                 /** @description The project the request acts in; ?project= in its place. */
                 "X-OpenFerment-Project"?: string;
@@ -9703,6 +10746,15 @@ export interface operations {
                     "application/json": {
                         [key: string]: unknown;
                     };
+                };
+            };
+            /** @description The project the request names is one the database does not hold, in words. */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Refusal"];
                 };
             };
         };
@@ -9795,6 +10847,8 @@ export interface operations {
         parameters: {
             query?: {
                 state?: string | null;
+                /** @description The project the request acts in, where a header cannot be sent (an EventSource); the X-OpenFerment-Project header in its place. */
+                project?: string;
             };
             header?: {
                 /** @description The project the request acts in; ?project= in its place. */
@@ -9814,6 +10868,15 @@ export interface operations {
                     "application/json": components["schemas"]["Proposal"][];
                 };
             };
+            /** @description The project the request names is one the database does not hold, in words. */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Refusal"];
+                };
+            };
             /** @description Validation Error */
             422: {
                 headers: {
@@ -9827,7 +10890,10 @@ export interface operations {
     };
     proposals_carry_out_api_proposals__proposal_id__carry_out_post: {
         parameters: {
-            query?: never;
+            query?: {
+                /** @description The project the request acts in, where a header cannot be sent (an EventSource); the X-OpenFerment-Project header in its place. */
+                project?: string;
+            };
             header?: {
                 /** @description The project the request acts in; ?project= in its place. */
                 "X-OpenFerment-Project"?: string;
@@ -9850,6 +10916,15 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["Proposal"];
+                };
+            };
+            /** @description The project the request names is one the database does not hold, in words. */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Refusal"];
                 };
             };
             /** @description Validation Error */
@@ -9865,7 +10940,10 @@ export interface operations {
     };
     proposals_dismiss_api_proposals__proposal_id__dismiss_post: {
         parameters: {
-            query?: never;
+            query?: {
+                /** @description The project the request acts in, where a header cannot be sent (an EventSource); the X-OpenFerment-Project header in its place. */
+                project?: string;
+            };
             header?: {
                 /** @description The project the request acts in; ?project= in its place. */
                 "X-OpenFerment-Project"?: string;
@@ -9888,6 +10966,15 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["Proposal"];
+                };
+            };
+            /** @description The project the request names is one the database does not hold, in words. */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Refusal"];
                 };
             };
             /** @description Validation Error */
@@ -9905,6 +10992,8 @@ export interface operations {
         parameters: {
             query?: {
                 product?: string;
+                /** @description The project the request acts in, where a header cannot be sent (an EventSource); the X-OpenFerment-Project header in its place. */
+                project?: string;
             };
             header?: {
                 /** @description The project the request acts in; ?project= in its place. */
@@ -9926,6 +11015,15 @@ export interface operations {
                     };
                 };
             };
+            /** @description The project the request names is one the database does not hold, in words. */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Refusal"];
+                };
+            };
             /** @description Validation Error */
             422: {
                 headers: {
@@ -9939,7 +11037,10 @@ export interface operations {
     };
     protparam_compute_api_protparam_post: {
         parameters: {
-            query?: never;
+            query?: {
+                /** @description The project the request acts in, where a header cannot be sent (an EventSource); the X-OpenFerment-Project header in its place. */
+                project?: string;
+            };
             header?: {
                 /** @description The project the request acts in; ?project= in its place. */
                 "X-OpenFerment-Project"?: string;
@@ -9962,6 +11063,15 @@ export interface operations {
                     "application/json": components["schemas"]["Artifact"];
                 };
             };
+            /** @description The project the request names is one the database does not hold, in words. */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Refusal"];
+                };
+            };
             /** @description Validation Error */
             422: {
                 headers: {
@@ -9975,7 +11085,10 @@ export interface operations {
     };
     pureos_catalogue_api_pureos_catalogue_get: {
         parameters: {
-            query?: never;
+            query?: {
+                /** @description The project the request acts in, where a header cannot be sent (an EventSource); the X-OpenFerment-Project header in its place. */
+                project?: string;
+            };
             header?: {
                 /** @description The project the request acts in; ?project= in its place. */
                 "X-OpenFerment-Project"?: string;
@@ -9996,11 +11109,23 @@ export interface operations {
                     }[];
                 };
             };
+            /** @description The project the request names is one the database does not hold, in words. */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Refusal"];
+                };
+            };
         };
     };
     pureos_catalogue_specs_api_pureos_catalogue__type_id__specs_get: {
         parameters: {
-            query?: never;
+            query?: {
+                /** @description The project the request acts in, where a header cannot be sent (an EventSource); the X-OpenFerment-Project header in its place. */
+                project?: string;
+            };
             header?: {
                 /** @description The project the request acts in; ?project= in its place. */
                 "X-OpenFerment-Project"?: string;
@@ -10023,6 +11148,15 @@ export interface operations {
                     };
                 };
             };
+            /** @description The project the request names is one the database does not hold, in words. */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Refusal"];
+                };
+            };
             /** @description Validation Error */
             422: {
                 headers: {
@@ -10036,7 +11170,10 @@ export interface operations {
     };
     pureos_propose_api_pureos_propose_post: {
         parameters: {
-            query?: never;
+            query?: {
+                /** @description The project the request acts in, where a header cannot be sent (an EventSource); the X-OpenFerment-Project header in its place. */
+                project?: string;
+            };
             header?: {
                 /** @description The project the request acts in; ?project= in its place. */
                 "X-OpenFerment-Project"?: string;
@@ -10061,6 +11198,15 @@ export interface operations {
                     };
                 };
             };
+            /** @description The project the request names is one the database does not hold, in words. */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Refusal"];
+                };
+            };
             /** @description Validation Error */
             422: {
                 headers: {
@@ -10074,7 +11220,10 @@ export interface operations {
     };
     pureos_train_runs_api_pureos_train_runs_get: {
         parameters: {
-            query?: never;
+            query?: {
+                /** @description The project the request acts in, where a header cannot be sent (an EventSource); the X-OpenFerment-Project header in its place. */
+                project?: string;
+            };
             header?: {
                 /** @description The project the request acts in; ?project= in its place. */
                 "X-OpenFerment-Project"?: string;
@@ -10095,11 +11244,23 @@ export interface operations {
                     }[];
                 };
             };
+            /** @description The project the request names is one the database does not hold, in words. */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Refusal"];
+                };
+            };
         };
     };
     pureos_train_check_api_pureos_train_check_post: {
         parameters: {
-            query?: never;
+            query?: {
+                /** @description The project the request acts in, where a header cannot be sent (an EventSource); the X-OpenFerment-Project header in its place. */
+                project?: string;
+            };
             header?: {
                 /** @description The project the request acts in; ?project= in its place. */
                 "X-OpenFerment-Project"?: string;
@@ -10124,6 +11285,15 @@ export interface operations {
                     };
                 };
             };
+            /** @description The project the request names is one the database does not hold, in words. */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Refusal"];
+                };
+            };
             /** @description Validation Error */
             422: {
                 headers: {
@@ -10137,7 +11307,10 @@ export interface operations {
     };
     pureos_train_from_run_api_pureos_train_from_run_post: {
         parameters: {
-            query?: never;
+            query?: {
+                /** @description The project the request acts in, where a header cannot be sent (an EventSource); the X-OpenFerment-Project header in its place. */
+                project?: string;
+            };
             header?: {
                 /** @description The project the request acts in; ?project= in its place. */
                 "X-OpenFerment-Project"?: string;
@@ -10162,6 +11335,15 @@ export interface operations {
                     };
                 };
             };
+            /** @description The project the request names is one the database does not hold, in words. */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Refusal"];
+                };
+            };
             /** @description Validation Error */
             422: {
                 headers: {
@@ -10175,7 +11357,10 @@ export interface operations {
     };
     pureos_train_run_api_pureos_train_run_post: {
         parameters: {
-            query?: never;
+            query?: {
+                /** @description The project the request acts in, where a header cannot be sent (an EventSource); the X-OpenFerment-Project header in its place. */
+                project?: string;
+            };
             header?: {
                 /** @description The project the request acts in; ?project= in its place. */
                 "X-OpenFerment-Project"?: string;
@@ -10200,6 +11385,15 @@ export interface operations {
                     };
                 };
             };
+            /** @description The project the request names is one the database does not hold, in words. */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Refusal"];
+                };
+            };
             /** @description Validation Error */
             422: {
                 headers: {
@@ -10213,7 +11407,10 @@ export interface operations {
     };
     pureos_train_validate_api_pureos_train_validate_post: {
         parameters: {
-            query?: never;
+            query?: {
+                /** @description The project the request acts in, where a header cannot be sent (an EventSource); the X-OpenFerment-Project header in its place. */
+                project?: string;
+            };
             header?: {
                 /** @description The project the request acts in; ?project= in its place. */
                 "X-OpenFerment-Project"?: string;
@@ -10238,6 +11435,15 @@ export interface operations {
                     };
                 };
             };
+            /** @description The project the request names is one the database does not hold, in words. */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Refusal"];
+                };
+            };
             /** @description Validation Error */
             422: {
                 headers: {
@@ -10251,7 +11457,10 @@ export interface operations {
     };
     pureos_train_api_pureos_train__key__get: {
         parameters: {
-            query?: never;
+            query?: {
+                /** @description The project the request acts in, where a header cannot be sent (an EventSource); the X-OpenFerment-Project header in its place. */
+                project?: string;
+            };
             header?: {
                 /** @description The project the request acts in; ?project= in its place. */
                 "X-OpenFerment-Project"?: string;
@@ -10274,6 +11483,15 @@ export interface operations {
                     };
                 };
             };
+            /** @description The project the request names is one the database does not hold, in words. */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Refusal"];
+                };
+            };
             /** @description Validation Error */
             422: {
                 headers: {
@@ -10287,7 +11505,10 @@ export interface operations {
     };
     pureos_trains_api_pureos_trains_get: {
         parameters: {
-            query?: never;
+            query?: {
+                /** @description The project the request acts in, where a header cannot be sent (an EventSource); the X-OpenFerment-Project header in its place. */
+                project?: string;
+            };
             header?: {
                 /** @description The project the request acts in; ?project= in its place. */
                 "X-OpenFerment-Project"?: string;
@@ -10306,13 +11527,25 @@ export interface operations {
                     "application/json": {
                         [key: string]: unknown;
                     }[];
+                };
+            };
+            /** @description The project the request names is one the database does not hold, in words. */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Refusal"];
                 };
             };
         };
     };
     pureos_trains_kept_api_pureos_trains_kept_get: {
         parameters: {
-            query?: never;
+            query?: {
+                /** @description The project the request acts in, where a header cannot be sent (an EventSource); the X-OpenFerment-Project header in its place. */
+                project?: string;
+            };
             header?: {
                 /** @description The project the request acts in; ?project= in its place. */
                 "X-OpenFerment-Project"?: string;
@@ -10331,6 +11564,15 @@ export interface operations {
                     "application/json": {
                         [key: string]: unknown;
                     }[];
+                };
+            };
+            /** @description The project the request names is one the database does not hold, in words. */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Refusal"];
                 };
             };
         };
@@ -10339,6 +11581,8 @@ export interface operations {
         parameters: {
             query?: {
                 engine?: string | null;
+                /** @description The project the request acts in, where a header cannot be sent (an EventSource); the X-OpenFerment-Project header in its place. */
+                project?: string;
             };
             header?: {
                 /** @description The project the request acts in; ?project= in its place. */
@@ -10358,6 +11602,15 @@ export interface operations {
                     "application/json": components["schemas"]["EngineRun"][];
                 };
             };
+            /** @description The project the request names is one the database does not hold, in words. */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Refusal"];
+                };
+            };
             /** @description Validation Error */
             422: {
                 headers: {
@@ -10371,7 +11624,10 @@ export interface operations {
     };
     runs_report_api_runs__run_id__get: {
         parameters: {
-            query?: never;
+            query?: {
+                /** @description The project the request acts in, where a header cannot be sent (an EventSource); the X-OpenFerment-Project header in its place. */
+                project?: string;
+            };
             header?: {
                 /** @description The project the request acts in; ?project= in its place. */
                 "X-OpenFerment-Project"?: string;
@@ -10392,7 +11648,7 @@ export interface operations {
                     "application/json": components["schemas"]["RunReport"];
                 };
             };
-            /** @description The project holds no run of that id, in words. */
+            /** @description The project holds no run of that id, in words. A project the request names that the database does not hold is a 404 too, in words. */
             404: {
                 headers: {
                     [name: string]: unknown;
@@ -10414,7 +11670,10 @@ export interface operations {
     };
     state_load_api_state_get: {
         parameters: {
-            query?: never;
+            query?: {
+                /** @description The project the request acts in, where a header cannot be sent (an EventSource); the X-OpenFerment-Project header in its place. */
+                project?: string;
+            };
             header?: {
                 /** @description The project the request acts in; ?project= in its place. */
                 "X-OpenFerment-Project"?: string;
@@ -10435,11 +11694,23 @@ export interface operations {
                     };
                 };
             };
+            /** @description The project the request names is one the database does not hold, in words. */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Refusal"];
+                };
+            };
         };
     };
     state_put_api_state__kind___item_id__put: {
         parameters: {
-            query?: never;
+            query?: {
+                /** @description The project the request acts in, where a header cannot be sent (an EventSource); the X-OpenFerment-Project header in its place. */
+                project?: string;
+            };
             header?: {
                 /** @description The project the request acts in; ?project= in its place. */
                 "X-OpenFerment-Project"?: string;
@@ -10467,6 +11738,15 @@ export interface operations {
                     };
                 };
             };
+            /** @description The project the request names is one the database does not hold, in words. */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Refusal"];
+                };
+            };
             /** @description Validation Error */
             422: {
                 headers: {
@@ -10482,6 +11762,8 @@ export interface operations {
         parameters: {
             query?: {
                 by?: string;
+                /** @description The project the request acts in, where a header cannot be sent (an EventSource); the X-OpenFerment-Project header in its place. */
+                project?: string;
             };
             header?: {
                 /** @description The project the request acts in; ?project= in its place. */
@@ -10506,6 +11788,15 @@ export interface operations {
                     };
                 };
             };
+            /** @description The project the request names is one the database does not hold, in words. */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Refusal"];
+                };
+            };
             /** @description Validation Error */
             422: {
                 headers: {
@@ -10519,7 +11810,10 @@ export interface operations {
     };
     study_comparisons_api_studies_comparisons_get: {
         parameters: {
-            query?: never;
+            query?: {
+                /** @description The project the request acts in, where a header cannot be sent (an EventSource); the X-OpenFerment-Project header in its place. */
+                project?: string;
+            };
             header?: {
                 /** @description The project the request acts in; ?project= in its place. */
                 "X-OpenFerment-Project"?: string;
@@ -10538,11 +11832,23 @@ export interface operations {
                     "application/json": components["schemas"]["StudyComparison"][];
                 };
             };
+            /** @description The project the request names is one the database does not hold, in words. */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Refusal"];
+                };
+            };
         };
     };
     study_comparison_make_api_studies_comparisons_post: {
         parameters: {
-            query?: never;
+            query?: {
+                /** @description The project the request acts in, where a header cannot be sent (an EventSource); the X-OpenFerment-Project header in its place. */
+                project?: string;
+            };
             header?: {
                 /** @description The project the request acts in; ?project= in its place. */
                 "X-OpenFerment-Project"?: string;
@@ -10565,6 +11871,15 @@ export interface operations {
                     "application/json": components["schemas"]["ComparisonReport"];
                 };
             };
+            /** @description The project the request names is one the database does not hold, in words. */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Refusal"];
+                };
+            };
             /** @description Validation Error */
             422: {
                 headers: {
@@ -10578,7 +11893,10 @@ export interface operations {
     };
     study_comparison_api_studies_comparisons__comparison_id__get: {
         parameters: {
-            query?: never;
+            query?: {
+                /** @description The project the request acts in, where a header cannot be sent (an EventSource); the X-OpenFerment-Project header in its place. */
+                project?: string;
+            };
             header?: {
                 /** @description The project the request acts in; ?project= in its place. */
                 "X-OpenFerment-Project"?: string;
@@ -10599,6 +11917,15 @@ export interface operations {
                     "application/json": components["schemas"]["ComparisonReport"];
                 };
             };
+            /** @description The project the request names is one the database does not hold, in words. */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Refusal"];
+                };
+            };
             /** @description Validation Error */
             422: {
                 headers: {
@@ -10614,6 +11941,8 @@ export interface operations {
         parameters: {
             query?: {
                 by?: string;
+                /** @description The project the request acts in, where a header cannot be sent (an EventSource); the X-OpenFerment-Project header in its place. */
+                project?: string;
             };
             header?: {
                 /** @description The project the request acts in; ?project= in its place. */
@@ -10631,6 +11960,15 @@ export interface operations {
                 };
                 content?: never;
             };
+            /** @description The project the request names is one the database does not hold, in words. */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Refusal"];
+                };
+            };
             /** @description Validation Error */
             422: {
                 headers: {
@@ -10644,7 +11982,10 @@ export interface operations {
     };
     study_runbooks_api_studies_runbooks_get: {
         parameters: {
-            query?: never;
+            query?: {
+                /** @description The project the request acts in, where a header cannot be sent (an EventSource); the X-OpenFerment-Project header in its place. */
+                project?: string;
+            };
             header?: {
                 /** @description The project the request acts in; ?project= in its place. */
                 "X-OpenFerment-Project"?: string;
@@ -10663,11 +12004,23 @@ export interface operations {
                     "application/json": components["schemas"]["Runbook"][];
                 };
             };
+            /** @description The project the request names is one the database does not hold, in words. */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Refusal"];
+                };
+            };
         };
     };
     study_runbook_make_api_studies_runbooks_post: {
         parameters: {
-            query?: never;
+            query?: {
+                /** @description The project the request acts in, where a header cannot be sent (an EventSource); the X-OpenFerment-Project header in its place. */
+                project?: string;
+            };
             header?: {
                 /** @description The project the request acts in; ?project= in its place. */
                 "X-OpenFerment-Project"?: string;
@@ -10690,6 +12043,15 @@ export interface operations {
                     "application/json": components["schemas"]["Runbook"];
                 };
             };
+            /** @description The project the request names is one the database does not hold, in words. */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Refusal"];
+                };
+            };
             /** @description Validation Error */
             422: {
                 headers: {
@@ -10703,7 +12065,10 @@ export interface operations {
     };
     study_runbook_api_studies_runbooks__runbook_id__get: {
         parameters: {
-            query?: never;
+            query?: {
+                /** @description The project the request acts in, where a header cannot be sent (an EventSource); the X-OpenFerment-Project header in its place. */
+                project?: string;
+            };
             header?: {
                 /** @description The project the request acts in; ?project= in its place. */
                 "X-OpenFerment-Project"?: string;
@@ -10724,6 +12089,15 @@ export interface operations {
                     "application/json": components["schemas"]["Runbook"];
                 };
             };
+            /** @description The project the request names is one the database does not hold, in words. */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Refusal"];
+                };
+            };
             /** @description Validation Error */
             422: {
                 headers: {
@@ -10737,7 +12111,10 @@ export interface operations {
     };
     study_runbook_lock_api_studies_runbooks__runbook_id__lock_post: {
         parameters: {
-            query?: never;
+            query?: {
+                /** @description The project the request acts in, where a header cannot be sent (an EventSource); the X-OpenFerment-Project header in its place. */
+                project?: string;
+            };
             header?: {
                 /** @description The project the request acts in; ?project= in its place. */
                 "X-OpenFerment-Project"?: string;
@@ -10762,6 +12139,15 @@ export interface operations {
                     "application/json": components["schemas"]["Runbook"];
                 };
             };
+            /** @description The project the request names is one the database does not hold, in words. */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Refusal"];
+                };
+            };
             /** @description Validation Error */
             422: {
                 headers: {
@@ -10775,7 +12161,10 @@ export interface operations {
     };
     study_scenarios_api_studies_scenarios_get: {
         parameters: {
-            query?: never;
+            query?: {
+                /** @description The project the request acts in, where a header cannot be sent (an EventSource); the X-OpenFerment-Project header in its place. */
+                project?: string;
+            };
             header?: {
                 /** @description The project the request acts in; ?project= in its place. */
                 "X-OpenFerment-Project"?: string;
@@ -10794,11 +12183,23 @@ export interface operations {
                     "application/json": components["schemas"]["StudyScenario"][];
                 };
             };
+            /** @description The project the request names is one the database does not hold, in words. */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Refusal"];
+                };
+            };
         };
     };
     study_scenario_make_api_studies_scenarios_post: {
         parameters: {
-            query?: never;
+            query?: {
+                /** @description The project the request acts in, where a header cannot be sent (an EventSource); the X-OpenFerment-Project header in its place. */
+                project?: string;
+            };
             header?: {
                 /** @description The project the request acts in; ?project= in its place. */
                 "X-OpenFerment-Project"?: string;
@@ -10821,6 +12222,15 @@ export interface operations {
                     "application/json": components["schemas"]["StudyScenario"];
                 };
             };
+            /** @description The project the request names is one the database does not hold, in words. */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Refusal"];
+                };
+            };
             /** @description Validation Error */
             422: {
                 headers: {
@@ -10834,7 +12244,10 @@ export interface operations {
     };
     study_scenario_api_studies_scenarios__scenario_id__get: {
         parameters: {
-            query?: never;
+            query?: {
+                /** @description The project the request acts in, where a header cannot be sent (an EventSource); the X-OpenFerment-Project header in its place. */
+                project?: string;
+            };
             header?: {
                 /** @description The project the request acts in; ?project= in its place. */
                 "X-OpenFerment-Project"?: string;
@@ -10855,6 +12268,15 @@ export interface operations {
                     "application/json": components["schemas"]["StudyScenario"];
                 };
             };
+            /** @description The project the request names is one the database does not hold, in words. */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Refusal"];
+                };
+            };
             /** @description Validation Error */
             422: {
                 headers: {
@@ -10868,7 +12290,10 @@ export interface operations {
     };
     study_scenario_run_api_studies_scenarios__scenario_id__run_post: {
         parameters: {
-            query?: never;
+            query?: {
+                /** @description The project the request acts in, where a header cannot be sent (an EventSource); the X-OpenFerment-Project header in its place. */
+                project?: string;
+            };
             header?: {
                 /** @description The project the request acts in; ?project= in its place. */
                 "X-OpenFerment-Project"?: string;
@@ -10893,6 +12318,15 @@ export interface operations {
                     "application/json": components["schemas"]["RunReport"];
                 };
             };
+            /** @description The project the request names is one the database does not hold, in words. */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Refusal"];
+                };
+            };
             /** @description Validation Error */
             422: {
                 headers: {
@@ -10911,6 +12345,8 @@ export interface operations {
                 streamId?: string | null;
                 preset?: string | null;
                 recordId?: string | null;
+                /** @description The project the request acts in, where a header cannot be sent (an EventSource); the X-OpenFerment-Project header in its place. */
+                project?: string;
             };
             header?: {
                 /** @description The project the request acts in; ?project= in its place. */
@@ -10932,6 +12368,15 @@ export interface operations {
                     };
                 };
             };
+            /** @description The project the request names is one the database does not hold, in words. */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Refusal"];
+                };
+            };
             /** @description Validation Error */
             422: {
                 headers: {
@@ -10945,7 +12390,10 @@ export interface operations {
     };
     thermo_props_api_thermo_props_post: {
         parameters: {
-            query?: never;
+            query?: {
+                /** @description The project the request acts in, where a header cannot be sent (an EventSource); the X-OpenFerment-Project header in its place. */
+                project?: string;
+            };
             header?: {
                 /** @description The project the request acts in; ?project= in its place. */
                 "X-OpenFerment-Project"?: string;
@@ -10968,6 +12416,15 @@ export interface operations {
                     "application/json": components["schemas"]["Artifact"];
                 };
             };
+            /** @description The project the request names is one the database does not hold, in words. */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Refusal"];
+                };
+            };
             /** @description Validation Error */
             422: {
                 headers: {
@@ -10983,6 +12440,8 @@ export interface operations {
         parameters: {
             query?: {
                 product?: string;
+                /** @description The project the request acts in, where a header cannot be sent (an EventSource); the X-OpenFerment-Project header in its place. */
+                project?: string;
             };
             header?: {
                 /** @description The project the request acts in; ?project= in its place. */
@@ -11004,6 +12463,15 @@ export interface operations {
                     };
                 };
             };
+            /** @description The project the request names is one the database does not hold, in words. */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Refusal"];
+                };
+            };
             /** @description Validation Error */
             422: {
                 headers: {
@@ -11017,7 +12485,10 @@ export interface operations {
     };
     thermo_volatility_api_thermo_volatility_post: {
         parameters: {
-            query?: never;
+            query?: {
+                /** @description The project the request acts in, where a header cannot be sent (an EventSource); the X-OpenFerment-Project header in its place. */
+                project?: string;
+            };
             header?: {
                 /** @description The project the request acts in; ?project= in its place. */
                 "X-OpenFerment-Project"?: string;
@@ -11040,6 +12511,15 @@ export interface operations {
                     "application/json": components["schemas"]["Artifact"];
                 };
             };
+            /** @description The project the request names is one the database does not hold, in words. */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Refusal"];
+                };
+            };
             /** @description Validation Error */
             422: {
                 headers: {
@@ -11053,7 +12533,10 @@ export interface operations {
     };
     tools_list_api_tools_get: {
         parameters: {
-            query?: never;
+            query?: {
+                /** @description The project the request acts in, where a header cannot be sent (an EventSource); the X-OpenFerment-Project header in its place. */
+                project?: string;
+            };
             header?: {
                 /** @description The project the request acts in; ?project= in its place. */
                 "X-OpenFerment-Project"?: string;
@@ -11072,14 +12555,27 @@ export interface operations {
                     "application/json": components["schemas"]["ToolInfo"][];
                 };
             };
+            /** @description The project the request names is one the database does not hold, in words. */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Refusal"];
+                };
+            };
         };
     };
     tools_run_api_tools__name__post: {
         parameters: {
             query?: {
                 by?: string;
+                /** @description The project the request acts in, where a header cannot be sent (an EventSource); the X-OpenFerment-Project header in its place. */
+                project?: string;
             };
             header?: {
+                /** @description The outside assistant calling, `<name>/<version>`, as UTF-8 text: the call runs in the model's lane under that name, its audit row's detail naming this door (`via: http`). The MCP server started with --service sends its client's declared name here. */
+                "X-OpenFerment-Assistant"?: string | null;
                 /** @description The project the request acts in; ?project= in its place. */
                 "X-OpenFerment-Project"?: string;
             };
@@ -11105,7 +12601,7 @@ export interface operations {
                     "application/json": components["schemas"]["ToolResult"];
                 };
             };
-            /** @description No tool of that name is registered here, in words. */
+            /** @description No tool of that name is registered here, in words. A project the request names that the database does not hold is a 404 too, in words. */
             404: {
                 headers: {
                     [name: string]: unknown;
@@ -11114,7 +12610,7 @@ export interface operations {
                     "application/json": components["schemas"]["Refusal"];
                 };
             };
-            /** @description A tool that writes, called with no ?by= naming the person calling, in words (a list of field errors when the body is no JSON object). */
+            /** @description A tool that writes, called with neither ?by= naming the person calling nor X-OpenFerment-Assistant naming the assistant; a call naming both; an X-OpenFerment-Assistant that names nobody: each in words (a list of field errors when the body is no JSON object). */
             422: {
                 headers: {
                     [name: string]: unknown;
@@ -11127,7 +12623,10 @@ export interface operations {
     };
     witness_runs_api_witness_runs_get: {
         parameters: {
-            query?: never;
+            query?: {
+                /** @description The project the request acts in, where a header cannot be sent (an EventSource); the X-OpenFerment-Project header in its place. */
+                project?: string;
+            };
             header?: {
                 /** @description The project the request acts in; ?project= in its place. */
                 "X-OpenFerment-Project"?: string;
@@ -11144,6 +12643,15 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["ExtractRun"][];
+                };
+            };
+            /** @description The project the request names is one the database does not hold, in words. */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Refusal"];
                 };
             };
         };

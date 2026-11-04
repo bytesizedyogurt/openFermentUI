@@ -158,9 +158,38 @@ def parameter_evidence(report: RunReport, words: str, limit: int) -> list[Eviden
     return out
 
 
+# How many characters of a run's diagnostics, as JSON, a summary names: the
+# rest are counted, and the run's page and GET /api/runs/{id} hold them all.
+DIAGNOSTICS_BUDGET = 1_500
+DIAGNOSTICS_WORDS = (
+    "what the run's computation reported about itself (the time it took, the iterations it made), kept on the run "
+    "beside its outputs: words to read, since a claim cites evidence ids alone and a replay compares the outputs "
+    "alone")
+
+
+def diagnostics_said(run: Any) -> dict[str, Any] | None:
+    """A run's diagnostics as a summary names them: how many, each name, value
+    and unit within DIAGNOSTICS_BUDGET, and what they are; None for a run
+    whose engine reports none."""
+    import json
+
+    if not run.diagnostics:
+        return None
+    shown: list[dict[str, Any]] = []
+    size = 0
+    for d in run.diagnostics:
+        row = {"name": d.name, "value": d.value, "unit": d.unit}
+        size += len(json.dumps(row, ensure_ascii=False))
+        if size > DIAGNOSTICS_BUDGET:
+            break
+        shown.append(row)
+    return {"count": len(run.diagnostics), "shown": shown, "note": DIAGNOSTICS_WORDS}
+
+
 def run_result(report: RunReport, *, state: str = "open") -> ToolResult:
     """A kept run in a tool's words: the engine and the artifact tool that
-    made it, what ran, on what values, and its numbers as evidence ids."""
+    made it, what ran, on what values, and its numbers as evidence ids; a
+    run whose engine reports diagnostics names them too (`diagnostics_said`)."""
     run = report.run
     if run.status == "refused":
         return ToolResult(summary={"runId": run.id, "engine": run.engine, "tool": run.tool, "plant": run.plant,
@@ -188,6 +217,7 @@ def run_result(report: RunReport, *, state: str = "open") -> ToolResult:
             "sffRefused": run.sffRefused,
             "packageTest": run.outputs.get("regression"),
             "by": run.by,
+            **({"diagnostics": said} if (said := diagnostics_said(run)) else {}),
         },
         evidence=evidence,
     )
@@ -242,6 +272,15 @@ def engines_listed() -> list[dict[str, Any]]:
     out += [{"name": name, "error": "no engine of this name is registered here now", "runs": len(ids),
              "runIds": ids[:RUN_IDS]} for name, ids in sorted(made.items()) if name not in registry.found()]
     return out
+
+
+def registered_names() -> list[str]:
+    """Every engine name the registry holds here, in name order, an engine
+    set aside among them (engine/registry.py): what `engine_plants` lists,
+    for a reader outside the engine package (Postdoc's question 13)."""
+    from ..engine import registry
+
+    return registry.names()
 
 
 def _registered(tool: str, name: str) -> tuple[Any, ToolResult | None]:
@@ -424,7 +463,8 @@ def _report(inp: EngineReportInput, ctx: ToolContext) -> ToolResult:
         found = parameter_evidence(report, inp.parameters, inp.limit)
         keep = ("state", "runId", "artifactId", "engine", "tool", "plant", "configuration", "scenarioId", "provenance",
                 "valuesSet")
-        result.summary = {**{k: result.summary.get(k) for k in keep}, "matched": len(found),
+        reported = {"diagnostics": result.summary["diagnostics"]} if "diagnostics" in result.summary else {}
+        result.summary = {**{k: result.summary.get(k) for k in keep}, **reported, "matched": len(found),
                           "parameters": [{"id": e.id, "label": e.label.split(": ", 1)[-1], "value": e.value,
                                           "unit": e.unit} for e in found],
                           "note": "The run's price, its outputs and its TEA breakdown: engine_report with no parameters."}
@@ -476,7 +516,8 @@ REPORT_TOOL = register(Tool(
         "each number its price block, its flowsheet's outputs and its TEA breakdown hold as an evidence id to cite; "
         "with words in `parameters`, the parameters the run read back from the plant (its feed's composition, "
         "moisture and price, the chemicals' prices, the finance terms), each as an evidence id with its origin. "
-        "For a refused run, the plant's own words."
+        "A run whose engine reports what its computation did (the time it took, say) names those diagnostics as "
+        "words beside its outputs. For a refused run, the plant's own words."
     ),
     input_model=EngineReportInput, run=_report, strict=False,
 ))

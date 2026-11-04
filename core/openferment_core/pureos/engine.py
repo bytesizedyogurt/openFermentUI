@@ -136,31 +136,56 @@ def _trains() -> list[tuple[str, TrainSpec, str]]:
     return [t for t in out if re.match(THING_ID, t[1].id)]
 
 
+# The default origin (models.DEFAULT_ORIGINS) each origin a train's
+# resolution names stands for: the class's or a package's own value, a
+# stated convention, the records that bound it, the inlet's run, simulation,
+# fit or vessel (an artifact, as Proforma's scenario flowsheets name one),
+# and a value a person typed into the train. A train's own value is a
+# person's: a typed value (TrainParam) carries its person and day and no
+# origin of its own, so the Builder's train and a model's (which holds ids and
+# words, pureos/kept.py) hold no model's estimate and no reading. Those two
+# reach a run as values the run sets (EngineInput), each with its own origin
+# on the run's inputs.
+DEFAULT_OF = {"library-default": "library-default", "convention": "convention", "record": "record",
+              "artifact": "artifact", "simulation": "artifact", "fit": "artifact", "assumption": "person-assumption"}
+# The origins a train's own value never holds (above), in words, for the
+# refusal of one that would.
+RUN_SETS = {"model-estimate": "a model's estimate", "measurement": "a deposition's reading"}
+
+
 def _origin(v: ParameterValue, spec: ParameterSpec) -> Origin | None:
     """Where a resolved value comes from, as the contract states a default's
-    origin; None for a value that waits or that the class reads for itself."""
-    from ..basis import SET_PARAM_ORIGINS, origin_of
+    origin (`DEFAULT_OF`), the run's provenance then computed from it by
+    basis as ever; None for a value that waits or that the class reads for
+    itself."""
+    from ..basis import origin_of
 
-    if v.value is None or v.source is None or v.origin in ("waiting", "not-read"):
+    if v.value is None or v.source is None or v.origin not in DEFAULT_OF:
         return None
-    if v.origin == "library-default":
+    kind = DEFAULT_OF[v.origin]
+    if kind == "library-default":
         return Origin(kind="library-default", ref=v.source.id or None, note=v.detail)
-    if v.origin == "convention":
+    if kind == "convention":
         return Origin(kind="convention", note=(v.detail or spec.note or "").strip() or f"{spec.key}'s stated convention")
-    if v.origin == "record":
+    if kind == "record":
         return Origin(kind="record", ref=", ".join(v.recordIds) or None, note=v.detail)
-    if v.origin in ("artifact", "simulation"):
+    if kind == "artifact":
         return Origin(kind="artifact", ref=v.source.id or None, note=v.detail)
-    if v.origin in SET_PARAM_ORIGINS:
-        return origin_of(v.source)
-    return None
+    return origin_of(v.source)
 
 
 def _parameter(place: str, spec: ParameterSpec, v: ParameterValue) -> EngineParameter:
     """One value of a place as the contract states a parameter, keyed
     `<place>.<key>`. A value with no default that the train fills itself when
     a run leaves it unset (any but one that waits) says so in its `note`,
-    with the resolution's reason."""
+    with the resolution's reason. A value whose origin only a run's request
+    sets (`RUN_SETS`) is no default a train holds, and is refused in words
+    (EngineRefused, a 422 at the routes) where it would read as another
+    origin."""
+    if v.value is not None and v.origin in RUN_SETS:
+        raise EngineRefused(f"{place}{catalogue.SEP}{spec.key} holds {RUN_SETS[v.origin]} as the train's own value, and "
+                            "a train's own values are a person's, typed in pureOS's Builder; a run sets such a value "
+                            "in its own inputs")
     origin = _origin(v, spec)
     held = {**spec.model_dump(), "key": f"{place}{catalogue.SEP}{spec.key}"}
     if origin is None and v.origin != "waiting":

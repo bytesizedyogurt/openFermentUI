@@ -19,15 +19,19 @@ the registry loads engines (`engine/registry.py`).
 """
 from __future__ import annotations
 
+import contextlib
+import contextvars
 import importlib.metadata
 import json
 import math
 import threading
+from collections.abc import Iterator
 from typing import Any
 
 from pydantic import ValidationError
 
-from ..models import EngineInput, EngineParameter, EngineRun, EngineThing, ReplayResult, SFFFlowsheet
+from ..models import (MAX_DIAGNOSTIC_NAME, MAX_DIAGNOSTICS, EngineInput, EngineParameter, EngineRun, EngineThing,
+                      ReplayResult, SFFFlowsheet, float_holds)
 from ..workers import SimWorker, WorkerError
 from . import Engine, EngineBroken, EngineRefused
 
@@ -37,8 +41,27 @@ WORKER_TIMEOUT_S = 120.0
 # a run and shapes its outputs. A change to either moves it, so a run kept
 # before reads as made by an earlier version (stale), and its id stays its own.
 CONTRACT_RUN = "engine run 1"
-# The longest name an output of an engine's run may have.
-MAX_OUTPUT_NAME = 200
+# The longest name an output or a diagnostic of an engine's run may have.
+MAX_OUTPUT_NAME = MAX_DIAGNOSTIC_NAME
+# The list the `run` op's diagnostics are handed to, while a run that asked
+# for the computation holds one open (`diagnosed`); a computation no run asked
+# for (a replay) hands them to nobody.
+_DIAGNOSED: contextvars.ContextVar[list[dict[str, Any]] | None] = contextvars.ContextVar("diagnosed", default=None)
+
+
+@contextlib.contextmanager
+def diagnosed() -> Iterator[list[dict[str, Any]]]:
+    """A list, for the block, that the worker's `run` op answers its
+    diagnostics into: what the one computation inside the block reported
+    about itself, empty when the block computed nothing (a run answered from
+    an artifact kept before) or its engine reports none (`runs.run_engine`
+    keeps them on the run's row)."""
+    held: list[dict[str, Any]] = []
+    token = _DIAGNOSED.set(held)
+    try:
+        yield held
+    finally:
+        _DIAGNOSED.reset(token)
 
 
 def version_string(engine: Engine) -> str:
@@ -53,9 +76,10 @@ class WorkerEngine:
     WorkerEngine). `version()` reads the installed distributions; `things()`
     asks the `things` op once a process; `parameters()` asks the
     `parameters` op; `run()` asks `things`, `parameters`, `run` and
-    `sff_export` in turn through `runs.run_engine`; `replay()` asks the `run`
-    op again through the run's artifact tool; `export_sff()` reads the record
-    the run kept."""
+    `sff_export` in turn through `runs.run_engine`, which keeps the
+    diagnostics the `run` op answers beside its outputs on the run's row;
+    `replay()` asks the `run` op again through the run's artifact tool;
+    `export_sff()` reads the record the run kept."""
 
     def __init__(self, *, name: str, worker: str, distributions: tuple[str, ...] | list[str] = (),
                  heavy: tuple[str, ...] | list[str] = (), timeout_s: float = WORKER_TIMEOUT_S) -> None:
@@ -145,26 +169,53 @@ class WorkerEngine:
     def parameters(self, thing: str, configuration: str | None) -> list[EngineParameter]:
         return self._listed("parameters", "parameters", EngineParameter, {"thing": thing, "configuration": configuration})
 
-    def compute(self, thing: str, configuration: str | None, values: list[dict[str, Any]]) -> list[dict[str, Any]]:
-        """The worker's `run` op on values already checked: each output a
-        name, a finite number or a string, and a unit, every name its own."""
-        outputs = self._answer("run", {"thing": thing, "configuration": configuration, "inputs": values}, "outputs")
-        if not isinstance(outputs, list):
-            raise self._broken("run", "outputs that are no list", outputs)
+    def _typed(self, kind: str, items: Any) -> list[dict[str, Any]]:
+        """The `run` op's outputs or its diagnostics (`kind` names which),
+        each a name, a finite number or a string, and a unit, every name its
+        own among them and at most MAX_OUTPUT_NAME characters; any other
+        shape breaks the contract (EngineBroken)."""
+        if not isinstance(items, list):
+            raise self._broken("run", f"{kind}s that are no list", items)
         seen: set[str] = set()
-        for o in outputs:
+        for o in items:
             ok = (isinstance(o, dict) and isinstance(o.get("name"), str) and isinstance(o.get("unit"), str)
                   and isinstance(o.get("value"), (int, float, str)) and not isinstance(o.get("value"), bool))
             if not ok:
-                raise self._broken("run", "an output that is no name, value and unit", o)
+                raise self._broken("run", f"{'an' if kind == 'output' else 'a'} {kind} that is no name, value and unit", o)
             if isinstance(o["value"], float) and not math.isfinite(o["value"]):
-                raise self._broken("run", "an output whose number is NaN or infinite", o)
+                raise self._broken("run", f"{'an' if kind == 'output' else 'a'} {kind} whose number is NaN or infinite", o)
+            if isinstance(o["value"], int) and not float_holds(o["value"]):
+                raise self._broken("run", f"{'an' if kind == 'output' else 'a'} {kind} whose number lies past a "
+                                          "float's range", {"name": o["name"], "unit": o["unit"]})
             name = o["name"]
             if not name.strip() or len(name) > MAX_OUTPUT_NAME:
-                raise self._broken("run", f"an output whose name is blank or longer than {MAX_OUTPUT_NAME} characters", o)
+                raise self._broken("run", f"{'an' if kind == 'output' else 'a'} {kind} whose name is blank or longer than "
+                                          f"{MAX_OUTPUT_NAME} characters", o)
             if name in seen:
-                raise self._broken("run", f"two outputs named {name!r}", outputs)
+                raise self._broken("run", f"two {kind}s named {name!r}", items)
             seen.add(name)
+        return items
+
+    def compute(self, thing: str, configuration: str | None, values: list[dict[str, Any]]) -> list[dict[str, Any]]:
+        """The worker's `run` op on values already checked: its outputs, each
+        a name, a finite number or a string, and a unit, every name its own.
+        The op may answer `diagnostics` beside them, in the same shape, at
+        most MAX_DIAGNOSTICS: what the computation reports about itself (the
+        time it took, the iterations it made). They are handed to the run
+        that asked for the computation (`diagnosed`), which keeps them on its
+        row; the artifact keeps the outputs alone, so a replay compares the
+        outputs alone. A shape outside these breaks the contract."""
+        got = self.call("run", {"thing": thing, "configuration": configuration, "inputs": values})
+        if not isinstance(got, dict) or "outputs" not in got:
+            raise self._broken("run", "no 'outputs'", got)
+        outputs = self._typed("output", got["outputs"])
+        reported = self._typed("diagnostic", got["diagnostics"]) if "diagnostics" in got else []
+        if len(reported) > MAX_DIAGNOSTICS:
+            raise self._broken("run", f"{len(reported)} diagnostics, more than the {MAX_DIAGNOSTICS} a run keeps",
+                               [d.get("name") for d in reported])
+        held = _DIAGNOSED.get()
+        if held is not None:
+            held[:] = reported
         return outputs
 
     def sff_document(self, thing: str, configuration: str | None, values: list[dict[str, Any]]) -> dict[str, Any]:

@@ -302,6 +302,7 @@ const PAIRS = [
   // Execution prompt §7.4 — engine runs (engine/runs.py).
   ['RunInput', 'RunInput'],
   ['RunSFF', 'RunSFF'],
+  ['RunDiagnostic', 'RunDiagnostic'],
   ['EngineRun', 'EngineRun'],
   ['RunReport', 'RunReport'],
   // Execution prompt §9.1 step 5 — studies (studies/).
