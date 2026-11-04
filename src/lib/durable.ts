@@ -33,8 +33,9 @@
 // all of these end with the app running normally on in-memory state. Losing
 // persistence is bad; refusing to open the screen because persistence is
 // unavailable would be worse.
-import type { Deposition, Guild, GuildWithdrawal, InputAssumption, LiveConversation, MeasuredEvidence, Runbook, Provenance, RecordStatus, ReviewDecision, TrainSpec } from '@/data/types';
+import type { Deposition, Guild, GuildWithdrawal, InputAssumption, MeasuredEvidence, Runbook, Provenance, RecordStatus, ReviewDecision, TrainSpec } from '@/data/types';
 import type { Override } from './params';
+import type { LiveConversation } from './postdoc';
 import type { Scenario } from './proforma';
 import type { OutboxEntry } from './projectState';
 

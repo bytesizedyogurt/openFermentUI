@@ -112,3 +112,25 @@ Never; this is how the drift stops recurring.
   so an override read back may carry none (Known debts). The page writes a person's change with
   its origin from here on, and `inputsOf` reads a change with none as a person's assumption, as the
   service does; `pnpm check:state` holds it.
+
+### Alpha 2.2, E.3 (2026-11-04): Postdoc's lib, and the seam where a draft becomes a runbook
+
+- `lib/postdoc.ts` names the generated schemas of Postdoc's answers: the health (`Health`, where
+  the hand-kept `PostdocHealth` stood, its fallback model always written and the service's name
+  beside it), the question (`AskRequest`, `PriorTurn`), the plan and what it rests on
+  (`AnswerPlan`; `AnswerPlanUsage`, the generated `Usage`; `Claim`, `ClaimValue`, `PassageRef`,
+  `Passage`, `Evidence`, `ModuleRow`, `CoverageMap`, `RunbookDraft`, `TraceStep`; `StopReason`,
+  read from `AnswerPlan['stopped']`) and the conversation (`LiveConversation`, `LiveTurn`). The
+  Postdoc screen, PlanTrace, PassageQuote, AnswerPlanView and EvidenceCard read them there,
+  EvidenceCard its `BasisInput` from `lib/studies.ts`; the store, the Durable snapshot, the project
+  state and check:state read the conversation's.
+- A question sends `by` with every ask, empty when nobody is named, which is the service's
+  default. A turn the page begins writes its asker (null when nobody is named) and its artifacts
+  (none yet), every field the generated `LiveTurn` holds.
+- One seam stands until E.11 moves the store's runbooks: `store.adoptRunbookDraft` takes the
+  generated `RunbookDraft` and writes the store's hand-kept `Runbook`, its predictions and
+  measures copied as the service wrote them under one type assertion, since lock.ts and
+  runbook_lock.py read a field left out and a null apart (Known debts).
+- Each reader keeps its default for a field older plans lack (`claim.values ?? []`,
+  `plan.stopped ?? 'done'` and their kin): a browser's snapshot from before alpha 2.0 lays such
+  plans on the page until a load from the service answers them whole.

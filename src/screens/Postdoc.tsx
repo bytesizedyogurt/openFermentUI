@@ -11,10 +11,17 @@ import { useEffect, useRef, useState } from 'react';
 import { MessageSquarePlus, PanelLeft, RefreshCw, Send, Sparkles, Square } from 'lucide-react';
 import { useStore, timeId, reviewerName } from '@/store';
 import { navigate, useRoute } from '@/router';
-import type { LiveConversation, LiveTurn } from '@/data/types';
 import { Button, Card, cx, EmptyState, Callout } from '@/components/ui';
 import { AnswerPlanView, PostdocDownNotice } from '@/components/AnswerPlanView';
-import { askPostdocStream, fetchConversation, postdocHealth, PostdocDown, type PostdocHealth } from '@/lib/postdoc';
+import {
+  askPostdocStream,
+  fetchConversation,
+  postdocHealth,
+  PostdocDown,
+  type Health,
+  type LiveConversation,
+  type LiveTurn,
+} from '@/lib/postdoc';
 import { PlanTrace } from '@/components/PlanTrace';
 import { stamp } from '@/lib/proforma';
 
@@ -52,7 +59,7 @@ function LiveTurnView({
   onAskAgain,
 }: {
   turn: LiveTurn;
-  health: PostdocHealth | null;
+  health: Health | null;
   latest: boolean;
   onAskAgain: (q: string) => void;
 }) {
@@ -124,7 +131,7 @@ function LivePanel({
   onAsk,
 }: {
   conversation: LiveConversation | null;
-  health: PostdocHealth | null;
+  health: Health | null;
   onAsk: (q: string) => void;
 }) {
   const turns = conversation?.turns ?? [];
@@ -193,7 +200,7 @@ export default function Postdoc({ sessionId, initialQuery }: { sessionId?: strin
 
   // The live turns are in the store (`liveConversations`), so this component
   // holds only what it is showing and whether the service answers.
-  const [health, setHealth] = useState<PostdocHealth | null>(null);
+  const [health, setHealth] = useState<Health | null>(null);
   const [healthChecked, setHealthChecked] = useState(false);
   // An answer streamed since the page loaded: the service is there, whatever
   // the health probe last said.
@@ -294,7 +301,7 @@ export default function Postdoc({ sessionId, initialQuery }: { sessionId?: strin
     const current = fresh ? null : conversation;
     const convId = current?.id ?? store.startLiveConversation(text.slice(0, 60));
     const turnId = timeId('lt');
-    const by = reviewerName() ?? undefined;
+    const by = reviewerName();
     store.addLiveTurn(convId, {
       id: turnId,
       question: text,
@@ -304,6 +311,7 @@ export default function Postdoc({ sessionId, initialQuery }: { sessionId?: strin
       error: null,
       status: 'running',
       by,
+      artifactIds: [],
     });
     setActiveId(convId);
     if (route.path !== `/postdoc/${convId}` || route.query.has('q')) navigate(`/postdoc/${convId}`, { replace: true });

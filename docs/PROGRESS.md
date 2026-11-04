@@ -239,6 +239,7 @@ DOI or PMID. Each now reads the project's rows.
 | 2026-11-04 19:48 | E.0b: `pnpm test:core` on the final tree; `pnpm test:sim`; the new and changed tests with the database address empty and on Python 3.12; `gen:api`, `gen:tools` and `gen:components` with each `--check`; `typecheck`, `check:plan`, `check:state`, `check:figures`, `check:tools`, `check:secrets`; `build`; `smoke` with no key; `pnpm prove --steps 5,9`, offline | 2889 passed, 1 skipped, 175 deselected; 142 passed; 124 passed each way; every check green; 12 of 12 screens; 45 of 45 checks, no call in the proof's spend table | 7 min 47 s (`test:core`); 7 min 30 s (`test:sim`); 139 s (the proof) | E.0b |
 | 2026-11-04 20:28 | E.1: `pnpm test:core` on the final tree; `typecheck`, `check:plan`, `check:state`, `check:figures`; `gen:api --check` and `gen:components --check`; `build`; `smoke` with no key; `pnpm prove --steps 9`, offline | 2889 passed, 1 skipped, 175 deselected; every check green, `check:state` 54 checks; the document and COMPONENTS.md as they were; 12 of 12 screens; 45 of 45 checks, no call in the proof's spend table | 7 min 34 s (`test:core`); 131 s (the proof) | E.1 |
 | 2026-11-04 20:42 | E.2: `pnpm test:core` on the final tree; `typecheck`, `check:plan`, `check:state`, `check:figures`; `gen:api --check` and `gen:components --check`; `build`, its bundle set beside the one the tree before the commit builds; `smoke` with no key | 2889 passed, 1 skipped, 175 deselected; every check green, `check:state` 54 checks; the document and COMPONENTS.md as they were; the bundle byte for byte the same; 12 of 12 screens | 7 min 35 s (`test:core`) | E.2 |
+| 2026-11-04 21:10 | E.3: `pnpm test:core` on the final tree; `typecheck`, `check:plan`, `check:state`, `check:figures`, `check:secrets`; `gen:api --check` and `gen:components --check`; `build`; `smoke` with no key, and the Postdoc screen read on a service with no key; `pnpm prove --steps 9`, offline | 2889 passed, 1 skipped, 175 deselected; every check green, `check:state` 54 checks; the document and COMPONENTS.md as they were; 12 of 12 screens, the Postdoc screen saying in words that the service holds no key; 45 of 45 checks, no call in the proof's spend table | 7 min 28 s (`test:core`); 134 s (the proof) | E.3 |
 | 2026-10-30 06:47 | `test:core` with 2.2; `check:tools`; `pnpm smoke` (own database, project made through the API) | 1920 passed, 2 skipped, 128 deselected; passed; 11 of 11 rail entries open in the project | 4 min 26 s | 2.2 |
 
 ## Spend (alpha 2.1)
@@ -275,7 +276,7 @@ prompt's §4).
 | [004](decisions/ADR-004-biosteam-adapter.md) | BioSTEAM through one adapter | accepted, stage 4 |
 | [005](decisions/ADR-005-projects.md) | Projects replace programs | accepted |
 | [006](decisions/ADR-006-quantities-and-estimates.md) | Typed quantities with origins replace Rule 1 | accepted, stages 4 and 6 |
-| [007](decisions/ADR-007-schema-source.md) | Types generated from OpenAPI | accepted, stage 7 (alpha 2.2 E.0a: a schema the service only writes lists every property as required; E.0b: the rows a project keeps of its pages read as their models and served as kept; E.1: each lib names the generated schemas it answers, and its screens and components read them there) |
+| [007](decisions/ADR-007-schema-source.md) | Types generated from OpenAPI | accepted, stage 7 (alpha 2.2 E.0a: a schema the service only writes lists every property as required; E.0b: the rows a project keeps of its pages read as their models and served as kept; E.1: each lib names the generated schemas it answers, and its screens and components read them there; E.3: Postdoc's lib, and the one seam where a draft becomes the store's runbook until E.11) |
 | [008](decisions/ADR-008-postdoc-memory-routing.md) | Postdoc memory on the server; model routes | accepted, stage 6 |
 | [009](decisions/ADR-009-ui.md) | The UI is kept and wired | accepted, stage 7 |
 | [010](decisions/ADR-010-deletions.md) | Deletions | accepted, stage 1 |
@@ -414,8 +415,9 @@ prompt's §4).
 | Paid: the module reads list a project's depositions, each reading a run may take and the measured evidence a reconciliation released; `module_stores.PARTIAL` holds no runbooks line | alpha 2.2, C.5 |
 | Paid: Proforma's screens read every scenario as the project's (`createdScenarioIds`, the index's `needsBinding` and the held path gone); `GET /api/proforma/scenarios` binds a kept `custom_train_v1` scenario with the parts it names and lists one whose parts cannot stand with its refusal in words, where it answered 500; pureOS's choosers list each scenario once | alpha 2.2, C.6 |
 | `src/engine/geneos/enumeration` (Dominion era) still serves RunbookDetail's research funnel, whose words still speak of a clearance reading and a molecule | after alpha 2.0 (stage 7 left the module screens as they were, now views inside a project) |
-| Paid in part: `src/data/types.ts` is still hand-kept beside the generated `src/api/types.gen.ts`, held to the service by `check:plan`'s pairs. Proforma's libs (`lib/proforma.ts`, `lib/studies.ts`, `lib/params.ts`), its eight screens, the parameter panel and their components (alpha 2.2 E.1) and the two flowsheet screens, FlowsheetPage and Flowsheets (E.2), read the generated types; the other screens read the hand-kept types | alpha 2.2 stage E, one lib and its screens at a time; E.15 deletes the file |
+| Paid in part: `src/data/types.ts` is still hand-kept beside the generated `src/api/types.gen.ts`, held to the service by `check:plan`'s pairs. Proforma's libs (`lib/proforma.ts`, `lib/studies.ts`, `lib/params.ts`), its eight screens, the parameter panel and their components (alpha 2.2 E.1), the two flowsheet screens, FlowsheetPage and Flowsheets (E.2), and Postdoc's lib (`lib/postdoc.ts`), its screen, the components that draw a plan (PlanTrace, PassageQuote, AnswerPlanView, EvidenceCard) and the conversations the store, the Durable snapshot and the project state hold (E.3) read the generated types; the other screens read the hand-kept types | alpha 2.2 stage E, one lib and its screens at a time; E.15 deletes the file |
 | The generated types name three fields an answer serves as kept as present (`Override.origin`, `Runbook.note`, `Runbook.progressPct`): openapi-typescript writes a field with a default as one an answer holds, and an answer served as kept leaves out a field its row never set. Every change the page kept before alpha 2.2 E.1 carries no origin; `inputsOf` reads a change with none as a person's assumption, as the service does (`pnpm check:state`), and the page writes the origin from E.1 on (ADR-007's note of E.1) | E.11, whose readers of the generated `Runbook` read its note and its progress as a row may leave them; or a service commit that writes the three as optional in the document |
+| `store.adoptRunbookDraft` takes the generated `RunbookDraft` and writes the store's hand-kept `Runbook` under one type assertion. A draft's prediction may hold a null kind, interval, artifact or records, and a draft's measure may leave its prediction out; the hand-kept `Prediction` and `Measure` admit neither. The values go in as the service wrote them, since lock.ts and runbook_lock.py read a field left out and a null apart (ADR-007's note of E.3) | E.11, which moves the store's runbooks to the generated `Runbook` |
 | Paid: the project state's three routes answered the rows in a dict with no model; `GET /api/state` answers a `ProjectState`, each row read as its kind's model and served as kept, `PUT` a `StateKept` and `DELETE` a `StateTakenBack`, and `core/tests/test_route_models.py` keeps no waiting set | alpha 2.2, E.0b |
 | Component tests on fixtures recorded from the real service (`pnpm record:fixtures`, §9.3) are not built; the walk and the smoke run against the real service | after alpha 2.0 |
 | No offline test computes on a published genome-scale model (Yeast9 and iMM904 need their fetched files); a model add-on applied in the worker, and a metabolite-defined product's demand through the worker, are untested | still open: after alpha 2.0 |
@@ -2117,3 +2119,29 @@ holds the numbers, the tables and the judgements).
   `typecheck`; `check:plan`, 1629 fields across 218 types; `check:state`, 54 checks;
   `check:figures`; `gen:api --check` and `gen:components --check`, the document and
   `COMPONENTS.md` as they were; `build`; `pnpm smoke` with no key, 12 of 12 screens.
+- E.3. Postdoc's lib, its screen and the components that draw a plan read the generated types
+  (the stage plan's E.3; ADR-007's implementation note of E.3). `lib/postdoc.ts` names the
+  generated schemas of Postdoc's answers: `Health`, where the hand-kept `PostdocHealth` stood; the
+  question (`AskRequest`, `PriorTurn`); the plan with all it rests on (`AnswerPlan`,
+  `AnswerPlanUsage` for the generated `Usage`, `Claim`, `ClaimValue`, `PassageRef`, `Passage`,
+  `Evidence`, `ModuleRow`, `CoverageMap`, `RunbookDraft`, `TraceStep`, `StopReason`); and the
+  conversation (`LiveConversation`, `LiveTurn`). The Postdoc screen, PlanTrace and PassageQuote
+  read every name there, AnswerPlanView and EvidenceCard each one they draw (`ExtractionRecord`
+  and `Paper` stay on the hand-kept types until E.4, and EvidenceCard reads `BasisInput` from
+  `lib/studies.ts`), and the store, the Durable snapshot, the project state and check:state read
+  the conversation's. The readers' changes: a question sends `by` with every ask, empty when
+  nobody is named, the service's own default; a turn the page begins writes its asker and its
+  artifacts, every field the generated `LiveTurn` holds; a draft's measure may leave its
+  prediction out (DraftCard); and `store.adoptRunbookDraft` writes the generated draft into the
+  store's hand-kept runbook under one type assertion, its values as the service wrote them, the
+  seam E.11 removes (a Known debts row). check:state's conversations are whole values of the
+  generated type. Checks: `pnpm test:core` 2889 passed, 1 skipped, 175 deselected (7 min 28 s, on
+  the final tree); `typecheck`; `check:plan`, 1629 fields across 218 types; `check:state`, 54
+  checks; `check:figures`; `check:secrets`; `gen:api --check` and `gen:components --check`, the
+  document and `COMPONENTS.md` as they were; `build`; `pnpm smoke` with no key, 12 of 12 screens,
+  and the Postdoc screen on a service with no key saying so in words, its health the generated
+  shape's five fields; `pnpm prove --steps 9`, offline, 45 of 45 checks, the conversation read from
+  the service with its estimate marked among them, no call in the proof's spend table; a scratch
+  check of the seam outside the tree, a draft's nulls and fields left out copied as they arrive
+  and the lock digest over the adopted runbook the digest over the draft's own predictions and
+  measures.

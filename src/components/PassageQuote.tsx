@@ -5,7 +5,7 @@
 // arrived. One click opens the reader on the sentence, where span location
 // marks it or says it could not.
 import { ExternalLink, Quote } from 'lucide-react';
-import type { Passage, PassageRef } from '@/data/types';
+import type { Passage, PassageRef } from '@/lib/postdoc';
 import { useStore } from '@/store';
 import { href } from '@/router';
 

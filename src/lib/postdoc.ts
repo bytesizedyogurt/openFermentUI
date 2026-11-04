@@ -12,8 +12,45 @@
 // everything looks like it is working and the thing you are demonstrating is
 // not running. The scripted flows still exist; they are fixtures now, not a
 // safety net (§9).
-import type { AnswerPlan, AnswerPlanUsage, AskRequest, LiveConversation, PriorTurn, TraceStep } from '@/data/types';
+//
+// Every shape here is the service's own, generated from its models into
+// src/api/types.gen.ts (ADR-007): the health it answers, the question as
+// asked, the plan with all it rests on, and the conversation the plan is
+// kept in. The screens and components that draw a plan read these names.
+import type { components } from '@/api/types.gen';
 import { apiFetch } from './project';
+
+type S = components['schemas'];
+
+/** `GET /api/health`: the service answering, the model a call goes to and the one it falls back to, and whether the service holds a key. */
+export type Health = S['Health'];
+/** What `POST /api/ask` and `/api/ask/stream` take: the question, who asks, and the conversation and turn it is kept as. */
+export type AskRequest = S['AskRequest'];
+/** An earlier turn sent with a follow-up asked outside a conversation the service keeps: the question and the plan's words. */
+export type PriorTurn = S['PriorTurn'];
+/** The validated answer (models.py `AnswerPlan`): claims whose words hold no number, each with what it rests on. */
+export type AnswerPlan = S['AnswerPlan'];
+/** The tokens a plan took, the share the prompt cache served, its cost and the models that answered. */
+export type AnswerPlanUsage = S['Usage'];
+/** One claim, each number it states typed with its origin (`ClaimValue`), and each sentence it quotes from a passage (`PassageRef`). */
+export type Claim = S['Claim'];
+export type ClaimValue = S['ClaimValue'];
+export type PassageRef = S['PassageRef'];
+/** A piece of a paper's own text, as a search returns it. */
+export type Passage = S['Passage'];
+/** A computed value a claim may cite, with its basis; a geneOS ceiling and a fermOS forecast answer one too. */
+export type Evidence = S['Evidence'];
+/** One row of one module a claim rests on, and the sweep of every module before the loop's first turn. */
+export type ModuleRow = S['ModuleRow'];
+export type CoverageMap = S['CoverageMap'];
+/** A runbook Postdoc drafted, its numbers written by the service, for a person to adopt and lock. */
+export type RunbookDraft = S['RunbookDraft'];
+/** One step of the loop as the service completed it, and why the loop stopped. */
+export type TraceStep = S['TraceStep'];
+export type StopReason = AnswerPlan['stopped'];
+/** A conversation as the service keeps it, its turns oldest first (postdoc/conversations.py). */
+export type LiveConversation = S['LiveConversation'];
+export type LiveTurn = S['LiveTurn'];
 
 /** Exactly what to type, so the message is actionable rather than sympathetic. */
 export const START_COMMAND = 'uv run uvicorn openferment_core.api:app --reload';
@@ -29,15 +66,6 @@ export class PostdocDown extends Error {
   }
 }
 
-export interface PostdocHealth {
-  ok: boolean;
-  model: string;
-  /** The model a call moves to when `model` declines or is unavailable. */
-  fallbackModel?: string;
-  /** False means the service is up but has no key — a different fix entirely. */
-  hasKey: boolean;
-}
-
 /**
  * Is the service there, and can it actually answer?
  *
@@ -45,7 +73,7 @@ export interface PostdocHealth {
  * need different sentences, and a screen that collapses them into
  * "unavailable" sends somebody to restart a process that is running fine.
  */
-export async function postdocHealth(signal?: AbortSignal): Promise<PostdocHealth> {
+export async function postdocHealth(signal?: AbortSignal): Promise<Health> {
   let response: Response;
   try {
     response = await fetch('/api/health', { signal });
@@ -55,7 +83,7 @@ export async function postdocHealth(signal?: AbortSignal): Promise<PostdocHealth
   if (!response.ok) {
     throw new PostdocDown(`Postdoc service answered ${response.status}.`);
   }
-  return (await response.json()) as PostdocHealth;
+  return (await response.json()) as Health;
 }
 
 /** What a question names besides its words: the conversation and the turn the
@@ -66,16 +94,19 @@ export interface AskOptions {
   history?: PriorTurn[];
   conversationId?: string;
   turnId?: string;
-  by?: string;
+  /** Who asks, by the reviewer name the page signs with; null when nobody is named. */
+  by?: string | null;
 }
 
 async function post(path: string, question: string, opts: AskOptions): Promise<Response> {
+  // `by` is sent with every question, empty when nobody is named: the
+  // service's own default.
   const body: AskRequest = {
     question,
     history: opts.history ?? [],
     ...(opts.conversationId ? { conversationId: opts.conversationId } : {}),
     ...(opts.turnId ? { turnId: opts.turnId } : {}),
-    ...(opts.by ? { by: opts.by } : {}),
+    by: opts.by ?? '',
   };
   let response: Response;
   try {

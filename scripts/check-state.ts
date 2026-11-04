@@ -35,8 +35,9 @@ import {
   type OutboxEntry,
   type ProjectState,
 } from '../src/lib/projectState';
-import type { Deposition, LiveConversation, TrainSpec } from '../src/data/types';
+import type { Deposition, TrainSpec } from '../src/data/types';
 import type { Override, ParameterSpec } from '../src/lib/params';
+import type { LiveConversation } from '../src/lib/postdoc';
 import type { FlowsheetInfo, ProformaScenarioInfo, Scenario, ScenarioInput } from '../src/lib/proforma';
 import type { Artifact, BasisSource, EngineRun } from '../src/lib/studies';
 import { loadOverlay } from '../src/lib/intake';
@@ -75,10 +76,11 @@ const aFlowsheet = (inputs: FlowsheetInfo['inputs']): FlowsheetInfo => ({
   id: 'placeholder-flowsheet', title: 'A placeholder flowsheet', description: '', source: '', inputs, outputs: [], gridInputs: [],
   leavesOut: [], priceBasis: null, priceOutput: null, program: null, brothStream: null, builtFrom: [],
 });
+const aConversation = (id: string): LiveConversation => ({ id, title: 'A placeholder conversation', startedAt: AT, turns: [] });
 
 const dep = { id: 'dep-1', runbookId: 'rb-1' } as unknown as Deposition;
 const scenario = aScenario('sc-1');
-const talk = { id: 'lc-1', turns: [] } as unknown as LiveConversation;
+const talk = aConversation('lc-1');
 const before: ProjectState = { ...EMPTY_STATE, depositions: [dep], scenarios: [scenario], conversations: [talk], fits: { 'sc-1': { mu: 'a'.repeat(16) } } };
 
 // ── changes ────────────────────────────────────────────────────────────
@@ -103,8 +105,8 @@ check('a deposition and a conversation that leave the page are never taken back'
 // the 30 newest, so stage C's 31 evaluation runs left every earlier answer
 // unreachable, and a link to one opened an empty pane.
 
-const kept = Array.from({ length: 51 }, (_, i) => ({ id: `lc-${i}`, turns: [] }) as unknown as LiveConversation);
-const begun = { id: 'lc-new', turns: [] } as unknown as LiveConversation;
+const kept = Array.from({ length: 51 }, (_, i) => aConversation(`lc-${i}`));
+const begun = aConversation('lc-new');
 const held = conversationsHeld(kept, [begun]);
 check(
   'every conversation the service keeps is held, newest first, after those the page began: a link to the oldest finds it',

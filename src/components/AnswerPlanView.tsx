@@ -14,18 +14,8 @@
 // The provenance tick reuses the existing visual language rather than inventing
 // a fourth one — a claim is evidence, and evidence in this system is ticked.
 import { AlertTriangle, ExternalLink, HelpCircle, Quote, SearchX } from 'lucide-react';
-import type {
-  AnswerPlan,
-  Claim,
-  ClaimValue,
-  CoverageMap,
-  ModuleRow,
-  Evidence,
-  ExtractionRecord,
-  Paper,
-  Passage,
-  RunbookDraft,
-} from '@/data/types';
+import type { ExtractionRecord, Paper } from '@/data/types';
+import type { AnswerPlan, Claim, ClaimValue, CoverageMap, Evidence, ModuleRow, Passage, RunbookDraft } from '@/lib/postdoc';
 import { useStore, provenanceOf } from '@/store';
 import { navigate } from '@/router';
 import { fmt } from '@/engine/units';
@@ -246,7 +236,8 @@ function ClaimRow({
 /** A runbook the agent drafted (OF-BLD-014 §9.2): its numbers were written by the service. */
 function DraftCard({ draft }: { draft: RunbookDraft }) {
   const adopt = useStore((s) => s.adoptRunbookDraft);
-  const predictionLabel = (id: string | null) => draft.predictions.find((p) => p.id === id)?.label ?? 'nothing predicted';
+  // A measure names the prediction it tests; one that tests none holds null or leaves the field out.
+  const predictionLabel = (id?: string | null) => draft.predictions.find((p) => p.id === id)?.label ?? 'nothing predicted';
   return (
     <Card className="p-4" data-testid="runbook-draft">
       <div className="text-caption uppercase tracking-wide text-ink-soft">Runbook draft</div>

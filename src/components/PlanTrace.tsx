@@ -7,7 +7,7 @@
 // (OF-BLD-015 §7.1): code sweeping every module for what the question names,
 // opening to one line a module.
 import { AlertTriangle, CheckCircle2, Database, FileSearch, LayoutGrid, RefreshCw, Repeat, Wrench } from 'lucide-react';
-import type { StopReason, TraceStep } from '@/data/types';
+import type { StopReason, TraceStep } from '@/lib/postdoc';
 
 const ICON: Record<string, typeof Database> = {
   search_records: Database,

@@ -9,12 +9,8 @@ import { create } from 'zustand';
 import type {
   Project,
   InputAssumption,
-  RunbookDraft,
   ReviewDecision,
   ActivityEvent,
-  LiveConversation,
-  LiveTurn,
-  TraceStep,
   Deposition,
   Deviation,
   ExtractionRecord,
@@ -55,6 +51,7 @@ import type {
   TrainSpec,
 } from '@/data/types';
 import type { Override } from '@/lib/params';
+import type { LiveConversation, LiveTurn, RunbookDraft, TraceStep } from '@/lib/postdoc';
 import type { Scenario } from '@/lib/proforma';
 import { toSI } from '@/engine/units';
 import { runbookLockHash } from '@/engine/lock';
@@ -1809,6 +1806,16 @@ export const useStore = create<OFState>()((set, get) => ({
   // runbook outlives this page in the project's rows.
   adoptRunbookDraft: (draft) => {
     const id = `rb-draft-${Date.now().toString(36)}-${nextId('d').slice(2)}`;
+    // The draft's predictions and measures enter the runbook as the service
+    // wrote them, every field present or left out and every null as it
+    // arrived, since lock.ts and runbook_lock.py read a field left out and a
+    // null apart. The draft reads the generated types and the store's
+    // runbooks the hand-kept ones until alpha 2.2 E.11 moves them; this
+    // assertion is the one seam between the two.
+    const assay = structuredClone({ predictions: draft.predictions, measurementSchema: draft.measures }) as Pick<
+      Runbook,
+      'predictions' | 'measurementSchema'
+    >;
     const runbook: Runbook = {
       id,
       kind: 'research',
@@ -1822,8 +1829,7 @@ export const useStore = create<OFState>()((set, get) => ({
       progressPct: 0,
       estCostUsd: null,
       strainId: draft.strainId || null,
-      predictions: structuredClone(draft.predictions),
-      measurementSchema: structuredClone(draft.measures),
+      ...assay,
       lockedAt: null,
       lockHash: null,
     };
