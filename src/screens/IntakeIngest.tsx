@@ -9,7 +9,7 @@
 // simulated, and with the service down the board says so and offers nothing.
 import { useMemo } from 'react';
 import { CheckCircle2, Loader2, Sparkles } from 'lucide-react';
-import type { Candidate } from '@/data/types';
+import type { Candidate } from '@/lib/review';
 import { useStore } from '@/store';
 import { href } from '@/router';
 import { START_COMMAND } from '@/lib/postdoc';

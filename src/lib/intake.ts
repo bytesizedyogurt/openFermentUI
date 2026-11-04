@@ -1,18 +1,28 @@
 // The browser's side of Intake (OF-BLD-012 §5.4).
 //
 // Calls with no key: extract one of the project's documents, post a review
-// decision, and ask for the overlay the store applies at load. Collecting a
-// document into the project is lib/literature.ts's.
+// decision, ask whether the service would keep one, and ask for the overlay
+// the store applies at load. Collecting a document into the project is
+// lib/literature.ts's.
 //
 // SAME DISCIPLINE AS lib/postdoc.ts. When the service is unreachable this says
-// so and says how to start it, and it never quietly substitutes the timer
-// simulation for a real fetch — the ingest board keeps that path, labelled as
-// the offline one, and the choice between them is made in the store where the
-// reader can see which one ran.
-import type { ExtractResponse, FetchSource } from '@/data/types';
-import type { DecisionCheck, Overlay, ReviewDecision } from './review';
+// so and names the command that starts it (`IntakeDown`).
+//
+// The answers read here are the service's own shapes, generated from its
+// models into src/api/types.gen.ts (ADR-007): the extraction's answer and the
+// source that served a text are named here, and the review family this posts
+// and reads is named in lib/review.ts.
+import type { components } from '@/api/types.gen';
+import type { DecisionCheck, Overlay, OverlayPaper, ReviewDecision } from './review';
 import { START_COMMAND, postdocHealth } from './postdoc';
 import { apiFetch } from './project';
+
+type S = components['schemas'];
+
+/** POST /api/intake/{paper_id}/extract: the candidates anchoring kept, the refusals counted by rule, and what the model calls took. */
+export type ExtractResponse = S['ExtractResponse'];
+/** Who served a document's text, as the overlay names it: Europe PMC, OSTI, the Saccharomyces Genome Database, an uploaded file or pasted text. */
+export type FetchSource = OverlayPaper['source'];
 
 /** Who served a fetched text, in the words the reader is shown. */
 const SOURCE_NAMES: Record<FetchSource, string> = {
@@ -35,9 +45,9 @@ export function licenceWords(licenceClass: string): string {
   return LICENCE_WORDS[licenceClass] ?? licenceClass.replace(/_/g, ' ');
 }
 
-/** The name of a fetched text's source; absent is Europe PMC, the one source an older service knew. */
-export function fetchSourceName(source: FetchSource | undefined): string {
-  return SOURCE_NAMES[source ?? 'europepmc'];
+/** The name of the source that served a text, in the words the reader is shown. */
+export function fetchSourceName(source: FetchSource): string {
+  return SOURCE_NAMES[source];
 }
 
 export class IntakeDown extends Error {
