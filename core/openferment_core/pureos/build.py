@@ -17,8 +17,10 @@ THE INLET a model names (`inletRef`):
                                                flow read from the design
     `<artifact id>/<stream id>`                a stream of a kept run
                                                (`proforma.run`,
-                                               `proforma.reference`,
-                                               `pureos.train_run`)
+                                               `library.run`,
+                                               `pureos.train_run`, or a
+                                               `proforma.reference` kept
+                                               from a retired entry)
 
 THE CHEMICAL SET a model's train builds on is the one pureOS holds, said so
 (its `program`, the set's key, until stage 4 reads the set from the run's

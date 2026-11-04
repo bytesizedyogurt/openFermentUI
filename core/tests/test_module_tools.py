@@ -176,19 +176,22 @@ def test_an_artifact_row_carries_its_headline_values(pool):  # noqa: F811
     """A Proforma read said the benchmark row named its tool and date and
     nothing else (live, 2026-10-20). The top-level scalars of the output
     ride on the row, with the inputs' names, so a read says what was
-    computed; a value is still cited through the tool that computes it."""
+    computed; a value is still cited through the tool that computes it. The
+    row is a library plant's run, the reference runs Proforma's rows list
+    since the shelf's hand-written entries retired (alpha 2.2 D8); its
+    numbers are PLACEHOLDERS."""
     from openferment_core.models import Artifact, BasisInput, BasisSource
 
-    art = Artifact(id="0123456789abcdef", tool="proforma_benchmark", toolVersion="1", provenance="computed",
+    art = Artifact(id="0123456789abcdef", tool="library.run", toolVersion="1", provenance="computed",
                    createdAt="2026-10-20T00:00:00Z", outputHash="x", durationMs=1,
-                   inputs=[BasisInput(name="package", value="biorefineries.cornstover@2.35.1", unit="",
+                   inputs=[BasisInput(name="plant", value="cornstover", unit="",
                                       source=BasisSource(kind="model", id="x"))],
-                   output={"mespUsdPerGal": 1.9677, "package": "biorefineries.cornstover@2.35.1", "nested": {"a": 1},
+                   output={"plant": "cornstover", "simulator": "biosteam 2.54.0", "nested": {"a": 1},
                            "quantiles": [1, 2, 3]})
     r = read("proforma", ctx_for(pool, artifacts=lambda: [art]), kind="artifact")
     [row] = r.rows
-    assert row.detail["output"] == {"mespUsdPerGal": 1.9677, "package": "biorefineries.cornstover@2.35.1"}
-    assert row.detail["inputs"] == ["package=biorefineries.cornstover@2.35.1"]
+    assert row.detail["output"] == {"plant": "cornstover", "simulator": "biosteam 2.54.0"}
+    assert row.detail["inputs"] == ["plant=cornstover"]
     assert read("proforma", ctx_for(pool, artifacts=lambda: [art]), words="cornstover").summary["count"] == 1
 
 

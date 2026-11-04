@@ -83,8 +83,6 @@ Proforma's flowsheets (OF-BLD-014 §8.1; the shelf, OF-BLD-019 §2.1).
 | Module | What it says it is |
 |---|---|
 | `cellulosic_ethanol_v0.py` | Cellulosic ethanol, version 0: openFerment's first flowsheet of its own, composed from the `biorefineries.cellulosic` factories (ADR-004; execution prompt §4.4, §8.4). |
-| `corn_drygrind.py` | The dry-grind corn ethanol plant (OF-BLD-019 §2.2): a published reference biorefinery, run whole on its package's own defaults. |
-| `cornstover_benchmark.py` | The benchmark (OF-BLD-014 §8.2): a published biorefinery, run end to end. |
 | `custom_train_v1.py` | A vessel and a train, priced: the seam (OF-BLD-020 §6.1, D11, E.2‴, E.3‴). |
 | `ethanol_glucose_v0.py` | Glucose to ethanol, version 0: a flowsheet of our own (OF-BLD-019 §2.3; D3, D4). |
 | `shelf.py` | Proforma's shelf of flowsheets (OF-BLD-019 §2.1, D2). |
@@ -180,6 +178,7 @@ Heavy libraries run in workers (OF-BLD-014 §3.4, E.6).
 | `dot_names.py` | Stable node names for a BioSTEAM digraph (OF-BLD-019 §7.R, finding 5). |
 | `echo_worker.py` | A worker for the tests (OF-BLD-014 §3.4). It echoes, sleeps on request and exits on request, so start, timeout, crash and restart are each exercised. It computes nothing. |
 | `geneos_worker.py` | The geneOS worker: flux balance analysis, in a process of its own (OF-BLD-014 §6.2, Appendix 2). |
+| `kept_references.py` | The replay of runs kept from two retired shelf entries (alpha 2.2 D8). |
 | `library_plants.py` | The `biorefineries` package's plants, found by inspection and run whole (ADR-004; execution prompt §4.4, §8.4). |
 | `proforma_worker.py` | The Proforma worker: BioSTEAM in a process of its own, kept warm (OF-BLD-014 §8.1). |
 | `sample_worker.py` | A worker for the engine contract's own tests (docs/api/engines.md; ADR-015). |

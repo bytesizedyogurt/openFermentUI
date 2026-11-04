@@ -21,6 +21,11 @@ A bare number is refused in words, since a PMID and an OSTI id look alike. In fi
 (`OPENFERMENT_FIXTURES=1`) every collector that would fetch reads `core/tests/fixtures/`
 (or `OPENFERMENT_FIXTURE_DIR`) and refuses the network.
 
+The same manners (the throttle, the User-Agent, a timeout, fixture mode's refusal) fetch the SFF
+file a person names by its public https address (`literature/collectors.py` `fetch_file`, its host
+checked as a public address before each request). That file becomes a flowsheet record of the
+project and stays outside the kit's corpus (`docs/api/sff.md`, A file by its address).
+
 ## What a document carries into the kit
 
 `CorpusEntry` fields, as Intake writes them: `path` (the document written as a file for the

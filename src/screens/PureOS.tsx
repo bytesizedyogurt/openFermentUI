@@ -135,7 +135,8 @@ function TrainsOnFile() {
                   </span>
                 </div>
                 <div className="text-caption text-ink-soft mt-0.5">
-                  {t.unitCount} units · product {t.product ?? 'not named'} · run {t.createdAt}
+                  {t.unitCount === 1 ? '1 unit' : `${t.unitCount} units`} · product {t.product ?? 'not named'} · run{' '}
+                  <span className="font-num">{stamp(t.createdAt)}</span>
                   {t.runs > 1 ? ` · newest of ${t.runs}` : ''}
                   {t.note ? ` · ${t.note}` : ''}
                 </div>
@@ -333,7 +334,8 @@ function TrainRunsOnFile({ runs, problem }: { runs: TrainSummary[] | null; probl
                   </span>
                 </div>
                 <div className="text-caption text-ink-soft mt-0.5">
-                  {t.unitCount} units · product {t.product ?? 'not named'} · run {t.createdAt}
+                  {t.unitCount === 1 ? '1 unit' : `${t.unitCount} units`} · product {t.product ?? 'not named'} · run{' '}
+                  <span className="font-num">{stamp(t.createdAt)}</span>
                   {t.trainId && made[t.trainId] ? (
                     <>
                       {' · '}

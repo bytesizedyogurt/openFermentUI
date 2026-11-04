@@ -334,11 +334,11 @@ List the project's study scenarios (each with the values it sets, their origins 
 
 *read · scope: project · strict*
 
-The minimum selling price the most recent kept run of one of the project's BioSTEAM scenarios produced, as one evidence id to cite: the median with its 5th to 95th percentile, the infeasible share, which inputs rest on an assumption and which on a deposition's reading, and what the flowsheet leaves out. Refuses when no run is on file, naming the inputs still waiting for a source and how a run is made. With proforma_benchmark it returns the stored benchmark instead: the NREL 2011 corn stover ethanol design's minimum ethanol selling price as biorefineries.cornstover computes it. It cannot run a scenario or make an assumption.
+The minimum selling price the most recent kept run of one of the project's BioSTEAM scenarios produced, as one evidence id to cite: the median with its 5th to 95th percentile, the infeasible share, which inputs rest on an assumption and which on a deposition's reading, and what the flowsheet leaves out. Refuses when no run is on file, naming the inputs still waiting for a source and how a run is made. With a plant of the library shelf by its id (cornstover, the NREL 2011 corn stover design; corn, the dry-grind corn plant; any plant engine_plants lists) it reads that plant's newest kept run on its package's own values: the selling price its TEA solves, as the evidence id engine_report gives it, and how many of the package test's values the run holds. An id of a retired reference entry (proforma_benchmark, cornstover_benchmark, corn_drygrind) reads its library plant, or, when the project keeps no such run, the newest run the project kept from that entry, its price as the entry named it. It cannot run a scenario or make an assumption.
 
 | Field | Type | Required | What it is |
 |---|---|---|---|
-| `scenarioId` | string | yes | The id of a BioSTEAM scenario the project keeps (proforma_read lists them), whose newest kept run it reads; or proforma_benchmark, the NREL 2011 corn stover ethanol design as biorefineries.cornstover builds it. |
+| `scenarioId` | string | yes | The id of a BioSTEAM scenario the project keeps (proforma_read lists them), whose newest kept run it reads; or a plant of the library shelf by its id (engine_plants lists them: cornstover is the NREL 2011 corn stover design, corn the dry-grind corn plant), whose newest run on its package's own values it reads. |
 
 ### `run_flowsheet`
 
@@ -354,11 +354,11 @@ Run one of the project's BioSTEAM scenarios as its page runs it, and keep the ru
 
 *read · scope: project · loose*
 
-Read the stream table a kept Proforma run holds: every stream of the base case with the unit it leaves and the unit it enters (none for a feed or a product), its phase, temperature, pressure, mass flow, price and largest components, as BioSTEAM held them after the run. Takes the run's artifact id and nothing else (a scenario's proforma.run artifact, a reference biorefinery's proforma.reference artifact, or a library plant's library.run artifact); you never type a number. The plant's feeds and products come first; a long table is cut to what a model may read and says how many streams it left out. Returns the run's evidence id to cite: a price, a cost or a recovery read from a run is cited by it. It runs nothing.
+Read the stream table a kept Proforma run holds: every stream of the base case with the unit it leaves and the unit it enters (none for a feed or a product), its phase, temperature, pressure, mass flow, price and largest components, as BioSTEAM held them after the run. Takes the run's artifact id and nothing else (a scenario's proforma.run artifact or a library plant's library.run artifact, the corn stover and dry-grind corn reference plants' among them, or a proforma.reference artifact kept from a retired reference entry); you never type a number. The plant's feeds and products come first; a long table is cut to what a model may read and says how many streams it left out. A scenario's run and a kept reference run return their evidence id to cite, the run's price; a library plant's numbers are cited by the evidence ids engine_report names for its outputs. It runs nothing.
 
 | Field | Type | Required | What it is |
 |---|---|---|---|
-| `artifactId` | string | yes | The artifact id of a kept run: a proforma.run artifact (a scenario's run, as run_flowsheet, selling_price or proforma_read return it), a proforma.reference artifact (a reference biorefinery's run, as proforma_read lists it) or a library.run artifact (a library plant's run, as engine_run and engine_report name it). Nothing else: no number, no stream, no setting. |
+| `artifactId` | string | yes | The artifact id of a kept run: a proforma.run artifact (a scenario's run, as run_flowsheet, selling_price or proforma_read return it), a library.run artifact (a library plant's run, as engine_run, engine_report and proforma_read name it), or a proforma.reference artifact kept from a retired reference entry. Nothing else: no number, no stream, no setting. |
 
 ## fermOS
 
@@ -559,7 +559,7 @@ Read pureOS: the downstream unit operations, by stage (each with the BioSTEAM cl
 
 *read · scope: project · loose*
 
-Read Proforma: the cost scenarios and the runs kept as artifacts: each scenario's runs and the reference biorefineries' runs (stream_table reads a run's streams). Kinds: scenario, artifact. Pass ids or refs, words, a kind and a state to narrow; pass an empty list and empty strings to list the module. Returns at most 20 rows, each with its ref (cite it in moduleRefs), label, state (open, fenced, approved, locked, proposed, retired; computed by the service), the module's own status word and its provenance; and the count of every match by state.
+Read Proforma: the cost scenarios and the runs kept as artifacts: each scenario's runs, the library plants' runs, the corn stover and dry-grind corn reference plants among them, and the runs kept from the retired reference entries (a reference run, the benchmark), listed as kept (stream_table reads a run's streams; engine_report reads a library run's numbers as evidence ids). Kinds: scenario, artifact. Pass ids or refs, words, a kind and a state to narrow; pass an empty list and empty strings to list the module. Returns at most 20 rows, each with its ref (cite it in moduleRefs), label, state (open, fenced, approved, locked, proposed, retired; computed by the service), the module's own status word and its provenance; and the count of every match by state.
 
 | Field | Type | Required | What it is |
 |---|---|---|---|

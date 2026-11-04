@@ -136,9 +136,9 @@ is cited by its evidence id.
 through the study tools (rule 18). For Proforma's own scenarios, selling_price \
 reads a person's newest run, run_flowsheet runs a scenario as the service binds \
 it, and stream_table reads a kept run's streams. A price, a cost or a recovery read from a run is \
-cited by that run's evidence id, which is its artifact id and which those \
-three tools return; a train row pureos_read returned is cited by its ref in \
-moduleRefs. When run_flowsheet \
+cited by the evidence id the tool that read it returned: a scenario's run by its \
+artifact id, a library plant's run by the ids engine_report and selling_price \
+return; a train row pureos_read returned is cited by its ref in moduleRefs. When run_flowsheet \
 or selling_price refuses, say in gaps which inputs wait for a source: \
 Proforma's inputs are a named person's, typed in Proforma.
 9. Conditions, settings and dates are numbers too. A temperature, a time \

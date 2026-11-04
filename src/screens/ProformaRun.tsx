@@ -55,7 +55,7 @@ import type { FlowsheetInfo, ParamScope, Quantity, RegressionCheck, RunReport as
 import { href, navigate } from '@/router';
 import { useStore } from '@/store';
 import { exportCSV } from '@/lib/csv';
-import { RUN_TOOL, baseCaseRefusal, proformaShelf, runViewOfArtifact, runViewOfRun, stamp } from '@/lib/proforma';
+import { RUN_TOOL, baseCaseRefusal, proformaShelf, regressionTable, runViewOfArtifact, runViewOfRun, stamp } from '@/lib/proforma';
 import { trainOfRun } from '@/lib/pureos';
 import { StudiesDown, downloadFlowsheet, makeRunbook, predictable, runReport } from '@/lib/studies';
 import { Button, Callout, Card, LinkButton, PageHeader, cx } from '@/components/ui';
@@ -64,7 +64,6 @@ import { ParameterPanel } from '@/components/ParameterPanel';
 import { NewScenarioDialog } from '@/components/NewScenarioDialog';
 import { ReadingOrigin, readingNote } from '@/components/ReadingOrigin';
 import { RunReport, inputLabels } from '@/screens/ProformaBiosteam';
-import { regressionTable } from '@/screens/ProformaReference';
 import { fmt } from '@/engine/units';
 
 const problemOf = (e: unknown) => (e instanceof StudiesDown ? `${e.message} ${e.remedy ?? ''}`.trim() : e instanceof Error ? e.message : String(e));
@@ -635,6 +634,7 @@ export default function ProformaRun({ runId }: { runId: string }) {
               scenarioId={run.scenarioId ?? ''}
               csvName={`run-${run.id}`}
               oneCase={!scenarioRun}
+              sffRecord={report.flowsheet?.id ?? null}
             />
           )}
           <FlowsheetCard report={report} />

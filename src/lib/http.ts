@@ -64,8 +64,9 @@ export async function call<T>(path: string, init?: RequestInit): Promise<T> {
   }
   if (response.ok) return (await response.json()) as T;
   // 413 is an upload past the size an import takes, 502 a source the service
-  // could not fetch (an SFF reference file); like 404, a 502 is the service's
-  // only when it says why, since a proxy in front of it answers 502 too.
+  // could not fetch (an SFF reference file, or a file named by its address);
+  // like 404, a 502 is the service's only when it says why, since a proxy in
+  // front of it answers 502 too.
   if ([404, 409, 413, 422, 502, 503].includes(response.status)) {
     let detail = '';
     try {

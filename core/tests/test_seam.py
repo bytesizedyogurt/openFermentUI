@@ -263,11 +263,11 @@ def test_a_scenario_inlet_reads_its_newest_runs_broth_as_its_flowsheet_names_it(
 
 
 def test_a_scenario_inlet_whose_flowsheet_names_no_broth_is_refused_naming_the_runs_streams(store, worker):
-    _keep(flowsheet="corn_drygrind", scenario="sc-corn")
+    _keep(flowsheet="toy", scenario="sc-corn")  # the toy's entry names no broth stream
     with pytest.raises(pureos.TrainRefused) as e:
         pureos.inlet_stream(spec_of(inlet={"kind": "run-stream", "ref": "sc-corn"}))
     words = str(e.value)
-    assert "the newest run of scenario sc-corn on file, is of corn_drygrind, whose shelf entry names no broth" in words
+    assert "the newest run of scenario sc-corn on file, is of toy, whose shelf entry names no broth" in words
     assert "name the stream the train takes, one of " + ", ".join(s["id"] for s in STREAMS) in words
     with pytest.raises(pureos.TrainRefused, match="there is no kept artifact or scenario run sc-none here"):
         pureos.inlet_stream(spec_of(inlet={"kind": "run-stream", "ref": "sc-none"}))
@@ -282,12 +282,8 @@ FERMENTER = "R1"
 def test_the_shelf_names_each_broth_by_the_id_its_flowsheet_file_gives_the_fermenters_outlet():
     """A scenario flowsheet's `brothStream` is read from its file: one of the
     stream names the fermenter's own `outs` give (`self.R1 = <unit>(...,
-    outs=...)`), never another unit's and never guessed; a reference names
-    none (its package names its streams)."""
+    outs=...)`), never another unit's and never guessed."""
     for info in shelf.SHELF.values():
-        if info.reference:
-            assert info.brothStream is None, info.id
-            continue
         assert info.brothStream, info.id
         tree = ast.parse((PKG / "flowsheets" / f"{info.id}.py").read_text(encoding="utf-8"))
         fermenters = [node.value for node in ast.walk(tree) if isinstance(node, ast.Assign)

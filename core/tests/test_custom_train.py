@@ -138,7 +138,7 @@ def request(parts, overrides=None, **kw) -> ProformaRunRequest:
 
 def test_the_shelf_holds_the_composite_the_yeast_programs_built_from_a_vessel_and_a_train():
     info = shelf.info(FLOWSHEET)
-    assert not info.reference and info.builtFrom == ["fermos.vessel", "pureos.train_run"]
+    assert info.builtFrom == ["fermos.vessel", "pureos.train_run"]
     # Its program is the chemical set its train builds on, the one pureOS holds.
     assert set(train_spec.PROGRAM_CHEMICALS) == {info.program} == {"yeast"}
     assert [i.key for i in info.inputs] == ["feed_glucose_conc", "titre", "yield", "productivity", "plant_scale",
@@ -536,3 +536,45 @@ def test_the_biosteam_engine_runs_the_composite_in_each_pair_its_kept_scenarios_
     assert biosteam.run(FLOWSHEET, configuration, asked, "Another STAND-IN person").id == run.id
     assert [r.id for r in runs.listed("biosteam")] == [run.id]
     registry.reset()
+
+
+def test_every_kept_scenario_is_the_projects_and_a_kept_composite_binds_with_the_parts_it_names(parts, worker, client):
+    """alpha 2.2 D9: GET /api/proforma/scenarios reads every scenario the
+    project keeps as the project's, and a kept custom_train_v1 scenario binds
+    with the vessel design and the train run it names, where it answered 500
+    before (composite.parts_of(None, None)); one whose parts cannot stand is
+    listed with its refusal in words, so one scenario never stops the list."""
+    from openferment_core import project_state
+
+    project_state.put("scenarios", SCENARIO, {"id": SCENARIO, "kind": "biosteam", "modelId": FLOWSHEET,
+                                              "name": "A STAND-IN composite", "vessel": parts.vessel,
+                                              "trainRun": parts.train}, by=BY)
+    project_state.put("scenarios", "sc-ethanol-test", {"id": "sc-ethanol-test", "kind": "biosteam",
+                                                       "modelId": proforma.ETHANOL, "name": "A STAND-IN ethanol"}, by=BY)
+    got = client.get("/api/proforma/scenarios")
+    assert got.status_code == 200, got.text
+    listed = {s["id"]: s for s in got.json()}
+    assert set(listed) == {SCENARIO, "sc-ethanol-test"}
+    composite = listed[SCENARIO]
+    assert composite["flowsheet"] == FLOWSHEET and composite["refused"] is None and composite["inputs"]
+    # The plant scale the vessel was designed at binds it, as the scenario's page binds it.
+    by_key = {i["key"]: i for i in composite["inputs"]}
+    assert by_key["plant_scale"]["binding"] == "artifact" and by_key["plant_scale"]["value"] == PLANT_STANDIN
+    assert listed["sc-ethanol-test"]["refused"] is None and listed["sc-ethanol-test"]["flowsheet"] == proforma.ETHANOL
+    # A kept composite whose parts cannot stand is listed, refused in words, beside the rest.
+    project_state.put("scenarios", "sc-composite-missing", {"id": "sc-composite-missing", "kind": "biosteam",
+                                                            "modelId": FLOWSHEET, "name": "No parts"}, by=BY)
+    again = client.get("/api/proforma/scenarios")
+    assert again.status_code == 200, again.text
+    missing = {s["id"]: s for s in again.json()}["sc-composite-missing"]
+    assert "no vessel design (vessel) and no train run (trainRun)" in missing["refused"] and missing["inputs"] == []
+    assert {s["id"] for s in again.json()} == {SCENARIO, "sc-ethanol-test", "sc-composite-missing"}
+    # A kept scenario on a flowsheet the shelf no longer holds (a retired entry's id, alpha 2.2 D8) is listed too.
+    project_state.put("scenarios", "sc-retired-entry", {"id": "sc-retired-entry", "kind": "biosteam",
+                                                        "modelId": "cornstover_benchmark", "name": "Retired"}, by=BY)
+    third = client.get("/api/proforma/scenarios")
+    assert third.status_code == 200, third.text
+    retired = {s["id"]: s for s in third.json()}["sc-retired-entry"]
+    assert retired["refused"].startswith("there is no flowsheet cornstover_benchmark on the shelf")
+    assert retired["inputs"] == [] and retired["leavesOut"] == [] and retired["priceBasis"] == ""
+    assert len(third.json()) == 4

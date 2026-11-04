@@ -1,8 +1,10 @@
 // The browser's side of Proforma's simulator (OF-BLD-014 §8.2).
 //
-// The simulator's status and the benchmark it reproduced. The service runs
-// BioSTEAM and keeps the benchmark as an artifact; with it down this says so,
-// and nothing stands in for a result (E.2). Shares lib/http.ts's call.
+// The simulator's status, the shelf's scenario flowsheets and their runs, and
+// the reference runs, which the library shelf's plants give (alpha 2.2 D8).
+// The service runs BioSTEAM and keeps every run as an artifact; with it down
+// this says so, and nothing stands in for a result (E.2). Shares lib/http.ts's
+// call.
 import type {
   Artifact,
   BasisInput,
@@ -10,6 +12,7 @@ import type {
   CeilingCheck,
   ComputedBasis,
   CostLine,
+  EngineRun,
   FermosFitInfo,
   FlowsheetInfo,
   HistogramBin,
@@ -63,26 +66,19 @@ export const proformaStatus = (signal?: AbortSignal) => call<SimulatorStatus>('/
  */
 export const proformaShelf = (signal?: AbortSignal) => call<FlowsheetInfo[]>('/api/proforma/shelf', { signal });
 
-// ── Reference runs (OF-BLD-019 §2.2, D3) ────────────────────────────────
+// ── Reference runs (alpha 2.2 D8; OF-BLD-019 §2.2) ──────────────────────
 
 /**
- * A reference biorefinery's newest stored run, or none, and the worker's
- * status: `ProformaReference` as GET and POST /api/proforma/reference/{id}
- * answer it, with the shelf's entry and the package test's values, which a
- * service that predates that endpoint does not send.
+ * The plants of the library shelf Proforma's reference runs read: the corn
+ * stover plant (the NREL 2011 design, the benchmark the shelf's retired entry
+ * ran) and the dry-grind corn plant, each run whole on its package's own
+ * values through the library's door (`GET /api/library`, `POST
+ * /api/library/{plant}/run`) and held to its package's own test.
  */
-export interface ReferenceResponse {
-  flowsheet?: FlowsheetInfo | null;
-  artifact: Artifact | null;
-  /** The package's own regression test, as the service read it from the installed file. */
-  regression?: PackageRegression | null;
-  simulator: SimulatorStatus;
-  /** What the service said when it answered that it holds no run, in its words. */
-  note?: string | null;
-}
+export const REFERENCE_PLANTS: readonly string[] = ['cornstover', 'corn'];
 
-/** Where a reference biorefinery's page lives (OF-BLD-019 §3.3; 'reference' is reserved under /proforma). */
-export const referencePath = (id: string) => `/proforma/reference/${encodeURIComponent(id)}`;
+/** Where a reference plant's page lives (OF-BLD-019 §3.3; 'reference' is reserved under /proforma). */
+export const referencePath = (plant: string) => `/proforma/reference/${encodeURIComponent(plant)}`;
 
 /**
  * Whether the service has no such endpoint, rather than no such run: FastAPI's
@@ -93,61 +89,66 @@ const noEndpoint = (e: unknown) =>
   (e instanceof ServiceRefused && (e.status === 405 || (e.status === 404 && e.message === 'Not Found'))) ||
   (e instanceof ServiceDown && /answered 40[45]\./.test(e.message));
 
+/** The values a plant's own package test asserts, read by the service from the installed file; null when it has none. */
+export const libraryRegression = (plant: string, signal?: AbortSignal) =>
+  call<PackageRegression | null>(`/api/library/${encodeURIComponent(plant)}/regression`, { signal });
+
+/** The origins of a value a run set for itself (the service's `basis.SET_ORIGINS`). */
+const SET_ORIGINS = new Set(['person-assumption', 'model-estimate', 'measurement']);
+
+/** Whether a kept engine run ran on its package's own values: it set no value of its own. */
+export const onOwnValues = (run: EngineRun): boolean => run.inputs.every((i) => !SET_ORIGINS.has(i.quantity.origin?.kind ?? ''));
+
 /**
- * The newest stored run of a reference flowsheet, its shelf entry and its
- * package test's values, at `GET /api/proforma/reference/{id}` (OF-BLD-019
- * §2.2), the corn stover benchmark included (§3.3): one artifact per
- * reference run, `proforma.reference`, with its tables and its checks. A
- * service that predates that endpoint says so in the note; for the benchmark
- * it still answers at `/api/proforma/benchmark` (OF-BLD-014 §8.2), which
- * keeps its price and no table. A 404 in words is the service saying the id
- * is not a reference it holds.
+ * A library plant's reference run among the project's runs (newest first, as `GET /api/runs` lists them): its newest
+ * run that computed, on its package's own values, in the configuration a run of it takes when none is named
+ * (`configuration`, the plant's default as `runnable` orders it: the library door runs a plant that takes
+ * configurations in its default, and keeps the run under it). Null when the project keeps none.
  */
-export async function proformaReference(id: string, signal?: AbortSignal): Promise<ReferenceResponse> {
-  let ref: ReferenceResponse;
-  try {
-    ref = await call<ReferenceResponse>(`/api/proforma/reference/${encodeURIComponent(id)}`, { signal });
-  } catch (e) {
-    if (noEndpoint(e)) {
-      if (id === BENCHMARK_FLOWSHEET) {
-        const old = await proformaBenchmark(signal);
-        return { ...old, note: 'This service keeps the benchmark at its old address, with its price and no table: the reference endpoint is newer than it.' };
-      }
-      return { artifact: null, simulator: await proformaStatus(signal), note: `This service has no reference endpoint, so it cannot run ${id} yet.` };
-    }
-    // A 404 in words is the service saying the id is not a reference it
-    // holds (OF-BLD-019 §3.R, finding 14): the caller says so, and offers no
-    // run of something that is not there.
-    throw e;
-  }
-  // The corn stover benchmark kept before reference runs held their tables
-  // (OF-BLD-014 §8.2, `proforma_benchmark`) is still the service's run of
-  // that plant, and the one Postdoc's selling_price cites: with no reference
-  // run on file, it is shown, price only, said to be what it is (§3.R,
-  // findings 0, 15, 22).
-  if (id === BENCHMARK_FLOWSHEET && !ref.artifact) {
-    const old = await proformaBenchmark(signal).catch(() => null);
-    if (old?.artifact) return { ...ref, artifact: old.artifact, note: LEGACY_BENCHMARK_NOTE };
-  }
-  return ref;
+export function referenceRunOf(plant: string, runs: EngineRun[], configuration: string | null = null): EngineRun | null {
+  return (
+    runs.find(
+      (r) =>
+        r.tool === LIBRARY_RUN_TOOL &&
+        r.plant === plant &&
+        (r.configuration ?? null) === configuration &&
+        r.status === 'done' &&
+        !!r.artifactId &&
+        onOwnValues(r),
+    ) ?? null
+  );
 }
 
-/** The tool the benchmark was kept under before reference runs held their tables (proforma.BENCHMARK). */
-export const LEGACY_BENCHMARK_TOOL = 'proforma_benchmark';
+// ── Runs kept from the retired reference entries (alpha 2.2 D8) ─────────
 
-export const LEGACY_BENCHMARK_NOTE =
-  'This is the benchmark run kept before reference runs held their tables: its price and settings, with no table and no check against the package’s test. Run makes the full reference run, with its tables and its checks.';
+/**
+ * The library plant each of the shelf's retired reference entries built, by the entry's id (the service's
+ * `proforma.RETIRED_PLANTS`): a run a person kept from an entry before it retired stays theirs, and the plant's page
+ * lists it.
+ */
+export const RETIRED_PLANTS: Readonly<Record<string, string>> = { cornstover_benchmark: 'cornstover', corn_drygrind: 'corn' };
 
-/** Run a reference flowsheet whole, on its package's defaults: `POST /api/proforma/reference/{id}`. */
-export async function runProformaReference(id: string, signal?: AbortSignal): Promise<ReferenceResponse> {
-  try {
-    return await call<ReferenceResponse>(`/api/proforma/reference/${encodeURIComponent(id)}`, { method: 'POST', signal });
-  } catch (e) {
-    if (!noEndpoint(e)) throw e;
-    if (id === BENCHMARK_FLOWSHEET) return runProformaBenchmark(signal);
-    throw new ServiceRefused(404, `This service cannot run ${id} yet: it has no reference endpoint.`);
-  }
+/** The tools a run kept from a retired entry was kept under: a reference run, and the benchmark. */
+export const KEPT_REFERENCE_TOOLS: readonly string[] = ['proforma.reference', 'proforma_benchmark'];
+
+/** The retired entry a kept run was made from: a reference run's flowsheet, the corn stover entry for the benchmark; null for any other artifact. */
+export function retiredEntryOf(a: Artifact): string | null {
+  if (a.tool === 'proforma_benchmark') return 'cornstover_benchmark';
+  if (a.tool !== 'proforma.reference') return null;
+  const named = (a.output as Record<string, unknown> | undefined)?.flowsheet ?? a.inputs.find((i) => i.name === 'flowsheet')?.value;
+  return typeof named === 'string' && named in RETIRED_PLANTS ? named : null;
 }
+
+/** The runs kept from the retired entries that built `plant`, in the order given (the service's, newest first). */
+export const keptRunsOf = (plant: string, kept: Artifact[]): Artifact[] =>
+  kept.filter((a) => {
+    const entry = retiredEntryOf(a);
+    return entry != null && RETIRED_PLANTS[entry] === plant;
+  });
+
+/** The runs the project kept from the retired entries (`GET /api/biorepo/artifacts?tool=`), newest first. */
+export const keptReferenceRuns = (signal?: AbortSignal) =>
+  call<Artifact[]>(`/api/biorepo/artifacts?${KEPT_REFERENCE_TOOLS.map((t) => `tool=${encodeURIComponent(t)}`).join('&')}`, { signal });
 
 /** One artifact the service keeps (`GET /api/biorepo/artifacts/{id}`). */
 export const proformaArtifact = (id: string, signal?: AbortSignal) =>
@@ -200,20 +201,65 @@ export interface PriceRead {
 const num = (v: unknown): number | null => (typeof v === 'number' && Number.isFinite(v) ? v : null);
 
 /**
- * A reference run's price: the output the shelf names as its price
- * (`priceOutput`, in `priceBasis`), else the price a run's tables were read
- * at. Null when the run holds neither. How the price was had (the corn
- * stover plant solves its; the corn plant's is the package's own, set, and
- * its TEA solves the IRR at it) is the shelf's `priceBasis` to say; `reads`
- * claims nothing beyond where the number was read (OF-BLD-019 §2.R).
+ * A library run's price (a `library.run` artifact): the product's price its TEA solves at the package's rate of return
+ * (`price.solvedPrice`, in the unit `price.units` names), else the product's price as the package sets it. Null when
+ * the run holds neither (a plant that carries no TEA). The words say which it is; nothing is computed here.
  */
-export function referencePrice(info: FlowsheetInfo | null, art: Artifact): PriceRead | null {
-  const o = art.output as Record<string, unknown>;
-  const named = info?.priceOutput ? num(o[info.priceOutput]) : null;
-  if (named != null) return { value: named, basis: info?.priceBasis ?? info?.priceOutput ?? '', low: null, high: null, reads: 'as the package\u2019s own run left it' };
-  const tea = o.tea as { productPrice?: unknown } | null | undefined;
-  const read = num(tea?.productPrice) ?? num(o.basePrice);
-  return read == null ? null : { value: read, basis: info?.priceBasis ?? 'USD per kg of product', low: null, high: null, reads: 'the price the run\u2019s TEA was read at' };
+export function libraryPrice(art: Artifact): PriceRead | null {
+  const price = rec<unknown>((art.output as Record<string, unknown>).price);
+  const units = rec<unknown>(price.units);
+  const product = typeof price.product === 'string' ? price.product : 'the product';
+  const solved = num(price.solvedPrice);
+  const unitOf = (key: string) => (typeof units[key] === 'string' ? (units[key] as string) : 'USD/kg');
+  if (solved != null)
+    return { value: solved, basis: `${unitOf('solvedPrice')} of ${product}`, low: null, high: null, reads: 'the price its TEA solves at the package\u2019s rate of return' };
+  const set = num(price.packagePrice);
+  return set == null ? null : { value: set, basis: `${unitOf('packagePrice')} of ${product}`, low: null, high: null, reads: 'the price as the package sets it' };
+}
+
+// ── Held to its package's own test (ADR-013) ────────────────────────────
+
+/** A value as a regression table prints it: thousands grouped, else five significant figures. */
+const sig = (v: number | null | undefined, n = 5): string => {
+  if (v == null || !Number.isFinite(v)) return '\u2014';
+  if (Math.abs(v) >= 1000) return Math.round(v).toLocaleString('en-US');
+  return String(Number(v.toPrecision(n)));
+};
+/** A share as a percentage, for the relative difference and the tolerance. */
+const pct = (v: number | null | undefined): string => (v == null || !Number.isFinite(v) ? '\u2014' : `${sig(v * 100, 2)} %`);
+
+/** One row of a package test held beside a run: the test's value, and what the run measured for its expression. */
+export interface RegressionRow {
+  expression: string;
+  label: string;
+  unit: string;
+  package: number;
+  rtol: number;
+  measured: number | null;
+  relDiff: number | null;
+  within: boolean | null;
+}
+
+/** The rows: the run's checks when it ran, else the package's values with nothing beside them. */
+export function regressionRows(regression: PackageRegression | null, checks: RegressionCheck[], ran: boolean): RegressionRow[] {
+  if (ran && checks.length) return checks.map((c) => ({ ...c }));
+  return (regression?.values ?? []).map((v) => ({ ...v, measured: null, relDiff: null, within: null }));
+}
+
+/** The table a package test is shown and exported in: its headers, and each row as the cells print it. */
+export function regressionTable(rows: RegressionRow[]) {
+  const headers = ['Quantity', 'Expression', 'Unit', "Package's value", 'This run', 'Relative difference', 'Tolerance', 'Within'];
+  const body = rows.map((r) => [
+    r.label,
+    r.expression,
+    r.unit || '\u2014',
+    sig(r.package),
+    sig(r.measured),
+    r.relDiff == null ? (r.measured != null && r.package === 0 ? 'package value is zero' : '\u2014') : pct(r.relDiff),
+    pct(r.rtol),
+    r.within == null ? 'not run' : r.within ? 'within' : 'outside',
+  ]);
+  return { headers, rows: body };
 }
 
 /**
@@ -252,6 +298,14 @@ export function isReading(source: BasisSource | null | undefined): boolean {
   );
 }
 
+/**
+ * What binds an input the service read from a kept artifact with no fit chosen for it, in words: the vessel design a
+ * custom_train_v1 scenario names (its source's note says so, composite.py), else a kept artifact.
+ */
+export function keptBindingWords(source: BasisSource | null | undefined): string {
+  return /vessel design/.test(source?.note ?? '') ? 'the vessel design' : 'a kept artifact';
+}
+
 export interface InputCounts {
   total: number;
   /** Bound to records by the service, or, with no binding to read, inputs that can bind to records. */
@@ -264,6 +318,14 @@ export interface InputCounts {
    * "with a fermOS fit chosen", never that the service bound one (§5.R).
    */
   computed: number;
+  /**
+   * Inputs the service bound to a kept artifact with no fit chosen for them: a
+   * custom_train_v1 scenario's plant scale, read from the vessel design it
+   * names (`binding` 'artifact'), counted by what binds each (`keptBy`).
+   */
+  kept: number;
+  /** What binds each input counted in `kept`, in words and in the order met: "the vessel design", "a kept artifact". */
+  keptBy: string[];
   assumed: number;
   conventions: number;
   waiting: number;
@@ -287,18 +349,22 @@ export function inputCounts(
     // scenario page lists it among the inputs, so the card counts it from the
     // shelf as the page does (OF-BLD-020 §2.R, finding 16).
     const conventions = flowsheet ? flowsheet.inputs.filter((i) => i.kind === 'convention').length : 0;
-    const c = { total: info.inputs.length + conventions, records: 0, measured: 0, computed: 0, assumed: 0, conventions, waiting: 0, bound: true };
+    const c: InputCounts = { total: info.inputs.length + conventions, records: 0, measured: 0, computed: 0, kept: 0, keptBy: [], assumed: 0, conventions, waiting: 0, bound: true };
     for (const i of info.inputs) {
       if (read.has(i.key) || (!typed.has(i.key) && isReading(i.source))) c.measured++;
       else if (typed.has(i.key) || i.binding === 'assumption') c.assumed++;
-      else if (i.binding === 'artifact' || fits[i.key]) c.computed++;
-      else if (i.binding === 'records') c.records++;
+      else if (fits[i.key]) c.computed++;
+      else if (i.binding === 'artifact') {
+        c.kept++;
+        const by = keptBindingWords(i.source);
+        if (!c.keptBy.includes(by)) c.keptBy.push(by);
+      } else if (i.binding === 'records') c.records++;
       else c.waiting++;
     }
     return c;
   }
   if (!flowsheet) return null;
-  const c = { total: flowsheet.inputs.length, records: 0, measured: 0, computed: 0, assumed: 0, conventions: 0, waiting: 0, bound: false };
+  const c: InputCounts = { total: flowsheet.inputs.length, records: 0, measured: 0, computed: 0, kept: 0, keptBy: [], assumed: 0, conventions: 0, waiting: 0, bound: false };
   for (const i of flowsheet.inputs) {
     if (i.kind === 'convention') c.conventions++;
     else if (read.has(i.key)) c.measured++;
@@ -310,32 +376,6 @@ export function inputCounts(
   return c;
 }
 
-export interface BenchmarkResponse {
-  artifact: Artifact | null;
-  simulator: SimulatorStatus;
-}
-
-/** What the benchmark's artifact holds, as `flowsheets/cornstover_benchmark.py` writes it. */
-export interface BenchmarkOutput {
-  package: string;
-  /** The benchmark kept before reference runs (OF-BLD-014 §8.2) names BioSTEAM's version here. */
-  biosteam?: string;
-  /** A reference run names its simulator and version here instead ('biosteam 2.54.0'; §3.R, findings 18, 29). */
-  simulator?: string;
-  mespUsdPerGal: number;
-  mespUsdPerKg: number;
-  settings: { rateOfReturn: number; operatingDays: number; incomeTax: number; startYear: number; endYear: number };
-  references: string[];
-}
-
-/** The shelf id of the corn stover benchmark (flowsheets/shelf.py). */
-export const BENCHMARK_FLOWSHEET = 'cornstover_benchmark';
-
-export const proformaBenchmark = (signal?: AbortSignal) => call<BenchmarkResponse>('/api/proforma/benchmark', { signal });
-
-export const runProformaBenchmark = (signal?: AbortSignal) =>
-  call<BenchmarkResponse>('/api/proforma/benchmark', { method: 'POST', signal });
-
 // ── The BioSTEAM scenario (§8.4), and the scenario run contract ─────────
 //
 // OF-BLD-019 §3.2 is the browser's side of the contract §2.3 builds in the
@@ -345,8 +385,8 @@ export const runProformaBenchmark = (signal?: AbortSignal) =>
 //       project keeps, bound (`ProformaScenarioInfo`, carrying its `flowsheet`);
 //   (c) GET  /api/proforma/bind?flowsheet=&host=  the same
 //       shape for a flowsheet, id and name empty: what a scenario (D6) shows
-//       as its inputs; a reference flowsheet, the toy or an unknown id is a
-//       refusal in words;
+//       as its inputs, the page's binding of every scenario of the project
+//       (alpha 2.2 D9); the toy or an unknown id is a refusal in words;
 //   (d) POST /api/proforma/run  a scenario by its id and its flowsheet, bound
 //       as (c) binds it, with the request's overrides. Inputs that still wait
 //       are a 422 listing them.
@@ -370,28 +410,31 @@ const bindQuery = (ask: BindAsk, extra: Record<string, string> = {}) => {
   return q.toString();
 };
 
-/** (b) The project's BioSTEAM scenarios, each bound by the service. */
+/**
+ * (b) The project's BioSTEAM scenarios, each bound by the service: every one the project's, a scenario on
+ * custom_train_v1 with its vessel design and train run, one whose binding is refused with the words (`refused`).
+ */
 export const proformaScenarios = (ask: BindAsk, signal?: AbortSignal) =>
   call<ProformaScenarioInfo[]>(`/api/proforma/scenarios?${bindQuery(ask)}`, { signal });
 
 /**
- * (c) A flowsheet's inputs, bound as the service binds a scenario made here.
- * A service that predates the endpoint says so in words, rather than as a
- * bare 404.
+ * (c) A flowsheet's inputs, bound as the service binds a scenario of it: the page's binding of every scenario, its
+ * flowsheet named, so a scenario this browser has not yet saved binds as a kept one does (ADR-014). A service that
+ * predates the endpoint says so in words.
  */
 export async function proformaBind(flowsheet: string, ask: BindAsk, signal?: AbortSignal): Promise<ProformaScenarioInfo> {
   try {
     return await call<ProformaScenarioInfo>(`/api/proforma/bind?${bindQuery(ask, { flowsheet })}`, { signal });
   } catch (e) {
     if (!noEndpoint(e)) throw e;
-    throw new ServiceRefused(404, 'This service has no bind endpoint, so it cannot bind the inputs of a scenario made here yet.');
+    throw new ServiceRefused(404, 'This service has no bind endpoint, so it cannot bind the inputs of a scenario yet.');
   }
 }
 
-/** What the page posts to run a scenario: `ProformaRunRequest`, and the flowsheet of a scenario made here. */
+/** What the page posts to run a scenario: `ProformaRunRequest`, its flowsheet named. */
 export interface RunAsk {
   scenarioId: string;
-  /** The scenario's flowsheet; the service holds a kept scenario to its own. */
+  /** The scenario's flowsheet; the service holds a kept scenario to its own, and binds one not yet saved by it. */
   flowsheet?: string | null;
   /**
    * A person's changes in the parameter panel (OF-BLD-020 D3): the scope
@@ -458,8 +501,9 @@ export function runSpecs(
 
 /** The body `runProformaScenario` posts, as the service reads it (`ProformaRunRequest`). */
 export function runBody(ask: RunAsk): ProformaRunRequest {
-  // `flowsheet` is sent only for a scenario made here, and `fits` only when a
-  // person chose one (OF-BLD-019 §2.3, §5.1). A person's values go as typed
+  // `flowsheet` names the scenario's own (a kept scenario is held to it, one
+  // not yet saved binds by it, ADR-014), and `fits` goes only when a person
+  // chose one (OF-BLD-019 §2.3, §5.1). A person's values go as typed
   // inputs (alpha 2.2 D2), each turned from its Override by params.ts's one
   // function, in its parameter's unit; the service converts each back into
   // that Override at its door and refuses any field the request does not name.
@@ -658,37 +702,14 @@ export function runViewOfResult(r: ProformaRunResult): RunView {
   });
 }
 
-/** The tool every reference biorefinery's run is kept under (proforma.REFERENCE). */
-export const REFERENCE_TOOL = 'proforma.reference';
-
-/**
- * A reference run in the shape a scenario run reads (OF-BLD-019 §3.3): the
- * same tables under the same keys, and one case, so no samples, no
- * sensitivity and no grid. Its base case is the run itself, and its price on
- * the TEA's own basis is the product price the worker read from the TEA,
- * which the cost breakdown closes on; nothing is computed here.
- */
-export function runViewOfReference(art: Artifact): RunView | null {
-  if (art.tool !== REFERENCE_TOOL) return null;
-  const view = viewOf(art.output, {
-    artifactId: art.id,
-    createdAt: art.createdAt,
-    durationMs: art.durationMs,
-    provenance: art.provenance,
-    basis: { tool: art.tool, toolVersion: art.toolVersion, inputs: art.inputs, artifactId: art.id, at: art.createdAt, seed: art.seed },
-  });
-  return { ...view, basePrice: num(view.tables.tea?.productPrice) };
-}
-
 /** The tool every engine run of a library plant or a flowsheet is kept under (engine/library.py LIBRARY_RUN). */
 export const LIBRARY_RUN_TOOL = 'library.run';
 
 /**
  * An engine run in the shape a scenario run reads (execution prompt §7.4):
- * the same tables under the same keys, one case and no samples, as a
- * reference run reads. Its base price is the price the run's TEA solved
- * for (`price.solvedPrice`, USD/kg, BioSTEAM's), else the TEA's own product
- * price; nothing is computed here.
+ * the same tables under the same keys, one case and no samples. Its base
+ * price is the price the run's TEA solved for (`price.solvedPrice`, USD/kg,
+ * BioSTEAM's), else the TEA's own product price; nothing is computed here.
  */
 export function runViewOfRun(art: Artifact): RunView | null {
   if (art.tool !== LIBRARY_RUN_TOOL) return null;
@@ -702,10 +723,10 @@ export function runViewOfRun(art: Artifact): RunView | null {
   return { ...view, basePrice: num(rec<unknown>(art.output.price).solvedPrice) ?? num(view.tables.tea?.productPrice) };
 }
 
-/** One of a reference run's checks against its package's own test, as the service wrote it (`output.checks`). */
-export const referenceChecks = (art: Artifact | null): RegressionCheck[] => arr<RegressionCheck>(art?.output?.checks);
+/** A run's checks against its package's own test, as the service wrote them (`output.checks`). */
+export const packageChecks = (art: Artifact | null): RegressionCheck[] => arr<RegressionCheck>(art?.output?.checks);
 
-/** A basis input a reference run names, by name ('compatibility', 'simulator'), or null. */
+/** A basis input a run names, by name ('compatibility', 'simulator'), or null. */
 export const basisInput = (art: Artifact | null, name: string): BasisInput | null => art?.inputs.find((i) => i.name === name) ?? null;
 
 // ── The inputs a run was bound with, read from its basis (Compare) ──────
@@ -924,10 +945,9 @@ export function modellerQuestions(
 // A run's `readBack` holds both what the inputs leave to the package or to
 // BioSTEAM (the finance model, a unit's defaults, the run's conventions) and
 // what the case gave from its inputs (the glucose fed is the plant's scale
-// over the bound yield; the batch time is titre over productivity). A
-// reference plant runs whole on its package's defaults, so everything it
-// reads back is the package's, named and in its unit as the shelf lists it.
-// A key this page does not know is shown as read back, crediting nobody.
+// over the bound yield; the batch time is titre over productivity). A key
+// this page does not know, every key of a library plant's run among them
+// (no shelf entry names one), is shown as read back, crediting nobody.
 
 export interface ReadBackRow {
   key: string;
@@ -997,7 +1017,7 @@ export function readBackRows(readBack: Record<string, unknown>, flowsheet: Flows
       const credit = composite ? named.get(finance ? key : COMPOSITE_CREDIT[key] ?? '') : undefined;
       const by = credit?.source.by ?? null;
       if (by) return { key, label, unit, value, origin: 'person' as const, by };
-      const origin: ReadBackRow['origin'] = flowsheet?.reference || finance ? 'setting' : known?.case.includes(key) ? 'case' : known?.setting.includes(key) ? 'setting' : 'read';
+      const origin: ReadBackRow['origin'] = finance ? 'setting' : known?.case.includes(key) ? 'case' : known?.setting.includes(key) ? 'setting' : 'read';
       return { key, label, unit, value, origin };
     });
 }

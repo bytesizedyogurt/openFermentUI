@@ -166,7 +166,7 @@ def test_the_list_holds_every_fit_and_forecast_and_nothing_else(store):
     assert sorted(i.artifactId for i in listed) == sorted([fit.kineticArtifactId, fc.artifactId])
     assert {i.tool for i in listed} == {"kinetic_fit", "growth_forecast"}
     assert all(i.provenance == "computed" for i in listed)
-    with pytest.raises(proforma.ScenarioRefused, match="reference biorefinery"):
+    with pytest.raises(proforma.ScenarioRefused, match="there is no flowsheet corn_drygrind on the shelf"):
         proforma.fermos_fits("corn_drygrind")
 
 

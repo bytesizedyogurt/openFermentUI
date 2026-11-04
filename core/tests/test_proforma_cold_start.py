@@ -51,7 +51,7 @@ def _two_calls(gap: float = 0.2):
 
     def first():
         try:
-            out["a"] = proforma.call("reference", {})
+            out["a"] = proforma.call("run", {})
         except Exception as e:  # noqa: BLE001 — the answer is what is compared
             out["a"] = e
 
@@ -70,9 +70,9 @@ def _two_calls(gap: float = 0.2):
 def test_a_request_during_the_cold_start_waits_and_is_answered(cold):
     w = cold(SlowStart(1.0))
     out = _two_calls()
-    assert out["a"] == "ok:reference"
+    assert out["a"] == "ok:run"
     assert out["b"] == "ok:thermo", out["b"]
-    assert proforma.status()["status"] == "ready" and sorted(w.calls) == ["reference", "thermo"]
+    assert proforma.status()["status"] == "ready" and sorted(w.calls) == ["run", "thermo"]
 
 
 def test_a_start_that_fails_is_told_in_its_own_words_to_both(cold):
@@ -89,4 +89,4 @@ def test_a_start_longer_than_its_timeout_is_said_to_be_starting(cold, monkeypatc
     out = _two_calls()
     assert isinstance(out["b"], WorkerError)
     assert "still starting" in str(out["b"]) and "None" not in str(out["b"])
-    assert out["a"] == "ok:reference"
+    assert out["a"] == "ok:run"

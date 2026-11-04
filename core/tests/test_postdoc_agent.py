@@ -463,21 +463,29 @@ def test_one_run_sweeps_first_offers_every_tool_and_opens_with_the_earlier_turns
 # ── a flowsheet run is cited like any computed value (OF-BLD-019 §6.1) ──
 
 
+def _scenario_run(scenario_id: str):
+    """A scenario run of the ethanol flowsheet on the stand-in evaluator, every input a fixture's STAND-IN
+    assumption (test_proforma's); none is a result."""
+    from openferment_core import proforma
+    from test_proforma import ETHANOL_STANDIN, assume
+
+    a = [assume(k, v, v, v, by="openFerment test fixture") for k, v in ETHANOL_STANDIN.items()]
+    return proforma.run_flowsheet(proforma.ETHANOL, a, samples=4, seed=0, scenario_id=scenario_id)
+
+
 def test_a_claim_citing_the_run_the_loops_stream_table_returned_is_kept_and_one_never_returned_is_dropped(
         proforma_store):  # noqa: F811
-    from openferment_core import proforma
-
-    # Two reference runs are kept; the loop reads one of them, and no tool returns the other.
-    aid = proforma.run_reference("corn_drygrind").id
-    other = proforma.run_reference("cornstover_benchmark").id
+    # Two scenario runs are kept; the loop reads one of them, and no tool returns the other.
+    aid = _scenario_run("sc-test-one").id
+    other = _scenario_run("sc-test-two").id
     script = Script(
         [("stream_table", {"artifactId": aid})],
-        plan(claim("c1", text="The reference corn plant's run prices its ethanol on the package's own defaults.",
+        plan(claim("c1", text="The scenario's run prices its ethanol on a fixture's stand-in assumptions.",
                    evidence=[aid]),
-             claim("c2", text="The reference stover plant prices its ethanol on the package's own defaults.",
+             claim("c2", text="Another scenario's run prices its ethanol on a fixture's stand-in assumptions.",
                    evidence=[other])),
     )
-    out = postdoc_agent.ask("What does the reference corn plant's run price its ethanol at?", converse=script,
+    out = postdoc_agent.ask("What does the scenario's run price its ethanol at?", converse=script,
                             ctx=tools.ToolContext(pool_factory=lambda: proforma_store))
     [kept] = out.claims
     assert kept.id == "c1" and kept.evidenceIds == [aid]
@@ -488,14 +496,12 @@ def test_a_claim_citing_the_run_the_loops_stream_table_returned_is_kept_and_one_
 
 
 def test_a_claim_citing_a_run_stream_table_read_is_kept(proforma_store, monkeypatch):  # noqa: F811
-    from openferment_core import proforma
-
-    art = proforma.run_reference("corn_drygrind")
+    art = _scenario_run("sc-test-one")
     script = Script(
         [("stream_table", {"artifactId": art.id})],
-        plan(claim("c1", text="The reference corn plant prices its ethanol on the package's own defaults.", evidence=[art.id])),
+        plan(claim("c1", text="The scenario's run prices its ethanol on a fixture's stand-in assumptions.", evidence=[art.id])),
     )
-    out = postdoc_agent.ask("What does the dry-grind corn reference plant price its ethanol at?", converse=script,
+    out = postdoc_agent.ask("What does the scenario's run price its ethanol at?", converse=script,
                             ctx=tools.ToolContext(pool_factory=lambda: proforma_store))
     [kept] = out.claims
     assert kept.evidenceIds == [art.id] and kept.provenance == art.provenance and out.rejected == 0

@@ -73,7 +73,6 @@ export default function GeneOSModel() {
   const [loaded, setLoaded] = useState<Loaded | null>(null);
   const [busy, setBusy] = useState(false);
   const scenarios = useStore((s) => s.scenarios);
-  const createdScenarioIds = useStore((s) => s.createdScenarioIds);
   // OF-BLD-020 §2.2: a person's changes to a scenario's inputs are its scope's overrides.
   const parameterOverrides = useStore((s) => s.parameterOverrides);
   const proformaFits = useStore((s) => s.proformaFits);
@@ -153,8 +152,9 @@ export default function GeneOSModel() {
 
   // OF-BLD-019 §5.2 — the Proforma scenarios, each asked of the
   // service once the ceilings above are computed and kept: the yield as the
-  // scenario binds it (its flowsheet when made here, its fermOS fits, the
-  // yield's override when typed), against the newest stored ceilings.
+  // scenario binds it (its flowsheet named, so one this browser has not yet
+  // saved binds as a kept one does, ADR-014; its fermOS fits; the yield's
+  // override when typed), against the newest stored ceilings.
   const scenarioAsks = useMemo(
     () =>
       scenarios
@@ -163,7 +163,7 @@ export default function GeneOSModel() {
           scenario: s,
           ask: {
             scenarioId: s.id,
-            flowsheet: createdScenarioIds.includes(s.id) ? (s.flowsheetId ?? s.modelId) : null,
+            flowsheet: s.flowsheetId ?? s.modelId,
             host: null,
             fits: proformaFits[s.id] ?? {},
             overrides: (parameterOverrides[proformaScope(s.id)] ?? []).filter((o) => o.key === 'yield'),
@@ -171,7 +171,7 @@ export default function GeneOSModel() {
             specs: (flowsheets ?? []).find((f) => f.id === (s.flowsheetId ?? s.modelId))?.inputs ?? [],
           },
         })),
-    [scenarios, createdScenarioIds, proformaFits, parameterOverrides, flowsheets],
+    [scenarios, proformaFits, parameterOverrides, flowsheets],
   );
   const asksKey = JSON.stringify(scenarioAsks.map((x) => x.ask));
   useEffect(() => {

@@ -15,9 +15,13 @@
  * train's changes named by their place (src/lib/pureos.ts,
  * `trainInputs`), a Proforma scenario's run carrying its changes as typed
  * inputs (src/lib/proforma.ts, `runBody`) and its ceiling check its typed
- * yield (`ceilingQuery`), and a run's grid read where it holds a dimension at
- * one value (src/engine/interp.ts). Run by `pnpm check:state`, offline: the
- * service is a stand-in for `fetch`.
+ * yield (`ceilingQuery`), a scenario card's counts (`inputCounts`, an input
+ * the vessel design binds apart from a chosen fit), the reference run a
+ * plant's page reads in its default configuration (`referenceRunOf`) and the
+ * runs kept from the retired reference entries it lists (`keptRunsOf`), and a
+ * run's grid read where it holds a dimension at one value
+ * (src/engine/interp.ts). Run by `pnpm check:state`, offline: the service is
+ * a stand-in for `fetch`.
  */
 import {
   EMPTY_STATE,
@@ -29,13 +33,24 @@ import {
   type OutboxEntry,
   type ProjectState,
 } from '../src/lib/projectState';
-import type { Deposition, FlowsheetInfo, LiveConversation, Override, ParameterSpec, Scenario, TrainSpec } from '../src/data/types';
+import type {
+  Artifact,
+  Deposition,
+  EngineRun,
+  FlowsheetInfo,
+  LiveConversation,
+  Override,
+  ParameterSpec,
+  ProformaScenarioInfo,
+  Scenario,
+  TrainSpec,
+} from '../src/data/types';
 import { loadOverlay } from '../src/lib/intake';
 import { ServiceDown, ServiceRefused, call, detailWords } from '../src/lib/http';
 import { runnable, type LibraryPlant } from '../src/lib/library';
 import { inputsOf } from '../src/lib/params';
 import { trainInputs, unitScope } from '../src/lib/pureos';
-import { ceilingQuery, isReading, runBody, runSpecs } from '../src/lib/proforma';
+import { ceilingQuery, inputCounts, isReading, keptRunsOf, referenceRunOf, retiredEntryOf, runBody, runSpecs } from '../src/lib/proforma';
 import { interpolate } from '../src/engine/interp';
 import { awaitingReadBack, correctedBy, correctionOf } from '../src/engine/readings';
 
@@ -359,6 +374,48 @@ async function callAgainst(answer: { status: number; body?: unknown }, healthy =
     q.toString(),
   );
   check('a ceiling check with no typed yield sends no inputs', !ceilingQuery({ scenarioId: 'sc-1', host: null }).has('inputs'));
+}
+
+// ── a scenario card's counts, the reference runs a page reads (src/lib/proforma.ts) ──
+
+{
+  // A custom_train_v1 scenario's plant scale, bound from the vessel design it names, is counted by what binds it;
+  // an input with a fit chosen is counted as a fit (alpha 2.2 C.6, the screens' review).
+  const scenario = { id: 'sc-2', modelId: 'custom_train_v1', kind: 'biosteam' } as unknown as Scenario;
+  const info = {
+    id: 'sc-2',
+    inputs: [
+      { key: 'plant_scale', binding: 'artifact', source: { kind: 'artifact', id: 'v'.repeat(16), note: 'the plant scale vessel design vvvv was designed at' } },
+      { key: 'titre', binding: 'artifact', source: { kind: 'artifact', id: 'f'.repeat(16), note: 'a fit' } },
+      { key: 'glucose_price', binding: 'assumption', source: null },
+    ],
+  } as unknown as ProformaScenarioInfo;
+  const c = inputCounts(scenario, info, [], [], { titre: 'f'.repeat(16) });
+  check(
+    'a plant scale the vessel design binds is counted by what binds it, and a chosen fit as a fit',
+    !!c && c.kept === 1 && c.keptBy.join() === 'the vessel design' && c.computed === 1 && c.assumed === 1,
+    JSON.stringify(c),
+  );
+  const none = inputCounts(scenario, { ...info, inputs: [info.inputs[0]] }, [], [], {});
+  check('with no fit chosen, no input is counted as a fit', !!none && none.computed === 0 && none.kept === 1, JSON.stringify(none));
+
+  // A plant that takes configurations is run in its default, and its page finds that run on a reload.
+  const run = (configuration: string | null, plant = 'placeholder-plant'): EngineRun =>
+    ({ id: `run-${configuration}`, tool: 'library.run', plant, configuration, status: 'done', artifactId: 'a'.repeat(16), inputs: [] }) as unknown as EngineRun;
+  const runs = [run('S2'), run('S1'), run(null, 'other')];
+  check('a plant’s reference run is its run in the default configuration', referenceRunOf('placeholder-plant', runs, 'S1')?.id === 'run-S1');
+  check('and a plant that takes none is found with none', referenceRunOf('other', runs)?.id === 'run-null' && referenceRunOf('placeholder-plant', runs) === null);
+
+  // The runs kept from the retired reference entries map to the library plant each entry built.
+  const art = (tool: string, flowsheet?: string): Artifact =>
+    ({ id: `${tool}-${flowsheet ?? ''}`, tool, inputs: flowsheet ? [{ name: 'flowsheet', value: flowsheet }] : [], output: {} }) as unknown as Artifact;
+  const kept = [art('proforma.reference', 'corn_drygrind'), art('proforma_benchmark'), art('proforma.reference', 'cornstover_benchmark'), art('library.run')];
+  check('a kept reference run names its retired entry, the benchmark the corn stover entry', retiredEntryOf(kept[0]) === 'corn_drygrind' && retiredEntryOf(kept[1]) === 'cornstover_benchmark' && retiredEntryOf(kept[3]) === null);
+  check(
+    'and each plant’s page lists the runs kept from its entry alone',
+    keptRunsOf('corn', kept).map((a) => a.id).join() === 'proforma.reference-corn_drygrind' &&
+      keptRunsOf('cornstover', kept).map((a) => a.id).join() === 'proforma_benchmark-,proforma.reference-cornstover_benchmark',
+  );
 }
 
 // ── a run's grid with a dimension of one value (src/engine/interp.ts) ──

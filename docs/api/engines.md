@@ -366,7 +366,7 @@ computation from that artifact and asks `sff_export` for the file again.
 the contract: its worker is the Proforma worker, and `heavy` names what that worker computes with
 (`biosteam`, `thermosteam`, `biorefineries`, `pisces_sff`). Its things are of two kinds, the
 library's own and the shelf's flowsheets a Proforma scenario runs (`flowsheets/shelf.py`, the
-ones `proforma.runnable` takes: no reference biorefinery and no toy), each read afresh in the
+ones `proforma.runnable` takes: every one on the shelf, and no toy), each read afresh in the
 request's project on every listing. The engine package imports no Proforma module
 (`core/tests/test_boundaries.py`): Proforma gives the engine its scenario flowsheets through a
 provider it registers as it is imported (`engine/biosteam.py` `provide`, `Provider`), which lists

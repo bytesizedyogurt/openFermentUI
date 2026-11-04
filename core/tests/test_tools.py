@@ -324,30 +324,44 @@ def test_selling_price_with_no_run_of_a_seed_scenario_names_what_waits_and_how_a
 def test_selling_price_refuses_what_is_no_scenario_the_project_keeps_in_words(proforma_store, test_seed):
     c = _pcx(_yeast_pool())
     elsewhere = tools.run("selling_price", {"scenarioId": "sc-mg2k1-1"}, c).error
-    assert "is not a BioSTEAM scenario this project keeps" in elsewhere and test_seed in elsewhere
+    assert "is no BioSTEAM scenario this project keeps and no plant of the library shelf" in elsewhere
+    assert test_seed in elsewhere and "engine_plants lists them" in elsewhere
     assert "name the scenario" in tools.run("selling_price", {"scenarioId": " "}, c).error
-    # A reference biorefinery's run is read where it is kept, and the words say where.
+    # A retired reference entry's id names its library plant (alpha 2.2 D8), whose run the project does not keep yet.
     corn = tools.run("selling_price", {"scenarioId": "corn_drygrind"}, c).error
-    assert "is a reference biorefinery, not a scenario" in corn and "stream_table" in corn
+    assert "no run of the library plant corn on its package's own values is kept" in corn and "engine_run" in corn
 
 
-def test_selling_price_cites_the_stored_benchmark_and_runs_nothing(monkeypatch, tmp_path):
-    from openferment_core import intake, proforma
+def test_selling_price_reads_a_library_plants_newest_run_on_its_own_values_and_runs_nothing(monkeypatch, tmp_path):
+    # alpha 2.2 D8: the benchmark the shelf's retired entry ran is the library
+    # plant cornstover's run; selling_price reads any plant's newest run on its
+    # package's own values, as one evidence id engine_report gives it too. The
+    # worker is test_comparisons' priced STAND-IN (its price is twice the
+    # cane's as the run sets it); no number is a result.
+    from openferment_core import intake
+    from openferment_core.engine import library, simulator
+    from test_comparisons import PricedStandIn
+    from test_library import over
 
     monkeypatch.setattr(intake, "DATA_DIR", tmp_path)
-    ctx = tools.ToolContext()
-    r = tools.run("selling_price", {"scenarioId": "proforma_benchmark"}, ctx)
-    assert r.error and "has not been run on this service" in r.error
-    # A STAND-IN benchmark output, so the stored artifact exists without BioSTEAM.
-    monkeypatch.setattr(proforma, "call", lambda op, args: {
-        "package": "biorefineries.cornstover@stand-in", "biosteam": "stand-in", "mespUsdPerGal": 2.5,
-        "mespUsdPerKg": 0.8, "ethanolDensityKgPerGal": 3.0, "settings": {}, "references": []})
-    art = proforma.run_benchmark()
-    monkeypatch.setattr(proforma, "call", lambda op, args: pytest.fail("the tool ran the benchmark"))
-    r = tools.run("selling_price", {"scenarioId": "proforma_benchmark"}, ctx)
-    assert r.error is None and r.evidence[0].id == art.id
-    assert r.evidence[0].value == 2.5 and r.evidence[0].unit == "USD gal⁻¹"
-    assert r.summary["provenance"] == r.evidence[0].provenance
+    monkeypatch.setattr(simulator, "call", PricedStandIn())
+    monkeypatch.setattr(library, "_PARAMETERS", {})
+    ctx = tools.ToolContext(person="Ada Moreno")
+    none = tools.run("selling_price", {"scenarioId": "sugarcane"}, ctx)
+    assert "no run of the library plant sugarcane on its package's own values is kept" in none.error
+    base = runs.run("sugarcane", by="Ada Moreno").run
+    runs.run("sugarcane", None, [over("stream.sugarcane.price", 0.05, by="Ada Moreno")], by="Ada Moreno")
+    monkeypatch.setattr(simulator, "call", lambda op, args: pytest.fail("the tool ran the plant"))
+    r = tools.run("selling_price", {"scenarioId": "sugarcane"}, ctx)
+    assert r.error is None, r.error
+    (ev,) = r.evidence
+    assert ev.id == f"{base.artifactId}:price.solvedPrice" == r.summary["evidenceId"] and ev.unit == "USD/kg"
+    assert r.summary["runId"] == base.id and r.summary["plant"] == "sugarcane" and r.summary["product"] == "ethanol"
+    assert ev.value == artifacts.get(base.artifactId).output["price"]["solvedPrice"], "the run on its own values"
+    assert r.summary["provenance"] == ev.provenance == "computed" and "retired" not in r.summary
+    # The benchmark's retired id names the corn stover plant, whose run is not kept here.
+    bench = tools.run("selling_price", {"scenarioId": "proforma_benchmark"}, ctx).error
+    assert "no run of the library plant cornstover on its package's own values is kept" in bench
 
 
 # Live test, 2026-10-16: told "an empty string for any field", the model sent
@@ -494,11 +508,21 @@ def test_run_flowsheet_takes_no_assumption_even_in_words(proforma_store):
     assert not tools.REGISTRY["run_flowsheet"].strict and not tools.REGISTRY["stream_table"].strict
 
 
+def _ethanol_run():
+    """A scenario run of the ethanol flowsheet on the stand-in evaluator, every input a fixture's STAND-IN
+    assumption (test_proforma's), so it holds tables and a price to cite; none is a result."""
+    from openferment_core import proforma
+    from test_proforma import ETHANOL_STANDIN, assume
+
+    a = [assume(k, v, v, v, by="openFerment test fixture") for k, v in ETHANOL_STANDIN.items()]
+    return proforma.run_flowsheet(proforma.ETHANOL, a, samples=4, seed=0, scenario_id="sc-test-tables")
+
+
 def test_stream_table_cuts_a_long_table_to_the_cap_and_says_how_many_it_left_out(proforma_store, monkeypatch):
     from openferment_core import proforma
     from openferment_core.models import StreamRow
 
-    aid = proforma.run_reference("corn_drygrind").id
+    aid = _ethanol_run().id
     # A STAND-IN table far past the cap: a feed, a product, and many streams between units.
     flows = {f"STAND-IN chemical {n}": float(n + 1) for n in range(12)}
     rows = [StreamRow(id="feed", source=None, sink="U0", phase="l", T=298.15, P=101325.0, massFlow=78.0, massFlows=flows),
@@ -520,23 +544,100 @@ def test_stream_table_cuts_a_long_table_to_the_cap_and_says_how_many_it_left_out
     assert r.evidence and r.evidence[0].id == aid
 
 
-def test_stream_table_reads_a_reference_run_and_cites_the_price_its_package_gives(proforma_store):
+def test_stream_table_reads_a_run_kept_from_a_retired_reference_entry_and_cites_its_price(proforma_store):
+    # alpha 2.2 D8: a person's kept proforma.reference artifact reads as kept,
+    # and cites the price its package gave on its own defaults, in the output
+    # and the basis its retired entry named (proforma.RETIRED), as it did
+    # while the entry stood. The worker is the STAND-IN; no number is a result.
     from openferment_core import proforma
-    from openferment_core.flowsheets import shelf
+    from test_proforma import kept_reference_basis
 
-    art = proforma.run_reference("corn_drygrind")
+    entry = proforma.RETIRED["corn_drygrind"]
+    art = artifacts.compute(proforma.REFERENCE, kept_reference_basis("corn_drygrind"))
     r = tools.run("stream_table", {"artifactId": art.id}, _pcx(proforma_store))
     assert r.error is None, r.error
     (ev,) = r.evidence
-    corn = shelf.SHELF["corn_drygrind"]
-    assert ev.id == art.id == r.summary["evidenceId"] and ev.value == art.output[corn.priceOutput]
-    assert ev.unit == corn.priceBasis and ev.provenance == art.provenance and ev.basis.tool == "proforma.reference"
-    assert r.summary["tool"] == "proforma.reference" and r.summary["scenarioId"] is None
+    assert ev.id == art.id == r.summary["evidenceId"] and r.summary["tool"] == "proforma.reference"
+    assert ev.value == art.output[entry.priceOutput] and ev.unit == entry.priceBasis
+    assert ev.label.startswith(entry.title) and ev.provenance == art.provenance
     assert len(r.data["streams"]) == r.summary["streamCount"] == len(proforma.tables_of(art).streams)
-    # Proforma's rows list the reference run beside the scenarios' (ARTIFACT_MODULE).
+    stover = artifacts.compute(proforma.REFERENCE, kept_reference_basis("cornstover_benchmark"))
+    (sev,) = tools.run("stream_table", {"artifactId": stover.id}, _pcx(proforma_store)).evidence
+    assert sev.value == stover.output["mespUsdPerGal"] and sev.unit == proforma.RETIRED["cornstover_benchmark"].priceBasis
+
+
+def test_stream_table_says_a_kept_reference_run_with_no_price_holds_none(proforma_store, monkeypatch):
+    from openferment_core import proforma
+    from test_proforma import kept_reference_basis
+
+    real = proforma.call
+    monkeypatch.setattr(proforma, "call", lambda op, args: {
+        k: v for k, v in real(op, args).items() if k != "ethanolPriceUsdPerKg"})
+    art = artifacts.compute(proforma.REFERENCE, kept_reference_basis("corn_drygrind"))
+    r = tools.run("stream_table", {"artifactId": art.id}, _pcx(proforma_store))
+    assert r.error is None and r.evidence == [] and r.summary["evidenceId"] is None
+    assert "retired from Proforma's shelf" in r.summary["meaning"] and "engine_report" in r.summary["meaning"]
+
+
+def test_proforma_read_lists_the_library_plants_runs_and_the_runs_kept_from_the_retired_entries(proforma_store,
+                                                                                                monkeypatch):
+    # Proforma's rows list the library shelf's runs beside the scenarios', and
+    # the runs a person kept from the retired reference entries, a reference
+    # run and the benchmark, as kept (ARTIFACT_MODULE, alpha 2.2 D8).
+    from openferment_core import proforma
+    from test_proforma import kept_benchmark_basis, kept_reference_basis
+    from test_vessel import keep
+
+    plant = keep("00000000000000c1", {"plant": "cornstover", "price": {"priced": True}}, tool="library.run")
+    scenario_run = _ethanol_run()
+    kept = artifacts.compute(proforma.REFERENCE, kept_reference_basis("corn_drygrind"))
+    monkeypatch.setattr(proforma, "call", lambda op, args: {"package": "STAND-IN", "mespUsdPerGal": 1.0})
+    bench = artifacts.compute(proforma.BENCHMARK, kept_benchmark_basis())
     read = tools.run("proforma_read", {"ids": [], "words": "", "kind": "artifact", "state": "", "limit": 20},
                      _pcx(proforma_store))
-    assert read.error is None and f"proforma/artifact/{art.id}" in [row.ref for row in read.rows]
+    refs = [row.ref for row in read.rows]
+    assert read.error is None and f"proforma/artifact/{plant.id}" in refs and f"proforma/artifact/{scenario_run.id}" in refs
+    assert f"proforma/artifact/{kept.id}" in refs and f"proforma/artifact/{bench.id}" in refs
+    assert read.rows[refs.index(f"proforma/artifact/{plant.id}")].detail["output"]["plant"] == "cornstover"
+
+
+def test_selling_price_answers_a_retired_id_from_the_run_the_project_kept_from_its_entry(proforma_store,
+                                                                                         monkeypatch):
+    # alpha 2.2 D8: with no run of the library plant on its package's own
+    # values kept, a retired entry's id answers from the newest run the
+    # project kept from that entry, its price as the entry named it, and says
+    # the run was kept from a retired entry; the library plant's own id
+    # refuses and names that kept run. The worker is the STAND-IN.
+    from openferment_core import proforma
+    from test_proforma import kept_benchmark_basis, kept_reference_basis
+
+    c = _pcx(_yeast_pool())
+    corn = artifacts.compute(proforma.REFERENCE, kept_reference_basis("corn_drygrind"))
+    real = proforma.call
+    monkeypatch.setattr(proforma, "call", lambda op, args: {"package": "STAND-IN", "biosteam": "STAND-IN",
+                                                            "mespUsdPerGal": 2.5, "references": []})
+    bench = artifacts.compute(proforma.BENCHMARK, kept_benchmark_basis())
+    monkeypatch.setattr(proforma, "call", lambda op, args: pytest.fail("selling_price ran something"))
+
+    got = tools.run("selling_price", {"scenarioId": "corn_drygrind"}, c)
+    assert got.error is None, got.error
+    (ev,) = got.evidence
+    entry = proforma.RETIRED["corn_drygrind"]
+    assert ev.id == corn.id == got.summary["evidenceId"] and ev.value == corn.output[entry.priceOutput]
+    assert ev.unit == entry.priceBasis and got.summary["entry"] == "corn_drygrind" and got.summary["plant"] == "corn"
+    assert "kept from the entry corn_drygrind before it retired" in got.summary["retired"]
+
+    b = tools.run("selling_price", {"scenarioId": proforma.BENCHMARK}, c)
+    assert b.error is None, b.error
+    assert b.evidence[0].id == bench.id and b.evidence[0].value == 2.5 and b.evidence[0].unit == proforma.BENCHMARK_UNIT
+    assert b.summary["entry"] == proforma.BENCHMARK_ENTRY and b.summary["plant"] == "cornstover"
+    newest = tools.run("selling_price", {"scenarioId": "cornstover_benchmark"}, c)
+    assert newest.summary["evidenceId"] == bench.id, "the newest run kept from the corn stover entry"
+
+    library_id = tools.run("selling_price", {"scenarioId": "corn"}, c).error
+    assert "no run of the library plant corn on its package's own values is kept" in library_id
+    assert f"keeps {proforma.REFERENCE} artifact {corn.id}" in library_id and "by the id corn_drygrind" in library_id
+    monkeypatch.setattr(proforma, "call", real)
 
 
 def test_stream_table_refuses_what_is_not_a_proforma_run_in_words(pool, proforma_store):
@@ -547,7 +648,8 @@ def test_stream_table_refuses_what_is_not_a_proforma_run_in_words(pool, proforma
     kept = conv.evidence[0].basis.artifactId
     other = tools.run("stream_table", {"artifactId": kept}, _pcx(proforma_store))
     assert other.error == (f"stream_table refused: {kept} is a convert_units artifact, and stream_table reads the "
-                           f"stream table of a {proforma.RUN}, {proforma.REFERENCE} or library.run artifact")
+                           f"stream table of a {proforma.RUN} or library.run artifact, or of a {proforma.REFERENCE} "
+                           "artifact kept from a retired reference entry")
     assert "no kept artifact" in tools.run("stream_table", {"artifactId": "0123456789abcdef"}, _pcx(proforma_store)).error
     assert "no kept artifact" in tools.run("stream_table", {"artifactId": "../corpus"}, _pcx(proforma_store)).error
     assert other.evidence == [] and other.data is None

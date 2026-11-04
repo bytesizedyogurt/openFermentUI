@@ -1,0 +1,430 @@
+{
+ "what": "The bases fd17f32's proforma.reference_inputs and proforma.benchmark_inputs wrote on a host with no Graphviz, before the shelf's hand-written reference entries retired (alpha 2.2 D8, C.6): a run a person kept from either entry rests on one of these, and test_proforma's sim tests keep and replay a run on each in the real worker. Captured by importing that commit's core and dumping each list; versions and words alone, no value of any plant.",
+ "commit": "fd17f32",
+ "reference": {
+  "cornstover_benchmark": [
+   {
+    "name": "flowsheet",
+    "value": "cornstover_benchmark",
+    "unit": "",
+    "source": {
+     "kind": "model",
+     "id": "biorefineries.cornstover@2.35.1",
+     "note": "Corn stover to ethanol, the NREL 2011 design, every setting the package's own",
+     "by": null
+    }
+   },
+   {
+    "name": "simulator",
+    "value": "biosteam 2.54.0",
+    "unit": "",
+    "source": {
+     "kind": "model",
+     "id": "biosteam@2.54.0",
+     "note": "the process simulator the package runs on",
+     "by": null
+    }
+   },
+   {
+    "name": "thermodynamics",
+    "value": "thermosteam 0.54.2",
+    "unit": "",
+    "source": {
+     "kind": "model",
+     "id": "thermosteam@0.54.2",
+     "note": "BioSTEAM's property engine",
+     "by": null
+    }
+   },
+   {
+    "name": "settings",
+    "value": "bst.process_tools.default()",
+    "unit": "",
+    "source": {
+     "kind": "model",
+     "id": "biosteam@2.54.0",
+     "note": "BioSTEAM's default utilities and plant cost index before the plant builds, as the package's own test builds it (default_settings, biorefineries/tests/test_biorefineries.py); the plant then sets its own, and the worker puts back what it held before",
+     "by": null
+    }
+   },
+   {
+    "name": "precision",
+    "value": "10 significant digits",
+    "unit": "",
+    "source": {
+     "kind": "convention",
+     "id": null,
+     "note": "every number the run keeps is rounded so: BioSTEAM sums a set of units in an order that moves the last digits from one build to the next, and a replay compares the plant",
+     "by": null
+    }
+   },
+   {
+    "name": "diagram",
+    "value": "not drawn: Graphviz's dot was not on the path of the host that made this run",
+    "unit": "",
+    "source": {
+     "kind": "convention",
+     "id": null,
+     "note": "D8: the flowsheet diagram is drawn with Graphviz when its dot is on the host's path; the run is the same plant either way, and a host with Graphviz keeps a run of its own",
+     "by": null
+    }
+   }
+  ],
+  "corn_drygrind": [
+   {
+    "name": "flowsheet",
+    "value": "corn_drygrind",
+    "unit": "",
+    "source": {
+     "kind": "model",
+     "id": "biorefineries.corn@2.35.1",
+     "note": "Dry-grind corn to ethanol, the conventional plant, every setting the package's own",
+     "by": null
+    }
+   },
+   {
+    "name": "simulator",
+    "value": "biosteam 2.54.0",
+    "unit": "",
+    "source": {
+     "kind": "model",
+     "id": "biosteam@2.54.0",
+     "note": "the process simulator the package runs on",
+     "by": null
+    }
+   },
+   {
+    "name": "thermodynamics",
+    "value": "thermosteam 0.54.2",
+    "unit": "",
+    "source": {
+     "kind": "model",
+     "id": "thermosteam@0.54.2",
+     "note": "BioSTEAM's property engine",
+     "by": null
+    }
+   },
+   {
+    "name": "settings",
+    "value": "bst.process_tools.default()",
+    "unit": "",
+    "source": {
+     "kind": "model",
+     "id": "biosteam@2.54.0",
+     "note": "BioSTEAM's default utilities and plant cost index before the plant builds, as the package's own test builds it (default_settings, biorefineries/tests/test_biorefineries.py); the plant then sets its own, and the worker puts back what it held before",
+     "by": null
+    }
+   },
+   {
+    "name": "cornFeed",
+    "value": "the package's default",
+    "unit": "kg h-1",
+    "source": {
+     "kind": "model",
+     "id": "biorefineries.corn@2.35.1",
+     "note": "the package's own default, read back after the run: BiorefinerySettings.feedstock_hourly_mass_flow",
+     "by": null
+    }
+   },
+   {
+    "name": "cornPrice",
+    "value": "the package's default",
+    "unit": "USD kg-1",
+    "source": {
+     "kind": "model",
+     "id": "biorefineries.corn@2.35.1",
+     "note": "the package's own default, read back after the run: default_stream_prices['Corn']",
+     "by": null
+    }
+   },
+   {
+    "name": "ethanolPrice",
+    "value": "the package's default",
+    "unit": "USD kg-1",
+    "source": {
+     "kind": "model",
+     "id": "biorefineries.corn@2.35.1",
+     "note": "the package's own default, read back after the run: default_stream_prices['Ethanol'], the price at which the package's TEA solves the internal rate of return",
+     "by": null
+    }
+   },
+   {
+    "name": "ddgsPrice",
+    "value": "the package's default",
+    "unit": "USD kg-1",
+    "source": {
+     "kind": "model",
+     "id": "biorefineries.corn@2.35.1",
+     "note": "the package's own default, read back after the run: default_stream_prices['DDGS']",
+     "by": null
+    }
+   },
+   {
+    "name": "crudeOilPrice",
+    "value": "the package's default",
+    "unit": "USD kg-1",
+    "source": {
+     "kind": "model",
+     "id": "biorefineries.corn@2.35.1",
+     "note": "the package's own default, read back after the run: default_stream_prices['Crude oil']",
+     "by": null
+    }
+   },
+   {
+    "name": "enzymePrice",
+    "value": "the package's default",
+    "unit": "USD kg-1",
+    "source": {
+     "kind": "model",
+     "id": "biorefineries.corn@2.35.1",
+     "note": "the package's own default, read back after the run: default_stream_prices['Enzyme']",
+     "by": null
+    }
+   },
+   {
+    "name": "yeastPrice",
+    "value": "the package's default",
+    "unit": "USD kg-1",
+    "source": {
+     "kind": "model",
+     "id": "biorefineries.corn@2.35.1",
+     "note": "the package's own default, read back after the run: default_stream_prices['Yeast']",
+     "by": null
+    }
+   },
+   {
+    "name": "electricityPrice",
+    "value": "the package's default",
+    "unit": "USD kWh-1",
+    "source": {
+     "kind": "model",
+     "id": "biorefineries.corn@2.35.1",
+     "note": "the package's own default, read back after the run: default_load_utility_settings(power_price=…)",
+     "by": null
+    }
+   },
+   {
+    "name": "ssfYield",
+    "value": "the package's default",
+    "unit": "",
+    "source": {
+     "kind": "model",
+     "id": "biorefineries.corn@2.35.1",
+     "note": "the package's own default, read back after the run: SimultaneousSaccharificationFermentation(yield_=…)",
+     "by": null
+    }
+   },
+   {
+    "name": "ssfTime",
+    "value": "the package's default",
+    "unit": "h",
+    "source": {
+     "kind": "model",
+     "id": "biorefineries.corn@2.35.1",
+     "note": "the package's own default, read back after the run: SimultaneousSaccharificationFermentation(tau=…)",
+     "by": null
+    }
+   },
+   {
+    "name": "ssfTemperature",
+    "value": "the package's default",
+    "unit": "K",
+    "source": {
+     "kind": "model",
+     "id": "biorefineries.corn@2.35.1",
+     "note": "the package's own default, read back after the run: SimultaneousSaccharificationFermentation(T=…)",
+     "by": null
+    }
+   },
+   {
+    "name": "ssfWorkingVolume",
+    "value": "the package's default",
+    "unit": "",
+    "source": {
+     "kind": "model",
+     "id": "biorefineries.corn@2.35.1",
+     "note": "the package's own default, read back after the run: SimultaneousSaccharificationFermentation(V_wf=…)",
+     "by": null
+    }
+   },
+   {
+    "name": "solidsContent",
+    "value": "the package's default",
+    "unit": "g g-1",
+    "source": {
+     "kind": "model",
+     "id": "biorefineries.corn@2.35.1",
+     "note": "the package's own default, read back after the run: default_process_parameters['slurry_solids_content']",
+     "by": null
+    }
+   },
+   {
+    "name": "yeastLoading",
+    "value": "the package's default",
+    "unit": "g g-1",
+    "source": {
+     "kind": "model",
+     "id": "biorefineries.corn@2.35.1",
+     "note": "the package's own default, read back after the run: default_process_parameters['yeast_loading']",
+     "by": null
+    }
+   },
+   {
+    "name": "operatingDays",
+    "value": "the package's default",
+    "unit": "d",
+    "source": {
+     "kind": "model",
+     "id": "biorefineries.corn@2.35.1",
+     "note": "the package's own default, read back after the run: default_tea_parameters['operating_days']",
+     "by": null
+    }
+   },
+   {
+    "name": "incomeTax",
+    "value": "the package's default",
+    "unit": "",
+    "source": {
+     "kind": "model",
+     "id": "biorefineries.corn@2.35.1",
+     "note": "the package's own default, read back after the run: default_tea_parameters['income_tax']",
+     "by": null
+    }
+   },
+   {
+    "name": "langFactor",
+    "value": "the package's default",
+    "unit": "",
+    "source": {
+     "kind": "model",
+     "id": "biorefineries.corn@2.35.1",
+     "note": "the package's own default, read back after the run: default_tea_parameters['lang_factor']",
+     "by": null
+    }
+   },
+   {
+    "name": "laborCost",
+    "value": "the package's default",
+    "unit": "USD yr-1",
+    "source": {
+     "kind": "model",
+     "id": "biorefineries.corn@2.35.1",
+     "note": "the package's own default, read back after the run: default_tea_parameters['labor_cost']",
+     "by": null
+    }
+   },
+   {
+    "name": "startYear",
+    "value": "the package's default",
+    "unit": "",
+    "source": {
+     "kind": "model",
+     "id": "biorefineries.corn@2.35.1",
+     "note": "the package's own default, read back after the run: default_tea_parameters['duration']",
+     "by": null
+    }
+   },
+   {
+    "name": "endYear",
+    "value": "the package's default",
+    "unit": "",
+    "source": {
+     "kind": "model",
+     "id": "biorefineries.corn@2.35.1",
+     "note": "the package's own default, read back after the run: default_tea_parameters['duration']",
+     "by": null
+    }
+   },
+   {
+    "name": "depreciation",
+    "value": "the package's default",
+    "unit": "",
+    "source": {
+     "kind": "model",
+     "id": "biorefineries.corn@2.35.1",
+     "note": "the package's own default, read back after the run: default_tea_parameters['depreciation']",
+     "by": null
+    }
+   },
+   {
+    "name": "cepci",
+    "value": "the package's default",
+    "unit": "",
+    "source": {
+     "kind": "model",
+     "id": "biorefineries.corn@2.35.1",
+     "note": "the package's own default, read back after the run: BiorefinerySettings(CEPCI=…)",
+     "by": null
+    }
+   },
+   {
+    "name": "compatibility",
+    "value": "SimultaneousSaccharificationFermentation._ins_size_is_fixed = False",
+    "unit": "",
+    "source": {
+     "kind": "convention",
+     "id": null,
+     "note": "biorefineries.corn's SimultaneousSaccharificationFermentation passes its two inlets (the mash and the yeast) to bst.BatchBioreactor, which declares one fixed inlet in biosteam 2.54.0, so corn.load() stops with 'at most 1 streams expected; 2 given'. The flowsheet lets the unit take them, as biosteam's own NRELEthanolFermentation declares; the unit's _run already mixes every inlet. No number of the package's is changed, and the package's own test values hold within its tolerance.",
+     "by": null
+    }
+   },
+   {
+    "name": "precision",
+    "value": "10 significant digits",
+    "unit": "",
+    "source": {
+     "kind": "convention",
+     "id": null,
+     "note": "every number the run keeps is rounded so: BioSTEAM sums a set of units in an order that moves the last digits from one build to the next, and a replay compares the plant",
+     "by": null
+    }
+   },
+   {
+    "name": "diagram",
+    "value": "not drawn: Graphviz's dot was not on the path of the host that made this run",
+    "unit": "",
+    "source": {
+     "kind": "convention",
+     "id": null,
+     "note": "D8: the flowsheet diagram is drawn with Graphviz when its dot is on the host's path; the run is the same plant either way, and a host with Graphviz keeps a run of its own",
+     "by": null
+    }
+   }
+  ]
+ },
+ "benchmark": [
+  {
+   "name": "model",
+   "value": "biorefineries.cornstover.Biorefinery",
+   "unit": "",
+   "source": {
+    "kind": "model",
+    "id": "biorefineries.cornstover@2.35.1",
+    "note": "the corn stover ethanol biorefinery built to NREL/TP-5100-47764, with every setting the package's own",
+    "by": null
+   }
+  },
+  {
+   "name": "simulator",
+   "value": "biosteam 2.54.0",
+   "unit": "",
+   "source": {
+    "kind": "model",
+    "id": "biosteam@2.54.0",
+    "note": "the process simulator the package runs on",
+    "by": null
+   }
+  },
+  {
+   "name": "gallon",
+   "value": "ethanol_density_kggal",
+   "unit": "kg gal-1",
+   "source": {
+    "kind": "model",
+    "id": "biorefineries.cornstover@2.35.1",
+    "note": "the package's own ethanol density per gallon converts its price per kilogram",
+    "by": null
+   }
+  }
+ ]
+}

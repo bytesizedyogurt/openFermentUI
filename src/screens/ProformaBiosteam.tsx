@@ -11,9 +11,10 @@
 // (CostWaterfall, Tornado, Distribution), never by recharts.
 //
 // The scenario page (ProformaScenario.tsx) composes these sections under its
-// inputs and its Run; a reference biorefinery's page (ProformaReference.tsx,
-// OF-BLD-019 §3.3) reads the same sections over its own `proforma.reference`
-// artifact through `runViewOfReference`, one case and no samples.
+// inputs and its Run; a run's page (ProformaRun.tsx) and a reference plant's
+// page (ProformaReference.tsx, OF-BLD-019 §3.3; alpha 2.2 D8) read the same
+// sections over a library plant's `library.run` artifact through
+// `runViewOfRun`, one case and no samples.
 import { useMemo, useState, type ReactNode } from 'react';
 import { Download } from 'lucide-react';
 import type { CostLine, FlowsheetInfo, ResultGrid, ScenarioInput } from '@/data/types';
@@ -503,9 +504,16 @@ export function UtilitiesCard({ view, csvName }: { view: RunView; csvName: strin
 
 // ── Diagram ─────────────────────────────────────────────────────────────
 
-export function DiagramCard({ view, csvName }: { view: RunView; csvName: string }) {
+/**
+ * The run's diagram, or the units in run order with the words why it has none. A library plant's run draws no
+ * diagram on any host (workers/library_plants.py: `draw` False): its SFF file's graph is its drawing, so its note says
+ * that and links the record (`sffRecord`) when the page knows it; the note a library run's artifact keeps names
+ * Graphviz, and that cause holds for a scenario's run alone.
+ */
+export function DiagramCard({ view, csvName, sffRecord = null }: { view: RunView; csvName: string; sffRecord?: string | null }) {
   const order = view.tables.unitOrder.length ? view.tables.unitOrder : [...view.tables.units].sort((a, b) => a.order - b.order).map((x) => x.id);
   const classOf = new Map(view.tables.units.map((x) => [x.id, x.unitClass]));
+  const library = view.basis.tool === 'library.run';
   return (
     <Section
       title="Diagram"
@@ -517,9 +525,26 @@ export function DiagramCard({ view, csvName }: { view: RunView; csvName: string 
         <img src={diagramSrc(view.tables.diagram)} alt={`Flowsheet diagram of ${view.flowsheet ?? 'the run'}: ${order.join(', ')}`} className="max-w-full h-auto" data-testid="diagram-svg" />
       ) : (
         <>
-          <p className="text-caption text-signal-warn mb-2" data-testid="diagram-note">
-            {view.tables.diagramNote ?? NO_DIAGRAM}
-          </p>
+          {library ? (
+            <p className="text-caption text-ink-soft mb-2" data-testid="diagram-note">
+              A library plant&rsquo;s run draws no diagram on any host: its SFF file&rsquo;s graph is its drawing
+              {sffRecord ? (
+                <>
+                  , on the record{' '}
+                  <a className="font-num underline underline-offset-2 hover:text-accent" href={href(`/flowsheets/${encodeURIComponent(sffRecord)}`)} data-testid="diagram-sff">
+                    {sffRecord}
+                  </a>
+                </>
+              ) : (
+                ', on the run’s SFF record when it wrote one'
+              )}
+              . The units are listed in run order.
+            </p>
+          ) : (
+            <p className="text-caption text-signal-warn mb-2" data-testid="diagram-note">
+              {view.tables.diagramNote ?? NO_DIAGRAM}
+            </p>
+          )}
           {order.length > 0 ? (
             <ol className="list-decimal pl-5 text-body" data-testid="diagram-units">
               {order.map((id) => (
@@ -541,39 +566,36 @@ export function DiagramCard({ view, csvName }: { view: RunView; csvName: string 
 // ── What the run read back, credited to whoever set it ──────────────────
 
 /** Each group's heading and line, by who set its values (§3.R, findings 6 and 20). */
-const READ_BACK_GROUPS: { origin: ReadBackRow['origin']; title: (reference: boolean) => string; reads: (reference: boolean) => string }[] = [
+const READ_BACK_GROUPS: { origin: ReadBackRow['origin']; title: string; reads: string }[] = [
   {
     origin: 'setting',
-    title: (reference) => (reference ? 'What the package set' : 'What the package, BioSTEAM and the run\u2019s conventions set'),
-    reads: (reference) =>
-      reference
-        ? 'Each the package\u2019s own default, read back from its objects after the run; nobody typed these.'
-        : 'The settings the inputs leave to the package\u2019s finance model, to BioSTEAM\u2019s units or to a convention the basis names, read back after the base case ran; nobody typed these.',
+    title: 'What the package, BioSTEAM and the run\u2019s conventions set',
+    reads:
+      'The settings the inputs leave to the package\u2019s finance model, to BioSTEAM\u2019s units or to a convention the basis names, read back after the base case ran; nobody typed these.',
   },
   {
     // OF-BLD-020 §6.R (main-11/23): a value a named person set, as the run's basis names them.
     origin: 'person',
-    title: () => 'What a named person set',
-    reads: () =>
+    title: 'What a named person set',
+    reads:
       'Each a named person\u2019s assumption, as the run\u2019s basis names it (a Finance value typed in this scenario\u2019s panel, or a vessel setting typed in fermOS \u2192 Vessel), read back after the base case ran.',
   },
   {
     origin: 'case',
-    title: () => 'What this case gave',
-    reads: () =>
+    title: 'What this case gave',
+    reads:
       'Set by this case\u2019s bound records and named assumptions, through BioSTEAM\u2019s units, and read back after the base case ran; the reference model supplied none of these.',
   },
   {
     origin: 'read',
-    title: () => 'Also read back from the run',
-    reads: () => 'Read from the run\u2019s objects after the base case ran; this page does not know which setting each one is, so it credits nobody.',
+    title: 'Also read back from the run',
+    reads: 'Read from the run\u2019s objects after the base case ran; this page does not know which setting each one is, so it credits nobody.',
   },
 ];
 
 export function ReadBack({ view, flowsheet }: { view: RunView; flowsheet: FlowsheetInfo | null }) {
   const rows = readBackRows(view.readBack, flowsheet, view.basis?.inputs ?? []);
   if (!rows.length) return null;
-  const reference = !!flowsheet?.reference;
   return (
     <Card className="p-4" data-testid="proforma-readback">
       {READ_BACK_GROUPS.map((g) => {
@@ -581,8 +603,8 @@ export function ReadBack({ view, flowsheet }: { view: RunView; flowsheet: Flowsh
         if (!these.length) return null;
         return (
           <div key={g.origin} className="mb-3 last:mb-0" data-testid="readback-group" data-origin={g.origin}>
-            <h2 className="font-serif text-section-title font-semibold mb-1">{g.title(reference)}</h2>
-            <p className="text-caption text-ink-soft mb-2">{g.reads(reference)}</p>
+            <h2 className="font-serif text-section-title font-semibold mb-1">{g.title}</h2>
+            <p className="text-caption text-ink-soft mb-2">{g.reads}</p>
             <table className="w-full text-caption">
               <tbody>
                 {these.map((r) => (
@@ -634,6 +656,7 @@ export function RunReport({
   csvName,
   flowsheet = null,
   oneCase = false,
+  sffRecord = null,
 }: {
   view: RunView;
   priceBasis: string;
@@ -646,6 +669,8 @@ export function RunReport({
   flowsheet?: FlowsheetInfo | null;
   /** The run is one case, sampled nowhere. */
   oneCase?: boolean;
+  /** The run's SFF record, when the page knows it: a library run's drawing. */
+  sffRecord?: string | null;
 }) {
   return (
     <div className="space-y-4" data-testid="run-report">
@@ -661,7 +686,7 @@ export function RunReport({
       <StreamsTable view={view} csvName={csvName} />
       <EquipmentTable view={view} csvName={csvName} />
       <UtilitiesCard view={view} csvName={csvName} />
-      <DiagramCard view={view} csvName={csvName} />
+      <DiagramCard view={view} csvName={csvName} sffRecord={sffRecord} />
       <ReadBack view={view} flowsheet={flowsheet} />
     </div>
   );

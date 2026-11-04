@@ -9,6 +9,7 @@ from __future__ import annotations
 import math
 import re
 import shutil
+from dataclasses import dataclass
 from typing import Any
 
 from . import binding as _binding
@@ -26,11 +27,6 @@ from .engine.simulator import (  # noqa: F401  (re-exported: the names callers a
 )
 from .flowsheets import shelf as _shelf
 from .workers import WorkerError
-
-# ── The benchmark (§8.2) ────────────────────────────────────────────────
-
-BENCHMARK = "proforma_benchmark"
-BENCHMARK_PACKAGE = "biorefineries.cornstover"
 
 
 def _installed(dist: str) -> str:
@@ -73,29 +69,127 @@ def _draws(inputs) -> bool | None:
     return None if said is None else str(said) == DIAGRAM_DRAWN
 
 
-def benchmark_inputs() -> list:
-    from .models import BasisInput, BasisSource
+# ── Runs kept from the shelf's retired reference entries (alpha 2.2 D8) ──
+#
+# The shelf held two hand-written reference entries, cornstover_benchmark and
+# corn_drygrind, which retired at alpha 2.2 C.6: the library shelf's
+# cornstover and corn run the same packages' plants whole on their own
+# defaults (engine/library.py), held to the package's own test, and the
+# reference screen reads them. The two artifact tools the entries' runs were
+# kept under stay registered, so an artifact a person kept replays: the
+# Proforma worker recomputes each from its stored basis through the code
+# that computed it (workers/kept_references.py), and a reference run's
+# checks set what it measured beside the library plant's package test, the
+# same test the entry named. A kept run's tables read as any run's
+# (`tables_of`), and a train standing on one reads its streams, on the
+# chemical set its entry named (`RETIRED`). Proforma's module rows list the
+# kept runs, the reference page shows them, selling_price cites a kept run's
+# price when the project keeps no run of the library plant on its package's
+# own values (`retired_evidence`), and stream_table cites a kept reference
+# run by it. No route or tool computes a new one.
 
-    ref = f"{BENCHMARK_PACKAGE}@{_installed('biorefineries')}"
-    return [
-        BasisInput(name="model", value="biorefineries.cornstover.Biorefinery", unit="", source=BasisSource(
-            kind="model", id=ref,
-            note="the corn stover ethanol biorefinery built to NREL/TP-5100-47764, with every setting the package's own")),
-        BasisInput(name="simulator", value=f"biosteam {_installed('biosteam')}", unit="", source=BasisSource(
-            kind="model", id=f"biosteam@{_installed('biosteam')}", note="the process simulator the package runs on")),
-        BasisInput(name="gallon", value="ethanol_density_kggal", unit="kg gal-1", source=BasisSource(
-            kind="model", id=ref, note="the package's own ethanol density per gallon converts its price per kilogram")),
-    ]
+# The benchmark (OF-BLD-014 §8.2): the corn stover plant's price per gallon.
+BENCHMARK = "proforma_benchmark"
+# A reference entry's run (OF-BLD-019 §2.2): the plant whole, with its tables.
+REFERENCE = "proforma.reference"
+# 2 (OF-BLD-019 §2.R): the basis says whether the diagram is drawn, and the
+# plant builds with fresh chemical caches.
+REFERENCE_VERSION = "reference run 2"
+# The significant digits a reference run keeps, when its basis names none.
+REFERENCE_DIGITS = 10
+
+
+@dataclass(frozen=True)
+class RetiredEntry:
+    """What a retired reference entry named, kept for the runs a person kept
+    from it: the library plant it built (the package test its kept runs are
+    held to is that plant's, engine/library.regression, and its SFF file is
+    the library run's to write), its title, the chemical set a train read
+    from its kept run builds on (`program`, None where the entry named
+    none), and the output a kept run's price is with the basis it is priced
+    on."""
+
+    plant: str
+    title: str
+    program: str | None
+    priceOutput: str
+    priceBasis: str
+
+
+RETIRED = {
+    "cornstover_benchmark": RetiredEntry(
+        plant="cornstover", title="Corn stover to ethanol, the NREL 2011 design", program=None,
+        priceOutput="mespUsdPerGal", priceBasis="USD per gallon of ethanol, at the package's own ethanol density"),
+    "corn_drygrind": RetiredEntry(
+        plant="corn", title="Dry-grind corn to ethanol, the conventional plant", program="yeast",
+        priceOutput="ethanolPriceUsdPerKg",
+        priceBasis=("USD per kg of the ethanol product stream as the package makes it (ethanol with its denaturant): "
+                    "the package's own price, at which its TEA solves the internal rate of return")),
+}
+# The library plant each retired entry built, by the entry's id.
+RETIRED_PLANTS = {entry: r.plant for entry, r in RETIRED.items()}
+# The entry the benchmark was run from: the corn stover plant's.
+BENCHMARK_ENTRY = "cornstover_benchmark"
+BENCHMARK_LABEL = "Minimum ethanol selling price, the NREL 2011 corn stover design as biorefineries.cornstover builds it"
+BENCHMARK_UNIT = "USD gal⁻¹"
+
+
+def retired_entry_of(art) -> str | None:
+    """The retired entry a kept run was made from: a reference run's
+    flowsheet, or the corn stover entry for the benchmark; None for any
+    other artifact."""
+    if art.tool == BENCHMARK:
+        return BENCHMARK_ENTRY
+    if art.tool == REFERENCE:
+        entry = str(_named(art.inputs, "flowsheet") or (art.output or {}).get("flowsheet") or "")
+        return entry if entry in RETIRED else None
+    return None
+
+
+def kept_from_retired(plant: str | None = None) -> list:
+    """The runs the project keeps from the retired reference entries, newest
+    first: every reference run and benchmark, or those of the entries that
+    built `plant`. A read: it runs nothing."""
+    from . import artifacts
+
+    kept = artifacts.of_tools(REFERENCE, BENCHMARK)
+    return [a for a in kept if (entry := retired_entry_of(a)) is not None
+            and (plant is None or RETIRED[entry].plant == plant)]
+
+
+def retired_evidence(art):
+    """A run kept from a retired reference entry as the one Evidence a claim
+    cites it by, its id the artifact's: a benchmark's price per gallon, or a
+    reference run's price on its package's own defaults in the output and
+    basis its entry named. None for any other run, and for a run that holds
+    no price."""
+    from . import artifacts
+    from .models import Evidence
+
+    entry = retired_entry_of(art)
+    if entry is None:
+        return None
+    o = art.output if isinstance(art.output, dict) else {}
+    if art.tool == BENCHMARK:
+        value, label, unit = o.get("mespUsdPerGal"), BENCHMARK_LABEL, BENCHMARK_UNIT
+    else:
+        r = RETIRED[entry]
+        value, unit = o.get(r.priceOutput), r.priceBasis
+        label = f"{r.title}: the price {o.get('package') or r.plant} gives on the package's own defaults"
+    if not isinstance(value, (int, float)) or isinstance(value, bool) or not math.isfinite(value):
+        return None
+    return Evidence(id=art.id, label=label, value=float(value), unit=unit, provenance=art.provenance,
+                    basis=artifacts.basis_of(art), figure=None)
 
 
 def _run_benchmark(inputs, seed):
-    return call("benchmark", {})
+    return call("replay_benchmark", {})
 
 
 def _register() -> None:
     from . import artifacts
 
-    artifacts.register(BENCHMARK, f"{BENCHMARK_PACKAGE}@{_installed('biorefineries')}", _run_benchmark)
+    artifacts.register(BENCHMARK, f"biorefineries.cornstover@{_installed('biorefineries')}", _run_benchmark)
 
 
 def _register_lazy() -> None:
@@ -107,134 +201,19 @@ def _register_lazy() -> None:
 _register_lazy()
 
 
-def stored_benchmark():
-    """The benchmark this installation ran, or None. A read: it runs nothing."""
-    from . import artifacts
-
-    reg = artifacts.registered(BENCHMARK)
-    try:
-        return artifacts.get(artifacts.artifact_id(reg.tool, reg.version, benchmark_inputs()))
-    except artifacts.ArtifactNotFound:
-        return None
-
-
-def run_benchmark():
-    from . import artifacts
-
-    return artifacts.compute(BENCHMARK, benchmark_inputs())
-
-
-def benchmark_evidence(art):
-    """The benchmark run as one Evidence: the package's minimum ethanol
-    selling price per gallon, as the stored artifact holds it."""
-    from . import artifacts
-    from .models import Evidence
-
-    return Evidence(
-        id=art.id,
-        label="Minimum ethanol selling price, the NREL 2011 corn stover design as biorefineries.cornstover builds it",
-        value=art.output["mespUsdPerGal"], unit="USD gal⁻¹",
-        provenance=art.provenance, basis=artifacts.basis_of(art), figure=None)
-
-
-# ── Reference biorefineries (OF-BLD-019 §2.2, D3) ───────────────────────
-#
-# A published biorefinery on the shelf (`reference: True`) runs whole on its
-# package's own defaults in the worker's `reference` op and is kept as one
-# `proforma.reference` artifact: the package's result, the quantities its
-# own test asserts as this installation computed them (`measured`), its
-# defaults read back (`readBack`), every table a `proforma.run` artifact
-# holds (so `tables_of` reads it too), and the test's values beside them
-# (`regression`, `checks`), parsed from the installed test file. Every input
-# names the package, the simulator or a stated convention, so the run is
-# `computed`, as the benchmark is. The benchmark's own endpoints and
-# artifact (§8.2) are unchanged; the corn stover plant answers here too.
-
-REFERENCE = "proforma.reference"
-# 2 (OF-BLD-019 §2.R): the basis says whether the diagram is drawn, and the
-# plant builds with fresh chemical caches.
-REFERENCE_VERSION = "reference run 2"
-# The significant digits a reference run keeps: BioSTEAM sums a set of units
-# in an order that moves the last digits from one build to the next, so the
-# run keeps fewer, and a replay compares the plant (a precision, stated in
-# every basis).
-REFERENCE_DIGITS = 10
-# numpy.allclose's own absolute tolerance, which the package's test uses
-# beside its rtol: a check holds when |measured − package| ≤ ATOL + rtol·|package|.
-ALLCLOSE_ATOL = 1e-08
-
-
-def _reference_info(flowsheet_id: str):
-    try:
-        info = _shelf.info(flowsheet_id)
-    except _shelf.NotOnShelf as e:
-        raise ScenarioRefused(str(e)) from None
-    if not info.reference:
-        refs = ", ".join(f.id for f in _shelf.SHELF.values() if f.reference)
-        raise ScenarioRefused(f"{flowsheet_id} is not a reference biorefinery: it runs on its inputs as a scenario; "
-                              f"the references are {refs}")
-    return info
-
-
-def reference_inputs(flowsheet_id: str) -> list:
-    """The basis of a reference run: the package's plant, the simulator, the
-    settings it builds under, each default the shelf lists (its value read
-    back after the run), what the run changes about the package to run it,
-    and the digits it keeps."""
-    from .models import BasisInput, BasisSource
-
-    info = _reference_info(flowsheet_id)
-    pkg = f"{_shelf.REFERENCE_MODULES[flowsheet_id]}@{_installed('biorefineries')}"
-    bst_v, tmo_v = _installed("biosteam"), _installed("thermosteam")
-    out = [
-        BasisInput(name="flowsheet", value=flowsheet_id, unit="", source=BasisSource(
-            kind="model", id=pkg, note=f"{info.title}, every setting the package's own")),
-        BasisInput(name="simulator", value=f"biosteam {bst_v}", unit="", source=BasisSource(
-            kind="model", id=f"biosteam@{bst_v}", note="the process simulator the package runs on")),
-        BasisInput(name="thermodynamics", value=f"thermosteam {tmo_v}", unit="", source=BasisSource(
-            kind="model", id=f"thermosteam@{tmo_v}", note="BioSTEAM's property engine")),
-        BasisInput(name="settings", value="bst.process_tools.default()", unit="", source=BasisSource(
-            kind="model", id=f"biosteam@{bst_v}",
-            note="BioSTEAM's default utilities and plant cost index before the plant builds, as the package's own "
-                 "test builds it (default_settings, biorefineries/tests/test_biorefineries.py); the plant then sets "
-                 "its own, and the worker puts back what it held before")),
-    ]
-    out += [BasisInput(name=i.key, value="the package's default", unit=i.unit,
-                       source=BasisSource(kind="model", id=pkg, note=i.note)) for i in info.inputs]
-    out += [BasisInput(name="compatibility", value=what, unit="", source=BasisSource(kind="convention", note=why))
-            for what, why in _shelf.REFERENCE_COMPAT.get(flowsheet_id, [])]
-    out.append(BasisInput(name="precision", value=f"{REFERENCE_DIGITS} significant digits", unit="", source=BasisSource(
-        kind="convention", note="every number the run keeps is rounded so: BioSTEAM sums a set of units in an order "
-                                "that moves the last digits from one build to the next, and a replay compares the plant")))
-    out.append(diagram_input())
-    return out
-
-
-def regression_checks(regression, measured: dict) -> list:
-    """Each of the package test's values beside what this installation
-    computed, held as the test holds it (numpy.allclose with the test's rtol)."""
-    from .models import RegressionCheck
-
-    out = []
-    for v in regression.values:
-        m = measured.get(v.expression)
-        m = float(m) if isinstance(m, (int, float)) else None
-        within = m is not None and abs(m - v.package) <= ALLCLOSE_ATOL + v.rtol * abs(v.package)
-        rel = abs(m - v.package) / abs(v.package) if m is not None and v.package != 0 else None
-        out.append(RegressionCheck(expression=v.expression, label=v.label, unit=v.unit, measured=m, package=v.package,
-                                   rtol=v.rtol, relDiff=rel, within=within))
-    return out
-
-
 def _run_reference(inputs, seed):
-    """One reference run, from its basis alone: the worker builds the plant
-    and reads it; the package test's values are set beside what it read."""
+    """A kept reference run, from its basis alone: the worker builds the
+    plant its basis names and reads it; the package test's values are set
+    beside what it read, as the run set them."""
+    from .engine import library
+
     flowsheet = str(_named(inputs, "flowsheet"))
     digits = int(str(_named(inputs, "precision") or REFERENCE_DIGITS).split()[0])
-    out = call("reference", {"flowsheet": flowsheet, "digits": digits, "diagram": _draws(inputs)})
-    regression = _shelf.package_regression(flowsheet)
+    out = call("replay_reference", {"flowsheet": flowsheet, "digits": digits, "diagram": _draws(inputs)})
+    plant = RETIRED_PLANTS.get(flowsheet)
+    regression = library.regression(plant, None) if plant else None
     out["regression"] = regression.model_dump(mode="json") if regression else None
-    out["checks"] = ([c.model_dump(mode="json") for c in regression_checks(regression, out.get("measured") or {})]
+    out["checks"] = ([c.model_dump(mode="json") for c in library.checks(regression, out.get("measured") or {})]
                      if regression else [])
     return out
 
@@ -253,39 +232,6 @@ def _lazy_reference() -> None:
 
 
 _lazy_reference()
-
-
-def _flowsheet_of(art) -> str | None:
-    return next((str(i.value) for i in art.inputs if i.name == "flowsheet"), None)
-
-
-def stored_reference(flowsheet_id: str):
-    """The newest stored reference run of a reference flowsheet, or None. A
-    read: it runs nothing and starts no simulator."""
-    from . import artifacts
-
-    _reference_info(flowsheet_id)
-    return next((a for a in artifacts.all_artifacts() if a.tool == REFERENCE and _flowsheet_of(a) == flowsheet_id), None)
-
-
-def run_reference(flowsheet_id: str):
-    """Run a reference biorefinery (or return the stored run of the same
-    basis) and keep it as one `proforma.reference` artifact."""
-    from . import artifacts
-
-    return artifacts.compute(REFERENCE, reference_inputs(flowsheet_id))
-
-
-def reference(flowsheet_id: str, art=None):
-    """What GET and POST /api/proforma/reference/{id} answer: the shelf's
-    entry, the run (the newest stored, unless one is given), the package
-    test's values and the simulator's status."""
-    from .models import ProformaReference
-
-    info = _reference_info(flowsheet_id)
-    art = art if art is not None else stored_reference(flowsheet_id)
-    return ProformaReference(flowsheet=info, artifact=art, regression=_shelf.package_regression(flowsheet_id),
-                             simulator=status())
 
 
 # ── Runs of a shelf flowsheet (§8.3) ─────────────────────────────────────────────
@@ -811,13 +757,17 @@ def _run_scenario(inputs, seed):
 
 def plant_of(art) -> dict[str, Any]:
     """What the worker rebuilds a run's base case from, read from the run's
-    basis alone, for its SFF file (ADR-003, engine/sff.py `export`): a
-    reference run's flowsheet, the benchmark's corn stover plant, or a shelf
-    run's flowsheet with its base values and, for a composite, its structure."""
-    if art.tool == REFERENCE:
-        return {"flowsheet": str(_named(art.inputs, "flowsheet"))}
-    if art.tool == BENCHMARK:
-        return {"flowsheet": "cornstover_benchmark"}
+    basis alone, for its SFF file (ADR-003, engine/sff.py `export`): a shelf
+    run's flowsheet with its base values and, for a composite, its structure.
+    A run kept from a retired reference entry is refused in words naming the
+    library plant whose run writes the same package's plant (alpha 2.2 D8)."""
+    if art.tool in (REFERENCE, BENCHMARK):
+        entry = str(_named(art.inputs, "flowsheet") or "cornstover_benchmark")
+        plant = RETIRED_PLANTS.get(entry, "cornstover")
+        raise ScenarioRefused(f"{art.tool} artifact {art.id} is a run kept from a reference entry that retired from "
+                              f"Proforma's shelf at alpha 2.2: it replays as kept, and its SFF file is the library "
+                              f"plant {plant}'s to write (run {plant} with POST /api/library/{plant}/run, which keeps "
+                              "that run's file)")
     if art.tool == RUN:
         from . import composite
 
@@ -827,8 +777,7 @@ def plant_of(art) -> dict[str, Any]:
         if flowsheet == composite.FLOWSHEET:
             plant["structure"] = composite.structure_of(art.inputs)
         return plant
-    raise ScenarioRefused(f"{art.tool} is not a run of a flowsheet: a shelf run, a reference run or the benchmark is "
-                          "exported as SFF")
+    raise ScenarioRefused(f"{art.tool} is not a run of a flowsheet: a shelf run is exported as SFF")
 
 
 # A run that carries its tables (OF-BLD-019 §2.1); a run stored before them
@@ -999,7 +948,6 @@ def run_flowsheet(flowsheet: str, assumptions: list, *, samples: int = SAMPLES, 
     tool or engine reaches it, and a test or a fixture makes a run's artifact
     with it (`run` keeps the row of every run a door asks for). The toy is
     refused unless the caller is a test or a fixture and says `allow_toy`; a
-    reference biorefinery runs whole through its own reference run; a
     flowsheet built from kept artifacts (OF-BLD-020 §6.1) runs as a scenario
     that names them."""
     from . import artifacts
@@ -1009,8 +957,6 @@ def run_flowsheet(flowsheet: str, assumptions: list, *, samples: int = SAMPLES, 
         info = _shelf.info(flowsheet, allow_toy=allow_toy)
     except _shelf.NotOnShelf as e:
         raise ScenarioRefused(str(e)) from None
-    if info.reference:
-        raise ScenarioRefused(f"{flowsheet} is a reference biorefinery: it runs whole on its package's own defaults")
     if info.builtFrom:
         raise ScenarioRefused(f"{flowsheet} is built from {' and '.join(info.builtFrom)} artifacts a scenario names: it "
                               "runs as that scenario (POST /api/proforma/run with vessel and trainRun)")
@@ -1037,10 +983,10 @@ def run_flowsheet(flowsheet: str, assumptions: list, *, samples: int = SAMPLES, 
 
 def tables_of(art):
     """The tables a `proforma.run` artifact holds, as every reader reads
-    them (D1: Proforma, pureOS, fermOS, Postdoc, the MCP server); a
-    `proforma.reference` artifact (§2.2) holds the same keys and reads the
-    same way. A run stored before §2.1 reads with empty tables and its
-    flowsheet from its basis."""
+    them (D1: Proforma, pureOS, fermOS, Postdoc, the MCP server); a library
+    run and a `proforma.reference` artifact kept from a retired reference
+    entry (§2.2) hold the same keys and read the same way. A run stored
+    before §2.1 reads with empty tables and its flowsheet from its basis."""
     from .models import ProformaTables
 
     o = art.output
@@ -1113,33 +1059,28 @@ PRODUCTS = {ETHANOL: "ethanol", _shelf.COMPOSITE: "ethanol"}
 
 def held_scenarios() -> list[dict]:
     """The BioSTEAM scenarios the project keeps (New scenario; the project's
-    rows, project_state.py), each naming the non-reference shelf flowsheet it
-    runs (its `modelId`)."""
+    rows, project_state.py), each naming the shelf flowsheet it runs (its
+    `modelId`): every scenario of the project, whichever browser made it."""
     from . import project_state
 
     return [r for r in project_state.kept("scenarios") if r.get("kind") == "biosteam"
-            and r.get("modelId") in _shelf.SHELF and not _shelf.SHELF[r["modelId"]].reference]
-
+            and r.get("modelId") in _shelf.SHELF]
 
 
 def runnable(flowsheet: str):
     """The shelf entry of a flowsheet a scenario can run, or the refusal in
-    words: the toy, an id the shelf does not hold, and a reference
-    biorefinery (it runs whole on its package's own defaults) are refused."""
+    words: the toy and an id the shelf does not hold are refused."""
     try:
-        info = _shelf.info(flowsheet)
+        return _shelf.info(flowsheet)
     except _shelf.NotOnShelf as e:
         raise ScenarioRefused(str(e)) from None
-    if info.reference:
-        raise ScenarioRefused(f"{flowsheet} is a reference biorefinery: it runs whole on its package's own defaults, "
-                              "not as a scenario's flowsheet")
-    return info
 
 
 def flowsheet_of(scenario_id: str, flowsheet: str | None = None) -> str:
     """The flowsheet a run runs: a kept scenario's own, by its id; else, for
-    a scenario a page has not yet saved, the non-reference shelf flowsheet it
-    names. Any other case is refused, in words."""
+    a scenario a page has not yet saved (ADR-014: its write waits in the
+    browser's queue), the shelf flowsheet it names. Any other case is
+    refused, in words."""
     if not (scenario_id or "").strip():
         raise ScenarioRefused("a run names the scenario it belongs to")
     held = {s["id"]: s for s in held_scenarios()}
@@ -1149,7 +1090,7 @@ def flowsheet_of(scenario_id: str, flowsheet: str | None = None) -> str:
             raise ScenarioRefused(f"{scenario_id} runs {own}, not {flowsheet}")
         return own
     if not flowsheet:
-        raise ScenarioRefused(f"there is no held scenario {scenario_id}; the BioSTEAM scenarios this project keeps are "
+        raise ScenarioRefused(f"there is no kept scenario {scenario_id}; the BioSTEAM scenarios this project keeps are "
                               f"{', '.join(held) or 'none'}, and a scenario not yet saved names the flowsheet it runs")
     return runnable(flowsheet).id
 
@@ -1293,25 +1234,54 @@ def bound(flowsheet: str, *, scenario_id: str = "", name: str = "", host: str | 
 
 
 def scenarios(host: str | None = None, pool=None) -> list:
-    """GET /api/proforma/scenarios (§2.3, b): one bound scenario per
-    BioSTEAM scenario the project keeps."""
-    from . import evidence_pool
+    """GET /api/proforma/scenarios (§2.3, b): one bound scenario per BioSTEAM
+    scenario the project keeps, every one the project's (alpha 2.2 D9), each
+    bound with the vessel design and the train run it names where its
+    flowsheet is built from them (custom_train_v1). A scenario its binding
+    refuses (a part that cannot stand) and one on a flowsheet the shelf no
+    longer holds (a retired entry's id, alpha 2.2 D8) are listed with the
+    refusal in words and no inputs, so one scenario never stops the list."""
+    from . import evidence_pool, project_state
 
     out = []
     for s in held_scenarios():
         pool = pool or evidence_pool.load()
-        out.append(bound(s["modelId"], scenario_id=s["id"], name=s.get("name") or s["id"], host=host, pool=pool))
+        try:
+            out.append(bound(s["modelId"], scenario_id=s["id"], name=s.get("name") or s["id"], host=host, pool=pool,
+                             vessel=s.get("vessel") or None, train_run=s.get("trainRun") or None))
+        except ScenarioRefused as e:
+            out.append(_listed_refused(s, host, str(e)))
+    listed = {s.id for s in out}
+    for s in project_state.kept("scenarios"):
+        if s.get("kind") == "biosteam" and s.get("modelId") not in _shelf.SHELF and s.get("id") not in listed:
+            try:
+                _shelf.info(str(s.get("modelId")))
+            except _shelf.NotOnShelf as e:
+                out.append(_listed_refused(s, host, str(e.args[0])))
     return out
+
+
+def _listed_refused(s: dict, host: str | None, words: str):
+    """A kept scenario as the list shows one its binding refuses: its id,
+    name and flowsheet, no inputs, and the refusal in words."""
+    from .models import ProformaScenarioInfo
+
+    flowsheet = str(s.get("modelId"))
+    info = _shelf.SHELF.get(flowsheet)
+    return ProformaScenarioInfo(
+        id=s["id"], name=s.get("name") or s["id"], product=PRODUCTS.get(flowsheet, flowsheet), flowsheet=flowsheet,
+        host=host, inputs=[], leavesOut=info.leavesOut if info else [],
+        priceBasis=(info.priceBasis or "") if info else "", refused=words)
 
 
 def bind_flowsheet(flowsheet: str, host: str | None = None,
                    assumptions: list | None = None, pool=None, fits: dict[str, str] | None = None,
                    vessel: str | None = None, train_run: str | None = None):
     """GET /api/proforma/bind (§2.3, c): a shelf flowsheet's inputs bound as a
-    scenario a person made here shows them, id and name empty, with the
-    fermOS fits a person chose (OF-BLD-019 §5.1). The toy, an id the shelf
-    does not hold, a reference biorefinery, and a fit that cannot feed the
-    input it was chosen for are refused in words."""
+    scenario of that flowsheet not yet saved (ADR-014) shows them, id and
+    name empty, with the fermOS fits a person chose (OF-BLD-019 §5.1). The
+    toy, an id the shelf does not hold, and a fit that cannot feed the input
+    it was chosen for are refused in words."""
     runnable(flowsheet)
     return bound(flowsheet, host=host, assumptions=assumptions, pool=pool, fits=fits, vessel=vessel,
                  train_run=train_run)
@@ -1372,10 +1342,8 @@ _PARTS = re.compile(r"vessel (\S+), train run (\S+)")
 
 def runs_as_thing(flowsheet: str) -> bool:
     """Whether a flowsheet is one a scenario runs, and so a thing of the
-    biosteam engine whatever the project keeps: on the shelf, and no
-    reference biorefinery."""
-    info = _shelf.SHELF.get(flowsheet)
-    return info is not None and not info.reference
+    biosteam engine whatever the project keeps: on the shelf."""
+    return flowsheet in _shelf.SHELF
 
 
 def parts_configuration(vessel: str, train_run: str) -> str:
@@ -1414,16 +1382,14 @@ def _kept_parts(flowsheet: str) -> list[str]:
 
 
 def thing_flowsheets() -> list[tuple[Any, list[str]]]:
-    """The shelf's flowsheets a scenario runs (`runnable`: no reference
-    biorefinery, no toy), in the shelf's order, each with the configurations
+    """The shelf's flowsheets a scenario runs (`runnable`: every one on the
+    shelf, no toy), in the shelf's order, each with the configurations
     it runs in as a thing of the biosteam engine: none for a flowsheet built
     from nothing a scenario names; for one built from a kept vessel design
     and a kept train run, each pair of parts the project's scenarios of it
     name (`_kept_parts`), the flowsheet listed while there is one."""
     out = []
     for info in _shelf.SHELF.values():
-        if info.reference:
-            continue
         configurations = _kept_parts(info.id) if info.builtFrom else []
         if info.builtFrom and not configurations:
             continue
@@ -2069,8 +2035,9 @@ def ceiling_check(scenario_id: str, flowsheet: str | None = None, host: str | No
                   fits: dict[str, str] | None = None, pool=None, overrides: list | None = None):
     """GET /api/proforma/ceiling-check: a scenario's fermenter yield beside
     the newest stored geneOS ceiling of each shelf model of its organism, on
-    its flowsheet's sugar (D11). The scenario is one the service holds by its
-    id, or one made here by the flowsheet it names (flowsheet_of); its yield
+    its flowsheet's sugar (D11). The scenario is one the project keeps, by
+    its id, or one not yet saved (ADR-014), by the flowsheet it names
+    (flowsheet_of); its yield
     is bound as its page binds it, with the person's overrides and the
     fermOS fits chosen. Refused in words as the binding is. A read: it keeps
     nothing, starts no worker, and changes no binding or run."""

@@ -2,10 +2,10 @@
 
     from_run(artifact_id, train_id=None) -> TrainFromRun
 
-A kept run (a `proforma.run`, a `proforma.reference`, a `pureos.train_run` or
-a library plant's `library.run`) holds its stream and unit tables
-(`proforma.tables_of`). This reads them into a `TrainSpec` the Builder
-opens, as data, and never computes a quantity:
+A kept run (a `proforma.run`, a `pureos.train_run`, a library plant's
+`library.run`, or a `proforma.reference` kept from a retired reference entry)
+holds its stream and unit tables (`proforma.tables_of`). This reads them into
+a `TrainSpec` the Builder opens, as data, and never computes a quantity:
 
     which units   every unit the product passes through: on the product's path
                   (pureOS's own reading of the path, by pass: `pureos._leads_on`)
@@ -27,8 +27,8 @@ opens, as data, and never computes a quantity:
                   product goes on and the run's numbers say so (the product's
                   kg/hr as its stream table holds them, compared, never made)
     the values    a run of a shelf flowsheet the worker builds case by case
-                  (`proforma.run` on a non-reference entry) gives each unit taken
-                  `readFrom` that flowsheet's own unit of the same id: its values
+                  (`proforma.run`) gives each unit taken `readFrom` that
+                  flowsheet's own unit of the same id: its values
                   are the package's, read in the worker as `model` inputs naming
                   its version when the train runs (§5.2); a run of a flowsheet
                   built from parts (`custom_train_v1`, its shelf entry's
@@ -141,9 +141,8 @@ def _read(art: Artifact) -> tuple[Any, str | None, str | None, str | None, str |
 
 def _reads_from(art: Artifact, flowsheet: str | None) -> str | None:
     """The shelf flowsheet whose own units a train read from this run takes
-    its values from: a run of one the worker builds case by case. A
-    reference runs whole, and the worker reads no unit of a flowsheet built
-    from parts (§5.R part a)."""
+    its values from: a run of one the worker builds case by case. The worker
+    reads no unit of a flowsheet built from parts (§5.R part a)."""
     from ..flowsheets import shelf
 
     if art.tool != RUN or not flowsheet:
@@ -152,7 +151,7 @@ def _reads_from(art: Artifact, flowsheet: str | None) -> str | None:
         info = shelf.info(flowsheet)
     except shelf.NotOnShelf:
         return None
-    return None if info.reference or info.builtFrom else info.id
+    return None if info.builtFrom else info.id
 
 
 def _parts_train(art: Artifact, flowsheet: str | None) -> tuple[str | None, TrainSpec | None, str | None]:
@@ -191,7 +190,7 @@ def from_run(artifact_id: str, train_id: str | None = None) -> TrainFromRun:
         art = artifacts.get(artifact_id)
     except artifacts.ArtifactNotFound:
         raise RunNotOnFile(f"there is no kept artifact {artifact_id} here: a train is read from a kept run (a Proforma "
-                           "run, a reference run or a pureOS train run)") from None
+                           "run, a library plant's run or a pureOS train run)") from None
     if art.tool not in RUN_TOOLS:
         raise TrainRefused(f"artifact {art.id} is a {art.tool} artifact; a train is read from a run ("
                            f"{', '.join(RUN_TOOLS)})")

@@ -7,8 +7,6 @@ the worker builds each flowsheet once and keeps it; every later request sets
 its inputs on the built objects and re-simulates (Appendix 3, trap 3).
 
     ping        answered by `serve`
-    benchmark   the published reference biorefinery (§8.2), built afresh
-                inside `package_defaults()` (OF-BLD-019 §2.R)
     evaluate    one case of a flowsheet: its inputs in, its outputs out
     grid        the outputs over a grid of up to three inputs
     montecarlo  Latin hypercube samples of the inputs, seeded
@@ -20,13 +18,15 @@ its inputs on the built objects and re-simulates (Appendix 3, trap 3).
                 `custom_train_v1`: a vessel design's fermenter, a train run's
                 units and the TEA's finance) takes it as `structure`, and the
                 worker keeps a built plant per structure (STRUCTURES_KEPT)
-    reference   a published reference biorefinery run whole on its
-                package's defaults (OF-BLD-019 §2.2): built afresh inside
+    replay_reference, replay_benchmark  a run kept from one of the two
+                reference entries that retired from the shelf (alpha 2.2
+                D8), recomputed from its basis for its replay
+                (`kept_references.py`): the plant built afresh inside
                 `package_defaults()`, as the package's own test builds it;
                 its outputs, the quantities that test asserts, its defaults
-                read back and every table; numbers rounded to the digits
-                the basis states, so a replay compares the plant and not
-                the order BioSTEAM sums a set of units in
+                read back and every table, numbers rounded to the digits
+                the basis states; or the corn stover plant's price solved
+                as the package solves it
     thermo_props  thermosteam's answer for one mixture (OF-BLD-019 §4.2, D9):
                 a Stream on the library's own chemicals at T and P, and its
                 density, heat capacity, viscosity, bubble and dew points;
@@ -62,12 +62,10 @@ its inputs on the built objects and re-simulates (Appendix 3, trap 3).
                 and read: stream, unit and utility tables, the diagram or
                 the unit list, each unit's costs, the inlet as built
     sff_export  a run's base case written as an SFF file (alpha 2.0,
-                ADR-003): a reference biorefinery built afresh inside
-                `package_defaults()` as its reference run builds it, or a
-                shelf flowsheet's warm plant set to the run's base values
-                (its solved price on the product while it is written, as
-                its tables are read); then validated, scored and tagged by
-                the vendored toolkit (`sff_toolkit.export_checked`)
+                ADR-003): a shelf flowsheet's warm plant set to the run's
+                base values (its solved price on the product while it is
+                written, as its tables are read); then validated, scored and
+                tagged by the vendored toolkit (`sff_toolkit.export_checked`)
     sff_validate, sff_score  a file the service wrote, checked by the
                 vendored toolkit (`sff_toolkit`)
     library_discover  every subpackage of the installed `biorefineries`,
@@ -135,7 +133,7 @@ from thermosteam.utils import chemical_cache
 
 from .. import flowsheets
 from ..flowsheets.shelf import TABLE_UNITS
-from . import library_plants, serve, sff_toolkit
+from . import kept_references, library_plants, serve, sff_toolkit
 from .dot_names import stable_names
 
 # BioSTEAM's stream utility prices as it imports them (process water, natural
@@ -187,9 +185,6 @@ def built(name: str, structure: dict[str, Any] | None = None) -> tuple[Any, Any]
         module = flowsheets.load(name)
     except KeyError as e:
         raise Refused(_said(e)) from e
-    if not hasattr(module, "build"):
-        raise Refused(f"{name} is a reference biorefinery: it runs whole on its package's own defaults, "
-                      "through its reference run, not case by case")
     takes = bool(getattr(module, "STRUCTURED", False))
     if takes and structure is None:
         raise Refused(f"{name} is built from a vessel design and a train run, which this request does not name")
@@ -566,7 +561,7 @@ def run(name: str, base: dict[str, float], specs: dict[str, dict[str, Any]], sam
     return {"base": base_out, "baseInfeasible": base_infeasible, "tables": out_tables, "grid": out_grid, "montecarlo": mc}
 
 
-# ── a reference biorefinery's run (OF-BLD-019 §2.2) ────────────────────
+# ── a plant built as its package's own test builds it (OF-BLD-019 §2.R) ──
 
 
 # The code every function thermosteam's `chemical_cache` decorator makes
@@ -606,7 +601,7 @@ def _fresh_cache(fn: Any) -> None:
 
 @contextmanager
 def package_defaults() -> Iterator[None]:
-    """A plant builds, and a reference biorefinery is read, as in a worker
+    """A plant builds, and a kept reference run replays, as in a worker
     that had built nothing before: BioSTEAM's defaults first, as the
     package's own test runs it (`default_settings` in
     biorefineries/tests/test_biorefineries.py calls
@@ -696,15 +691,15 @@ def rounded(value: Any, digits: int) -> Any:
     return value
 
 
-def reference(name: str, digits: int, draw: bool | None = None) -> dict[str, Any]:
-    """A reference biorefinery, run whole: built afresh inside
-    `package_defaults()`, then everything read before the settings go back."""
+def replay_reference(name: str, digits: int, draw: bool | None = None) -> dict[str, Any]:
+    """A run kept from a retired reference entry (alpha 2.2 D8), recomputed
+    for its replay as the entry's reference run computed it: the plant built
+    afresh inside `package_defaults()`, then everything read before the
+    settings go back."""
     try:
-        module = flowsheets.load(name)
+        module = kept_references.plant(name)
     except KeyError as e:
         raise Refused(_said(e)) from e
-    if not hasattr(module, "load"):
-        raise Refused(f"{name} is not a reference biorefinery: it is run case by case, on its inputs")
     if not 1 <= digits <= 17:
         raise Refused("a reference run keeps between 1 and 17 significant digits")
     with package_defaults():
@@ -721,8 +716,8 @@ def reference(name: str, digits: int, draw: bool | None = None) -> dict[str, Any
     return rounded(out, digits)
 
 
-def _op_reference(args):
-    return reference(str(args["flowsheet"]), int(args.get("digits", 17)), args.get("diagram"))
+def _op_replay_reference(args):
+    return replay_reference(str(args["flowsheet"]), int(args.get("digits", 17)), args.get("diagram"))
 
 
 # ── thermosteam answers property questions (OF-BLD-019 §4.2, D9) ───────
@@ -1020,15 +1015,13 @@ def _op_montecarlo(args):
                       dict(args.get("base") or {}), args.get("structure"))
 
 
-def _op_benchmark(args):
-    """The benchmark (§8.2), built afresh inside `package_defaults()`: the
-    corn stover plant sets its own utility prices and cost index as it
-    builds, and these go back with everything else afterwards, so no later
-    case prices on them (OF-BLD-019 §2.R)."""
-    from openferment_core.flowsheets import cornstover_benchmark
-
+def _op_replay_benchmark(args):
+    """A kept benchmark recomputed for its replay (alpha 2.2 D8), built afresh
+    inside `package_defaults()`: the corn stover plant sets its own utility
+    prices and cost index as it builds, and these go back with everything
+    else afterwards, so no later case prices on them (OF-BLD-019 §2.R)."""
     with package_defaults():
-        return cornstover_benchmark.run()
+        return kept_references.benchmark()
 
 
 def _op_vessel_specs(args):
@@ -1255,13 +1248,11 @@ def _train_export(spec: dict[str, Any], path: str, meta: dict[str, Any] | None, 
 def _op_sff_export(args):
     """A run's base case written as an SFF file at the path the service names,
     with openFerment's block in its metadata, then checked (ADR-003). A
-    reference biorefinery is built afresh inside `package_defaults()`, as
-    its reference run builds it; a shelf flowsheet's warm plant is set to
-    the run's base values and simulated, as `run` sets its base case, and
-    its solved price stands on the product while the file is written; a
-    library plant is built afresh and set as its run set it; a pureOS train
-    is rebuilt from its run's train_run request and simulated
-    (`_train_export`)."""
+    shelf flowsheet's warm plant is set to the run's base values and
+    simulated, as `run` sets its base case, and its solved price stands on
+    the product while the file is written; a library plant is built afresh
+    and set as its run set it; a pureOS train is rebuilt from its run's
+    train_run request and simulated (`_train_export`)."""
     path = str(args["path"])
     meta = args.get("metadata") or None
     title = args.get("title") or None
@@ -1275,16 +1266,6 @@ def _op_sff_export(args):
         except library_plants.Refused as e:
             raise Refused(str(e)) from e
     name = str(args["flowsheet"])
-    try:
-        module = flowsheets.load(name)
-    except KeyError as e:
-        raise Refused(_said(e)) from e
-    if hasattr(module, "load"):
-        with package_defaults():
-            b = module.load()
-            parts = module.parts(b)
-            return sff_toolkit.export_checked(parts["system"], parts.get("tea"), path, metadata=meta,
-                                              process_title=title)
     structure = args.get("structure")
     module, b = built(name, structure)
     evaluate(name, {k: float(v) for k, v in (args.get("base") or {}).items()}, structure)
@@ -1346,8 +1327,9 @@ def _op_library_cases(args):
             for c in out]
 
 
-HANDLERS = {"evaluate": _op_evaluate, "grid": _op_grid, "montecarlo": _op_montecarlo, "benchmark": _op_benchmark,
-            "run": _op_run, "reference": _op_reference, "thermo_props": _op_thermo_props,
+HANDLERS = {"evaluate": _op_evaluate, "grid": _op_grid, "montecarlo": _op_montecarlo, "run": _op_run,
+            "replay_reference": _op_replay_reference, "replay_benchmark": _op_replay_benchmark,
+            "thermo_props": _op_thermo_props,
             "vessel_specs": _op_vessel_specs, "vessel_design": _op_vessel_design,
             "catalogue_specs": _op_catalogue_specs, "catalogue_unit_check": _op_catalogue_unit_check}
 

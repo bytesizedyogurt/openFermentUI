@@ -469,10 +469,7 @@ def refusals_by_place(spec: TrainSpec) -> list[tuple[str, str]]:
             except shelf.NotOnShelf as ex:
                 at(u.id, f"unit {u.id} reads from {u.readFrom.flowsheet!r}: {ex}")
             else:
-                if info.reference:
-                    at(u.id, f"unit {u.id} reads from {info.id}, a reference biorefinery: it runs whole, and a "
-                                "train reads the units of a flowsheet the worker builds case by case")
-                elif info.builtFrom:
+                if info.builtFrom:
                     # §5.R (part a): the worker reads no unit of a flowsheet
                     # built from parts; its train's units are the train run's.
                     at(u.id, f"unit {u.id} reads from {info.id}, built from a vessel design and a train run "

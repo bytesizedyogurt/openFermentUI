@@ -305,10 +305,14 @@ def fixture_sources(pool_factory: Callable[[], Any]) -> Sources:
 ARTIFACT_MODULE = {
     "growth_fit": "fermos", "kinetic_fit": "fermos", "growth_forecast": "fermos",
     "geneos.ceiling": "geneos", "geneos.frontier": "geneos", "geneos.mix": "geneos",
-    "proforma.run": "proforma", "proforma_benchmark": "proforma",
-    # A reference biorefinery's run (OF-BLD-019 §2.2), so Proforma's rows
-    # list the reference runs beside the scenarios' (§6.1).
-    "proforma.reference": "proforma",
+    "proforma.run": "proforma",
+    # A library plant's run (alpha 2.2 D8): the reference runs Proforma's rows
+    # list beside the scenarios' (§6.1) are the library shelf's, the corn
+    # stover and dry-grind corn plants among them.
+    "library.run": "proforma",
+    # The runs a person kept from the shelf's retired reference entries, a
+    # reference run and the benchmark (alpha 2.2 D8), listed as kept.
+    "proforma.reference": "proforma", "proforma_benchmark": "proforma",
 }
 
 

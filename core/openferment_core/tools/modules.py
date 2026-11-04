@@ -60,8 +60,10 @@ WHAT = {
               "train-run is one kept run of such a train (pureos/train-run/<artifact id>, read by its id or its "
               "train's: its train, product, units and product stream in words; its numbers stay in the artifact, "
               "cited by the row's ref or the evidence id pureos_build returns)",
-    "proforma": "the cost scenarios and the runs kept as artifacts: each scenario's runs and the reference "
-                "biorefineries' runs (stream_table reads a run's streams)",
+    "proforma": "the cost scenarios and the runs kept as artifacts: each scenario's runs, the library plants' runs, "
+                "the corn stover and dry-grind corn reference plants among them, and the runs kept from the retired "
+                "reference entries (a reference run, the benchmark), listed as kept (stream_table reads a run's "
+                "streams; engine_report reads a library run's numbers as evidence ids)",
     "biorepo": "the records, the extractor's candidates, the computed artifacts and the Witness runs that score the extractor",
     "guild": "the people on the ledger (name, role, whether active) and the competence checks on skills; no level is stored "
              "and none is read",

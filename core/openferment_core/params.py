@@ -566,9 +566,6 @@ _GROUPS = {"process": "Process", "economic": "Economics", "convention": "Convent
 def _bounds(info: FlowsheetInfo, fi: FlowsheetInput, convention: Any) -> tuple[float | None, float | None, str]:
     """A flowsheet input's bounds and their reason (D4): a physical limit. A
     record field carries no range (alpha 2.0, ADR-010)."""
-    if info.reference:
-        return None, None, ("the package's own default, read back after the run: a reference biorefinery runs whole on "
-                            "its package's defaults and takes no value here, so no range is offered")
     if fi.kind == "convention" and convention is not None and not _is_number(convention):
         return None, None, "a convention stated in words: it takes no number, so it has no bounds"
     if fi.dimension == "fraction":
@@ -592,18 +589,14 @@ def flowsheet_specs(info: FlowsheetInfo) -> list[ParameterSpec]:
     titre, yield and productivity (it replaces the records, as
     `proforma.apply_fits` binds it), the records of each field in order, then
     a named person's assumption. A convention takes the value every run's
-    basis states. A reference biorefinery's inputs are its package's own
-    defaults, read back after the run."""
+    basis states."""
     from . import proforma
 
     stated = _stated(info.id)
     out = []
     for fi in info.inputs:
         convention = None
-        if info.reference:
-            rule = ["library-default"]
-            group = "Package defaults"
-        elif fi.kind == "convention":
+        if fi.kind == "convention":
             rule = ["convention"]
             convention = stated.get(fi.name)
             group = _GROUPS[fi.kind]

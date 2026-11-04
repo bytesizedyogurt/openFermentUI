@@ -316,18 +316,19 @@ export const SUB_VIEWS: (NavSurface & { owner: string })[] = [
   },
   {
     // OF-BLD-019 §3.3 — 'reference' is reserved under /proforma: a reference
-    // biorefinery's page, /proforma/reference/:id, one a shelf entry.
+    // plant's page, /proforma/reference/:plant, one a plant of the library
+    // shelf (alpha 2.2 D8).
     label: 'Corn ethanol reference',
-    to: '/proforma/reference/corn_drygrind',
-    descriptor: 'the dry-grind corn plant run whole, beside its package\u2019s own test',
-    aliases: ['reference', 'reference biorefinery', 'dry grind', 'corn ethanol', 'package test', 'regression values'],
+    to: '/proforma/reference/corn',
+    descriptor: 'the dry-grind corn plant of the library shelf run whole, beside its package\u2019s own test',
+    aliases: ['reference', 'reference plant', 'dry grind', 'corn ethanol', 'package test', 'regression values'],
     icon: LineChart,
     owner: 'Proforma',
   },
   {
     label: 'Corn stover benchmark',
-    to: '/proforma/reference/cornstover_benchmark',
-    descriptor: 'the NREL 2011 corn stover design run whole, beside its package\u2019s own test',
+    to: '/proforma/reference/cornstover',
+    descriptor: 'the NREL 2011 corn stover design of the library shelf run whole, beside its package\u2019s own test',
     aliases: ['benchmark', 'corn stover', 'nrel 2011', 'reference run'],
     icon: LineChart,
     owner: 'Proforma',
@@ -493,9 +494,13 @@ export const REDIRECTS: Record<string, string> = {
   '/biorepo/ingest': '/intake/ingest',
   '/proforma/compare': '/biorepo/compare',
   // OF-BLD-019 §3.3 — the benchmark's card and the old BioSTEAM page became
-  // the reference page of the corn stover benchmark.
-  '/proforma/benchmark': '/proforma/reference/cornstover_benchmark',
-  '/proforma/biosteam': '/proforma/reference/cornstover_benchmark',
+  // the reference page of the corn stover plant; alpha 2.2 D8 — the shelf's
+  // two hand-written reference entries retired, and their pages are the
+  // library shelf's plants' own.
+  '/proforma/benchmark': '/proforma/reference/cornstover',
+  '/proforma/biosteam': '/proforma/reference/cornstover',
+  '/proforma/reference/cornstover_benchmark': '/proforma/reference/cornstover',
+  '/proforma/reference/corn_drygrind': '/proforma/reference/corn',
 
   // ── OF-BLD-006 legacy, re-pointed at the CURRENT destination ────────
   // These were already redirects; their targets moved underneath them, so

@@ -257,9 +257,9 @@ def test_a_fermos_fit_feeds_the_yield_the_check_reads(pool):
 
 
 def test_it_is_refused_in_words_as_the_binding_is(pool, held):
-    with pytest.raises(proforma.ScenarioRefused, match="reference biorefinery"):
+    with pytest.raises(proforma.ScenarioRefused, match="there is no flowsheet corn_drygrind on the shelf"):
         check(pool, scenario=MADE_HERE, flowsheet="corn_drygrind")
-    with pytest.raises(proforma.ScenarioRefused, match="no held scenario"):
+    with pytest.raises(proforma.ScenarioRefused, match="no kept scenario"):
         check(pool, scenario=MADE_HERE, flowsheet=None)
     with pytest.raises(proforma.ScenarioRefused, match="runs ethanol_glucose_v0, not custom_train_v1"):
         check(pool, scenario=HELD, flowsheet="custom_train_v1")
@@ -285,7 +285,8 @@ def test_the_endpoint_answers_a_held_and_a_made_scenario_and_refuses_in_words(cl
     for params, said in (({"scenarioId": HELD, "fits": "[1]"}, "fits is a JSON object"),
                          ({"scenarioId": HELD, "inputs": "{}"}, "inputs is a JSON list"),
                          ({"scenarioId": HELD, "overrides": "[]"}, "overrides is retired"),
-                         ({"scenarioId": MADE_HERE, "flowsheet": "cornstover_benchmark"}, "reference biorefinery"),
+                         ({"scenarioId": MADE_HERE, "flowsheet": "cornstover_benchmark"},
+                          "there is no flowsheet cornstover_benchmark on the shelf"),
                          ({"scenarioId": HELD, "fits": '{"yield": "0000000000000000"}'}, "no kept artifact")):
         r = client.get("/api/proforma/ceiling-check", params=params)
         assert r.status_code == 422 and said in r.json()["detail"], (params, r.text)

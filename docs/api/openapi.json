@@ -5283,7 +5283,7 @@
         "type": "object"
       },
       "PackageRegression": {
-        "description": "A reference biorefinery's regression values, read from the package's\ninstalled test file: which package, which file, which test.",
+        "description": "A plant's regression values, read from its package's installed test\nfile: which package, which file, which test.",
         "properties": {
           "file": {
             "title": "File",
@@ -8145,7 +8145,7 @@
         "type": "object"
       },
       "SFFFlowsheet": {
-        "description": "An SFF flowsheet record (GET /api/flowsheets/{id}).\n\n`origin` is computed: `run` for a run of this project exported by\nopenFerment; `library` for a file whose sha256 is one of the toolkit's\nreference flowsheets at the pinned commit, whichever door it came\nthrough; `imported` for any other file. `sffVersion` is what the file\ndeclares; `validation.schemaVersion` is the schema it was checked\nagainst. `graph` is left out of a listing.",
+        "description": "An SFF flowsheet record (GET /api/flowsheets/{id}).\n\n`origin` is computed: `run` for a run of this project exported by\nopenFerment; `library` for a file whose sha256 is one of the toolkit's\nreference flowsheets at the pinned commit, whichever door it came\nthrough; `imported` for any other file. `sffVersion` is what the file\ndeclares; `validation.schemaVersion` is the schema it was checked\nagainst. `url` is the https address a file fetched by its address came\nfrom (POST /api/flowsheets/import-url), None for every other door.\n`graph` is left out of a listing.",
         "properties": {
           "bytes": {
             "title": "Bytes",
@@ -8259,6 +8259,17 @@
           "units": {
             "title": "Units",
             "type": "integer"
+          },
+          "url": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Url"
           },
           "validation": {
             "$ref": "#/components/schemas/SFFValidation"
@@ -8471,6 +8482,29 @@
           "declared"
         ],
         "title": "SFFTag",
+        "type": "object"
+      },
+      "SFFUrlImport": {
+        "description": "POST /api/flowsheets/import-url: the public https address of an SFF\nfile to fetch and keep in the project, kept whole as the record's\nsource, query included, and the person who names it.",
+        "properties": {
+          "by": {
+            "maxLength": 200,
+            "minLength": 1,
+            "title": "By",
+            "type": "string"
+          },
+          "url": {
+            "maxLength": 2048,
+            "minLength": 1,
+            "title": "Url",
+            "type": "string"
+          }
+        },
+        "required": [
+          "url",
+          "by"
+        ],
+        "title": "SFFUrlImport",
         "type": "object"
       },
       "SFFValidation": {
@@ -10504,9 +10538,22 @@
     },
     "/api/biorepo/artifacts": {
       "get": {
-        "description": "Every value this service computed and kept, newest first.",
+        "description": "Every value this service computed and kept, newest first; with\n`?tool=` (repeated for several), those of the tools named alone, read by\nthe table's tool column (the reference page lists the runs a person kept\nfrom the shelf's retired reference entries so, alpha 2.2 D8).",
         "operationId": "artifacts_list_api_biorepo_artifacts_get",
         "parameters": [
+          {
+            "in": "query",
+            "name": "tool",
+            "required": false,
+            "schema": {
+              "default": [],
+              "items": {
+                "type": "string"
+              },
+              "title": "Tool",
+              "type": "array"
+            }
+          },
           {
             "description": "The project the request acts in; ?project= in its place.",
             "in": "header",
@@ -10531,6 +10578,16 @@
               }
             },
             "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
           }
         },
         "summary": "Artifacts List",
@@ -12224,7 +12281,7 @@
     },
     "/api/flowsheets/export": {
       "post": {
-        "description": "A kept run's base case written as an SFF file by the toolkit in the\nworker, checked, drawn and kept with origin `run`: a shelf run, a\nreference run, a library run or a pureOS train run. 404 for a run the\nproject does not hold; 422 for an artifact that is not a run; 409 in the\nworker's words for a base case that cannot be built or a file the\ntoolkit cannot write (a train run's, while its schema requires a TEA\nyear: docs/api/sff.md).",
+        "description": "A kept run's base case written as an SFF file by the toolkit in the\nworker, checked, drawn and kept with origin `run`: a shelf run, a\nlibrary run or a pureOS train run. 404 for a run the project does not\nhold; 422 for an artifact that is not a run, and for a run kept from a\nretired reference entry, whose file the library plant's run writes; 409\nin the worker's words for a base case that cannot be built or a file the\ntoolkit cannot write (a train run's, while its schema requires a TEA\nyear: docs/api/sff.md).",
         "operationId": "flowsheets_export_api_flowsheets_export_post",
         "parameters": [
           {
@@ -12321,6 +12378,94 @@
           }
         },
         "summary": "Flowsheets Import",
+        "x-openferment-scope": "project"
+      }
+    },
+    "/api/flowsheets/import-url": {
+      "post": {
+        "description": "An SFF file fetched from the public https address a person names, the\none door that fetches a flowsheet by its address (alpha 2.2 D10 and its\namendment at C.6), the way Intake fetches a document\n(literature/collectors.py `fetch_file`: its User-Agent, its throttle, a\ntimeout, the network refused in fixture mode). Before each request, the\nfirst and each redirect's, the host is resolved and every address it\nnames must be public; the request goes to a checked address, and the\nwhole exchange is held to a deadline. The body is streamed under the\nsize an import takes; then read, checked by the toolkit in the worker,\ndrawn and kept as an uploaded file is, its hash kept and the address its\nsource (engine/sff.py `import_url`). 413 past the size; 422 for an\naddress that is not https, one outside the public internet (a redirect\nto either included) and a file that is not an SFF flowsheet; 502 when\nthe host name could not be found, the host could not be reached or read\nin time, or it answered an error; 503 when the worker could not check\nthe file.",
+        "operationId": "flowsheets_import_url_api_flowsheets_import_url_post",
+        "parameters": [
+          {
+            "description": "The project the request acts in; ?project= in its place.",
+            "in": "header",
+            "name": "X-OpenFerment-Project",
+            "required": false,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/SFFUrlImport"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/SFFFlowsheet"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "413": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Refusal"
+                }
+              }
+            },
+            "description": "The file the address serves is larger than an import takes: in words, nothing kept."
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "anyOf": [
+                    {
+                      "$ref": "#/components/schemas/Refusal"
+                    },
+                    {
+                      "$ref": "#/components/schemas/HTTPValidationError"
+                    }
+                  ]
+                }
+              }
+            },
+            "description": "An address that is not https, that names a user or a password, or whose host is or resolves to an address outside the public internet (loopback, private, link-local, multicast, reserved or unspecified), a redirect to any of these, the network refused in fixture mode, or a file that is not an SFF flowsheet: in words, nothing kept (a list of field errors when the request's own fields are refused)."
+          },
+          "502": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Refusal"
+                }
+              }
+            },
+            "description": "The host name could not be found, the host could not be reached or read in time, or it answered an error: in words, nothing kept."
+          },
+          "503": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Refusal"
+                }
+              }
+            },
+            "description": "The Proforma simulator could not check the file: in words, nothing kept."
+          }
+        },
+        "summary": "Flowsheets Import Url",
         "x-openferment-scope": "project"
       }
     },
@@ -14601,73 +14746,9 @@
         "x-openferment-scope": "project"
       }
     },
-    "/api/proforma/benchmark": {
-      "get": {
-        "description": "The benchmark this installation reproduced (§8.2), or none yet. A read:\nit starts nothing. POST runs it.",
-        "operationId": "proforma_benchmark_api_proforma_benchmark_get",
-        "parameters": [
-          {
-            "description": "The project the request acts in; ?project= in its place.",
-            "in": "header",
-            "name": "X-OpenFerment-Project",
-            "required": false,
-            "schema": {
-              "type": "string"
-            }
-          }
-        ],
-        "responses": {
-          "200": {
-            "content": {
-              "application/json": {
-                "schema": {
-                  "additionalProperties": true,
-                  "title": "Response Proforma Benchmark Api Proforma Benchmark Get",
-                  "type": "object"
-                }
-              }
-            },
-            "description": "Successful Response"
-          }
-        },
-        "summary": "Proforma Benchmark",
-        "x-openferment-scope": "project"
-      },
-      "post": {
-        "description": "Run the published corn stover biorefinery and keep its price (§8.2).",
-        "operationId": "proforma_benchmark_run_api_proforma_benchmark_post",
-        "parameters": [
-          {
-            "description": "The project the request acts in; ?project= in its place.",
-            "in": "header",
-            "name": "X-OpenFerment-Project",
-            "required": false,
-            "schema": {
-              "type": "string"
-            }
-          }
-        ],
-        "responses": {
-          "200": {
-            "content": {
-              "application/json": {
-                "schema": {
-                  "additionalProperties": true,
-                  "title": "Response Proforma Benchmark Run Api Proforma Benchmark Post",
-                  "type": "object"
-                }
-              }
-            },
-            "description": "Successful Response"
-          }
-        },
-        "summary": "Proforma Benchmark Run",
-        "x-openferment-scope": "project"
-      }
-    },
     "/api/proforma/bind": {
       "get": {
-        "description": "A shelf flowsheet's inputs bound, as a scenario not yet saved to the\nproject shows them (OF-BLD-019 §2.3, D6), id and name empty; `?fits=`\nlays on the fermOS fits a person chose (§5.1), a JSON object of input\nkey to artifact id, and `?inputs=` the values a person sets over both\n(OF-BLD-020 D3; alpha 2.2 D2), a JSON list of typed quantities, each\nconverted at Proforma's door into the Override of the flowsheet's own\nscope, `proforma:<flowsheet id>`, as a run converts its values. A\nflowsheet built from kept artifacts (`custom_train_v1`, OF-BLD-020 §6.1)\nnames its vessel design and its train run (`?vessel=`, `?trainRun=`). A\nreference biorefinery, the toy, an unknown id, a fit that cannot feed\nits input, a value that cannot stand, or a composite's part that cannot\n(missing, another tool's, damaged, of another chemical set) is a 422 in\nwords, and so is the retired `?overrides=`. A read: it starts no\nsimulator.",
+        "description": "A shelf flowsheet's inputs bound, as a scenario not yet saved to the\nproject shows them (OF-BLD-019 §2.3, D6), id and name empty; `?fits=`\nlays on the fermOS fits a person chose (§5.1), a JSON object of input\nkey to artifact id, and `?inputs=` the values a person sets over both\n(OF-BLD-020 D3; alpha 2.2 D2), a JSON list of typed quantities, each\nconverted at Proforma's door into the Override of the flowsheet's own\nscope, `proforma:<flowsheet id>`, as a run converts its values. A\nflowsheet built from kept artifacts (`custom_train_v1`, OF-BLD-020 §6.1)\nnames its vessel design and its train run (`?vessel=`, `?trainRun=`).\nThe toy, an unknown id, a fit that cannot feed its input, a value that\ncannot stand, or a composite's part that cannot (missing, another tool's,\ndamaged, of another chemical set) is a 422 in words, and so is the\nretired `?overrides=`. A read: it starts no simulator.",
         "operationId": "proforma_bind_api_proforma_bind_get",
         "parameters": [
           {
@@ -14913,108 +14994,6 @@
         "x-openferment-scope": "project"
       }
     },
-    "/api/proforma/reference/{flowsheet_id}": {
-      "get": {
-        "description": "A reference biorefinery on the shelf (OF-BLD-019 §2.2): its entry, the\nnewest stored run or none, its package test's values, the simulator's\nstatus. A read: it starts nothing. 404 for an id that is not a\nreference biorefinery on the shelf.",
-        "operationId": "proforma_reference_api_proforma_reference__flowsheet_id__get",
-        "parameters": [
-          {
-            "in": "path",
-            "name": "flowsheet_id",
-            "required": true,
-            "schema": {
-              "title": "Flowsheet Id",
-              "type": "string"
-            }
-          },
-          {
-            "description": "The project the request acts in; ?project= in its place.",
-            "in": "header",
-            "name": "X-OpenFerment-Project",
-            "required": false,
-            "schema": {
-              "type": "string"
-            }
-          }
-        ],
-        "responses": {
-          "200": {
-            "content": {
-              "application/json": {
-                "schema": {
-                  "additionalProperties": true,
-                  "title": "Response Proforma Reference Api Proforma Reference  Flowsheet Id  Get",
-                  "type": "object"
-                }
-              }
-            },
-            "description": "Successful Response"
-          },
-          "422": {
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/HTTPValidationError"
-                }
-              }
-            },
-            "description": "Validation Error"
-          }
-        },
-        "summary": "Proforma Reference",
-        "x-openferment-scope": "project"
-      },
-      "post": {
-        "description": "Run a reference biorefinery whole on its package's defaults and keep\nit as one `proforma.reference` artifact (a basis already run returns its\nstored artifact).",
-        "operationId": "proforma_reference_run_api_proforma_reference__flowsheet_id__post",
-        "parameters": [
-          {
-            "in": "path",
-            "name": "flowsheet_id",
-            "required": true,
-            "schema": {
-              "title": "Flowsheet Id",
-              "type": "string"
-            }
-          },
-          {
-            "description": "The project the request acts in; ?project= in its place.",
-            "in": "header",
-            "name": "X-OpenFerment-Project",
-            "required": false,
-            "schema": {
-              "type": "string"
-            }
-          }
-        ],
-        "responses": {
-          "200": {
-            "content": {
-              "application/json": {
-                "schema": {
-                  "additionalProperties": true,
-                  "title": "Response Proforma Reference Run Api Proforma Reference  Flowsheet Id  Post",
-                  "type": "object"
-                }
-              }
-            },
-            "description": "Successful Response"
-          },
-          "422": {
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/HTTPValidationError"
-                }
-              }
-            },
-            "description": "Validation Error"
-          }
-        },
-        "summary": "Proforma Reference Run",
-        "x-openferment-scope": "project"
-      }
-    },
     "/api/proforma/run": {
       "post": {
         "description": "Run a scenario the project keeps by its id, or one not yet saved by\nthe shelf flowsheet it names (OF-BLD-019 §2.3, d), with the values a\nperson or a model sets as typed inputs, and keep it as one run of the\nbiosteam engine (GET /api/runs/{id}, its id the artifact's) with its SFF\nfile: 422 in words for any other case, listing every input waiting for a\nsource; a refusal inside the run is kept as its receipt and 422 in the\nworker's words.",
@@ -15140,7 +15119,7 @@
     },
     "/api/proforma/scenarios": {
       "get": {
-        "description": "The project's BioSTEAM scenarios with their inputs bound to records\n(§8.3; OF-BLD-019 §2.3). A read: it starts no simulator.",
+        "description": "Every BioSTEAM scenario the project keeps, with its inputs bound to\nrecords (§8.3; OF-BLD-019 §2.3; alpha 2.2 D9): a scenario on\ncustom_train_v1 binds with the vessel design and the train run it names,\nand one whose binding is refused is listed with the words (`refused`).\nA read: it starts no simulator.",
         "operationId": "proforma_scenarios_api_proforma_scenarios_get",
         "parameters": [
           {

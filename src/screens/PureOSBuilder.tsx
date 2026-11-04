@@ -141,7 +141,7 @@ import { StreamTable } from './PureOSTrain';
 
 /** What Price this in Proforma does, said beside its choices (OF-BLD-020 §6.2). */
 export const PRICE_TRAIN_WORDS =
-  'Proforma prices this train as the train of custom_train_v1: a fermenter rebuilt from a fermOS vessel design, its beer through the units of the train run kept here, priced with the TEA the shelf flowsheets use. The scenario is made in this browser and opens on its page, where it binds and says what waits.';
+  'Proforma prices this train as the train of custom_train_v1: a fermenter rebuilt from a fermOS vessel design, its beer through the units of the train run kept here, priced with the TEA the shelf flowsheets use. The scenario is the project’s, saved with its other scenarios, and opens on its page, where it binds and says what waits.';
 /** What it needs while no train run is kept on the page. */
 export const PRICE_NEEDS_RUN = 'A train run: Run this train first. Proforma prices a kept train run, and this page holds none yet.';
 /** What it needs while no vessel design is kept on the service, and how one is made. */
@@ -157,21 +157,16 @@ const problemOf = (e: unknown) =>
   e instanceof PureosDown ? `${e.message} ${e.remedy ?? ''}`.trim() : e instanceof PureosRefused ? e.message : e instanceof Error ? e.message : String(e);
 
 /**
- * The project's BioSTEAM scenarios, by id and name: their newest
- * runs are among the runs a train can take a stream of. Selected as the
- * store holds them and filtered here, so a render never sees a new list
- * from the store's own snapshot (React's error 185, an endless update).
+ * The project's BioSTEAM scenarios as this browser holds them, by id and
+ * name: their newest runs are among the runs a train can take a stream of,
+ * each listed once beside the service's (`runChoices`; alpha 2.2 D9).
+ * Selected as the store holds them and filtered here, so a render never sees
+ * a new list from the store's own snapshot (React's error 185, an endless
+ * update).
  */
-function useMadeScenarios(): { id: string; name: string }[] {
+function useHeldScenarios(): { id: string; name: string }[] {
   const scenarios = useStore((s) => s.scenarios);
-  const ids = useStore((s) => s.createdScenarioIds);
-  return useMemo(
-    () =>
-      scenarios
-        .filter((sc) => ids.includes(sc.id) && sc.kind === 'biosteam')
-        .map((sc) => ({ id: sc.id, name: sc.name })),
-    [scenarios, ids],
-  );
+  return useMemo(() => scenarios.filter((sc) => sc.kind === 'biosteam').map((sc) => ({ id: sc.id, name: sc.name })), [scenarios]);
 }
 
 /**
@@ -878,8 +873,8 @@ function InletSection({
   const [vessels, setVessels] = useState<VesselSummary[]>([]);
   const [runs, setRuns] = useState<{ choices: RunChoice[]; problems: string[] } | null>(null);
   const [problem, setProblem] = useState<string | null>(null);
-  const made = useMadeScenarios();
-  const madeKey = made.map((m) => m.id).join();
+  const held = useHeldScenarios();
+  const heldKey = held.map((m) => m.id).join();
   useEffect(() => {
     setProblem(null);
     const ctrl = new AbortController();
@@ -898,12 +893,12 @@ function InletSection({
         .catch(() => undefined);
     }
     if (inlet.kind === 'run-stream')
-      runChoices(made, ctrl.signal)
+      runChoices(held, ctrl.signal)
         .then((r) => !ctrl.signal.aborted && setRuns(r))
         .catch((e: unknown) => !ctrl.signal.aborted && setProblem(problemOf(e)));
     return () => ctrl.abort();
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [inlet.kind, madeKey]);
+  }, [inlet.kind, heldKey]);
 
   const setKind = (kind: TrainSpec['inlet']['kind']) => {
     if (kind === inlet.kind) return;
@@ -1298,14 +1293,14 @@ function TypeDetails({ type }: { type: UnitType }) {
 
 /** Start a fresh train from a kept run's units, read by the service. */
 function StartFromRun() {
-  const made = useMadeScenarios();
+  const held = useHeldScenarios();
   const [open, setOpen] = useState(false);
   const [runs, setRuns] = useState<{ choices: RunChoice[]; problems: string[] } | null>(null);
   const [chosen, setChosen] = useState('');
   useEffect(() => {
     if (!open) return;
     const ctrl = new AbortController();
-    runChoices(made, ctrl.signal)
+    runChoices(held, ctrl.signal)
       .then((r) => !ctrl.signal.aborted && setRuns(r))
       .catch(() => undefined);
     return () => ctrl.abort();

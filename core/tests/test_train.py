@@ -272,7 +272,7 @@ def test_validate_names_every_refusal_at_once_in_words():
         "inlet names the train's inlet, not a unit",
         "unit inlet's outlet outlet goes onward, to waste or to recycle:<an earlier unit>; 'somewhere' is none of them",
         "unit S1's outlet regenerate recycles to M1 (flash), whose inlet takes one stream",
-        "unit S1 reads from corn_drygrind, a reference biorefinery",
+        "unit S1 reads from 'corn_drygrind': there is no flowsheet corn_drygrind on the shelf",
         "unit S1: approx_duty binds from no record field, so no record can be named for it",
     ]
     for words in expected:
@@ -854,6 +854,37 @@ def test_a_train_stands_on_a_library_plants_run(client, store, worker, no_pool):
     read = tools.run("stream_table", {"artifactId": aid}, tools.ToolContext())
     assert read.error is None and read.summary["tool"] == "library.run"
     assert read.summary["streamCount"] == len(made["streams"]) and read.evidence == []
+
+
+def test_a_train_is_read_from_a_run_kept_from_a_retired_reference_entry_on_the_set_its_entry_named(client, store, worker,
+                                                                                                    no_pool):
+    """A dry-grind corn reference run a person kept before the shelf's
+    hand-written entries retired (alpha 2.2 D8) reads into a train through
+    the route, as it did when the entry stood: its train builds on the
+    chemical set the entry named (`proforma.RETIRED`). A kept corn stover
+    reference run names no set, as its entry named none, and is refused in
+    words. Each kept run is a STAND-IN: test_train's own stand-in run's
+    tables, kept as a `proforma.reference` artifact naming its entry."""
+    from test_vessel import keep
+
+    made = artifacts.get(pureos.run_train(spec_of()).artifactId).output
+    product = made["productStream"]
+    flow = next(s for s in made["streams"] if s["id"] == product)["massFlows"][TRACED]
+    tea = {"teaClass": STANDIN, "product": product, "basisFlow": flow, **{k: 1.0 for k in (
+        "operatingHours", "sales", "materialCost", "otherMaterialCost", "utilityCost", "purchaseCost",
+        "installedEquipmentCost", "FCI", "TCI", "FOC", "capitalRecovery", "coproductCredits")}}
+    tables = {"tablesSource": STANDIN, "tea": tea, **{k: made[k] for k in ("streams", "units", "tableUnits",
+                                                                           "unitOrder")}}
+    corn = keep("00000000000000cd", {"flowsheet": "corn_drygrind", **tables}, tool=proforma.REFERENCE)
+    got = client.post("/api/pureos/train/from-run", json={"artifactId": corn.id})
+    assert got.status_code == 200, got.text
+    train = got.json()["train"]
+    assert train["program"] == proforma.RETIRED["corn_drygrind"].program == "yeast"
+    assert [u["id"] for u in train["units"]] == ["C1", "F1"]
+    assert (train["inlet"]["kind"], train["inlet"]["ref"], train["inlet"]["streamId"]) == ("run-stream", corn.id, "inlet")
+    stover = keep("00000000000000ce", {"flowsheet": "cornstover_benchmark", **tables}, tool=proforma.REFERENCE)
+    refused = client.post("/api/pureos/train/from-run", json={"artifactId": stover.id})
+    assert refused.status_code == 422 and "belongs to no program" in refused.json()["detail"]
 
 
 def test_a_train_naming_no_chemical_set_or_an_unknown_one_builds_on_the_one_pureos_holds(client, store, worker,

@@ -36,12 +36,16 @@ def test_an_unknown_input_or_flowsheet_is_refused_in_words(warm, tmp_path):
     with pytest.raises(WorkerError, match="no input sugar"):
         warm.call("evaluate", {"flowsheet": "toy", "values": {"sugar": 1.0}})
     # D11: the words of flowsheets.load's KeyError arrive as it wrote them, unquoted.
-    for op, args in (("evaluate", {"values": {}}), ("reference", {"digits": 10}),
-                     ("grid", {"axes": {"split": [0.2]}}), ("montecarlo", {"specs": {}, "n": 1}),
-                     ("sff_export", {"path": str(tmp_path / "nowhere.sff.json")})):
+    for op, args in (("evaluate", {"values": {}}), ("grid", {"axes": {"split": [0.2]}}),
+                     ("montecarlo", {"specs": {}, "n": 1}), ("sff_export", {"path": str(tmp_path / "nowhere.sff.json")})):
         with pytest.raises(WorkerError) as e:
             warm.call(op, {"flowsheet": "nowhere", **args})
         assert str(e.value).startswith("Refused: there is no flowsheet nowhere; there are "), (op, str(e.value))
+    # A replay names the runs it replays: those kept from the two retired reference entries (alpha 2.2 D8).
+    with pytest.raises(WorkerError) as e:
+        warm.call("replay_reference", {"flowsheet": "nowhere", "digits": 10})
+    assert str(e.value) == ("Refused: nowhere is no retired reference entry whose kept runs replay here; they are "
+                            "cornstover_benchmark, corn_drygrind")
 
 
 def test_grid_and_montecarlo_pass_the_structure_on_as_evaluate_does(warm):

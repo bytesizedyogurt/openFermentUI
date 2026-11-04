@@ -170,7 +170,8 @@ def _standin_call(op: str, args: dict[str, Any]) -> Any:
 
     if op == "evaluate":
         return evaluate(args["values"])
-    if op == "reference":
+    if op == "replay_reference":
+        # A run kept from a retired reference entry, replayed (alpha 2.2 D8).
         return _standin_reference(str(args["flowsheet"]))
     if op == "run":
         # OF-BLD-019 §2.1: the worker's whole run, composed of the three
@@ -210,10 +211,8 @@ STANDIN_HOURS = 8000.0
 
 
 def _standin_reference(flowsheet: str) -> dict[str, Any]:
-    from openferment_core.flowsheets import shelf as _shelf
     from openferment_core.flowsheets.shelf import TABLE_UNITS
 
-    info = _shelf.info(flowsheet)
     hours, feed, product, price, feed_price = 8000.0, 40000.0, 12000.0, 0.5, 0.15
     lines_in = {"feedstock": feed * feed_price, "otherMaterials": 600.0, "utilities": 900.0,
                 "fixedOperating": 500.0, "capitalRecovery": 700.0}
@@ -278,7 +277,7 @@ def _standin_reference(flowsheet: str) -> dict[str, Any]:
         outputs = {"mespUsdPerGal": price * 3.0, "mespUsdPerKg": price, "ethanolDensityKgPerGal": 3.0,
                    "settings": {"rateOfReturn": 0.1, "operatingDays": hours / 24.0, "incomeTax": 0.35,
                                 "startYear": 2007, "endYear": 2037}}
-    read_back = {i.key: ("STAND-IN" if i.dimension == "schedule" else lang if i.key == "langFactor" else 1.0) for i in info.inputs}
+    read_back = {"langFactor": lang, "depreciation": "STAND-IN"} if flowsheet == "corn_drygrind" else {}
     return {
         "flowsheet": flowsheet, "simulator": PROFORMA_STANDIN, "package": f"STAND-IN for {flowsheet}",
         **outputs, "references": [PROFORMA_STANDIN], "measured": measured, "readBack": read_back,

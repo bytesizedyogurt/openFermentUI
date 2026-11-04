@@ -777,9 +777,10 @@ def test_a_class_that_refuses_its_construction_is_refused_in_words(real):
 ETHANOL_STANDIN = {"feed_glucose_conc": 100.0, "titre": 45.0, "yield": 0.45, "productivity": 2.0,
                    "plant_scale": 50000.0, "glucose_price": 0.4}  # STAND-IN inputs, as test_proforma's
 ETHANOL_RUN = ("run", {"flowsheet": "ethanol_glucose_v0", "base": ETHANOL_STANDIN, "specs": {}, "samples": 0, "seed": 0})
-# The corn plant, loaded whole: it rebinds names in its package (biorefineries.corn.tea becomes its TEA object
-# as an attribute of the package), which a design run after it must not trip on (found by verify's sim stage).
-CORN_RUN = ("reference", {"flowsheet": "corn_drygrind", "digits": proforma.REFERENCE_DIGITS})
+# The corn plant, loaded whole as the library shelf runs it (alpha 2.2 D8): it rebinds names in its package
+# (biorefineries.corn.tea becomes its TEA object as an attribute of the package), which a design run after it must
+# not trip on (found by verify's sim stage).
+CORN_RUN = ("library_run", {"plant": "corn", "configuration": None, "overrides": {}, "digits": 10})
 
 
 def _requests(real_dir) -> dict[str, dict]:

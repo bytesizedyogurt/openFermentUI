@@ -2606,6 +2606,8 @@ export interface ProformaScenarioInfo {
   waiting: string[];
   leavesOut: string[];
   priceBasis: string;
+  /** The words a kept scenario's binding was refused in (a part of a custom_train_v1 scenario that cannot stand, or a flowsheet the shelf no longer holds), its inputs then empty; null when it binds. */
+  refused?: string | null;
 }
 
 export interface ProformaRunRequest {
@@ -2845,16 +2847,12 @@ export interface FlowsheetInfo {
   source: string;
   /** The chemical-set key (`yeast`); null for a general flowsheet. */
   program: string | null;
-  /** A published reference biorefinery, run whole on its package's defaults. */
-  reference: boolean;
   inputs: FlowsheetInput[];
   outputs: string[];
   priceOutput: string | null;
   priceBasis: string | null;
   leavesOut: string[];
   gridInputs: string[];
-  /** A reference biorefinery's own regression test, cited as file::test; its values come from the installed file (PackageRegression). */
-  packageTest: string | null;
   /**
    * OF-BLD-020 §6.1 (D11): the kept artifacts a scenario on this flowsheet
    * names besides the flowsheet, by tool (`custom_train_v1`: a `fermos.vessel`
@@ -2869,13 +2867,11 @@ export interface FlowsheetInfo {
   brothStream: string | null;
 }
 
-// OF-BLD-019 §2.2 (D3) — a reference biorefinery runs whole on its package's
-// defaults and is kept as one `proforma.reference` artifact: the package's
-// outputs, the quantities its own test asserts as this installation
-// computed them (`measured`), the defaults read back (`readBack`), the
-// test's values beside them (`regression`, `checks`), and every table a
-// `proforma.run` artifact holds. The test's values are parsed from the
-// installed test file; none is typed here.
+// OF-BLD-019 §2.2; ADR-013 — a library plant run whole on its package's own
+// values is set beside the values its package's own test asserts, as this
+// installation computed them (`measured`): the test's values beside them
+// (`regression`, `checks`) in the run's artifact. The test's values are
+// parsed from the installed test file; none is typed here.
 
 /** One value a package's own test asserts, as its test file writes it. */
 export interface RegressionValue {
@@ -2887,7 +2883,7 @@ export interface RegressionValue {
   rtol: number;
 }
 
-/** A reference biorefinery's regression values, read from the package's installed test file. */
+/** A plant's regression values, read from its package's installed test file. */
 export interface PackageRegression {
   package: string;
   file: string;
@@ -2906,15 +2902,6 @@ export interface RegressionCheck {
   /** |measured − package| / |package|; null when the package's value is zero. */
   relDiff: number | null;
   within: boolean;
-}
-
-/** GET and POST /api/proforma/reference/:id. */
-export interface ProformaReference {
-  flowsheet: FlowsheetInfo;
-  /** The newest stored `proforma.reference` run, or null before the first. */
-  artifact: Artifact | null;
-  regression: PackageRegression | null;
-  simulator: { status: 'cold' | 'starting' | 'ready' | 'failed'; error: string | null };
 }
 
 /** One stream of the base case: source and sink unit (null for a feed or a product). */
@@ -3841,7 +3828,7 @@ export interface TrainParam {
 /** Where a train's broth comes from (D10). */
 export interface TrainInlet {
   kind: 'simulation' | 'run-stream' | 'typed';
-  /** A `fermos.simulation`, or a run (`proforma.run`, `proforma.reference`, `pureos.train_run`) whose stream it is; null when typed. */
+  /** A `fermos.simulation`, or a run (`proforma.run`, `library.run`, `pureos.train_run`, or a `proforma.reference` kept from a retired entry) whose stream it is; null when typed. */
   ref?: string | null;
   /** The run's stream (run-stream alone). */
   streamId?: string | null;
@@ -3996,7 +3983,7 @@ export interface TrainRun {
 
 /** `POST /api/pureos/train/from-run` (OF-BLD-020 §5.3): a kept run's units read into a train. */
 export interface TrainFromRunRequest {
-  /** A `proforma.run`, `proforma.reference` or `pureos.train_run` artifact. */
+  /** A `proforma.run`, `library.run` or `pureos.train_run` artifact (or a `proforma.reference` kept from a retired entry). */
   artifactId: string;
   /** The id the train takes; by default `from-<artifact id>`. */
   trainId?: string | null;
@@ -4196,6 +4183,8 @@ export interface SFFFlowsheet {
   simulator: string | null;
   runArtifactId: string | null;
   libraryId: string | null;
+  /** The https address a file fetched by its address came from (POST /api/flowsheets/import-url); null for every other door. */
+  url: string | null;
   units: number;
   streams: number;
   validation: SFFValidation;

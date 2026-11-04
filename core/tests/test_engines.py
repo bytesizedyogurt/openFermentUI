@@ -2382,8 +2382,9 @@ def test_biosteam_lists_the_shelfs_scenario_flowsheets_beside_its_library_plants
     assert (flowsheet.kind, flowsheet.title, flowsheet.configurations, flowsheet.defaultConfiguration) == (
         "scenario", shelf.SHELF[SCENARIO_FLOWSHEET].title, [], None)
     assert (flowsheet.precision.rtol, flowsheet.precision.atol) == (0.0, 0.0), "a Proforma run replays identically"
-    # A reference biorefinery is no scenario's flowsheet, and the composite waits for a scenario that names its parts.
-    assert not {f for f, info in shelf.SHELF.items() if info.reference} & set(things)
+    # The shelf's retired reference entries are no thing (alpha 2.2 D8), and the composite waits for a scenario that
+    # names its parts.
+    assert not {"cornstover_benchmark", "corn_drygrind"} & set(things)
     assert shelf.COMPOSITE not in things
     listed = {e["name"]: e for e in TestClient(api.app).get("/api/engines").json()}
     assert SCENARIO_FLOWSHEET in [t["id"] for t in listed["biosteam"]["things"]]

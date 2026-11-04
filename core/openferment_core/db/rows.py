@@ -4,7 +4,8 @@ Most stores keep a project's entities as rows of a `_scoped` table: the key
 `(project_id, id)`, a few lookup columns, and the Pydantic model as `body`.
 These are the reads and writes they share, so every store writes a row the
 same way: an upsert that keeps `created_by` and `created_at` from the first
-write and moves `updated_at` (where the table has it) on every later one.
+write and moves `updated_at` (where the table has it) on every later one,
+or (`put_first`) a write that keeps the first row of an id whole.
 """
 from __future__ import annotations
 
@@ -52,6 +53,28 @@ async def put(
     if "updated_at" in table.c:
         changes["updated_at"] = func.clock_timestamp()
     await s.execute(stmt.on_conflict_do_update(index_elements=[table.c.project_id, table.c.id], set_=changes))
+
+
+async def put_first(
+    s: AsyncSession,
+    table: Table,
+    project_id: str,
+    row_id: str,
+    value: Mapping[str, Any],
+    *,
+    by: str,
+    **columns: Any,
+) -> dict[str, Any]:
+    """Write one row once: its body and lookup `columns` when the project
+    holds no row of that id, and the body held either way. Of two writes of
+    one row in flight together, the first keeps its row and the second reads
+    it back."""
+    values = {"project_id": project_id, "id": row_id, "body": dict(value), "created_by": by, **columns}
+    stmt = insert(table).values(**values).on_conflict_do_nothing(index_elements=[table.c.project_id, table.c.id])
+    await s.execute(stmt)
+    held = await body(s, table, project_id, row_id)
+    assert held is not None
+    return held
 
 
 async def drop(s: AsyncSession, table: Table, project_id: str, row_id: str) -> None:

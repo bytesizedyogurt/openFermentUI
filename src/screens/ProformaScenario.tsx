@@ -2,11 +2,11 @@
 // assumption ticked, the waterfall always summing to the headline, and
 // simulation treated as work rather than magic.
 //
-// OF-BLD-019 §3.2 (D1, D5, D6): the BioSTEAM page is THE scenario page. A
-// held BioSTEAM scenario and one a person made here with New scenario open
-// the same page (BiosteamScenario, below): header, inputs with their sources,
-// Run with the worker's status line, and every section of the newest run read
-// from its one artifact (ProformaBiosteam.tsx).
+// OF-BLD-019 §3.2 (D1, D5, D6): the BioSTEAM page is THE scenario page. Every
+// BioSTEAM scenario of the project opens it (BiosteamScenario, below; alpha
+// 2.2 D9): header, inputs with their sources, Run with the worker's status
+// line, and every section of the newest run read from its one artifact
+// (ProformaBiosteam.tsx).
 import { useEffect, useMemo, useState } from 'react';
 import { Download, GitCompare, Pin, PinOff, Play, Route } from 'lucide-react';
 import { overrideEnds, overridesFor, proformaScope, useStore } from '@/store';
@@ -25,7 +25,6 @@ import {
   proformaArtifact,
   proformaNewestRun,
   proformaBind,
-  proformaScenarios,
   proformaShelf,
   proformaStatus,
   questionsText,
@@ -56,14 +55,16 @@ import { RunReport, inputLabels } from './ProformaBiosteam';
 
 // ── The BioSTEAM scenario page (OF-BLD-014 §8.4; OF-BLD-019 §3.2) ───────
 //
-// ONE page for a held BioSTEAM scenario and for one a person made here with
-// New scenario (D6). It reads, and never types:
+// ONE page for every BioSTEAM scenario of the project (D6; alpha 2.2 D9),
+// each made with New scenario. It reads, and never types:
 //
 //   the shelf       the flowsheet's title, source and each input's
 //                   dimension (GET /api/proforma/shelf);
-//   the binding     a held scenario from GET /api/proforma/scenarios, one
-//                   made here from GET /api/proforma/bind?flowsheet= (the
-//                   scenario run contract, src/lib/proforma.ts), each input
+//   the binding     GET /api/proforma/bind?flowsheet= with the scenario's
+//                   fits and parts (the scenario run contract,
+//                   src/lib/proforma.ts), its flowsheet named, so a
+//                   scenario this browser has not yet saved binds as a kept
+//                   one does (ADR-014); each input
 //                   bound to records, an artifact, a named person's
 //                   assumption, or waiting: its host list, what it leaves
 //                   out, and the questions for a modeller read it;
@@ -544,7 +545,7 @@ function StatusLine({ status, problem, running, elapsed }: { status: SimulatorSt
   );
 }
 
-function BiosteamScenario({ scenario, madeHere }: { scenario: Scenario; madeHere: boolean }) {
+function BiosteamScenario({ scenario }: { scenario: Scenario }) {
   // OF-BLD-020 §2.2 (D3): a person's changes to this scenario's inputs, kept
   // with the project under the scenario's scope and sent with the run.
   const scope = proformaScope(scenario.id);
@@ -598,40 +599,34 @@ function BiosteamScenario({ scenario, madeHere }: { scenario: Scenario; madeHere
     return () => ctrl.abort();
   }, []);
 
-  // The binding: a held scenario by (b), one made here by its flowsheet (c);
-  // with a fermOS fit chosen, either by (c) with the fits (OF-BLD-019 §5.1),
-  // which binds a held scenario's flowsheet exactly as (b) does.
+  // The binding (c): the scenario's flowsheet with the fermOS fits a person
+  // chose (OF-BLD-019 §5.1) and, on custom_train_v1, its parts; every
+  // scenario of the project binds so (alpha 2.2 D9), one this browser has
+  // not yet saved among them (ADR-014).
   const fitsKey = JSON.stringify(Object.entries(chosenFits).sort());
   useEffect(() => {
     const ctrl = new AbortController();
     setInfo(null);
     setBindProblem(null);
     const fits = Object.fromEntries(JSON.parse(fitsKey) as [string, string][]);
-    const ask = { host };
-    const bound =
-      madeHere || Object.keys(fits).length > 0
-        ? proformaBind(flowsheetId, { ...ask, fits, vessel: vesselId, trainRun: trainRunId }, ctrl.signal)
-        : proformaScenarios(ask, ctrl.signal).then((all) => {
-            const found = all.find((x) => x.id === scenario.id);
-            if (!found) throw new Error(`The service binds no scenario ${scenario.id}: it is not among the BioSTEAM scenarios this service holds.`);
-            return found;
-          });
-    bound.then(setInfo).catch((e: unknown) => !ctrl.signal.aborted && setBindProblem(problemOf(e)));
+    proformaBind(flowsheetId, { host, fits, vessel: vesselId, trainRun: trainRunId }, ctrl.signal)
+      .then(setInfo)
+      .catch((e: unknown) => !ctrl.signal.aborted && setBindProblem(problemOf(e)));
     return () => ctrl.abort();
-  }, [madeHere, flowsheetId, scenario.id, host, fitsKey, vesselId, trainRunId]);
+  }, [flowsheetId, host, fitsKey, vesselId, trainRunId]);
 
   // The inputs as the parameter panel shows them (OF-BLD-020 §2.2): the
-  // scenario's scope, bound by the service as a run binds it, a scenario made
-  // here naming its flowsheet, with the host and the fits chosen.
+  // scenario's scope, bound by the service as a run binds it, the scenario
+  // naming its flowsheet, with the host and the fits chosen.
   const ask = useMemo(
     () => ({
-      flowsheet: madeHere ? flowsheetId : null,
+      flowsheet: flowsheetId,
       host,
       fits: Object.fromEntries(JSON.parse(fitsKey) as [string, string][]),
       // A composite's parts, as the run names them (OF-BLD-020 §6.1).
       ...(vesselId || trainRunId ? { vessel: vesselId, trainRun: trainRunId } : {}),
     }),
-    [madeHere, flowsheetId, host, fitsKey, vesselId, trainRunId],
+    [flowsheetId, host, fitsKey, vesselId, trainRunId],
   );
   useEffect(() => {
     const ctrl = new AbortController();
@@ -664,7 +659,7 @@ function BiosteamScenario({ scenario, madeHere }: { scenario: Scenario; madeHere
     ceilingCheck(
       {
         scenarioId: scenario.id,
-        flowsheet: madeHere ? flowsheetId : null,
+        flowsheet: flowsheetId,
         host,
         fits,
         overrides: typedYield,
@@ -675,7 +670,7 @@ function BiosteamScenario({ scenario, madeHere }: { scenario: Scenario; madeHere
       .then(setCeiling)
       .catch((e: unknown) => !ctrl.signal.aborted && setCeilingProblem(problemOf(e)));
     return () => ctrl.abort();
-  }, [madeHere, flowsheetId, scenario.id, host, fitsKey, yieldTyped, yieldUnit]);
+  }, [flowsheetId, scenario.id, host, fitsKey, yieldTyped, yieldUnit]);
 
 
   // The newest run: the service's, which holds every run any browser, the
@@ -801,7 +796,7 @@ function BiosteamScenario({ scenario, madeHere }: { scenario: Scenario; madeHere
     const fits = Object.fromEntries(Object.entries(chosenFits).filter(([k]) => bound.inputs.find((i) => i.key === k)?.binding === 'artifact'));
     runProformaScenario({
       scenarioId: scenario.id,
-      flowsheet: madeHere ? flowsheetId : null,
+      flowsheet: flowsheetId,
       overrides: sent,
       specs: runSpecs(panel, flowsheet, bound),
       by: reviewer,
@@ -1112,7 +1107,6 @@ const FIT_INPUTS = ['titre', 'yield', 'productivity'];
 /** A BioSTEAM scenario the service simulates, by its id. */
 export default function ProformaScenario({ scenarioId }: { scenarioId: string }) {
   const scenario = useStore((s) => s.scenarios.find((x) => x.id === scenarioId));
-  const madeHere = useStore((s) => s.createdScenarioIds.includes(scenarioId));
   const stateLoaded = useStore((s) => s.stateSeen !== null || s.stateProblem !== null);
   // The project's scenarios arrive with its rows, just after the page loads:
   // a deep link waits for them rather than say the scenario does not exist.
@@ -1125,5 +1119,5 @@ export default function ProformaScenario({ scenarioId }: { scenarioId: string })
         action={<Button onClick={() => navigate('/proforma')}>Back to Proforma</Button>}
       />
     );
-  return <BiosteamScenario key={scenario.id} scenario={scenario} madeHere={madeHere} />;
+  return <BiosteamScenario key={scenario.id} scenario={scenario} />;
 }

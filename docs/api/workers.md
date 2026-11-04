@@ -41,7 +41,7 @@ out  {"id": 1, "ok": false, "error": "Refused: there is no flowsheet x; there ar
 
 | Worker | Module | Imports | Ops |
 |---|---|---|---|
-| `proforma` | `workers/proforma_worker.py` (with `flowsheets/`, `workers/library_plants.py`, `workers/sff_toolkit.py`, `vendor/pisces_sff`) | biosteam, thermosteam, biorefineries, the SFF toolkit | `benchmark`, `evaluate`, `grid`, `montecarlo`, `run`, `reference`, `thermo_props`, `volatility`, `vessel_specs`, `vessel_design`, `catalogue_specs`, `catalogue_unit_check`, `train_specs`, `flowsheet_unit_values`, `train_run`, `sff_export`, `sff_validate`, `sff_score`, `library_discover`, `library_parameters`, `library_run`, `library_cases` |
+| `proforma` | `workers/proforma_worker.py` (with `flowsheets/`, `workers/library_plants.py`, `workers/kept_references.py`, `workers/sff_toolkit.py`, `vendor/pisces_sff`) | biosteam, thermosteam, biorefineries, the SFF toolkit | `evaluate`, `grid`, `montecarlo`, `run`, `replay_reference`, `replay_benchmark`, `thermo_props`, `volatility`, `vessel_specs`, `vessel_design`, `catalogue_specs`, `catalogue_unit_check`, `train_specs`, `flowsheet_unit_values`, `train_run`, `sff_export`, `sff_validate`, `sff_score`, `library_discover`, `library_parameters`, `library_run`, `library_cases` |
 | `geneos` | `workers/geneos_worker.py` | cobra | `describe`, `ceiling`, `frontier`, `mix` |
 | `echo` | `workers/echo_worker.py` | nothing heavy | the protocol's own tests |
 | `sample` | `workers/sample_worker.py` | nothing heavy | `things`, `parameters`, `run`, `sff_export`, `environment`: the engine contract's own tests (`engine/sample.py`, which no entry point registers) |
@@ -111,19 +111,22 @@ plant cost index. `custom_train_v1` is built from a `structure`, `{"fermenter", 
 "financeKeys"}` as `composite.structure_of` reads it from the run's basis, and the worker keeps its
 four newest structured builds (`STRUCTURES_KEPT`). A structure `custom_train_v1` cannot build (a
 TEA parameter the corn plant's TEA does not take, a train unit whose id clashes with the
-flowsheet's own, say) is refused in that module's words, through its own `Refused`. The reference
-biorefineries (`cornstover_benchmark`, `corn_drygrind`) run whole through `reference`.
-`evaluate`, `grid`, `montecarlo` and `run` refuse a reference biorefinery, `custom_train_v1`
-without a `structure`, and any other flowsheet given one.
+flowsheet's own, say) is refused in that module's words, through its own `Refused`. `evaluate`,
+`grid`, `montecarlo` and `run` refuse `custom_train_v1` without a `structure`, and any other
+flowsheet given one. The published plants of `biorefineries`, run whole on their package's
+defaults, are the library's (`library_run`, below); the shelf's two hand-written reference entries
+retired at alpha 2.2 (D8), and the runs a person kept from them replay through `replay_reference`
+and `replay_benchmark` alone.
 
-### `benchmark`
+### `replay_benchmark`
 
-The benchmark (OF-BLD-014 §8.2): `biorefineries.cornstover`'s plant built afresh inside
-`package_defaults()`, its ethanol price solved by the package's TEA
-(`flowsheets/cornstover_benchmark.run`). Request `{}`; the handler reads no field. Result
-`{"package", "biosteam", "mespUsdPerGal", "mespUsdPerKg", "ethanolDensityKgPerGal", "settings":
-{"rateOfReturn", "operatingDays", "incomeTax", "startYear", "endYear"}, "references": [string,
-…]}`. `proforma.py` keeps it as one `proforma_benchmark` artifact and cites `mespUsdPerGal`.
+A kept `proforma_benchmark` artifact recomputed for its replay (OF-BLD-014 §8.2; alpha 2.2 D8):
+`biorefineries.cornstover`'s plant built afresh inside `package_defaults()`, its ethanol price
+solved by the package's TEA (`workers/kept_references.benchmark`). Request `{}`; the handler reads
+no field. Result `{"package", "biosteam", "mespUsdPerGal", "mespUsdPerKg",
+"ethanolDensityKgPerGal", "settings": {"rateOfReturn", "operatingDays", "incomeTax", "startYear",
+"endYear"}, "references": [string, …]}`, the output the artifact holds. No route or tool makes a
+new one.
 
 ### `evaluate`
 
@@ -182,30 +185,33 @@ when the base case failed; `grid` is `grid`'s result, null without `axes`; `mont
 `readBack`; each sample's `inputs`, price output and `infeasible.reason`; each cell's price output
 and `costLines`; and every key of `tables`. A refusal in any case ends the run.
 
-### `reference`
+### `replay_reference`
 
-A reference biorefinery run whole on its package's defaults (OF-BLD-019 §2.2): built afresh inside
-`package_defaults()` and read before the worker's settings go back. Request `{"flowsheet",
-"digits" (1–17, default 17), "diagram"}`; `proforma.py` sends the digits the basis states
-(`REFERENCE_DIGITS`, 10) and `diagram` as `run` takes it. Result, every float rounded to `digits`
-significant digits: `{"flowsheet", "simulator": "biosteam <version>", "measured": {expression:
-number}, "readBack"}`, with the module's `outputs()` and the run's tables (below) beside them.
-The outputs are `cornstover_benchmark`'s `package`, `mespUsdPerGal`, `mespUsdPerKg`,
-`ethanolDensityKgPerGal`, `settings` and `references`, or `corn_drygrind`'s `package`,
-`ethanolPriceUsdPerKg`, `IRR`, `ethanolKgPerH`, `cornKgPerH` and `references`. `measured` holds
-the quantities the package's test asserts, keyed by the expression the test writes: `tea.IRR`,
-`feedstock.price`, `product.price`, `tea.sales`, `tea.material_cost`,
+A kept `proforma.reference` artifact recomputed for its replay (OF-BLD-019 §2.2; alpha 2.2 D8):
+the plant of the retired entry its basis names, built afresh inside `package_defaults()` and read
+before the worker's settings go back (`workers/kept_references.py`). Request `{"flowsheet",
+"digits" (1–17, default 17), "diagram"}`; `proforma.py` sends the entry its basis names, the digits
+the basis states (`REFERENCE_DIGITS`, 10, where it names none) and `diagram` as `run` takes it.
+Result, every float rounded to `digits` significant digits: `{"flowsheet", "simulator": "biosteam
+<version>", "measured": {expression: number}, "readBack"}`, with the plant's outputs and the run's
+tables (below) beside them. The outputs are `cornstover_benchmark`'s `package`, `mespUsdPerGal`,
+`mespUsdPerKg`, `ethanolDensityKgPerGal`, `settings` and `references`, or `corn_drygrind`'s
+`package`, `ethanolPriceUsdPerKg`, `IRR`, `ethanolKgPerH`, `cornKgPerH` and `references`.
+`measured` holds the quantities the package's test asserts, keyed by the expression the test
+writes: `tea.IRR`, `feedstock.price`, `product.price`, `tea.sales`, `tea.material_cost`,
 `tea.installed_equipment_cost`, `tea.utility_cost`, `units.get_heating_duty()`,
 `units.get_cooling_duty()`, `units.get_electricity_consumption()` and
-`units.get_electricity_production()`. `readBack` is the module's `read_back()`, every input the
-shelf lists for `corn_drygrind`, and `{}` for `cornstover_benchmark`, which has none.
-`proforma.py` adds `regression` and `checks` before it keeps the `proforma.reference` artifact. A
-flowsheet with no `load` (one run case by case) is refused, and so are `digits` outside 1–17.
+`units.get_electricity_production()`. `readBack` is every input the dry-grind corn entry listed,
+read back, and `{}` for `cornstover_benchmark`, which listed none. `proforma.py` adds `regression`
+and `checks`, the library plant's package test (`engine/library.regression`) beside what the replay
+measured, as the run added them. An entry other than the two is refused in words (`Refused: <id> is
+no retired reference entry whose kept runs replay here; they are cornstover_benchmark,
+corn_drygrind`), and so are `digits` outside 1–17.
 
 ### `tables`
 
-What `run` returns as `tables`, and what `reference` and `library_run` return beside their other
-keys: every table of the base case, read from the objects it left (`tables()` in
+What `run` returns as `tables`, and what `replay_reference` and `library_run` return beside their
+other keys: every table of the base case, read from the objects it left (`tables()` in
 `proforma_worker.py`). Where the flowsheet solved a price, the product stream carries it while the
 tables are read.
 
@@ -258,15 +264,14 @@ Request:
 |---|---|---|
 | `flowsheet` | string | a shelf flowsheet id (`flowsheets.KNOWN`) |
 | `path` | string | where the file is written |
-| `base` | object, key → number | a flowsheet run case by case: the run's base values. Left out for a reference biorefinery |
+| `base` | object, key → number | a flowsheet run case by case: the run's base values |
 | `structure` | object | a structured flowsheet (`custom_train_v1`): what it is built from |
 | `metadata` | object | written as `metadata.openferment` in the file |
 | `title` | string or null | written as `metadata.process_title` |
 | `library` | string | in place of `flowsheet` for a library run: the `biorefineries` plant, with `configuration` and `overrides` as `library_run` takes them |
 | `train` | object | in place of `flowsheet` for a pureOS train run: the `train_run` request its run's basis gives (`system`, `inlet`, `units`, as `train_run` takes them; `train_spec.plant_of`) |
 
-A reference biorefinery (a flowsheet module with `load`) is built afresh inside
-`package_defaults()`; any other is the worker's warm plant set to `base` and simulated, its
+A shelf flowsheet is the worker's warm plant set to `base` and simulated, its
 solved price on the product while the file is written (a Proforma scenario's run asks it as the
 run is kept, from the run's basis alone, `proforma.plant_of`; the service asks it of no run whose
 base case could not run, which keeps its words as `sffRefused`); a library plant is built afresh and
@@ -618,8 +623,8 @@ A per-component parameter comes per chemical as `<key>.<chemical>`, the light an
 from `LHK`, an evaporator's pressures come as `P.<n>` with `effects`, and a bool comes as `"true"`
 or `"false"`. `unread` names, with why, each parameter the unit holds as None or as something
 other than a number or a word; the class's own default stands for it. The op refuses
-`custom_train_v1` (its units are the fermenter's and a train run's own), a reference biorefinery,
-a type the catalogue does not hold, a unit ID the flowsheet lacks, and a unit that is not an
+`custom_train_v1` (its units are the fermenter's and a train run's own), a flowsheet the shelf
+does not hold, a type the catalogue does not hold, a unit ID the flowsheet lacks, and a unit that is not an
 instance of the catalogue type's class.
 
 ### `train_run`

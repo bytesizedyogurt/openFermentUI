@@ -1,6 +1,6 @@
 // Scenario comparison (OF-DES-001 §8.13; OF-BLD-019 §3.3, D1, D6).
 //
-// Pinned BioSTEAM scenarios (kind 'biosteam', held or made here) side by
+// Pinned BioSTEAM scenarios (kind 'biosteam', each the project's) side by
 // side from each one's NEWEST RUN ARTIFACT (its `lastRunId`, read at GET
 // /api/biorepo/artifacts/{id}): the price with its basis and provenance, the
 // TEA's cost lines closing on the run's own base-case price, and the inputs as

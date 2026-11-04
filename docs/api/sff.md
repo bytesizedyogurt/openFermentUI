@@ -27,21 +27,73 @@ file, what openFerment adds to a file it writes, and the routes. The code is
 | Field | What it is |
 |---|---|
 | `id` | `run-<artifact id>` for a run's export; `sff-<first 16 hex of the file's sha256>` for any other file. The same file kept twice is one record; a run exported twice is one record |
-| `origin` | `run` (exported by openFerment from a run of the project), `library` (the file's sha256 is one of the toolkit's reference flowsheets at the pinned commit, whichever route it came by), `imported` (any other file) |
+| `origin` | `run` (exported by openFerment from a run of the project), `library` (the file's sha256 is one of the toolkit's reference flowsheets at the pinned commit, whichever route it came by), `imported` (any other file, uploaded or fetched by its address) |
 | `title` | the file's `metadata.process_title`, else its named feedstocks and products (`Corn stover → Ethanol`), else the file's name |
-| `source` | where the file came from, in words: a run's export says `exported from run <artifact id> of <flowsheet id>`, or `of train <train id>` for a train run |
+| `source` | where the file came from, in words: a run's export says `exported from run <artifact id> of <flowsheet id>`, or `of train <train id>` for a train run; an uploaded file `the file <name>, imported`; a file fetched by its address `the file at <address>, imported`, with `served from <address>` before `imported` when a redirect led to another address; a reference flowsheet the toolkit's own words, followed by `fetched from <address>` (and `served from <address>`) when it came by its address |
 | `sha256`, `bytes` | of the file as it came; the file is kept byte for byte (`GET …/file`) |
 | `validation` | `valid` (no schema failure and no error-severity check failed), `summary` (every result counted by severity and status), `findings` (each result that did not pass: check id, severity, status, message, path) |
 | `completeness` | the toolkit's completeness report: `score` (weighted over every scored criterion), `representableScore` (over the criteria the file's own version can state), per category and criticality, each criterion with what it found missing, the re-execution route it found, and the toolkit's text rendering |
 | `tags` | each tag the toolkit knows: earned, declared, blocking. `reproducible` is never evaluated (`earned: null`): earning it runs the toolkit's conda harness, which openFerment does not run. openFerment's replay check is the verification that counts (ADR-003) |
 | `graph` | what the UI draws (below); left out of a listing |
 | `runArtifactId`, `libraryId` | the run a `run` record was exported from; the reference id (`SF_BST_15`) of a `library` record |
+| `url` | the https address a file fetched by its address came from, as the person named it (below); null for every other door |
 
 A file that fails validation is kept, with its findings. Seventeen of the toolkit's eighteen
 reference flowsheets declare SFF 0.0.3 and fail the 0.2.4 schema gate; refusing them would
 refuse the toolkit's own corpus. A file is refused only when no graph can be read from it: not
 UTF-8, not JSON, or not an object with a list of units and a list of streams (422), or larger
 than 16 MB (413).
+
+## A file by its address
+
+`POST /api/flowsheets/import-url` takes `{"url", "by"}`: the public https address of an SFF file
+and the person who names it (`engine/sff.py` `import_url`). This route is the one door that
+fetches a flowsheet by its address: the address is a person's to name (the prompt's §3), and the
+`flowsheet_import` tool takes a reference file's id alone, so no model, over the loop or MCP, has
+the service fetch an address. The service fetches the file the way Intake fetches a document
+(`literature/collectors.py` `fetch_file`), with the collectors' manners: the throttle (at most two
+requests a second, shared with every collector), the User-Agent naming the project and, when
+`OPENFERMENT_CONTACT` is set, somebody to write to, a timeout of 20 s on connecting and on each
+read, and one retry on a 5xx. The whole exchange, from the host's resolution through the TLS
+handshake and the headers to the file's last byte, is held to 120 s. Each of these is a setting.
+
+- **https alone.** The address must be https and name a host; one that names a user or a password
+  is refused too, since the record keeps the address as its source. A redirect is followed to
+  another https address alone, held to every rule here, at most five times.
+- **A public address alone** (D10's amendment at C.6). Before connecting, and again for each
+  redirect's address, the host is read as an address when it names one by its digits (a dotted
+  quad, an IPv6 address, or a short or numeric form such as `127.1` or `2130706433`, read as the
+  system reads it), and resolved otherwise. The fetch is refused when any address the host names
+  is loopback, private, link-local, multicast, reserved, unspecified or otherwise outside the
+  public internet, as Python's `ipaddress` module decides, IPv4 and IPv6 alike, an IPv4-mapped
+  IPv6 address read as its IPv4. The request then goes to a checked address by its digits, with
+  the host's name in its Host header and as the TLS server name its certificate is checked
+  against, so a second resolution cannot move it; the service connects itself, with no proxy.
+  This narrows what the service reaches and adds no host to any list.
+- **Streamed under the size an import takes.** The body is read as it arrives and refused once it
+  passes 16 MB (for an uncompressed body, as soon as the host states a larger length), before the
+  rest is read; a compressed body is held to the size it decompresses to.
+- **Fixture mode.** With `OPENFERMENT_FIXTURES` set the network is refused, as every collector
+  refuses it there, in the collectors' words.
+- **Kept as an uploaded file is.** The bytes are read, checked by the toolkit in the worker, drawn
+  and kept byte for byte with their sha256, under the same rules: `origin` is `imported`, or
+  `library` when the file hashes as one of the reference flowsheets; `source` names the address
+  (for a reference flowsheet, its own words followed by `fetched from <address>`) and `url` holds
+  it. The address is kept whole, its query included, in `source` and in `url`, so a person names
+  an address that carries no secret. The same file kept again is the record
+  already held, whichever address served it, so the same address serving the same bytes twice is
+  one record; of two imports of one file in flight together, the first keeps its record and the
+  second answers with it.
+
+Each refusal is said in words a person reads: 413 for a file past the size; 422 for an address
+that is not https, that names a user or a password, or that names an address outside the public
+internet (a redirect to any of these included), for the network refused in fixture mode, and for
+a file no graph can be read from (the check's words, or, when the address served something that
+is no JSON, what it served: `the address served an HTML page (text/html), and an SFF file is
+JSON`); 502 when the host name could not be found, the host refused the connection, could not be
+reached, or was not read in time, or it answered an error; 503 when the worker could not check
+the file. The log keeps each failure's exception in its own words. A refused request keeps
+nothing. The guard's list of hosts the service answers to is unchanged: the fetch is outbound.
 
 ## The graph
 
@@ -80,11 +132,14 @@ A pureOS train run's block names its train in that place:
 `"train": "the id of the train whose run was written"`, and its file's process title is the
 train's name.
 
-The export writes the run's base case: a reference biorefinery built afresh inside
-`package_defaults()` as its reference run builds it, a shelf flowsheet's warm plant set to the
-run's base values (with the price the run solved on its product), a library plant built afresh
-and set as its run set it, or a pureOS train rebuilt from the `train_run` request its run's basis
-gives and simulated whole as its run simulated it (`docs/api/workers.md`, `sff_export`). A train
+The export writes the run's base case: a shelf flowsheet's warm plant set to the run's base
+values (with the price the run solved on its product), a library plant built afresh and set as
+its run set it, or a pureOS train rebuilt from the `train_run` request its run's basis gives and
+simulated whole as its run simulated it (`docs/api/workers.md`, `sff_export`). A run kept from
+one of the shelf's two retired reference entries (a `proforma.reference` or `proforma_benchmark`
+artifact, alpha 2.2 D8) writes no file of its own: the library plant it built (`cornstover`,
+`corn`) writes the same package's plant from its run, and the export is refused in words naming
+it. A train
 carries no TEA. The schema the toolkit ships at `e236e32` requires every file's
 `metadata.TEA_year` (`sff_schema.json`), the year its costs are reported in, which the exporter
 reads from the system's TEA (`tea.duration[0]`, `export/_export.py`), and a train run computes
@@ -136,13 +191,16 @@ All act in the project the request names (ADR-005).
 | `GET /api/flowsheets/{id}` | one record with its graph; 404 when the project holds none |
 | `GET /api/flowsheets/{id}/file` | the file as held (`application/json`, as an attachment) |
 | `POST /api/flowsheets/import` | multipart: `file`, `by`. Checked in the worker, drawn, kept. 413, 422, 503 |
+| `POST /api/flowsheets/import-url` | `{"url", "by"}`: the file a public https address serves, fetched as Intake fetches a document and kept as an uploaded file is, the address its source (above). 413, 422, 502, 503 |
 | `GET /api/flowsheets/library` | the reference flowsheets and which are fetched here; fetches nothing |
 | `POST /api/flowsheets/library/{id}` | `{"by"}`: fetched (or found here), hash checked, checked in the worker, kept with origin `library`. 404, 502 (fetch or hash), 503 |
-| `POST /api/flowsheets/export` | `{"artifactId", "by"}`: a kept run (a shelf run, a reference run, the benchmark, a library run or a pureOS train run) exported, checked and kept with origin `run`. 404, 409 in the worker's words (the run's base case cannot be built; for a train run, the toolkit wrote no file, at `e236e32` for want of a TEA year), 422, 503 |
+| `POST /api/flowsheets/export` | `{"artifactId", "by"}`: a kept run (a shelf run, a library run or a pureOS train run) exported, checked and kept with origin `run`. 404, 409 in the worker's words (the run's base case cannot be built; for a train run, the toolkit wrote no file, at `e236e32` for want of a TEA year), 422 (no run, or a run kept from a retired reference entry, the refusal naming its library plant), 503 |
 
 ## Measured (2026-10-30, BioSTEAM 2.54.0, biorefineries 2.35.1)
 
-- The corn stover reference plant: export 0.3 s, validation 0.1 s, completeness scoring 2.0 s,
+- The corn stover reference plant, measured at alpha 2.0's step 4.1 through the retired
+  `cornstover_benchmark` entry's export (that path now refuses; the library plant's run writes
+  its own file): export 0.3 s, validation 0.1 s, completeness scoring 2.0 s,
   tags 0.1 s after the plant is built; valid; completeness 0.741, representable 0.851 (system and
   TEA settings, 0.157, are the weakest category). `exported-from-simulator` is not earned without
   a reproducibility recipe (MET-07) and is blocked by UNIT-07.

@@ -1841,6 +1841,10 @@ class ProformaScenarioInfo(BaseModel):
     waiting: list[str] = Field(default_factory=list)
     leavesOut: list[str] = Field(default_factory=list)
     priceBasis: str
+    # The words a kept scenario's binding was refused in (a part of a
+    # custom_train_v1 scenario that cannot stand, or a flowsheet the shelf no
+    # longer holds), its inputs then empty; None for a scenario that binds.
+    refused: str | None = None
 
 
 class ProformaRunRequest(BaseModel):
@@ -1873,8 +1877,8 @@ class ProformaRunRequest(BaseModel):
     # The shelf flowsheet the scenario runs (OF-BLD-019 §2.3, D6): a scenario
     # the project keeps runs its own and needs none (another is refused); a
     # scenario not yet saved runs this one, bound as
-    # GET /api/proforma/bind binds it. A reference biorefinery, the toy or an
-    # id the shelf does not hold is refused in words.
+    # GET /api/proforma/bind binds it. The toy or an id the shelf does not
+    # hold is refused in words.
     flowsheet: str | None = None
     # The fermOS fits a person chose, by input key: titre, yield and
     # productivity, each the id of a kept `kinetic_fit` or `growth_forecast`
@@ -2128,8 +2132,6 @@ class FlowsheetInfo(BaseModel):
     source: str
     # The chemical-set key (`yeast`, train_spec.PROGRAM_CHEMICALS); None for a general flowsheet.
     program: str | None = None
-    # A published reference biorefinery, run whole on its package's defaults.
-    reference: bool = False
     inputs: list[FlowsheetInput] = Field(default_factory=list)
     # The names its evaluation (or its whole run) reports.
     outputs: list[str] = Field(default_factory=list)
@@ -2139,10 +2141,6 @@ class FlowsheetInfo(BaseModel):
     leavesOut: list[str] = Field(default_factory=list)
     # The inputs a run's grid walks, for the sliders; none, no grid.
     gridInputs: list[str] = Field(default_factory=list)
-    # A reference biorefinery's own regression test, cited as file::test
-    # ('biorefineries/tests/test_biorefineries.py::test_corn'); its values
-    # are read from the installed file (PackageRegression), never retyped.
-    packageTest: str | None = None
     # OF-BLD-020 §6.1 (D11): the kept artifacts a scenario on this flowsheet
     # names besides the flowsheet, by tool, in the order the flowsheet builds
     # on them (`custom_train_v1`: a `fermos.vessel` design and a
@@ -2155,14 +2153,13 @@ class FlowsheetInfo(BaseModel):
     brothStream: str | None = None
 
 
-# ── A reference biorefinery's run (OF-BLD-019 §2.2, D3) ──────────────────
+# ── A plant held to its package's own test (OF-BLD-019 §2.2; ADR-013) ──────
 #
-# A published biorefinery runs whole on its package's defaults and is kept
-# as one `proforma.reference` artifact: the package's outputs, the
-# quantities its own test asserts as this installation computed them, the
-# defaults read back, and every table a `proforma.run` artifact holds. The
-# test's values come from the installed test file, parsed, with the file
-# and test named.
+# A library plant run whole on its package's defaults (engine/library.py) is
+# set beside the values its package's own test asserts, as this installation
+# computed them. The test's values come from the installed test file,
+# parsed, with the file and test named; a `proforma.reference` artifact kept
+# from the shelf's retired reference entries holds the same (alpha 2.2 D8).
 
 
 class RegressionValue(BaseModel):
@@ -2178,8 +2175,8 @@ class RegressionValue(BaseModel):
 
 
 class PackageRegression(BaseModel):
-    """A reference biorefinery's regression values, read from the package's
-    installed test file: which package, which file, which test."""
+    """A plant's regression values, read from its package's installed test
+    file: which package, which file, which test."""
 
     package: str
     file: str
@@ -2201,17 +2198,6 @@ class RegressionCheck(BaseModel):
     # with its default absolute tolerance has it).
     relDiff: float | None = None
     within: bool
-
-
-class ProformaReference(BaseModel):
-    """GET and POST /api/proforma/reference/{id}: the shelf's entry, the
-    newest stored reference run (or None), the package test's values, and
-    where the simulator is."""
-
-    flowsheet: FlowsheetInfo
-    artifact: Artifact | None = None
-    regression: PackageRegression | None = None
-    simulator: dict[str, Any] = Field(default_factory=dict)
 
 
 class StreamRow(BaseModel):
@@ -3495,9 +3481,9 @@ class TrainInlet(BaseModel):
     model_config = ConfigDict(extra="forbid")
 
     kind: Literal["simulation", "run-stream", "typed"]
-    # The artifact: a `fermos.simulation`, or a `proforma.run`,
-    # `proforma.reference` or `pureos.train_run` whose stream is the inlet;
-    # None for a typed inlet.
+    # The artifact: a `fermos.simulation`, or a `proforma.run`, `library.run`
+    # or `pureos.train_run` whose stream is the inlet (or a `proforma.reference`
+    # kept from a retired reference entry); None for a typed inlet.
     ref: str | None = None
     # The stream of that run (run-stream alone).
     streamId: str | None = None
@@ -3704,7 +3690,8 @@ class TrainFromRunRequest(BaseModel):
 
     model_config = ConfigDict(extra="forbid")
 
-    # A `proforma.run`, `proforma.reference` or `pureos.train_run` artifact.
+    # A `proforma.run`, `library.run` or `pureos.train_run` artifact (or a
+    # `proforma.reference` kept from a retired reference entry).
     artifactId: str
     # The id the train takes; by default `from-<artifact id>`.
     trainId: str | None = None
@@ -3994,7 +3981,9 @@ class SFFFlowsheet(BaseModel):
     reference flowsheets at the pinned commit, whichever door it came
     through; `imported` for any other file. `sffVersion` is what the file
     declares; `validation.schemaVersion` is the schema it was checked
-    against. `graph` is left out of a listing."""
+    against. `url` is the https address a file fetched by its address came
+    from (POST /api/flowsheets/import-url), None for every other door.
+    `graph` is left out of a listing."""
 
     id: str
     title: str
@@ -4006,6 +3995,7 @@ class SFFFlowsheet(BaseModel):
     simulator: str | None = None
     runArtifactId: str | None = None
     libraryId: str | None = None
+    url: str | None = None
     units: int
     streams: int
     validation: SFFValidation
@@ -4044,6 +4034,15 @@ class SFFLibraryImport(BaseModel):
     """POST /api/flowsheets/library/{id}: who keeps the reference flowsheet
     in the project."""
 
+    by: str = Field(min_length=1, max_length=200)
+
+
+class SFFUrlImport(BaseModel):
+    """POST /api/flowsheets/import-url: the public https address of an SFF
+    file to fetch and keep in the project, kept whole as the record's
+    source, query included, and the person who names it."""
+
+    url: str = Field(min_length=1, max_length=2048)
     by: str = Field(min_length=1, max_length=200)
 
 

@@ -117,14 +117,19 @@ def scenario_of(art: Artifact, scenarios: Iterable[dict[str, Any]]) -> tuple[str
 
 
 def program_of(art: Artifact, scenario_id: str | None, scenarios: Iterable[dict[str, Any]]) -> str | None:
-    """A train's chemical set: its scenario's, else its flowsheet's on the shelf."""
+    """A train's chemical set: its scenario's, else its flowsheet's on the
+    shelf, else, for a run kept from a retired reference entry, the set the
+    entry named (alpha 2.2 D8: `proforma.RETIRED`)."""
+    from .. import proforma
     from ..flowsheets import shelf as _shelf
 
     found: list[str | None] = [next((s.get("program") for s in scenarios if s["id"] == scenario_id), None)]
     try:
         found.append(_shelf.info(_flowsheet(art) or "", allow_toy=True).program)
     except _shelf.NotOnShelf:
-        pass
+        entry = proforma.retired_entry_of(art)
+        if entry is not None:
+            found.append(proforma.RETIRED[entry].program)
     kept = [p for p in found if p]
     return kept[0] if kept else None
 

@@ -10,7 +10,8 @@ and its origin, computed from where the file came from:
     run       exported by openFerment from a run of the project (`export`)
     library   one of the toolkit's reference flowsheets at the pinned commit,
               known by its sha256 whichever door it came through
-    imported  any other file a person brought (`import_sff`)
+    imported  any other file a person brought (`import_sff`), or fetched from
+              the https address a person named (`import_url`)
 
 The toolkit imports BioSTEAM, so validating, scoring and exporting are the
 Proforma worker's ops (workers/sff_toolkit.py), reached through
@@ -31,6 +32,7 @@ the run's).
     GET  /api/flowsheets/{id}            one record, its graph included
     GET  /api/flowsheets/{id}/file       the file as it is held
     POST /api/flowsheets/import          an uploaded SFF file, checked and kept
+    POST /api/flowsheets/import-url      an SFF file fetched from its https address, checked and kept
     GET  /api/flowsheets/library         the reference flowsheets at the pinned commit
     POST /api/flowsheets/library/{id}    one fetched, checked and kept in the project
     POST /api/flowsheets/export          a run's base case exported, checked and kept
@@ -50,8 +52,9 @@ from collections.abc import Callable
 from dataclasses import dataclass
 from datetime import UTC, datetime
 from functools import cache
-from pathlib import Path
+from pathlib import Path, PurePosixPath
 from typing import Any
+from urllib.parse import unquote, urlsplit
 
 from sqlalchemy import select
 
@@ -378,8 +381,11 @@ def parsed(data: bytes, name: str) -> tuple[str, dict[str, Any]]:
         raise SFFRefused(f"{name} is not UTF-8 text; an SFF file is JSON") from None
     try:
         doc = json.loads(text)
-    except ValueError as e:
-        raise SFFRefused(f"{name} is not JSON: {e}") from None
+    except json.JSONDecodeError as e:
+        raise SFFRefused(f"{name} is not JSON: its text stops reading as JSON at line {e.lineno}, column "
+                         f"{e.colno}") from None
+    except RecursionError:
+        raise SFFRefused(f"{name} nests its JSON deeper than a flowsheet's reader follows") from None
     if not isinstance(doc, dict) or not isinstance(doc.get("units"), list) or not isinstance(doc.get("streams"), list):
         raise SFFRefused(f"{name} is not an SFF flowsheet: an SFF file is a JSON object with a list of units and a "
                          "list of streams")
@@ -422,7 +428,7 @@ def _now() -> str:
 
 def _record(doc: dict[str, Any], data: bytes, checked: dict[str, Any], *, record_id: str, origin: str, source: str,
             fallback_title: str, by: str, run_artifact_id: str | None = None, library_id: str | None = None,
-            simulator_said: str | None = None) -> SFFFlowsheet:
+            simulator_said: str | None = None, url: str | None = None) -> SFFFlowsheet:
     meta = doc.get("metadata") or {}
     sim = meta.get("process_simulator")
     if simulator_said is None and isinstance(sim, dict) and sim.get("name"):
@@ -431,7 +437,7 @@ def _record(doc: dict[str, Any], data: bytes, checked: dict[str, Any], *, record
     return SFFFlowsheet(
         id=record_id, title=title_of(doc, fallback_title), origin=origin, source=source,
         sffVersion=version if isinstance(version, str) else None, sha256=sha256_of(data), bytes=len(data),
-        simulator=simulator_said, runArtifactId=run_artifact_id, libraryId=library_id,
+        simulator=simulator_said, runArtifactId=run_artifact_id, libraryId=library_id, url=url,
         units=len(doc.get("units") or []), streams=len(doc.get("streams") or []),
         validation=SFFValidation.model_validate(checked["validation"]),
         completeness=SFFCompleteness.model_validate(checked["completeness"]),
@@ -452,6 +458,17 @@ async def _put(project_id: str, record: SFFFlowsheet, text: str) -> SFFFlowsheet
                        schema_version=record.sffVersion or "unstated", recipe=None, origin=record.origin,
                        sha256=record.sha256, document=text)
     return record
+
+
+async def _put_first(project_id: str, record: SFFFlowsheet, text: str) -> SFFFlowsheet:
+    """An imported file's record written once: the first import of a file
+    keeps its record, and an import of the same file in flight beside it
+    answers with the record the first kept."""
+    async with db.session() as s:
+        held = await rows.put_first(s, t.flowsheets, project_id, record.id, record.model_dump(mode="json"),
+                                    by=record.createdBy, schema_version=record.sffVersion or "unstated", recipe=None,
+                                    origin=record.origin, sha256=record.sha256, document=text)
+    return SFFFlowsheet.model_validate(held)
 
 
 async def _listed(project_id: str) -> list[SFFFlowsheet]:
@@ -495,7 +512,64 @@ def import_sff(data: bytes, filename: str, *, project_id: str, by: str) -> SFFFl
     is one of the reference flowsheets', else `imported`. The same file kept
     again is the record already held."""
     name = filename or "the file"
-    text, doc = parsed(data, name)
+    return _imported(data, parsed(data, name), project_id=project_id, by=by, source=f"the file {name}, imported",
+                     title=Path(name).stem)
+
+
+def import_url(url: str, data: bytes, *, project_id: str, by: str, served: str | None = None,
+               kind: str = "") -> SFFFlowsheet:
+    """An SFF file fetched from the https address a person named, kept as an
+    uploaded file is (`import_sff`): read, checked by the toolkit in the
+    worker, drawn and stored, its hash kept. The door fetches `data` the way
+    Intake fetches a document (literature/collectors.py `fetch_file`): `url`
+    is the address named, `served` the one that served the file after a
+    redirect, `kind` the content type it was served as. The record's source
+    names the address, its `url` holds the address named, and its origin is
+    `imported`, or `library` when the file hashes as a reference flowsheet,
+    whose source is the reference flowsheet's words followed by the address
+    it was fetched from. The same file kept again is the record already
+    held, whichever address served it."""
+    name = f"the file at {url}"
+    try:
+        found = parsed(data, name)
+    except SFFRefused:
+        if kind and "json" not in kind and not _reads_as_json(data):
+            raise SFFRefused(f"{name} is not an SFF file: the address served {_served_as(kind)}, and an SFF file "
+                             "is JSON") from None
+        raise
+    via = f", served from {served}" if served and served != url else ""
+    title = unquote(PurePosixPath(urlsplit(url).path).stem)
+    return _imported(data, found, project_id=project_id, by=by, source=f"{name}{via}, imported", title=title,
+                     url=url, fetched=f", fetched from {url}{via}")
+
+
+def _reads_as_json(data: bytes) -> bool:
+    try:
+        json.loads(data.decode("utf-8"))
+    except (UnicodeDecodeError, ValueError, RecursionError):
+        return False
+    return True
+
+
+def _served_as(kind: str) -> str:
+    """A content type in a person's words, the type itself beside them."""
+    said = {"text/html": "an HTML page", "application/xhtml+xml": "an HTML page", "text/plain": "plain text",
+            "application/pdf": "a PDF", "application/zip": "a zip archive",
+            "application/octet-stream": "bytes of no stated kind"}.get(kind)
+    return f"{said} ({kind})" if said else f"a file of type {kind}"
+
+
+def _imported(data: bytes, found: tuple[str, dict[str, Any]], *, project_id: str, by: str, source: str, title: str,
+              url: str | None = None, fetched: str = "") -> SFFFlowsheet:
+    """A file a person brought, read (`found`, from `parsed`), kept as its
+    record: the one already held when the project holds the same file,
+    else checked by the toolkit in the worker, drawn and stored. `source`
+    and `title` (the fallback when the file names no title, the record's id
+    when empty) say where an imported file came from; a reference
+    flowsheet's own words say where it did, followed by `fetched` (the
+    address it was fetched from, for a file fetched by its address). Two
+    imports of one file in flight together keep one record, the first's."""
+    text, doc = found
     sha = sha256_of(data)
     record_id = f"sff-{sha[:16]}"
     held = db.run(_get(project_id, record_id))
@@ -510,12 +584,13 @@ def import_sff(data: bytes, filename: str, *, project_id: str, by: str) -> SFFFl
         else:
             checked = _checked(path)
     if lib is not None:
-        record = _record(doc, data, checked, record_id=record_id, origin="library", source=_library_source(lib),
-                         fallback_title=lib.id, by=by, library_id=lib.id)
+        record = _record(doc, data, checked, record_id=record_id, origin="library",
+                         source=f"{_library_source(lib)}{fetched}", fallback_title=lib.id, by=by, library_id=lib.id,
+                         url=url)
     else:
-        record = _record(doc, data, checked, record_id=record_id, origin="imported",
-                         source=f"the file {name}, imported", fallback_title=Path(name).stem or record_id, by=by)
-    return db.run(_put(project_id, record, text))
+        record = _record(doc, data, checked, record_id=record_id, origin="imported", source=source,
+                         fallback_title=title or record_id, by=by, url=url)
+    return db.run(_put_first(project_id, record, text))
 
 
 def import_library(file_id: str, *, project_id: str, by: str, get: Callable[[str], bytes] = download) -> SFFFlowsheet:

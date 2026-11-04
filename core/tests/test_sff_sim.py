@@ -1,9 +1,10 @@
 """SFF with the real toolkit in the real worker (ADR-003; the stage 4 gate).
 
 Marked `sim`: the Proforma worker loads BioSTEAM and the vendored toolkit.
-A reference run and a shelf run are each exported as SFF, validated and
-scored by the toolkit, and describe the base case their run read; the
-toolkit checks a file on its own as it checked the export; and reference
+A library run of the corn stover plant (the plant the shelf's retired
+reference entry ran, alpha 2.2 D8) and a shelf run are each exported as SFF,
+validated and scored by the toolkit, and describe the plant their run read;
+the toolkit checks a file on its own as it checked the export; and reference
 flowsheets fetched from the pinned commit (once, from GitHub, into a
 directory of this test session's own) import and draw, the one that fails
 validation under the schema the toolkit ships kept with its findings.
@@ -15,6 +16,7 @@ import json
 import pytest
 
 from openferment_core import proforma
+from openferment_core.engine import library as library_plants
 from openferment_core.engine import sff
 from openferment_core.models import InputAssumption
 
@@ -46,9 +48,9 @@ def _row(art, stream_id: str) -> dict:
     return next(s for s in art.output["streams"] if s["id"] == stream_id)
 
 
-def test_a_reference_runs_export_validates_scores_and_is_the_base_case_its_run_read(warm):
-    art = proforma.run_reference("cornstover_benchmark")
-    record = sff.export(proforma.plant_of(art), project_id=PROJECT, run_artifact_id=art.id, by="openFerment test")
+def test_the_corn_stover_plants_library_run_exports_validates_scores_and_is_the_plant_its_run_read(warm):
+    art = library_plants.run("cornstover")
+    record = sff.export(library_plants.plant_of(art), project_id=PROJECT, run_artifact_id=art.id, by="openFerment test")
     assert record.validation.valid, record.validation.findings
     assert record.validation.schemaVersion == "0.2.4" and record.sffVersion == "0.2.4"
     assert not [f for f in record.validation.findings if f.severity == "error" and f.status == "fail"]
@@ -59,16 +61,15 @@ def test_a_reference_runs_export_validates_scores_and_is_the_base_case_its_run_r
 
     g = record.graph
     assert len(g.nodes) == record.units and g.dangling == []
-    assert ("cornstover", "Corn stover") in [(f.id, f.name) for f in g.feeds]
+    assert "cornstover" in [f.id for f in g.feeds]
     [ethanol] = [p for p in g.products if p.id == "ethanol"]
-    assert ethanol.name == "Ethanol"
     # The file describes the plant the run read: the product's flow is the
     # run's own row, to the ten digits the run keeps.
     assert ethanol.massFlow == pytest.approx(_row(art, "ethanol")["massFlow"], rel=1e-9)
 
     held = json.loads(sff.document(record.id, project_id=PROJECT))
     assert held["metadata"]["openferment"] == {"project_id": PROJECT, "run_artifact_id": art.id, "origin": "run",
-                                               "flowsheet": "cornstover_benchmark"}
+                                               "flowsheet": "library:cornstover"}
 
 
 def test_a_shelf_runs_export_is_its_base_case_with_its_solved_price_on_the_product(warm):
@@ -87,8 +88,8 @@ def test_a_shelf_runs_export_is_its_base_case_with_its_solved_price_on_the_produ
 
 
 def test_the_worker_checks_a_file_on_its_own_as_it_checked_the_export(warm, tmp_path):
-    art = proforma.run_reference("cornstover_benchmark")
-    record = sff.export(proforma.plant_of(art), project_id=PROJECT, run_artifact_id=art.id, by="openFerment test")
+    art = library_plants.run("cornstover")
+    record = sff.export(library_plants.plant_of(art), project_id=PROJECT, run_artifact_id=art.id, by="openFerment test")
     path = tmp_path / "held.json"
     path.write_text(sff.document(record.id, project_id=PROJECT), encoding="utf-8")
     v = proforma.call("sff_validate", {"path": str(path)})

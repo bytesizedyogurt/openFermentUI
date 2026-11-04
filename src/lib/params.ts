@@ -35,7 +35,7 @@ import { ServiceDown, ServiceRefused, call } from './http';
 
 export { ServiceDown as ParamsDown, ServiceRefused as ParamsRefused };
 
-/** What a scope is asked with besides its name: a Proforma scenario made here names its flowsheet; host and fits bind as Proforma's binding does; a vessel scope names the vessel type its design is (OF-BLD-020 §4.2); a family scope binds as a simulation binds (§3.3). */
+/** What a scope is asked with besides its name: a Proforma scenario names its flowsheet (one not yet saved binds by it, ADR-014); host and fits bind as Proforma's binding does; a vessel scope names the vessel type its design is (OF-BLD-020 §4.2); a family scope binds as a simulation binds (§3.3). */
 export interface ParamAsk {
   flowsheet?: string | null;
   host?: string | null;

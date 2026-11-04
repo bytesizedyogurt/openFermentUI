@@ -2,9 +2,9 @@
 // service's shelf, name the scenario, and it opens.
 //
 // The shelf is the service's (`GET /api/proforma/shelf`): every flowsheet a
-// scenario can name, and the toy never. A reference biorefinery runs whole on its
-// package's own defaults, so it is not offered here: a scenario is made on a
-// flowsheet whose inputs bind to records or to a named person's assumption.
+// scenario can name, each one whose inputs bind to records or to a named
+// person's assumption, and the toy never. The reference plants are the
+// library shelf's, run whole from their reference page or from Studies.
 // What is made is a `biosteam` scenario and nothing else (D5), kept in the
 // open project's rows under a time-based id (D6; lib/projectState.ts); it
 // carries no input value of its own.
@@ -64,7 +64,7 @@ export function NoFlowsheetLine() {
   return (
     <span data-testid="no-flowsheet">
       No flowsheet is on this service&rsquo;s shelf yet, so there is nothing to start a scenario from. The reference
-      biorefineries run whole on their package&rsquo;s defaults and are not a starting point.
+      plants are the library shelf&rsquo;s, run whole from Proforma&rsquo;s Reference runs row or from Studies.
     </span>
   );
 }
@@ -140,7 +140,8 @@ function ShelfScenario({ open, onClose, initialFlowsheet = null, attachFit = nul
     setTrainRun(initialTrainRun);
   }, [open, initialFlowsheet, initialVessel, initialTrainRun]);
 
-  const choices = useMemo(() => (shelf ?? []).filter((f) => !f.reference), [shelf]);
+  // Every flowsheet on the shelf is one a scenario runs (alpha 2.2 D8).
+  const choices = useMemo(() => shelf ?? [], [shelf]);
   const composite = useMemo(() => choices.some((f) => builtFromParts(f)), [choices]);
 
   // The kept parts, asked for when the shelf holds a flowsheet built from them.

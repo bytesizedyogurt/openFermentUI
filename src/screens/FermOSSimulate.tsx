@@ -431,7 +431,7 @@ export default function FermOSSimulate() {
         ? proformaShelf(ctrl.signal).then((shelf) => {
             // The fits list is read for a flowsheet (what each can feed it):
             // the first one a scenario can name; the fits are the same for any.
-            const flowsheet = shelf.find((f) => !f.reference);
+            const flowsheet = shelf[0];
             if (!flowsheet) throw new FermosRefused(422, 'No flowsheet a scenario can name is on the shelf, so the fits list cannot be read.');
             return fermosFits(flowsheet.id, ctrl.signal).then((all) => setFits(all.filter((x) => x.tool !== 'fermos.simulation')));
           })

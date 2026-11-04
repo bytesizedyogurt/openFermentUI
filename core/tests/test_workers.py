@@ -138,7 +138,10 @@ ALLOWED = {
     # subclass `bst.Unit`, so the worker alone imports them (held below).
     "biosteam": {"workers/proforma_worker.py", "pureos/catalogue.py", "pureos/inhouse.py",
                  # alpha 2.0 (ADR-004): the library plant runner, in the Proforma worker.
-                 "workers/library_plants.py"},
+                 "workers/library_plants.py",
+                 # alpha 2.2 D8: the replay of runs kept from the shelf's retired reference
+                 # entries, reached by the Proforma worker's replay ops alone.
+                 "workers/kept_references.py"},
     # OF-BLD-019 §4.2: BioSTEAM's property engine, which the service reaches
     # through the Proforma worker's `thermo_props` op and nowhere else.
     "thermosteam": {"workers/proforma_worker.py", "pureos/inhouse.py",

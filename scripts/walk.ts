@@ -199,8 +199,9 @@ async function main(): Promise<void> {
     const runs = await page.locator('[data-testid="flowsheets-record"][data-origin="run"]').count();
     if (runs === 0) throw new Error('no SFF record written by a run is listed');
     await page.getByTestId('flowsheets-import').waitFor();
+    await page.getByTestId('flowsheets-import-url').waitFor();
     await page.getByTestId('flowsheets-library-file').first().waitFor();
-    return `${runs} record${runs === 1 ? '' : 's'} written by runs listed, with an import and the toolkit's reference files`;
+    return `${runs} record${runs === 1 ? '' : 's'} written by runs listed, with an import by file or by address and the toolkit's reference files`;
   });
 
   await step('Conversation', async () => {

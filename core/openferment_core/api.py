@@ -115,6 +115,7 @@ from .models import (
     SFFFlowsheet,
     SFFLibraryEntry,
     SFFLibraryImport,
+    SFFUrlImport,
     ToolInfo,
     ToolResult,
 )
@@ -737,60 +738,6 @@ def proforma_shelf() -> list[dict]:  # noqa: N803 (the wire name)
     return [f.model_dump(mode="json") for f in proforma.shelf()]
 
 
-@app.get("/api/proforma/benchmark")
-def proforma_benchmark() -> dict:
-    """The benchmark this installation reproduced (§8.2), or none yet. A read:
-    it starts nothing. POST runs it."""
-    from . import proforma
-
-    art = proforma.stored_benchmark()
-    return {"artifact": art.model_dump(mode="json") if art else None, "simulator": proforma.status()}
-
-
-@app.post("/api/proforma/benchmark")
-def proforma_benchmark_run() -> dict:
-    """Run the published corn stover biorefinery and keep its price (§8.2)."""
-    from . import proforma
-    from .workers import WorkerCrashed, WorkerError, WorkerTimeout
-
-    try:
-        art = proforma.run_benchmark()
-    except (WorkerError, WorkerCrashed, WorkerTimeout) as e:
-        raise HTTPException(status_code=503, detail=f"the Proforma simulator could not run the benchmark: {e}") from e
-    return {"artifact": art.model_dump(mode="json"), "simulator": proforma.status()}
-
-
-@app.get("/api/proforma/reference/{flowsheet_id}")
-def proforma_reference(flowsheet_id: str) -> dict:
-    """A reference biorefinery on the shelf (OF-BLD-019 §2.2): its entry, the
-    newest stored run or none, its package test's values, the simulator's
-    status. A read: it starts nothing. 404 for an id that is not a
-    reference biorefinery on the shelf."""
-    from . import proforma
-
-    try:
-        return proforma.reference(flowsheet_id).model_dump(mode="json")
-    except proforma.ScenarioRefused as e:
-        raise HTTPException(status_code=404, detail=str(e)) from e
-
-
-@app.post("/api/proforma/reference/{flowsheet_id}")
-def proforma_reference_run(flowsheet_id: str) -> dict:
-    """Run a reference biorefinery whole on its package's defaults and keep
-    it as one `proforma.reference` artifact (a basis already run returns its
-    stored artifact)."""
-    from . import proforma
-    from .workers import WorkerCrashed, WorkerError, WorkerTimeout
-
-    try:
-        art = proforma.run_reference(flowsheet_id)
-        return proforma.reference(flowsheet_id, art).model_dump(mode="json")
-    except proforma.ScenarioRefused as e:
-        raise HTTPException(status_code=404, detail=str(e)) from e
-    except (WorkerError, WorkerCrashed, WorkerTimeout) as e:
-        raise HTTPException(status_code=503, detail=f"the Proforma simulator could not run {flowsheet_id}: {e}") from e
-
-
 # ── SFF flowsheet records (alpha 2.0, ADR-003; engine/sff.py) ────────────
 
 
@@ -853,13 +800,65 @@ def flowsheets_import(file: UploadFile = File(...), by: str = Form(..., min_leng
         raise HTTPException(status_code=503, detail=f"the Proforma simulator could not check the file: {e}") from e
 
 
+@app.post("/api/flowsheets/import-url", response_model=SFFFlowsheet, responses={
+    413: {"model": Refusal, "description": "The file the address serves is larger than an import takes: in words, "
+                                           "nothing kept."},
+    422: {"description": "An address that is not https, that names a user or a password, or whose host is or "
+                         "resolves to an address outside the public internet (loopback, private, link-local, "
+                         "multicast, reserved or unspecified), a redirect to any of these, the network refused in "
+                         "fixture mode, or a file that is not an SFF flowsheet: in words, nothing kept (a list of "
+                         "field errors when the request's own fields are refused).",
+          "content": {"application/json": {"schema": {"anyOf": [
+              {"$ref": "#/components/schemas/Refusal"}, {"$ref": "#/components/schemas/HTTPValidationError"}]}}}},
+    502: {"model": Refusal, "description": "The host name could not be found, the host could not be reached or read "
+                                           "in time, or it answered an error: in words, nothing kept."},
+    503: {"model": Refusal, "description": "The Proforma simulator could not check the file: in words, nothing kept."}})
+def flowsheets_import_url(request: SFFUrlImport) -> SFFFlowsheet:
+    """An SFF file fetched from the public https address a person names, the
+    one door that fetches a flowsheet by its address (alpha 2.2 D10 and its
+    amendment at C.6), the way Intake fetches a document
+    (literature/collectors.py `fetch_file`: its User-Agent, its throttle, a
+    timeout, the network refused in fixture mode). Before each request, the
+    first and each redirect's, the host is resolved and every address it
+    names must be public; the request goes to a checked address, and the
+    whole exchange is held to a deadline. The body is streamed under the
+    size an import takes; then read, checked by the toolkit in the worker,
+    drawn and kept as an uploaded file is, its hash kept and the address its
+    source (engine/sff.py `import_url`). 413 past the size; 422 for an
+    address that is not https, one outside the public internet (a redirect
+    to either included) and a file that is not an SFF flowsheet; 502 when
+    the host name could not be found, the host could not be reached or read
+    in time, or it answered an error; 503 when the worker could not check
+    the file."""
+    from .engine import sff
+    from .literature import collectors
+
+    try:
+        got = collectors.fetch_file(request.url, limit=sff.MAX_FILE)
+    except collectors.TooLarge as e:
+        raise HTTPException(status_code=413, detail=str(e)) from e
+    except (collectors.AddressRefused, collectors.NetworkRefused) as e:
+        raise HTTPException(status_code=422, detail=str(e)) from e
+    except collectors.HostFailed as e:
+        raise HTTPException(status_code=502, detail=str(e)) from e
+    try:
+        return sff.import_url(got.url, got.data, served=got.served, kind=got.kind, project_id=projects.current(),
+                              by=request.by)
+    except sff.SFFRefused as e:
+        raise _sff_refused(e) from e
+    except (WorkerError, WorkerCrashed, WorkerTimeout) as e:
+        raise HTTPException(status_code=503, detail=f"the Proforma simulator could not check the file at {got.url}: "
+                                                    f"{e}") from e
+
+
 @app.post("/api/flowsheets/export", response_model=SFFFlowsheet)
 def flowsheets_export(request: SFFExportRequest) -> SFFFlowsheet:
     """A kept run's base case written as an SFF file by the toolkit in the
     worker, checked, drawn and kept with origin `run`: a shelf run, a
-    reference run, a library run or a pureOS train run. 404 for a run the
-    project does not hold; 422 for an artifact that is not a run; 409 in the
-    worker's words for a base case that cannot be built or a file the
+    library run or a pureOS train run. 404 for a run the project does not
+    hold; 422 for an artifact that is not a run, and for a run kept from a
+    retired reference entry, whose file the library plant's run writes; 409
+    in the worker's words for a base case that cannot be built or a file the
     toolkit cannot write (a train run's, while its schema requires a TEA
     year: docs/api/sff.md)."""
     from . import proforma
@@ -1311,8 +1310,11 @@ def study_export(by: str = "") -> Response:
 
 @app.get("/api/proforma/scenarios")
 def proforma_scenarios(host: str | None = None) -> list[dict]:  # noqa: N803 (the wire name)
-    """The project's BioSTEAM scenarios with their inputs bound to records
-    (§8.3; OF-BLD-019 §2.3). A read: it starts no simulator."""
+    """Every BioSTEAM scenario the project keeps, with its inputs bound to
+    records (§8.3; OF-BLD-019 §2.3; alpha 2.2 D9): a scenario on
+    custom_train_v1 binds with the vessel design and the train run it names,
+    and one whose binding is refused is listed with the words (`refused`).
+    A read: it starts no simulator."""
     from . import proforma
 
     return [s.model_dump(mode="json") for s in proforma.scenarios(host=host)]
@@ -1331,12 +1333,11 @@ def proforma_bind(flowsheet: str, host: str | None = None,  # noqa: N803
     converted at Proforma's door into the Override of the flowsheet's own
     scope, `proforma:<flowsheet id>`, as a run converts its values. A
     flowsheet built from kept artifacts (`custom_train_v1`, OF-BLD-020 §6.1)
-    names its vessel design and its train run (`?vessel=`, `?trainRun=`). A
-    reference biorefinery, the toy, an unknown id, a fit that cannot feed
-    its input, a value that cannot stand, or a composite's part that cannot
-    (missing, another tool's, damaged, of another chemical set) is a 422 in
-    words, and so is the retired `?overrides=`. A read: it starts no
-    simulator."""
+    names its vessel design and its train run (`?vessel=`, `?trainRun=`).
+    The toy, an unknown id, a fit that cannot feed its input, a value that
+    cannot stand, or a composite's part that cannot (missing, another tool's,
+    damaged, of another chemical set) is a 422 in words, and so is the
+    retired `?overrides=`. A read: it starts no simulator."""
     from . import composite, proforma
 
     _retired("overrides", overrides)
@@ -2161,9 +2162,13 @@ def witness_runs() -> list[ExtractRun]:
 
 
 @app.get("/api/biorepo/artifacts", response_model=list[Artifact])
-def artifacts_list() -> list[Artifact]:  # noqa: N803 (the wire name)
-    """Every value this service computed and kept, newest first."""
-    return artifacts.all_artifacts()
+def artifacts_list(tool: list[str] = Query(default=[])) -> list[Artifact]:  # noqa: N803 (the wire name)
+    """Every value this service computed and kept, newest first; with
+    `?tool=` (repeated for several), those of the tools named alone, read by
+    the table's tool column (the reference page lists the runs a person kept
+    from the shelf's retired reference entries so, alpha 2.2 D8)."""
+    named = [x.strip() for x in tool if x.strip()]
+    return artifacts.of_tools(*named) if named else artifacts.all_artifacts()
 
 
 @app.get("/api/biorepo/artifacts/{artifact_id}", response_model=Artifact)

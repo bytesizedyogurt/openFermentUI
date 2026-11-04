@@ -87,7 +87,10 @@ export interface paths {
         };
         /**
          * Artifacts List
-         * @description Every value this service computed and kept, newest first.
+         * @description Every value this service computed and kept, newest first; with
+         *     `?tool=` (repeated for several), those of the tools named alone, read by
+         *     the table's tool column (the reference page lists the runs a person kept
+         *     from the shelf's retired reference entries so, alpha 2.2 D8).
          */
         get: operations["artifacts_list_api_biorepo_artifacts_get"];
         put?: never;
@@ -756,9 +759,10 @@ export interface paths {
          * Flowsheets Export
          * @description A kept run's base case written as an SFF file by the toolkit in the
          *     worker, checked, drawn and kept with origin `run`: a shelf run, a
-         *     reference run, a library run or a pureOS train run. 404 for a run the
-         *     project does not hold; 422 for an artifact that is not a run; 409 in the
-         *     worker's words for a base case that cannot be built or a file the
+         *     library run or a pureOS train run. 404 for a run the project does not
+         *     hold; 422 for an artifact that is not a run, and for a run kept from a
+         *     retired reference entry, whose file the library plant's run writes; 409
+         *     in the worker's words for a base case that cannot be built or a file the
          *     toolkit cannot write (a train run's, while its schema requires a TEA
          *     year: docs/api/sff.md).
          */
@@ -786,6 +790,41 @@ export interface paths {
          *     an SFF flowsheet.
          */
         post: operations["flowsheets_import_api_flowsheets_import_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/flowsheets/import-url": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Flowsheets Import Url
+         * @description An SFF file fetched from the public https address a person names, the
+         *     one door that fetches a flowsheet by its address (alpha 2.2 D10 and its
+         *     amendment at C.6), the way Intake fetches a document
+         *     (literature/collectors.py `fetch_file`: its User-Agent, its throttle, a
+         *     timeout, the network refused in fixture mode). Before each request, the
+         *     first and each redirect's, the host is resolved and every address it
+         *     names must be public; the request goes to a checked address, and the
+         *     whole exchange is held to a deadline. The body is streamed under the
+         *     size an import takes; then read, checked by the toolkit in the worker,
+         *     drawn and kept as an uploaded file is, its hash kept and the address its
+         *     source (engine/sff.py `import_url`). 413 past the size; 422 for an
+         *     address that is not https, one outside the public internet (a redirect
+         *     to either included) and a file that is not an SFF flowsheet; 502 when
+         *     the host name could not be found, the host could not be reached or read
+         *     in time, or it answered an error; 503 when the worker could not check
+         *     the file.
+         */
+        post: operations["flowsheets_import_url_api_flowsheets_import_url_post"];
         delete?: never;
         options?: never;
         head?: never;
@@ -1645,31 +1684,6 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
-    "/api/proforma/benchmark": {
-        parameters: {
-            query?: never;
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        /**
-         * Proforma Benchmark
-         * @description The benchmark this installation reproduced (§8.2), or none yet. A read:
-         *     it starts nothing. POST runs it.
-         */
-        get: operations["proforma_benchmark_api_proforma_benchmark_get"];
-        put?: never;
-        /**
-         * Proforma Benchmark Run
-         * @description Run the published corn stover biorefinery and keep its price (§8.2).
-         */
-        post: operations["proforma_benchmark_run_api_proforma_benchmark_post"];
-        delete?: never;
-        options?: never;
-        head?: never;
-        patch?: never;
-        trace?: never;
-    };
     "/api/proforma/bind": {
         parameters: {
             query?: never;
@@ -1687,12 +1701,11 @@ export interface paths {
          *     converted at Proforma's door into the Override of the flowsheet's own
          *     scope, `proforma:<flowsheet id>`, as a run converts its values. A
          *     flowsheet built from kept artifacts (`custom_train_v1`, OF-BLD-020 §6.1)
-         *     names its vessel design and its train run (`?vessel=`, `?trainRun=`). A
-         *     reference biorefinery, the toy, an unknown id, a fit that cannot feed
-         *     its input, a value that cannot stand, or a composite's part that cannot
-         *     (missing, another tool's, damaged, of another chemical set) is a 422 in
-         *     words, and so is the retired `?overrides=`. A read: it starts no
-         *     simulator.
+         *     names its vessel design and its train run (`?vessel=`, `?trainRun=`).
+         *     The toy, an unknown id, a fit that cannot feed its input, a value that
+         *     cannot stand, or a composite's part that cannot (missing, another tool's,
+         *     damaged, of another chemical set) is a 422 in words, and so is the
+         *     retired `?overrides=`. A read: it starts no simulator.
          */
         get: operations["proforma_bind_api_proforma_bind_get"];
         put?: never;
@@ -1726,35 +1739,6 @@ export interface paths {
         get: operations["proforma_ceiling_check_api_proforma_ceiling_check_get"];
         put?: never;
         post?: never;
-        delete?: never;
-        options?: never;
-        head?: never;
-        patch?: never;
-        trace?: never;
-    };
-    "/api/proforma/reference/{flowsheet_id}": {
-        parameters: {
-            query?: never;
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        /**
-         * Proforma Reference
-         * @description A reference biorefinery on the shelf (OF-BLD-019 §2.2): its entry, the
-         *     newest stored run or none, its package test's values, the simulator's
-         *     status. A read: it starts nothing. 404 for an id that is not a
-         *     reference biorefinery on the shelf.
-         */
-        get: operations["proforma_reference_api_proforma_reference__flowsheet_id__get"];
-        put?: never;
-        /**
-         * Proforma Reference Run
-         * @description Run a reference biorefinery whole on its package's defaults and keep
-         *     it as one `proforma.reference` artifact (a basis already run returns its
-         *     stored artifact).
-         */
-        post: operations["proforma_reference_run_api_proforma_reference__flowsheet_id__post"];
         delete?: never;
         options?: never;
         head?: never;
@@ -1820,8 +1804,11 @@ export interface paths {
         };
         /**
          * Proforma Scenarios
-         * @description The project's BioSTEAM scenarios with their inputs bound to records
-         *     (§8.3; OF-BLD-019 §2.3). A read: it starts no simulator.
+         * @description Every BioSTEAM scenario the project keeps, with its inputs bound to
+         *     records (§8.3; OF-BLD-019 §2.3; alpha 2.2 D9): a scenario on
+         *     custom_train_v1 binds with the vessel design and the train run it names,
+         *     and one whose binding is refused is listed with the words (`refused`).
+         *     A read: it starts no simulator.
          */
         get: operations["proforma_scenarios_api_proforma_scenarios_get"];
         put?: never;
@@ -4810,8 +4797,8 @@ export interface components {
         };
         /**
          * PackageRegression
-         * @description A reference biorefinery's regression values, read from the package's
-         *     installed test file: which package, which file, which test.
+         * @description A plant's regression values, read from its package's installed test
+         *     file: which package, which file, which test.
          */
         PackageRegression: {
             /** File */
@@ -5887,7 +5874,9 @@ export interface components {
          *     reference flowsheets at the pinned commit, whichever door it came
          *     through; `imported` for any other file. `sffVersion` is what the file
          *     declares; `validation.schemaVersion` is the schema it was checked
-         *     against. `graph` is left out of a listing.
+         *     against. `url` is the https address a file fetched by its address came
+         *     from (POST /api/flowsheets/import-url), None for every other door.
+         *     `graph` is left out of a listing.
          */
         SFFFlowsheet: {
             /** Bytes */
@@ -5929,6 +5918,8 @@ export interface components {
             toolkit: string;
             /** Units */
             units: number;
+            /** Url */
+            url?: string | null;
             validation: components["schemas"]["SFFValidation"];
         };
         /**
@@ -6015,6 +6006,18 @@ export interface components {
             declared: boolean;
             /** Earned */
             earned?: boolean | null;
+        };
+        /**
+         * SFFUrlImport
+         * @description POST /api/flowsheets/import-url: the public https address of an SFF
+         *     file to fetch and keep in the project, kept whole as the record's
+         *     source, query included, and the person who names it.
+         */
+        SFFUrlImport: {
+            /** By */
+            by: string;
+            /** Url */
+            url: string;
         };
         /**
          * SFFValidation
@@ -6858,7 +6861,9 @@ export interface operations {
     };
     artifacts_list_api_biorepo_artifacts_get: {
         parameters: {
-            query?: never;
+            query?: {
+                tool?: string[];
+            };
             header?: {
                 /** @description The project the request acts in; ?project= in its place. */
                 "X-OpenFerment-Project"?: string;
@@ -6875,6 +6880,15 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["Artifact"][];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
                 };
             };
         };
@@ -7969,6 +7983,69 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    flowsheets_import_url_api_flowsheets_import_url_post: {
+        parameters: {
+            query?: never;
+            header?: {
+                /** @description The project the request acts in; ?project= in its place. */
+                "X-OpenFerment-Project"?: string;
+            };
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["SFFUrlImport"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["SFFFlowsheet"];
+                };
+            };
+            /** @description The file the address serves is larger than an import takes: in words, nothing kept. */
+            413: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Refusal"];
+                };
+            };
+            /** @description An address that is not https, that names a user or a password, or whose host is or resolves to an address outside the public internet (loopback, private, link-local, multicast, reserved or unspecified), a redirect to any of these, the network refused in fixture mode, or a file that is not an SFF flowsheet: in words, nothing kept (a list of field errors when the request's own fields are refused). */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Refusal"] | components["schemas"]["HTTPValidationError"];
+                };
+            };
+            /** @description The host name could not be found, the host could not be reached or read in time, or it answered an error: in words, nothing kept. */
+            502: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Refusal"];
+                };
+            };
+            /** @description The Proforma simulator could not check the file: in words, nothing kept. */
+            503: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Refusal"];
                 };
             };
         };
@@ -9380,56 +9457,6 @@ export interface operations {
             };
         };
     };
-    proforma_benchmark_api_proforma_benchmark_get: {
-        parameters: {
-            query?: never;
-            header?: {
-                /** @description The project the request acts in; ?project= in its place. */
-                "X-OpenFerment-Project"?: string;
-            };
-            path?: never;
-            cookie?: never;
-        };
-        requestBody?: never;
-        responses: {
-            /** @description Successful Response */
-            200: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": {
-                        [key: string]: unknown;
-                    };
-                };
-            };
-        };
-    };
-    proforma_benchmark_run_api_proforma_benchmark_post: {
-        parameters: {
-            query?: never;
-            header?: {
-                /** @description The project the request acts in; ?project= in its place. */
-                "X-OpenFerment-Project"?: string;
-            };
-            path?: never;
-            cookie?: never;
-        };
-        requestBody?: never;
-        responses: {
-            /** @description Successful Response */
-            200: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": {
-                        [key: string]: unknown;
-                    };
-                };
-            };
-        };
-    };
     proforma_bind_api_proforma_bind_get: {
         parameters: {
             query: {
@@ -9485,78 +9512,6 @@ export interface operations {
                 "X-OpenFerment-Project"?: string;
             };
             path?: never;
-            cookie?: never;
-        };
-        requestBody?: never;
-        responses: {
-            /** @description Successful Response */
-            200: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": {
-                        [key: string]: unknown;
-                    };
-                };
-            };
-            /** @description Validation Error */
-            422: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["HTTPValidationError"];
-                };
-            };
-        };
-    };
-    proforma_reference_api_proforma_reference__flowsheet_id__get: {
-        parameters: {
-            query?: never;
-            header?: {
-                /** @description The project the request acts in; ?project= in its place. */
-                "X-OpenFerment-Project"?: string;
-            };
-            path: {
-                flowsheet_id: string;
-            };
-            cookie?: never;
-        };
-        requestBody?: never;
-        responses: {
-            /** @description Successful Response */
-            200: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": {
-                        [key: string]: unknown;
-                    };
-                };
-            };
-            /** @description Validation Error */
-            422: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["HTTPValidationError"];
-                };
-            };
-        };
-    };
-    proforma_reference_run_api_proforma_reference__flowsheet_id__post: {
-        parameters: {
-            query?: never;
-            header?: {
-                /** @description The project the request acts in; ?project= in its place. */
-                "X-OpenFerment-Project"?: string;
-            };
-            path: {
-                flowsheet_id: string;
-            };
             cookie?: never;
         };
         requestBody?: never;

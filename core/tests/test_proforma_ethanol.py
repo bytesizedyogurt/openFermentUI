@@ -113,7 +113,7 @@ def test_the_flowsheet_file_holds_no_number():
 
 def test_the_shelf_entry_is_the_flowsheets_inputs():
     e = shelf.SHELF[ETHANOL]
-    assert not e.reference and e.program == "yeast" and e.source == "this repository"
+    assert e.program == "yeast" and e.source == "this repository"
     module = _assigned("INPUTS")
     valued = [i for i in e.inputs if i.kind != "convention"]
     assert [i.key for i in valued] == list(module)
@@ -199,8 +199,8 @@ def test_the_bind_endpoint_binds_a_flowsheet_and_refuses_in_words(client, held):
     b = r.json()
     assert b["id"] == "" and b["name"] == "" and b["flowsheet"] == ETHANOL and b["waiting"] == ["plant_scale", "glucose_price"]
     assert set(b) == set(client.get("/api/proforma/scenarios").json()[0])  # the same shape as (b)
-    for fid, words in (("cornstover_benchmark", "reference biorefinery"), ("toy", "STAND-IN for tests"),
-                       ("nowhere", "there is no flowsheet nowhere")):
+    for fid, words in (("cornstover_benchmark", "there is no flowsheet cornstover_benchmark on the shelf"),
+                       ("toy", "STAND-IN for tests"), ("nowhere", "there is no flowsheet nowhere")):
         r = client.get(f"/api/proforma/bind?flowsheet={fid}")
         assert r.status_code == 422 and words in r.json()["detail"]
     narrowed = client.get(f"/api/proforma/bind?flowsheet={ETHANOL}&host=nobody").json()
@@ -224,8 +224,8 @@ def test_a_scenario_made_here_runs_its_flowsheet_bound_as_bind_binds_it(standin,
 
 def test_every_other_run_is_refused_in_words(standin, client, held):
     cases = [
-        ({"scenarioId": MADE_HERE}, f"there is no held scenario {MADE_HERE}"),
-        ({"scenarioId": MADE_HERE, "flowsheet": "cornstover_benchmark"}, "reference biorefinery"),
+        ({"scenarioId": MADE_HERE}, f"there is no kept scenario {MADE_HERE}"),
+        ({"scenarioId": MADE_HERE, "flowsheet": "cornstover_benchmark"}, "there is no flowsheet cornstover_benchmark"),
         ({"scenarioId": MADE_HERE, "flowsheet": "toy"}, "STAND-IN for tests"),
         ({"scenarioId": MADE_HERE, "flowsheet": "nowhere"}, "there is no flowsheet nowhere"),
         ({"scenarioId": HELD, "flowsheet": shelf.COMPOSITE}, f"{HELD} runs ethanol_glucose_v0, not {shelf.COMPOSITE}"),
@@ -356,13 +356,16 @@ def test_a_host_with_graphviz_draws_its_own_run_of_a_basis_run_without_it(monkey
     # §2.R, review 7 and 11: whether the run's diagram is drawn is part of its
     # basis, so a run made where Graphviz's dot was absent is not the run a
     # host with dot makes of the same inputs: that host draws its own.
+    from test_proforma import ETHANOL_STANDIN
+
+    every = [assume(k, v) for k, v in ETHANOL_STANDIN.items()]
     monkeypatch.setattr(proforma, "drawn_here", lambda: False)
-    without = proforma.run_reference("corn_drygrind")
+    without = proforma.run_flowsheet(ETHANOL, every, samples=4, seed=0)
     named = {i.name: i for i in without.inputs}
     assert named["diagram"].source.kind == "convention" and "not drawn" in str(named["diagram"].value)
     monkeypatch.setattr(proforma, "drawn_here", lambda: True)
-    drawn = proforma.run_reference("corn_drygrind")
+    drawn = proforma.run_flowsheet(ETHANOL, every, samples=4, seed=0)
     assert drawn.id != without.id and {i.name: i for i in drawn.inputs}["diagram"].value == "drawn by Graphviz"
-    assert without.provenance == drawn.provenance == "computed"
+    assert without.provenance == drawn.provenance == "assumed"
     run_without = {i.name: i for i in proforma.basis_inputs([], ETHANOL, 8)}["diagram"]
     assert run_without.value == "drawn by Graphviz"  # drawn_here is patched to True above

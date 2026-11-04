@@ -363,6 +363,8 @@ TRAIN_RUN = "pureos.train_run"
 # Alpha 2.0 stage 6: an engine run of a library plant or a flowsheet, and a
 # study's comparison of runs, which a model keeps through engine_run and
 # study_compare.
+# The two kinds kept from the retired reference entries (alpha 2.2 D8) stay
+# listed, so a function that computes one is read as one that keeps a run.
 RUN_KINDS = frozenset({_proforma_mod.RUN, _proforma_mod.REFERENCE, _proforma_mod.BENCHMARK, _fermos_mod.SIMULATION,
                        _vessel_mod.TOOL, TRAIN_RUN, _library_mod.LIBRARY_RUN, _comparisons_mod.COMPARISON})
 COMPUTE = "openferment_core.artifacts.compute"

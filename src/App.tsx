@@ -218,12 +218,12 @@ function Screen() {
     case 'proforma':
       if (b === 'scenario' && c) return <ProformaScenario scenarioId={c} />;
       // OF-BLD-019 §3.3 — 'reference' is a reserved second segment: a
-      // reference biorefinery's page by its shelf id; with no id, the index,
-      // whose Reference runs row lists them.
+      // reference plant's page by its id on the library shelf (alpha 2.2 D8);
+      // with no id, the index, whose Reference runs row lists them.
       // Keyed by id (OF-BLD-019 §3.R, findings 13, 24): a run still in flight
       // when the reader moves to the other reference lands on the page that
       // asked, never on this one.
-      if (b === 'reference') return c ? <ProformaReference key={c} flowsheetId={c} /> : <Proforma />;
+      if (b === 'reference') return c ? <ProformaReference key={c} plantId={c} /> : <Proforma />;
       // Execution prompt §9.1 step 5 — 'studies', 'runs' and 'comparisons' are
       // reserved too: the project's studies, an engine run by its id, a
       // comparison by its artifact's id. Keyed by id, so one page opened over

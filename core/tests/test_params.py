@@ -289,8 +289,6 @@ def test_a_flowsheets_inputs_are_its_specs_with_bounds_and_their_reasons():
     assert scale.boundsReason == "a physical limit: no negative ethanol fermented in a year"
     assert purity.sourceRule == ["convention"] and purity.convention == "fuel grade" and purity.min is None
     assert purity.note == shelf.info(ETHANOL).inputs[-1].note
-    corn = params.flowsheet_specs(shelf.info("corn_drygrind"))
-    assert all(s.sourceRule == ["library-default"] and "package's own default" in s.boundsReason for s in corn)
 
 
 def test_the_provider_binds_what_bind_inputs_binds(standin):
@@ -366,7 +364,8 @@ def test_get_serves_a_scope_and_refuses_in_words(client):
         ("/api/params/pureos:unit:t1:u1", 404, "pureOS's train units"),
         ("/api/params/nothing-at-all", 422, "a parameter scope is"),
         (f"/api/params/{SCOPE}/resolve", 422, "a parameter scope is"),
-        (f"/api/params/proforma:{MADE_HERE}?flowsheet=cornstover_benchmark", 422, "reference biorefinery"),
+        (f"/api/params/proforma:{MADE_HERE}?flowsheet=cornstover_benchmark", 422,
+         "there is no flowsheet cornstover_benchmark on the shelf"),
         (f"/api/params/{SCOPE}?flowsheet=custom_train_v1", 422, f"{HELD} runs ethanol_glucose_v0"),
         (f"/api/params/{SCOPE}?fits=[1]", 422, "fits is a JSON object"),
         (f"/api/params/{SCOPE}?fits=" + '{"plant_scale":"0123456789abcdef"}', 422, "a fermOS fit feeds"),

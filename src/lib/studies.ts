@@ -25,6 +25,7 @@
 //   GET  /api/flowsheets/library                the toolkit's reference files at the pinned commit
 //   POST /api/flowsheets/library/{id}           one reference file kept in the project
 //   POST /api/flowsheets/import                 an SFF file a person uploads
+//   POST /api/flowsheets/import-url             an SFF file fetched from the https address a person names
 //
 // Nothing here computes: each screen shows what the service answered. With the
 // service down a call says so (ServiceDown); a refusal comes back in the
@@ -121,6 +122,13 @@ export function importFlowsheet(file: File, by: string): Promise<SFFFlowsheet> {
   form.append('by', by);
   return call<SFFFlowsheet>('/api/flowsheets/import', { method: 'POST', body: form });
 }
+/**
+ * The SFF file an https address serves, fetched by the service and kept in the project as an uploaded file is, the
+ * address its source. A refusal comes back in the service's words: an address that is not https, a file past the size
+ * an import takes, a host that failed or answered an error, a file that is not an SFF flowsheet.
+ */
+export const importFlowsheetUrl = (url: string, by: string) =>
+  call<SFFFlowsheet>('/api/flowsheets/import-url', post({ url, by }));
 
 
 /** A file the service answers, fetched with the open project named and handed to the person; its name as the service gave it. */

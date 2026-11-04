@@ -103,6 +103,23 @@ openFerment's own replay check (re-run within tolerance) is the verification tha
   record id, valid, completeness score, earned tags), or says in the toolkit's or the worker's
   words why none could be written (`sffRefused`), and the run stands either way.
 
+### Alpha 2.2 C.6 (2026-11-04)
+
+- A file enters by its public https address too (`POST /api/flowsheets/import-url`, the stage-C
+  plan's D10 and its amendment at C.6; `docs/api/sff.md`, A file by its address). The service
+  fetches it with Intake's manners (`literature/collectors.py` `fetch_file`: the throttle, the
+  User-Agent, a timeout, fixture mode's refusal), resolves the host before each request (the
+  first and each redirect's) and refuses any address outside the public internet, sends the
+  request to a checked address with the host's name as its Host and its TLS server name, holds
+  the whole exchange to a deadline, streams the file under the size an import takes, follows a
+  redirect to another such address alone, and keeps it as an uploaded file is (`engine/sff.py`
+  `import_url`): checked in the worker, drawn, its hash kept, its address its source and its
+  `url`. A file that hashes as a reference flowsheet stays `library`, whichever door it came by,
+  its source the reference flowsheet's words followed by the address it was fetched from.
+- The address is a person's to name: the route is the one door that fetches by address, and the
+  registry's `flowsheet_import` takes a reference file's id alone, so no model, over the loop or
+  MCP, has the service fetch an address.
+
 ## Revisit condition
 
 The toolkit ships an importer or packaging; the schema reaches 1.0.

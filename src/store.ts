@@ -324,12 +324,6 @@ export interface OFState {
   learnProgress: Record<string, boolean>;
   /** Runbooks adopted from a Postdoc draft, by id (OF-BLD-014 §9.2). Durable. */
   adoptedRunbookIds: string[];
-  /**
-   * Proforma scenarios a person made from a shelf flowsheet, by id
-   * (OF-BLD-019 §3.1, D6): every scenario the project keeps. They live in
-   * `scenarios` and are saved whole as the project's rows, keyed by id.
-   */
-  createdScenarioIds: string[];
   /** A research runbook, unlocked, from a draft; returns its id. */
   adoptRunbookDraft: (draft: RunbookDraft) => string;
   /**
@@ -814,7 +808,6 @@ const initialState = () => ({
   proformaFits: {} as Record<string, Record<string, string>>,
   trainsMade: {} as Record<string, TrainMade>,
   adoptedRunbookIds: [] as string[],
-  createdScenarioIds: [] as string[],
   exports: [] as { name: string; at: string; rows: number }[],
 });
 
@@ -977,7 +970,6 @@ export const useStore = create<OFState>()((set, get) => ({
           return l && !r.lockedAt ? { ...r, lockedAt: l.lockedAt, lockHash: l.lockHash } : r;
         },
       );
-      const made = new Set(state.scenarios.map((sc) => sc.id));
       return {
         depositions: state.depositions,
         depositedBy: state.depositedBy ?? {},
@@ -987,8 +979,8 @@ export const useStore = create<OFState>()((set, get) => ({
         parameterOverrides: state.overrides,
         proformaAssumptions: assumptionsFromOverrides(state.overrides),
         proformaFits: state.fits,
-        scenarios: [...s.scenarios.filter((sc) => !made.has(sc.id) && !s.createdScenarioIds.includes(sc.id)), ...state.scenarios],
-        createdScenarioIds: [...made],
+        // Every scenario is the project's (alpha 2.2 D9): the service's rows, with what this browser still owes laid on.
+        scenarios: state.scenarios,
         trainsMade: state.trains,
         // A turn the service reads as running is being answered there; the screen follows it.
         liveConversations: conversationsHeld(state.conversations, []),
@@ -2099,22 +2091,14 @@ export const useStore = create<OFState>()((set, get) => ({
     const s = get();
     const src = s.scenarios.find((x) => x.id === id);
     if (!src) return id;
-    // A copy of a scenario on a shelf flowsheet is a scenario a person made:
-    // Durable, time-based id, not run (OF-BLD-019 D6).
-    if (src.kind === 'biosteam' && src.flowsheetId)
-      return get().createScenario(
-        src.flowsheetId,
-        `${src.name} (copy)`,
-        src.vessel && src.trainRun ? { vessel: src.vessel, trainRun: src.trainRun } : null,
-      );
-    const copy: Scenario = {
-      ...structuredClone(src),
-      id: nextId('sc'),
-      name: `${src.name} (copy)`,
-      pinned: false,
-    };
-    set({ scenarios: [...s.scenarios, copy] });
-    return copy.id;
+    // A copy of a scenario is a scenario of the project (alpha 2.2 D9): a
+    // time-based id, its flowsheet and parts the source's, and no run of its
+    // own yet (OF-BLD-019 D6).
+    return get().createScenario(
+      src.flowsheetId ?? src.modelId,
+      `${src.name} (copy)`,
+      src.vessel && src.trainRun ? { vessel: src.vessel, trainRun: src.trainRun } : null,
+    );
   },
 
   // OF-BLD-019 §3.1 (D5, D6) — New scenario makes a `biosteam` scenario and
@@ -2141,7 +2125,7 @@ export const useStore = create<OFState>()((set, get) => ({
       lastRunId: null,
       createdAt: new Date().toISOString(),
     };
-    set((s) => ({ scenarios: [...s.scenarios, made], createdScenarioIds: [...s.createdScenarioIds, id] }));
+    set((s) => ({ scenarios: [...s.scenarios, made] }));
     return id;
   },
 
@@ -3376,7 +3360,7 @@ export function projectStateOf(s: OFState): ProjectState {
     runbookLocks,
     overrides: s.parameterOverrides,
     fits: s.proformaFits,
-    scenarios: s.scenarios.filter((sc) => s.createdScenarioIds.includes(sc.id)),
+    scenarios: s.scenarios,
     trains: s.trainsMade,
     conversations: s.liveConversations,
   };
@@ -3447,7 +3431,6 @@ if (typeof window !== 'undefined') {
         s.parameterOverrides === prev.parameterOverrides &&
         s.proformaFits === prev.proformaFits &&
         s.scenarios === prev.scenarios &&
-        s.createdScenarioIds === prev.createdScenarioIds &&
         s.trainsMade === prev.trainsMade &&
         s.liveConversations === prev.liveConversations)
     )

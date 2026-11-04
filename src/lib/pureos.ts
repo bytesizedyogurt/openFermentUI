@@ -31,7 +31,7 @@ import type {
 } from '@/data/types';
 import { ServiceDown, ServiceRefused, call } from './http';
 import { inputsOf } from './params';
-import { proformaArtifact, proformaNewestRun, proformaReference, proformaScenarios, proformaShelf } from './proforma';
+import { keptReferenceRuns, proformaArtifact, proformaNewestRun, proformaScenarios, proformaShelf, retiredEntryOf } from './proforma';
 import { listRuns } from './studies';
 
 export { ServiceDown as PureosDown, ServiceRefused as PureosRefused };
@@ -308,16 +308,18 @@ export function flowsheetOfRun(a: Artifact): string | null {
 
 /**
  * The kept runs a train can take a stream of, or be read from: pureOS's own
- * train runs, the newest run of every BioSTEAM scenario (the held ones and
- * the ones made here), every reference run on the shelf, and every library
- * plant's run the project keeps (alpha 2.2 D8: `GET /api/runs?engine=biosteam`,
- * its tool `library.run`), each with its streams as its artifact or its train
- * holds them.
+ * train runs, the newest run of every BioSTEAM scenario of the project, each
+ * listed once (the service's, then those this browser holds that the service
+ * does not list yet, ADR-014; alpha 2.2 D9), every library plant's run the
+ * project keeps (alpha 2.2 D8: `GET /api/runs?engine=biosteam`, its tool
+ * `library.run`), the reference plants' among them, and every reference run a
+ * person kept from the shelf's retired reference entries (`proforma.reference`,
+ * read as kept), each with its streams as its artifact or its train holds them.
  * Read, never made; a source the service cannot answer is said in words and
  * the rest still come back.
  */
 export async function runChoices(
-  made: { id: string; name: string }[],
+  held: { id: string; name: string }[],
   signal?: AbortSignal,
 ): Promise<{ choices: RunChoice[]; problems: string[] }> {
   const problems: string[] = [];
@@ -336,8 +338,9 @@ export async function runChoices(
   // The shelf names each scenario flowsheet's broth (OF-BLD-020 §6.2).
   const shelf = (await proformaShelf(signal).catch(said('Proforma’s shelf'))) ?? [];
   const brothOf = new Map(shelf.map((f) => [f.id, f.brothStream ?? null]));
-  const held = (await proformaScenarios({ host: null }, signal).catch(said('Proforma’s scenarios'))) ?? [];
-  const scenarios = [...held.map((s) => ({ id: s.id, name: s.name })), ...made];
+  const served = (await proformaScenarios({ host: null }, signal).catch(said('Proforma’s scenarios'))) ?? [];
+  const listed = new Set(served.map((s) => s.id));
+  const scenarios = [...served.map((s) => ({ id: s.id, name: s.name })), ...held.filter((s) => !listed.has(s.id))];
   for (const sc of scenarios) {
     const a = await proformaNewestRun(sc.id, signal).catch(said(`the runs of ${sc.id}`));
     if (!a) continue;
@@ -354,18 +357,18 @@ export async function runChoices(
       streams: streamsOfArtifact(a),
     });
   }
-  for (const f of shelf.filter((x) => x.reference)) {
-    const ref = await proformaReference(f.id, signal).catch(said(`the reference run of ${f.id}`));
-    const a = ref?.artifact;
-    if (a && a.tool === 'proforma.reference')
-      choices.push({ artifactId: a.id, ref: a.id, scenarioId: null, broth: null, tool: a.tool, label: `reference run of ${f.title}`, createdAt: a.createdAt, streams: streamsOfArtifact(a) });
-  }
   const library = (await listRuns(signal, 'biosteam').catch(said('the library plants’ runs'))) ?? [];
   for (const r of library) {
     if (r.tool !== 'library.run' || r.status !== 'done' || !r.artifactId) continue;
     const a = await proformaArtifact(r.artifactId, signal).catch(said(`library run ${r.id}`));
     if (a)
       choices.push({ artifactId: a.id, ref: a.id, scenarioId: null, broth: null, tool: a.tool, label: `library run of ${r.plant}${r.configuration ? ` (${r.configuration})` : ''}`, createdAt: a.createdAt, streams: streamsOfArtifact(a) });
+  }
+  const kept = (await keptReferenceRuns(signal).catch(said('the runs kept from the retired reference entries'))) ?? [];
+  for (const a of kept) {
+    const entry = retiredEntryOf(a);
+    if (a.tool !== 'proforma.reference' || !entry) continue;
+    choices.push({ artifactId: a.id, ref: a.id, scenarioId: null, broth: null, tool: a.tool, label: `reference run of ${entry}, kept from the retired entry`, createdAt: a.createdAt, streams: streamsOfArtifact(a) });
   }
   return { choices, problems };
 }
