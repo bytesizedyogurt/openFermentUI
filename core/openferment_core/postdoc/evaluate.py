@@ -25,10 +25,13 @@ each question as a turn); `openferment_core.evaluation` is the command.
 
 TWO SUITES. `default` holds the proof's two questions over the sugarcane plant;
 `ethanol` holds the owner's twelve real questions over a project of ethanol
-sources (alpha 2.1 stage B and C; docs/reports/live-questions-2026-11.md), each
-with what a good answer does in words (`expects`). A run asks one suite, under
-a `tag` that names the route table it ran on, so runs on different models sit
-side by side (`summary`).
+sources (alpha 2.1 stage B and C; docs/reports/live-questions-2026-11.md) and
+the two alpha 2.2 adds for the base's seams (its prompt's §5): the engines
+registered, what each takes and gives and which of the project's runs came from
+each (13), and a deposition's reading set as a scenario's value and run (14),
+each question with what a good answer does in words (`expects`). A run asks one
+suite, under a `tag` that names the route table it ran on, so runs on different
+models sit side by side (`summary`).
 
 THE JUDGE (alpha 2.1 stage C). Beside the code's scores, a model on the `judge`
 route reads each answer as Postdoc gave it: the question, what a good answer
@@ -163,9 +166,22 @@ def _eth(n: int, question: str, expects: str, tools: list[list[str]], cites: lis
                         estimate=estimate, follows=f"eq-eth-{follows:02d}" if follows else None, suite=ETHANOL)
 
 
+# The engines question 13 expects named: the three the core registers
+# (core/pyproject.toml's entry points in the group `openferment.engines`).
+# Stage D adds the stranger's engine once it is installed.
+ENGINES_EXPECTED = ("biosteam", "kinetics", "train")
+
+
+def _named(names: tuple[str, ...]) -> str:
+    """Names in words: `a`, `a and b`, `a, b and c`."""
+    return names[0] if len(names) == 1 else f"{', '.join(names[:-1])} and {names[-1]}"
+
+
 # The owner's twelve (alpha 2.1 execution prompt §5), asked of a project that
 # holds the ethanol sources (docs/corpus/ethanol-sources.txt) and their
-# extraction. Words only: what a good answer does, never what it finds.
+# extraction, and the two the alpha 2.2 prompt's §5 adds for the base's seams:
+# the engine reads (13) and a measurement origin (14), in the prompt's words.
+# Words only: what a good answer does, never what it finds.
 ETHANOL_QUESTIONS = (
     _eth(1, "Which of the project's documents report an ethanol titre, and under what conditions does each report it?",
          "Names each document that reports an ethanol titre and the conditions it reports it under, each claim citing "
@@ -221,6 +237,28 @@ ETHANOL_QUESTIONS = (
          "Gives the ethanol ceiling on glucose from the genome-scale models on the shelf as geneOS artifacts and "
          "compares the project's recorded yields with it, or says in words that a model file is absent.",
          [["yield_ceiling", "geneos_read"]], ["evidence", "record"]),
+    _eth(13, "Which engines are registered here, what does each take and give, and which of this project's runs came "
+             "from each?",
+         f"Names each engine registered here ({_named(ENGINES_EXPECTED)}) from the engine reads: what each runs, what "
+         "each takes (its parameters, each with its unit and the origin of its default, or that a run sets it) and "
+         "what each gives (the outputs a run of it keeps), and which of the project's runs came from each, set out "
+         "as one table with a row for each engine, its cells the ids, units and origins the reads returned, and each "
+         "run named by its id and cited by the evidence id or the module row a read returned.",
+         [["engine_plants"], ["engine_parameters"],
+          ["engine_report", "study_read", "proforma_read", "fermos_read", "pureos_read"]],
+         ["evidence", "row"], estimate=False),
+    _eth(14, "Take the ethanol yield measured in this project's most recent deposition, set it as the glucose-only "
+             "scenario's yield, run it, and say what changed and what the value rests on.",
+         "Reads the ethanol yield the project's most recent deposition holds from the bench's readings (runbooks_read, "
+         "kind reading), sets it as the yield of the glucose-only scenario this conversation proposed, the value and "
+         "unit as the reading gives them with the origin measurement naming the reading's id, runs the scenario, sets "
+         "the run beside the glucose-only scenario's own run in a comparison, and says what changed, citing the "
+         "comparison, and what the value rests on: the deposition, the person who deposited it and when it was "
+         "taken, and the run's provenance, measured, or assumed with the reason (the estimate or the assumption "
+         "among the run's values). Where the project's depositions hold no ethanol yield, says so in words and runs "
+         "nothing.",
+         [["runbooks_read"], ["study_scenario"], ["engine_run"], ["study_compare"]], ["evidence", "row"],
+         follows=5),
 )
 SUITES: dict[str, tuple[EvalQuestion, ...]] = {DEFAULT: DEFAULT_QUESTIONS, ETHANOL: ETHANOL_QUESTIONS}
 

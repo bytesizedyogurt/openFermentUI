@@ -72,6 +72,13 @@ take, a fit a forecast cannot draw from, a design with no scale) keeps nothing. 
 forecast keeps nothing. A fermOS artifact kept before its runs were rows has none of its own; the
 same request asked again keeps its row.
 
+A fit (`POST /api/fermos/fit`: a deposition's series fitted as a `kinetic_fit` and a `growth_fit`)
+is kept as its artifacts alone, with no runs row. A fit is no thing of the kinetics engine (D4: its
+things are the families that simulate, a forecast of a kept fit and a vessel design); it reads the
+readings a person deposited, and each forecast, simulation or vessel design made from it is a run,
+its basis naming the fit's artifact. Its series arrive as the browser sends them
+(`FermosFitRequest`; `docs/PROGRESS.md`, Known debts).
+
 ## A train run
 
 The train engine (`core/openferment_core/pureos/engine.py`; `docs/api/engines.md`, The core's

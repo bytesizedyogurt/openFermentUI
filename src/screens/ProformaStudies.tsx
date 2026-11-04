@@ -57,7 +57,7 @@ import {
   type EngineThing,
 } from '@/lib/studies';
 import { runnable, type LibraryPlant } from '@/lib/library';
-import { NEW_TRAIN, builderCopyPath, builderPath, trainOfRun } from '@/lib/pureos';
+import { NEW_TRAIN, builderCopyPath, builderPath, ranWhat } from '@/lib/pureos';
 import { Button, Callout, Card, EmptyState, LinkButton, PageHeader } from '@/components/ui';
 import { ProvenanceBadge } from '@/components/Provenance';
 import { ReadingOrigin, readingNote } from '@/components/ReadingOrigin';
@@ -73,12 +73,6 @@ interface Held {
 }
 
 const where = (plant: string, configuration: string | null) => plant + (configuration ? ` (${configuration})` : '');
-
-/** What a run ran, as a person reads it: a train run names its train's name beside its id (`trainOfRun`). */
-const ranWhat = (r: EngineRun) => {
-  const t = trainOfRun(r);
-  return t ? `${t.name} (${r.plant})` : where(r.plant, r.configuration);
-};
 
 /** A configuration as a person reads it: the plant's own when it names none. */
 const configurationWords = (c: string | null) => c ?? 'its own';
@@ -233,11 +227,12 @@ function BiosteamPlants({ onRan }: { onRan: () => void }) {
  * `kinetics` and `train`): a family's parameters on fermOS → Simulate, a vessel's scale on fermOS → Vessel, a train's
  * values in pureOS → Builder (a train a model built, on a copy of it). Each value set there is the person's
  * assumption, and the run is kept as one row of the engine. `says` is what the thing's values are, when it is more
- * than the words for a thing whose parameters wait.
+ * than the words for a thing whose parameters wait. `waits` marks a kind no run on the engine's own defaults can
+ * compute: every kinetics family has parameters with no default (D4), so the card offers its page alone.
  */
-const SETS_VALUES: Record<string, Record<string, { to: (thing: string) => string; words: string; says?: string }>> = {
+const SETS_VALUES: Record<string, Record<string, { to: (thing: string) => string; words: string; says?: string; waits?: boolean }>> = {
   kinetics: {
-    family: { to: (id) => `/fermos/simulate?family=${encodeURIComponent(id)}`, words: 'fermOS → Simulate' },
+    family: { to: (id) => `/fermos/simulate?family=${encodeURIComponent(id)}`, words: 'fermOS → Simulate', waits: true },
     vessel: { to: () => '/fermos/vessel', words: 'fermOS → Vessel' },
   },
   train: {
@@ -278,6 +273,7 @@ function EngineThings({ engine, onRan }: { engine: EngineInfo; onRan: () => void
   const [problem, setProblem] = useState<string | null>(null);
   const [ran, setRan] = useState<RunReport | null>(null);
   const configurations = configurationsOf(thing);
+  const setsValues = thing ? SETS_VALUES[engine.name]?.[thing.kind ?? ''] : undefined;
   const choose = (id: string) => {
     setThingId(id);
     setConfiguration(configurationsOf(things.find((t) => t.id === id) ?? null)[0] ?? null);
@@ -350,27 +346,53 @@ function EngineThings({ engine, onRan }: { engine: EngineInfo; onRan: () => void
               ))}
             </select>
           </label>
-          <Button variant="primary" disabled={busy || !reviewer || !thing} onClick={run} data-testid="run-engine-go">
-            <Play size={14} /> {busy ? 'Running…' : 'Run it'}
-          </Button>
+          {!setsValues?.waits && (
+            <Button variant="primary" disabled={busy || !reviewer || !thing} onClick={run} data-testid="run-engine-go">
+              <Play size={14} /> {busy ? 'Running…' : 'Run it'}
+            </Button>
+          )}
         </div>
       )}
-      {!reviewer && things.length > 0 && (
+      {!reviewer && things.length > 0 && !setsValues?.waits && (
         <p className="text-caption text-ink-soft mt-2">A run is asked for in a person&rsquo;s name: set yours in Settings first.</p>
       )}
-      {thing && SETS_VALUES[engine.name]?.[thing.kind ?? ''] && (
-        <p className="text-caption text-ink-soft mt-2" data-testid="run-engine-sets-values">
+      {thing && setsValues && (
+        <p className="text-caption text-ink-soft mt-2" data-testid="run-engine-sets-values" data-waits={setsValues.waits ? 'true' : 'false'}>
           {engine.name === 'train' && thing.title ? `${thing.title} (${thing.id})` : thing.id}{' '}
-          {SETS_VALUES[engine.name][thing.kind ?? ''].says ?? 'runs with values its parameters have no default for: set them on'}{' '}
-          <a className="text-accent hover:underline" href={href(SETS_VALUES[engine.name][thing.kind ?? ''].to(thing.id))}>
-            {SETS_VALUES[engine.name][thing.kind ?? ''].words}
+          {setsValues.waits
+            ? 'has parameters with no default, which a run sets: set them on'
+            : (setsValues.says ?? 'runs with values its parameters have no default for: set them on')}{' '}
+          <a className="text-accent hover:underline" href={href(setsValues.to(thing.id))}>
+            {setsValues.words}
           </a>
           , each your assumption; that run is one of the {engine.name} engine&rsquo;s, listed with the project&rsquo;s runs.
         </p>
       )}
       {ran && <Ran ran={ran} />}
-      {problem && <p className="text-caption text-signal-warn mt-2" data-testid="run-plant-problem">{problem}</p>}
+      {problem && <Refusal words={problem} />}
     </>
+  );
+}
+
+/**
+ * A refusal in the engine's words: its first sentence, and the rest (each parameter that waits, each bound) folded
+ * under it when there is more.
+ */
+function Refusal({ words }: { words: string }) {
+  const cut = words.search(/[.:;](\s|$)/);
+  const head = cut > 0 ? words.slice(0, cut + 1) : words;
+  const rest = cut > 0 ? words.slice(cut + 1).trim() : '';
+  return (
+    <div className="text-caption text-signal-warn mt-2" data-testid="run-plant-problem">
+      {rest ? (
+        <details>
+          <summary className="cursor-pointer">{head}</summary>
+          <p className="mt-1">{rest}</p>
+        </details>
+      ) : (
+        <p>{head}</p>
+      )}
+    </div>
   );
 }
 
@@ -475,9 +497,17 @@ function Runs({ runs, scenarios }: { runs: EngineRun[]; scenarios: StudyScenario
           title="No engine run yet"
           body={
             <>
-              A run is one computation of a registered engine, kept with its basis, its artifact and, where the engine has a plant, its SFF file:
-              BioSTEAM runs a library plant or openFerment&rsquo;s flowsheet whole. Run a plant above, or a scenario below; Postdoc runs the
-              scenarios it proposes.
+              A run is one computation of a registered engine, kept with its basis, its artifact and, where the engine has a plant, its SFF file.
+              BioSTEAM runs a library plant or openFerment&rsquo;s flowsheet whole, and a Proforma scenario: run a plant above, or a scenario below,
+              and Postdoc runs the scenarios it proposes. The kinetics engine keeps each simulation, forecast and vessel design made on{' '}
+              <a className="text-accent hover:underline" href={href('/fermos/simulate')}>
+                fermOS
+              </a>
+              , and the train engine each train run made in{' '}
+              <a className="text-accent hover:underline" href={href(builderPath(NEW_TRAIN))}>
+                pureOS → Builder
+              </a>
+              ; each one is listed here.
             </>
           }
         />

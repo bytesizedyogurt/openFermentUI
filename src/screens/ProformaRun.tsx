@@ -49,7 +49,7 @@
 // (POST /api/studies/runbooks), and opens on the runbook's page, where it is
 // locked.
 import { SffGraph } from '@/components/SffGraph';
-import { useEffect, useState } from 'react';
+import { useEffect, useState, type ReactNode } from 'react';
 import { BookOpen, Download, ListChecks, Play } from 'lucide-react';
 import type { FlowsheetInfo, ParamScope, Quantity, RegressionCheck, RunReport as EngineRunReport } from '@/data/types';
 import { href, navigate } from '@/router';
@@ -119,8 +119,31 @@ interface RunOutput {
 /** The artifact tools whose run builds no plant, so it keeps no SFF file by design: the kinetics engine's (docs/api/runs.md). */
 const NO_PLANT_TOOLS = new Set(['fermos.simulation', 'growth_forecast', 'fermos.vessel']);
 
+/**
+ * A train run's file, which waits on the toolkit: the SFF schema it ships requires every file's TEA year, and a train
+ * carries no TEA, so every train run keeps those words as its `sffRefused` (docs/PROGRESS.md, Known debts). Said in
+ * plain ink, as a kinetics run's none is; any other refusal of a file is a failure, said as one.
+ */
+const fileWaitsOnToolkit = (run: EngineRunReport['run']) => run.tool === 'pureos.train_run' && /TEA_year/.test(run.sffRefused ?? '');
+
+/**
+ * BioSTEAM's runs, whose page shows their numbers in their artifact's own sections: their `outputs.values`, the
+ * values a comparison reads, fold under the outputs card's summary.
+ */
+const FOLDED_OUTPUTS = new Set(['library.run', RUN_TOOL]);
+
 /** A value as a page shows it: a number to a few significant digits (its full value in the title and the CSV), words as they are. */
 const shown = (v: unknown) => (typeof v === 'number' ? fmt(v) : String(v));
+
+/**
+ * A basis note as the page shows it, the build's own decision tags dropped: a leading `D8: `, and a trailing
+ * parenthesis naming a decision, a build document or a rule's constant (`(D9)`, `(OF-BLD-020 §3.2 added the
+ * field)`, `(Appendix 2 §A)`, `(CARBON_RULE)`). The basis keeps the words whole, its id hashing them, and so does
+ * the CSV.
+ */
+const LEADING_TAG = /^D\d+:\s+/;
+const TRAILING_TAG = /\s*\((?:D\d+\b[^)]*|OF-[A-Z]+-\d+[^)]*|Appendix \d+[^)]*|[A-Z][A-Z0-9]*_[A-Z0-9_]+)\)\s*$/;
+export const plainNote = (note: string) => note.replace(LEADING_TAG, '').replace(TRAILING_TAG, '').trim();
 
 /** A run's time in words: milliseconds under a tenth of a second, seconds above. */
 const took = (ms: number) => (ms < 100 ? `${Math.round(ms)} ms` : `${(ms / 1000).toFixed(1)} s`);
@@ -128,12 +151,8 @@ const took = (ms: number) => (ms < 100 ? `${Math.round(ms)} ms` : `${(ms / 1000)
 /** Words a sentence follows on: a full stop added when they end with none. */
 const ended = (words: string) => (/[.!?]$/.test(words.trim()) ? words.trim() : `${words.trim()}.`);
 
-/**
- * The outputs a contract engine's run kept. A library run and a Proforma scenario's run keep their `outputs.values`
- * too, and the page shows them in their artifacts' own sections.
- */
+/** The outputs a run kept (`outputs.values`), every engine's: the values a comparison of it reads. */
 function runOutputs(run: EngineRunReport['run']): RunOutput[] {
-  if (run.tool === 'library.run' || run.tool === RUN_TOOL) return [];
   const values = run.outputs.values;
   if (!Array.isArray(values)) return [];
   return values.filter(
@@ -143,13 +162,14 @@ function runOutputs(run: EngineRunReport['run']): RunOutput[] {
 }
 
 /**
- * A contract engine's or a kinetics run (docs/api/engines.md): each output with its value, its interval where it
- * carries one, its unit and its origin, the run's artifact. A forecast's value is its median, and its interval the
- * 5th to the 95th percentile.
+ * Any engine's run (docs/api/engines.md): each output with its value, its interval where it carries one, its unit
+ * and its origin, the run's artifact. A forecast's value is its median, and its interval the 5th to the 95th
+ * percentile. A BioSTEAM run's table folds under its summary, its numbers shown in the sections below as well.
  */
 function Outputs({ report }: { report: EngineRunReport }) {
   const values = runOutputs(report.run);
   if (!values.length) return null;
+  const folded = FOLDED_OUTPUTS.has(report.run.tool);
   const forecast = report.run.tool === 'growth_forecast';
   const banded = values.some((v) => v.quantity.low != null || v.quantity.high != null);
   const headers = ['Output', forecast ? 'Median' : 'Value', ...(banded ? [forecast ? '5th percentile' : 'Low', forecast ? '95th percentile' : 'High'] : []), 'Unit', 'Origin'];
@@ -171,46 +191,62 @@ function Outputs({ report }: { report: EngineRunReport }) {
         Each output the {report.run.engine} engine computed, in its unit, its origin the run&rsquo;s artifact: a replay computes it again from the
         basis below.
         {forecast && ' Each is the band’s median, between its 5th and 95th percentiles: a band for readings of a run like the fitted one.'}
+        {folded && ' These are the values a comparison of this run reads; the sections below show the run’s price, its tables and its costs.'}
       </p>
-      <div className="overflow-x-auto">
-        <table className="w-full text-caption">
-          <thead>
-            <tr className="border-b border-line text-ink-soft">
-              {['Output', forecast ? 'Median' : 'Value', ...(banded ? [forecast ? '5th to 95th percentile' : 'Low to high'] : []), 'Unit', 'Origin'].map((h) => (
-                <th key={h} className="text-left py-1 pr-2 font-medium">
-                  {h}
-                </th>
-              ))}
-            </tr>
-          </thead>
-          <tbody>
-            {values.map((v) => (
-              <tr key={v.name} className="border-b border-line/50 align-top" data-testid="run-output" data-origin={v.quantity.origin?.kind}>
-                <td className="py-1 pr-2 font-num">{v.name}</td>
-                <td className="py-1 pr-2 font-num" title={String(v.quantity.value)} data-testid="run-output-value">
-                  {shown(v.quantity.value)}
-                </td>
-                {banded && (
-                  <td className="py-1 pr-2 font-num" title={`${v.quantity.low ?? ''} to ${v.quantity.high ?? ''}`} data-testid="run-output-band">
-                    {band(v.quantity)}
-                  </td>
-                )}
-                <td className="py-1 pr-2 font-num">{v.quantity.unit || '—'}</td>
-                <td className="py-1 pr-2">
-                  {v.quantity.origin?.kind === 'artifact' && v.quantity.origin.ref ? (
-                    <a className="text-accent hover:underline" href={href(`/biorepo/artifacts/${v.quantity.origin.ref}`)}>
-                      {originOf(v.quantity)}
-                    </a>
-                  ) : (
-                    originOf(v.quantity)
-                  )}
-                </td>
+      <OutputsTable folded={folded} count={values.length}>
+        <div className="overflow-x-auto">
+          <table className="w-full text-caption">
+            <thead>
+              <tr className="border-b border-line text-ink-soft">
+                {['Output', forecast ? 'Median' : 'Value', ...(banded ? [forecast ? '5th to 95th percentile' : 'Low to high'] : []), 'Unit', 'Origin'].map((h) => (
+                  <th key={h} className="text-left py-1 pr-2 font-medium">
+                    {h}
+                  </th>
+                ))}
               </tr>
-            ))}
-          </tbody>
-        </table>
-      </div>
+            </thead>
+            <tbody>
+              {values.map((v) => (
+                <tr key={v.name} className="border-b border-line/50 align-top" data-testid="run-output" data-origin={v.quantity.origin?.kind}>
+                  <td className="py-1 pr-2 font-num">{v.name}</td>
+                  <td className="py-1 pr-2 font-num" title={String(v.quantity.value)} data-testid="run-output-value">
+                    {shown(v.quantity.value)}
+                  </td>
+                  {banded && (
+                    <td className="py-1 pr-2 font-num" title={`${v.quantity.low ?? ''} to ${v.quantity.high ?? ''}`} data-testid="run-output-band">
+                      {band(v.quantity)}
+                    </td>
+                  )}
+                  <td className="py-1 pr-2 font-num">{v.quantity.unit || '—'}</td>
+                  <td className="py-1 pr-2">
+                    {v.quantity.origin?.kind === 'artifact' && v.quantity.origin.ref ? (
+                      <a className="text-accent hover:underline" href={href(`/biorepo/artifacts/${v.quantity.origin.ref}`)}>
+                        {originOf(v.quantity)}
+                      </a>
+                    ) : (
+                      originOf(v.quantity)
+                    )}
+                  </td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        </div>
+      </OutputsTable>
     </Card>
+  );
+}
+
+/** The outputs' table, open for a run whose page shows it alone, folded under its summary for a BioSTEAM run's. */
+function OutputsTable({ folded, count, children }: { folded: boolean; count: number; children: ReactNode }) {
+  if (!folded) return <>{children}</>;
+  return (
+    <details data-testid="run-outputs-folded">
+      <summary className="cursor-pointer text-caption">
+        Every value it kept as an output ({count}), each with its unit and origin
+      </summary>
+      {children}
+    </details>
   );
 }
 
@@ -289,6 +325,8 @@ function Inputs({ report }: { report: EngineRunReport }) {
                       shown(report.run.inputs[i]?.quantity.value ?? c)
                     ) : j === 3 && report.run.inputs[i]?.quantity.origin?.kind === 'measurement' ? (
                       <ReadingOrigin origin={report.run.inputs[i].quantity.origin!} />
+                    ) : j === 5 ? (
+                      <span title={c}>{plainNote(c)}</span>
                     ) : (
                       c
                     )}
@@ -359,6 +397,8 @@ function FlowsheetCard({ report }: { report: EngineRunReport }) {
         <h2 className="font-serif text-section-title font-semibold mb-1">Its SFF file</h2>
         {NO_PLANT_TOOLS.has(report.run.tool) ? (
           <p className="text-body text-ink-soft" data-testid="run-sff-none">This run keeps no SFF file: {ended(report.run.sffRefused)}</p>
+        ) : fileWaitsOnToolkit(report.run) ? (
+          <p className="text-body text-ink-soft" data-testid="run-sff-waits">This run keeps no SFF file yet: {ended(report.run.sffRefused)}</p>
         ) : (
           <p className="text-body text-signal-warn">No SFF file could be written: {report.run.sffRefused}</p>
         )}

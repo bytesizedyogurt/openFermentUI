@@ -174,6 +174,9 @@ STREAM_TOOLS = ("proforma.run", "proforma.reference", TRAIN_RUN, "library.run")
 # create_chemicals). `chemical_set` reads the one a train builds on.
 PROGRAM_CHEMICALS = {"yeast": "the yeast program's chemicals, as the ethanol flowsheet builds on them "
                               "(biorefineries.corn.create_chemicals)"}
+# How a check says an inlet whose chemicals the set does not hold: the
+# refusal ends with these words (`_prepare`), and the units wait unread.
+CANNOT_BUILD = "the train cannot build its stream"
 
 
 def chemical_set(program: str | None) -> str:
@@ -1522,7 +1525,7 @@ def _prepare(spec: TrainSpec, overrides: Iterable[Override] | None, by: str | No
     unknown = sorted(set(chemicals) - set(ws["chemicals"]))
     if unknown:
         refusals.append((INLET, f"the inlet carries {', '.join(unknown)}, which {PROGRAM_CHEMICALS[chosen]} do "
-                                "not hold: the train cannot build its stream"))
+                                f"not hold: {CANNOT_BUILD}"))
         _refuse(refusals)
     pool = _pool()
     resolved: list[tuple[UnitScope, list[ParameterValue]]] = []

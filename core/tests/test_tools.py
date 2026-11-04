@@ -830,6 +830,28 @@ def test_fermos_write_simulate_refuses_a_field_it_does_not_take(fermos_store):
     assert "simulate:" in tools.REGISTRY["fermos_write"].description
 
 
+def test_a_write_action_every_call_refuses_is_described_with_its_refusal_and_no_fields():
+    """A module write's description lists an action every call refuses with
+    the refusal's own words and none of its fields, so no model is offered a
+    field (proforma's bind took a value) the call then refuses."""
+    from openferment_core.tools import writes
+
+    listed = 0
+    for (module, action), words in writes.NO_WRITE_ACTION.items():
+        if action not in writes.ACTIONS.get(module, {}):
+            continue
+        described = tools.REGISTRY[f"{module}_write"].description
+        what, _ = writes.ACTIONS[module][action]
+        assert f"{action}: refused, every call ({words})" in described and f"{action}: {what}" not in described, \
+            (module, action)
+        listed += 1
+    assert listed >= 6, "fermOS's fit, Proforma's bind, BioRepo's decide, Intake's add, Primer's lesson, Guild's check"
+    bind = tools.REGISTRY["proforma_write"].description
+    assert "bind: refused, every call (a Proforma scenario's assumptions are a named person's" in bind
+    assert "(fields: key, value, basis)" not in bind
+    assert "run: run the BioSTEAM scenario named in target" in bind, "an action that runs keeps its words"
+
+
 def test_a_scenario_run_by_a_tool_is_one_row_created_by_its_caller(proforma_store):
     """proforma_write's run and run_flowsheet keep the one row of the
     scenario's run (alpha 2.2 D3), created by the caller the tool names: a

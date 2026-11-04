@@ -316,6 +316,20 @@ def listed(engine: str | None = None) -> list[EngineRun]:
     return db.run(_listed(projects.current(), engine))
 
 
+async def _made(project_id: str) -> list[tuple[Any, ...]]:
+    async with db.session() as s:
+        return await rows.columns(s, t.runs, project_id, "engine", "id", order=(t.runs.c.created_at.desc(), t.runs.c.id))
+
+
+def made_by() -> dict[str, list[str]]:
+    """The project's run ids by the engine that made each, newest first,
+    read from the rows' own columns (`engine_plants` lists them)."""
+    out: dict[str, list[str]] = {}
+    for engine, run_id in db.run(_made(projects.current())):
+        out.setdefault(engine, []).append(run_id)
+    return out
+
+
 def parameters_of(run: EngineRun, art: Artifact) -> ParamScope | None:
     """The run's parameters as the parameter panel reads them: each as its
     plant declares it (library._spec), its value the run's, a person's

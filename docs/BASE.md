@@ -59,7 +59,9 @@ A module adds capability through a contract and edits nothing in the base:
 ## The two handoff tests
 
 The claim that a module needs no edit to the base is tested by someone who has read only the
-contract pages.
+contract pages. Stage D of alpha 2.2 runs both tests: it adds the mirror engine and the
+record-reader below (`examples/` holds neither yet), and the proof's step that installs the
+engine and checks it. Until then the commands below are the ones those rounds will run.
 
 1. **An engine from the contract alone.** A builder who may read `docs/api/engines.md`,
    `docs/api/workers.md`, `docs/api/runs.md` and `docs/api/openapi.json`, and nothing else,
@@ -82,8 +84,10 @@ contract pages.
    cd core && uv run python ../examples/agents/record-reader/read.py --project <id>
    ```
 
-`pnpm prove` runs the first test on every run; `docs/reports/handoff-2026-11.md` records the
-builders' rounds, what each read and what the pages lacked.
+Once stage D lands, `pnpm prove` runs the first test on every run, and
+`docs/reports/handoff-2026-11.md` records the builders' rounds, what each read and what the pages
+lacked. Today `pnpm prove` step 10 makes the eight checks on the core's three engines (`biosteam`,
+`kinetics` and `train`) and on any other engine the service lists.
 
 ## What the base runs on
 

@@ -357,16 +357,22 @@ from openferment_core.studies import comparisons as _comparisons_mod  # noqa: E4
 PACKAGE_DIR = Path(writes.__file__).resolve().parent.parent
 TOOLS_DIR = Path(writes.__file__).resolve().parent
 WORKER_SIDE = ("workers", "flowsheets")
-# What a kept run is (OF-BLD-020 §3.4): a Proforma run, a simulation, a vessel
-# design, and pureOS's train run (night two names it; `pureos.train_run`).
+# What a kept run is (OF-BLD-020 §3.4; alpha 2.2 D3, every run a `runs` row):
+# a Proforma run, a simulation, a kept growth forecast and a vessel design (the
+# kinetics engine's), and pureOS's train run (the train engine's;
+# `pureos.train_run`).
 TRAIN_RUN = "pureos.train_run"
 # Alpha 2.0 stage 6: an engine run of a library plant or a flowsheet, and a
 # study's comparison of runs, which a model keeps through engine_run and
 # study_compare.
 # The two kinds kept from the retired reference entries (alpha 2.2 D8) stay
 # listed, so a function that computes one is read as one that keeps a run.
+# A contract engine's run (`engine.<name>`, one tool for each engine
+# registered) is computed by `engine/runs.compute_kept` and `run_engine` on a
+# tool they take as a value, which the rule reads as a tool it cannot name.
 RUN_KINDS = frozenset({_proforma_mod.RUN, _proforma_mod.REFERENCE, _proforma_mod.BENCHMARK, _fermos_mod.SIMULATION,
-                       _vessel_mod.TOOL, TRAIN_RUN, _library_mod.LIBRARY_RUN, _comparisons_mod.COMPARISON})
+                       _fermos_mod.FORECAST, _vessel_mod.TOOL, TRAIN_RUN, _library_mod.LIBRARY_RUN,
+                       _comparisons_mod.COMPARISON})
 COMPUTE = "openferment_core.artifacts.compute"
 APPEND = "openferment_core.audit.append"
 # The same row inside a store's own transaction (ADR-001): a write and its

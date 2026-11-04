@@ -4,7 +4,11 @@ stage 6; execution prompt §4.6, §9.1 step 6; ADR-004, ADR-006).
 `engine_plants` lists what the shelf runs: the `biorefineries` plants with an
 entry point and openFerment's own flowsheets, each with its configurations,
 then the shelf's flowsheets a Proforma scenario runs (the biosteam engine's
-things of kind `scenario`, alpha 2.2 D6).
+things of kind `scenario`, alpha 2.2 D6); or, named, another engine's
+things. Beside them it lists every engine registered here (`engines`), each
+with its version, its worker's state, its last conformance verdict and the
+ids of the project's runs it made, newest first, so one read says which
+engines there are and which run came from each.
 `engine_parameters` gives one plant's parameters as the package builds it
 (the Proforma worker reads them): each key with its unit and the library's
 default, the values a scenario sets are set against. `engine_run` runs a plant
@@ -155,11 +159,13 @@ def parameter_evidence(report: RunReport, words: str, limit: int) -> list[Eviden
 
 
 def run_result(report: RunReport, *, state: str = "open") -> ToolResult:
-    """A kept run in a tool's words: what ran, on what values, and its numbers as evidence ids."""
+    """A kept run in a tool's words: the engine and the artifact tool that
+    made it, what ran, on what values, and its numbers as evidence ids."""
     run = report.run
     if run.status == "refused":
-        return ToolResult(summary={"runId": run.id, "plant": run.plant, "configuration": run.configuration,
-                                   "status": "refused", "refused": run.refused, "scenarioId": run.scenarioId})
+        return ToolResult(summary={"runId": run.id, "engine": run.engine, "tool": run.tool, "plant": run.plant,
+                                   "configuration": run.configuration, "status": "refused", "refused": run.refused,
+                                   "scenarioId": run.scenarioId})
     evidence = run_evidence(report)
     own = [{"key": i.name, "value": i.quantity.value, "unit": i.quantity.unit, "origin": i.quantity.origin.kind,
             "by": i.quantity.origin.by, **({"reading": i.quantity.origin.ref} if i.quantity.origin.kind == "measurement"
@@ -170,6 +176,8 @@ def run_result(report: RunReport, *, state: str = "open") -> ToolResult:
             "state": state,
             "runId": run.id,
             "artifactId": run.artifactId,
+            "engine": run.engine,
+            "tool": run.tool,
             "plant": run.plant,
             "configuration": run.configuration,
             "scenarioId": run.scenarioId,
@@ -190,11 +198,50 @@ def run_result(report: RunReport, *, state: str = "open") -> ToolResult:
 
 class EnginePlantsInput(BaseModel):
     engine: str = Field(default="biosteam", max_length=40, description=(
-        "The engine to read (GET /api/engines names them): biosteam, whose things are the library plants, "
-        "openFerment's flowsheet and the shelf's scenario flowsheets, or any other registered here."))
+        "The engine whose things to list: biosteam, whose things are the library plants, openFerment's flowsheet "
+        "and the shelf's scenario flowsheets, or any other the summary's `engines` names. Whichever is named, the "
+        "summary lists every engine registered here with the ids of the project's runs each made."))
     words: str = Field(default="", max_length=200,
                        description="Words to narrow the shelf by: a product, a feedstock, a plant's name; empty for all.")
     limit: int = Field(default=20, ge=1, le=MAX_ROWS, description="How many rows at most.")
+
+
+# How many of an engine's runs the listing names by id, newest first; `runs` counts them all.
+RUN_IDS = 20
+
+
+def engines_listed() -> list[dict[str, Any]]:
+    """Every engine registered here, in name order (GET /api/engines lists the
+    same): its version, its worker and the worker's state, its last
+    conformance verdict, and the project's runs it made (`runs`, how many;
+    `runIds`, the newest RUN_IDS, newest first). An engine that cannot be
+    used is listed with its words and its runs."""
+    from ..engine import conform, registry, runs
+
+    made = runs.made_by()
+    out: list[dict[str, Any]] = []
+    for name, found in sorted(registry.found().items()):
+        ids = made.get(name, [])
+        row: dict[str, Any] = {"name": name}
+        if found.engine is None:
+            row["error"] = found.error
+        else:
+            try:
+                row["version"] = found.engine.version()
+            except Exception as e:  # a version that cannot be read is said, and the engine still listed
+                row["error"] = f"its version could not be read: {type(e).__name__}: {e}"
+            row["worker"] = found.engine.worker
+            row["workerStatus"] = registry.status_of(found.engine)
+        verdict = conform.latest(name)
+        row["conformance"] = (None if verdict is None else
+                              {"ok": verdict.ok, "version": verdict.version, "by": verdict.by, "at": verdict.at})
+        row["runs"] = len(ids)
+        row["runIds"] = ids[:RUN_IDS]
+        out.append(row)
+    # The project's runs of an engine registered here no longer, listed under its name with those words.
+    out += [{"name": name, "error": "no engine of this name is registered here now", "runs": len(ids),
+             "runIds": ids[:RUN_IDS]} for name, ids in sorted(made.items()) if name not in registry.found()]
+    return out
 
 
 def _registered(tool: str, name: str) -> tuple[Any, ToolResult | None]:
@@ -224,7 +271,8 @@ def _plants(inp: EnginePlantsInput, ctx: ToolContext) -> ToolResult:
         rows = [{"plant": th.id, "kind": th.kind, "title": th.title, "configurations": th.configurations,
                  "defaultConfiguration": th.defaultConfiguration} for th in things
                 if not words or all(w in f"{th.id} {th.title} {th.kind or ''}".lower() for w in words)]
-        return ToolResult(summary={"engine": engine.name, "matched": len(rows), "plants": rows[: inp.limit]})
+        return ToolResult(summary={"engine": engine.name, "matched": len(rows), "plants": rows[: inp.limit],
+                                   "engines": engines_listed()})
     shelf = library.shelf()
     # Each plant as the engine runs it (engine/biosteam.py): the
     # configurations it built in here, and the one a run takes when none is
@@ -249,7 +297,7 @@ def _plants(inp: EnginePlantsInput, ctx: ToolContext) -> ToolResult:
               "defaultConfiguration": th.defaultConfiguration} for th in things.values()
              if th.id not in held and (not words or all(w in f"{th.id} {th.title}".lower() for w in words))]
     return ToolResult(summary={"engine": "biosteam", "simulator": shelf.simulator, "package": shelf.package,
-                               "matched": len(rows), "plants": rows[: inp.limit]})
+                               "matched": len(rows), "plants": rows[: inp.limit], "engines": engines_listed()})
 
 
 # ── engine_parameters ───────────────────────────────────────────────────
@@ -374,7 +422,8 @@ def _report(inp: EngineReportInput, ctx: ToolContext) -> ToolResult:
         # The parameters asked for, in the summary's room: the run's own numbers
         # stay citable, and engine_report with no words lists them.
         found = parameter_evidence(report, inp.parameters, inp.limit)
-        keep = ("state", "runId", "artifactId", "plant", "configuration", "scenarioId", "provenance", "valuesSet")
+        keep = ("state", "runId", "artifactId", "engine", "tool", "plant", "configuration", "scenarioId", "provenance",
+                "valuesSet")
         result.summary = {**{k: result.summary.get(k) for k in keep}, "matched": len(found),
                           "parameters": [{"id": e.id, "label": e.label.split(": ", 1)[-1], "value": e.value,
                                           "unit": e.unit} for e in found],
@@ -388,7 +437,10 @@ PLANTS_TOOL = register(Tool(
     description=(
         "List what the library shelf runs: the biorefineries plants with an entry point and openFerment's own "
         "flowsheets, each with its configurations, the configuration a run takes when none is named, and the "
-        "package a flowsheet is composed from. Narrow by words. Returns ids and words, nothing to cite."
+        "package a flowsheet is composed from; or, with `engine`, that engine's things. Beside them, `engines` "
+        "lists every engine registered here: its version, its worker and the worker's state, its last "
+        "conformance verdict, and the ids of the project's runs it made, newest first (engine_report reads "
+        "each). Narrow the things by words. Returns ids and words, nothing to cite."
     ),
     input_model=EnginePlantsInput, run=_plants, strict=False,
 ))

@@ -165,6 +165,15 @@ export function trainOfRun(run: { engine: string; inputs: { name: string; quanti
 }
 
 /**
+ * What a run ran, as a person reads it, from its runs row: a train run names its train's name beside its id
+ * (`trainOfRun`), any other its thing and the configuration it ran in.
+ */
+export function ranWhat(run: { engine: string; plant: string; configuration?: string | null; inputs: { name: string; quantity: { value: unknown } }[] }): string {
+  const t = trainOfRun(run);
+  return t ? `${t.name} (${run.plant})` : run.plant + (run.configuration ? ` (${run.configuration})` : '');
+}
+
+/**
  * OF-BLD-020 §6.2 — where the Builder opens a fresh train with its inlet set:
  * a kept simulation's harvest (`simulation:<artifact id>`, fermOS → Simulate's
  * **Use as a train's inlet**) or a scenario's newest run, whose broth its

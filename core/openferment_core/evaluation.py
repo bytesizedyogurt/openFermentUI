@@ -8,10 +8,10 @@
     python -m openferment_core.evaluation summary [--suite S]          each tag's runs side by side
 
 A suite is `default` (the proof's two questions) or `ethanol` (the owner's
-twelve). A tag names the route table a run was asked on, so runs on different
-models sit side by side; `--judge` has the `judge` route read each answer as it
-is kept, and `judge` has the judge route as it now stands read the kept ones
-again (a second judge).
+twelve and the base's two, fourteen in all). A tag names the route table a run
+was asked on, so runs on different models sit side by side; `--judge` has the
+`judge` route read each answer as it is kept, and `judge` has the judge route
+as it now stands read the kept ones again (a second judge).
 
 It acts in the project OPENFERMENT_PROJECT names, on the database
 OPENFERMENT_DATABASE_URL names, each read from the environment or else from

@@ -201,6 +201,55 @@ Option 2.
   version across edits of its code, and a run's id holds the version, so a new version is what
   makes the service compute a request afresh.
 
+## Implementation (alpha 2.2 stage C, 2026-11-04)
+
+Stage C put the core's other two engines behind the contract and every run on one shape
+(`docs/PROGRESS.md`, Log, stage C; the decisions D1 to D11 of the stage's plan, each named there).
+
+- **`kinetics`** (`core/openferment_core/fermos_engine.py`, D4) is fermOS behind the contract. Its
+  worker is `None` and it declares nothing heavy: fermOS integrates with SciPy in the service's
+  process, and a vessel design runs on BioSTEAM in the Proforma worker. Its things are the
+  families that simulate, a forecast of a kept logistic fit and a vessel design, the last two
+  listed while the project keeps what each takes. A parameter with no default reads value and
+  origin null, and a run that leaves one unset is refused in words, keeping nothing.
+  fermOS's requests take typed inputs (D2), and each simulation, kept forecast and vessel design
+  is one `runs` row at every door (D3). A fit keeps its artifacts alone (`docs/api/runs.md`, A
+  kinetics run). `conform kinetics --inputs <file>` holds the eight checks on the placeholders
+  `write_placeholder_inputs` writes, each a person's assumption dated the day it is written.
+- **`train`** (`core/openferment_core/pureos/engine.py`, D5) is pureOS's trains behind the
+  contract. Its worker is the Proforma worker; its things are the project's trains, saved and
+  built, read afresh. A train's requests take inputs named by place, and each run is one row at
+  every door, keeping `sffRefused` while the toolkit's schema requires a TEA year a train carries
+  none of. `conform train --project <id>` reads the project and checks a copy of it on a database
+  of the checks' own, writing the verdict alone where it read (D5's amendment at C.3).
+- **Proforma as `biosteam`'s things** (D6). The shelf's scenario flowsheets join the library's
+  plants through a provider Proforma registers with the engine as it is imported
+  (`engine/biosteam.provide`), so the engine package imports no Proforma module. The prompt's
+  §6.2 names Proforma's shelf flowsheets by the worker's ops (`benchmark`, `evaluate`, `grid`,
+  `montecarlo`, `run`); in the tree they are two things, `ethanol_glucose_v0` and
+  `custom_train_v1`, each run through the worker's one `run` op, whose artifact carries the
+  base case, the grid and the samples, one row of the tool `proforma.run`. The worker's
+  `evaluate`, `grid` and `montecarlo` ops stay for its own tests (`test_proforma_worker.py`), and
+  `benchmark` retired with the shelf's hand-written entries (D8), its code kept so a kept run
+  replays (`workers/kept_references.py`).
+- **The `measurement` origin** (§6.3, D7; ADR-006's note of 2026-11-03): a value may name a
+  deposition's reading, looked up in the project before anything runs; a run resting on readings
+  and the package's defaults is `measured`. The bench's readings-alone record is ADR-016.
+- **The reads a model has** (Postdoc's question 13, `postdoc/evaluate.py`): `engine_plants` lists
+  every engine registered here with its version, its worker's state, its last verdict and the
+  ids of the project's runs it made; `engine_report` and `engine_run` name a run's engine and
+  artifact tool.
+- **Conformance on a hand-written engine.** The core's three engines compute in code of their
+  own, with no `compute` for check 7 to offer a thing to, so check 7 holds the refusal it reaches
+  (a thing the engine lacks, refused in words before any run, nothing kept) and says so; a
+  refusal inside each one's computation is a receipt its own tests hold (`test_engines.py`,
+  `test_runs.py`).
+- **Proof step 10** makes the eight checks on every engine the service lists and requires every
+  engine `core/pyproject.toml` registers among them: `kinetics` with the placeholders the proof
+  writes, `train` on a train the proof makes from step 4's corn stover run through the Builder's
+  routes; it prints checks 3, 5 and 7's words under each engine's line, and holds the proof's
+  project the same after the checks.
+
 ## Revisit condition
 
 A second scientific engine arriving beyond the three in the tree, or the SFF toolkit shipping an

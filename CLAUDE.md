@@ -25,7 +25,7 @@
 - C: `pnpm test:slow` (marker `slow`) and `pnpm test:live` (marker `live`: a real network call, most needing the key and spending) run by hand, outside verify.
 - C: `pnpm prove` runs the proof (`scripts/prove.py`, steps 1 to 10) on a database of its own, with no key and the network refused; run `pnpm build` first, since step 9 walks the built app in Chromium; `--steps 3,8` proves the steps named with what they stand on.
 - C: `pnpm ready` (or `pnpm ready --offline`) says in rows whether the service can run: the database, both schemas, pgvector, the embedder, the model routes and the key; `pnpm ready --probe` adds one minimal call on the `index` route, the one row that sees the account's own usage limit, and it spends.
-- C: `pnpm eval seed` and `pnpm eval run [--live]` keep and score Postdoc's evaluation set in the project `OPENFERMENT_PROJECT` names; `--suite ethanol` is the owner's twelve, `--tag` names a route table, `--judge` and `pnpm eval judge` add the `judge` route's scores, and `pnpm eval summary` sets the tags side by side (`docs/api/postdoc.md`).
+- C: `pnpm eval seed` and `pnpm eval run [--live]` keep and score Postdoc's evaluation set in the project `OPENFERMENT_PROJECT` names; `--suite ethanol` is the owner's twelve and the base's two, fourteen in all, `--tag` names a route table, `--judge` and `pnpm eval judge` add the `judge` route's scores, and `pnpm eval summary` sets the tags side by side (`docs/api/postdoc.md`).
 - C: `pnpm gen:api`, `pnpm gen:tools` and `pnpm gen:components` write `docs/api/openapi.json` with `src/api/types.gen.ts`, `docs/TOOLS.md` and `COMPONENTS.md`; verify fails on drift, so regenerate a generated file and leave it unedited by hand.
 - C: `pnpm smoke` opens every rail entry against the real service and needs a build; `pnpm dev` serves the client on Vite.
 - R: `pnpm test:core` green before every commit; push after every step; never force-push; never commit `core/.env` or a database dump (§11.2).
@@ -74,7 +74,8 @@
 - C: The licence stays undecided, and no LICENSE file is added until the owner chooses (ADR-012).
 - C: The corn stover plant's two values its package's own test fails on these pins are held to the package's own measurement (ADR-013).
 - C: The browser's Durable snapshot keeps preferences and the writes the service has not acknowledged (ADR-014).
-- C: Engines register through the entry-point group `openferment.engines` behind one contract, BioSTEAM the first, every run one `runs` row with its `engine` (ADR-015).
+- C: Engines register through the entry-point group `openferment.engines` behind one contract: the core's `biosteam`, `kinetics` (fermOS) and `train` (pureOS), every run one `runs` row with its `engine`, each held by `conform` (kinetics with `--inputs`, train with `--project`) (ADR-015).
+- C: The bench records a locked runbook's readings alone beside a protocol's steps, the readings a scenario's `measurement` value names (ADR-016).
 
 ## Communication contracts
 
@@ -121,6 +122,7 @@
 - C: ADR-010: a deleted piece proves needed, restored from `alpha-1.0` with a decision record. ADR-011: a guard proves necessary again and returns with a negative test.
 - C: ADR-013: biosteam, thermosteam or biorefineries changes version, or the package's test values change upstream. ADR-014: the owner asks for the queue to go, or accounts give pending writes a home on the service.
 - C: ADR-015: a second scientific engine beyond the three in the tree, or the SFF toolkit ships an importer (ADR-003).
+- C: ADR-016: a project keeps protocols in its store, or the owner asks for the bench to stay protocol-only.
 
 ## Stop conditions (ask the owner first; execution prompt §11.1)
 
@@ -137,4 +139,4 @@
 - R: Tag `alpha-1.0` marks `d19224f`, the tree before this build, and a deleted piece returns from it (ADR-010); the tag's push waits on the owner (`docs/PROGRESS.md`, Blockers).
 - C: `docs/handoff/2026-10/` holds the owner's handoff documents (white paper, development plan, reference atlas), with extracted text in `txt/`.
 - C: A citation such as OF-BLD-012 §2.3, OF-DES or OF-COR-001 in code or tests names an alpha 1.0 document; those kept are in `docs/history/`, and none carries authority.
-- C: `docs/decisions/` holds ADR-000 to ADR-015; `docs/PROGRESS.md` holds the log of every stage, the departures, the debts and the blockers; `docs/reports/` holds measured reports.
+- C: `docs/decisions/` holds ADR-000 to ADR-016; `docs/PROGRESS.md` holds the log of every stage, the departures, the debts and the blockers; `docs/reports/` holds measured reports.

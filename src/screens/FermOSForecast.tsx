@@ -39,6 +39,7 @@ import { useEffect, useMemo, useState } from 'react';
 import type { ForecastResult, ParameterSpec, ParamScope, SimulationResult } from '@/data/types';
 import { overridesFor, useStore } from '@/store';
 import { href, navigate } from '@/router';
+import { EngineRunLink } from '@/components/EngineRunLink';
 import { Button, Callout } from '@/components/ui';
 import { NewScenarioDialog } from '@/components/NewScenarioDialog';
 import { ParameterPanel } from '@/components/ParameterPanel';
@@ -338,8 +339,8 @@ export default function FermOSForecast() {
             are computed curves, kept as{' '}
             <a className="font-num hover:text-accent" href={href(`/biorepo/artifacts/${sim.artifactId}`)}>
               {sim.artifactId}
-            </a>
-            ; the run&rsquo;s readings are the filled points.
+            </a>{' '}
+            (<EngineRunLink artifactId={sim.artifactId} engine="kinetics" />); the run&rsquo;s readings are the filled points.
           </p>
         </>
       )}
@@ -376,6 +377,15 @@ export default function FermOSForecast() {
               <li className="text-signal-warn">The sugar runs out at about {fmt(result.substrateRunsOutH, 3)} h, and the forecast ends there.</li>
             )}
           </ul>
+          {result.artifactId && (
+            <p className="text-caption text-ink-soft" data-testid="forecast-kept">
+              Kept as{' '}
+              <a className="font-num hover:text-accent" href={href(`/biorepo/artifacts/${result.artifactId}`)}>
+                {result.artifactId}
+              </a>
+              ; <EngineRunLink artifactId={result.artifactId} engine="kinetics" />.
+            </p>
+          )}
           {result.evidence && <EvidenceCard evidence={result.evidence} />}
         </>
       )}

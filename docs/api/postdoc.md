@@ -78,8 +78,15 @@ score as JSON:
 | `bareNumbers` | 1 when no claim was dropped for a number in its text; `droppedForNumbers` keeps the count |
 
 Two suites (alpha 2.1): `default`, the proof's two questions, and `ethanol`, the owner's twelve
-real questions of `docs/reports/live-questions-2026-11.md`, each with what a good answer does in
-words (`expects`). `pnpm eval seed --suite ethanol` keeps them; `pnpm eval run --live --suite
+real questions of `docs/reports/live-questions-2026-11.md` and the two the alpha 2.2 prompt's §5
+adds for the base's seams, each with what a good answer does in words (`expects`):
+
+| Question | What a good answer does |
+|---|---|
+| `eq-eth-13` Which engines are registered here, what does each take and give, and which of this project's runs came from each? | The engine reads (`engine_plants`, whose `engines` names every engine registered here with the ids of the project's runs it made; `engine_parameters`; then `engine_report`, which names a run's engine and tool, or a module read) set out as one table with a row for each engine the core registers (`biosteam`, `kinetics` and `train`, the names `ENGINES_EXPECTED` holds; stage D adds the stranger's), each run cited by its evidence id or module row; no estimate |
+| `eq-eth-14` Take the ethanol yield measured in this project's most recent deposition, set it as the glucose-only scenario's yield, run it, and say what changed and what the value rests on. | Asked in question 5's conversation: the reading read with `runbooks_read` (kind `reading`), set as the scenario's value with the origin `{"kind": "measurement", "ref": "<the reading's id>"}`, run with `engine_run`, set beside the glucose-only run with `study_compare` and the comparison cited; the run's provenance `measured`, or `assumed` with the reason; where no deposition holds such a reading, said in words |
+
+`pnpm eval seed --suite ethanol` keeps the fourteen; `pnpm eval run --live --suite
 ethanol --tag <name> [--judge]` asks them on the routing table the environment sets and keeps each
 run under the tag, with the seconds it took. `--judge` has the first model on the `judge` route
 read each answer as it is kept: the question, what a good answer does, every claim with what it

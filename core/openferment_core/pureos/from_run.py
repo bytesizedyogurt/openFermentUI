@@ -17,8 +17,21 @@ a `TrainSpec` the Builder opens, as data, and never computes a quantity:
                   other component), one whose class no type holds, or one whose
                   outlets the type's ports do not match one for one, is named in
                   `unmapped` with why, in words
-    the inlet     the run's own stream entering the first unit taken (its first
-                  inlet, BioSTEAM's feed), a `run-stream` inlet on that run
+    the inlet     the run's own stream carrying the most product into the
+                  train from outside it, a `run-stream` inlet on that run: a
+                  stream entering a unit taken comes from outside the train
+                  when it is a feed, or its source is no unit taken and no
+                  unit the train's own outlets reach going forward in run
+                  order (through units it leaves out, a recycle back to an
+                  earlier unit read as no part of the train); of those, the
+                  one whose product kg/hr the run's stream table holds
+                  highest (the earlier unit's, then the earlier inlet's, on a
+                  tie). The train starts at the unit it enters, a unit taken
+                  before that one is named in `unmapped`, and the notes name
+                  every other stream entering the train from outside it with
+                  its product kg/hr. A run whose streams from outside carry
+                  no product starts at the first unit taken, on its first
+                  inlet
     the outlets   each outlet routed as the run routed it, followed through the
                   units the train leaves out: on to the next unit taken (or, for
                   the last, to the product stream), back to an earlier one (a
@@ -55,7 +68,7 @@ read in the worker, a class's default, a record's or a person's.
 """
 from __future__ import annotations
 
-from typing import Any
+from typing import Any, NamedTuple
 
 from ..models import (
     Artifact,
@@ -76,6 +89,18 @@ REFERENCE = "proforma.reference"
 TRAIN_RUN = "pureos.train_run"
 LIBRARY_RUN = "library.run"
 RUN_TOOLS = (RUN, REFERENCE, TRAIN_RUN, LIBRARY_RUN)
+
+
+class Entering(NamedTuple):
+    """A stream entering a unit of the train from outside it: its product
+    flow, the unit's place among the units taken, the inlet's place among
+    the unit's, the stream and the unit."""
+
+    flow: float
+    place: int
+    inlet: int
+    stream: str
+    unit: Any
 
 
 class RunNotOnFile(LookupError):
@@ -238,8 +263,59 @@ def from_run(artifact_id: str, train_id: str | None = None) -> TrainFromRun:
         raise TrainRefused(f"no unit of run {art.id} that its product passes through is a unit type of pureOS's catalogue, "
                            "so no train is read from it: "
                            + "; ".join(f"{m.unitId} ({m.unitClass}): {m.why}" for m in unmapped))
-    ids = [u.id for u, _ in taken]
+    flow_unit = t.tableUnits.get("massFlow") or ""
+
+    def kg(value: float) -> str:
+        return f"{value:g} {flow_unit}".strip()
+
     units = {u.id: u for u in t.units}
+
+    def from_outside() -> list[Entering]:
+        """Each stream entering a unit taken from outside the train (module
+        docstring)."""
+        held = {u.id for u, _ in taken}
+        # The units the train's own outlets reach going forward in run order,
+        # through units it leaves out.
+        reached: set[str] = set()
+        stack = [units[uid] for uid in held]
+        while stack:
+            u = stack.pop()
+            for sid in u.outs:
+                row = streams.get(sid)
+                x = units.get(row.sink) if row is not None and row.sink else None
+                if x is not None and x.id not in held and x.id not in reached and x.order > u.order:
+                    reached.add(x.id)
+                    stack.append(x)
+        out = []
+        for k, (u, _) in enumerate(taken):
+            for n, sid in enumerate(u.ins):
+                row = streams.get(sid)
+                source = row.source if row is not None else None
+                if source is None or (source not in held and source not in reached):
+                    out.append(Entering(carries(sid), k, n, sid, u))
+        return out
+
+    # The train starts where the most product enters it from outside it
+    # (module docstring): the run's stream table compared, never made.
+    entering = from_outside()
+    best = max(entering, key=lambda x: (x.flow, -x.place, -x.inlet), default=None)
+    if best is not None and best.flow > EPS:
+        start, inlet_id = best.place, best.stream
+    else:
+        start = 0
+        first = taken[0][0]
+        if not first.ins:
+            raise TrainRefused(f"unit {first.id}, the first of run {art.id}'s train, has no inlet in its unit table")
+        inlet_id = first.ins[0]
+    first = taken[start][0]
+    for u, _ in taken[:start]:
+        took_in = sum(carries(s) for s in u.ins)
+        unmapped.append(TrainUnmapped(unitId=u.id, unitClass=u.unitClass, why=(
+            f"before {first.id}, where the train starts: {inlet_id} carries the most {chem} into the train from "
+            f"outside it ({kg(best.flow)} by the run's stream table) and enters {first.id}, and {kg(took_in)} of "
+            f"{chem} enters {u.id}")))
+    taken = taken[start:]
+    ids = [u.id for u, _ in taken]
     notes: list[str] = []
 
     def reaches(sid: str) -> tuple[set[str], bool]:
@@ -338,15 +414,19 @@ def from_run(artifact_id: str, train_id: str | None = None) -> TrainFromRun:
         spec_units.append(TrainUnitSpec(
             id=names[u.id], type=e.id, outlets=routes,
             readFrom=TrainUnitReadFrom(flowsheet=reads, unit=u.id) if reads else None))
-    first = taken[0][0]
-    if not first.ins:
-        raise TrainRefused(f"unit {first.id}, the first of run {art.id}'s train, has no inlet in its unit table")
-    inlet_id = first.ins[0]
-    if len(first.ins) > 1:
-        notes.append(f"The inlet is {inlet_id}, the first inlet of {first.id} in the run; "
-                     f"{', '.join(first.ins[1:])} also entered it there, which the train leaves out.")
+    others = [x for x in from_outside() if x.stream != inlet_id]
+    if best is not None and best.flow > EPS:
+        notes.append(f"The inlet is {inlet_id}, the stream carrying the most {chem} into the train from outside it "
+                     f"by the run's stream table ({kg(best.flow)}), entering {first.id}"
+                     + (f"; the train starts there, and the {start} unit{'s' if start != 1 else ''} taken before it "
+                        f"{'are' if start != 1 else 'is'} left out ("
+                        + ", ".join(m.unitId for m in unmapped[-start:]) + ")" if start else "") + ".")
     else:
-        notes.append(f"The inlet is {inlet_id}, the stream entering {first.id} in the run, as its stream table holds it.")
+        notes.append(f"The inlet is {inlet_id}, the first inlet of {first.id} in the run, as its stream table holds it: "
+                     f"no stream from outside the train carries {chem} into it there.")
+    if others:
+        notes.append("Also entering the train from outside it in the run, and left out of it: " + "; ".join(
+            f"{x.stream} into {x.unit.id} ({kg(x.flow)} of {chem})" for x in others) + ".")
     renamed = [f"{uid} as {names[uid]}" for uid in ids if names[uid] != uid]
     if renamed:
         notes.append(f"A unit id BioSTEAM would not take is renamed: {', '.join(renamed)}.")

@@ -59,11 +59,19 @@ def assume(key, value, low=None, high=None):
 ASSUMED = [assume("plant_scale", 100000.0), assume("glucose_price", 0.4, 0.3, 0.5)]
 
 
-def test_a_scenario_with_no_run_on_the_service_reads_as_none(client):
+def test_a_scenario_with_no_run_on_the_service_reads_as_none(client, monkeypatch):
+    from openferment_core.engine import simulator
+
+    # A read starts no simulator, whatever state an earlier test in this
+    # process left the worker in: neither name that starts it is asked.
+    started: list[str] = []
+    for module in (proforma, simulator):
+        monkeypatch.setattr(module, "start", lambda *a, **k: started.append("start"))
+        monkeypatch.setattr(module, "worker", lambda *a, **k: started.append("worker"))
+    before = proforma.status()
     r = client.get(f"/api/proforma/runs?scenarioId={HELD}")
     assert r.status_code == 200 and r.json() == {"scenarioId": HELD, "artifact": None}
-    # A read: it starts no simulator.
-    assert proforma.status()["status"] in ("cold", "failed")
+    assert started == [] and proforma.status() == before
 
 
 def test_the_newest_run_of_each_scenario_is_found_by_the_scenario_its_basis_names(client, standin, monkeypatch):

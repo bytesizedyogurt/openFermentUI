@@ -1200,6 +1200,10 @@ def _description(module: str) -> str:
         return (f"Write to {label}: nothing can be written here by a model. {NO_WRITE[module]}. Every call is refused in "
                 "words; report the refusal in gaps and name the person who could make the change.")
     for action, (what, fields) in ACTIONS[module].items():
+        # An action every call refuses is listed with the refusal's words and no fields.
+        if (module, action) in NO_WRITE_ACTION:
+            lines.append(f"{action}: refused, every call ({NO_WRITE_ACTION[(module, action)]})")
+            continue
         g = gates.gated(module, action)
         tail = (f" [gated: {g.covers}; becomes a proposal a person carries out on Home]" if g and g.id != "spend"
                 else " [at the budget, gated: becomes a spend proposal a person carries out on Home]" if g else "")

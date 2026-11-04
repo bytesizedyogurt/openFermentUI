@@ -851,6 +851,38 @@ function StrayOverrides({ scope, data }: { scope: string; data: ParamScope | nul
   );
 }
 
+/**
+ * A run-stream inlet whose stream entered, in its run, a unit other than the
+ * train's first: once a person removes or moves the first units of a train
+ * read from a run, the inlet still names the stream those units took. Said in
+ * words, with each stream the train's first unit took in that run (its sink in
+ * the run's stream table) a click away; a first unit the run did not hold, or
+ * one renamed, says nothing.
+ */
+function InletAway({ run, streamId, first, take }: { run: RunChoice; streamId: string; first: string | null; take: (streamId: string) => void }) {
+  const entered = run.streams.find((s) => s.id === streamId)?.sink ?? null;
+  const into = first ? run.streams.filter((s) => s.sink === first) : [];
+  if (!first || !entered || entered === first || into.length === 0) return null;
+  return (
+    <div className="mt-2" data-testid="builder-inlet-away" data-entered={entered} data-first={first}>
+      <Callout kind="warn">
+        <p>
+          The inlet is stream <span className="font-num">{streamId}</span>, which entered <span className="font-num">{entered}</span> in run{' '}
+          <span className="font-num">{run.artifactId}</span>; the train&rsquo;s first unit is <span className="font-num">{first}</span>, which in that run took{' '}
+          {into.map((s) => s.id).join(', ')}.
+        </p>
+        <div className="flex flex-wrap gap-2 mt-1">
+          {into.map((s) => (
+            <Button key={s.id} size="sm" className="min-h-[44px]" onClick={() => take(s.id)} data-testid="builder-inlet-take">
+              Take {s.id} · {composition(s)}
+            </Button>
+          ))}
+        </div>
+      </Callout>
+    </div>
+  );
+}
+
 function InletSection({
   draft,
   spec,
@@ -1007,6 +1039,9 @@ function InletSection({
         )}
       </div>
       {inlet.kind === 'simulation' && inlet.ref && <HarvestRead read={chosenHarvest} />}
+      {inlet.kind === 'run-stream' && chosenRun && inlet.streamId && (
+        <InletAway run={chosenRun} streamId={inlet.streamId} first={draft.units[0]?.id ?? null} take={(sid) => change({ inlet: { ...inlet, streamId: sid } })} />
+      )}
       {inlet.kind === 'run-stream' && chosenRun?.scenarioId && (
         <p className="text-caption text-ink-soft mt-1" data-testid="builder-inlet-scenario" data-broth={chosenRun.broth ?? ''}>
           The train names scenario <span className="font-num">{chosenRun.scenarioId}</span>, so the service reads its newest run when the train runs (now{' '}

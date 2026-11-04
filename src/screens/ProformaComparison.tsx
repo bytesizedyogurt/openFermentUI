@@ -18,11 +18,12 @@
 //                that holds a run of another engine, `study comparison 2`).
 import { useEffect, useState } from 'react';
 import { BookOpen, Download } from 'lucide-react';
-import type { ComparisonReport } from '@/data/types';
+import type { ComparisonReport, EngineRun } from '@/data/types';
 import { href } from '@/router';
 import { exportCSV } from '@/lib/csv';
 import { stamp } from '@/lib/proforma';
-import { StudiesDown, comparisonReport } from '@/lib/studies';
+import { StudiesDown, comparisonReport, listRuns } from '@/lib/studies';
+import { ranWhat } from '@/lib/pureos';
 import { Callout, Card, LinkButton, PageHeader } from '@/components/ui';
 import { ProvenanceBadge } from '@/components/Provenance';
 import { Tornado, type TornadoRow } from '@/components/figures';
@@ -72,6 +73,8 @@ const pct = (c: number | null) => (c == null ? '—' : `${c >= 0 ? '+' : ''}${(c
 export default function ProformaComparison({ comparisonId }: { comparisonId: string }) {
   const [report, setReport] = useState<ComparisonReport | null>(null);
   const [problem, setProblem] = useState<string | null>(null);
+  // The project's runs rows, by id: each compared run is named from its own (`ranWhat`), as Studies names it.
+  const [rows, setRows] = useState<Map<string, EngineRun>>(new Map());
 
   useEffect(() => {
     const ctrl = new AbortController();
@@ -80,6 +83,9 @@ export default function ProformaComparison({ comparisonId }: { comparisonId: str
     comparisonReport(comparisonId, ctrl.signal)
       .then(setReport)
       .catch((e: unknown) => !ctrl.signal.aborted && setProblem(problemOf(e)));
+    listRuns(ctrl.signal)
+      .then((list) => setRows(new Map(list.map((r) => [r.id, r]))))
+      .catch(() => undefined);
     return () => ctrl.abort();
   }, [comparisonId]);
 
@@ -146,8 +152,8 @@ export default function ProformaComparison({ comparisonId }: { comparisonId: str
                   <a className="font-num underline underline-offset-2 hover:text-accent" href={href(`/proforma/runs/${r.artifactId}`)}>
                     {r.artifactId}
                   </a>{' '}
-                  {r.plant}
-                  {r.configuration ? ` (${r.configuration})` : ''}, {r.provenance}
+                  {rows.get(r.artifactId) ? ranWhat(rows.get(r.artifactId)!) : `${r.plant ?? 'a run'}${r.configuration ? ` (${r.configuration})` : ''}`}
+                  {rows.get(r.artifactId) && rows.get(r.artifactId)!.engine !== 'biosteam' ? ` on ${rows.get(r.artifactId)!.engine}` : ''}, {r.provenance}
                   {i === 0 && <span className="text-ink-soft"> · each change is reckoned from this run</span>}
                 </li>
               ))}

@@ -310,7 +310,12 @@ def _refused_unknown(engine: Any, by: str) -> tuple[bool, str]:
     first ask reaches its worker's `run` op once, the worker's `Refused` is
     kept as a receipt in the worker's words, and the same request asked again
     is answered from the receipt with the worker's `run` op never asked. Any
-    other engine refuses the unknown thing in words, keeping nothing."""
+    other engine computes in code of its own (it has no `compute`), where the
+    check can offer no thing, so the check holds the refusal it reaches: the
+    unknown thing refused in words before any run, keeping nothing. A refusal
+    inside such an engine's own computation is the receipt its own run keeps,
+    which the engine's own tests hold (the core's three: test_engines.py and
+    test_runs.py); the words say so."""
     from ..engine import runs
 
     held = {r.id for r in runs.listed(engine.name)}
@@ -321,7 +326,11 @@ def _refused_unknown(engine: Any, by: str) -> tuple[bool, str]:
         except (EngineRefused, LookupError, ValueError) as e:
             said = _words(e)
             kept = {r.id for r in runs.listed(engine.name)} - held
-            return _traceless(said) and not kept, (f"refused in words, {len(kept)} run kept: {_cut(said, 200)}")
+            return _traceless(said) and not kept, (
+                f"the engine computes in code of its own, with no compute the check can offer a thing to, so it holds "
+                f"the refusal it reaches: {NO_SUCH_THING!r}, a thing the engine lacks, refused in words before any "
+                f"run, {len(kept)} run kept ({_cut(said, 200)}); a refusal inside its own computation is the receipt "
+                f"its own run keeps, held by the engine's own tests")
 
     computed: list[str] = []
     offered = EngineThing(id=NO_SUCH_THING, title="a thing the conformance check offers the worker as one of its own",

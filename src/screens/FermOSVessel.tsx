@@ -43,6 +43,7 @@ import { Gauge } from 'lucide-react';
 import type { FermosFitInfo, ParamScope, SimulationSummary, VesselDesign } from '@/data/types';
 import { overridesFor, useStore } from '@/store';
 import { href, navigate, useRoute } from '@/router';
+import { EngineRunLink } from '@/components/EngineRunLink';
 import { Button, Callout, EmptyState, SectionTitle } from '@/components/ui';
 import { NewScenarioDialog } from '@/components/NewScenarioDialog';
 import { ParameterPanel } from '@/components/ParameterPanel';
@@ -190,7 +191,8 @@ function Result({ design }: { design: VesselDesign }) {
           <a className="font-num hover:text-accent" href={href(`/biorepo/artifacts/${design.artifactId}`)}>
             {design.artifactId}
           </a>{' '}
-          on {stamp(design.createdAt)}, designed for {design.sourceTool} <span className="font-num">{design.source}</span>
+          on {stamp(design.createdAt)}, designed for {design.sourceTool} <span className="font-num">{design.source}</span>;{' '}
+          <EngineRunLink artifactId={design.artifactId} engine="kinetics" />
         </span>
       </p>
 

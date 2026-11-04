@@ -63,8 +63,8 @@ from openferment_core import api, artifacts, events, llm, ready, tools
 from openferment_core.engine import EngineBroken, EngineRefused, conform, contract, library, registry, runs, simulator
 from openferment_core.engine.sample import SAMPLE
 from openferment_core.literature import KIT_SETTINGS
-from openferment_core.models import (CONFIGURATION_MAX, EngineInput, EngineParameter, EngineRun, EngineThing,
-                                     ParameterSpec, Quantity)
+from openferment_core.models import (CONFIGURATION_MAX, EngineCheck, EngineInput, EngineParameter, EngineRun,
+                                     EngineThing, ParameterSpec, Quantity)
 from openferment_core.workers import WorkerCrashed, WorkerTimeout, withheld
 
 SAMPLE_ENTRY = "openferment_core.engine.sample:SAMPLE"
@@ -879,8 +879,13 @@ def test_check_7_fails_when_the_same_request_reaches_the_worker_again(engines, m
 
 
 def test_check_7_holds_an_engine_without_compute_to_a_refusal_in_words_that_keeps_nothing(engines):
+    """A hand-written engine computes in code of its own: check 7 holds the
+    refusal it reaches, and its words say what it held and where the
+    receipts of the engine's own computation are held."""
     ok, words = conform._refused_unknown(registry.get("biosteam"), "conformance test")
     assert ok and "the biosteam engine runs no thing 'conform-no-such-thing'" in words and "0 run kept" in words
+    assert words.startswith("the engine computes in code of its own, with no compute the check can offer a thing to")
+    assert "refused in words before any run" in words and words.endswith("held by the engine's own tests")
 
 
 def test_a_thing_that_must_name_a_configuration_is_checked_in_its_first_and_refused_with_none(engines, monkeypatch):
@@ -1875,6 +1880,75 @@ def test_both_doors_refuse_a_trains_bad_inputs_together_by_place_in_one_set_of_w
     assert "V: a value a train's run sets is named <unit id>.<key> or inlet.<key>" in said
     assert "unit F1 (flash) has no parameter 'nonesuch'" in said
     assert runs.listed("train") == []
+
+
+@pytest.fixture
+def core_engines(train_engines, monkeypatch):
+    """A registry of the three engines core/pyproject.toml registers, over
+    test_train's stand-in worker and a project whose evidence pool holds no
+    record (the `kinetics_engines` and `train_engines` fixtures together)."""
+    from types import SimpleNamespace
+
+    monkeypatch.setattr(registry, "entry_points", lambda: _points(("biosteam", BIOSTEAM_ENTRY),
+                                                                  ("kinetics", KINETICS_ENTRY), ("train", TRAIN_ENTRY)))
+    monkeypatch.setattr(evidence_pool, "load", lambda *a, **k: SimpleNamespace(records=[], records_by_id={}))
+    registry.reset()
+    yield train_engines
+    registry.reset()
+
+
+def test_engine_plants_names_every_engine_with_the_runs_each_made_and_a_runs_read_names_its_engine(core_engines):
+    """Question 13's reads (postdoc/evaluate.py): `engine_plants` lists every
+    engine registered here, whichever engine it is asked for, each with its
+    version, its worker and the worker's state, its last verdict and the ids
+    of the project's runs it made, newest first; `engine_report` names the
+    engine and the artifact tool of the run it reads."""
+    client = TestClient(api.app)
+    kinetic = client.post("/api/engines/kinetics/run", json={"thing": "batch_v1", "by": "Ada Moreno",
+                                                             "inputs": _sent(_typed())})
+    assert kinetic.status_code == 200, kinetic.text
+    _saved(spec_of())
+    trained = client.post("/api/engines/train/run", json={"thing": "t1", "by": "Ada Moreno"})
+    assert trained.status_code == 200, trained.text
+    again = client.post("/api/engines/train/run", json={"thing": "t1", "by": "Ada Moreno", "inputs": [
+        {"name": "F1.V", "quantity": person(0.2, unit="")}]})
+    assert again.status_code == 200, again.text
+    k, first, second = (r.json()["run"] for r in (kinetic, trained, again))
+    conform.keep(conform.verdict(KINETICS, [EngineCheck(number=n, check=conform.CHECKS[n], ok=True, said="held")
+                                            for n in range(1, 9)], "conformance test"))
+    ctx = tools.ToolContext(model=llm.DEFAULT_PRIMARY)
+    for asked in ({}, {"engine": "kinetics"}, {"engine": "train"}):
+        listed = tools.run("engine_plants", asked, ctx)
+        assert listed.error is None, listed.error
+        engines = {e["name"]: e for e in listed.summary["engines"]}
+        assert list(engines) == ["biosteam", "kinetics", "train"], asked
+        assert (engines["kinetics"]["runs"], engines["kinetics"]["runIds"]) == (1, [k["id"]])
+        assert (engines["train"]["runs"], engines["train"]["runIds"]) == (2, [second["id"], first["id"]]), "newest first"
+        assert (engines["biosteam"]["runs"], engines["biosteam"]["runIds"]) == (0, [])
+        assert engines["kinetics"]["version"] == KINETICS.version() and engines["train"]["version"] == TRAIN.version()
+        assert (engines["kinetics"]["worker"], engines["kinetics"]["workerStatus"]) == (None, "none")
+        assert engines["train"]["worker"] == TRAIN.worker == engines["biosteam"]["worker"]
+        assert engines["kinetics"]["conformance"]["ok"] is True and engines["kinetics"]["conformance"]["by"] == \
+            "conformance test"
+        assert engines["train"]["conformance"] is None and engines["biosteam"]["conformance"] is None
+        assert not any("error" in e for e in engines.values())
+    for run in (k, first):
+        read = tools.run("engine_report", {"run": run["id"]}, ctx)
+        assert read.error is None and (read.summary["engine"], read.summary["tool"]) == (run["engine"], run["tool"])
+    assert (first["engine"], first["tool"], k["engine"], k["tool"]) == ("train", train_spec.TRAIN_RUN, "kinetics",
+                                                                        fermos.SIMULATION)
+
+
+def test_engine_plants_lists_the_projects_runs_of_an_engine_registered_here_no_longer(core_engines, monkeypatch):
+    _saved(spec_of())
+    made = TestClient(api.app).post("/api/engines/train/run", json={"thing": "t1", "by": "Ada Moreno"})
+    assert made.status_code == 200, made.text
+    monkeypatch.setattr(registry, "entry_points", lambda: _points(("biosteam", BIOSTEAM_ENTRY)))
+    registry.reset()
+    listed = {e["name"]: e for e in tools.run("engine_plants", {}, tools.ToolContext()).summary["engines"]}
+    assert list(listed) == ["biosteam", "train"]
+    assert listed["train"] == {"name": "train", "error": "no engine of this name is registered here now", "runs": 1,
+                               "runIds": [made.json()["run"]["id"]]}
 
 
 def _conform_here(test_database, monkeypatch) -> None:

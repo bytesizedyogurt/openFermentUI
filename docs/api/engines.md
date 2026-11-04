@@ -351,13 +351,19 @@ computation from that artifact and asks `sff_export` for the file again.
   every run and filters by it, and a run's page shows each output with its origin.
 - **Tools.** `engine_plants`, `engine_parameters`, `engine_run` and `engine_report` take `engine`
   (default `biosteam`), so Postdoc and any MCP client list, read and report every engine's things
-  and runs the same way. `engine_run` runs a contract engine's thing at its own defaults; values
-  are set through `POST /api/engines/{name}/run`, and a study scenario (`engine_run`'s `scenario`)
-  runs on BioSTEAM. A kinetics family runs with values no default gives, so `engine_run` on one
-  answers its refusal naming each parameter that waits; a person sets those values on fermOS's
-  screens or at `POST /api/engines/kinetics/run` (The core's `kinetics`, below). At the HTTP
-  endpoint (`POST /api/tools/{name}`) a tool that writes, `engine_run` among them, names its
-  caller with `?by=`, who is then the write's author; a call that names nobody is a 422 in words.
+  and runs the same way. Whichever engine it is asked for, `engine_plants` lists every engine
+  registered here (`engines`): its version, its worker and the worker's state, its last
+  conformance verdict, and the ids of the project's runs it made, newest first (`runs` counts
+  them, `runIds` names the newest twenty); a project's runs of an engine registered here no longer
+  are listed under its name with those words. `engine_report` and `engine_run` name the engine and
+  the artifact tool of the run they answer (`engine`, `tool`). `engine_run` runs a contract
+  engine's thing at its own defaults; values are set through `POST /api/engines/{name}/run`, and a
+  study scenario (`engine_run`'s `scenario`) runs on BioSTEAM. A kinetics family runs with values
+  no default gives, so `engine_run` on one answers its refusal naming each parameter that waits; a
+  person sets those values on fermOS's screens or at `POST /api/engines/kinetics/run` (The core's
+  `kinetics`, below). At the HTTP endpoint (`POST /api/tools/{name}`) a tool that writes,
+  `engine_run` among them, names its caller with `?by=`, who is then the write's author; a call
+  that names nobody is a 422 in words.
 - **`pnpm ready`** prints one row per engine: its version, its worker and its conformance verdict.
 
 ## The core's `biosteam`
@@ -657,8 +663,13 @@ registered.
   them. Check 7 offers a
   WorkerEngine's worker the thing `conform-no-such-thing` as one of its own: the first ask reaches
   the worker's `run` op once, its `Refused` is kept as a receipt in its words, and the same request
-  asked again is answered from the receipt with the worker's `run` op never asked; a hand-written
-  engine (`biosteam`) refuses the unknown thing in words, keeping nothing. Check 8 asks a second
+  asked again is answered from the receipt with the worker's `run` op never asked. A hand-written
+  engine (the core's three, `biosteam`, `kinetics` and `train`) computes in code of its own, with
+  no `compute` the check can offer a thing to, so check 7 holds the refusal it reaches there: the
+  unknown thing refused in words before any run, keeping nothing, and its words say so. A refusal
+  inside such an engine's own computation is the receipt its own run keeps, which the engine's
+  own tests hold (for the core's three, `core/tests/test_engines.py` and
+  `core/tests/test_runs.py`). Check 8 asks a second
   run in a model's name, on a basis of its own: with no values set, through the `engine_run` tool
   on another thing checked, or else another configuration of the first; with values set, with
   no second basis, or with every thing checked (`--project`: check 3 has run each thing already),

@@ -42,6 +42,7 @@ import { useEffect, useMemo, useState } from 'react';
 import type { FamilyInfo, FermosBinding, FermosFitInfo, ParameterSpec, ParameterValue, ParamScope, SimulationResult, SimulationSummary, SteadyState } from '@/data/types';
 import { overridesFor, useStore } from '@/store';
 import { href, useRoute } from '@/router';
+import { EngineRunLink } from '@/components/EngineRunLink';
 import { Button, Callout, SectionTitle } from '@/components/ui';
 import { ProvenanceBadge } from '@/components/Provenance';
 import { ParameterPanel } from '@/components/ParameterPanel';
@@ -155,7 +156,7 @@ function BuiltFrom({ r }: { r: SimulationResult }) {
         <a className="font-num hover:text-accent underline underline-offset-2" href={href(`/biorepo/artifacts/${r.artifactId}`)}>
           {r.artifactId}
         </a>
-        .
+        ; <EngineRunLink artifactId={r.artifactId} engine="kinetics" />.
       </p>
       <ul className="text-caption mt-1 space-y-0.5">
         {[...groups.entries()].map(([w, keys]) => (

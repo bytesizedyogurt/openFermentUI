@@ -81,9 +81,9 @@ def test_the_scores_are_computed_from_the_plan():
 # ── alpha 2.1 stage C: the owner's twelve, tags and the judge ──────────
 
 
-def test_the_owners_twelve_are_a_suite_of_their_own():
+def test_the_owners_twelve_and_the_bases_two_are_a_suite_of_their_own():
     made = evaluate.seed(suite=evaluate.ETHANOL)
-    assert made == [f"eq-eth-{n:02d}" for n in range(1, 13)] and evaluate.seed(suite=evaluate.ETHANOL) == []
+    assert made == [f"eq-eth-{n:02d}" for n in range(1, 15)] and evaluate.seed(suite=evaluate.ETHANOL) == []
     held = {q.id: q for q in evaluate.questions(evaluate.ETHANOL)}
     assert (held["eq-eth-07"].follows, held["eq-eth-08"].follows) == ("eq-eth-06", "eq-eth-05")
     assert all(q.expects and q.suite == evaluate.ETHANOL for q in held.values())
@@ -91,6 +91,50 @@ def test_the_owners_twelve_are_a_suite_of_their_own():
     assert held["eq-eth-05"].estimate is True and held["eq-eth-07"].estimate is False and held["eq-eth-01"].estimate is None
     with pytest.raises(ValueError, match="no suite"):
         evaluate.seed(suite="nonesuch")
+
+
+# ── alpha 2.2 stage C: the base's two (the prompt's §5, questions 13 and 14) ──
+
+
+def _core_engines() -> set[str]:
+    """The engines core/pyproject.toml registers in the group `openferment.engines`."""
+    import tomllib
+    from pathlib import Path
+
+    project = tomllib.loads((Path(__file__).resolve().parent.parent / "pyproject.toml").read_text(encoding="utf-8"))
+    return set(project["project"]["entry-points"]["openferment.engines"])
+
+
+def test_question_13_expects_the_engine_reads_and_every_engine_the_core_registers():
+    q = {q.id: q for q in evaluate.ETHANOL_QUESTIONS}["eq-eth-13"]
+    assert q.question == ("Which engines are registered here, what does each take and give, and which of this "
+                          "project's runs came from each?"), "the prompt's words"
+    assert _core_engines() <= set(evaluate.ENGINES_EXPECTED), "every engine the core registers is one it expects"
+    assert all(name in q.expects for name in evaluate.ENGINES_EXPECTED) and "one table" in q.expects
+    assert q.tools[:2] == [["engine_plants"], ["engine_parameters"]] and "engine_report" in q.tools[2]
+    assert set(q.cites) == {"evidence", "row"} and q.estimate is False and q.follows is None
+
+
+def test_question_14_expects_a_measurement_origin_a_provenance_with_its_reason_and_a_comparison():
+    q = {q.id: q for q in evaluate.ETHANOL_QUESTIONS}["eq-eth-14"]
+    assert q.question == ("Take the ethanol yield measured in this project's most recent deposition, set it as the "
+                          "glucose-only scenario's yield, run it, and say what changed and what the value rests on."), \
+        "the prompt's words"
+    assert q.tools == [["runbooks_read"], ["study_scenario"], ["engine_run"], ["study_compare"]]
+    assert all(w in q.expects for w in ("origin measurement", "reading's id", "measured", "assumed with the reason",
+                                        "comparison"))
+    assert q.follows == "eq-eth-05", "asked in the conversation that proposed the glucose-only scenario"
+    assert q.estimate is None, "the glucose-only scenario's own estimates may stand, each labelled"
+    assert set(q.cites) == {"evidence", "row"}
+
+
+def test_every_question_names_tools_the_registry_holds_and_words_alone():
+    from openferment_core import tools
+
+    for q in (*evaluate.DEFAULT_QUESTIONS, *evaluate.ETHANOL_QUESTIONS):
+        assert all(name in tools.WHITELIST for group in q.tools for name in group), q.id
+    for q in evaluate.ETHANOL_QUESTIONS[12:]:
+        assert not any(ch.isdigit() for ch in q.question + q.expects), f"{q.id}: words only, no values"
 
 
 def test_an_estimate_a_question_allows_is_held_to_its_label():

@@ -27,6 +27,17 @@ async def bodies(
     return list((await s.execute(q)).scalars())
 
 
+async def columns(
+    s: AsyncSession, table: Table, project_id: str, *names: str, order: Iterable[Any] = ()
+) -> list[tuple[Any, ...]]:
+    """The named lookup columns of a project's rows, each row a tuple in the
+    order named, oldest first unless `order` says otherwise: a read that
+    leaves the bodies where they are."""
+    q = select(*(table.c[n] for n in names)).where(table.c.project_id == project_id)
+    q = q.order_by(*(order or (table.c.created_at, table.c.id)))
+    return [tuple(r) for r in (await s.execute(q)).all()]
+
+
 async def body(s: AsyncSession, table: Table, project_id: str, row_id: str, *, for_update: bool = False) -> dict[str, Any] | None:
     """One row's body, or None. `for_update` holds the row until the transaction ends."""
     q = select(table.c.body).where(table.c.project_id == project_id, table.c.id == row_id)
