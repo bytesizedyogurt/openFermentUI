@@ -47,9 +47,9 @@ import {
   statusOf,
   verdictFor,
 } from '../src/engine/competence';
-import type { Checks, Guild, GuildEvidence, GuildPerson, Proposal } from '../src/data/types';
+import type { Checks, Guild, GuildEvidence, GuildPerson } from '../src/data/types';
 import { mayQueue, proposeChecks } from '../src/engine/checks';
-import { needsActing, shownProposals } from '../src/lib/proposals';
+import { needsActing, shownProposals, type Proposal } from '../src/lib/proposals';
 
 let fails = 0;
 const check = (label: string, ok: boolean, extra: unknown = '') => {

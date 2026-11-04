@@ -72,7 +72,7 @@ import { createElement } from 'react';
 import { renderToStaticMarkup } from 'react-dom/server';
 import { fmt } from '../src/engine/units';
 import { toTable as timeCourseTable, type TimeCourseProps } from '../src/components/figures/TimeCourse';
-import type { TrainUnit } from '../src/data/types';
+import type { TrainUnit } from '../src/lib/pureos';
 import { gatherLinks } from '../src/components/Dossier';
 import { ArtifactsDown, ArtifactRefused } from '../src/lib/artifacts';
 import { YIELD_FIELD, yieldFieldKnown, yieldsOnSugar } from '../src/lib/geneos';

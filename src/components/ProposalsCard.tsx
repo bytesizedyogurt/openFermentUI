@@ -15,10 +15,9 @@
 // acting on Guild, because Guild knows people by id (finding 11).
 import { useEffect, useState } from 'react';
 import { Inbox } from 'lucide-react';
-import type { Proposal } from '@/data/types';
 import { useStore, reviewerName } from '@/store';
 import { navigate } from '@/router';
-import { carryOut, dismiss, listProposals, needsActing, shownProposals } from '@/lib/proposals';
+import { carryOut, dismiss, listProposals, needsActing, shownProposals, type Proposal } from '@/lib/proposals';
 import { useGuild } from './GuildBits';
 import { Button, Card } from './ui';
 

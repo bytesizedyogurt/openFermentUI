@@ -18,10 +18,6 @@ import type {
   Protocol,
   Runbook,
   SeriesRole,
-  TrainProposal,
-  TrainFromRun,
-  TrainRun,
-  KeptTrain,
   RunState,
   Strain,
   TimerState,
@@ -38,12 +34,12 @@ import type {
   CheckResult,
   Checks,
   Skill,
-  TrainSpec,
 } from '@/data/types';
 import type { FermosFitResponse } from '@/lib/fermos';
 import type { Override } from '@/lib/params';
 import type { LiveConversation, LiveTurn, RunbookDraft, TraceStep } from '@/lib/postdoc';
 import type { Scenario } from '@/lib/proforma';
+import type { KeptTrain, TrainFromRun, TrainProposal, TrainRun, TrainSpec } from '@/lib/pureos';
 import type { ExtractionRecord, Overlay, OverlayPaper, Paper, RecordStatus, ReviewDecision, RunOutput } from '@/lib/review';
 import type { Provenance } from '@/lib/studies';
 import { toSI } from '@/engine/units';

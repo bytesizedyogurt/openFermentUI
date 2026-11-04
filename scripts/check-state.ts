@@ -37,7 +37,7 @@ import {
   type OutboxEntry,
   type ProjectState,
 } from '../src/lib/projectState';
-import type { Deposition, TrainSpec } from '../src/data/types';
+import type { Deposition } from '../src/data/types';
 import type { Override, ParameterSpec } from '../src/lib/params';
 import type { LiveConversation } from '../src/lib/postdoc';
 import type { FlowsheetInfo, ProformaScenarioInfo, Scenario, ScenarioInput } from '../src/lib/proforma';
@@ -48,7 +48,7 @@ import { ONTOLOGY } from '../src/data/ontology';
 import { ServiceDown, ServiceRefused, call, detailWords } from '../src/lib/http';
 import { runnable, type LibraryPlant } from '../src/lib/library';
 import { inputsOf } from '../src/lib/params';
-import { trainInputs, unitScope } from '../src/lib/pureos';
+import { trainInputs, unitScope, type TrainSpec } from '../src/lib/pureos';
 import { ceilingQuery, inputCounts, isReading, keptRunsOf, referenceRunOf, retiredEntryOf, runBody, runSpecs } from '../src/lib/proforma';
 import { interpolate } from '../src/engine/interp';
 import { awaitingReadBack, correctedBy, correctionOf } from '../src/engine/readings';

@@ -26,11 +26,11 @@
 // train by the service.
 import { useEffect, useMemo, useState } from 'react';
 import { ArrowLeft, Download, Filter } from 'lucide-react';
-import type { StreamRow, Train, TrainUnit } from '@/data/types';
+import type { StreamRow } from '@/lib/proforma';
 import { trainSubjects } from '@/lib/thermo';
 import { PropertiesPanel } from '@/components/PropertiesPanel';
 import { operationForClass } from '@/data/vocabulary';
-import { PureosDown, PureosRefused, RUN_WORDS, builderFromRunPath, builderPath, productIn, pureosTrain, share, streamsOf } from '@/lib/pureos';
+import { PureosDown, PureosRefused, RUN_WORDS, builderFromRunPath, builderPath, productIn, pureosTrain, share, streamsOf, type Train, type TrainUnit } from '@/lib/pureos';
 import { useStore } from '@/store';
 import { OwnerTabs } from '@/components/OwnerTabs';
 import { PUREOS_TABS } from '@/data/tabs';

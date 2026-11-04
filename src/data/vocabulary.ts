@@ -4,8 +4,62 @@
 // Names, stages, spellings and the BioSTEAM classes each step maps to. No
 // value, range or claim about any organism or product lives here. alpha 2.0
 // (ADR-010) kept these two lists from the old facet vocabulary and deleted
-// the rest with the seeded catalogue.
-import type { CarbonSource, UnitOperation, UnitOperationStage } from './types';
+// the rest with the seeded catalogue. The types of both lists are declared
+// here with them (alpha 2.2 E.7).
+
+/**
+ * Where a unit operation sits in a downstream train, fermenter to vial. The
+ * order of `UNIT_OP_STAGE_ORDER` below is the display order; a product's own
+ * `unitOperationIds` array is the authority on its actual train, because two
+ * products can use the same operation at different points.
+ */
+export type UnitOperationStage =
+  | 'harvest'
+  | 'clarification'
+  | 'cell disruption'
+  | 'recovery'
+  | 'capture'
+  | 'capture/polish'
+  | 'polish'
+  | 'concentration'
+  | 'desalting'
+  | 'isolation'
+  | 'purification'
+  | 'drying'
+  | 'formulation'
+  | 'finishing'
+  // OF-BLD-020 §5.1: a pump, a tank, a heat exchanger, a mixer or a splitter
+  // serves a train without being a step of it.
+  | 'utility';
+
+export interface UnitOperation {
+  id: string;
+  label: string;
+  stage: UnitOperationStage;
+  /** Scale band where the operation is used at all, when it is not universal. */
+  scale?: string;
+  /** Chemistry detail, e.g. the resin family for a chromatography step. */
+  resin?: string;
+  note?: string;
+  /**
+   * The BioSTEAM unit classes this step is (OF-BLD-019 §4.1), so a unit in a
+   * train a flowsheet ran links to the step it performs. Names only, as
+   * BioSTEAM spells its classes; a step BioSTEAM has no class for names none.
+   */
+  biosteamClasses?: string[];
+}
+
+/**
+ * A carbon source a value can be measured on (OF-BLD-014 §2.1): a name and
+ * the spellings a paper uses for it, lower-case. Words alone, with no number
+ * and no concentration: what is resolved is the paper's wording.
+ * `carbonSourceId` below matches against `spellings`.
+ */
+export interface CarbonSource {
+  id: string;
+  label: string;
+  spellings: string[];
+}
 
 /**
  * The id a paper's wording names, by the whole-word rule (OF-BLD-014 §2.1).

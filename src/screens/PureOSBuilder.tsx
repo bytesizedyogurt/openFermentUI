@@ -73,29 +73,21 @@
 // needs and how one is made (Run here; fermOS → Vessel).
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { ArrowDown, ArrowLeft, ArrowUp, Download, Plus, Trash2 } from 'lucide-react';
-import type {
-  FermosHarvest,
-  KeptTrain,
-  ParameterSpec,
-  ParamScope,
-  ProposalReason,
-  SimulationSummary,
-  StreamRow,
-  TrainFromRun,
-  TrainProposal,
-  TrainRun,
-  TrainSpec,
-  TrainUnitSpec,
-  TrainValidation,
-  UnitSpecs,
-  UnitType,
-} from '@/data/types';
 import { href, navigate, useRoute } from '@/router';
 import { overridesFor, timeId, useStore } from '@/store';
-import { paramScope, type ParamAsk } from '@/lib/params';
+import { paramScope, type ParamAsk, type ParameterSpec, type ParamScope } from '@/lib/params';
 import { PRODUCT_WORDS, productWords } from '@/lib/geneos';
-import { STATE_WORDS, fermosHarvest, fermosSimulations } from '@/lib/fermos';
-import { NO_DIAGRAM, compositeVessels, diagramSrc, scenarioFromVesselAndTrain, stamp, vesselWords, type VesselSummary } from '@/lib/proforma';
+import { STATE_WORDS, fermosHarvest, fermosSimulations, type FermosHarvest, type SimulationSummary } from '@/lib/fermos';
+import {
+  NO_DIAGRAM,
+  compositeVessels,
+  diagramSrc,
+  scenarioFromVesselAndTrain,
+  stamp,
+  vesselWords,
+  type StreamRow,
+  type VesselSummary,
+} from '@/lib/proforma';
 import { exportCSV } from '@/lib/csv';
 import {
   INLET,
@@ -123,8 +115,19 @@ import {
   unitOf,
   unitScope,
   unitSpecs,
+  unitsOf,
   validateTrain,
+  type KeptTrain,
+  type ProposalReason,
   type RunChoice,
+  type TrainFromRun,
+  type TrainProposal,
+  type TrainRun,
+  type TrainSpec,
+  type TrainUnitSpec,
+  type TrainValidation,
+  type UnitSpecs,
+  type UnitType,
 } from '@/lib/pureos';
 import { fmt } from '@/engine/units';
 import { Button, Callout, Card, EmptyState, PageHeader, SectionTitle, Stat, cx } from '@/components/ui';
@@ -188,7 +191,7 @@ function freshTrain(product: string, inlet: TrainSpec['inlet'] | null = null): T
 const structureOf = (t: TrainSpec): TrainSpec => ({
   ...t,
   inlet: { ...t.inlet, params: {} },
-  units: t.units.map((u) => ({ ...u, params: {} })),
+  units: unitsOf(t).map((u) => ({ ...u, params: {} })),
 });
 
 export default function PureOSBuilder({ trainId }: { trainId: string }) {
@@ -330,7 +333,7 @@ export default function PureOSBuilder({ trainId }: { trainId: string }) {
       )}
 
       <div className="mt-5">
-        <ComponentTag component="pureOS" action={draft ? `train of ${draft.units.length} units, built here` : 'train builder'} />
+        <ComponentTag component="pureOS" action={draft ? `train of ${unitsOf(draft).length} units, built here` : 'train builder'} />
       </div>
     </div>
   );
@@ -349,7 +352,7 @@ function FromRunNote({ info }: { info: { artifactId: string; answer: TrainFromRu
   const a = info.answer;
   return (
     <div className="mb-4">
-      <Callout kind="info" title={`Read from run ${info.artifactId}: ${a.train.units.length} units by their class`}>
+      <Callout kind="info" title={`Read from run ${info.artifactId}: ${unitsOf(a.train).length} units by their class`}>
         <ul className="text-caption space-y-0.5" data-testid="builder-from-run">
           {a.notes.map((n) => (
             <li key={n}>{n}</li>
@@ -450,6 +453,7 @@ function Builder({
     () => Object.fromEntries(Object.entries(overridesAll).filter(([scope]) => scope.startsWith(prefix))),
     [overridesAll, prefix],
   );
+  const units = unitsOf(draft);
   const spec = useMemo(() => trainSpecOf(draft, mine), [draft, mine]);
   const overrides = useMemo(() => trainOverrides(spec, mine), [spec, mine]);
   // Each place's specs as its panel read them: the units its values are sent in as inputs (lib/pureos.trainInputs).
@@ -534,19 +538,19 @@ function Builder({
   const clearScope = (place: string) => {
     for (const o of mine[unitScope(draft.id, place)] ?? []) clearOverride(o.scope, o.key);
   };
-  const addUnit = (type: UnitType) => change({ units: [...draft.units, unitOf(type, nextUnitId(draft.units))] });
+  const addUnit = (type: UnitType) => change({ units: [...units, unitOf(type, nextUnitId(units))] });
   const moveUnit = (i: number, by: -1 | 1) => {
-    const units = [...draft.units];
-    const [u] = units.splice(i, 1);
-    units.splice(i + by, 0, u);
-    change({ units });
+    const order = [...units];
+    const [u] = order.splice(i, 1);
+    order.splice(i + by, 0, u);
+    change({ units: order });
   };
   const removeUnit = (i: number) => {
-    clearScope(draft.units[i].id);
-    change({ units: draft.units.filter((_, n) => n !== i) });
+    clearScope(units[i].id);
+    change({ units: units.filter((_, n) => n !== i) });
   };
   const routeOutlet = (i: number, port: string, to: string) =>
-    change({ units: draft.units.map((u, n) => (n === i ? { ...u, outlets: { ...u.outlets, [port]: to } } : u)) });
+    change({ units: units.map((u, n) => (n === i ? { ...u, outlets: { ...u.outlets, [port]: to } } : u)) });
 
   const savedSame = saved ? sameTrain(saved.train, spec) : false;
   const doSave = () => {
@@ -611,22 +615,22 @@ function Builder({
       <InletSection draft={draft} spec={spec} change={change} clearInlet={() => clearScope(INLET)} refusals={placeRefusals(INLET)} onSpecs={readSpecs} />
 
       <section aria-labelledby="builder-steps" data-testid="builder-steps">
-        <SectionTitle right={<span className="font-num text-caption text-ink-soft">{draft.units.length} units</span>}>
+        <SectionTitle right={<span className="font-num text-caption text-ink-soft">{units.length} units</span>}>
           <span id="builder-steps">Steps, in order</span>
         </SectionTitle>
-        {draft.units.length === 0 && (
+        {units.length === 0 && (
           <p className="text-body text-ink-soft" data-testid="builder-no-units">
             No unit yet: add the first from the palette below. A train sends one outlet of each unit on to the next, and the last unit&rsquo;s is the product stream.
           </p>
         )}
         <div className="space-y-3">
-          {draft.units.map((u, i) => (
+          {units.map((u, i) => (
             <UnitCard
               key={u.id}
               unit={u}
               index={i}
-              count={draft.units.length}
-              units={draft.units}
+              count={units.length}
+              units={units}
               type={typeOf.get(u.type) ?? null}
               spec={spec}
               refusals={placeRefusals(u.id)}
@@ -1039,7 +1043,7 @@ function InletSection({
       </div>
       {inlet.kind === 'simulation' && inlet.ref && <HarvestRead read={chosenHarvest} />}
       {inlet.kind === 'run-stream' && chosenRun && inlet.streamId && (
-        <InletAway run={chosenRun} streamId={inlet.streamId} first={draft.units[0]?.id ?? null} take={(sid) => change({ inlet: { ...inlet, streamId: sid } })} />
+        <InletAway run={chosenRun} streamId={inlet.streamId} first={unitsOf(draft)[0]?.id ?? null} take={(sid) => change({ inlet: { ...inlet, streamId: sid } })} />
       )}
       {inlet.kind === 'run-stream' && chosenRun?.scenarioId && (
         <p className="text-caption text-ink-soft mt-1" data-testid="builder-inlet-scenario" data-broth={chosenRun.broth ?? ''}>

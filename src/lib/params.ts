@@ -32,6 +32,7 @@
 // Override at its door.
 import type { components } from '@/api/types.gen';
 import type { EngineInput } from './studies';
+import type { TrainSpec } from './pureos';
 import { ServiceDown, ServiceRefused, call } from './http';
 
 type S = components['schemas'];
@@ -51,8 +52,6 @@ export type ParamScope = S['ParamScope'];
 /** `POST /api/params/{scope}/resolve`, and what it answers. Runs nothing. */
 export type ParamResolveRequest = S['ParamResolveRequest'];
 export type ParamResolveResult = S['ParamResolveResult'];
-/** pureOS's train, which a unit scope is asked with (src/lib/pureos.ts makes one). */
-type TrainSpec = S['TrainSpec'];
 
 export { ServiceDown as ParamsDown, ServiceRefused as ParamsRefused };
 

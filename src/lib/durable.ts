@@ -33,7 +33,8 @@
 // all of these end with the app running normally on in-memory state. Losing
 // persistence is bad; refusing to open the screen because persistence is
 // unavailable would be worse.
-import type { Deposition, Guild, GuildWithdrawal, InputAssumption, MeasuredEvidence, Runbook, TrainSpec } from '@/data/types';
+import type { components } from '@/api/types.gen';
+import type { Deposition, Guild, GuildWithdrawal, InputAssumption, MeasuredEvidence, Runbook } from '@/data/types';
 import type { Provenance } from './studies';
 import type { RecordStatus, ReviewDecision } from './review';
 import type { Override } from './params';
@@ -163,15 +164,12 @@ export interface DurableSnapshot {
   trainsMade?: Record<string, TrainMade>;
 }
 
-/** A train built in pureOS's Builder and saved (OF-BLD-020 §5.3): one of the project's rows. */
-export interface TrainMade {
-  /** The train as data, every value typed into its panels laid in as each place's params. */
-  train: TrainSpec;
-  /** When it was saved, ISO, UTC. */
-  savedAt: string;
-  /** The reviewer name it was saved under. */
-  by: string;
-}
+/**
+ * A train built in pureOS's Builder and saved (OF-BLD-020 §5.3): one of the project's rows, the service's `TrainMade`
+ * generated from its model (ADR-007). It holds the train as data, every value typed into its panels laid in as each
+ * place's params; when it was saved, ISO, UTC; and the reviewer name it was saved under.
+ */
+export type TrainMade = components['schemas']['TrainMade'];
 
 export const EMPTY_SNAPSHOT: DurableSnapshot = {
   version: 1,

@@ -190,3 +190,28 @@ Never; this is how the drift stops recurring.
   required lists (E.0a's rule) and name each field with a default as one a request may leave out.
   The service writes every field of a fit it answers; the readers default the ones a request may
   leave out (a fit's parameters and quality, a series' points, a quality's residuals), nine reads.
+
+### Alpha 2.2, E.7 (2026-11-04): pureOS's lib, and a train's units read as a request may leave them
+
+- `lib/pureos.ts` names the generated schemas pureOS answers and takes: a run's train and its units
+  (`Train`, `TrainUnit`), a proposal (`ProposeRequest`, `TrainProposal`, `ProposalReason`,
+  `ProposalMissing`), the catalogue (`UnitType`, `UnitSpecs`), a train as data (`TrainSpec`,
+  `TrainUnitSpec`, `TrainParam`) with its validation, check and run (`TrainValidation`,
+  `TrainRunRequest`, `TrainRun`, `StreamPurity`), a train read from a run (`TrainFromRunRequest`,
+  `TrainFromRun`) and a train a model kept (`KeptTrain`); it reads a stream, a train on file and a
+  vessel (`StreamRow`, `TrainSummary`, `VesselSummary`) from `lib/proforma.ts`, which names them
+  for Proforma's pages. `lib/proposals.ts` names a gate's `Proposal` and a person's act on it,
+  `ProposalAction`; the Guild person acting stays on the hand-kept types until Guild's lib moves
+  (E.12). pureOS's four screens, ProposedTrain, ProposalsCard and the figures PurityByStream and
+  RecoveryByUnit read every name there, `lib/thermo.ts` its `Train`, `lib/params.ts` its
+  `TrainSpec` (the alias E.1 left goes), and the store its saved trains, its proposals and what the
+  Builder showed.
+- A train goes to the service in a request (a validation, a check, a run), so the generated
+  `TrainSpec` keeps Pydantic's required list (E.0a's rule) and names its units as a field a request
+  may leave out. The service writes every train it answers whole, and the page makes every train
+  with its units; each reader takes a train's units through `unitsOf`, which reads a train sent with
+  none as a train of no unit.
+- The Builder's saved train in the Durable snapshot, `TrainMade`, is the generated row of E.0b,
+  where a hand mirror stood in `lib/durable.ts`.
+- The vocabulary's own types (`UnitOperationStage`, `UnitOperation`, `CarbonSource`) move to
+  `data/vocabulary.ts` beside its lists; `src/data/types.ts` re-exports them until E.15.

@@ -12,10 +12,11 @@
 // The question and the answer are the service's own shapes, generated from its
 // models into src/api/types.gen.ts (ADR-007): both doors answer the
 // `thermo_props` artifact beside what it holds, which the service reads as
-// `ThermoProps`, so a page reads each property as typed.
+// `ThermoProps`, so a page reads each property as typed. A train whose
+// streams a card asks about is pureOS's, named in lib/pureos.ts.
 import type { components } from '@/api/types.gen';
-import type { Train } from '@/data/types';
 import { ServiceDown, ServiceRefused, call } from './http';
+import type { Train } from './pureos';
 
 export { ServiceDown as ThermoDown, ServiceRefused as ThermoRefused };
 

@@ -48,12 +48,11 @@
 // missing. The rules are the service's (`pureos/proposer.py`); the page
 // decides nothing, and the Builder opens the proposal by its train id.
 import { useEffect, useMemo, useState } from 'react';
-import { UNIT_OPERATIONS, UNIT_OP_STAGE_ORDER } from '@/data/vocabulary';
-import type { KeptTrain, TrainSummary, UnitOperationStage } from '@/data/types';
+import { UNIT_OPERATIONS, UNIT_OP_STAGE_ORDER, type UnitOperationStage } from '@/data/vocabulary';
 import { href, navigate, useRoute } from '@/router';
 import { useStore } from '@/store';
-import { NEW_TRAIN, PureosDown, PureosRefused, builderCopyPath, builderPath, pureosTrainRuns, pureosTrains, pureosTrainsKept, share, trainPath } from '@/lib/pureos';
-import { stamp } from '@/lib/proforma';
+import { NEW_TRAIN, PureosDown, PureosRefused, builderCopyPath, builderPath, pureosTrainRuns, pureosTrains, pureosTrainsKept, share, trainPath, unitsOf, type KeptTrain } from '@/lib/pureos';
+import { stamp, type TrainSummary } from '@/lib/proforma';
 import { Button, Callout, Card, PageHeader, SectionTitle, Stat, cx } from '@/components/ui';
 import { OwnerTabs } from '@/components/OwnerTabs';
 import { PUREOS_TABS } from '@/data/tabs';
@@ -200,7 +199,7 @@ function TrainsBuiltHere({ runs, problem }: { runs: TrainSummary[] | null; probl
                     </span>
                   </div>
                   <div className="text-caption text-ink-soft mt-0.5">
-                    {m.train.units.length} units · product {m.train.product} · inlet {m.train.inlet.kind} · saved {stamp(m.savedAt)} by {m.by}
+                    {unitsOf(m.train).length} units · product {m.train.product} · inlet {m.train.inlet.kind} · saved {stamp(m.savedAt)} by {m.by}
                   </div>
                 </li>
               );
@@ -257,6 +256,7 @@ function TrainsMadeByPostdoc({ runs, problem: runsProblem }: { runs: TrainSummar
           <ul>
             {listed.map((k) => {
               const run = runs?.find((r) => r.trainId === k.spec.id) ?? null;
+              const units = unitsOf(k.spec);
               return (
                 <li key={k.spec.id} className="py-2.5 border-b border-line/70 last:border-0" data-testid="pureos-kept-row" data-train={k.spec.id}>
                   <div className="flex flex-wrap items-baseline gap-x-3 gap-y-1">
@@ -280,8 +280,8 @@ function TrainsMadeByPostdoc({ runs, problem: runsProblem }: { runs: TrainSummar
                     </span>
                   </div>
                   <div className="text-caption text-ink-soft mt-0.5">
-                    product {k.spec.product} · {k.spec.units.length} {k.spec.units.length === 1 ? 'unit' : 'units'}
-                    {k.spec.units.length ? `: ${k.spec.units.map((u) => `${u.id} ${u.type}`).join(', ')}` : ''} · inlet {k.spec.inlet.kind} · built by {k.madeBy}
+                    product {k.spec.product} · {units.length} {units.length === 1 ? 'unit' : 'units'}
+                    {units.length ? `: ${units.map((u) => `${u.id} ${u.type}`).join(', ')}` : ''} · inlet {k.spec.inlet.kind} · built by {k.madeBy}
                     {k.effort ? ` at effort ${k.effort}` : ''}, {stamp(k.at)}
                     {k.updatedAt !== k.at ? `, last changed ${stamp(k.updatedAt)}` : ''}
                   </div>

@@ -5,35 +5,69 @@
 // computes nothing of its own: every mass, recovery and cumulative share on
 // the page is a field the service sent. With the service down this says so,
 // and nothing stands in for a train (E.2). Shares lib/http.ts's call.
-import type {
-  Artifact,
-  EngineInput,
-  KeptTrain,
-  ParameterSpec,
-  ProposeRequest,
-  StreamRow,
-  Train,
-  TrainFromRun,
-  TrainFromRunRequest,
-  TrainParam,
-  TrainProposal,
-  TrainRun,
-  TrainRunRequest,
-  TrainSpec,
-  TrainSummary,
-  TrainUnit,
-  TrainUnitSpec,
-  TrainValidation,
-  UnitSpecs,
-  UnitType,
-  VesselSummary,
-} from '@/data/types';
+//
+// Every shape the service answers or takes here is generated from its models
+// into src/api/types.gen.ts (ADR-007) and named below: a run's train and its
+// units, a proposal with its reasons, the catalogue's unit types and their
+// specs, a train as data with its validation, check and run, a train read
+// from a run, and a train a model kept. A stream, a train on file and a vessel
+// are named in lib/proforma.ts, which reads them for Proforma's pages too.
+import type { components } from '@/api/types.gen';
 import { ServiceDown, ServiceRefused, call } from './http';
-import { inputsOf, type Override } from './params';
-import { keptReferenceRuns, proformaArtifact, proformaNewestRun, proformaScenarios, proformaShelf, retiredEntryOf } from './proforma';
-import { listRuns } from './studies';
+import { inputsOf, type Override, type ParameterSpec } from './params';
+import {
+  keptReferenceRuns,
+  proformaArtifact,
+  proformaNewestRun,
+  proformaScenarios,
+  proformaShelf,
+  retiredEntryOf,
+  type StreamRow,
+  type TrainSummary,
+  type VesselSummary,
+} from './proforma';
+import { listRuns, type Artifact, type EngineInput } from './studies';
 
 export { ServiceDown as PureosDown, ServiceRefused as PureosRefused };
+
+type S = components['schemas'];
+
+/** `GET /api/pureos/train/{key}`: a run's train as the service reads it from the run's stream and unit tables. */
+export type Train = S['Train'];
+/** One unit of a run's train, in run order, with the product's flow through it as the stream table states it. */
+export type TrainUnit = S['TrainUnit'];
+/** `POST /api/pureos/propose`: a product, a host and optionally an inlet, each by its id. */
+export type ProposeRequest = S['ProposeRequest'];
+/** What the written rules propose: a train with each unit's reason, or none with each property nothing holds. */
+export type TrainProposal = S['TrainProposal'];
+export type ProposalReason = S['ProposalReason'];
+export type ProposalMissing = S['ProposalMissing'];
+/** `GET /api/pureos/catalogue`: a unit type; `GET /api/pureos/catalogue/{id}/specs`: its specs with the class's defaults. */
+export type UnitType = S['UnitType'];
+export type UnitSpecs = S['UnitSpecs'];
+/**
+ * A train as data: its inlet, its units in order, each with the values a person typed for it. The service takes one
+ * in a request that may leave its units out, so a reader takes a train's units through `unitsOf`.
+ */
+export type TrainSpec = S['TrainSpec'];
+export type TrainUnitSpec = S['TrainUnitSpec'];
+/** A value a person typed for one parameter of a train's place: an Override without its scope and key. */
+export type TrainParam = S['TrainParam'];
+/** `POST /api/pureos/train/validate`, and `/check`: every refusal at once, by its place. */
+export type TrainValidation = S['TrainValidation'];
+/** `POST /api/pureos/train/run`, and `/check`: the train, a person's values as typed inputs, and who asks. */
+export type TrainRunRequest = S['TrainRunRequest'];
+/** `POST /api/pureos/train/run`: the one `pureos.train_run` artifact, read; a stream's purity within it. */
+export type TrainRun = S['TrainRun'];
+export type StreamPurity = S['StreamPurity'];
+/** `POST /api/pureos/train/from-run`: a kept run's units read into a train, and what it leaves out. */
+export type TrainFromRunRequest = S['TrainFromRunRequest'];
+export type TrainFromRun = S['TrainFromRun'];
+/** `GET /api/pureos/trains-kept`: a train a model built, kept on the service. */
+export type KeptTrain = S['KeptTrain'];
+
+/** A train's units in order: each one it holds, and none when the train as sent left them out. */
+export const unitsOf = (t: Pick<TrainSpec, 'units'>): TrainUnitSpec[] => t.units ?? [];
 
 /** Every train on file. */
 export const pureosTrains = (signal?: AbortSignal) => call<TrainSummary[]>('/api/pureos/trains', { signal });
@@ -203,13 +237,13 @@ export function trainSpecOf(draft: TrainSpec, overrides: Record<string, Override
   return {
     ...draft,
     inlet: { ...draft.inlet, params: params(INLET) },
-    units: draft.units.map((u) => ({ ...u, params: params(u.id) })),
+    units: unitsOf(draft).map((u) => ({ ...u, params: params(u.id) })),
   };
 }
 
 /** Every override of a train's places: the browser's own bookkeeping of what a person typed there. */
 export const trainOverrides = (train: TrainSpec, overrides: Record<string, Override[]>): Override[] =>
-  [INLET, ...train.units.map((u) => u.id)].flatMap((place) => overrides[unitScope(train.id, place)] ?? []);
+  [INLET, ...unitsOf(train).map((u) => u.id)].flatMap((place) => overrides[unitScope(train.id, place)] ?? []);
 
 /**
  * A train's overrides as the inputs a run or a check sends (alpha 2.2 D2): each turned by `inputsOf` in the unit its
@@ -218,7 +252,7 @@ export const trainOverrides = (train: TrainSpec, overrides: Record<string, Overr
  * params (`trainSpecOf`), each a person's as typed, and its inputs follow once its panel has read the units.
  */
 export function trainInputs(train: TrainSpec, overrides: Override[], specs: Record<string, ParameterSpec[]>): EngineInput[] {
-  return [INLET, ...train.units.map((u) => u.id)].flatMap((place) => {
+  return [INLET, ...unitsOf(train).map((u) => u.id)].flatMap((place) => {
     const scope = unitScope(train.id, place);
     const read = specs[scope];
     if (!read) return [];
@@ -245,7 +279,7 @@ export const trainText = (t: TrainSpec): string =>
     canonical({
       ...t,
       inlet: { ...t.inlet, ref: t.inlet.ref ?? null, streamId: t.inlet.streamId ?? null, vessel: t.inlet.vessel ?? null, params: t.inlet.params ?? {} },
-      units: t.units.map((u) => ({ ...u, params: u.params ?? {}, records: u.records ?? {}, readFrom: u.readFrom ?? null, outlets: u.outlets ?? {} })),
+      units: unitsOf(t).map((u) => ({ ...u, params: u.params ?? {}, records: u.records ?? {}, readFrom: u.readFrom ?? null, outlets: u.outlets ?? {} })),
     }),
   );
 

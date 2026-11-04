@@ -8,7 +8,8 @@
 // draws no bar and says why in words: a recovery is never divided out of a
 // zero here. Bars take the stroke the run's provenance gives them, so a run
 // that rests on an assumption reads as modeled.
-import type { Provenance, TrainUnit } from '@/data/types';
+import type { TrainUnit } from '@/lib/pureos';
+import type { Provenance } from '@/lib/studies';
 import { fmt } from '@/engine/units';
 import { DASH_ARRAY, ENCODING, markColor } from './encoding';
 import { FigureFrame, type FigureTable } from './FigureFrame';

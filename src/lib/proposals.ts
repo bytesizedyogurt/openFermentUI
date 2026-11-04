@@ -1,10 +1,22 @@
 // Proposals a model made at a gate (OF-BLD-015 §7.4), read and answered
 // through the service. Nothing here decides anything: a person presses the
 // button, and their reviewer name goes on the proposal and the audit log.
-import type { GuildPerson, Proposal, ProposalAction } from '@/data/types';
+//
+// A proposal and a person's act on it are the service's shapes, generated
+// from its models into src/api/types.gen.ts (ADR-007). The person acting is
+// Guild's, named on the hand-kept types until Guild's lib moves.
+import type { components } from '@/api/types.gen';
+import type { GuildPerson } from '@/data/types';
 import { mayQueue } from '@/engine/checks';
 import type { StatusMap } from '@/engine/competence';
 import { apiFetch } from './project';
+
+type S = components['schemas'];
+
+/** `GET /api/proposals`: what a model asked for at a gate, until a person carries it out or dismisses it on Home. */
+export type Proposal = S['Proposal'];
+/** `POST /api/proposals/{id}/carry-out` and `/dismiss`: the person acting, the Guild person they act as, and why. */
+export type ProposalAction = S['ProposalAction'];
 
 export async function listProposals(signal?: AbortSignal): Promise<Proposal[]> {
   const response = await apiFetch('/api/proposals?state=proposed', { signal });

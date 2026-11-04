@@ -637,64 +637,15 @@ export type { Job, JobStage } from '@/store';
 // ── OF-BLD-005 · molecules, vocabulary and runbooks ────────────────────
 //
 // Breadth alongside the Chlamydomonas β-casein throughline. Products are the
-// molecules a facility could make; the vocabulary below is the facet set they
-// are described with; runbooks are synthesised answers to "how would we make
+// molecules a facility could make; the vocabulary is the facet set they are
+// described with; runbooks are synthesised answers to "how would we make
 // this". None of it touches the corpus — PAPERS, RECORDS and PROTOCOLS are
 // unaffected, and every value here carries a modeled provenance.
 
-/**
- * Where a unit operation sits in a downstream train, fermenter to vial. The
- * order of `UNIT_OP_STAGE_ORDER` in `vocabulary.ts` is the display order; a
- * product's own `unitOperationIds` array is the authority on its actual train,
- * because two products can use the same operation at different points.
- */
-export type UnitOperationStage =
-  | 'harvest'
-  | 'clarification'
-  | 'cell disruption'
-  | 'recovery'
-  | 'capture'
-  | 'capture/polish'
-  | 'polish'
-  | 'concentration'
-  | 'desalting'
-  | 'isolation'
-  | 'purification'
-  | 'drying'
-  | 'formulation'
-  | 'finishing'
-  // OF-BLD-020 §5.1: a pump, a tank, a heat exchanger, a mixer or a splitter
-  // serves a train without being a step of it.
-  | 'utility';
-
-export interface UnitOperation {
-  id: string;
-  label: string;
-  stage: UnitOperationStage;
-  /** Scale band where the operation is used at all, when it is not universal. */
-  scale?: string;
-  /** Chemistry detail, e.g. the resin family for a chromatography step. */
-  resin?: string;
-  note?: string;
-  /**
-   * The BioSTEAM unit classes this step is (OF-BLD-019 §4.1), so a unit in a
-   * train a flowsheet ran links to the step it performs. Names only, as
-   * BioSTEAM spells its classes; a step BioSTEAM has no class for names none.
-   */
-  biosteamClasses?: string[];
-}
-
-/**
- * A carbon source a value can be measured on (OF-BLD-014 §2.1): a name and
- * the spellings a paper uses for it, lower-case. Words only — no number, no
- * concentration — because what is resolved is the paper's wording, not a
- * medium. `carbonSourceId` in vocabulary.ts matches against `spellings`.
- */
-export interface CarbonSource {
-  id: string;
-  label: string;
-  spellings: string[];
-}
+// The downstream unit operations, their stages and the carbon sources are the
+// vocabulary's own, declared in src/data/vocabulary.ts beside the lists (alpha
+// 2.2 E.7); named here until this file goes (E.15).
+export type { CarbonSource, UnitOperation, UnitOperationStage } from './vocabulary';
 
 export type ProductCategory =
   | 'molecular_biology_enzyme'

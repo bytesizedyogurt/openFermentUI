@@ -10,7 +10,8 @@
 // never picks it. A stream that carries nothing has no share: it draws no bar
 // and says so, and nothing is divided here. The largest other components are
 // the service's too, named beside each row.
-import type { ComputedBasis, Provenance, StreamPurity } from '@/data/types';
+import type { StreamPurity } from '@/lib/pureos';
+import type { ComputedBasis, Provenance } from '@/lib/studies';
 import { fmt } from '@/engine/units';
 import { DASH_ARRAY, ENCODING, markColor } from './encoding';
 import { FigureFrame, type FigureTable } from './FigureFrame';

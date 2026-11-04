@@ -21,11 +21,10 @@
 // simulation's harvest. Products and strains arrive with the documents that
 // report them, through Intake. The service refuses what does not fit, in words.
 import { useEffect, useMemo, useState } from 'react';
-import type { SimulationSummary, TrainProposal } from '@/data/types';
 import { useStore } from '@/store';
-import { PureosDown, PureosRefused, proposeTrain } from '@/lib/pureos';
+import { PureosDown, PureosRefused, proposeTrain, type TrainProposal } from '@/lib/pureos';
 import { PRODUCT_WORDS, productWords } from '@/lib/geneos';
-import { fermosSimulations } from '@/lib/fermos';
+import { fermosSimulations, type SimulationSummary } from '@/lib/fermos';
 import { Button, Callout, Card, SectionTitle } from '@/components/ui';
 import { ProposedTrainView } from '@/components/ProposedTrain';
 
