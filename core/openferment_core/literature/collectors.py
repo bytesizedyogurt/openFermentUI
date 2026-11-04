@@ -271,6 +271,15 @@ def _v4(address: IPAddress) -> IPAddress:
     return mapped if mapped is not None else address
 
 
+def _address_words(address: IPAddress) -> str:
+    """An address as the refusal words write it, the same on every Python: an
+    IPv4-mapped IPv6 address as ::ffff: and its dotted IPv4 address (Python
+    3.13 writes it so, and 3.12 writes it in hexadecimal groups); any other as
+    `str` writes it."""
+    mapped = getattr(address, "ipv4_mapped", None)
+    return f"::ffff:{mapped}" if mapped is not None else str(address)
+
+
 def refused_class(address: IPAddress) -> str | None:
     """Why a fetch by address does not connect to `address`, in words, or
     None for a public address. An IPv4-mapped IPv6 address is read as its
@@ -310,11 +319,12 @@ def public_addresses(url: httpx.URL, resolve: Resolve) -> tuple[str, ...]:
         if why is None:
             continue
         if literal is None:
-            named = f"{host} resolves to {', '.join(str(a) for a in found)}; {address} is {why}"
-        elif str(literal) == host:
+            resolved = ", ".join(_address_words(a) for a in found)
+            named = f"{host} resolves to {resolved}; {_address_words(address)} is {why}"
+        elif _address_words(literal) == host:
             named = f"{host} is {why}"
         else:
-            named = f"{host} reads as {literal}, {why}"
+            named = f"{host} reads as {_address_words(literal)}, {why}"
         raise AddressRefused(f"{named}; a file is fetched from a public address alone")
     return tuple(dict.fromkeys(str(_v4(a)) for a in found))
 
