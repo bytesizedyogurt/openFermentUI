@@ -36,10 +36,40 @@ from fastapi.staticfiles import StaticFiles
 from sqlalchemy.exc import InterfaceError, OperationalError
 
 from . import artifacts, audit, biorepo, checks, db, extract, fermos, geneos, guard, guild, intake, postdoc_agent, practice, projects, tools, witness
-from .catalogues import CatalogueEntry
+from .catalogues import CatalogueEntry, CatalogueIntake
 from .literature import kit
 from .workers import WorkerCrashed, WorkerError, WorkerTimeout
 from .models import (
+    CeilingCheck,
+    FamilyInfo,
+    FermosBinding,
+    FermosFitInfo,
+    FermosHarvest,
+    FlowsheetInfo,
+    Health,
+    KeptTrain,
+    LiteratureStats,
+    ParamResolveResult,
+    ParamScope,
+    ProformaRunResult,
+    ProformaScenarioInfo,
+    ProformaTables,
+    RegressionCheck,
+    ScenarioRunsResponse,
+    SimulationResult,
+    SimulationSummary,
+    SimulatorStatus,
+    StoredAnswer,
+    ThermoPropsStored,
+    Train,
+    TrainFromRun,
+    TrainProposal,
+    TrainRun,
+    TrainSummary,
+    TrainValidation,
+    UnitSpecs,
+    UnitType,
+    VesselSummary,
     AuditEntry,
     Proposal,
     ProposalAction,
@@ -180,6 +210,78 @@ UNSCOPED = ("/api/health", "/api/projects")
 NO_SUCH_PROJECT = "The project the request names is one the database does not hold, in words."
 
 
+# The schemas a response serves as kept, a field its row leaves unset staying
+# out of the answer (ADR-007, implementation note of alpha 2.2 E.0a): a
+# runbook and what it holds, served with `response_model_exclude_unset` for
+# its lock's digest (runbook_lock.py reads an absent field and a null one
+# apart), and a draft of one, which a page keeps as a runbook. Each keeps
+# Pydantic's required list.
+AS_KEPT = frozenset({"Runbook", "RunbookStage", "Prediction", "Measure", "Range", "RunbookDraft"})
+SCHEMA_REF = "#/components/schemas/"
+
+
+def _named_in(node: Any, into: set[str]) -> None:
+    """Every component schema a part of the document names, by its name."""
+    if isinstance(node, dict):
+        ref = node.get("$ref")
+        if isinstance(ref, str) and ref.startswith(SCHEMA_REF):
+            into.add(ref.removeprefix(SCHEMA_REF))
+        for v in node.values():
+            _named_in(v, into)
+    elif isinstance(node, list):
+        for v in node:
+            _named_in(v, into)
+
+
+def _reached(names: set[str], schemas: dict[str, Any]) -> set[str]:
+    """The schemas named and every schema they name in turn."""
+    reached: set[str] = set()
+    todo = sorted(names)
+    while todo:
+        name = todo.pop()
+        if name in reached or name not in schemas:
+            continue
+        reached.add(name)
+        inside: set[str] = set()
+        _named_in(schemas[name], inside)
+        todo.extend(sorted(inside - reached))
+    return reached
+
+
+def response_only(schema: dict[str, Any]) -> set[str]:
+    """The component schemas the service writes and never reads: reached
+    from a success response (a 2xx), and from no request body and no
+    parameter."""
+    asked: set[str] = set()
+    answered: set[str] = set()
+    for item in schema.get("paths", {}).values():
+        for method, operation in item.items():
+            if method not in ("get", "post", "put", "patch", "delete"):
+                continue
+            _named_in(operation.get("requestBody"), asked)
+            _named_in(operation.get("parameters"), asked)
+            for status, response in operation.get("responses", {}).items():
+                if str(status).startswith("2"):
+                    _named_in(response, answered)
+    schemas = schema.get("components", {}).get("schemas", {})
+    return _reached(answered, schemas) - _reached(asked, schemas)
+
+
+def _required_as_written(schema: dict[str, Any]) -> None:
+    """ADR-007, implementation note of alpha 2.2 E.0a: FastAPI writes every
+    field of a model it serves, so a schema the service only writes lists
+    every property as required, in the order of its properties, and the
+    browser's generated type reads each field as one the service sends. A
+    schema in AS_KEPT keeps Pydantic's own list, as does every schema a
+    request takes: a field with a default stays one a request may leave
+    out."""
+    schemas = schema.get("components", {}).get("schemas", {})
+    for name in sorted(response_only(schema) - AS_KEPT):
+        properties = schemas[name].get("properties")
+        if properties:
+            schemas[name]["required"] = list(properties)
+
+
 def _scoped_openapi() -> dict[str, Any]:
     """The OpenAPI document (docs/api/openapi.json, `pnpm gen:api`) with every
     route's project scope written on it (ADR-005; acceptance A5): a route that
@@ -187,12 +289,14 @@ def _scoped_openapi() -> dict[str, Any]:
     project's id in the X-OpenFerment-Project header or in `?project=` where a
     header cannot be sent (an EventSource), and declares the 404 a project the
     database does not hold is answered with; the routes that act in none say
-    `none`."""
+    `none`. A schema the service only writes lists every property as
+    required (`_required_as_written`)."""
     if app.openapi_schema:
         return app.openapi_schema
     from fastapi.openapi.utils import get_openapi
 
     schema = get_openapi(title=app.title, version=app.version, description=app.description, routes=app.routes)
+    _required_as_written(schema)
     refusal = {"application/json": {"schema": {"$ref": "#/components/schemas/Refusal"}}}
     for path, item in schema.get("paths", {}).items():
         scoped = not path.startswith(UNSCOPED)
@@ -345,23 +449,23 @@ async def refuse_changes_from_elsewhere(request: Request, call_next):
         return JSONResponse(status_code=403, content={"detail": why})
     return await call_next(request)
 
-@app.get("/api/health")
-def health() -> dict:
+@app.get("/api/health", response_model=Health)
+def health() -> Health:
     """Liveness, and what the service can actually do right now.
 
     `hasKey` lets the UI tell "the service is down" from "the service is up but
     has no key" — two different problems with two different fixes, and a single
     "unavailable" would send somebody to restart a process that is running fine.
     """
-    return {
-        "ok": True,
-        "service": "openferment-core",
-        "model": llm.primary(),
+    return Health(
+        ok=True,
+        service="openferment-core",
+        model=llm.primary(),
         # The model a call falls back to when the primary declines or is
         # unavailable (llm.py).
-        "fallbackModel": llm.fallback(),
-        "hasKey": bool(os.environ.get("ANTHROPIC_API_KEY")),
-    }
+        fallbackModel=llm.fallback(),
+        hasKey=bool(os.environ.get("ANTHROPIC_API_KEY")),
+    )
 
 
 def _ask_agent(question: str, on_step=None, cancelled=None, history=None, on_call=None, on_result=None,
@@ -617,26 +721,26 @@ def fermos_forecast(req: ForecastRequest) -> ForecastResult:
 # ── fermOS simulates (OF-BLD-020 §3.1) ─────────────────────────────────
 
 
-@app.get("/api/fermos/families")
-def fermos_families() -> list[dict]:  # noqa: N803 (the wire name)
+@app.get("/api/fermos/families", response_model=list[FamilyInfo])
+def fermos_families() -> list[FamilyInfo]:
     """The model families (`FamilyInfo`): each with its equations, states,
     parameters (ParameterSpecs) and the panel's groups."""
-    return [f.model_dump(mode="json") for f in fermos.families()]
+    return fermos.families()
 
 
-@app.get("/api/fermos/families/{family_id}")
-def fermos_family(family_id: str) -> dict:
+@app.get("/api/fermos/families/{family_id}", response_model=FamilyInfo)
+def fermos_family(family_id: str) -> FamilyInfo:
     """One model family by id; 404 in words for none."""
     from . import kinetics
 
     try:
-        return fermos.family_info(family_id).model_dump(mode="json")
+        return fermos.family_info(family_id)
     except kinetics.FamilyRefused as e:
         raise HTTPException(status_code=404, detail=str(e)) from e
 
 
-@app.post("/api/fermos/simulate")
-def fermos_simulate(req: SimulationRequest) -> dict:
+@app.post("/api/fermos/simulate", response_model=SimulationResult)
+def fermos_simulate(req: SimulationRequest) -> SimulationResult:
     """Simulate a model family (`SimulationResult`) and keep it as one
     `fermos.simulation` artifact. Each parameter resolves with its source: a
     value the request sets (a typed quantity with its origin: a person's
@@ -646,16 +750,16 @@ def fermos_simulate(req: SimulationRequest) -> dict:
     (named with what would bind it), the light socket, a value set that
     cannot stand, a reading the lookup refuses, or a run that cannot end."""
     try:
-        return fermos.simulate(req).model_dump(mode="json")
+        return fermos.simulate(req)
     except fermos.SimulationRefused as e:
         raise HTTPException(status_code=422, detail=str(e)) from e
 
 
-@app.get("/api/fermos/bind")
+@app.get("/api/fermos/bind", response_model=FermosBinding)
 def fermos_bind(family: str, strain: str | None = None, product: str | None = None, sugar: str | None = None,
                 fit: str | None = None, startFrom: str = "records",  # noqa: N803 (the wire name)
                 durationPreset: str = "until-sugar-runs-out",  # noqa: N803
-                inputs: str | None = None) -> dict:
+                inputs: str | None = None) -> FermosBinding:
     """A family's parameters bound for a strain, product and sugar
     (`FermosBinding`, OF-BLD-020 §3.2, D6): each from the fit a person chose
     (`?fit=`), the records of the evidence pool through the aggregate gate, a kept simulation (`?startFrom=simulation:<id>`), or the
@@ -679,20 +783,20 @@ def fermos_bind(family: str, strain: str | None = None, product: str | None = No
     req = SimulationRequest(family=family, strain=strain, product=product, sugar=sugar, fitArtifact=fit,
                             startFrom=startFrom, durationPreset=durationPreset, inputs=_inputs_param(inputs))
     try:
-        return fermos.bind(req).model_dump(mode="json")
+        return fermos.bind(req)
     except fermos.SimulationRefused as e:
         raise HTTPException(status_code=422, detail=str(e)) from e
 
 
-@app.get("/api/fermos/simulations")
-def fermos_simulations() -> list[dict]:  # noqa: N803 (the wire name)
+@app.get("/api/fermos/simulations", response_model=list[SimulationSummary])
+def fermos_simulations() -> list[SimulationSummary]:
     """The kept simulations, newest first (`SimulationSummary`). A read: it
     runs nothing."""
-    return [s.model_dump(mode="json") for s in fermos.simulations()]
+    return fermos.simulations()
 
 
-@app.get("/api/fermos/harvest")
-def fermos_harvest(simulation: str, hour: float | None = None) -> dict:  # noqa: N803 (the wire name)
+@app.get("/api/fermos/harvest", response_model=FermosHarvest)
+def fermos_harvest(simulation: str, hour: float | None = None) -> FermosHarvest:
     """A kept simulation's broth at an hour (`FermosHarvest`, OF-BLD-020
     §6.2, D10): its own harvest hour, or `?hour=`, a person's (the hour the
     Builder's inlet scope holds under their name; a model never sends one),
@@ -711,13 +815,13 @@ def fermos_harvest(simulation: str, hour: float | None = None) -> dict:  # noqa:
     except artifacts.ArtifactDamaged as e:
         raise HTTPException(status_code=409, detail=str(e)) from e
     try:
-        return fermos.harvest(art, hour).model_dump(mode="json")
+        return fermos.harvest(art, hour)
     except fermos.SimulationRefused as e:
         raise HTTPException(status_code=422, detail=str(e)) from e
 
 
-@app.get("/api/fermos/fits")
-def fermos_fits(flowsheet: str) -> list[dict]:  # noqa: N803 (the wire name)
+@app.get("/api/fermos/fits", response_model=list[FermosFitInfo])
+def fermos_fits(flowsheet: str) -> list[FermosFitInfo]:
     """The kinetic fits, forecasts and simulations fermOS keeps (a
     simulation since OF-BLD-020 §3.3), newest first, each with what it can
     feed a shelf flowsheet's titre, yield and productivity and why not
@@ -726,7 +830,7 @@ def fermos_fits(flowsheet: str) -> list[dict]:  # noqa: N803 (the wire name)
     from . import proforma
 
     try:
-        return [f.model_dump(mode="json") for f in proforma.fermos_fits(flowsheet)]
+        return proforma.fermos_fits(flowsheet)
     except proforma.ScenarioRefused as e:
         raise HTTPException(status_code=422, detail=str(e)) from e
 
@@ -792,21 +896,21 @@ def _retired(name: str, raw: str | None) -> None:
             "parameter's key (name) and a quantity in its unit with its origin (kind, by, at), as a run takes them"))
 
 
-@app.get("/api/proforma/status")
-def proforma_status() -> dict:
+@app.get("/api/proforma/status", response_model=SimulatorStatus)
+def proforma_status() -> SimulatorStatus:
     """Where the BioSTEAM worker is (§8.1): cold, starting, ready or failed."""
     from . import proforma
 
-    return proforma.status()
+    return proforma.simulator_status()
 
 
-@app.get("/api/proforma/shelf")
-def proforma_shelf() -> list[dict]:  # noqa: N803 (the wire name)
+@app.get("/api/proforma/shelf", response_model=list[FlowsheetInfo])
+def proforma_shelf() -> list[FlowsheetInfo]:
     """The shelf of flowsheets (OF-BLD-019 §2.1, D2): pure data, read with no
     simulator."""
     from . import proforma
 
-    return [f.model_dump(mode="json") for f in proforma.shelf()]
+    return proforma.shelf()
 
 
 # ── SFF flowsheet records (alpha 2.0, ADR-003; engine/sff.py) ────────────
@@ -1058,9 +1162,9 @@ def catalogue_keep(kind: str, asked: CatalogueKeep) -> CatalogueEntry:
         raise HTTPException(status_code=422, detail=str(e)) from e
 
 
-@app.post("/api/intake/catalogue")
+@app.post("/api/intake/catalogue", response_model=CatalogueIntake)
 def catalogue_intake(kind: str = Form(...), by: str = Form(..., min_length=1, max_length=200),
-                     file: UploadFile = File(...)) -> dict:
+                     file: UploadFile = File(...)) -> CatalogueIntake:
     """A file of catalogue entries of one kind, JSON or CSV, taken in: every
     row that is an entry kept with the file as its source, every other row
     refused with its reason."""
@@ -1070,7 +1174,7 @@ def catalogue_intake(kind: str = Form(...), by: str = Form(..., min_length=1, ma
     if len(data) > 4 * 1024 * 1024:
         raise HTTPException(status_code=413, detail=f"{file.filename} is larger than 4 MB")
     try:
-        return catalogues.intake(_catalogue_kind(kind), data, file.filename or "", by=by).model_dump(mode="json")
+        return catalogues.intake(_catalogue_kind(kind), data, file.filename or "", by=by)
     except catalogues.CatalogueRefused as e:
         raise HTTPException(status_code=422, detail=str(e)) from e
 
@@ -1394,8 +1498,8 @@ def study_export(by: str = "") -> Response:
                     headers={"Content-Disposition": f'attachment; filename="{_exports.filename()}"'})
 
 
-@app.get("/api/proforma/scenarios")
-def proforma_scenarios(host: str | None = None) -> list[dict]:  # noqa: N803 (the wire name)
+@app.get("/api/proforma/scenarios", response_model=list[ProformaScenarioInfo])
+def proforma_scenarios(host: str | None = None) -> list[ProformaScenarioInfo]:
     """Every BioSTEAM scenario the project keeps, with its inputs bound to
     records (§8.3; OF-BLD-019 §2.3; alpha 2.2 D9): a scenario on
     custom_train_v1 binds with the vessel design and the train run it names,
@@ -1403,14 +1507,14 @@ def proforma_scenarios(host: str | None = None) -> list[dict]:  # noqa: N803 (th
     A read: it starts no simulator."""
     from . import proforma
 
-    return [s.model_dump(mode="json") for s in proforma.scenarios(host=host)]
+    return proforma.scenarios(host=host)
 
 
-@app.get("/api/proforma/bind")
+@app.get("/api/proforma/bind", response_model=ProformaScenarioInfo)
 def proforma_bind(flowsheet: str, host: str | None = None,  # noqa: N803
                   fits: str | None = None, inputs: str | None = None, vessel: str | None = None,
                   trainRun: str | None = None,  # noqa: N803 (the wire name)
-                  overrides: str | None = Query(default=None, include_in_schema=False)) -> dict:
+                  overrides: str | None = Query(default=None, include_in_schema=False)) -> ProformaScenarioInfo:
     """A shelf flowsheet's inputs bound, as a scenario not yet saved to the
     project shows them (OF-BLD-019 §2.3, D6), id and name empty; `?fits=`
     lays on the fermOS fits a person chose (§5.1), a JSON object of input
@@ -1441,16 +1545,16 @@ def proforma_bind(flowsheet: str, host: str | None = None,  # noqa: N803
             proforma._check_keys(proforma.runnable(flowsheet), values)
         return proforma.bind_flowsheet(flowsheet, host=host,
                                        assumptions=values, fits=chosen, vessel=vessel,
-                                       train_run=trainRun).model_dump(mode="json")
+                                       train_run=trainRun)
     except proforma.ScenarioRefused as e:
         raise HTTPException(status_code=422, detail=str(e)) from e
 
 
-@app.get("/api/proforma/ceiling-check")
+@app.get("/api/proforma/ceiling-check", response_model=CeilingCheck)
 def proforma_ceiling_check(scenarioId: str, flowsheet: str | None = None, host: str | None = None,  # noqa: N803
                            fits: str | None = None, inputs: str | None = None,
                            overrides: str | None = Query(default=None, include_in_schema=False),
-                           assumptions: str | None = Query(default=None, include_in_schema=False)) -> dict:  # noqa: N803
+                           assumptions: str | None = Query(default=None, include_in_schema=False)) -> CeilingCheck:  # noqa: N803
     """A scenario's fermenter yield read against the newest stored geneOS
     ceiling of each shelf model of its organism, on its flowsheet's sugar
     (OF-BLD-019 §5.2, D11): `CeilingCheck`. A scenario the project keeps by
@@ -1470,12 +1574,12 @@ def proforma_ceiling_check(scenarioId: str, flowsheet: str | None = None, host: 
     try:
         over = proforma.overrides_of(scenarioId, proforma.flowsheet_of(scenarioId, flowsheet), given)
         return proforma.ceiling_check(scenarioId, flowsheet, host=host, fits=chosen,
-                                      overrides=over).model_dump(mode="json")
+                                      overrides=over)
     except proforma.ScenarioRefused as e:
         raise HTTPException(status_code=422, detail=str(e)) from e
 
 
-@app.post("/api/proforma/run", responses={
+@app.post("/api/proforma/run", response_model=ProformaRunResult, responses={
     422: {"description": "The scenario cannot run as asked, in words (a list of field errors when the request's own "
                          "fields are refused): an input that waits for a source, a value its input cannot take, or a "
                          "refusal inside the run, its receipt kept.",
@@ -1483,7 +1587,7 @@ def proforma_ceiling_check(scenarioId: str, flowsheet: str | None = None, host: 
               {"$ref": "#/components/schemas/Refusal"}, {"$ref": "#/components/schemas/HTTPValidationError"}]}}}},
     503: {"model": Refusal, "description": "The Proforma simulator could not run the scenario: in words, with no run "
                                            "kept."}})
-def proforma_run(req: ProformaRunRequest) -> dict:
+def proforma_run(req: ProformaRunRequest) -> ProformaRunResult:
     """Run a scenario the project keeps by its id, or one not yet saved by
     the shelf flowsheet it names (OF-BLD-019 §2.3, d), with the values a
     person or a model sets as typed inputs, and keep it as one run of the
@@ -1495,15 +1599,15 @@ def proforma_run(req: ProformaRunRequest) -> dict:
     from .workers import WorkerCrashed, WorkerError, WorkerTimeout
 
     try:
-        return proforma.run(req).model_dump(mode="json")
+        return proforma.run(req)
     except proforma.ScenarioRefused as e:
         raise HTTPException(status_code=422, detail=str(e)) from e
     except (WorkerError, WorkerCrashed, WorkerTimeout) as e:
         raise HTTPException(status_code=503, detail=f"the Proforma simulator could not run the scenario: {e}") from e
 
 
-@app.get("/api/proforma/runs")
-def proforma_runs(scenarioId: str = "") -> dict:  # noqa: N803 (the wire name)
+@app.get("/api/proforma/runs", response_model=ScenarioRunsResponse)
+def proforma_runs(scenarioId: str = "") -> ScenarioRunsResponse:  # noqa: N803 (the wire name)
     """A scenario's newest run on this service (OF-BLD-019 §3.R): the newest
     stored `proforma.run` whose basis names the scenario (`latest_run`, the
     one pureOS and selling_price read), or none. A read: it runs nothing and
@@ -1514,20 +1618,19 @@ def proforma_runs(scenarioId: str = "") -> dict:  # noqa: N803 (the wire name)
     sid = scenarioId.strip()
     if not sid:
         raise HTTPException(status_code=422, detail="a read of a scenario's runs names the scenario it belongs to")
-    art = proforma.latest_run(sid)
-    return {"scenarioId": sid, "artifact": art.model_dump(mode="json") if art else None}
+    return ScenarioRunsResponse(scenarioId=sid, artifact=proforma.latest_run(sid))
 
 
 # ── one parameter panel (OF-BLD-020 §2.1, D2–D4) ────────────────────────
 
 
-@app.get("/api/params/{scope:path}")
+@app.get("/api/params/{scope:path}", response_model=ParamScope)
 def params_scope(scope: str, flowsheet: str | None = None, host: str | None = None, fits: str | None = None,
                  vesselType: str | None = None, strain: str | None = None, product: str | None = None,  # noqa: N803
                  sugar: str | None = None, fit: str | None = None, startFrom: str | None = None,  # noqa: N803
                  durationPreset: str | None = None,  # noqa: N803 (the wire name)
                  unitType: str | None = None, train: str | None = None,  # noqa: N803 (the wire name)
-                 vessel: str | None = None, trainRun: str | None = None) -> dict:  # noqa: N803 (the wire name)
+                 vessel: str | None = None, trainRun: str | None = None) -> ParamScope:  # noqa: N803 (the wire name)
     """A scope's parameters (`ParamScope`): every spec with its bounds and
     their reason, and its value as the service binds it now, with its
     source. `proforma:<scenario id>` is a scenario the project keeps, or
@@ -1563,7 +1666,7 @@ def params_scope(scope: str, flowsheet: str | None = None, host: str | None = No
                               durationPreset=durationPreset, unitType=unitType,
                               train=_train_param(train), vessel=vessel, trainRun=trainRun)
     try:
-        return params.scope(scope, req).model_dump(mode="json")
+        return params.scope(scope, req)
     except params.ScopeUnknown as e:
         raise HTTPException(status_code=404, detail=str(e)) from e
     except params.ParamRefused as e:
@@ -1574,8 +1677,8 @@ def params_scope(scope: str, flowsheet: str | None = None, host: str | None = No
         raise HTTPException(status_code=503, detail=f"the Proforma simulator, where BioSTEAM runs, could not answer: {e}") from e
 
 
-@app.post("/api/params/{scope:path}/resolve")
-def params_resolve(scope: str, req: ParamResolveRequest) -> dict:
+@app.post("/api/params/{scope:path}/resolve", response_model=ParamResolveResult)
+def params_resolve(scope: str, req: ParamResolveRequest) -> ParamResolveResult:
     """The values a person or a model sets laid on a scope's values
     (`ParamResolveResult`): each a typed quantity with its origin, converted
     into an override of the scope the route names (in its parameter's unit)
@@ -1589,7 +1692,7 @@ def params_resolve(scope: str, req: ParamResolveRequest) -> dict:
     from . import artifacts, params
 
     try:
-        return params.resolve_scope(scope, req).model_dump(mode="json")
+        return params.resolve_scope(scope, req)
     except params.ScopeUnknown as e:
         raise HTTPException(status_code=404, detail=str(e)) from e
     except params.ParamRefused as e:
@@ -1603,9 +1706,9 @@ def params_resolve(scope: str, req: ParamResolveRequest) -> dict:
 # ── fermOS sizes the vessel on BioSTEAM (OF-BLD-020 §4.1, D7) ──────────
 
 
-@app.get("/api/fermos/vessel/specs")
+@app.get("/api/fermos/vessel/specs", response_model=ParamScope)
 def fermos_vessel_specs(simulation: str | None = None, fit: str | None = None,
-                        vesselType: str | None = None) -> dict:  # noqa: N803 (the wire name)
+                        vesselType: str | None = None) -> ParamScope:  # noqa: N803 (the wire name)
     """The vessel scope `fermos:vessel:<simulation or fit id>` (a
     `ParamScope`): every design parameter of Appendix 2 §C with its bounds
     and their reason, and its value with its source: BioSTEAM's own default
@@ -1624,7 +1727,7 @@ def fermos_vessel_specs(simulation: str | None = None, fit: str | None = None,
     from . import params
 
     try:
-        return vessel.scope(named[0], vesselType).model_dump(mode="json")
+        return vessel.scope(named[0], vesselType)
     except params.ScopeUnknown as e:
         raise HTTPException(status_code=404, detail=str(e)) from e
     except params.ParamRefused as e:
@@ -1657,13 +1760,13 @@ def fermos_vessel(req: VesselRequest) -> VesselDesign:
         raise HTTPException(status_code=503, detail=f"the Proforma simulator, where BioSTEAM runs, could not answer: {e}") from e
 
 
-@app.get("/api/fermos/vessels")
-def fermos_vessels() -> list[dict]:
+@app.get("/api/fermos/vessels", response_model=list[VesselSummary])
+def fermos_vessels() -> list[VesselSummary]:
     """Every kept vessel design, newest first (`VesselSummary`): a read,
     which starts no simulator."""
     from . import vessel
 
-    return [v.model_dump(mode="json") for v in vessel.designs()]
+    return vessel.designs()
 
 
 # ── thermosteam answers property questions (OF-BLD-019 §4.2, D9) ───────
@@ -1702,17 +1805,18 @@ def thermo_props(req: ThermoPropsRequest) -> Artifact:
         raise HTTPException(status_code=503, detail=f"the Proforma simulator, where thermosteam runs, could not answer: {e}") from e
 
 
-@app.get("/api/thermo/props")
+@app.get("/api/thermo/props", response_model=ThermoPropsStored)
 def thermo_props_stored(artifactId: str | None = None, streamId: str | None = None,  # noqa: N803 (the wire names)
-                        preset: str | None = None, recordId: str | None = None) -> dict:
-    """The answer stored for the same question, as `{"artifact": …}`, or
-    `{"artifact": null}` when it has not been asked here: a read, which
-    starts no simulator. The same 404, 409 and 422 as the POST."""
+                        preset: str | None = None, recordId: str | None = None) -> ThermoPropsStored:
+    """The answer stored for the same question (`ThermoPropsStored`): its
+    artifact beside what the artifact holds, read as `ThermoProps`, or both
+    null when it has not been asked here: a read, which starts no simulator.
+    The same 404, 409 and 422 as the POST."""
     from . import thermo
 
     art = _thermo_answer(thermo.stored, ThermoPropsRequest(artifactId=artifactId, streamId=streamId, preset=preset,
                                                            recordId=recordId))
-    return {"artifact": art.model_dump(mode="json") if art else None}
+    return ThermoPropsStored(artifact=art, props=thermo.output_of(art) if art else None)
 
 
 # ── a product's properties (OF-BLD-020 §7.1, D12) ──────────────────────
@@ -1752,15 +1856,14 @@ def protparam_compute(req: ProductPropertyRequest) -> Artifact:
     return _protparam_answer(protparam.of_product, req.product)
 
 
-@app.get("/api/protparam")
-def protparam_stored(product: str = "") -> dict:
+@app.get("/api/protparam", response_model=StoredAnswer)
+def protparam_stored(product: str = "") -> StoredAnswer:
     """The answer stored for the product's sequence, as `{"artifact": …}`, or
     `{"artifact": null}` when it has not been computed here: a read, which
     computes nothing. The same 404, 409 and 422 as the POST."""
     from . import protparam
 
-    art = _protparam_answer(protparam.stored, product)
-    return {"artifact": art.model_dump(mode="json") if art else None}
+    return StoredAnswer(artifact=_protparam_answer(protparam.stored, product))
 
 
 def _volatility_answer(fn, product: str):
@@ -1794,15 +1897,14 @@ def thermo_volatility(req: ProductPropertyRequest) -> Artifact:
         raise HTTPException(status_code=503, detail=f"the Proforma simulator, where thermosteam runs, could not answer: {e}") from e
 
 
-@app.get("/api/thermo/volatility")
-def thermo_volatility_stored(product: str = "") -> dict:
+@app.get("/api/thermo/volatility", response_model=StoredAnswer)
+def thermo_volatility_stored(product: str = "") -> StoredAnswer:
     """The volatility stored for the product, as `{"artifact": …}`, or
     `{"artifact": null}`: a read, which starts no simulator. The same 404,
     409 and 422 as the POST."""
     from . import thermo
 
-    art = _volatility_answer(thermo.stored_volatility, product)
-    return {"artifact": art.model_dump(mode="json") if art else None}
+    return StoredAnswer(artifact=_volatility_answer(thermo.stored_volatility, product))
 
 
 def _warm_proforma() -> None:
@@ -1915,11 +2017,11 @@ def literature_documents() -> list[LiteratureDocument]:
     ]
 
 
-@app.get("/api/literature/stats")
-def literature_stats() -> dict[str, Any]:
+@app.get("/api/literature/stats", response_model=LiteratureStats)
+def literature_stats() -> LiteratureStats:
     """The project's documents and chunks in the kit, by source, licence class
     and embedding version; the concept graph's size is the instance's."""
-    return kit.stats(projects.current())
+    return LiteratureStats.model_validate(kit.stats(projects.current()))
 
 
 @app.get("/api/literature/search", response_model=SearchResponse)
@@ -2267,6 +2369,63 @@ def artifacts_read(artifact_id: str) -> Artifact:
         raise HTTPException(status_code=409, detail=str(e)) from None
 
 
+# What a read of a run's tables or its checks answers beside them, each in words.
+RUN_READ_REFUSALS: dict[int | str, dict[str, Any]] = {
+    404: {"model": Refusal, "description": "The project holds no artifact of that id, in words."},
+    409: {"model": Refusal, "description": "The stored artifact is damaged, in words."},
+    422: {"model": Refusal, "description": "The artifact is of a tool whose artifacts hold no run's tables, in "
+                                           "words naming the tools that hold them."},
+}
+
+
+def _run_with_tables(artifact_id: str) -> Artifact:
+    """The artifact a read of a run's tables or checks names: 404 when the
+    project holds none of that id, 409 when it is damaged on disk, and 422
+    when it is of a tool other than the ones whose artifacts hold a run's
+    tables (`proforma.TABLE_TOOLS`)."""
+    from . import proforma
+
+    try:
+        art = artifacts.get(artifact_id)
+    except artifacts.ArtifactNotFound:
+        raise HTTPException(status_code=404, detail=f"no artifact {artifact_id!r}") from None
+    except artifacts.ArtifactDamaged as e:
+        raise HTTPException(status_code=409, detail=str(e)) from None
+    if art.tool not in proforma.TABLE_TOOLS:
+        raise HTTPException(status_code=422, detail=(
+            f"{artifact_id} is a {art.tool} artifact; a run's tables are held by a Proforma run ({proforma.RUN}), a "
+            f"library plant's run ({_library.LIBRARY_RUN}) and a run kept from a retired reference entry "
+            f"({proforma.REFERENCE})"))
+    return art
+
+
+@app.get("/api/biorepo/artifacts/{artifact_id}/tables", response_model=ProformaTables, responses=RUN_READ_REFUSALS)
+def artifacts_tables(artifact_id: str) -> ProformaTables:
+    """A run's tables as every reader reads them (`proforma.tables_of`): the
+    flowsheet it ran, what made the tables, the base case's TEA, streams,
+    units and utility duties, its diagram or the words for why it has none,
+    and its units in run order. A run kept before runs carried their tables
+    reads with empty ones. A read: it computes nothing and starts no
+    simulator."""
+    from . import proforma
+
+    return proforma.tables_of(_run_with_tables(artifact_id))
+
+
+@app.get("/api/biorepo/artifacts/{artifact_id}/checks", response_model=list[RegressionCheck],
+         responses=RUN_READ_REFUSALS)
+def artifacts_checks(artifact_id: str) -> list[RegressionCheck]:
+    """A run's checks against its package's own test (`proforma.checks_of`,
+    ADR-013): each of the test's values beside what the run computed, with
+    whether it holds within the test's tolerance. A library plant's run and a
+    run kept from a retired reference entry hold them; a Proforma scenario's
+    run, and a run of a plant whose package test asserts no values, answer an
+    empty list. A read: it computes nothing and starts no simulator."""
+    from . import proforma
+
+    return proforma.checks_of(_run_with_tables(artifact_id))
+
+
 @app.post("/api/biorepo/artifacts/{artifact_id}/replay", response_model=ReplayResult, responses={
     404: {"model": Refusal, "description": "The project holds no artifact of that id, in words."},
     409: {"model": Refusal, "description": "The tool that made it is not registered in this service, or the stored "
@@ -2287,28 +2446,27 @@ def artifacts_replay(artifact_id: str) -> ReplayResult:
 # ── pureOS reads the train (OF-BLD-019 §4.1, D1) ────────────────────────
 
 
-@app.get("/api/pureos/trains")
-def pureos_trains() -> list[dict]:  # noqa: N803 (the wire name)
+@app.get("/api/pureos/trains", response_model=list[TrainSummary])
+def pureos_trains() -> list[TrainSummary]:
     """The trains on file: the newest Proforma run of each scenario, read
     unit by unit from its stream table, with its overall recovery. A read: it
     starts no simulator."""
     from . import pureos
 
-    return [pureos.summary(t).model_dump(mode="json")
-            for t in pureos.trains()]
+    return [pureos.summary(t) for t in pureos.trains()]
 
 
-@app.get("/api/pureos/train-runs")
-def pureos_train_runs() -> list[dict]:  # noqa: N803 (the wire name)
+@app.get("/api/pureos/train-runs", response_model=list[TrainSummary])
+def pureos_train_runs() -> list[TrainSummary]:
     """Every kept pureOS train run (`TrainSummary`), newest first (OF-BLD-020
     §5.2). A read: it starts no simulator."""
     from . import pureos
 
-    return [s.model_dump(mode="json") for s in pureos.train_runs()]
+    return pureos.train_runs()
 
 
-@app.get("/api/pureos/trains-kept")
-def pureos_trains_kept() -> list[dict]:  # noqa: N803 (the wire name)
+@app.get("/api/pureos/trains-kept", response_model=list[KeptTrain])
+def pureos_trains_kept() -> list[KeptTrain]:
     """The trains a model built with `pureos_build` or `pureos_write`
     (`KeptTrain`: the train as data, `madeBy` the model, `at` and
     `updatedAt`), the most recently changed first (OF-BLD-020 §5.4). A
@@ -2316,22 +2474,22 @@ def pureos_trains_kept() -> list[dict]:  # noqa: N803 (the wire name)
     writes nothing and starts no simulator."""
     from .pureos import kept
 
-    return [k.model_dump(mode="json") for k in kept.listed()]
+    return kept.listed()
 
 
-@app.post("/api/pureos/train/validate")
-def pureos_train_validate(train: TrainSpec) -> dict:
+@app.post("/api/pureos/train/validate", response_model=TrainValidation)
+def pureos_train_validate(train: TrainSpec) -> TrainValidation:
     """Every refusal of a train at once, in words (`TrainValidation`): a type
     not in the catalogue, an outlet its type does not have, a recycle that is
     not to an earlier unit, a key its unit does not declare, no unit, two
     outlets on, a duplicate id. Runs nothing (OF-BLD-020 §5.2, D9)."""
     from . import pureos
 
-    return pureos.validation(train).model_dump(mode="json")
+    return pureos.validation(train)
 
 
-@app.post("/api/pureos/train/check")
-def pureos_train_check(req: TrainRunRequest) -> dict:
+@app.post("/api/pureos/train/check", response_model=TrainValidation)
+def pureos_train_check(req: TrainRunRequest) -> TrainValidation:
     """Everything a run of the train would refuse, at once, in the run's
     words, each by the place it belongs to (`TrainValidation`: a unit's id,
     `inlet`, or `train`): an input that names no place or no parameter, a
@@ -2345,7 +2503,7 @@ def pureos_train_check(req: TrainRunRequest) -> dict:
     from . import artifacts, pureos
 
     try:
-        return pureos.check_train(req.train, req.inputs, req.by).model_dump(mode="json")
+        return pureos.check_train(req.train, req.inputs, req.by)
     except artifacts.ArtifactDamaged as e:
         raise HTTPException(status_code=409, detail=str(e)) from e
     except (WorkerError, WorkerCrashed, WorkerTimeout) as e:
@@ -2353,8 +2511,8 @@ def pureos_train_check(req: TrainRunRequest) -> dict:
                                                     f"the train's units: {e}") from e
 
 
-@app.post("/api/pureos/train/from-run")
-def pureos_train_from_run(req: TrainFromRunRequest) -> dict:
+@app.post("/api/pureos/train/from-run", response_model=TrainFromRun)
+def pureos_train_from_run(req: TrainFromRunRequest) -> TrainFromRun:
     """A kept run's units read into a train (`TrainFromRun`, OF-BLD-020
     §5.3): every unit on the product's path whose class is a catalogue
     type, in run order, its outlets routed as the run routed them, its values
@@ -2366,7 +2524,7 @@ def pureos_train_from_run(req: TrainFromRunRequest) -> dict:
     from . import artifacts, pureos
 
     try:
-        return pureos.from_run(req.artifactId, req.trainId).model_dump(mode="json")
+        return pureos.from_run(req.artifactId, req.trainId)
     except pureos.RunNotOnFile as e:
         raise HTTPException(status_code=404, detail=str(e)) from None
     except pureos.TrainRefused as e:
@@ -2375,8 +2533,8 @@ def pureos_train_from_run(req: TrainFromRunRequest) -> dict:
         raise HTTPException(status_code=409, detail=str(e)) from e
 
 
-@app.post("/api/pureos/train/run")
-def pureos_train_run(req: TrainRunRequest) -> dict:
+@app.post("/api/pureos/train/run", response_model=TrainRun)
+def pureos_train_run(req: TrainRunRequest) -> TrainRun:
     """Run a train (`TrainRun`): every value resolved with its source, each
     value the request sets (`inputs`, each named `<unit id>.<key>` or
     `inlet.<key>`) laid on, the train built and run in the Proforma worker,
@@ -2394,7 +2552,7 @@ def pureos_train_run(req: TrainRunRequest) -> dict:
     from . import artifacts, pureos
 
     try:
-        return pureos.run_train(req.train, req.inputs, req.by).model_dump(mode="json")
+        return pureos.run_train(req.train, req.inputs, req.by)
     except pureos.TrainRefused as e:
         raise HTTPException(status_code=422, detail=str(e)) from e
     except artifacts.ArtifactDamaged as e:
@@ -2404,8 +2562,8 @@ def pureos_train_run(req: TrainRunRequest) -> dict:
                                                     f"train: {e}") from e
 
 
-@app.get("/api/pureos/train/{key}")
-def pureos_train(key: str) -> dict:
+@app.get("/api/pureos/train/{key}", response_model=Train)
+def pureos_train(key: str) -> Train:
     """One train: the newest run of the scenario `key` names, the newest run
     of the pureOS train it names (OF-BLD-020 §5.2), or the run whose artifact
     id it is. 404 says how a run gets there; a deep link opens what it
@@ -2413,15 +2571,15 @@ def pureos_train(key: str) -> dict:
     from . import pureos
 
     try:
-        return pureos.train(key).model_dump(mode="json")
+        return pureos.train(key)
     except pureos.TrainNotFound as e:
         raise HTTPException(status_code=404, detail=str(e)) from None
 
 
 # ── pureOS proposes a train (OF-BLD-020 §7.2, D12) ──────────────────────
 
-@app.post("/api/pureos/propose")
-def pureos_propose(req: ProposeRequest) -> dict:
+@app.post("/api/pureos/propose", response_model=TrainProposal)
+def pureos_propose(req: ProposeRequest) -> TrainProposal:
     """A train proposed by written rules (`TrainProposal`): the product's
     class and the properties its rule splits on (thermosteam's volatility,
     ProtParam on the catalogue entry's sequence, where the product is a
@@ -2436,7 +2594,7 @@ def pureos_propose(req: ProposeRequest) -> dict:
     from . import artifacts, pureos
 
     try:
-        return pureos.propose(req.product, req.host, req.inletRef).model_dump(mode="json")
+        return pureos.propose(req.product, req.host, req.inletRef)
     except pureos.ProposeUnknown as e:
         raise HTTPException(status_code=404, detail=str(e)) from None
     except pureos.ProposeRefused as e:
@@ -2451,19 +2609,19 @@ def pureos_propose(req: ProposeRequest) -> dict:
 # ── pureOS's unit catalogue (OF-BLD-020 §5.1, D8) ──────────────────────
 
 
-@app.get("/api/pureos/catalogue")
-def pureos_catalogue() -> list[dict]:
+@app.get("/api/pureos/catalogue", response_model=list[UnitType])
+def pureos_catalogue() -> list[UnitType]:
     """Every unit type a train can hold (`UnitType`), in stage order: its
     BioSTEAM or in-house class, what each inlet and outlet is, whether
     BioSTEAM costs it, what it needs set, what it does not offer and why.
     From the catalogue's data alone: it starts no simulator."""
     from .pureos import catalogue
 
-    return [u.model_dump(mode="json") for u in catalogue.listing()]
+    return catalogue.listing()
 
 
-@app.get("/api/pureos/catalogue/{type_id}/specs")
-def pureos_catalogue_specs(type_id: str) -> dict:
+@app.get("/api/pureos/catalogue/{type_id}/specs", response_model=UnitSpecs)
+def pureos_catalogue_specs(type_id: str) -> UnitSpecs:
     """One unit type's parameters (`UnitSpecs`): every ParameterSpec with the
     choices and bounds its class gives, each default as the class gives it,
     read from its code in the Proforma worker (which this starts when it is
@@ -2473,7 +2631,7 @@ def pureos_catalogue_specs(type_id: str) -> dict:
     from .pureos import catalogue
 
     try:
-        return catalogue.specs_of(type_id).model_dump(mode="json")
+        return catalogue.specs_of(type_id)
     except catalogue.CatalogueUnknown as e:
         raise HTTPException(status_code=404, detail=str(e)) from None
     except (WorkerError, WorkerCrashed, WorkerTimeout) as e:

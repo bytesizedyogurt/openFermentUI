@@ -234,6 +234,8 @@ DOI or PMID. Each now reads the project's rows.
 | 2026-11-04 16:35 | CI on `6f85338` (D.0), run 41865693107: `pnpm verify`, then `pnpm prove` | every stage green; every proof check holds | 13 min 27 s (verify); 3 min 23 s (the proof) | `6f85338` |
 | 2026-11-04 17:05 | The stage D rounds: the mirror's own tests in core's environment; `conform mirror`; `pnpm prove`, offline, steps 1 to 10, with the mirror under `examples/engines/`; the record-reader against `pnpm prove --keep`'s service | 30 passed; 8 of 8 checks; 86 of 86 checks, `conform mirror` 8 of 8 in step 10 and `reflect` run from the Runs screen in the walk, no call in the proof's spend table; exit 0, the entry and the audit row naming `example-agent/0.1` | 3 s; 9 s; 297 s; about 30 s | `bde178d` and stage D |
 | 2026-11-04 17:32 | The stage D gate: `pnpm verify`, all sixteen stages, with both examples in the tree and the mirror installed | every stage green: `test:core` 2865 passed, 1 skipped, 175 deselected; `test:sim` 142 passed; `test:lit` 10 passed; `smoke` 12 of 12 screens | 17 min 25 s | `bde178d` and stage D |
+| 2026-11-04 17:44 | CI on `37e6bd0` (the stage D gate), run 41878467102: `pnpm verify`, then `pnpm prove` | every stage green; every proof check holds | 8 min 36 s (verify); 2 min 14 s (the proof) | `37e6bd0` |
+| 2026-11-04 18:44 | E.0a: `pnpm test:core`, twice, the second on the final tree; `pnpm test:sim`; the new and changed tests with the database address empty and on Python 3.12; `gen:api`, `gen:tools` and `gen:components` with each `--check`; `typecheck`, `check:plan`, `check:state`, `check:figures`, `check:tools`, `check:secrets`; `build`; `smoke` with no key; `pnpm prove`, offline, steps 1 to 10 | 2876 passed, 1 skipped, 175 deselected each time; 142 passed; 64 passed each way; every check green; 12 of 12 screens; 86 of 86 checks, no call in the proof's spend table | 7 min 36 s (`test:core`); 7 min 29 s (`test:sim`); 275 s (the proof) | E.0a |
 | 2026-10-30 06:47 | `test:core` with 2.2; `check:tools`; `pnpm smoke` (own database, project made through the API) | 1920 passed, 2 skipped, 128 deselected; passed; 11 of 11 rail entries open in the project | 4 min 26 s | 2.2 |
 
 ## Spend (alpha 2.1)
@@ -270,7 +272,7 @@ prompt's §4).
 | [004](decisions/ADR-004-biosteam-adapter.md) | BioSTEAM through one adapter | accepted, stage 4 |
 | [005](decisions/ADR-005-projects.md) | Projects replace programs | accepted |
 | [006](decisions/ADR-006-quantities-and-estimates.md) | Typed quantities with origins replace Rule 1 | accepted, stages 4 and 6 |
-| [007](decisions/ADR-007-schema-source.md) | Types generated from OpenAPI | accepted, stage 7 |
+| [007](decisions/ADR-007-schema-source.md) | Types generated from OpenAPI | accepted, stage 7 (alpha 2.2 E.0a: a schema the service only writes lists every property as required) |
 | [008](decisions/ADR-008-postdoc-memory-routing.md) | Postdoc memory on the server; model routes | accepted, stage 6 |
 | [009](decisions/ADR-009-ui.md) | The UI is kept and wired | accepted, stage 7 |
 | [010](decisions/ADR-010-deletions.md) | Deletions | accepted, stage 1 |
@@ -409,6 +411,7 @@ prompt's §4).
 | Paid: Proforma's screens read every scenario as the project's (`createdScenarioIds`, the index's `needsBinding` and the held path gone); `GET /api/proforma/scenarios` binds a kept `custom_train_v1` scenario with the parts it names and lists one whose parts cannot stand with its refusal in words, where it answered 500; pureOS's choosers list each scenario once | alpha 2.2, C.6 |
 | `src/engine/geneos/enumeration` (Dominion era) still serves RunbookDetail's research funnel, whose words still speak of a clearance reading and a molecule | after alpha 2.0 (stage 7 left the module screens as they were, now views inside a project) |
 | `src/data/types.ts` is still hand-kept beside the generated `src/api/types.gen.ts`, held to the service by `check:plan`'s pairs; the screens read the hand-kept types | the screens move to the generated types one by one, after alpha 2.0 |
+| The project state's three routes (`GET /api/state`, `PUT` and `DELETE /api/state/{kind}/{id}`) answer the rows as the page sent them, in a dict with no model; `core/tests/test_route_models.py` names them as the routes that wait (alpha 2.2 E.0a) | alpha 2.2 stage E: E.0b gives `GET /api/state` its `ProjectState`, and `PUT` and `DELETE` need a model each before the test's waiting set empties |
 | Component tests on fixtures recorded from the real service (`pnpm record:fixtures`, §9.3) are not built; the walk and the smoke run against the real service | after alpha 2.0 |
 | No offline test computes on a published genome-scale model (Yeast9 and iMM904 need their fetched files); a model add-on applied in the worker, and a metabolite-defined product's demand through the worker, are untested | still open: after alpha 2.0 |
 | `units.json` maps `wt%` and `% (w/w)` to `% CDW`, aliases written for the PHA program; changing them changes how a stored record converts | the vocabulary review, after alpha 2.0 |
@@ -2000,3 +2003,36 @@ holds the numbers, the tables and the judgements).
   process substitution, a count's unit, the placeholder rule beside it, `WorkerError`'s words, a
   worker checking its values again, the models' attribute names). Question 13 needs no core
   change: seeded with the mirror installed, it expects biosteam, kinetics, mirror and train.
+
+### Alpha 2.2 — Stage E — 2026-11-04
+
+- E.0a. The service answers a model on every JSON route the screens read, and a schema it only
+  writes lists every property as required (the stage plan's section 2; ADR-007's implementation
+  note of E.0a). Thirty-five routes gain their model and return it: Proforma's shelf, scenarios,
+  binding, ceiling check, run, runs and simulator status; fermOS's fits, families, simulation,
+  binding, simulations, harvest, vessel parameters and vessels; the parameter panel's scope and its
+  resolve; pureOS's catalogue, a unit type's parameters, the proposal, trains, train runs,
+  validation, check, from-run, run, one train and the kept trains; the stored answers of
+  thermosteam, ProtParam and volatility; the catalogue's file intake; the literature's counts; and
+  health. models.py gains `GridDim` (`ProformaGrid.dims`), `ScenarioRunsResponse`,
+  `SimulatorStatus` (served by `proforma.simulator_status`; `status()` keeps the dict its callers
+  and the sim tests read), `ThermoPropsStored` (`GET /api/thermo/props` answers the stored
+  artifact beside what it holds, `{artifact, props}`), `StoredAnswer`, `LiteratureStats` and
+  `Health`. Two reads are new, `GET /api/biorepo/artifacts/{id}/tables` (`proforma.tables_of`)
+  and `/checks` (`proforma.checks_of`), each refusing in words an artifact of a tool outside
+  `proforma.TABLE_TOOLS`, the tuple `stream_table` now reads too; `docs/api/runs.md` lists both.
+  `api._scoped_openapi` marks the schemas reached from a success response and from no request:
+  the document holds 255 schemas, 66 of them new, and 177 are marked (the plan's scratch documents
+  measured 172), none split in two; the runbook family (`api.AS_KEPT`) and every schema a request
+  takes keep Pydantic's lists, and the client typechecks against the new `src/api/types.gen.ts`
+  with no file of its own changed. `core/tests/test_route_models.py` holds every route to a model
+  with its exceptions named (the three event streams, a flowsheet's file, the study export, and
+  the project state's three routes, which wait for E.0b: a Known debts row), each marked schema's
+  list, the request schemas' and the family's, and the two reads; `test_thermo.py`'s stored read
+  expects the pair. Checks: `pnpm test:core` 2876 passed, 1 skipped, 175 deselected (7 min 36 s, on the
+  final tree); `pnpm test:sim` 142 passed (7 min 29 s), the Proforma run, fermOS's simulation, the
+  train run and the vessel among them; the new and changed tests with the database address empty
+  and on Python 3.12, 64 passed each way; `gen:api`, `gen:tools` and `gen:components` with each
+  `--check`, `docs/TOOLS.md` and `COMPONENTS.md` as they were; `typecheck`, `check:plan`,
+  `check:state`, `check:figures`, `check:tools`, `check:secrets`; `build`; `pnpm smoke` with no
+  key, 12 of 12 screens; `pnpm prove`, offline, steps 1 to 10, 86 of 86 checks.

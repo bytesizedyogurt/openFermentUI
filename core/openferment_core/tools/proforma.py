@@ -73,7 +73,7 @@ TABLE_NAME = "stream_table"
 # The runs whose stream table stream_table reads: a library plant's run among
 # them (alpha 2.2 D8), whose tables the Proforma worker reads as a run's, and
 # a run kept from a retired reference entry, read as kept.
-TABLE_TOOLS = (proforma.RUN, "library.run", proforma.REFERENCE)
+TABLE_TOOLS = proforma.TABLE_TOOLS
 LIBRARY_RUN = "library.run"
 # The library plant an id of a retired reference entry names (alpha 2.2 D8).
 RETIRED_IDS = {proforma.BENCHMARK: "cornstover", **proforma.RETIRED_PLANTS}

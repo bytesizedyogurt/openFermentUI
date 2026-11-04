@@ -133,7 +133,22 @@
           }
         },
         "required": [
-          "question"
+          "question",
+          "claims",
+          "gaps",
+          "declined",
+          "usage",
+          "rejected",
+          "rejectionReasons",
+          "evidence",
+          "passages",
+          "trace",
+          "stopped",
+          "coverage",
+          "rows",
+          "runbookDraft",
+          "conversationId",
+          "turnId"
         ],
         "title": "AnswerPlan",
         "type": "object"
@@ -213,7 +228,8 @@
           "outputHash",
           "provenance",
           "createdAt",
-          "durationMs"
+          "durationMs",
+          "seed"
         ],
         "title": "Artifact",
         "type": "object"
@@ -360,7 +376,11 @@
           "who",
           "module",
           "action",
-          "state"
+          "state",
+          "target",
+          "askId",
+          "effort",
+          "detail"
         ],
         "title": "AuditEntry",
         "type": "object"
@@ -402,7 +422,9 @@
         "required": [
           "at",
           "who",
-          "action"
+          "action",
+          "from",
+          "to"
         ],
         "title": "AuditEvent",
         "type": "object"
@@ -539,7 +561,10 @@
           }
         },
         "required": [
-          "kind"
+          "kind",
+          "id",
+          "note",
+          "by"
         ],
         "title": "BasisSource",
         "type": "object"
@@ -634,6 +659,70 @@
           "by"
         ],
         "title": "Body_intake_upload_api_intake_upload_post",
+        "type": "object"
+      },
+      "BoundRecord": {
+        "description": "One record an input was bound to, in the input's unit.",
+        "properties": {
+          "carbonSource": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Carbonsource"
+          },
+          "id": {
+            "title": "Id",
+            "type": "string"
+          },
+          "organism": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Organism"
+          },
+          "paperId": {
+            "title": "Paperid",
+            "type": "string"
+          },
+          "provenance": {
+            "enum": [
+              "measured",
+              "gold",
+              "verified",
+              "curated",
+              "computed",
+              "unverified",
+              "user",
+              "industry-estimate",
+              "assumed"
+            ],
+            "title": "Provenance",
+            "type": "string"
+          },
+          "value": {
+            "title": "Value",
+            "type": "number"
+          }
+        },
+        "required": [
+          "id",
+          "paperId",
+          "value",
+          "organism",
+          "carbonSource",
+          "provenance"
+        ],
+        "title": "BoundRecord",
         "type": "object"
       },
       "BriefRequest": {
@@ -902,7 +991,26 @@
           "field",
           "value",
           "unit",
-          "si"
+          "si",
+          "confidence",
+          "status",
+          "provenance",
+          "organism",
+          "organismText",
+          "carbonSource",
+          "componentTag",
+          "goldOnly",
+          "extractorRun",
+          "rejectReason",
+          "isPrimary",
+          "citesRecordId",
+          "method",
+          "numbering",
+          "curationRef",
+          "range",
+          "comparativeBaseline",
+          "negativeResult",
+          "valueBasis"
         ],
         "title": "Candidate",
         "type": "object"
@@ -1109,9 +1217,61 @@
         "required": [
           "kind",
           "id",
-          "name"
+          "name",
+          "species",
+          "program",
+          "aliases",
+          "category",
+          "sequence",
+          "sequenceSource",
+          "family",
+          "summary",
+          "mastery",
+          "skills",
+          "note",
+          "source",
+          "by",
+          "agent",
+          "via",
+          "at"
         ],
         "title": "CatalogueEntry",
+        "type": "object"
+      },
+      "CatalogueIntake": {
+        "description": "What a file of entries came to: the ids kept, and each row refused with why.",
+        "properties": {
+          "kept": {
+            "items": {
+              "type": "string"
+            },
+            "title": "Kept",
+            "type": "array"
+          },
+          "kind": {
+            "enum": [
+              "strain",
+              "product",
+              "skill",
+              "lesson"
+            ],
+            "title": "Kind",
+            "type": "string"
+          },
+          "refused": {
+            "items": {
+              "type": "string"
+            },
+            "title": "Refused",
+            "type": "array"
+          }
+        },
+        "required": [
+          "kind",
+          "kept",
+          "refused"
+        ],
+        "title": "CatalogueIntake",
         "type": "object"
       },
       "CatalogueKeep": {
@@ -1132,6 +1292,214 @@
           "entry"
         ],
         "title": "CatalogueKeep",
+        "type": "object"
+      },
+      "CeilingCheck": {
+        "description": "GET /api/proforma/ceiling-check: one scenario's fermenter yield beside\nevery stored ceiling of its organism's shelf models on its sugar.",
+        "properties": {
+          "computeAt": {
+            "title": "Computeat",
+            "type": "string"
+          },
+          "empty": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Empty"
+          },
+          "flagged": {
+            "default": false,
+            "title": "Flagged",
+            "type": "boolean"
+          },
+          "flowsheet": {
+            "title": "Flowsheet",
+            "type": "string"
+          },
+          "host": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Host"
+          },
+          "models": {
+            "items": {
+              "type": "string"
+            },
+            "title": "Models",
+            "type": "array"
+          },
+          "notes": {
+            "items": {
+              "type": "string"
+            },
+            "title": "Notes",
+            "type": "array"
+          },
+          "organismWords": {
+            "title": "Organismwords",
+            "type": "string"
+          },
+          "otherSugars": {
+            "items": {
+              "type": "string"
+            },
+            "title": "Othersugars",
+            "type": "array"
+          },
+          "product": {
+            "title": "Product",
+            "type": "string"
+          },
+          "rows": {
+            "items": {
+              "$ref": "#/components/schemas/CeilingRow"
+            },
+            "title": "Rows",
+            "type": "array"
+          },
+          "scenarioId": {
+            "title": "Scenarioid",
+            "type": "string"
+          },
+          "species": {
+            "items": {
+              "type": "string"
+            },
+            "title": "Species",
+            "type": "array"
+          },
+          "strains": {
+            "items": {
+              "type": "string"
+            },
+            "title": "Strains",
+            "type": "array"
+          },
+          "substrate": {
+            "title": "Substrate",
+            "type": "string"
+          },
+          "sugarWords": {
+            "title": "Sugarwords",
+            "type": "string"
+          },
+          "yieldBinding": {
+            "enum": [
+              "records",
+              "assumption",
+              "artifact",
+              "waiting"
+            ],
+            "title": "Yieldbinding",
+            "type": "string"
+          },
+          "yieldHigh": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Yieldhigh"
+          },
+          "yieldLow": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Yieldlow"
+          },
+          "yieldRecords": {
+            "default": 0,
+            "title": "Yieldrecords",
+            "type": "integer"
+          },
+          "yieldSource": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/BasisSource"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "yieldTool": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Yieldtool"
+          },
+          "yieldUnit": {
+            "title": "Yieldunit",
+            "type": "string"
+          },
+          "yieldValue": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Yieldvalue"
+          },
+          "yieldWords": {
+            "title": "Yieldwords",
+            "type": "string"
+          }
+        },
+        "required": [
+          "scenarioId",
+          "flowsheet",
+          "product",
+          "substrate",
+          "sugarWords",
+          "host",
+          "strains",
+          "species",
+          "organismWords",
+          "models",
+          "yieldBinding",
+          "yieldValue",
+          "yieldLow",
+          "yieldHigh",
+          "yieldUnit",
+          "yieldSource",
+          "yieldTool",
+          "yieldRecords",
+          "yieldWords",
+          "rows",
+          "flagged",
+          "empty",
+          "computeAt",
+          "otherSugars",
+          "notes"
+        ],
+        "title": "CeilingCheck",
         "type": "object"
       },
       "CeilingRequest": {
@@ -1155,6 +1523,194 @@
           "substrate"
         ],
         "title": "CeilingRequest",
+        "type": "object"
+      },
+      "CeilingRow": {
+        "description": "One stored ceiling beside the scenario's yield, both on the ceiling's\nown footing, grams of product per gram of sugar and mol per mol.",
+        "properties": {
+          "artifactId": {
+            "title": "Artifactid",
+            "type": "string"
+          },
+          "ceilingGPerG": {
+            "title": "Ceilinggperg",
+            "type": "number"
+          },
+          "ceilingMolPerMol": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Ceilingmolpermol"
+          },
+          "conventions": {
+            "items": {
+              "type": "string"
+            },
+            "title": "Conventions",
+            "type": "array"
+          },
+          "createdAt": {
+            "title": "Createdat",
+            "type": "string"
+          },
+          "flag": {
+            "enum": [
+              "above",
+              "within",
+              "no-yield"
+            ],
+            "title": "Flag",
+            "type": "string"
+          },
+          "host": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Host"
+          },
+          "match": {
+            "enum": [
+              "strain",
+              "species"
+            ],
+            "title": "Match",
+            "type": "string"
+          },
+          "matchWords": {
+            "title": "Matchwords",
+            "type": "string"
+          },
+          "modelBasis": {
+            "title": "Modelbasis",
+            "type": "string"
+          },
+          "modelId": {
+            "title": "Modelid",
+            "type": "string"
+          },
+          "modelName": {
+            "title": "Modelname",
+            "type": "string"
+          },
+          "older": {
+            "default": 0,
+            "title": "Older",
+            "type": "integer"
+          },
+          "product": {
+            "title": "Product",
+            "type": "string"
+          },
+          "provenance": {
+            "enum": [
+              "measured",
+              "gold",
+              "verified",
+              "curated",
+              "computed",
+              "unverified",
+              "user",
+              "industry-estimate",
+              "assumed"
+            ],
+            "title": "Provenance",
+            "type": "string"
+          },
+          "recordsAbove": {
+            "items": {
+              "type": "string"
+            },
+            "title": "Recordsabove",
+            "type": "array"
+          },
+          "substrate": {
+            "title": "Substrate",
+            "type": "string"
+          },
+          "words": {
+            "title": "Words",
+            "type": "string"
+          },
+          "yieldGPerG": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Yieldgperg"
+          },
+          "yieldHighGPerG": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Yieldhighgperg"
+          },
+          "yieldLowGPerG": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Yieldlowgperg"
+          },
+          "yieldMolPerMol": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Yieldmolpermol"
+          }
+        },
+        "required": [
+          "modelId",
+          "modelName",
+          "modelBasis",
+          "host",
+          "match",
+          "matchWords",
+          "product",
+          "substrate",
+          "artifactId",
+          "provenance",
+          "createdAt",
+          "older",
+          "ceilingGPerG",
+          "ceilingMolPerMol",
+          "conventions",
+          "yieldGPerG",
+          "yieldLowGPerG",
+          "yieldHighGPerG",
+          "yieldMolPerMol",
+          "flag",
+          "words",
+          "recordsAbove"
+        ],
+        "title": "CeilingRow",
         "type": "object"
       },
       "Check": {
@@ -1296,7 +1852,19 @@
           "id",
           "personId",
           "skillIds",
-          "proposedAt"
+          "reasons",
+          "state",
+          "score",
+          "proposedAt",
+          "proposedBy",
+          "assessorId",
+          "scheduledFor",
+          "brief",
+          "results",
+          "evidenceIds",
+          "closedAt",
+          "dismissedBy",
+          "dismissReason"
         ],
         "title": "Check",
         "type": "object"
@@ -1338,7 +1906,11 @@
           }
         },
         "required": [
+          "steps",
+          "criteria",
+          "questions",
           "model",
+          "usage",
           "draftedAt"
         ],
         "title": "CheckBrief",
@@ -1571,6 +2143,10 @@
             "type": "integer"
           }
         },
+        "required": [
+          "version",
+          "checks"
+        ],
         "title": "Checks",
         "type": "object"
       },
@@ -1657,7 +2233,15 @@
         },
         "required": [
           "id",
-          "text"
+          "text",
+          "recordIds",
+          "paperIds",
+          "support",
+          "provenance",
+          "passages",
+          "evidenceIds",
+          "moduleRefs",
+          "values"
         ],
         "title": "Claim",
         "type": "object"
@@ -1686,7 +2270,8 @@
         },
         "required": [
           "label",
-          "quantity"
+          "quantity",
+          "source"
         ],
         "title": "ClaimValue",
         "type": "object"
@@ -1775,10 +2360,17 @@
         },
         "required": [
           "status",
+          "documentId",
           "collector",
           "identifier",
           "title",
-          "licenceClass"
+          "licenceClass",
+          "licence",
+          "sections",
+          "tables",
+          "chunks",
+          "reason",
+          "transient"
         ],
         "title": "CollectOutcome",
         "type": "object"
@@ -1903,7 +2495,8 @@
           "toolVersion",
           "inputs",
           "artifactId",
-          "at"
+          "at",
+          "seed"
         ],
         "title": "ComputedBasis",
         "type": "object"
@@ -1978,6 +2571,12 @@
             "type": "integer"
           }
         },
+        "required": [
+          "entities",
+          "searched",
+          "found",
+          "modules"
+        ],
         "title": "CoverageMap",
         "type": "object"
       },
@@ -2012,7 +2611,9 @@
           }
         },
         "required": [
-          "ok"
+          "ok",
+          "rule",
+          "why"
         ],
         "title": "DecisionCheck",
         "type": "object"
@@ -2123,11 +2724,17 @@
           "ref",
           "depositionId",
           "entryId",
+          "runbookId",
+          "runbook",
           "measureId",
+          "measure",
           "value",
           "unit",
           "at",
-          "by"
+          "by",
+          "hours",
+          "inUnit",
+          "note"
         ],
         "title": "DepositionReading",
         "type": "object"
@@ -2180,7 +2787,10 @@
           "paperId",
           "sectionId",
           "field",
-          "rule"
+          "value",
+          "unit",
+          "rule",
+          "detail"
         ],
         "title": "DroppedCandidate",
         "type": "object"
@@ -2339,7 +2949,15 @@
         },
         "required": [
           "name",
-          "entryPoint"
+          "entryPoint",
+          "version",
+          "worker",
+          "workerStatus",
+          "heavy",
+          "things",
+          "thingsAre",
+          "conformance",
+          "error"
         ],
         "title": "EngineInfo",
         "type": "object"
@@ -2522,8 +3140,20 @@
         "required": [
           "key",
           "label",
+          "symbol",
+          "gloss",
+          "dimension",
           "unit",
+          "min",
+          "max",
+          "step",
+          "scale",
+          "group",
+          "sourceRule",
+          "note",
           "boundsReason",
+          "choices",
+          "convention",
           "value",
           "origin"
         ],
@@ -2718,13 +3348,25 @@
         },
         "required": [
           "id",
+          "engine",
           "plant",
+          "configuration",
           "status",
           "tool",
           "toolVersion",
           "inputs",
+          "provenance",
+          "artifactId",
+          "outputs",
+          "versions",
+          "sff",
+          "sffRefused",
+          "refused",
+          "scenarioId",
           "by",
-          "at"
+          "at",
+          "durationMs",
+          "diagnostics"
         ],
         "title": "EngineRun",
         "type": "object"
@@ -2820,6 +3462,9 @@
         "required": [
           "id",
           "title",
+          "kind",
+          "configurations",
+          "defaultConfiguration",
           "precision"
         ],
         "title": "EngineThing",
@@ -2896,8 +3541,10 @@
           "label",
           "value",
           "unit",
+          "interval",
           "provenance",
-          "basis"
+          "basis",
+          "figure"
         ],
         "title": "Evidence",
         "type": "object"
@@ -3029,7 +3676,19 @@
         },
         "required": [
           "paperId",
-          "extractedAt"
+          "run",
+          "extractedAt",
+          "candidates",
+          "audit",
+          "rejected",
+          "rejectionReasons",
+          "rejectionDetails",
+          "dropped",
+          "usage",
+          "notes",
+          "calls",
+          "truncatedSections",
+          "fieldDrops"
         ],
         "title": "ExtractResponse",
         "type": "object"
@@ -3065,7 +3724,10 @@
           }
         },
         "required": [
-          "run"
+          "run",
+          "results",
+          "falsePositives",
+          "models"
         ],
         "title": "ExtractRun",
         "type": "object"
@@ -3134,7 +3796,8 @@
         },
         "required": [
           "goldRecordId",
-          "outcome"
+          "outcome",
+          "extracted"
         ],
         "title": "ExtractRunResult",
         "type": "object"
@@ -3165,9 +3828,266 @@
         "required": [
           "at",
           "kept",
-          "refused"
+          "refused",
+          "models"
         ],
         "title": "ExtractionSummary",
+        "type": "object"
+      },
+      "FamilyInfo": {
+        "description": "GET /api/fermos/families: a model family as the panel shows it.",
+        "properties": {
+          "equations": {
+            "title": "Equations",
+            "type": "string"
+          },
+          "groups": {
+            "items": {
+              "type": "string"
+            },
+            "title": "Groups",
+            "type": "array"
+          },
+          "id": {
+            "title": "Id",
+            "type": "string"
+          },
+          "socket": {
+            "title": "Socket",
+            "type": "boolean"
+          },
+          "specs": {
+            "items": {
+              "$ref": "#/components/schemas/ParameterSpec"
+            },
+            "title": "Specs",
+            "type": "array"
+          },
+          "stateUnits": {
+            "additionalProperties": {
+              "type": "string"
+            },
+            "title": "Stateunits",
+            "type": "object"
+          },
+          "states": {
+            "items": {
+              "type": "string"
+            },
+            "title": "States",
+            "type": "array"
+          },
+          "title": {
+            "title": "Title",
+            "type": "string"
+          },
+          "what": {
+            "title": "What",
+            "type": "string"
+          }
+        },
+        "required": [
+          "id",
+          "title",
+          "what",
+          "equations",
+          "states",
+          "stateUnits",
+          "socket",
+          "specs",
+          "groups"
+        ],
+        "title": "FamilyInfo",
+        "type": "object"
+      },
+      "FermosBinding": {
+        "description": "GET /api/fermos/bind (OF-BLD-020 §3.2): a family's parameters bound\nfor a strain, product and sugar from a fit, the records, a kept\nsimulation and the conventions, starting no integration.",
+        "properties": {
+          "notes": {
+            "items": {
+              "type": "string"
+            },
+            "title": "Notes",
+            "type": "array"
+          },
+          "refused": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Refused"
+          },
+          "values": {
+            "items": {
+              "$ref": "#/components/schemas/ParameterValue"
+            },
+            "title": "Values",
+            "type": "array"
+          },
+          "waiting": {
+            "items": {
+              "type": "string"
+            },
+            "title": "Waiting",
+            "type": "array"
+          }
+        },
+        "required": [
+          "values",
+          "waiting",
+          "refused",
+          "notes"
+        ],
+        "title": "FermosBinding",
+        "type": "object"
+      },
+      "FermosFitInfo": {
+        "description": "A kinetic fit or a forecast fermOS keeps, and what it can feed one\nshelf flowsheet (GET /api/fermos/fits). A person picks it; a model never\ndoes.",
+        "properties": {
+          "artifactId": {
+            "title": "Artifactid",
+            "type": "string"
+          },
+          "batchTimeH": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Batchtimeh"
+          },
+          "batchTimeNote": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Batchtimenote"
+          },
+          "createdAt": {
+            "title": "Createdat",
+            "type": "string"
+          },
+          "depositionId": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Depositionid"
+          },
+          "feeds": {
+            "items": {
+              "$ref": "#/components/schemas/FitFeed"
+            },
+            "title": "Feeds",
+            "type": "array"
+          },
+          "fitArtifactId": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Fitartifactid"
+          },
+          "flags": {
+            "items": {
+              "type": "string"
+            },
+            "title": "Flags",
+            "type": "array"
+          },
+          "flowsheet": {
+            "title": "Flowsheet",
+            "type": "string"
+          },
+          "productSeries": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Productseries"
+          },
+          "provenance": {
+            "enum": [
+              "measured",
+              "gold",
+              "verified",
+              "curated",
+              "computed",
+              "unverified",
+              "user",
+              "industry-estimate",
+              "assumed"
+            ],
+            "title": "Provenance",
+            "type": "string"
+          },
+          "refused": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Refused"
+          },
+          "substrateSeries": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Substrateseries"
+          },
+          "tool": {
+            "title": "Tool",
+            "type": "string"
+          }
+        },
+        "required": [
+          "artifactId",
+          "tool",
+          "provenance",
+          "createdAt",
+          "flowsheet",
+          "depositionId",
+          "fitArtifactId",
+          "productSeries",
+          "substrateSeries",
+          "batchTimeH",
+          "batchTimeNote",
+          "feeds",
+          "flags",
+          "refused"
+        ],
+        "title": "FermosFitInfo",
         "type": "object"
       },
       "FermosFitRequest": {
@@ -3268,9 +4188,143 @@
         },
         "required": [
           "depositionId",
-          "confirmedShare"
+          "growth",
+          "kinetic",
+          "growthArtifactId",
+          "kineticArtifactId",
+          "confirmedShare",
+          "sample",
+          "notes"
         ],
         "title": "FermosFitResponse",
+        "type": "object"
+      },
+      "FermosHarvest": {
+        "description": "GET /api/fermos/harvest: a kept simulation's broth at an hour.",
+        "properties": {
+          "absent": {
+            "title": "Absent",
+            "type": "string"
+          },
+          "artifactId": {
+            "title": "Artifactid",
+            "type": "string"
+          },
+          "asked": {
+            "title": "Asked",
+            "type": "number"
+          },
+          "exact": {
+            "title": "Exact",
+            "type": "boolean"
+          },
+          "family": {
+            "title": "Family",
+            "type": "string"
+          },
+          "harvestH": {
+            "title": "Harvesth",
+            "type": "number"
+          },
+          "hour": {
+            "title": "Hour",
+            "type": "number"
+          },
+          "hourSource": {
+            "enum": [
+              "the simulation's harvest hour",
+              "a person's hour"
+            ],
+            "title": "Hoursource",
+            "type": "string"
+          },
+          "how": {
+            "title": "How",
+            "type": "string"
+          },
+          "product": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Product"
+          },
+          "provenance": {
+            "enum": [
+              "measured",
+              "gold",
+              "verified",
+              "curated",
+              "computed",
+              "unverified",
+              "user",
+              "industry-estimate",
+              "assumed"
+            ],
+            "title": "Provenance",
+            "type": "string"
+          },
+          "read": {
+            "title": "Read",
+            "type": "string"
+          },
+          "runEndH": {
+            "title": "Runendh",
+            "type": "number"
+          },
+          "states": {
+            "items": {
+              "$ref": "#/components/schemas/HarvestState"
+            },
+            "title": "States",
+            "type": "array"
+          },
+          "strain": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Strain"
+          },
+          "sugar": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Sugar"
+          }
+        },
+        "required": [
+          "artifactId",
+          "family",
+          "strain",
+          "product",
+          "sugar",
+          "provenance",
+          "asked",
+          "hourSource",
+          "how",
+          "hour",
+          "exact",
+          "read",
+          "harvestH",
+          "runEndH",
+          "states",
+          "absent"
+        ],
+        "title": "FermosHarvest",
         "type": "object"
       },
       "FermosPoint": {
@@ -3374,6 +4428,10 @@
             "title": "Text"
           }
         },
+        "required": [
+          "href",
+          "text"
+        ],
         "title": "FetchLicense",
         "type": "object"
       },
@@ -3399,6 +4457,78 @@
           "text"
         ],
         "title": "FetchedSection",
+        "type": "object"
+      },
+      "FitFeed": {
+        "description": "What one fermOS artifact gives one input of a flowsheet: the value in\nthe input's unit, with the 5th and 95th percentile of the forecast's band\nfor readings, or why it gives nothing, in words naming the parameter.",
+        "properties": {
+          "derivation": {
+            "title": "Derivation",
+            "type": "string"
+          },
+          "high": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "High"
+          },
+          "key": {
+            "title": "Key",
+            "type": "string"
+          },
+          "low": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Low"
+          },
+          "refused": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Refused"
+          },
+          "unit": {
+            "title": "Unit",
+            "type": "string"
+          },
+          "value": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Value"
+          }
+        },
+        "required": [
+          "key",
+          "unit",
+          "value",
+          "low",
+          "high",
+          "derivation",
+          "refused"
+        ],
+        "title": "FitFeed",
         "type": "object"
       },
       "FitParam": {
@@ -3476,6 +4606,174 @@
           "unit"
         ],
         "title": "FitParam",
+        "type": "object"
+      },
+      "FlowsheetInfo": {
+        "properties": {
+          "brothStream": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Brothstream"
+          },
+          "builtFrom": {
+            "items": {
+              "type": "string"
+            },
+            "title": "Builtfrom",
+            "type": "array"
+          },
+          "description": {
+            "title": "Description",
+            "type": "string"
+          },
+          "gridInputs": {
+            "items": {
+              "type": "string"
+            },
+            "title": "Gridinputs",
+            "type": "array"
+          },
+          "id": {
+            "title": "Id",
+            "type": "string"
+          },
+          "inputs": {
+            "items": {
+              "$ref": "#/components/schemas/FlowsheetInput"
+            },
+            "title": "Inputs",
+            "type": "array"
+          },
+          "leavesOut": {
+            "items": {
+              "type": "string"
+            },
+            "title": "Leavesout",
+            "type": "array"
+          },
+          "outputs": {
+            "items": {
+              "type": "string"
+            },
+            "title": "Outputs",
+            "type": "array"
+          },
+          "priceBasis": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Pricebasis"
+          },
+          "priceOutput": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Priceoutput"
+          },
+          "program": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Program"
+          },
+          "source": {
+            "title": "Source",
+            "type": "string"
+          },
+          "title": {
+            "title": "Title",
+            "type": "string"
+          }
+        },
+        "required": [
+          "id",
+          "title",
+          "description",
+          "source",
+          "program",
+          "inputs",
+          "outputs",
+          "priceOutput",
+          "priceBasis",
+          "leavesOut",
+          "gridInputs",
+          "builtFrom",
+          "brothStream"
+        ],
+        "title": "FlowsheetInfo",
+        "type": "object"
+      },
+      "FlowsheetInput": {
+        "description": "One input a shelf flowsheet takes. It names the ontology fields whose\nrecords bind it; with none, a named person's assumption or a stated\nconvention sets it. The file of the flowsheet holds no value for it.",
+        "properties": {
+          "dimension": {
+            "title": "Dimension",
+            "type": "string"
+          },
+          "fields": {
+            "items": {
+              "type": "string"
+            },
+            "title": "Fields",
+            "type": "array"
+          },
+          "key": {
+            "title": "Key",
+            "type": "string"
+          },
+          "kind": {
+            "enum": [
+              "process",
+              "economic",
+              "convention"
+            ],
+            "title": "Kind",
+            "type": "string"
+          },
+          "name": {
+            "title": "Name",
+            "type": "string"
+          },
+          "note": {
+            "title": "Note",
+            "type": "string"
+          },
+          "unit": {
+            "title": "Unit",
+            "type": "string"
+          }
+        },
+        "required": [
+          "key",
+          "name",
+          "dimension",
+          "unit",
+          "fields",
+          "kind",
+          "note"
+        ],
+        "title": "FlowsheetInput",
         "type": "object"
       },
       "ForecastRequest": {
@@ -3615,8 +4913,14 @@
           "times",
           "bands",
           "finals",
+          "yieldInterval",
+          "substrateRunsOutH",
           "draws",
-          "seed"
+          "seed",
+          "artifactId",
+          "evidence",
+          "sample",
+          "notes"
         ],
         "title": "ForecastResult",
         "type": "object"
@@ -3696,12 +5000,16 @@
         "required": [
           "id",
           "name",
+          "host",
           "scope",
           "route",
           "licence",
           "source",
+          "unavailable",
           "feed",
-          "product"
+          "notes",
+          "product",
+          "products"
         ],
         "title": "GeneosModelInfo",
         "type": "object"
@@ -3775,9 +5083,35 @@
           "kind",
           "modelId",
           "product",
-          "substrates"
+          "substrates",
+          "finding",
+          "artifactId",
+          "evidence",
+          "output"
         ],
         "title": "GeneosResult",
+        "type": "object"
+      },
+      "GridDim": {
+        "description": "One axis of a run's grid: the input it walks, by key, and the values\nit takes, in the input's unit.",
+        "properties": {
+          "key": {
+            "title": "Key",
+            "type": "string"
+          },
+          "values": {
+            "items": {
+              "type": "number"
+            },
+            "title": "Values",
+            "type": "array"
+          }
+        },
+        "required": [
+          "key",
+          "values"
+        ],
+        "title": "GridDim",
         "type": "object"
       },
       "GrowthFit": {
@@ -3849,7 +5183,13 @@
         },
         "required": [
           "measureId",
-          "unit"
+          "unit",
+          "mu",
+          "doublingTimeH",
+          "r2",
+          "window",
+          "points",
+          "reason"
         ],
         "title": "GrowthFit",
         "type": "object"
@@ -3881,6 +5221,12 @@
             "type": "integer"
           }
         },
+        "required": [
+          "version",
+          "people",
+          "evidence",
+          "policy"
+        ],
         "title": "Guild",
         "type": "object"
       },
@@ -4176,6 +5522,110 @@
         "title": "HTTPValidationError",
         "type": "object"
       },
+      "HarvestState": {
+        "description": "One state of the simulation at the hour read, in the unit it keeps.",
+        "properties": {
+          "state": {
+            "title": "State",
+            "type": "string"
+          },
+          "unit": {
+            "title": "Unit",
+            "type": "string"
+          },
+          "value": {
+            "title": "Value",
+            "type": "number"
+          }
+        },
+        "required": [
+          "state",
+          "value",
+          "unit"
+        ],
+        "title": "HarvestState",
+        "type": "object"
+      },
+      "Health": {
+        "description": "GET /api/health: the service answering, the models a call goes to\n(the primary, and the one a call falls back to), and whether it holds a\nkey, so a page can say the service is up with no key to call a model\nwith.",
+        "properties": {
+          "fallbackModel": {
+            "title": "Fallbackmodel",
+            "type": "string"
+          },
+          "hasKey": {
+            "title": "Haskey",
+            "type": "boolean"
+          },
+          "model": {
+            "title": "Model",
+            "type": "string"
+          },
+          "ok": {
+            "title": "Ok",
+            "type": "boolean"
+          },
+          "service": {
+            "title": "Service",
+            "type": "string"
+          }
+        },
+        "required": [
+          "ok",
+          "service",
+          "model",
+          "fallbackModel",
+          "hasKey"
+        ],
+        "title": "Health",
+        "type": "object"
+      },
+      "HistogramBin": {
+        "properties": {
+          "count": {
+            "title": "Count",
+            "type": "integer"
+          },
+          "high": {
+            "title": "High",
+            "type": "number"
+          },
+          "low": {
+            "title": "Low",
+            "type": "number"
+          }
+        },
+        "required": [
+          "low",
+          "high",
+          "count"
+        ],
+        "title": "HistogramBin",
+        "type": "object"
+      },
+      "InputSensitivity": {
+        "properties": {
+          "key": {
+            "title": "Key",
+            "type": "string"
+          },
+          "rho": {
+            "title": "Rho",
+            "type": "number"
+          },
+          "sourceKind": {
+            "title": "Sourcekind",
+            "type": "string"
+          }
+        },
+        "required": [
+          "key",
+          "rho",
+          "sourceKind"
+        ],
+        "title": "InputSensitivity",
+        "type": "object"
+      },
       "Interval": {
         "properties": {
           "high": {
@@ -4207,6 +5657,65 @@
           "high"
         ],
         "title": "Interval",
+        "type": "object"
+      },
+      "KeptTrain": {
+        "description": "A train a model built with `pureos_build` or `pureos_write`, kept by\nthe service with who made it and when: the train as data (D9). Its runs\nare `pureos.train_run` artifacts, found by the train's id.",
+        "properties": {
+          "agent": {
+            "const": "model",
+            "default": "model",
+            "title": "Agent",
+            "type": "string"
+          },
+          "askId": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Askid"
+          },
+          "at": {
+            "title": "At",
+            "type": "string"
+          },
+          "effort": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Effort"
+          },
+          "madeBy": {
+            "title": "Madeby",
+            "type": "string"
+          },
+          "spec": {
+            "$ref": "#/components/schemas/TrainSpec"
+          },
+          "updatedAt": {
+            "title": "Updatedat",
+            "type": "string"
+          }
+        },
+        "required": [
+          "spec",
+          "agent",
+          "madeBy",
+          "effort",
+          "askId",
+          "at",
+          "updatedAt"
+        ],
+        "title": "KeptTrain",
         "type": "object"
       },
       "KineticFit": {
@@ -4323,7 +5832,11 @@
           }
         },
         "required": [
-          "ok"
+          "configuration",
+          "ok",
+          "units",
+          "priced",
+          "error"
         ],
         "title": "LibraryBuild",
         "type": "object"
@@ -4369,7 +5882,8 @@
         "required": [
           "name",
           "kind",
-          "required"
+          "required",
+          "default"
         ],
         "title": "LibraryEntryParameter",
         "type": "object"
@@ -4428,7 +5942,11 @@
         },
         "required": [
           "plant",
+          "configuration",
           "scope",
+          "found",
+          "specs",
+          "values",
           "simulator",
           "package"
         ],
@@ -4625,7 +6143,26 @@
         "required": [
           "id",
           "module",
-          "kind"
+          "kind",
+          "composedFrom",
+          "recipe",
+          "defaultConfiguration",
+          "title",
+          "readme",
+          "entry",
+          "parameters",
+          "processModel",
+          "scenario",
+          "requiresConfiguration",
+          "configurations",
+          "configurationsFrom",
+          "takesCache",
+          "tests",
+          "testNames",
+          "compat",
+          "factories",
+          "error",
+          "builds"
         ],
         "title": "LibraryPlant",
         "type": "object"
@@ -4686,7 +6223,9 @@
           }
         },
         "required": [
-          "name"
+          "name",
+          "type",
+          "default"
         ],
         "title": "LibraryScenarioField",
         "type": "object"
@@ -4727,7 +6266,9 @@
           "package",
           "simulator",
           "thermosteam",
-          "testFile"
+          "testFile",
+          "testTables",
+          "plants"
         ],
         "title": "LibraryShelf",
         "type": "object"
@@ -4845,9 +6386,17 @@
         "required": [
           "documentId",
           "title",
+          "authors",
+          "year",
+          "doi",
+          "journal",
+          "citation",
           "source",
+          "sourceRef",
           "licenceClass",
           "chunks",
+          "collector",
+          "selection",
           "linkedBy",
           "linkedAt"
         ],
@@ -4877,6 +6426,69 @@
         "title": "LiteratureQuestion",
         "type": "object"
       },
+      "LiteratureStats": {
+        "description": "GET /api/literature/stats, in the kit's own names: the project's\ndocuments, their chunks and their citations, counted by licence class,\nsource and embedding version; the concept graph's entities,\nrelationships and communities are the instance's, counted whole.",
+        "properties": {
+          "chunks": {
+            "title": "Chunks",
+            "type": "integer"
+          },
+          "citations": {
+            "title": "Citations",
+            "type": "integer"
+          },
+          "communities": {
+            "title": "Communities",
+            "type": "integer"
+          },
+          "documents": {
+            "title": "Documents",
+            "type": "integer"
+          },
+          "embedding_versions": {
+            "additionalProperties": {
+              "type": "integer"
+            },
+            "title": "Embedding Versions",
+            "type": "object"
+          },
+          "entities": {
+            "title": "Entities",
+            "type": "integer"
+          },
+          "license_classes": {
+            "additionalProperties": {
+              "type": "integer"
+            },
+            "title": "License Classes",
+            "type": "object"
+          },
+          "relationships": {
+            "title": "Relationships",
+            "type": "integer"
+          },
+          "sources": {
+            "additionalProperties": {
+              "type": "integer"
+            },
+            "title": "Sources",
+            "type": "object"
+          }
+        },
+        "required": [
+          "documents",
+          "chunks",
+          "citations",
+          "entities",
+          "relationships",
+          "communities",
+          "license_classes",
+          "sources",
+          "embedding_versions"
+        ],
+        "title": "LiteratureStats",
+        "type": "object"
+      },
       "LiveConversation": {
         "description": "A Postdoc conversation, its turns oldest first (mirrors\n`LiveConversation` in src/data/types.ts; GET /api/conversations/{id}).",
         "properties": {
@@ -4903,7 +6515,8 @@
         "required": [
           "id",
           "title",
-          "startedAt"
+          "startedAt",
+          "turns"
         ],
         "title": "LiveConversation",
         "type": "object"
@@ -4984,9 +6597,37 @@
           "id",
           "question",
           "askedAt",
-          "status"
+          "steps",
+          "plan",
+          "error",
+          "status",
+          "by",
+          "artifactIds"
         ],
         "title": "LiveTurn",
+        "type": "object"
+      },
+      "MassBalance": {
+        "properties": {
+          "closure": {
+            "title": "Closure",
+            "type": "number"
+          },
+          "note": {
+            "title": "Note",
+            "type": "string"
+          },
+          "ok": {
+            "title": "Ok",
+            "type": "boolean"
+          }
+        },
+        "required": [
+          "closure",
+          "ok",
+          "note"
+        ],
+        "title": "MassBalance",
         "type": "object"
       },
       "Measure": {
@@ -5122,7 +6763,12 @@
         },
         "required": [
           "module",
-          "label"
+          "label",
+          "count",
+          "hits",
+          "named",
+          "partial",
+          "error"
         ],
         "title": "ModuleCoverage",
         "type": "object"
@@ -5213,9 +6859,30 @@
           "ref",
           "label",
           "state",
-          "status"
+          "status",
+          "provenance",
+          "detail"
         ],
         "title": "ModuleRow",
+        "type": "object"
+      },
+      "NotOffered": {
+        "description": "A parameter the class's constructor takes that the panel does not\noffer, and why, in words.",
+        "properties": {
+          "name": {
+            "title": "Name",
+            "type": "string"
+          },
+          "why": {
+            "title": "Why",
+            "type": "string"
+          }
+        },
+        "required": [
+          "name",
+          "why"
+        ],
+        "title": "NotOffered",
         "type": "object"
       },
       "Origin": {
@@ -5331,6 +6998,12 @@
             "title": "Runs"
           }
         },
+        "required": [
+          "papers",
+          "records",
+          "candidates",
+          "runs"
+        ],
         "title": "Overlay",
         "type": "object"
       },
@@ -5495,9 +7168,82 @@
         },
         "required": [
           "ingest",
-          "textSource"
+          "textSource",
+          "sections",
+          "license",
+          "fetchedAt",
+          "reason",
+          "source",
+          "title",
+          "authors",
+          "year",
+          "journal",
+          "doi",
+          "pmcid",
+          "url",
+          "licenceClass",
+          "extraction"
         ],
         "title": "OverlayPaper",
+        "type": "object"
+      },
+      "OxygenUptake": {
+        "description": "OUR(t) = qO2·X on the time course's hours, and its peak read on the\nsolver's own steps.",
+        "properties": {
+          "note": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Note"
+          },
+          "peak": {
+            "title": "Peak",
+            "type": "number"
+          },
+          "peakH": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Peakh"
+          },
+          "t": {
+            "items": {
+              "type": "number"
+            },
+            "title": "T",
+            "type": "array"
+          },
+          "unit": {
+            "title": "Unit",
+            "type": "string"
+          },
+          "value": {
+            "items": {
+              "type": "number"
+            },
+            "title": "Value",
+            "type": "array"
+          }
+        },
+        "required": [
+          "t",
+          "value",
+          "unit",
+          "peak",
+          "peakH",
+          "note"
+        ],
+        "title": "OxygenUptake",
         "type": "object"
       },
       "PackageRegression": {
@@ -5526,7 +7272,8 @@
         "required": [
           "package",
           "file",
-          "test"
+          "test",
+          "values"
         ],
         "title": "PackageRegression",
         "type": "object"
@@ -5703,6 +7450,59 @@
         "title": "ParamResolveRequest",
         "type": "object"
       },
+      "ParamResolveResult": {
+        "properties": {
+          "basisInputs": {
+            "items": {
+              "$ref": "#/components/schemas/BasisInput"
+            },
+            "title": "Basisinputs",
+            "type": "array"
+          },
+          "notes": {
+            "items": {
+              "type": "string"
+            },
+            "title": "Notes",
+            "type": "array"
+          },
+          "scope": {
+            "title": "Scope",
+            "type": "string"
+          },
+          "values": {
+            "items": {
+              "$ref": "#/components/schemas/ParameterValue"
+            },
+            "title": "Values",
+            "type": "array"
+          },
+          "waiting": {
+            "items": {
+              "type": "string"
+            },
+            "title": "Waiting",
+            "type": "array"
+          },
+          "warnings": {
+            "items": {
+              "type": "string"
+            },
+            "title": "Warnings",
+            "type": "array"
+          }
+        },
+        "required": [
+          "scope",
+          "values",
+          "waiting",
+          "basisInputs",
+          "warnings",
+          "notes"
+        ],
+        "title": "ParamResolveResult",
+        "type": "object"
+      },
       "ParamScope": {
         "description": "GET /api/params/{scope}: a scope's specs with their current values.",
         "properties": {
@@ -5761,7 +7561,8 @@
           "title",
           "specs",
           "values",
-          "waiting"
+          "waiting",
+          "notes"
         ],
         "title": "ParamScope",
         "type": "object"
@@ -5897,9 +7698,16 @@
           "gloss",
           "dimension",
           "unit",
+          "min",
+          "max",
+          "step",
+          "scale",
           "group",
           "sourceRule",
-          "boundsReason"
+          "note",
+          "boundsReason",
+          "choices",
+          "convention"
         ],
         "title": "ParameterSpec",
         "type": "object"
@@ -6043,8 +7851,16 @@
         "required": [
           "key",
           "value",
+          "low",
+          "high",
           "source",
-          "origin"
+          "origin",
+          "identified",
+          "overriddenBy",
+          "libraryDefault",
+          "recordIds",
+          "detail",
+          "outOfBounds"
         ],
         "title": "ParameterValue",
         "type": "object"
@@ -6201,6 +8017,11 @@
             "type": "integer"
           }
         },
+        "required": [
+          "version",
+          "scenarios",
+          "sessions"
+        ],
         "title": "Practice",
         "type": "object"
       },
@@ -6361,7 +8182,8 @@
           }
         },
         "required": [
-          "text"
+          "text",
+          "steps"
         ],
         "title": "PracticeObservation",
         "type": "object"
@@ -6447,7 +8269,12 @@
           "title",
           "situation",
           "prompt",
+          "watchFor",
+          "evidence",
+          "steps",
+          "depositionIds",
           "model",
+          "usage",
           "createdAt"
         ],
         "title": "PracticeScenario",
@@ -6526,7 +8353,13 @@
           "id",
           "scenarioId",
           "skillId",
-          "startedAt"
+          "personId",
+          "turns",
+          "observed",
+          "startedAt",
+          "closedAt",
+          "evidenceId",
+          "usage"
         ],
         "title": "PracticeSession",
         "type": "object"
@@ -6601,7 +8434,12 @@
           }
         },
         "required": [
-          "kind"
+          "kind",
+          "protocolId",
+          "stepId",
+          "material",
+          "depositionId",
+          "itemId"
         ],
         "title": "PracticeSource",
         "type": "object"
@@ -6670,6 +8508,8 @@
         "required": [
           "role",
           "text",
+          "move",
+          "steps",
           "at"
         ],
         "title": "PracticeTurn",
@@ -6793,7 +8633,12 @@
           "id",
           "label",
           "source",
-          "text"
+          "text",
+          "value",
+          "unit",
+          "at",
+          "measure",
+          "basis"
         ],
         "title": "PracticeValue",
         "type": "object"
@@ -6971,6 +8816,60 @@
         "title": "ProductPropertyRequest",
         "type": "object"
       },
+      "ProformaGrid": {
+        "properties": {
+          "costLines": {
+            "additionalProperties": {
+              "items": {
+                "anyOf": [
+                  {
+                    "type": "number"
+                  },
+                  {
+                    "type": "null"
+                  }
+                ]
+              },
+              "type": "array"
+            },
+            "title": "Costlines",
+            "type": "object"
+          },
+          "dims": {
+            "items": {
+              "$ref": "#/components/schemas/GridDim"
+            },
+            "title": "Dims",
+            "type": "array"
+          },
+          "infeasible": {
+            "title": "Infeasible",
+            "type": "integer"
+          },
+          "msp": {
+            "items": {
+              "anyOf": [
+                {
+                  "type": "number"
+                },
+                {
+                  "type": "null"
+                }
+              ]
+            },
+            "title": "Msp",
+            "type": "array"
+          }
+        },
+        "required": [
+          "dims",
+          "msp",
+          "costLines",
+          "infeasible"
+        ],
+        "title": "ProformaGrid",
+        "type": "object"
+      },
       "ProformaRunRequest": {
         "additionalProperties": false,
         "description": "POST /api/proforma/run. It holds these fields alone: a field it does\nnot name is refused.",
@@ -7060,6 +8959,460 @@
         "title": "ProformaRunRequest",
         "type": "object"
       },
+      "ProformaRunResult": {
+        "properties": {
+          "artifactId": {
+            "title": "Artifactid",
+            "type": "string"
+          },
+          "baseCostLines": {
+            "anyOf": [
+              {
+                "additionalProperties": {
+                  "type": "number"
+                },
+                "type": "object"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Basecostlines"
+          },
+          "baseInfeasible": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Baseinfeasible"
+          },
+          "basePrice": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Baseprice"
+          },
+          "diagram": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Diagram"
+          },
+          "diagramNote": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Diagramnote"
+          },
+          "evidence": {
+            "$ref": "#/components/schemas/Evidence"
+          },
+          "feasible": {
+            "title": "Feasible",
+            "type": "integer"
+          },
+          "flowsheet": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Flowsheet"
+          },
+          "grid": {
+            "$ref": "#/components/schemas/ProformaGrid"
+          },
+          "histogram": {
+            "items": {
+              "$ref": "#/components/schemas/HistogramBin"
+            },
+            "title": "Histogram",
+            "type": "array"
+          },
+          "infeasible": {
+            "additionalProperties": {
+              "type": "integer"
+            },
+            "title": "Infeasible",
+            "type": "object"
+          },
+          "inputs": {
+            "items": {
+              "$ref": "#/components/schemas/ScenarioInput"
+            },
+            "title": "Inputs",
+            "type": "array"
+          },
+          "leavesOut": {
+            "items": {
+              "type": "string"
+            },
+            "title": "Leavesout",
+            "type": "array"
+          },
+          "priceBasis": {
+            "title": "Pricebasis",
+            "type": "string"
+          },
+          "provenance": {
+            "enum": [
+              "measured",
+              "gold",
+              "verified",
+              "curated",
+              "computed",
+              "unverified",
+              "user",
+              "industry-estimate",
+              "assumed"
+            ],
+            "title": "Provenance",
+            "type": "string"
+          },
+          "quantiles": {
+            "additionalProperties": {
+              "type": "number"
+            },
+            "title": "Quantiles",
+            "type": "object"
+          },
+          "readBack": {
+            "additionalProperties": {
+              "type": "number"
+            },
+            "title": "Readback",
+            "type": "object"
+          },
+          "samples": {
+            "title": "Samples",
+            "type": "integer"
+          },
+          "scenarioId": {
+            "title": "Scenarioid",
+            "type": "string"
+          },
+          "sensitivity": {
+            "items": {
+              "$ref": "#/components/schemas/InputSensitivity"
+            },
+            "title": "Sensitivity",
+            "type": "array"
+          },
+          "streams": {
+            "items": {
+              "$ref": "#/components/schemas/StreamRow"
+            },
+            "title": "Streams",
+            "type": "array"
+          },
+          "tableUnits": {
+            "additionalProperties": {
+              "type": "string"
+            },
+            "title": "Tableunits",
+            "type": "object"
+          },
+          "tablesSource": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Tablessource"
+          },
+          "tea": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/TeaBreakdown"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "unitOrder": {
+            "items": {
+              "type": "string"
+            },
+            "title": "Unitorder",
+            "type": "array"
+          },
+          "units": {
+            "items": {
+              "$ref": "#/components/schemas/UnitRow"
+            },
+            "title": "Units",
+            "type": "array"
+          },
+          "utilities": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/UtilityDuties"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          }
+        },
+        "required": [
+          "scenarioId",
+          "artifactId",
+          "provenance",
+          "inputs",
+          "basePrice",
+          "baseCostLines",
+          "baseInfeasible",
+          "quantiles",
+          "histogram",
+          "sensitivity",
+          "samples",
+          "feasible",
+          "infeasible",
+          "grid",
+          "readBack",
+          "leavesOut",
+          "priceBasis",
+          "evidence",
+          "flowsheet",
+          "tablesSource",
+          "tea",
+          "streams",
+          "units",
+          "utilities",
+          "diagram",
+          "diagramNote",
+          "unitOrder",
+          "tableUnits"
+        ],
+        "title": "ProformaRunResult",
+        "type": "object"
+      },
+      "ProformaScenarioInfo": {
+        "properties": {
+          "flowsheet": {
+            "title": "Flowsheet",
+            "type": "string"
+          },
+          "host": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Host"
+          },
+          "hosts": {
+            "items": {
+              "type": "string"
+            },
+            "title": "Hosts",
+            "type": "array"
+          },
+          "id": {
+            "title": "Id",
+            "type": "string"
+          },
+          "inputs": {
+            "items": {
+              "$ref": "#/components/schemas/ScenarioInput"
+            },
+            "title": "Inputs",
+            "type": "array"
+          },
+          "leavesOut": {
+            "items": {
+              "type": "string"
+            },
+            "title": "Leavesout",
+            "type": "array"
+          },
+          "name": {
+            "title": "Name",
+            "type": "string"
+          },
+          "priceBasis": {
+            "title": "Pricebasis",
+            "type": "string"
+          },
+          "product": {
+            "title": "Product",
+            "type": "string"
+          },
+          "refused": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Refused"
+          },
+          "waiting": {
+            "items": {
+              "type": "string"
+            },
+            "title": "Waiting",
+            "type": "array"
+          }
+        },
+        "required": [
+          "id",
+          "name",
+          "product",
+          "flowsheet",
+          "host",
+          "hosts",
+          "inputs",
+          "waiting",
+          "leavesOut",
+          "priceBasis",
+          "refused"
+        ],
+        "title": "ProformaScenarioInfo",
+        "type": "object"
+      },
+      "ProformaTables": {
+        "description": "What a reader takes from a `proforma.run` artifact (proforma.tables_of):\nthe flowsheet, what made the tables, and the tables themselves.",
+        "properties": {
+          "diagram": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Diagram"
+          },
+          "diagramNote": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Diagramnote"
+          },
+          "flowsheet": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Flowsheet"
+          },
+          "streams": {
+            "items": {
+              "$ref": "#/components/schemas/StreamRow"
+            },
+            "title": "Streams",
+            "type": "array"
+          },
+          "tableUnits": {
+            "additionalProperties": {
+              "type": "string"
+            },
+            "title": "Tableunits",
+            "type": "object"
+          },
+          "tablesSource": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Tablessource"
+          },
+          "tea": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/TeaBreakdown"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "unitOrder": {
+            "items": {
+              "type": "string"
+            },
+            "title": "Unitorder",
+            "type": "array"
+          },
+          "units": {
+            "items": {
+              "$ref": "#/components/schemas/UnitRow"
+            },
+            "title": "Units",
+            "type": "array"
+          },
+          "utilities": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/UtilityDuties"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          }
+        },
+        "required": [
+          "flowsheet",
+          "tablesSource",
+          "tea",
+          "streams",
+          "units",
+          "utilities",
+          "diagram",
+          "diagramNote",
+          "unitOrder",
+          "tableUnits"
+        ],
+        "title": "ProformaTables",
+        "type": "object"
+      },
       "Project": {
         "description": "What scopes a lab's documents, records, flowsheets, runs, artifacts,\nrunbooks, depositions, conversations and Guild entries: every row the\nservice keeps belongs to one.",
         "properties": {
@@ -7088,6 +9441,7 @@
         "required": [
           "id",
           "name",
+          "description",
           "createdBy",
           "createdAt"
         ],
@@ -7290,7 +9644,17 @@
           "title",
           "why",
           "how",
-          "by"
+          "route",
+          "server",
+          "target",
+          "fields",
+          "note",
+          "by",
+          "askId",
+          "state",
+          "carriedOutBy",
+          "carriedOutAt",
+          "result"
         ],
         "title": "Proposal",
         "type": "object"
@@ -7323,6 +9687,66 @@
           "person"
         ],
         "title": "ProposalAction",
+        "type": "object"
+      },
+      "ProposalMissing": {
+        "description": "A property the rules needed and nothing holds, and why.",
+        "properties": {
+          "property": {
+            "title": "Property",
+            "type": "string"
+          },
+          "why": {
+            "title": "Why",
+            "type": "string"
+          }
+        },
+        "required": [
+          "property",
+          "why"
+        ],
+        "title": "ProposalMissing",
+        "type": "object"
+      },
+      "ProposalReason": {
+        "description": "Why one unit of a proposal is there: the rule, the property it read,\nthe artifact that holds that property (None when the products\ncatalogue states it), and the words, which carry no number.",
+        "properties": {
+          "artifactId": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Artifactid"
+          },
+          "property": {
+            "title": "Property",
+            "type": "string"
+          },
+          "rule": {
+            "title": "Rule",
+            "type": "string"
+          },
+          "unitId": {
+            "title": "Unitid",
+            "type": "string"
+          },
+          "words": {
+            "title": "Words",
+            "type": "string"
+          }
+        },
+        "required": [
+          "unitId",
+          "rule",
+          "property",
+          "artifactId",
+          "words"
+        ],
+        "title": "ProposalReason",
         "type": "object"
       },
       "ProposeRequest": {
@@ -7457,6 +9881,69 @@
         "title": "Refusal",
         "type": "object"
       },
+      "RegressionCheck": {
+        "description": "One of the package test's values beside what this installation computed.",
+        "properties": {
+          "expression": {
+            "title": "Expression",
+            "type": "string"
+          },
+          "label": {
+            "title": "Label",
+            "type": "string"
+          },
+          "measured": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Measured"
+          },
+          "package": {
+            "title": "Package",
+            "type": "number"
+          },
+          "relDiff": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Reldiff"
+          },
+          "rtol": {
+            "title": "Rtol",
+            "type": "number"
+          },
+          "unit": {
+            "title": "Unit",
+            "type": "string"
+          },
+          "within": {
+            "title": "Within",
+            "type": "boolean"
+          }
+        },
+        "required": [
+          "expression",
+          "label",
+          "unit",
+          "measured",
+          "package",
+          "rtol",
+          "relDiff",
+          "within"
+        ],
+        "title": "RegressionCheck",
+        "type": "object"
+      },
       "RegressionValue": {
         "description": "One value a package's own test asserts, as its test file writes it.",
         "properties": {
@@ -7506,7 +9993,9 @@
           }
         },
         "required": [
-          "path"
+          "path",
+          "stored",
+          "replayed"
         ],
         "title": "ReplayDifference",
         "type": "object"
@@ -7561,7 +10050,10 @@
           "identical",
           "storedHash",
           "replayedHash",
-          "durationMs"
+          "differences",
+          "durationMs",
+          "tolerance",
+          "withinTolerance"
         ],
         "title": "ReplayResult",
         "type": "object"
@@ -7788,7 +10280,10 @@
           }
         },
         "required": [
-          "run"
+          "run",
+          "artifact",
+          "flowsheet",
+          "parameters"
         ],
         "title": "RunReport",
         "type": "object"
@@ -7825,7 +10320,9 @@
         },
         "required": [
           "recordId",
-          "valid"
+          "valid",
+          "score",
+          "tags"
         ],
         "title": "RunSFF",
         "type": "object"
@@ -8151,7 +10648,10 @@
         },
         "required": [
           "id",
-          "unit"
+          "unit",
+          "name",
+          "massFlow",
+          "price"
         ],
         "title": "SFFBoundary",
         "type": "object"
@@ -8238,6 +10738,16 @@
             "title": "Sffversion"
           }
         },
+        "required": [
+          "score",
+          "representableScore",
+          "categories",
+          "criticalities",
+          "criteria",
+          "sffVersion",
+          "recipe",
+          "report"
+        ],
         "title": "SFFCompleteness",
         "type": "object"
       },
@@ -8298,7 +10808,9 @@
           "weight",
           "representable",
           "status",
-          "message"
+          "score",
+          "message",
+          "missing"
         ],
         "title": "SFFCriterion",
         "type": "object"
@@ -8333,7 +10845,8 @@
         "required": [
           "id",
           "source",
-          "sink"
+          "sink",
+          "massFlow"
         ],
         "title": "SFFEdge",
         "type": "object"
@@ -8531,12 +11044,19 @@
           "title",
           "origin",
           "source",
+          "sffVersion",
           "sha256",
           "bytes",
+          "simulator",
+          "runArtifactId",
+          "libraryId",
+          "url",
           "units",
           "streams",
           "validation",
           "completeness",
+          "tags",
+          "graph",
           "toolkit",
           "createdBy",
           "createdAt"
@@ -8588,6 +11108,14 @@
             "type": "array"
           }
         },
+        "required": [
+          "nodes",
+          "edges",
+          "feeds",
+          "products",
+          "dangling",
+          "massFlowUnit"
+        ],
         "title": "SFFGraph",
         "type": "object"
       },
@@ -8644,9 +11172,11 @@
         "required": [
           "id",
           "title",
+          "sffVersion",
           "sha256",
           "bytes",
           "url",
+          "model",
           "fetched"
         ],
         "title": "SFFLibraryEntry",
@@ -8698,6 +11228,7 @@
         "required": [
           "id",
           "type",
+          "method",
           "rank"
         ],
         "title": "SFFNode",
@@ -8730,7 +11261,9 @@
           }
         },
         "required": [
-          "declared"
+          "earned",
+          "declared",
+          "blocking"
         ],
         "title": "SFFTag",
         "type": "object"
@@ -8789,7 +11322,9 @@
         },
         "required": [
           "valid",
-          "schemaVersion"
+          "schemaVersion",
+          "summary",
+          "findings"
         ],
         "title": "SFFValidation",
         "type": "object"
@@ -8850,6 +11385,165 @@
           "plant"
         ],
         "title": "ScenarioCreate",
+        "type": "object"
+      },
+      "ScenarioInput": {
+        "properties": {
+          "binding": {
+            "enum": [
+              "records",
+              "assumption",
+              "artifact",
+              "waiting"
+            ],
+            "title": "Binding",
+            "type": "string"
+          },
+          "flags": {
+            "items": {
+              "type": "string"
+            },
+            "title": "Flags",
+            "type": "array"
+          },
+          "high": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "High"
+          },
+          "key": {
+            "title": "Key",
+            "type": "string"
+          },
+          "label": {
+            "title": "Label",
+            "type": "string"
+          },
+          "leftOutNoCarbon": {
+            "default": 0,
+            "title": "Leftoutnocarbon",
+            "type": "integer"
+          },
+          "leftOutOtherCarbon": {
+            "default": 0,
+            "title": "Leftoutothercarbon",
+            "type": "integer"
+          },
+          "low": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Low"
+          },
+          "recordIds": {
+            "items": {
+              "type": "string"
+            },
+            "title": "Recordids",
+            "type": "array"
+          },
+          "records": {
+            "items": {
+              "$ref": "#/components/schemas/BoundRecord"
+            },
+            "title": "Records",
+            "type": "array"
+          },
+          "sampling": {
+            "anyOf": [
+              {
+                "enum": [
+                  "triangular",
+                  "uniform",
+                  "fixed"
+                ],
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Sampling"
+          },
+          "source": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/BasisSource"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "unit": {
+            "title": "Unit",
+            "type": "string"
+          },
+          "value": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Value"
+          }
+        },
+        "required": [
+          "key",
+          "label",
+          "unit",
+          "binding",
+          "value",
+          "low",
+          "high",
+          "sampling",
+          "source",
+          "recordIds",
+          "records",
+          "leftOutNoCarbon",
+          "leftOutOtherCarbon",
+          "flags"
+        ],
+        "title": "ScenarioInput",
+        "type": "object"
+      },
+      "ScenarioRunsResponse": {
+        "description": "GET /api/proforma/runs: a scenario's newest run on this service, or\nNone when it has none.",
+        "properties": {
+          "artifact": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/Artifact"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "scenarioId": {
+            "title": "Scenarioid",
+            "type": "string"
+          }
+        },
+        "required": [
+          "scenarioId",
+          "artifact"
+        ],
+        "title": "ScenarioRunsResponse",
         "type": "object"
       },
       "ScenarioValue": {
@@ -8948,8 +11642,13 @@
           "passageId",
           "title",
           "text",
+          "sectionPath",
+          "citation",
           "licenceClass",
-          "score"
+          "year",
+          "score",
+          "layers",
+          "isTable"
         ],
         "title": "SearchHit",
         "type": "object"
@@ -8982,7 +11681,9 @@
         },
         "required": [
           "query",
-          "profile"
+          "profile",
+          "hits",
+          "degradedStages"
         ],
         "title": "SearchResponse",
         "type": "object"
@@ -9025,6 +11726,153 @@
           "scatter"
         ],
         "title": "SeriesFitQuality",
+        "type": "object"
+      },
+      "SimulationCeiling": {
+        "properties": {
+          "computeAt": {
+            "title": "Computeat",
+            "type": "string"
+          },
+          "empty": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Empty"
+          },
+          "flagged": {
+            "default": false,
+            "title": "Flagged",
+            "type": "boolean"
+          },
+          "product": {
+            "title": "Product",
+            "type": "string"
+          },
+          "rows": {
+            "items": {
+              "$ref": "#/components/schemas/SimulationCeilingRow"
+            },
+            "title": "Rows",
+            "type": "array"
+          },
+          "strain": {
+            "title": "Strain",
+            "type": "string"
+          },
+          "sugar": {
+            "title": "Sugar",
+            "type": "string"
+          }
+        },
+        "required": [
+          "product",
+          "sugar",
+          "strain",
+          "rows",
+          "flagged",
+          "empty",
+          "computeAt"
+        ],
+        "title": "SimulationCeiling",
+        "type": "object"
+      },
+      "SimulationCeilingRow": {
+        "description": "Yp/s beside the newest stored geneOS ceiling of one host model on\nthe sugar, read and never clamped.",
+        "properties": {
+          "above": {
+            "title": "Above",
+            "type": "boolean"
+          },
+          "artifactId": {
+            "title": "Artifactid",
+            "type": "string"
+          },
+          "ceilingGPerG": {
+            "title": "Ceilinggperg",
+            "type": "number"
+          },
+          "match": {
+            "enum": [
+              "strain",
+              "species"
+            ],
+            "title": "Match",
+            "type": "string"
+          },
+          "matchWords": {
+            "title": "Matchwords",
+            "type": "string"
+          },
+          "modelId": {
+            "title": "Modelid",
+            "type": "string"
+          },
+          "modelName": {
+            "title": "Modelname",
+            "type": "string"
+          },
+          "provenance": {
+            "enum": [
+              "measured",
+              "gold",
+              "verified",
+              "curated",
+              "computed",
+              "unverified",
+              "user",
+              "industry-estimate",
+              "assumed"
+            ],
+            "title": "Provenance",
+            "type": "string"
+          },
+          "words": {
+            "title": "Words",
+            "type": "string"
+          },
+          "yieldAchievedGPerG": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Yieldachievedgperg"
+          },
+          "ypsGPerG": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Ypsgperg"
+          }
+        },
+        "required": [
+          "modelId",
+          "modelName",
+          "match",
+          "matchWords",
+          "artifactId",
+          "provenance",
+          "ceilingGPerG",
+          "ypsGPerG",
+          "yieldAchievedGPerG",
+          "above",
+          "words"
+        ],
+        "title": "SimulationCeilingRow",
         "type": "object"
       },
       "SimulationRequest": {
@@ -9123,6 +11971,370 @@
         "title": "SimulationRequest",
         "type": "object"
       },
+      "SimulationResult": {
+        "description": "One kept `fermos.simulation` artifact as every reader reads it.",
+        "properties": {
+          "aerobic": {
+            "title": "Aerobic",
+            "type": "boolean"
+          },
+          "artifactId": {
+            "title": "Artifactid",
+            "type": "string"
+          },
+          "basis": {
+            "$ref": "#/components/schemas/ComputedBasis"
+          },
+          "ceiling": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/SimulationCeiling"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "end": {
+            "additionalProperties": {
+              "type": "number"
+            },
+            "title": "End",
+            "type": "object"
+          },
+          "family": {
+            "title": "Family",
+            "type": "string"
+          },
+          "finalTitre": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Finaltitre"
+          },
+          "flags": {
+            "items": {
+              "type": "string"
+            },
+            "title": "Flags",
+            "type": "array"
+          },
+          "harvestH": {
+            "title": "Harvesth",
+            "type": "number"
+          },
+          "massBalance": {
+            "$ref": "#/components/schemas/MassBalance"
+          },
+          "notes": {
+            "items": {
+              "type": "string"
+            },
+            "title": "Notes",
+            "type": "array"
+          },
+          "our": {
+            "$ref": "#/components/schemas/OxygenUptake"
+          },
+          "parameters": {
+            "items": {
+              "$ref": "#/components/schemas/ParameterValue"
+            },
+            "title": "Parameters",
+            "type": "array"
+          },
+          "product": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Product"
+          },
+          "productivity": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Productivity"
+          },
+          "provenance": {
+            "enum": [
+              "measured",
+              "gold",
+              "verified",
+              "curated",
+              "computed",
+              "unverified",
+              "user",
+              "industry-estimate",
+              "assumed"
+            ],
+            "title": "Provenance",
+            "type": "string"
+          },
+          "series": {
+            "additionalProperties": {
+              "items": {
+                "type": "number"
+              },
+              "type": "array"
+            },
+            "title": "Series",
+            "type": "object"
+          },
+          "start": {
+            "items": {
+              "$ref": "#/components/schemas/ParameterValue"
+            },
+            "title": "Start",
+            "type": "array"
+          },
+          "steadyState": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/SteadyState"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "strain": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Strain"
+          },
+          "sugar": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Sugar"
+          },
+          "sugarRunsOutH": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Sugarrunsouth"
+          },
+          "title": {
+            "title": "Title",
+            "type": "string"
+          },
+          "units": {
+            "additionalProperties": {
+              "type": "string"
+            },
+            "title": "Units",
+            "type": "object"
+          },
+          "yieldAchieved": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Yieldachieved"
+          }
+        },
+        "required": [
+          "artifactId",
+          "provenance",
+          "family",
+          "title",
+          "strain",
+          "product",
+          "sugar",
+          "parameters",
+          "start",
+          "series",
+          "units",
+          "our",
+          "end",
+          "sugarRunsOutH",
+          "harvestH",
+          "finalTitre",
+          "yieldAchieved",
+          "productivity",
+          "massBalance",
+          "ceiling",
+          "flags",
+          "aerobic",
+          "steadyState",
+          "notes",
+          "basis"
+        ],
+        "title": "SimulationResult",
+        "type": "object"
+      },
+      "SimulationSummary": {
+        "description": "GET /api/fermos/simulations: one kept simulation, newest first.",
+        "properties": {
+          "artifactId": {
+            "title": "Artifactid",
+            "type": "string"
+          },
+          "createdAt": {
+            "title": "Createdat",
+            "type": "string"
+          },
+          "family": {
+            "title": "Family",
+            "type": "string"
+          },
+          "finalTitre": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Finaltitre"
+          },
+          "harvestH": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Harvesth"
+          },
+          "product": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Product"
+          },
+          "provenance": {
+            "enum": [
+              "measured",
+              "gold",
+              "verified",
+              "curated",
+              "computed",
+              "unverified",
+              "user",
+              "industry-estimate",
+              "assumed"
+            ],
+            "title": "Provenance",
+            "type": "string"
+          },
+          "strain": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Strain"
+          },
+          "sugar": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Sugar"
+          },
+          "title": {
+            "title": "Title",
+            "type": "string"
+          }
+        },
+        "required": [
+          "artifactId",
+          "family",
+          "title",
+          "strain",
+          "product",
+          "sugar",
+          "finalTitre",
+          "harvestH",
+          "createdAt",
+          "provenance"
+        ],
+        "title": "SimulationSummary",
+        "type": "object"
+      },
+      "SimulatorStatus": {
+        "description": "GET /api/proforma/status: where the Proforma worker is (cold,\nstarting, ready or failed), and the words of a start that failed.",
+        "properties": {
+          "error": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Error"
+          },
+          "status": {
+            "enum": [
+              "cold",
+              "starting",
+              "ready",
+              "failed"
+            ],
+            "title": "Status",
+            "type": "string"
+          }
+        },
+        "required": [
+          "status",
+          "error"
+        ],
+        "title": "SimulatorStatus",
+        "type": "object"
+      },
       "StateWrite": {
         "description": "PUT /api/state/{kind}/{id}: the row as the page keeps it, and who.",
         "properties": {
@@ -9139,6 +12351,256 @@
           "value"
         ],
         "title": "StateWrite",
+        "type": "object"
+      },
+      "SteadyState": {
+        "description": "chemostat_v1's steady state and washout (D5 as built, 6).",
+        "properties": {
+          "P": {
+            "title": "P",
+            "type": "number"
+          },
+          "S": {
+            "title": "S",
+            "type": "number"
+          },
+          "X": {
+            "title": "X",
+            "type": "number"
+          },
+          "bistable": {
+            "default": false,
+            "title": "Bistable",
+            "type": "boolean"
+          },
+          "dWashout": {
+            "title": "Dwashout",
+            "type": "number"
+          },
+          "dWashoutD5": {
+            "title": "Dwashoutd5",
+            "type": "number"
+          },
+          "dWashoutMax": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Dwashoutmax"
+          },
+          "dilutionRate": {
+            "title": "Dilutionrate",
+            "type": "number"
+          },
+          "productivity": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Productivity"
+          },
+          "reached": {
+            "anyOf": [
+              {
+                "enum": [
+                  "culture",
+                  "washout"
+                ],
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Reached"
+          },
+          "washout": {
+            "title": "Washout",
+            "type": "boolean"
+          },
+          "words": {
+            "title": "Words",
+            "type": "string"
+          }
+        },
+        "required": [
+          "washout",
+          "dilutionRate",
+          "dWashout",
+          "dWashoutD5",
+          "X",
+          "S",
+          "P",
+          "productivity",
+          "words",
+          "dWashoutMax",
+          "bistable",
+          "reached"
+        ],
+        "title": "SteadyState",
+        "type": "object"
+      },
+      "StoredAnswer": {
+        "description": "GET /api/protparam and GET /api/thermo/volatility: the answer stored\nfor the same product, or None when it has not been asked here.",
+        "properties": {
+          "artifact": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/Artifact"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          }
+        },
+        "required": [
+          "artifact"
+        ],
+        "title": "StoredAnswer",
+        "type": "object"
+      },
+      "StreamImpurity": {
+        "properties": {
+          "chemical": {
+            "title": "Chemical",
+            "type": "string"
+          },
+          "massFraction": {
+            "title": "Massfraction",
+            "type": "number"
+          }
+        },
+        "required": [
+          "chemical",
+          "massFraction"
+        ],
+        "title": "StreamImpurity",
+        "type": "object"
+      },
+      "StreamPurity": {
+        "description": "One stream of a train run: the product's share of its mass, and its\nlargest other components by mass, read from the stream table.",
+        "properties": {
+          "impurities": {
+            "items": {
+              "$ref": "#/components/schemas/StreamImpurity"
+            },
+            "title": "Impurities",
+            "type": "array"
+          },
+          "massFlow": {
+            "title": "Massflow",
+            "type": "number"
+          },
+          "productFraction": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Productfraction"
+          },
+          "stream": {
+            "title": "Stream",
+            "type": "string"
+          }
+        },
+        "required": [
+          "stream",
+          "massFlow",
+          "productFraction",
+          "impurities"
+        ],
+        "title": "StreamPurity",
+        "type": "object"
+      },
+      "StreamRow": {
+        "description": "One stream of the base case, as BioSTEAM holds it after the run.",
+        "properties": {
+          "P": {
+            "title": "P",
+            "type": "number"
+          },
+          "T": {
+            "title": "T",
+            "type": "number"
+          },
+          "id": {
+            "title": "Id",
+            "type": "string"
+          },
+          "massFlow": {
+            "title": "Massflow",
+            "type": "number"
+          },
+          "massFlows": {
+            "additionalProperties": {
+              "type": "number"
+            },
+            "title": "Massflows",
+            "type": "object"
+          },
+          "phase": {
+            "title": "Phase",
+            "type": "string"
+          },
+          "price": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Price"
+          },
+          "sink": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Sink"
+          },
+          "source": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Source"
+          }
+        },
+        "required": [
+          "id",
+          "source",
+          "sink",
+          "phase",
+          "T",
+          "P",
+          "massFlow",
+          "massFlows",
+          "price"
+        ],
+        "title": "StreamRow",
         "type": "object"
       },
       "StudyComparison": {
@@ -9280,13 +12742,459 @@
         },
         "required": [
           "id",
+          "kind",
           "title",
           "plant",
+          "configuration",
           "values",
+          "note",
+          "runIds",
           "by",
           "at"
         ],
         "title": "StudyScenario",
+        "type": "object"
+      },
+      "TeaBreakdown": {
+        "description": "The TEA object's own numbers for the base case, read through its\nattributes and methods, never recomputed.",
+        "properties": {
+          "FCI": {
+            "title": "Fci",
+            "type": "number"
+          },
+          "FOC": {
+            "title": "Foc",
+            "type": "number"
+          },
+          "IRR": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Irr"
+          },
+          "TCI": {
+            "title": "Tci",
+            "type": "number"
+          },
+          "basis": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Basis"
+          },
+          "basisFlow": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Basisflow"
+          },
+          "capitalRecovery": {
+            "title": "Capitalrecovery",
+            "type": "number"
+          },
+          "coproductCredits": {
+            "title": "Coproductcredits",
+            "type": "number"
+          },
+          "feedstock": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Feedstock"
+          },
+          "feedstockCost": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Feedstockcost"
+          },
+          "incomeTax": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Incometax"
+          },
+          "installedEquipmentCost": {
+            "title": "Installedequipmentcost",
+            "type": "number"
+          },
+          "laborCost": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Laborcost"
+          },
+          "lines": {
+            "items": {
+              "$ref": "#/components/schemas/TeaLine"
+            },
+            "title": "Lines",
+            "type": "array"
+          },
+          "materialCost": {
+            "title": "Materialcost",
+            "type": "number"
+          },
+          "operatingHours": {
+            "title": "Operatinghours",
+            "type": "number"
+          },
+          "otherMaterialCost": {
+            "title": "Othermaterialcost",
+            "type": "number"
+          },
+          "product": {
+            "title": "Product",
+            "type": "string"
+          },
+          "productPrice": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Productprice"
+          },
+          "purchaseCost": {
+            "title": "Purchasecost",
+            "type": "number"
+          },
+          "sales": {
+            "title": "Sales",
+            "type": "number"
+          },
+          "teaClass": {
+            "title": "Teaclass",
+            "type": "string"
+          },
+          "utilityCost": {
+            "title": "Utilitycost",
+            "type": "number"
+          }
+        },
+        "required": [
+          "teaClass",
+          "product",
+          "feedstock",
+          "productPrice",
+          "basisFlow",
+          "basis",
+          "operatingHours",
+          "sales",
+          "materialCost",
+          "feedstockCost",
+          "otherMaterialCost",
+          "utilityCost",
+          "purchaseCost",
+          "installedEquipmentCost",
+          "FCI",
+          "TCI",
+          "FOC",
+          "laborCost",
+          "capitalRecovery",
+          "coproductCredits",
+          "IRR",
+          "incomeTax",
+          "lines"
+        ],
+        "title": "TeaBreakdown",
+        "type": "object"
+      },
+      "TeaLine": {
+        "description": "One line of the price, per year and per unit of the price's basis.\nThe lines sum to the main product's revenue by construction.",
+        "properties": {
+          "key": {
+            "enum": [
+              "feedstock",
+              "otherMaterials",
+              "utilities",
+              "otherVariable",
+              "fixedOperating",
+              "capitalRecovery",
+              "coproductCredits"
+            ],
+            "title": "Key",
+            "type": "string"
+          },
+          "label": {
+            "title": "Label",
+            "type": "string"
+          },
+          "perUnit": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Perunit"
+          },
+          "reads": {
+            "title": "Reads",
+            "type": "string"
+          },
+          "usdPerYear": {
+            "title": "Usdperyear",
+            "type": "number"
+          }
+        },
+        "required": [
+          "key",
+          "label",
+          "usdPerYear",
+          "perUnit",
+          "reads"
+        ],
+        "title": "TeaLine",
+        "type": "object"
+      },
+      "ThermoProps": {
+        "description": "What a `thermo_props` artifact holds (its `output`): thermosteam's\nanswer for one mixture, every number the library's, in its units.",
+        "properties": {
+          "Cp": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Cp"
+          },
+          "P": {
+            "title": "P",
+            "type": "number"
+          },
+          "PSource": {
+            "title": "Psource",
+            "type": "string"
+          },
+          "T": {
+            "title": "T",
+            "type": "number"
+          },
+          "TSource": {
+            "title": "Tsource",
+            "type": "string"
+          },
+          "bubblePoint": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Bubblepoint"
+          },
+          "density": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Density"
+          },
+          "dewPoint": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Dewpoint"
+          },
+          "kind": {
+            "title": "Kind",
+            "type": "string"
+          },
+          "library": {
+            "title": "Library",
+            "type": "string"
+          },
+          "massFractions": {
+            "additionalProperties": {
+              "type": "number"
+            },
+            "title": "Massfractions",
+            "type": "object"
+          },
+          "notes": {
+            "items": {
+              "type": "string"
+            },
+            "title": "Notes",
+            "type": "array"
+          },
+          "phase": {
+            "title": "Phase",
+            "type": "string"
+          },
+          "preset": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Preset"
+          },
+          "recordId": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Recordid"
+          },
+          "runArtifactId": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Runartifactid"
+          },
+          "solved": {
+            "anyOf": [
+              {
+                "additionalProperties": true,
+                "type": "object"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Solved"
+          },
+          "streamId": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Streamid"
+          },
+          "subject": {
+            "title": "Subject",
+            "type": "string"
+          },
+          "units": {
+            "additionalProperties": {
+              "type": "string"
+            },
+            "title": "Units",
+            "type": "object"
+          },
+          "vapourAtBubble": {
+            "anyOf": [
+              {
+                "additionalProperties": {
+                  "type": "number"
+                },
+                "type": "object"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Vapouratbubble"
+          },
+          "viscosity": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Viscosity"
+          }
+        },
+        "required": [
+          "kind",
+          "subject",
+          "runArtifactId",
+          "streamId",
+          "preset",
+          "recordId",
+          "library",
+          "T",
+          "P",
+          "phase",
+          "TSource",
+          "PSource",
+          "massFractions",
+          "density",
+          "Cp",
+          "viscosity",
+          "bubblePoint",
+          "dewPoint",
+          "vapourAtBubble",
+          "units",
+          "solved",
+          "notes"
+        ],
+        "title": "ThermoProps",
         "type": "object"
       },
       "ThermoPropsRequest": {
@@ -9338,6 +13246,37 @@
           }
         },
         "title": "ThermoPropsRequest",
+        "type": "object"
+      },
+      "ThermoPropsStored": {
+        "description": "GET /api/thermo/props: the answer stored for the same question, its\nartifact with what the artifact holds, or both None when nobody has\nasked it here.",
+        "properties": {
+          "artifact": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/Artifact"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "props": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/ThermoProps"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          }
+        },
+        "required": [
+          "artifact",
+          "props"
+        ],
+        "title": "ThermoPropsStored",
         "type": "object"
       },
       "ToolCallRecord": {
@@ -9418,6 +13357,12 @@
           "turnId",
           "tool",
           "input",
+          "summary",
+          "error",
+          "evidenceIds",
+          "recordIds",
+          "passageIds",
+          "artifactIds",
           "by",
           "at"
         ],
@@ -9522,6 +13467,17 @@
             "$ref": "#/components/schemas/Usage"
           }
         },
+        "required": [
+          "summary",
+          "evidence",
+          "recordIds",
+          "passages",
+          "error",
+          "usage",
+          "draft",
+          "rows",
+          "data"
+        ],
         "title": "ToolResult",
         "type": "object"
       },
@@ -9581,11 +13537,282 @@
         "required": [
           "n",
           "kind",
+          "tool",
+          "input",
           "summary",
           "ms",
           "ok"
         ],
         "title": "TraceStep",
+        "type": "object"
+      },
+      "Train": {
+        "description": "A run's train as pureOS reads it, for `/pureos/train/:scenarioId`\nand `pureos_read`.",
+        "properties": {
+          "artifactId": {
+            "title": "Artifactid",
+            "type": "string"
+          },
+          "createdAt": {
+            "title": "Createdat",
+            "type": "string"
+          },
+          "flowsheet": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Flowsheet"
+          },
+          "note": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Note"
+          },
+          "overallRecovery": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Overallrecovery"
+          },
+          "product": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Product"
+          },
+          "productBasis": {
+            "title": "Productbasis",
+            "type": "string"
+          },
+          "productLost": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Productlost"
+          },
+          "productOut": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Productout"
+          },
+          "productStream": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Productstream"
+          },
+          "program": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Program"
+          },
+          "provenance": {
+            "enum": [
+              "measured",
+              "gold",
+              "verified",
+              "curated",
+              "computed",
+              "unverified",
+              "user",
+              "industry-estimate",
+              "assumed"
+            ],
+            "title": "Provenance",
+            "type": "string"
+          },
+          "runs": {
+            "default": 1,
+            "title": "Runs",
+            "type": "integer"
+          },
+          "scenarioId": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Scenarioid"
+          },
+          "scenarioName": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Scenarioname"
+          },
+          "streams": {
+            "items": {
+              "$ref": "#/components/schemas/StreamRow"
+            },
+            "title": "Streams",
+            "type": "array"
+          },
+          "tableUnits": {
+            "additionalProperties": {
+              "type": "string"
+            },
+            "title": "Tableunits",
+            "type": "object"
+          },
+          "tablesSource": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Tablessource"
+          },
+          "tool": {
+            "default": "proforma.run",
+            "title": "Tool",
+            "type": "string"
+          },
+          "trainId": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Trainid"
+          },
+          "trainName": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Trainname"
+          },
+          "units": {
+            "items": {
+              "$ref": "#/components/schemas/TrainUnit"
+            },
+            "title": "Units",
+            "type": "array"
+          }
+        },
+        "required": [
+          "scenarioId",
+          "scenarioName",
+          "artifactId",
+          "flowsheet",
+          "createdAt",
+          "provenance",
+          "program",
+          "tablesSource",
+          "productStream",
+          "product",
+          "productBasis",
+          "productOut",
+          "productLost",
+          "overallRecovery",
+          "units",
+          "streams",
+          "tableUnits",
+          "runs",
+          "note",
+          "tool",
+          "trainId",
+          "trainName"
+        ],
+        "title": "Train",
+        "type": "object"
+      },
+      "TrainFromRun": {
+        "description": "A run's train as data: every unit on the product's path whose class is\na catalogue type, in run order, each outlet routed as the run routed it;\nthe units it does not take; what it says of itself; and the refusals\nits structure meets (validate's), which a person settles in the\nBuilder.",
+        "properties": {
+          "notes": {
+            "items": {
+              "type": "string"
+            },
+            "title": "Notes",
+            "type": "array"
+          },
+          "refusals": {
+            "items": {
+              "type": "string"
+            },
+            "title": "Refusals",
+            "type": "array"
+          },
+          "train": {
+            "$ref": "#/components/schemas/TrainSpec"
+          },
+          "unmapped": {
+            "items": {
+              "$ref": "#/components/schemas/TrainUnmapped"
+            },
+            "title": "Unmapped",
+            "type": "array"
+          }
+        },
+        "required": [
+          "train",
+          "unmapped",
+          "notes",
+          "refusals"
+        ],
+        "title": "TrainFromRun",
         "type": "object"
       },
       "TrainFromRunRequest": {
@@ -9674,6 +13901,187 @@
         "title": "TrainInlet",
         "type": "object"
       },
+      "TrainInletRead": {
+        "description": "What a train run's inlet was and where it came from (D10).",
+        "properties": {
+          "P": {
+            "title": "P",
+            "type": "number"
+          },
+          "T": {
+            "title": "T",
+            "type": "number"
+          },
+          "absent": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Absent"
+          },
+          "brothFlow": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Brothflow"
+          },
+          "chemicals": {
+            "items": {
+              "type": "string"
+            },
+            "title": "Chemicals",
+            "type": "array"
+          },
+          "concentrations": {
+            "anyOf": [
+              {
+                "additionalProperties": {
+                  "type": "number"
+                },
+                "type": "object"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Concentrations"
+          },
+          "flows": {
+            "additionalProperties": {
+              "type": "number"
+            },
+            "title": "Flows",
+            "type": "object"
+          },
+          "harvestHour": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Harvesthour"
+          },
+          "kind": {
+            "enum": [
+              "simulation",
+              "run-stream",
+              "typed"
+            ],
+            "title": "Kind",
+            "type": "string"
+          },
+          "notes": {
+            "items": {
+              "type": "string"
+            },
+            "title": "Notes",
+            "type": "array"
+          },
+          "phase": {
+            "title": "Phase",
+            "type": "string"
+          },
+          "ref": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Ref"
+          },
+          "refTool": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Reftool"
+          },
+          "streamId": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Streamid"
+          },
+          "vessel": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Vessel"
+          },
+          "water": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Water"
+          },
+          "waterNote": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Waternote"
+          }
+        },
+        "required": [
+          "kind",
+          "ref",
+          "refTool",
+          "streamId",
+          "vessel",
+          "chemicals",
+          "concentrations",
+          "flows",
+          "water",
+          "waterNote",
+          "brothFlow",
+          "harvestHour",
+          "T",
+          "P",
+          "phase",
+          "absent",
+          "notes"
+        ],
+        "title": "TrainInletRead",
+        "type": "object"
+      },
       "TrainParam": {
         "additionalProperties": false,
         "description": "A value a person typed for one parameter of a train's unit or inlet:\nan Override without its scope and key, which its place in the train\nnames (D3, D9).",
@@ -9737,6 +14145,285 @@
           "at"
         ],
         "title": "TrainParam",
+        "type": "object"
+      },
+      "TrainProposal": {
+        "description": "POST /api/pureos/propose: a train proposed by the written rules, or\nnone, with what is missing. (Named apart from `Proposal`, a write a\nmodel proposed at a gate, OF-BLD-015 §7.4.)",
+        "properties": {
+          "artifacts": {
+            "items": {
+              "type": "string"
+            },
+            "title": "Artifacts",
+            "type": "array"
+          },
+          "host": {
+            "title": "Host",
+            "type": "string"
+          },
+          "missing": {
+            "items": {
+              "$ref": "#/components/schemas/ProposalMissing"
+            },
+            "title": "Missing",
+            "type": "array"
+          },
+          "notes": {
+            "items": {
+              "type": "string"
+            },
+            "title": "Notes",
+            "type": "array"
+          },
+          "product": {
+            "title": "Product",
+            "type": "string"
+          },
+          "productClass": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Productclass"
+          },
+          "program": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Program"
+          },
+          "reasons": {
+            "items": {
+              "$ref": "#/components/schemas/ProposalReason"
+            },
+            "title": "Reasons",
+            "type": "array"
+          },
+          "train": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/TrainSpec"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          }
+        },
+        "required": [
+          "product",
+          "host",
+          "program",
+          "productClass",
+          "train",
+          "reasons",
+          "missing",
+          "artifacts",
+          "notes"
+        ],
+        "title": "TrainProposal",
+        "type": "object"
+      },
+      "TrainPurity": {
+        "properties": {
+          "impuritiesShown": {
+            "title": "Impuritiesshown",
+            "type": "integer"
+          },
+          "note": {
+            "title": "Note",
+            "type": "string"
+          },
+          "product": {
+            "title": "Product",
+            "type": "string"
+          },
+          "productFraction": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Productfraction"
+          },
+          "productStream": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Productstream"
+          },
+          "streams": {
+            "items": {
+              "$ref": "#/components/schemas/StreamPurity"
+            },
+            "title": "Streams",
+            "type": "array"
+          }
+        },
+        "required": [
+          "product",
+          "productStream",
+          "productFraction",
+          "streams",
+          "impuritiesShown",
+          "note"
+        ],
+        "title": "TrainPurity",
+        "type": "object"
+      },
+      "TrainRun": {
+        "description": "POST /api/pureos/train/run: the one `pureos.train_run` artifact, read.",
+        "properties": {
+          "artifactId": {
+            "title": "Artifactid",
+            "type": "string"
+          },
+          "basis": {
+            "$ref": "#/components/schemas/ComputedBasis"
+          },
+          "costs": {
+            "items": {
+              "$ref": "#/components/schemas/TrainUnitCost"
+            },
+            "title": "Costs",
+            "type": "array"
+          },
+          "createdAt": {
+            "title": "Createdat",
+            "type": "string"
+          },
+          "diagram": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Diagram"
+          },
+          "diagramNote": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Diagramnote"
+          },
+          "flags": {
+            "items": {
+              "type": "string"
+            },
+            "title": "Flags",
+            "type": "array"
+          },
+          "inlet": {
+            "$ref": "#/components/schemas/TrainInletRead"
+          },
+          "notes": {
+            "items": {
+              "type": "string"
+            },
+            "title": "Notes",
+            "type": "array"
+          },
+          "parameters": {
+            "items": {
+              "$ref": "#/components/schemas/TrainUnitParameters"
+            },
+            "title": "Parameters",
+            "type": "array"
+          },
+          "provenance": {
+            "enum": [
+              "measured",
+              "gold",
+              "verified",
+              "curated",
+              "computed",
+              "unverified",
+              "user",
+              "industry-estimate",
+              "assumed"
+            ],
+            "title": "Provenance",
+            "type": "string"
+          },
+          "purity": {
+            "$ref": "#/components/schemas/TrainPurity"
+          },
+          "spec": {
+            "$ref": "#/components/schemas/TrainSpec"
+          },
+          "train": {
+            "$ref": "#/components/schemas/Train"
+          },
+          "unitOrder": {
+            "items": {
+              "type": "string"
+            },
+            "title": "Unitorder",
+            "type": "array"
+          },
+          "units": {
+            "items": {
+              "$ref": "#/components/schemas/UnitRow"
+            },
+            "title": "Units",
+            "type": "array"
+          },
+          "utilities": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/UtilityDuties"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          }
+        },
+        "required": [
+          "artifactId",
+          "provenance",
+          "createdAt",
+          "spec",
+          "train",
+          "purity",
+          "costs",
+          "inlet",
+          "parameters",
+          "notes",
+          "flags",
+          "basis",
+          "units",
+          "utilities",
+          "diagram",
+          "diagramNote",
+          "unitOrder"
+        ],
+        "title": "TrainRun",
         "type": "object"
       },
       "TrainRunRequest": {
@@ -9805,6 +14492,430 @@
           "inlet"
         ],
         "title": "TrainSpec",
+        "type": "object"
+      },
+      "TrainSummary": {
+        "description": "One train on file, for pureOS's index: the newest run of a scenario.",
+        "properties": {
+          "artifactId": {
+            "title": "Artifactid",
+            "type": "string"
+          },
+          "createdAt": {
+            "title": "Createdat",
+            "type": "string"
+          },
+          "flowsheet": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Flowsheet"
+          },
+          "note": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Note"
+          },
+          "overallRecovery": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Overallrecovery"
+          },
+          "product": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Product"
+          },
+          "program": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Program"
+          },
+          "provenance": {
+            "enum": [
+              "measured",
+              "gold",
+              "verified",
+              "curated",
+              "computed",
+              "unverified",
+              "user",
+              "industry-estimate",
+              "assumed"
+            ],
+            "title": "Provenance",
+            "type": "string"
+          },
+          "runs": {
+            "default": 1,
+            "title": "Runs",
+            "type": "integer"
+          },
+          "scenarioId": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Scenarioid"
+          },
+          "scenarioName": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Scenarioname"
+          },
+          "tool": {
+            "default": "proforma.run",
+            "title": "Tool",
+            "type": "string"
+          },
+          "trainId": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Trainid"
+          },
+          "trainName": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Trainname"
+          },
+          "unitCount": {
+            "title": "Unitcount",
+            "type": "integer"
+          }
+        },
+        "required": [
+          "scenarioId",
+          "scenarioName",
+          "artifactId",
+          "flowsheet",
+          "createdAt",
+          "provenance",
+          "program",
+          "product",
+          "unitCount",
+          "overallRecovery",
+          "runs",
+          "note",
+          "tool",
+          "trainId",
+          "trainName"
+        ],
+        "title": "TrainSummary",
+        "type": "object"
+      },
+      "TrainUnit": {
+        "description": "One unit of a run's train, in run order, with the product's flow\nthrough it as the stream table states it.",
+        "properties": {
+          "cumulative": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Cumulative"
+          },
+          "id": {
+            "title": "Id",
+            "type": "string"
+          },
+          "ins": {
+            "items": {
+              "type": "string"
+            },
+            "title": "Ins",
+            "type": "array"
+          },
+          "line": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Line"
+          },
+          "lostTo": {
+            "items": {
+              "type": "string"
+            },
+            "title": "Lostto",
+            "type": "array"
+          },
+          "massIn": {
+            "title": "Massin",
+            "type": "number"
+          },
+          "massOut": {
+            "title": "Massout",
+            "type": "number"
+          },
+          "note": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Note"
+          },
+          "onPath": {
+            "title": "Onpath",
+            "type": "boolean"
+          },
+          "order": {
+            "title": "Order",
+            "type": "integer"
+          },
+          "outs": {
+            "items": {
+              "type": "string"
+            },
+            "title": "Outs",
+            "type": "array"
+          },
+          "productIn": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Productin"
+          },
+          "productLost": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Productlost"
+          },
+          "productOnward": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Productonward"
+          },
+          "productOut": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Productout"
+          },
+          "recovery": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Recovery"
+          },
+          "unitClass": {
+            "title": "Unitclass",
+            "type": "string"
+          }
+        },
+        "required": [
+          "id",
+          "unitClass",
+          "line",
+          "order",
+          "ins",
+          "outs",
+          "onPath",
+          "massIn",
+          "massOut",
+          "productIn",
+          "productOut",
+          "productOnward",
+          "productLost",
+          "lostTo",
+          "recovery",
+          "cumulative",
+          "note"
+        ],
+        "title": "TrainUnit",
+        "type": "object"
+      },
+      "TrainUnitCost": {
+        "description": "One unit's cost as BioSTEAM gives it, or why there is none.",
+        "properties": {
+          "costModel": {
+            "title": "Costmodel",
+            "type": "boolean"
+          },
+          "installedCost": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Installedcost"
+          },
+          "items": {
+            "additionalProperties": {
+              "type": "number"
+            },
+            "title": "Items",
+            "type": "object"
+          },
+          "note": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Note"
+          },
+          "purchaseCost": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Purchasecost"
+          },
+          "type": {
+            "title": "Type",
+            "type": "string"
+          },
+          "unit": {
+            "title": "Unit",
+            "type": "string"
+          },
+          "unitClass": {
+            "title": "Unitclass",
+            "type": "string"
+          }
+        },
+        "required": [
+          "unit",
+          "type",
+          "unitClass",
+          "costModel",
+          "purchaseCost",
+          "installedCost",
+          "items",
+          "note"
+        ],
+        "title": "TrainUnitCost",
+        "type": "object"
+      },
+      "TrainUnitParameters": {
+        "description": "One unit's parameters as its run's basis holds them, each with its\nsource.",
+        "properties": {
+          "type": {
+            "title": "Type",
+            "type": "string"
+          },
+          "unit": {
+            "title": "Unit",
+            "type": "string"
+          },
+          "unitClass": {
+            "title": "Unitclass",
+            "type": "string"
+          },
+          "values": {
+            "items": {
+              "$ref": "#/components/schemas/ParameterValue"
+            },
+            "title": "Values",
+            "type": "array"
+          }
+        },
+        "required": [
+          "unit",
+          "type",
+          "unitClass",
+          "values"
+        ],
+        "title": "TrainUnitParameters",
         "type": "object"
       },
       "TrainUnitReadFrom": {
@@ -9881,6 +14992,63 @@
         "title": "TrainUnitSpec",
         "type": "object"
       },
+      "TrainUnmapped": {
+        "description": "A unit of the run the train does not take, and why, in words.",
+        "properties": {
+          "unitClass": {
+            "title": "Unitclass",
+            "type": "string"
+          },
+          "unitId": {
+            "title": "Unitid",
+            "type": "string"
+          },
+          "why": {
+            "title": "Why",
+            "type": "string"
+          }
+        },
+        "required": [
+          "unitId",
+          "unitClass",
+          "why"
+        ],
+        "title": "TrainUnmapped",
+        "type": "object"
+      },
+      "TrainValidation": {
+        "description": "POST /api/pureos/train/validate: every refusal at once, in words;\nruns nothing. POST /api/pureos/train/check answers in the same shape\nwith everything the run would refuse (OF-BLD-020 §5.3).",
+        "properties": {
+          "ok": {
+            "title": "Ok",
+            "type": "boolean"
+          },
+          "places": {
+            "additionalProperties": {
+              "items": {
+                "type": "string"
+              },
+              "type": "array"
+            },
+            "title": "Places",
+            "type": "object"
+          },
+          "refusals": {
+            "items": {
+              "type": "string"
+            },
+            "title": "Refusals",
+            "type": "array"
+          }
+        },
+        "required": [
+          "ok",
+          "refusals",
+          "places"
+        ],
+        "title": "TrainValidation",
+        "type": "object"
+      },
       "TurnError": {
         "properties": {
           "message": {
@@ -9897,6 +15065,497 @@
           "remedy"
         ],
         "title": "TurnError",
+        "type": "object"
+      },
+      "UnitDefault": {
+        "description": "A parameter's default as the class gives it, read from its code in\nthe worker, and where it was read; None when the class gives none or\ndecides at run time.",
+        "properties": {
+          "key": {
+            "title": "Key",
+            "type": "string"
+          },
+          "readFrom": {
+            "title": "Readfrom",
+            "type": "string"
+          },
+          "value": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Value"
+          }
+        },
+        "required": [
+          "key",
+          "value",
+          "readFrom"
+        ],
+        "title": "UnitDefault",
+        "type": "object"
+      },
+      "UnitNeed": {
+        "description": "What a unit needs set before it runs: one of `alternatives`, each a\nlist of keys that must all hold a value.",
+        "properties": {
+          "alternatives": {
+            "items": {
+              "items": {
+                "type": "string"
+              },
+              "type": "array"
+            },
+            "title": "Alternatives",
+            "type": "array"
+          },
+          "why": {
+            "title": "Why",
+            "type": "string"
+          }
+        },
+        "required": [
+          "alternatives",
+          "why"
+        ],
+        "title": "UnitNeed",
+        "type": "object"
+      },
+      "UnitParamMap": {
+        "description": "How one spec reaches the class: under which of the class's own names,\nas a constructor argument or an attribute set after construction, and\nwhether its key is a template expanded per component or per effect\n(`split` → `split.<chemical>`, `P` → `P.<effect>`).",
+        "properties": {
+          "how": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "How"
+          },
+          "key": {
+            "title": "Key",
+            "type": "string"
+          },
+          "name": {
+            "title": "Name",
+            "type": "string"
+          },
+          "per": {
+            "anyOf": [
+              {
+                "enum": [
+                  "component",
+                  "effect"
+                ],
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Per"
+          },
+          "via": {
+            "enum": [
+              "argument",
+              "attribute"
+            ],
+            "title": "Via",
+            "type": "string"
+          }
+        },
+        "required": [
+          "key",
+          "name",
+          "via",
+          "per",
+          "how"
+        ],
+        "title": "UnitParamMap",
+        "type": "object"
+      },
+      "UnitPort": {
+        "description": "One inlet or outlet of a catalogue unit, in words.",
+        "properties": {
+          "index": {
+            "title": "Index",
+            "type": "integer"
+          },
+          "many": {
+            "default": false,
+            "title": "Many",
+            "type": "boolean"
+          },
+          "name": {
+            "title": "Name",
+            "type": "string"
+          },
+          "onward": {
+            "default": false,
+            "title": "Onward",
+            "type": "boolean"
+          },
+          "side": {
+            "enum": [
+              "in",
+              "out"
+            ],
+            "title": "Side",
+            "type": "string"
+          },
+          "source": {
+            "anyOf": [
+              {
+                "enum": [
+                  "upstream",
+                  "side",
+                  "unit"
+                ],
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Source"
+          },
+          "what": {
+            "title": "What",
+            "type": "string"
+          }
+        },
+        "required": [
+          "side",
+          "index",
+          "name",
+          "what",
+          "onward",
+          "source",
+          "many"
+        ],
+        "title": "UnitPort",
+        "type": "object"
+      },
+      "UnitRow": {
+        "description": "One unit operation, in run order.",
+        "properties": {
+          "coolingDuty": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Coolingduty"
+          },
+          "heatingDuty": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Heatingduty"
+          },
+          "id": {
+            "title": "Id",
+            "type": "string"
+          },
+          "ins": {
+            "items": {
+              "type": "string"
+            },
+            "title": "Ins",
+            "type": "array"
+          },
+          "installedCost": {
+            "title": "Installedcost",
+            "type": "number"
+          },
+          "line": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Line"
+          },
+          "order": {
+            "title": "Order",
+            "type": "integer"
+          },
+          "outs": {
+            "items": {
+              "type": "string"
+            },
+            "title": "Outs",
+            "type": "array"
+          },
+          "power": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Power"
+          },
+          "purchaseCost": {
+            "title": "Purchasecost",
+            "type": "number"
+          },
+          "unitClass": {
+            "title": "Unitclass",
+            "type": "string"
+          }
+        },
+        "required": [
+          "id",
+          "unitClass",
+          "line",
+          "order",
+          "ins",
+          "outs",
+          "installedCost",
+          "purchaseCost",
+          "heatingDuty",
+          "coolingDuty",
+          "power"
+        ],
+        "title": "UnitRow",
+        "type": "object"
+      },
+      "UnitSpecs": {
+        "description": "GET /api/pureos/catalogue/{id}/specs: an entry's ParameterSpecs with\nthe choices and bounds the class gives, each parameter's default read\nfrom the class, and how each reaches it.",
+        "properties": {
+          "biosteamClass": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Biosteamclass"
+          },
+          "chemicals": {
+            "items": {
+              "type": "string"
+            },
+            "title": "Chemicals",
+            "type": "array"
+          },
+          "defaults": {
+            "items": {
+              "$ref": "#/components/schemas/UnitDefault"
+            },
+            "title": "Defaults",
+            "type": "array"
+          },
+          "id": {
+            "title": "Id",
+            "type": "string"
+          },
+          "inhouseClass": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Inhouseclass"
+          },
+          "needs": {
+            "items": {
+              "$ref": "#/components/schemas/UnitNeed"
+            },
+            "title": "Needs",
+            "type": "array"
+          },
+          "notOffered": {
+            "items": {
+              "$ref": "#/components/schemas/NotOffered"
+            },
+            "title": "Notoffered",
+            "type": "array"
+          },
+          "notes": {
+            "items": {
+              "type": "string"
+            },
+            "title": "Notes",
+            "type": "array"
+          },
+          "params": {
+            "items": {
+              "$ref": "#/components/schemas/UnitParamMap"
+            },
+            "title": "Params",
+            "type": "array"
+          },
+          "specs": {
+            "items": {
+              "$ref": "#/components/schemas/ParameterSpec"
+            },
+            "title": "Specs",
+            "type": "array"
+          },
+          "versions": {
+            "additionalProperties": {
+              "type": "string"
+            },
+            "title": "Versions",
+            "type": "object"
+          }
+        },
+        "required": [
+          "id",
+          "biosteamClass",
+          "inhouseClass",
+          "specs",
+          "defaults",
+          "params",
+          "notOffered",
+          "needs",
+          "chemicals",
+          "versions",
+          "notes"
+        ],
+        "title": "UnitSpecs",
+        "type": "object"
+      },
+      "UnitType": {
+        "description": "A catalogue entry without its specs (GET /api/pureos/catalogue).",
+        "properties": {
+          "biosteamClass": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Biosteamclass"
+          },
+          "costModel": {
+            "title": "Costmodel",
+            "type": "boolean"
+          },
+          "id": {
+            "title": "Id",
+            "type": "string"
+          },
+          "inhouseClass": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Inhouseclass"
+          },
+          "insOuts": {
+            "items": {
+              "$ref": "#/components/schemas/UnitPort"
+            },
+            "title": "Insouts",
+            "type": "array"
+          },
+          "line": {
+            "title": "Line",
+            "type": "string"
+          },
+          "maps": {
+            "items": {
+              "type": "string"
+            },
+            "title": "Maps",
+            "type": "array"
+          },
+          "name": {
+            "title": "Name",
+            "type": "string"
+          },
+          "needs": {
+            "items": {
+              "$ref": "#/components/schemas/UnitNeed"
+            },
+            "title": "Needs",
+            "type": "array"
+          },
+          "notOffered": {
+            "items": {
+              "$ref": "#/components/schemas/NotOffered"
+            },
+            "title": "Notoffered",
+            "type": "array"
+          },
+          "notes": {
+            "items": {
+              "type": "string"
+            },
+            "title": "Notes",
+            "type": "array"
+          },
+          "specCount": {
+            "title": "Speccount",
+            "type": "integer"
+          },
+          "stage": {
+            "enum": [
+              "harvest",
+              "disruption",
+              "clarification",
+              "concentration",
+              "capture",
+              "polish",
+              "formulation",
+              "drying",
+              "utility"
+            ],
+            "title": "Stage",
+            "type": "string"
+          }
+        },
+        "required": [
+          "id",
+          "name",
+          "line",
+          "stage",
+          "biosteamClass",
+          "inhouseClass",
+          "insOuts",
+          "costModel",
+          "notes",
+          "notOffered",
+          "needs",
+          "maps",
+          "specCount"
+        ],
+        "title": "UnitType",
         "type": "object"
       },
       "Usage": {
@@ -9934,7 +15593,69 @@
             "type": "integer"
           }
         },
+        "required": [
+          "inputTokens",
+          "outputTokens",
+          "cacheReadTokens",
+          "cacheWriteTokens",
+          "costUsd",
+          "models"
+        ],
         "title": "Usage",
+        "type": "object"
+      },
+      "UtilityDuties": {
+        "description": "BioSTEAM's UnitGroup over the plant's units: each total with the unit\nthe UnitGroup states for it.",
+        "properties": {
+          "cooling": {
+            "title": "Cooling",
+            "type": "number"
+          },
+          "coolingUnit": {
+            "title": "Coolingunit",
+            "type": "string"
+          },
+          "electricityConsumption": {
+            "title": "Electricityconsumption",
+            "type": "number"
+          },
+          "electricityConsumptionUnit": {
+            "title": "Electricityconsumptionunit",
+            "type": "string"
+          },
+          "electricityProduction": {
+            "title": "Electricityproduction",
+            "type": "number"
+          },
+          "electricityProductionUnit": {
+            "title": "Electricityproductionunit",
+            "type": "string"
+          },
+          "group": {
+            "title": "Group",
+            "type": "string"
+          },
+          "heating": {
+            "title": "Heating",
+            "type": "number"
+          },
+          "heatingUnit": {
+            "title": "Heatingunit",
+            "type": "string"
+          }
+        },
+        "required": [
+          "group",
+          "heating",
+          "heatingUnit",
+          "cooling",
+          "coolingUnit",
+          "electricityConsumption",
+          "electricityConsumptionUnit",
+          "electricityProduction",
+          "electricityProductionUnit"
+        ],
+        "title": "UtilityDuties",
         "type": "object"
       },
       "ValidationError": {
@@ -10025,6 +15746,7 @@
           "byItem",
           "utility",
           "costIndex",
+          "costIndexYear",
           "note"
         ],
         "title": "VesselCost",
@@ -10203,13 +15925,17 @@
           "aerobic",
           "unitClass",
           "unitId",
+          "vesselType",
           "design",
+          "oxygen",
+          "oxygenNote",
           "heat",
           "cost",
           "parameters",
           "used",
           "scale",
           "reaction",
+          "flags",
           "versions",
           "evidence"
         ],
@@ -10332,7 +16058,13 @@
         },
         "required": [
           "bst",
-          "conventionNote"
+          "convention",
+          "conventionNote",
+          "unit",
+          "method",
+          "consumedKmolPerH",
+          "oxygenKmolPerH",
+          "dutyNote"
         ],
         "title": "VesselHeat",
         "type": "object"
@@ -10550,7 +16282,18 @@
           "kLaUnit",
           "method",
           "aerated",
-          "scale"
+          "oxygenBasis",
+          "targetUptake",
+          "sized",
+          "balancedUptake",
+          "scale",
+          "cStar",
+          "cL",
+          "drivingForce",
+          "reactionO2KmolPerH",
+          "scaledO2KmolPerH",
+          "simulatedO2KmolPerH",
+          "floorKmolPerH"
         ],
         "title": "VesselOxygen",
         "type": "object"
@@ -10622,6 +16365,104 @@
           }
         },
         "title": "VesselRequest",
+        "type": "object"
+      },
+      "VesselSummary": {
+        "description": "GET /api/fermos/vessels: one kept `fermos.vessel` artifact.",
+        "properties": {
+          "artifactId": {
+            "title": "Artifactid",
+            "type": "string"
+          },
+          "createdAt": {
+            "title": "Createdat",
+            "type": "string"
+          },
+          "installed": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Installed"
+          },
+          "provenance": {
+            "enum": [
+              "measured",
+              "gold",
+              "verified",
+              "curated",
+              "computed",
+              "unverified",
+              "user",
+              "industry-estimate",
+              "assumed"
+            ],
+            "title": "Provenance",
+            "type": "string"
+          },
+          "source": {
+            "title": "Source",
+            "type": "string"
+          },
+          "sourceTool": {
+            "title": "Sourcetool",
+            "type": "string"
+          },
+          "unitClass": {
+            "title": "Unitclass",
+            "type": "string"
+          },
+          "vesselType": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Vesseltype"
+          },
+          "vessels": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Vessels"
+          },
+          "volume": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Volume"
+          }
+        },
+        "required": [
+          "artifactId",
+          "provenance",
+          "createdAt",
+          "source",
+          "sourceTool",
+          "unitClass",
+          "vesselType",
+          "vessels",
+          "volume",
+          "installed"
+        ],
+        "title": "VesselSummary",
         "type": "object"
       }
     }
@@ -10992,6 +16833,89 @@
         "x-openferment-scope": "project"
       }
     },
+    "/api/biorepo/artifacts/{artifact_id}/checks": {
+      "get": {
+        "description": "A run's checks against its package's own test (`proforma.checks_of`,\nADR-013): each of the test's values beside what the run computed, with\nwhether it holds within the test's tolerance. A library plant's run and a\nrun kept from a retired reference entry hold them; a Proforma scenario's\nrun, and a run of a plant whose package test asserts no values, answer an\nempty list. A read: it computes nothing and starts no simulator.",
+        "operationId": "artifacts_checks_api_biorepo_artifacts__artifact_id__checks_get",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "artifact_id",
+            "required": true,
+            "schema": {
+              "title": "Artifact Id",
+              "type": "string"
+            }
+          },
+          {
+            "description": "The project the request acts in; ?project= in its place.",
+            "in": "header",
+            "name": "X-OpenFerment-Project",
+            "required": false,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "description": "The project the request acts in, where a header cannot be sent (an EventSource); the X-OpenFerment-Project header in its place.",
+            "in": "query",
+            "name": "project",
+            "required": false,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "items": {
+                    "$ref": "#/components/schemas/RegressionCheck"
+                  },
+                  "title": "Response Artifacts Checks Api Biorepo Artifacts  Artifact Id  Checks Get",
+                  "type": "array"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "404": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Refusal"
+                }
+              }
+            },
+            "description": "The project holds no artifact of that id, in words. A project the request names that the database does not hold is a 404 too, in words."
+          },
+          "409": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Refusal"
+                }
+              }
+            },
+            "description": "The stored artifact is damaged, in words."
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Refusal"
+                }
+              }
+            },
+            "description": "The artifact is of a tool whose artifacts hold no run's tables, in words naming the tools that hold them."
+          }
+        },
+        "summary": "Artifacts Checks",
+        "x-openferment-scope": "project"
+      }
+    },
     "/api/biorepo/artifacts/{artifact_id}/replay": {
       "post": {
         "description": "Recompute and compare. 404 for an unknown id; 409 when the tool that\nmade it is not registered in this service, which cannot replay it. The\nengines are read first, so a run of any of them registers its tool.",
@@ -11068,6 +16992,85 @@
           }
         },
         "summary": "Artifacts Replay",
+        "x-openferment-scope": "project"
+      }
+    },
+    "/api/biorepo/artifacts/{artifact_id}/tables": {
+      "get": {
+        "description": "A run's tables as every reader reads them (`proforma.tables_of`): the\nflowsheet it ran, what made the tables, the base case's TEA, streams,\nunits and utility duties, its diagram or the words for why it has none,\nand its units in run order. A run kept before runs carried their tables\nreads with empty ones. A read: it computes nothing and starts no\nsimulator.",
+        "operationId": "artifacts_tables_api_biorepo_artifacts__artifact_id__tables_get",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "artifact_id",
+            "required": true,
+            "schema": {
+              "title": "Artifact Id",
+              "type": "string"
+            }
+          },
+          {
+            "description": "The project the request acts in; ?project= in its place.",
+            "in": "header",
+            "name": "X-OpenFerment-Project",
+            "required": false,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "description": "The project the request acts in, where a header cannot be sent (an EventSource); the X-OpenFerment-Project header in its place.",
+            "in": "query",
+            "name": "project",
+            "required": false,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProformaTables"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "404": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Refusal"
+                }
+              }
+            },
+            "description": "The project holds no artifact of that id, in words. A project the request names that the database does not hold is a 404 too, in words."
+          },
+          "409": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Refusal"
+                }
+              }
+            },
+            "description": "The stored artifact is damaged, in words."
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Refusal"
+                }
+              }
+            },
+            "description": "The artifact is of a tool whose artifacts hold no run's tables, in words naming the tools that hold them."
+          }
+        },
+        "summary": "Artifacts Tables",
         "x-openferment-scope": "project"
       }
     },
@@ -12259,9 +18262,7 @@
             "content": {
               "application/json": {
                 "schema": {
-                  "additionalProperties": true,
-                  "title": "Response Fermos Bind Api Fermos Bind Get",
-                  "type": "object"
+                  "$ref": "#/components/schemas/FermosBinding"
                 }
               }
             },
@@ -12322,8 +18323,7 @@
               "application/json": {
                 "schema": {
                   "items": {
-                    "additionalProperties": true,
-                    "type": "object"
+                    "$ref": "#/components/schemas/FamilyInfo"
                   },
                   "title": "Response Fermos Families Api Fermos Families Get",
                   "type": "array"
@@ -12385,9 +18385,7 @@
             "content": {
               "application/json": {
                 "schema": {
-                  "additionalProperties": true,
-                  "title": "Response Fermos Family Api Fermos Families  Family Id  Get",
-                  "type": "object"
+                  "$ref": "#/components/schemas/FamilyInfo"
                 }
               }
             },
@@ -12527,8 +18525,7 @@
               "application/json": {
                 "schema": {
                   "items": {
-                    "additionalProperties": true,
-                    "type": "object"
+                    "$ref": "#/components/schemas/FermosFitInfo"
                   },
                   "title": "Response Fermos Fits Api Fermos Fits Get",
                   "type": "array"
@@ -12686,9 +18683,7 @@
             "content": {
               "application/json": {
                 "schema": {
-                  "additionalProperties": true,
-                  "title": "Response Fermos Harvest Api Fermos Harvest Get",
-                  "type": "object"
+                  "$ref": "#/components/schemas/FermosHarvest"
                 }
               }
             },
@@ -12758,9 +18753,7 @@
             "content": {
               "application/json": {
                 "schema": {
-                  "additionalProperties": true,
-                  "title": "Response Fermos Simulate Api Fermos Simulate Post",
-                  "type": "object"
+                  "$ref": "#/components/schemas/SimulationResult"
                 }
               }
             },
@@ -12821,8 +18814,7 @@
               "application/json": {
                 "schema": {
                   "items": {
-                    "additionalProperties": true,
-                    "type": "object"
+                    "$ref": "#/components/schemas/SimulationSummary"
                   },
                   "title": "Response Fermos Simulations Api Fermos Simulations Get",
                   "type": "array"
@@ -12993,9 +18985,7 @@
             "content": {
               "application/json": {
                 "schema": {
-                  "additionalProperties": true,
-                  "title": "Response Fermos Vessel Specs Api Fermos Vessel Specs Get",
-                  "type": "object"
+                  "$ref": "#/components/schemas/ParamScope"
                 }
               }
             },
@@ -13056,8 +19046,7 @@
               "application/json": {
                 "schema": {
                   "items": {
-                    "additionalProperties": true,
-                    "type": "object"
+                    "$ref": "#/components/schemas/VesselSummary"
                   },
                   "title": "Response Fermos Vessels Api Fermos Vessels Get",
                   "type": "array"
@@ -14820,9 +20809,7 @@
             "content": {
               "application/json": {
                 "schema": {
-                  "additionalProperties": true,
-                  "title": "Response Health Api Health Get",
-                  "type": "object"
+                  "$ref": "#/components/schemas/Health"
                 }
               }
             },
@@ -14872,9 +20859,7 @@
             "content": {
               "application/json": {
                 "schema": {
-                  "additionalProperties": true,
-                  "title": "Response Catalogue Intake Api Intake Catalogue Post",
-                  "type": "object"
+                  "$ref": "#/components/schemas/CatalogueIntake"
                 }
               }
             },
@@ -15753,9 +21738,7 @@
             "content": {
               "application/json": {
                 "schema": {
-                  "additionalProperties": true,
-                  "title": "Response Literature Stats Api Literature Stats Get",
-                  "type": "object"
+                  "$ref": "#/components/schemas/LiteratureStats"
                 }
               }
             },
@@ -16038,9 +22021,7 @@
             "content": {
               "application/json": {
                 "schema": {
-                  "additionalProperties": true,
-                  "title": "Response Params Scope Api Params  Scope  Get",
-                  "type": "object"
+                  "$ref": "#/components/schemas/ParamScope"
                 }
               }
             },
@@ -16119,9 +22100,7 @@
             "content": {
               "application/json": {
                 "schema": {
-                  "additionalProperties": true,
-                  "title": "Response Params Resolve Api Params  Scope  Resolve Post",
-                  "type": "object"
+                  "$ref": "#/components/schemas/ParamResolveResult"
                 }
               }
             },
@@ -16529,9 +22508,7 @@
             "content": {
               "application/json": {
                 "schema": {
-                  "additionalProperties": true,
-                  "title": "Response Proforma Bind Api Proforma Bind Get",
-                  "type": "object"
+                  "$ref": "#/components/schemas/ProformaScenarioInfo"
                 }
               }
             },
@@ -16664,9 +22641,7 @@
             "content": {
               "application/json": {
                 "schema": {
-                  "additionalProperties": true,
-                  "title": "Response Proforma Ceiling Check Api Proforma Ceiling Check Get",
-                  "type": "object"
+                  "$ref": "#/components/schemas/CeilingCheck"
                 }
               }
             },
@@ -16736,9 +22711,7 @@
             "content": {
               "application/json": {
                 "schema": {
-                  "additionalProperties": true,
-                  "title": "Response Proforma Run Api Proforma Run Post",
-                  "type": "object"
+                  "$ref": "#/components/schemas/ProformaRunResult"
                 }
               }
             },
@@ -16825,9 +22798,7 @@
             "content": {
               "application/json": {
                 "schema": {
-                  "additionalProperties": true,
-                  "title": "Response Proforma Runs Api Proforma Runs Get",
-                  "type": "object"
+                  "$ref": "#/components/schemas/ScenarioRunsResponse"
                 }
               }
             },
@@ -16904,8 +22875,7 @@
               "application/json": {
                 "schema": {
                   "items": {
-                    "additionalProperties": true,
-                    "type": "object"
+                    "$ref": "#/components/schemas/ProformaScenarioInfo"
                   },
                   "title": "Response Proforma Scenarios Api Proforma Scenarios Get",
                   "type": "array"
@@ -16969,8 +22939,7 @@
               "application/json": {
                 "schema": {
                   "items": {
-                    "additionalProperties": true,
-                    "type": "object"
+                    "$ref": "#/components/schemas/FlowsheetInfo"
                   },
                   "title": "Response Proforma Shelf Api Proforma Shelf Get",
                   "type": "array"
@@ -17023,9 +22992,7 @@
             "content": {
               "application/json": {
                 "schema": {
-                  "additionalProperties": true,
-                  "title": "Response Proforma Status Api Proforma Status Get",
-                  "type": "object"
+                  "$ref": "#/components/schemas/SimulatorStatus"
                 }
               }
             },
@@ -17424,9 +23391,7 @@
             "content": {
               "application/json": {
                 "schema": {
-                  "additionalProperties": true,
-                  "title": "Response Protparam Stored Api Protparam Get",
-                  "type": "object"
+                  "$ref": "#/components/schemas/StoredAnswer"
                 }
               }
             },
@@ -17555,8 +23520,7 @@
               "application/json": {
                 "schema": {
                   "items": {
-                    "additionalProperties": true,
-                    "type": "object"
+                    "$ref": "#/components/schemas/UnitType"
                   },
                   "title": "Response Pureos Catalogue Api Pureos Catalogue Get",
                   "type": "array"
@@ -17618,9 +23582,7 @@
             "content": {
               "application/json": {
                 "schema": {
-                  "additionalProperties": true,
-                  "title": "Response Pureos Catalogue Specs Api Pureos Catalogue  Type Id  Specs Get",
-                  "type": "object"
+                  "$ref": "#/components/schemas/UnitSpecs"
                 }
               }
             },
@@ -17690,9 +23652,7 @@
             "content": {
               "application/json": {
                 "schema": {
-                  "additionalProperties": true,
-                  "title": "Response Pureos Propose Api Pureos Propose Post",
-                  "type": "object"
+                  "$ref": "#/components/schemas/TrainProposal"
                 }
               }
             },
@@ -17753,8 +23713,7 @@
               "application/json": {
                 "schema": {
                   "items": {
-                    "additionalProperties": true,
-                    "type": "object"
+                    "$ref": "#/components/schemas/TrainSummary"
                   },
                   "title": "Response Pureos Train Runs Api Pureos Train Runs Get",
                   "type": "array"
@@ -17817,9 +23776,7 @@
             "content": {
               "application/json": {
                 "schema": {
-                  "additionalProperties": true,
-                  "title": "Response Pureos Train Check Api Pureos Train Check Post",
-                  "type": "object"
+                  "$ref": "#/components/schemas/TrainValidation"
                 }
               }
             },
@@ -17889,9 +23846,7 @@
             "content": {
               "application/json": {
                 "schema": {
-                  "additionalProperties": true,
-                  "title": "Response Pureos Train From Run Api Pureos Train From Run Post",
-                  "type": "object"
+                  "$ref": "#/components/schemas/TrainFromRun"
                 }
               }
             },
@@ -17961,9 +23916,7 @@
             "content": {
               "application/json": {
                 "schema": {
-                  "additionalProperties": true,
-                  "title": "Response Pureos Train Run Api Pureos Train Run Post",
-                  "type": "object"
+                  "$ref": "#/components/schemas/TrainRun"
                 }
               }
             },
@@ -18033,9 +23986,7 @@
             "content": {
               "application/json": {
                 "schema": {
-                  "additionalProperties": true,
-                  "title": "Response Pureos Train Validate Api Pureos Train Validate Post",
-                  "type": "object"
+                  "$ref": "#/components/schemas/TrainValidation"
                 }
               }
             },
@@ -18104,9 +24055,7 @@
             "content": {
               "application/json": {
                 "schema": {
-                  "additionalProperties": true,
-                  "title": "Response Pureos Train Api Pureos Train  Key  Get",
-                  "type": "object"
+                  "$ref": "#/components/schemas/Train"
                 }
               }
             },
@@ -18167,8 +24116,7 @@
               "application/json": {
                 "schema": {
                   "items": {
-                    "additionalProperties": true,
-                    "type": "object"
+                    "$ref": "#/components/schemas/TrainSummary"
                   },
                   "title": "Response Pureos Trains Api Pureos Trains Get",
                   "type": "array"
@@ -18222,8 +24170,7 @@
               "application/json": {
                 "schema": {
                   "items": {
-                    "additionalProperties": true,
-                    "type": "object"
+                    "$ref": "#/components/schemas/KeptTrain"
                   },
                   "title": "Response Pureos Trains Kept Api Pureos Trains Kept Get",
                   "type": "array"
@@ -19417,7 +25364,7 @@
     },
     "/api/thermo/props": {
       "get": {
-        "description": "The answer stored for the same question, as `{\"artifact\": …}`, or\n`{\"artifact\": null}` when it has not been asked here: a read, which\nstarts no simulator. The same 404, 409 and 422 as the POST.",
+        "description": "The answer stored for the same question (`ThermoPropsStored`): its\nartifact beside what the artifact holds, read as `ThermoProps`, or both\nnull when it has not been asked here: a read, which starts no simulator.\nThe same 404, 409 and 422 as the POST.",
         "operationId": "thermo_props_stored_api_thermo_props_get",
         "parameters": [
           {
@@ -19508,9 +25455,7 @@
             "content": {
               "application/json": {
                 "schema": {
-                  "additionalProperties": true,
-                  "title": "Response Thermo Props Stored Api Thermo Props Get",
-                  "type": "object"
+                  "$ref": "#/components/schemas/ThermoPropsStored"
                 }
               }
             },
@@ -19648,9 +25593,7 @@
             "content": {
               "application/json": {
                 "schema": {
-                  "additionalProperties": true,
-                  "title": "Response Thermo Volatility Stored Api Thermo Volatility Get",
-                  "type": "object"
+                  "$ref": "#/components/schemas/StoredAnswer"
                 }
               }
             },

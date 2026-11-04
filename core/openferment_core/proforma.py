@@ -29,6 +29,14 @@ from .flowsheets import shelf as _shelf
 from .workers import WorkerError
 
 
+def simulator_status():
+    """`status()` as its model (`SimulatorStatus`), as GET
+    /api/proforma/status answers it."""
+    from .models import SimulatorStatus
+
+    return SimulatorStatus.model_validate(status())
+
+
 def _installed(dist: str) -> str:
     from importlib.metadata import PackageNotFoundError, version
 
@@ -993,6 +1001,23 @@ def tables_of(art):
     fields = {k: o[k] for k in ProformaTables.model_fields if k in o and o[k] is not None}
     fields.setdefault("flowsheet", next((str(i.value) for i in art.inputs if i.name == "flowsheet"), None))
     return ProformaTables.model_validate(fields)
+
+
+# The tools whose artifacts hold a run's tables (`tables_of`): a Proforma
+# run, a library plant's run, and a run kept from a retired reference entry.
+# The last two also hold the checks against their package's own test
+# (`checks_of`).
+TABLE_TOOLS = (RUN, "library.run", REFERENCE)
+
+
+def checks_of(art):
+    """A run's checks against its package's own test, as a library run and a
+    run kept from a retired reference entry hold them (`output.checks`,
+    engine/library.py `checks`): each of the test's values beside what the
+    run computed. A run that holds none reads as an empty list."""
+    from .models import RegressionCheck
+
+    return [RegressionCheck.model_validate(c) for c in art.output.get("checks") or []]
 
 
 def shelf() -> list:

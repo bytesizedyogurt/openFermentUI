@@ -127,6 +127,31 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/biorepo/artifacts/{artifact_id}/checks": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Artifacts Checks
+         * @description A run's checks against its package's own test (`proforma.checks_of`,
+         *     ADR-013): each of the test's values beside what the run computed, with
+         *     whether it holds within the test's tolerance. A library plant's run and a
+         *     run kept from a retired reference entry hold them; a Proforma scenario's
+         *     run, and a run of a plant whose package test asserts no values, answer an
+         *     empty list. A read: it computes nothing and starts no simulator.
+         */
+        get: operations["artifacts_checks_api_biorepo_artifacts__artifact_id__checks_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/biorepo/artifacts/{artifact_id}/replay": {
         parameters: {
             query?: never;
@@ -143,6 +168,31 @@ export interface paths {
          *     engines are read first, so a run of any of them registers its tool.
          */
         post: operations["artifacts_replay_api_biorepo_artifacts__artifact_id__replay_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/biorepo/artifacts/{artifact_id}/tables": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Artifacts Tables
+         * @description A run's tables as every reader reads them (`proforma.tables_of`): the
+         *     flowsheet it ran, what made the tables, the base case's TEA, streams,
+         *     units and utility duties, its diagram or the words for why it has none,
+         *     and its units in run order. A run kept before runs carried their tables
+         *     reads with empty ones. A read: it computes nothing and starts no
+         *     simulator.
+         */
+        get: operations["artifacts_tables_api_biorepo_artifacts__artifact_id__tables_get"];
+        put?: never;
+        post?: never;
         delete?: never;
         options?: never;
         head?: never;
@@ -2576,9 +2626,10 @@ export interface paths {
         };
         /**
          * Thermo Props Stored
-         * @description The answer stored for the same question, as `{"artifact": …}`, or
-         *     `{"artifact": null}` when it has not been asked here: a read, which
-         *     starts no simulator. The same 404, 409 and 422 as the POST.
+         * @description The answer stored for the same question (`ThermoPropsStored`): its
+         *     artifact beside what the artifact holds, read as `ThermoProps`, or both
+         *     null when it has not been asked here: a read, which starts no simulator.
+         *     The same 404, 409 and 422 as the POST.
          */
         get: operations["thermo_props_stored_api_thermo_props_get"];
         put?: never;
@@ -2716,24 +2767,24 @@ export interface components {
         /** AnswerPlan */
         AnswerPlan: {
             /** Claims */
-            claims?: components["schemas"]["Claim"][];
+            claims: components["schemas"]["Claim"][];
             /** Conversationid */
-            conversationId?: string | null;
-            coverage?: components["schemas"]["CoverageMap"] | null;
+            conversationId: string | null;
+            coverage: components["schemas"]["CoverageMap"] | null;
             /**
              * Declined
              * @description Set when the corpus cannot support an answer. Says what is missing.
              */
-            declined?: string | null;
+            declined: string | null;
             /** Evidence */
-            evidence?: components["schemas"]["Evidence"][];
+            evidence: components["schemas"]["Evidence"][];
             /**
              * Gaps
              * @description What evidence is missing.
              */
-            gaps?: string[];
+            gaps: string[];
             /** Passages */
-            passages?: components["schemas"]["Passage"][];
+            passages: components["schemas"]["Passage"][];
             /** Question */
             question: string;
             /**
@@ -2742,10 +2793,10 @@ export interface components {
              */
             rejected: number;
             /** Rejectionreasons */
-            rejectionReasons?: string[];
+            rejectionReasons: string[];
             /** Rows */
-            rows?: components["schemas"]["ModuleRow"][];
-            runbookDraft?: components["schemas"]["RunbookDraft"] | null;
+            rows: components["schemas"]["ModuleRow"][];
+            runbookDraft: components["schemas"]["RunbookDraft"] | null;
             /**
              * Stopped
              * @default done
@@ -2753,10 +2804,10 @@ export interface components {
              */
             stopped: "done" | "rounds" | "calls" | "cost" | "time";
             /** Trace */
-            trace?: components["schemas"]["TraceStep"][];
+            trace: components["schemas"]["TraceStep"][];
             /** Turnid */
-            turnId?: string | null;
-            usage?: components["schemas"]["Usage"];
+            turnId: string | null;
+            usage: components["schemas"]["Usage"];
         };
         /**
          * Artifact
@@ -2783,7 +2834,7 @@ export interface components {
              */
             provenance: "measured" | "gold" | "verified" | "curated" | "computed" | "unverified" | "user" | "industry-estimate" | "assumed";
             /** Seed */
-            seed?: number | null;
+            seed: number | null;
             /** Tool */
             tool: string;
             /** Toolversion */
@@ -2828,7 +2879,7 @@ export interface components {
              * Askid
              * @description The ask of Postdoc's the write was part of; empty for a write from outside an ask.
              */
-            askId?: string | null;
+            askId: string | null;
             /**
              * At
              * @description When the row was written, ISO 8601 in UTC (`+00:00`).
@@ -2838,14 +2889,14 @@ export interface components {
              * Detail
              * @description What the write was, by the action's own names (the tool, the kind, a note), and, for a write of the model's lane, the door it came in by (`via`: postdoc, mcp or http).
              */
-            detail?: {
+            detail: {
                 [key: string]: unknown;
             };
             /**
              * Effort
              * @description The effort the service's model ran at, for a write of Postdoc's; empty for a person's write and for an outside assistant's, since no model of the service ran for it.
              */
-            effort?: string | null;
+            effort: string | null;
             /**
              * Module
              * @enum {string}
@@ -2854,7 +2905,7 @@ export interface components {
             /** State */
             state: string;
             /** Target */
-            target?: string | null;
+            target: string | null;
             /** Who */
             who: string;
         };
@@ -2868,9 +2919,9 @@ export interface components {
             /** At */
             at: string;
             /** From */
-            from?: unknown | null;
+            from: unknown | null;
             /** To */
-            to?: unknown | null;
+            to: unknown | null;
             /** Who */
             who: string;
         };
@@ -2906,16 +2957,16 @@ export interface components {
         /** BasisSource */
         BasisSource: {
             /** By */
-            by?: string | null;
+            by: string | null;
             /** Id */
-            id?: string | null;
+            id: string | null;
             /**
              * Kind
              * @enum {string}
              */
             kind: "record" | "deposition" | "artifact" | "model" | "convention" | "assumption" | "model-estimate";
             /** Note */
-            note?: string | null;
+            note: string | null;
         };
         /** Body_catalogue_intake_api_intake_catalogue_post */
         Body_catalogue_intake_api_intake_catalogue_post: {
@@ -2960,6 +3011,27 @@ export interface components {
              */
             title: string;
         };
+        /**
+         * BoundRecord
+         * @description One record an input was bound to, in the input's unit.
+         */
+        BoundRecord: {
+            /** Carbonsource */
+            carbonSource: string | null;
+            /** Id */
+            id: string;
+            /** Organism */
+            organism: string | null;
+            /** Paperid */
+            paperId: string;
+            /**
+             * Provenance
+             * @enum {string}
+             */
+            provenance: "measured" | "gold" | "verified" | "curated" | "computed" | "unverified" | "user" | "industry-estimate" | "assumed";
+            /** Value */
+            value: number;
+        };
         /** BriefRequest */
         BriefRequest: {
             /** By */
@@ -2977,20 +3049,20 @@ export interface components {
          */
         Candidate: {
             /** Carbonsource */
-            carbonSource?: string | null;
+            carbonSource: string | null;
             /** Citesrecordid */
-            citesRecordId?: string | null;
+            citesRecordId: string | null;
             /** Comparativebaseline */
-            comparativeBaseline?: string | null;
+            comparativeBaseline: string | null;
             /** Componenttag */
-            componentTag?: string | null;
+            componentTag: string | null;
             /**
              * Confidence
              * @default 0
              */
             confidence: number;
             /** Curationref */
-            curationRef?: string | null;
+            curationRef: string | null;
             /**
              * Extractorrun
              * @default claude-1
@@ -3000,7 +3072,7 @@ export interface components {
             /** Field */
             field: string;
             /** Goldonly */
-            goldOnly?: boolean | null;
+            goldOnly: boolean | null;
             /** Id */
             id: string;
             /**
@@ -3009,15 +3081,15 @@ export interface components {
              */
             isPrimary: boolean;
             /** Method */
-            method?: string | null;
+            method: string | null;
             /** Negativeresult */
-            negativeResult?: boolean | null;
+            negativeResult: boolean | null;
             /** Numbering */
-            numbering?: string | null;
+            numbering: string | null;
             /** Organism */
-            organism?: string | null;
+            organism: string | null;
             /** Organismtext */
-            organismText?: string | null;
+            organismText: string | null;
             /** Paperid */
             paperId: string;
             /**
@@ -3028,9 +3100,9 @@ export interface components {
             provenance: "measured" | "gold" | "verified" | "curated" | "computed" | "unverified" | "user" | "industry-estimate" | "assumed";
             /** Quote */
             quote: string;
-            range?: components["schemas"]["Range"] | null;
+            range: components["schemas"]["Range"] | null;
             /** Rejectreason */
-            rejectReason?: string | null;
+            rejectReason: string | null;
             /** Sectionid */
             sectionId: string;
             si: components["schemas"]["Quantity"];
@@ -3045,7 +3117,7 @@ export interface components {
             /** Value */
             value: number | string;
             /** Valuebasis */
-            valueBasis?: ("exact" | "converted" | "range-midpoint" | "range-low" | "range-high" | "negation") | null;
+            valueBasis: ("exact" | "converted" | "range-midpoint" | "range-low" | "range-high" | "negation") | null;
         };
         /**
          * CatalogueEntry
@@ -3053,9 +3125,9 @@ export interface components {
          */
         CatalogueEntry: {
             /** Agent */
-            agent?: ("model" | "person") | null;
+            agent: ("model" | "person") | null;
             /** Aliases */
-            aliases?: string[];
+            aliases: string[];
             /**
              * At
              * @default
@@ -3067,9 +3139,9 @@ export interface components {
              */
             by: string;
             /** Category */
-            category?: string | null;
+            category: string | null;
             /** Family */
-            family?: string | null;
+            family: string | null;
             /** Id */
             id: string;
             /**
@@ -3078,27 +3150,42 @@ export interface components {
              */
             kind: "strain" | "product" | "skill" | "lesson";
             /** Mastery */
-            mastery?: string[];
+            mastery: string[];
             /** Name */
             name: string;
             /** Note */
-            note?: string | null;
+            note: string | null;
             /** Program */
-            program?: string | null;
+            program: string | null;
             /** Sequence */
-            sequence?: string | null;
+            sequence: string | null;
             /** Sequencesource */
-            sequenceSource?: string | null;
+            sequenceSource: string | null;
             /** Skills */
-            skills?: string[];
+            skills: string[];
             /** Source */
-            source?: string | null;
+            source: string | null;
             /** Species */
-            species?: string | null;
+            species: string | null;
             /** Summary */
-            summary?: string | null;
+            summary: string | null;
             /** Via */
-            via?: ("postdoc" | "mcp" | "http") | null;
+            via: ("postdoc" | "mcp" | "http") | null;
+        };
+        /**
+         * CatalogueIntake
+         * @description What a file of entries came to: the ids kept, and each row refused with why.
+         */
+        CatalogueIntake: {
+            /** Kept */
+            kept: string[];
+            /**
+             * Kind
+             * @enum {string}
+             */
+            kind: "strain" | "product" | "skill" | "lesson";
+            /** Refused */
+            refused: string[];
         };
         /**
          * CatalogueKeep
@@ -3115,6 +3202,71 @@ export interface components {
                 [key: string]: unknown;
             };
         };
+        /**
+         * CeilingCheck
+         * @description GET /api/proforma/ceiling-check: one scenario's fermenter yield beside
+         *     every stored ceiling of its organism's shelf models on its sugar.
+         */
+        CeilingCheck: {
+            /** Computeat */
+            computeAt: string;
+            /** Empty */
+            empty: string | null;
+            /**
+             * Flagged
+             * @default false
+             */
+            flagged: boolean;
+            /** Flowsheet */
+            flowsheet: string;
+            /** Host */
+            host: string | null;
+            /** Models */
+            models: string[];
+            /** Notes */
+            notes: string[];
+            /** Organismwords */
+            organismWords: string;
+            /** Othersugars */
+            otherSugars: string[];
+            /** Product */
+            product: string;
+            /** Rows */
+            rows: components["schemas"]["CeilingRow"][];
+            /** Scenarioid */
+            scenarioId: string;
+            /** Species */
+            species: string[];
+            /** Strains */
+            strains: string[];
+            /** Substrate */
+            substrate: string;
+            /** Sugarwords */
+            sugarWords: string;
+            /**
+             * Yieldbinding
+             * @enum {string}
+             */
+            yieldBinding: "records" | "assumption" | "artifact" | "waiting";
+            /** Yieldhigh */
+            yieldHigh: number | null;
+            /** Yieldlow */
+            yieldLow: number | null;
+            /**
+             * Yieldrecords
+             * @default 0
+             */
+            yieldRecords: number;
+            yieldSource: components["schemas"]["BasisSource"] | null;
+            /** Yieldtool */
+            yieldTool: string | null;
+            /** Yieldunit */
+            yieldUnit: string;
+            /** Yieldvalue */
+            yieldValue: number | null;
+            /** Yieldwords */
+            yieldWords: string;
+        };
         /** CeilingRequest */
         CeilingRequest: {
             /** Modelid */
@@ -3127,19 +3279,82 @@ export interface components {
             /** Substrate */
             substrate: string;
         };
+        /**
+         * CeilingRow
+         * @description One stored ceiling beside the scenario's yield, both on the ceiling's
+         *     own footing, grams of product per gram of sugar and mol per mol.
+         */
+        CeilingRow: {
+            /** Artifactid */
+            artifactId: string;
+            /** Ceilinggperg */
+            ceilingGPerG: number;
+            /** Ceilingmolpermol */
+            ceilingMolPerMol: number | null;
+            /** Conventions */
+            conventions: string[];
+            /** Createdat */
+            createdAt: string;
+            /**
+             * Flag
+             * @enum {string}
+             */
+            flag: "above" | "within" | "no-yield";
+            /** Host */
+            host: string | null;
+            /**
+             * Match
+             * @enum {string}
+             */
+            match: "strain" | "species";
+            /** Matchwords */
+            matchWords: string;
+            /** Modelbasis */
+            modelBasis: string;
+            /** Modelid */
+            modelId: string;
+            /** Modelname */
+            modelName: string;
+            /**
+             * Older
+             * @default 0
+             */
+            older: number;
+            /** Product */
+            product: string;
+            /**
+             * Provenance
+             * @enum {string}
+             */
+            provenance: "measured" | "gold" | "verified" | "curated" | "computed" | "unverified" | "user" | "industry-estimate" | "assumed";
+            /** Recordsabove */
+            recordsAbove: string[];
+            /** Substrate */
+            substrate: string;
+            /** Words */
+            words: string;
+            /** Yieldgperg */
+            yieldGPerG: number | null;
+            /** Yieldhighgperg */
+            yieldHighGPerG: number | null;
+            /** Yieldlowgperg */
+            yieldLowGPerG: number | null;
+            /** Yieldmolpermol */
+            yieldMolPerMol: number | null;
+        };
         /** Check */
         Check: {
             /** Assessorid */
-            assessorId?: string | null;
-            brief?: components["schemas"]["CheckBrief"] | null;
+            assessorId: string | null;
+            brief: components["schemas"]["CheckBrief"] | null;
             /** Closedat */
-            closedAt?: string | null;
+            closedAt: string | null;
             /** Dismissreason */
-            dismissReason?: string | null;
+            dismissReason: string | null;
             /** Dismissedby */
-            dismissedBy?: string | null;
+            dismissedBy: string | null;
             /** Evidenceids */
-            evidenceIds?: string[];
+            evidenceIds: string[];
             /** Id */
             id: string;
             /** Personid */
@@ -3147,13 +3362,13 @@ export interface components {
             /** Proposedat */
             proposedAt: string;
             /** Proposedby */
-            proposedBy?: string | null;
+            proposedBy: string | null;
             /** Reasons */
-            reasons?: components["schemas"]["CheckReason"][];
+            reasons: components["schemas"]["CheckReason"][];
             /** Results */
-            results?: components["schemas"]["CheckResult"][];
+            results: components["schemas"]["CheckResult"][];
             /** Scheduledfor */
-            scheduledFor?: string | null;
+            scheduledFor: string | null;
             /**
              * Score
              * @default 0
@@ -3175,16 +3390,16 @@ export interface components {
          */
         CheckBrief: {
             /** Criteria */
-            criteria?: components["schemas"]["CheckCriterion"][];
+            criteria: components["schemas"]["CheckCriterion"][];
             /** Draftedat */
             draftedAt: string;
             /** Model */
             model: string;
             /** Questions */
-            questions?: string[];
+            questions: string[];
             /** Steps */
-            steps?: components["schemas"]["PracticeStepRef"][];
-            usage?: components["schemas"]["Usage"];
+            steps: components["schemas"]["PracticeStepRef"][];
+            usage: components["schemas"]["Usage"];
         };
         /**
          * CheckCriterion
@@ -3284,7 +3499,7 @@ export interface components {
          */
         Checks: {
             /** Checks */
-            checks?: components["schemas"]["Check"][];
+            checks: components["schemas"]["Check"][];
             /**
              * Version
              * @default 1
@@ -3298,15 +3513,15 @@ export interface components {
          */
         Claim: {
             /** Evidenceids */
-            evidenceIds?: string[];
+            evidenceIds: string[];
             /** Id */
             id: string;
             /** Modulerefs */
-            moduleRefs?: string[];
+            moduleRefs: string[];
             /** Paperids */
-            paperIds?: string[];
+            paperIds: string[];
             /** Passages */
-            passages?: components["schemas"]["PassageRef"][];
+            passages: components["schemas"]["PassageRef"][];
             /**
              * Provenance
              * @default unverified
@@ -3314,7 +3529,7 @@ export interface components {
              */
             provenance: "measured" | "gold" | "verified" | "curated" | "computed" | "unverified" | "user" | "industry-estimate" | "assumed";
             /** Recordids */
-            recordIds?: string[];
+            recordIds: string[];
             /**
              * Support
              * @default direct
@@ -3327,7 +3542,7 @@ export interface components {
              */
             text: string;
             /** Values */
-            values?: components["schemas"]["ClaimValue"][];
+            values: components["schemas"]["ClaimValue"][];
         };
         /**
          * ClaimValue
@@ -3343,7 +3558,7 @@ export interface components {
             label: string;
             quantity: components["schemas"]["Quantity"];
             /** Source */
-            source?: string | null;
+            source: string | null;
         };
         /**
          * CollectOutcome
@@ -3362,14 +3577,14 @@ export interface components {
             /** Collector */
             collector: string;
             /** Documentid */
-            documentId?: string | null;
+            documentId: string | null;
             /** Identifier */
             identifier: string;
-            licence?: components["schemas"]["FetchLicense"] | null;
+            licence: components["schemas"]["FetchLicense"] | null;
             /** Licenceclass */
             licenceClass: string;
             /** Reason */
-            reason?: string | null;
+            reason: string | null;
             /**
              * Sections
              * @default 0
@@ -3445,7 +3660,7 @@ export interface components {
             /** Inputs */
             inputs: components["schemas"]["BasisInput"][];
             /** Seed */
-            seed?: number | null;
+            seed: number | null;
             /** Tool */
             tool: string;
             /** Toolversion */
@@ -3476,14 +3691,14 @@ export interface components {
          */
         CoverageMap: {
             /** Entities */
-            entities?: string[];
+            entities: string[];
             /**
              * Found
              * @default 0
              */
             found: number;
             /** Modules */
-            modules?: components["schemas"]["ModuleCoverage"][];
+            modules: components["schemas"]["ModuleCoverage"][];
             /**
              * Searched
              * @default 0
@@ -3501,9 +3716,9 @@ export interface components {
             /** Ok */
             ok: boolean;
             /** Rule */
-            rule?: string | null;
+            rule: string | null;
             /** Why */
-            why?: string | null;
+            why: string | null;
         };
         /**
          * DepositionReading
@@ -3526,21 +3741,21 @@ export interface components {
             /** Entryid */
             entryId: string;
             /** Hours */
-            hours?: number | null;
+            hours: number | null;
             /** Inunit */
-            inUnit?: number | null;
+            inUnit: number | null;
             /** Measure */
-            measure?: string | null;
+            measure: string | null;
             /** Measureid */
             measureId: string;
             /** Note */
-            note?: string | null;
+            note: string | null;
             /** Ref */
             ref: string;
             /** Runbook */
-            runbook?: string | null;
+            runbook: string | null;
             /** Runbookid */
-            runbookId?: string | null;
+            runbookId: string | null;
             /** Unit */
             unit: string;
             /** Value */
@@ -3575,7 +3790,7 @@ export interface components {
              */
             unit: string;
             /** Value */
-            value?: number | string | null;
+            value: number | string | null;
         };
         /**
          * EngineCheck
@@ -3614,25 +3829,25 @@ export interface components {
          * @description GET /api/engines: one engine as the service found it.
          */
         EngineInfo: {
-            conformance?: components["schemas"]["EngineConformance"] | null;
+            conformance: components["schemas"]["EngineConformance"] | null;
             /** Entrypoint */
             entryPoint: string;
             /** Error */
-            error?: string | null;
+            error: string | null;
             /** Heavy */
-            heavy?: string[];
+            heavy: string[];
             /** Name */
             name: string;
             /** Things */
-            things?: components["schemas"]["EngineThing"][];
+            things: components["schemas"]["EngineThing"][];
             /** Thingsare */
-            thingsAre?: string | null;
+            thingsAre: string | null;
             /** Version */
-            version?: {
+            version: {
                 [key: string]: string;
             };
             /** Worker */
-            worker?: string | null;
+            worker: string | null;
             /**
              * Workerstatus
              * @default cold
@@ -3685,9 +3900,9 @@ export interface components {
             /** Boundsreason */
             boundsReason: string;
             /** Choices */
-            choices?: string[] | null;
+            choices: string[] | null;
             /** Convention */
-            convention?: number | string | null;
+            convention: number | string | null;
             /**
              * Dimension
              * @default
@@ -3708,11 +3923,11 @@ export interface components {
             /** Label */
             label: string;
             /** Max */
-            max?: number | null;
+            max: number | null;
             /** Min */
-            min?: number | null;
+            min: number | null;
             /** Note */
-            note?: string | null;
+            note: string | null;
             origin: components["schemas"]["Origin"] | null;
             /**
              * Scale
@@ -3721,9 +3936,9 @@ export interface components {
              */
             scale: "linear" | "log";
             /** Sourcerule */
-            sourceRule?: string[];
+            sourceRule: string[];
             /** Step */
-            step?: number | null;
+            step: number | null;
             /**
              * Symbol
              * @default
@@ -3751,17 +3966,17 @@ export interface components {
          */
         EngineRun: {
             /** Artifactid */
-            artifactId?: string | null;
+            artifactId: string | null;
             /** At */
             at: string;
             /** By */
             by: string;
             /** Configuration */
-            configuration?: string | null;
+            configuration: string | null;
             /** Diagnostics */
-            diagnostics?: components["schemas"]["RunDiagnostic"][];
+            diagnostics: components["schemas"]["RunDiagnostic"][];
             /** Durationms */
-            durationMs?: number | null;
+            durationMs: number | null;
             /**
              * Engine
              * @default biosteam
@@ -3772,20 +3987,20 @@ export interface components {
             /** Inputs */
             inputs: components["schemas"]["RunInput"][];
             /** Outputs */
-            outputs?: {
+            outputs: {
                 [key: string]: unknown;
             };
             /** Plant */
             plant: string;
             /** Provenance */
-            provenance?: ("measured" | "gold" | "verified" | "curated" | "computed" | "unverified" | "user" | "industry-estimate" | "assumed") | null;
+            provenance: ("measured" | "gold" | "verified" | "curated" | "computed" | "unverified" | "user" | "industry-estimate" | "assumed") | null;
             /** Refused */
-            refused?: string | null;
+            refused: string | null;
             /** Scenarioid */
-            scenarioId?: string | null;
-            sff?: components["schemas"]["RunSFF"] | null;
+            scenarioId: string | null;
+            sff: components["schemas"]["RunSFF"] | null;
             /** Sffrefused */
-            sffRefused?: string | null;
+            sffRefused: string | null;
             /**
              * Status
              * @enum {string}
@@ -3796,7 +4011,7 @@ export interface components {
             /** Toolversion */
             toolVersion: string;
             /** Versions */
-            versions?: {
+            versions: {
                 [key: string]: string;
             };
         };
@@ -3825,13 +4040,13 @@ export interface components {
          */
         EngineThing: {
             /** Configurations */
-            configurations?: string[];
+            configurations: string[];
             /** Defaultconfiguration */
-            defaultConfiguration?: string | null;
+            defaultConfiguration: string | null;
             /** Id */
             id: string;
             /** Kind */
-            kind?: string | null;
+            kind: string | null;
             precision: components["schemas"]["EnginePrecision"];
             /** Title */
             title: string;
@@ -3843,10 +4058,10 @@ export interface components {
         Evidence: {
             basis: components["schemas"]["ComputedBasis"];
             /** Figure */
-            figure?: string | null;
+            figure: string | null;
             /** Id */
             id: string;
-            interval?: components["schemas"]["Range"] | null;
+            interval: components["schemas"]["Range"] | null;
             /** Label */
             label: string;
             /**
@@ -3889,24 +4104,24 @@ export interface components {
          */
         ExtractResponse: {
             /** Audit */
-            audit?: components["schemas"]["AuditEvent"][];
+            audit: components["schemas"]["AuditEvent"][];
             /**
              * Calls
              * @default 1
              */
             calls: number;
             /** Candidates */
-            candidates?: components["schemas"]["Candidate"][];
+            candidates: components["schemas"]["Candidate"][];
             /** Dropped */
-            dropped?: components["schemas"]["DroppedCandidate"][];
+            dropped: components["schemas"]["DroppedCandidate"][];
             /** Extractedat */
             extractedAt: string;
             /** Fielddrops */
-            fieldDrops?: {
+            fieldDrops: {
                 [key: string]: number;
             };
             /** Notes */
-            notes?: string[];
+            notes: string[];
             /** Paperid */
             paperId: string;
             /**
@@ -3915,9 +4130,9 @@ export interface components {
              */
             rejected: number;
             /** Rejectiondetails */
-            rejectionDetails?: string[];
+            rejectionDetails: string[];
             /** Rejectionreasons */
-            rejectionReasons?: {
+            rejectionReasons: {
                 [key: string]: number;
             };
             /**
@@ -3927,8 +4142,8 @@ export interface components {
              */
             run: "claude-1";
             /** Truncatedsections */
-            truncatedSections?: string[];
-            usage?: components["schemas"]["Usage"];
+            truncatedSections: string[];
+            usage: components["schemas"]["Usage"];
         };
         /**
          * ExtractRun
@@ -3936,11 +4151,11 @@ export interface components {
          */
         ExtractRun: {
             /** Falsepositives */
-            falsePositives?: components["schemas"]["ExtractRunFalsePositive"][];
+            falsePositives: components["schemas"]["ExtractRunFalsePositive"][];
             /** Models */
-            models?: string[];
+            models: string[];
             /** Results */
-            results?: components["schemas"]["ExtractRunResult"][];
+            results: components["schemas"]["ExtractRunResult"][];
             /**
              * Run
              * @constant
@@ -3967,7 +4182,7 @@ export interface components {
          * @description One reference, a value a reviewer typed, scored against a run (§6.2).
          */
         ExtractRunResult: {
-            extracted?: components["schemas"]["Quantity"] | null;
+            extracted: components["schemas"]["Quantity"] | null;
             /** Goldrecordid */
             goldRecordId: string;
             /**
@@ -3988,9 +4203,90 @@ export interface components {
             /** Kept */
             kept: number;
             /** Models */
-            models?: string[];
+            models: string[];
             /** Refused */
             refused: number;
+        };
+        /**
+         * FamilyInfo
+         * @description GET /api/fermos/families: a model family as the panel shows it.
+         */
+        FamilyInfo: {
+            /** Equations */
+            equations: string;
+            /** Groups */
+            groups: string[];
+            /** Id */
+            id: string;
+            /** Socket */
+            socket: boolean;
+            /** Specs */
+            specs: components["schemas"]["ParameterSpec"][];
+            /** Stateunits */
+            stateUnits: {
+                [key: string]: string;
+            };
+            /** States */
+            states: string[];
+            /** Title */
+            title: string;
+            /** What */
+            what: string;
+        };
+        /**
+         * FermosBinding
+         * @description GET /api/fermos/bind (OF-BLD-020 §3.2): a family's parameters bound
+         *     for a strain, product and sugar from a fit, the records, a kept
+         *     simulation and the conventions, starting no integration.
+         */
+        FermosBinding: {
+            /** Notes */
+            notes: string[];
+            /** Refused */
+            refused: string | null;
+            /** Values */
+            values: components["schemas"]["ParameterValue"][];
+            /** Waiting */
+            waiting: string[];
+        };
+        /**
+         * FermosFitInfo
+         * @description A kinetic fit or a forecast fermOS keeps, and what it can feed one
+         *     shelf flowsheet (GET /api/fermos/fits). A person picks it; a model never
+         *     does.
+         */
+        FermosFitInfo: {
+            /** Artifactid */
+            artifactId: string;
+            /** Batchtimeh */
+            batchTimeH: number | null;
+            /** Batchtimenote */
+            batchTimeNote: string | null;
+            /** Createdat */
+            createdAt: string;
+            /** Depositionid */
+            depositionId: string | null;
+            /** Feeds */
+            feeds: components["schemas"]["FitFeed"][];
+            /** Fitartifactid */
+            fitArtifactId: string | null;
+            /** Flags */
+            flags: string[];
+            /** Flowsheet */
+            flowsheet: string;
+            /** Productseries */
+            productSeries: string | null;
+            /**
+             * Provenance
+             * @enum {string}
+             */
+            provenance: "measured" | "gold" | "verified" | "curated" | "computed" | "unverified" | "user" | "industry-estimate" | "assumed";
+            /** Refused */
+            refused: string | null;
+            /** Substrateseries */
+            substrateSeries: string | null;
+            /** Tool */
+            tool: string;
         };
         /** FermosFitRequest */
         FermosFitRequest: {
@@ -4015,19 +4311,63 @@ export interface components {
             confirmedShare: number;
             /** Depositionid */
             depositionId: string;
-            growth?: components["schemas"]["GrowthFit"] | null;
+            growth: components["schemas"]["GrowthFit"] | null;
             /** Growthartifactid */
-            growthArtifactId?: string | null;
-            kinetic?: components["schemas"]["KineticFit"] | null;
+            growthArtifactId: string | null;
+            kinetic: components["schemas"]["KineticFit"] | null;
             /** Kineticartifactid */
-            kineticArtifactId?: string | null;
+            kineticArtifactId: string | null;
             /** Notes */
-            notes?: string[];
+            notes: string[];
             /**
              * Sample
              * @default false
              */
             sample: boolean;
+        };
+        /**
+         * FermosHarvest
+         * @description GET /api/fermos/harvest: a kept simulation's broth at an hour.
+         */
+        FermosHarvest: {
+            /** Absent */
+            absent: string;
+            /** Artifactid */
+            artifactId: string;
+            /** Asked */
+            asked: number;
+            /** Exact */
+            exact: boolean;
+            /** Family */
+            family: string;
+            /** Harvesth */
+            harvestH: number;
+            /** Hour */
+            hour: number;
+            /**
+             * Hoursource
+             * @enum {string}
+             */
+            hourSource: "the simulation's harvest hour" | "a person's hour";
+            /** How */
+            how: string;
+            /** Product */
+            product: string | null;
+            /**
+             * Provenance
+             * @enum {string}
+             */
+            provenance: "measured" | "gold" | "verified" | "curated" | "computed" | "unverified" | "user" | "industry-estimate" | "assumed";
+            /** Read */
+            read: string;
+            /** Runendh */
+            runEndH: number;
+            /** States */
+            states: components["schemas"]["HarvestState"][];
+            /** Strain */
+            strain: string | null;
+            /** Sugar */
+            sugar: string | null;
         };
         /** FermosPoint */
         FermosPoint: {
@@ -4068,9 +4408,9 @@ export interface components {
          */
         FetchLicense: {
             /** Href */
-            href?: string | null;
+            href: string | null;
             /** Text */
-            text?: string | null;
+            text: string | null;
         };
         /**
          * FetchedSection
@@ -4083,6 +4423,28 @@ export interface components {
             id: string;
             /** Text */
             text: string;
+        };
+        /**
+         * FitFeed
+         * @description What one fermOS artifact gives one input of a flowsheet: the value in
+         *     the input's unit, with the 5th and 95th percentile of the forecast's band
+         *     for readings, or why it gives nothing, in words naming the parameter.
+         */
+        FitFeed: {
+            /** Derivation */
+            derivation: string;
+            /** High */
+            high: number | null;
+            /** Key */
+            key: string;
+            /** Low */
+            low: number | null;
+            /** Refused */
+            refused: string | null;
+            /** Unit */
+            unit: string;
+            /** Value */
+            value: number | null;
         };
         /**
          * FitParam
@@ -4105,6 +4467,60 @@ export interface components {
             unit: string;
             /** Value */
             value: number;
+        };
+        /** FlowsheetInfo */
+        FlowsheetInfo: {
+            /** Brothstream */
+            brothStream: string | null;
+            /** Builtfrom */
+            builtFrom: string[];
+            /** Description */
+            description: string;
+            /** Gridinputs */
+            gridInputs: string[];
+            /** Id */
+            id: string;
+            /** Inputs */
+            inputs: components["schemas"]["FlowsheetInput"][];
+            /** Leavesout */
+            leavesOut: string[];
+            /** Outputs */
+            outputs: string[];
+            /** Pricebasis */
+            priceBasis: string | null;
+            /** Priceoutput */
+            priceOutput: string | null;
+            /** Program */
+            program: string | null;
+            /** Source */
+            source: string;
+            /** Title */
+            title: string;
+        };
+        /**
+         * FlowsheetInput
+         * @description One input a shelf flowsheet takes. It names the ontology fields whose
+         *     records bind it; with none, a named person's assumption or a stated
+         *     convention sets it. The file of the flowsheet holds no value for it.
+         */
+        FlowsheetInput: {
+            /** Dimension */
+            dimension: string;
+            /** Fields */
+            fields: string[];
+            /** Key */
+            key: string;
+            /**
+             * Kind
+             * @enum {string}
+             */
+            kind: "process" | "economic" | "convention";
+            /** Name */
+            name: string;
+            /** Note */
+            note: string;
+            /** Unit */
+            unit: string;
         };
         /**
          * ForecastRequest
@@ -4136,16 +4552,16 @@ export interface components {
         /** ForecastResult */
         ForecastResult: {
             /** Artifactid */
-            artifactId?: string | null;
+            artifactId: string | null;
             /** Bands */
             bands: components["schemas"]["Band"][];
             /** Draws */
             draws: number;
-            evidence?: components["schemas"]["Evidence"] | null;
+            evidence: components["schemas"]["Evidence"] | null;
             /** Finals */
             finals: components["schemas"]["Interval"][];
             /** Notes */
-            notes?: string[];
+            notes: string[];
             /**
              * Sample
              * @default false
@@ -4154,10 +4570,10 @@ export interface components {
             /** Seed */
             seed: number;
             /** Substraterunsouth */
-            substrateRunsOutH?: number | null;
+            substrateRunsOutH: number | null;
             /** Times */
             times: number[];
-            yieldInterval?: components["schemas"]["Interval"] | null;
+            yieldInterval: components["schemas"]["Interval"] | null;
         };
         /**
          * GeneosModelInfo
@@ -4167,7 +4583,7 @@ export interface components {
             /** Feed */
             feed: string;
             /** Host */
-            host?: string | null;
+            host: string | null;
             /** Id */
             id: string;
             /** Licence */
@@ -4175,11 +4591,11 @@ export interface components {
             /** Name */
             name: string;
             /** Notes */
-            notes?: string[];
+            notes: string[];
             /** Product */
             product: string;
             /** Products */
-            products?: string[];
+            products: string[];
             /** Route */
             route: string;
             /** Scope */
@@ -4187,7 +4603,7 @@ export interface components {
             /** Source */
             source: string;
             /** Unavailable */
-            unavailable?: string | null;
+            unavailable: string | null;
         };
         /**
          * GeneosResult
@@ -4196,10 +4612,10 @@ export interface components {
          */
         GeneosResult: {
             /** Artifactid */
-            artifactId?: string | null;
-            evidence?: components["schemas"]["Evidence"] | null;
+            artifactId: string | null;
+            evidence: components["schemas"]["Evidence"] | null;
             /** Finding */
-            finding?: string | null;
+            finding: string | null;
             /**
              * Kind
              * @enum {string}
@@ -4208,7 +4624,7 @@ export interface components {
             /** Modelid */
             modelId: string;
             /** Output */
-            output?: {
+            output: {
                 [key: string]: unknown;
             };
             /** Product */
@@ -4217,28 +4633,39 @@ export interface components {
             substrates: string[];
         };
         /**
+         * GridDim
+         * @description One axis of a run's grid: the input it walks, by key, and the values
+         *     it takes, in the input's unit.
+         */
+        GridDim: {
+            /** Key */
+            key: string;
+            /** Values */
+            values: number[];
+        };
+        /**
          * GrowthFit
          * @description ln X against t over the best window of four or more readings.
          */
         GrowthFit: {
             /** Doublingtimeh */
-            doublingTimeH?: number | null;
+            doublingTimeH: number | null;
             /** Measureid */
             measureId: string;
-            mu?: components["schemas"]["FitParam"] | null;
+            mu: components["schemas"]["FitParam"] | null;
             /**
              * Points
              * @default 0
              */
             points: number;
             /** R2 */
-            r2?: number | null;
+            r2: number | null;
             /** Reason */
-            reason?: string | null;
+            reason: string | null;
             /** Unit */
             unit: string;
             /** Window */
-            window?: number[];
+            window: number[];
         };
         /**
          * Guild
@@ -4246,10 +4673,10 @@ export interface components {
          */
         Guild: {
             /** Evidence */
-            evidence?: components["schemas"]["GuildEvidence"][];
+            evidence: components["schemas"]["GuildEvidence"][];
             /** People */
-            people?: components["schemas"]["GuildPerson"][];
-            policy?: components["schemas"]["GuildPolicy"];
+            people: components["schemas"]["GuildPerson"][];
+            policy: components["schemas"]["GuildPolicy"];
             /**
              * Version
              * @default 1
@@ -4382,6 +4809,55 @@ export interface components {
             /** Detail */
             detail?: components["schemas"]["ValidationError"][];
         };
+        /**
+         * HarvestState
+         * @description One state of the simulation at the hour read, in the unit it keeps.
+         */
+        HarvestState: {
+            /** State */
+            state: string;
+            /** Unit */
+            unit: string;
+            /** Value */
+            value: number;
+        };
+        /**
+         * Health
+         * @description GET /api/health: the service answering, the models a call goes to
+         *     (the primary, and the one a call falls back to), and whether it holds a
+         *     key, so a page can say the service is up with no key to call a model
+         *     with.
+         */
+        Health: {
+            /** Fallbackmodel */
+            fallbackModel: string;
+            /** Haskey */
+            hasKey: boolean;
+            /** Model */
+            model: string;
+            /** Ok */
+            ok: boolean;
+            /** Service */
+            service: string;
+        };
+        /** HistogramBin */
+        HistogramBin: {
+            /** Count */
+            count: number;
+            /** High */
+            high: number;
+            /** Low */
+            low: number;
+        };
+        /** InputSensitivity */
+        InputSensitivity: {
+            /** Key */
+            key: string;
+            /** Rho */
+            rho: number;
+            /** Sourcekind */
+            sourceKind: string;
+        };
         /** Interval */
         Interval: {
             /** High */
@@ -4394,6 +4870,31 @@ export interface components {
             role: string;
             /** Unit */
             unit: string;
+        };
+        /**
+         * KeptTrain
+         * @description A train a model built with `pureos_build` or `pureos_write`, kept by
+         *     the service with who made it and when: the train as data (D9). Its runs
+         *     are `pureos.train_run` artifacts, found by the train's id.
+         */
+        KeptTrain: {
+            /**
+             * Agent
+             * @default model
+             * @constant
+             */
+            agent: "model";
+            /** Askid */
+            askId: string | null;
+            /** At */
+            at: string;
+            /** Effort */
+            effort: string | null;
+            /** Madeby */
+            madeBy: string;
+            spec: components["schemas"]["TrainSpec"];
+            /** Updatedat */
+            updatedAt: string;
         };
         /**
          * KineticFit
@@ -4428,15 +4929,15 @@ export interface components {
          */
         LibraryBuild: {
             /** Configuration */
-            configuration?: string | null;
+            configuration: string | null;
             /** Error */
-            error?: string | null;
+            error: string | null;
             /** Ok */
             ok: boolean;
             /** Priced */
-            priced?: boolean | null;
+            priced: boolean | null;
             /** Units */
-            units?: number | null;
+            units: number | null;
         };
         /**
          * LibraryCompat
@@ -4455,7 +4956,7 @@ export interface components {
          */
         LibraryEntryParameter: {
             /** Default */
-            default?: unknown;
+            default: unknown;
             /** Kind */
             kind: string;
             /** Name */
@@ -4472,9 +4973,9 @@ export interface components {
          */
         LibraryParameters: {
             /** Configuration */
-            configuration?: string | null;
+            configuration: string | null;
             /** Found */
-            found?: {
+            found: {
                 [key: string]: string;
             };
             /** Package */
@@ -4486,9 +4987,9 @@ export interface components {
             /** Simulator */
             simulator: string;
             /** Specs */
-            specs?: components["schemas"]["ParameterSpec"][];
+            specs: components["schemas"]["ParameterSpec"][];
             /** Values */
-            values?: components["schemas"]["ParameterValue"][];
+            values: components["schemas"]["ParameterValue"][];
         };
         /**
          * LibraryPlant
@@ -4500,23 +5001,23 @@ export interface components {
          */
         LibraryPlant: {
             /** Builds */
-            builds?: components["schemas"]["LibraryBuild"][];
+            builds: components["schemas"]["LibraryBuild"][];
             /** Compat */
-            compat?: components["schemas"]["LibraryCompat"][];
+            compat: components["schemas"]["LibraryCompat"][];
             /** Composedfrom */
-            composedFrom?: string | null;
+            composedFrom: string | null;
             /** Configurations */
-            configurations?: string[];
+            configurations: string[];
             /** Configurationsfrom */
-            configurationsFrom?: string | null;
+            configurationsFrom: string | null;
             /** Defaultconfiguration */
-            defaultConfiguration?: string | null;
+            defaultConfiguration: string | null;
             /** Entry */
-            entry?: string | null;
+            entry: string | null;
             /** Error */
-            error?: string | null;
+            error: string | null;
             /** Factories */
-            factories?: string[];
+            factories: string[];
             /** Id */
             id: string;
             /**
@@ -4527,36 +5028,36 @@ export interface components {
             /** Module */
             module: string;
             /** Parameters */
-            parameters?: components["schemas"]["LibraryEntryParameter"][];
+            parameters: components["schemas"]["LibraryEntryParameter"][];
             /**
              * Processmodel
              * @default false
              */
             processModel: boolean;
             /** Readme */
-            readme?: string | null;
+            readme: string | null;
             /** Recipe */
-            recipe?: string | null;
+            recipe: string | null;
             /**
              * Requiresconfiguration
              * @default false
              */
             requiresConfiguration: boolean;
             /** Scenario */
-            scenario?: components["schemas"]["LibraryScenarioField"][];
+            scenario: components["schemas"]["LibraryScenarioField"][];
             /**
              * Takescache
              * @default false
              */
             takesCache: boolean;
             /** Testnames */
-            testNames?: {
+            testNames: {
                 [key: string]: unknown;
             } | null;
             /** Tests */
-            tests?: string[];
+            tests: string[];
             /** Title */
-            title?: string | null;
+            title: string | null;
         };
         /**
          * LibraryRunRequest
@@ -4582,11 +5083,11 @@ export interface components {
          */
         LibraryScenarioField: {
             /** Default */
-            default?: unknown;
+            default: unknown;
             /** Name */
             name: string;
             /** Type */
-            type?: string | null;
+            type: string | null;
         };
         /**
          * LibraryShelf
@@ -4596,13 +5097,13 @@ export interface components {
             /** Package */
             package: string;
             /** Plants */
-            plants?: components["schemas"]["LibraryPlant"][];
+            plants: components["schemas"]["LibraryPlant"][];
             /** Simulator */
             simulator: string;
             /** Testfile */
             testFile: string;
             /** Testtables */
-            testTables?: {
+            testTables: {
                 [key: string]: unknown;
             };
             /** Thermosteam */
@@ -4614,19 +5115,19 @@ export interface components {
          */
         LiteratureDocument: {
             /** Authors */
-            authors?: string[];
+            authors: string[];
             /** Chunks */
             chunks: number;
             /** Citation */
-            citation?: string | null;
+            citation: string | null;
             /** Collector */
-            collector?: string | null;
+            collector: string | null;
             /** Documentid */
             documentId: string;
             /** Doi */
-            doi?: string | null;
+            doi: string | null;
             /** Journal */
-            journal?: string | null;
+            journal: string | null;
             /** Licenceclass */
             licenceClass: string;
             /** Linkedat */
@@ -4634,17 +5135,17 @@ export interface components {
             /** Linkedby */
             linkedBy: string;
             /** Selection */
-            selection?: {
+            selection: {
                 [key: string]: unknown;
             };
             /** Source */
             source: string;
             /** Sourceref */
-            sourceRef?: string | null;
+            sourceRef: string | null;
             /** Title */
             title: string;
             /** Year */
-            year?: number | null;
+            year: number | null;
         };
         /**
          * LiteratureQuestion
@@ -4661,6 +5162,39 @@ export interface components {
             topK: number;
         };
         /**
+         * LiteratureStats
+         * @description GET /api/literature/stats, in the kit's own names: the project's
+         *     documents, their chunks and their citations, counted by licence class,
+         *     source and embedding version; the concept graph's entities,
+         *     relationships and communities are the instance's, counted whole.
+         */
+        LiteratureStats: {
+            /** Chunks */
+            chunks: number;
+            /** Citations */
+            citations: number;
+            /** Communities */
+            communities: number;
+            /** Documents */
+            documents: number;
+            /** Embedding Versions */
+            embedding_versions: {
+                [key: string]: number;
+            };
+            /** Entities */
+            entities: number;
+            /** License Classes */
+            license_classes: {
+                [key: string]: number;
+            };
+            /** Relationships */
+            relationships: number;
+            /** Sources */
+            sources: {
+                [key: string]: number;
+            };
+        };
+        /**
          * LiveConversation
          * @description A Postdoc conversation, its turns oldest first (mirrors
          *     `LiveConversation` in src/data/types.ts; GET /api/conversations/{id}).
@@ -4673,7 +5207,7 @@ export interface components {
             /** Title */
             title: string;
             /** Turns */
-            turns?: components["schemas"]["LiveTurn"][];
+            turns: components["schemas"]["LiveTurn"][];
         };
         /**
          * LiveTurn
@@ -4686,15 +5220,15 @@ export interface components {
          */
         LiveTurn: {
             /** Artifactids */
-            artifactIds?: string[];
+            artifactIds: string[];
             /** Askedat */
             askedAt: string;
             /** By */
-            by?: string | null;
-            error?: components["schemas"]["TurnError"] | null;
+            by: string | null;
+            error: components["schemas"]["TurnError"] | null;
             /** Id */
             id: string;
-            plan?: components["schemas"]["AnswerPlan"] | null;
+            plan: components["schemas"]["AnswerPlan"] | null;
             /** Question */
             question: string;
             /**
@@ -4703,7 +5237,16 @@ export interface components {
              */
             status: "running" | "answered" | "failed" | "stopped" | "interrupted";
             /** Steps */
-            steps?: components["schemas"]["TraceStep"][];
+            steps: components["schemas"]["TraceStep"][];
+        };
+        /** MassBalance */
+        MassBalance: {
+            /** Closure */
+            closure: number;
+            /** Note */
+            note: string;
+            /** Ok */
+            ok: boolean;
         };
         /**
          * Measure
@@ -4746,9 +5289,9 @@ export interface components {
              */
             count: number;
             /** Error */
-            error?: string | null;
+            error: string | null;
             /** Hits */
-            hits?: components["schemas"]["CoverageHit"][];
+            hits: components["schemas"]["CoverageHit"][];
             /** Label */
             label: string;
             /**
@@ -4762,7 +5305,7 @@ export interface components {
              */
             named: boolean;
             /** Partial */
-            partial?: string | null;
+            partial: string | null;
         };
         /**
          * ModuleRow
@@ -4771,7 +5314,7 @@ export interface components {
          */
         ModuleRow: {
             /** Detail */
-            detail?: {
+            detail: {
                 [key: string]: unknown;
             };
             /** Id */
@@ -4786,7 +5329,7 @@ export interface components {
              */
             module: "runbooks" | "geneos" | "fermos" | "pureos" | "proforma" | "biorepo" | "guild" | "primer" | "intake" | "home";
             /** Provenance */
-            provenance?: ("measured" | "gold" | "verified" | "curated" | "computed" | "unverified" | "user" | "industry-estimate" | "assumed") | null;
+            provenance: ("measured" | "gold" | "verified" | "curated" | "computed" | "unverified" | "user" | "industry-estimate" | "assumed") | null;
             /** Ref */
             ref: string;
             /**
@@ -4796,6 +5339,17 @@ export interface components {
             state: "open" | "fenced" | "approved" | "locked" | "proposed" | "retired";
             /** Status */
             status: string;
+        };
+        /**
+         * NotOffered
+         * @description A parameter the class's constructor takes that the panel does not
+         *     offer, and why, in words.
+         */
+        NotOffered: {
+            /** Name */
+            name: string;
+            /** Why */
+            why: string;
         };
         /**
          * Origin
@@ -4834,17 +5388,17 @@ export interface components {
          */
         Overlay: {
             /** Candidates */
-            candidates?: components["schemas"]["Candidate"][] | null;
+            candidates: components["schemas"]["Candidate"][] | null;
             /** Papers */
-            papers?: {
+            papers: {
                 [key: string]: components["schemas"]["OverlayPaper"];
             };
             /** Records */
-            records?: {
+            records: {
                 [key: string]: components["schemas"]["ReviewDecision"];
             };
             /** Runs */
-            runs?: components["schemas"]["ExtractRun"][] | null;
+            runs: components["schemas"]["ExtractRun"][] | null;
         };
         /**
          * OverlayPaper
@@ -4856,26 +5410,26 @@ export interface components {
          */
         OverlayPaper: {
             /** Authors */
-            authors?: string[];
+            authors: string[];
             /** Doi */
-            doi?: string | null;
-            extraction?: components["schemas"]["ExtractionSummary"] | null;
+            doi: string | null;
+            extraction: components["schemas"]["ExtractionSummary"] | null;
             /** Fetchedat */
-            fetchedAt?: string | null;
+            fetchedAt: string | null;
             /** Ingest */
             ingest: string;
             /** Journal */
-            journal?: string | null;
+            journal: string | null;
             /** Licenceclass */
-            licenceClass?: string | null;
+            licenceClass: string | null;
             /** License */
-            license?: string | null;
+            license: string | null;
             /** Pmcid */
-            pmcid?: string | null;
+            pmcid: string | null;
             /** Reason */
-            reason?: string | null;
+            reason: string | null;
             /** Sections */
-            sections?: components["schemas"]["FetchedSection"][];
+            sections: components["schemas"]["FetchedSection"][];
             /**
              * Source
              * @default europepmc
@@ -4888,11 +5442,30 @@ export interface components {
              */
             textSource: "full-text";
             /** Title */
-            title?: string | null;
+            title: string | null;
             /** Url */
-            url?: string | null;
+            url: string | null;
             /** Year */
-            year?: number | null;
+            year: number | null;
+        };
+        /**
+         * OxygenUptake
+         * @description OUR(t) = qO2·X on the time course's hours, and its peak read on the
+         *     solver's own steps.
+         */
+        OxygenUptake: {
+            /** Note */
+            note: string | null;
+            /** Peak */
+            peak: number;
+            /** Peakh */
+            peakH: number | null;
+            /** T */
+            t: number[];
+            /** Unit */
+            unit: string;
+            /** Value */
+            value: number[];
         };
         /**
          * PackageRegression
@@ -4907,7 +5480,7 @@ export interface components {
             /** Test */
             test: string;
             /** Values */
-            values?: components["schemas"]["RegressionValue"][];
+            values: components["schemas"]["RegressionValue"][];
         };
         /**
          * ParamResolveRequest
@@ -4947,6 +5520,21 @@ export interface components {
             /** Vesseltype */
             vesselType?: ("stirred-tank" | "bubble-column") | null;
         };
+        /** ParamResolveResult */
+        ParamResolveResult: {
+            /** Basisinputs */
+            basisInputs: components["schemas"]["BasisInput"][];
+            /** Notes */
+            notes: string[];
+            /** Scope */
+            scope: string;
+            /** Values */
+            values: components["schemas"]["ParameterValue"][];
+            /** Waiting */
+            waiting: string[];
+            /** Warnings */
+            warnings: string[];
+        };
         /**
          * ParamScope
          * @description GET /api/params/{scope}: a scope's specs with their current values.
@@ -4958,7 +5546,7 @@ export interface components {
              */
             kind: "fermos-family" | "fermos-vessel" | "fermos-forecast" | "pureos-unit" | "proforma" | "library";
             /** Notes */
-            notes?: string[];
+            notes: string[];
             /** Scope */
             scope: string;
             /** Specs */
@@ -4980,9 +5568,9 @@ export interface components {
             /** Boundsreason */
             boundsReason: string;
             /** Choices */
-            choices?: string[] | null;
+            choices: string[] | null;
             /** Convention */
-            convention?: number | string | null;
+            convention: number | string | null;
             /** Dimension */
             dimension: string;
             /** Gloss */
@@ -4994,11 +5582,11 @@ export interface components {
             /** Label */
             label: string;
             /** Max */
-            max?: number | null;
+            max: number | null;
             /** Min */
-            min?: number | null;
+            min: number | null;
             /** Note */
-            note?: string | null;
+            note: string | null;
             /**
              * Scale
              * @default linear
@@ -5008,7 +5596,7 @@ export interface components {
             /** Sourcerule */
             sourceRule: string[];
             /** Step */
-            step?: number | null;
+            step: number | null;
             /** Symbol */
             symbol: string;
             /** Unit */
@@ -5020,28 +5608,28 @@ export interface components {
          */
         ParameterValue: {
             /** Detail */
-            detail?: string | null;
+            detail: string | null;
             /** High */
-            high?: number | null;
+            high: number | null;
             /** Identified */
-            identified?: boolean | null;
+            identified: boolean | null;
             /** Key */
             key: string;
             /** Librarydefault */
-            libraryDefault?: number | string | null;
+            libraryDefault: number | string | null;
             /** Low */
-            low?: number | null;
+            low: number | null;
             /**
              * Origin
              * @enum {string}
              */
             origin: "fit" | "record" | "artifact" | "simulation" | "assumption" | "model-estimate" | "measurement" | "convention" | "library-default" | "waiting" | "not-read";
             /** Outofbounds */
-            outOfBounds?: string | null;
+            outOfBounds: string | null;
             /** Overriddenby */
-            overriddenBy?: string | null;
+            overriddenBy: string | null;
             /** Recordids */
-            recordIds?: string[];
+            recordIds: string[];
             source: components["schemas"]["BasisSource"] | null;
             /** Value */
             value: number | string | null;
@@ -5120,9 +5708,9 @@ export interface components {
          */
         Practice: {
             /** Scenarios */
-            scenarios?: components["schemas"]["PracticeScenario"][];
+            scenarios: components["schemas"]["PracticeScenario"][];
             /** Sessions */
-            sessions?: components["schemas"]["PracticeSession"][];
+            sessions: components["schemas"]["PracticeSession"][];
             /**
              * Version
              * @default 1
@@ -5195,7 +5783,7 @@ export interface components {
          */
         PracticeObservation: {
             /** Steps */
-            steps?: components["schemas"]["PracticeStepRef"][];
+            steps: components["schemas"]["PracticeStepRef"][];
             /** Text */
             text: string;
         };
@@ -5209,9 +5797,9 @@ export interface components {
             /** Createdat */
             createdAt: string;
             /** Depositionids */
-            depositionIds?: string[];
+            depositionIds: string[];
             /** Evidence */
-            evidence?: components["schemas"]["PracticeValue"][];
+            evidence: components["schemas"]["PracticeValue"][];
             /** Id */
             id: string;
             /** Model */
@@ -5223,25 +5811,25 @@ export interface components {
             /** Skillid */
             skillId: string;
             /** Steps */
-            steps?: components["schemas"]["PracticeStepRef"][];
+            steps: components["schemas"]["PracticeStepRef"][];
             /** Title */
             title: string;
-            usage?: components["schemas"]["Usage"];
+            usage: components["schemas"]["Usage"];
             /** Watchfor */
-            watchFor?: string[];
+            watchFor: string[];
         };
         /** PracticeSession */
         PracticeSession: {
             /** Closedat */
-            closedAt?: string | null;
+            closedAt: string | null;
             /** Evidenceid */
-            evidenceId?: string | null;
+            evidenceId: string | null;
             /** Id */
             id: string;
             /** Observed */
-            observed?: components["schemas"]["PracticeObservation"][];
+            observed: components["schemas"]["PracticeObservation"][];
             /** Personid */
-            personId?: string | null;
+            personId: string | null;
             /** Scenarioid */
             scenarioId: string;
             /** Skillid */
@@ -5249,8 +5837,8 @@ export interface components {
             /** Startedat */
             startedAt: string;
             /** Turns */
-            turns?: components["schemas"]["PracticeTurn"][];
-            usage?: components["schemas"]["Usage"];
+            turns: components["schemas"]["PracticeTurn"][];
+            usage: components["schemas"]["Usage"];
         };
         /**
          * PracticeSource
@@ -5259,20 +5847,20 @@ export interface components {
          */
         PracticeSource: {
             /** Depositionid */
-            depositionId?: string | null;
+            depositionId: string | null;
             /** Itemid */
-            itemId?: string | null;
+            itemId: string | null;
             /**
              * Kind
              * @enum {string}
              */
             kind: "step" | "material" | "entry" | "observation";
             /** Material */
-            material?: string | null;
+            material: string | null;
             /** Protocolid */
-            protocolId?: string | null;
+            protocolId: string | null;
             /** Stepid */
-            stepId?: string | null;
+            stepId: string | null;
         };
         /** PracticeStepRef */
         PracticeStepRef: {
@@ -5286,14 +5874,14 @@ export interface components {
             /** At */
             at: string;
             /** Move */
-            move?: ("why" | "change" | "next" | "close") | null;
+            move: ("why" | "change" | "next" | "close") | null;
             /**
              * Role
              * @enum {string}
              */
             role: "trainee" | "tutor";
             /** Steps */
-            steps?: components["schemas"]["PracticeStepRef"][];
+            steps: components["schemas"]["PracticeStepRef"][];
             /** Text */
             text: string;
         };
@@ -5316,22 +5904,22 @@ export interface components {
          */
         PracticeValue: {
             /** At */
-            at?: string | null;
+            at: string | null;
             /** Basis */
-            basis?: string | null;
+            basis: string | null;
             /** Id */
             id: string;
             /** Label */
             label: string;
             /** Measure */
-            measure?: string | null;
+            measure: string | null;
             source: components["schemas"]["PracticeSource"];
             /** Text */
             text: string;
             /** Unit */
-            unit?: string | null;
+            unit: string | null;
             /** Value */
-            value?: number | null;
+            value: number | null;
         };
         /**
          * PredictedOutput
@@ -5401,6 +5989,19 @@ export interface components {
             /** Product */
             product: string;
         };
+        /** ProformaGrid */
+        ProformaGrid: {
+            /** Costlines */
+            costLines: {
+                [key: string]: (number | null)[];
+            };
+            /** Dims */
+            dims: components["schemas"]["GridDim"][];
+            /** Infeasible */
+            infeasible: number;
+            /** Msp */
+            msp: (number | null)[];
+        };
         /**
          * ProformaRunRequest
          * @description POST /api/proforma/run. It holds these fields alone: a field it does
@@ -5438,6 +6039,126 @@ export interface components {
             trainRun?: string | null;
             /** Vessel */
             vessel?: string | null;
+        };
+        /** ProformaRunResult */
+        ProformaRunResult: {
+            /** Artifactid */
+            artifactId: string;
+            /** Basecostlines */
+            baseCostLines: {
+                [key: string]: number;
+            } | null;
+            /** Baseinfeasible */
+            baseInfeasible: string | null;
+            /** Baseprice */
+            basePrice: number | null;
+            /** Diagram */
+            diagram: string | null;
+            /** Diagramnote */
+            diagramNote: string | null;
+            evidence: components["schemas"]["Evidence"];
+            /** Feasible */
+            feasible: number;
+            /** Flowsheet */
+            flowsheet: string | null;
+            grid: components["schemas"]["ProformaGrid"];
+            /** Histogram */
+            histogram: components["schemas"]["HistogramBin"][];
+            /** Infeasible */
+            infeasible: {
+                [key: string]: number;
+            };
+            /** Inputs */
+            inputs: components["schemas"]["ScenarioInput"][];
+            /** Leavesout */
+            leavesOut: string[];
+            /** Pricebasis */
+            priceBasis: string;
+            /**
+             * Provenance
+             * @enum {string}
+             */
+            provenance: "measured" | "gold" | "verified" | "curated" | "computed" | "unverified" | "user" | "industry-estimate" | "assumed";
+            /** Quantiles */
+            quantiles: {
+                [key: string]: number;
+            };
+            /** Readback */
+            readBack: {
+                [key: string]: number;
+            };
+            /** Samples */
+            samples: number;
+            /** Scenarioid */
+            scenarioId: string;
+            /** Sensitivity */
+            sensitivity: components["schemas"]["InputSensitivity"][];
+            /** Streams */
+            streams: components["schemas"]["StreamRow"][];
+            /** Tableunits */
+            tableUnits: {
+                [key: string]: string;
+            };
+            /** Tablessource */
+            tablesSource: string | null;
+            tea: components["schemas"]["TeaBreakdown"] | null;
+            /** Unitorder */
+            unitOrder: string[];
+            /** Units */
+            units: components["schemas"]["UnitRow"][];
+            utilities: components["schemas"]["UtilityDuties"] | null;
+        };
+        /** ProformaScenarioInfo */
+        ProformaScenarioInfo: {
+            /** Flowsheet */
+            flowsheet: string;
+            /** Host */
+            host: string | null;
+            /** Hosts */
+            hosts: string[];
+            /** Id */
+            id: string;
+            /** Inputs */
+            inputs: components["schemas"]["ScenarioInput"][];
+            /** Leavesout */
+            leavesOut: string[];
+            /** Name */
+            name: string;
+            /** Pricebasis */
+            priceBasis: string;
+            /** Product */
+            product: string;
+            /** Refused */
+            refused: string | null;
+            /** Waiting */
+            waiting: string[];
+        };
+        /**
+         * ProformaTables
+         * @description What a reader takes from a `proforma.run` artifact (proforma.tables_of):
+         *     the flowsheet, what made the tables, and the tables themselves.
+         */
+        ProformaTables: {
+            /** Diagram */
+            diagram: string | null;
+            /** Diagramnote */
+            diagramNote: string | null;
+            /** Flowsheet */
+            flowsheet: string | null;
+            /** Streams */
+            streams: components["schemas"]["StreamRow"][];
+            /** Tableunits */
+            tableUnits: {
+                [key: string]: string;
+            };
+            /** Tablessource */
+            tablesSource: string | null;
+            tea: components["schemas"]["TeaBreakdown"] | null;
+            /** Unitorder */
+            unitOrder: string[];
+            /** Units */
+            units: components["schemas"]["UnitRow"][];
+            utilities: components["schemas"]["UtilityDuties"] | null;
         };
         /**
          * Project
@@ -5486,17 +6207,17 @@ export interface components {
             /** Action */
             action: string;
             /** Askid */
-            askId?: string | null;
+            askId: string | null;
             /** At */
             at: string;
             /** By */
             by: string;
             /** Carriedoutat */
-            carriedOutAt?: string | null;
+            carriedOutAt: string | null;
             /** Carriedoutby */
-            carriedOutBy?: string | null;
+            carriedOutBy: string | null;
             /** Fields */
-            fields?: {
+            fields: {
                 [key: string]: string;
             };
             /** Gate */
@@ -5516,9 +6237,9 @@ export interface components {
              */
             note: string;
             /** Result */
-            result?: string | null;
+            result: string | null;
             /** Route */
-            route?: string | null;
+            route: string | null;
             /**
              * Server
              * @default false
@@ -5531,7 +6252,7 @@ export interface components {
              */
             state: "proposed" | "done" | "dismissed";
             /** Target */
-            target?: string | null;
+            target: string | null;
             /** Title */
             title: string;
             /** Why */
@@ -5551,6 +6272,34 @@ export interface components {
              * @default
              */
             reason: string;
+        };
+        /**
+         * ProposalMissing
+         * @description A property the rules needed and nothing holds, and why.
+         */
+        ProposalMissing: {
+            /** Property */
+            property: string;
+            /** Why */
+            why: string;
+        };
+        /**
+         * ProposalReason
+         * @description Why one unit of a proposal is there: the rule, the property it read,
+         *     the artifact that holds that property (None when the products
+         *     catalogue states it), and the words, which carry no number.
+         */
+        ProposalReason: {
+            /** Artifactid */
+            artifactId: string | null;
+            /** Property */
+            property: string;
+            /** Rule */
+            rule: string;
+            /** Unitid */
+            unitId: string;
+            /** Words */
+            words: string;
         };
         /**
          * ProposeRequest
@@ -5602,6 +6351,28 @@ export interface components {
             detail: string;
         };
         /**
+         * RegressionCheck
+         * @description One of the package test's values beside what this installation computed.
+         */
+        RegressionCheck: {
+            /** Expression */
+            expression: string;
+            /** Label */
+            label: string;
+            /** Measured */
+            measured: number | null;
+            /** Package */
+            package: number;
+            /** Reldiff */
+            relDiff: number | null;
+            /** Rtol */
+            rtol: number;
+            /** Unit */
+            unit: string;
+            /** Within */
+            within: boolean;
+        };
+        /**
          * RegressionValue
          * @description One value a package's own test asserts, as its test file writes it.
          */
@@ -5625,16 +6396,16 @@ export interface components {
             /** Path */
             path: string;
             /** Replayed */
-            replayed?: unknown;
+            replayed: unknown;
             /** Stored */
-            stored?: unknown;
+            stored: unknown;
         };
         /** ReplayResult */
         ReplayResult: {
             /** Artifactid */
             artifactId: string;
             /** Differences */
-            differences?: components["schemas"]["ReplayDifference"][];
+            differences: components["schemas"]["ReplayDifference"][];
             /** Durationms */
             durationMs: number;
             /** Identical */
@@ -5643,7 +6414,7 @@ export interface components {
             replayedHash: string;
             /** Storedhash */
             storedHash: string;
-            tolerance?: components["schemas"]["ReplayTolerance"] | null;
+            tolerance: components["schemas"]["ReplayTolerance"] | null;
             /**
              * Withintolerance
              * @default false
@@ -5734,9 +6505,9 @@ export interface components {
          *     with its origin; None for a refused run).
          */
         RunReport: {
-            artifact?: components["schemas"]["Artifact"] | null;
-            flowsheet?: components["schemas"]["SFFFlowsheet"] | null;
-            parameters?: components["schemas"]["ParamScope"] | null;
+            artifact: components["schemas"]["Artifact"] | null;
+            flowsheet: components["schemas"]["SFFFlowsheet"] | null;
+            parameters: components["schemas"]["ParamScope"] | null;
             run: components["schemas"]["EngineRun"];
         };
         /**
@@ -5748,9 +6519,9 @@ export interface components {
             /** Recordid */
             recordId: string;
             /** Score */
-            score?: number | null;
+            score: number | null;
             /** Tags */
-            tags?: string[];
+            tags: string[];
             /** Valid */
             valid: boolean;
         };
@@ -5872,11 +6643,11 @@ export interface components {
             /** Id */
             id: string;
             /** Massflow */
-            massFlow?: number | null;
+            massFlow: number | null;
             /** Name */
-            name?: string | null;
+            name: string | null;
             /** Price */
-            price?: number | null;
+            price: number | null;
             /** Unit */
             unit: string;
         };
@@ -5889,17 +6660,17 @@ export interface components {
          */
         SFFCompleteness: {
             /** Categories */
-            categories?: {
+            categories: {
                 [key: string]: number | null;
             };
             /** Criteria */
-            criteria?: components["schemas"]["SFFCriterion"][];
+            criteria: components["schemas"]["SFFCriterion"][];
             /** Criticalities */
-            criticalities?: {
+            criticalities: {
                 [key: string]: number | null;
             };
             /** Recipe */
-            recipe?: {
+            recipe: {
                 [key: string]: unknown;
             };
             /**
@@ -5908,11 +6679,11 @@ export interface components {
              */
             report: string;
             /** Representablescore */
-            representableScore?: number | null;
+            representableScore: number | null;
             /** Score */
-            score?: number | null;
+            score: number | null;
             /** Sffversion */
-            sffVersion?: string | null;
+            sffVersion: string | null;
         };
         /**
          * SFFCriterion
@@ -5928,11 +6699,11 @@ export interface components {
             /** Message */
             message: string;
             /** Missing */
-            missing?: string[];
+            missing: string[];
             /** Representable */
             representable: boolean;
             /** Score */
-            score?: number | null;
+            score: number | null;
             /** Status */
             status: string;
             /** Weight */
@@ -5946,7 +6717,7 @@ export interface components {
             /** Id */
             id: string;
             /** Massflow */
-            massFlow?: number | null;
+            massFlow: number | null;
             /** Sink */
             sink: string;
             /** Source */
@@ -6002,30 +6773,30 @@ export interface components {
             createdAt: string;
             /** Createdby */
             createdBy: string;
-            graph?: components["schemas"]["SFFGraph"] | null;
+            graph: components["schemas"]["SFFGraph"] | null;
             /** Id */
             id: string;
             /** Libraryid */
-            libraryId?: string | null;
+            libraryId: string | null;
             /**
              * Origin
              * @enum {string}
              */
             origin: "run" | "library" | "imported";
             /** Runartifactid */
-            runArtifactId?: string | null;
+            runArtifactId: string | null;
             /** Sffversion */
-            sffVersion?: string | null;
+            sffVersion: string | null;
             /** Sha256 */
             sha256: string;
             /** Simulator */
-            simulator?: string | null;
+            simulator: string | null;
             /** Source */
             source: string;
             /** Streams */
             streams: number;
             /** Tags */
-            tags?: {
+            tags: {
                 [key: string]: components["schemas"]["SFFTag"];
             };
             /** Title */
@@ -6035,7 +6806,7 @@ export interface components {
             /** Units */
             units: number;
             /** Url */
-            url?: string | null;
+            url: string | null;
             validation: components["schemas"]["SFFValidation"];
         };
         /**
@@ -6046,20 +6817,20 @@ export interface components {
          */
         SFFGraph: {
             /** Dangling */
-            dangling?: string[];
+            dangling: string[];
             /** Edges */
-            edges?: components["schemas"]["SFFEdge"][];
+            edges: components["schemas"]["SFFEdge"][];
             /** Feeds */
-            feeds?: components["schemas"]["SFFBoundary"][];
+            feeds: components["schemas"]["SFFBoundary"][];
             /**
              * Massflowunit
              * @default kg/hr
              */
             massFlowUnit: string;
             /** Nodes */
-            nodes?: components["schemas"]["SFFNode"][];
+            nodes: components["schemas"]["SFFNode"][];
             /** Products */
-            products?: components["schemas"]["SFFBoundary"][];
+            products: components["schemas"]["SFFBoundary"][];
         };
         /**
          * SFFLibraryEntry
@@ -6075,9 +6846,9 @@ export interface components {
             /** Id */
             id: string;
             /** Model */
-            model?: string | null;
+            model: string | null;
             /** Sffversion */
-            sffVersion?: string | null;
+            sffVersion: string | null;
             /** Sha256 */
             sha256: string;
             /** Title */
@@ -6103,7 +6874,7 @@ export interface components {
             /** Id */
             id: string;
             /** Method */
-            method?: string | null;
+            method: string | null;
             /** Rank */
             rank: number;
             /** Type */
@@ -6117,11 +6888,11 @@ export interface components {
          */
         SFFTag: {
             /** Blocking */
-            blocking?: string[];
+            blocking: string[];
             /** Declared */
             declared: boolean;
             /** Earned */
-            earned?: boolean | null;
+            earned: boolean | null;
         };
         /**
          * SFFUrlImport
@@ -6143,11 +6914,11 @@ export interface components {
          */
         SFFValidation: {
             /** Findings */
-            findings?: components["schemas"]["SFFFinding"][];
+            findings: components["schemas"]["SFFFinding"][];
             /** Schemaversion */
             schemaVersion: string;
             /** Summary */
-            summary?: {
+            summary: {
                 [key: string]: {
                     [key: string]: number;
                 };
@@ -6176,6 +6947,55 @@ export interface components {
             /** Values */
             values?: components["schemas"]["ScenarioValue"][];
         };
+        /** ScenarioInput */
+        ScenarioInput: {
+            /**
+             * Binding
+             * @enum {string}
+             */
+            binding: "records" | "assumption" | "artifact" | "waiting";
+            /** Flags */
+            flags: string[];
+            /** High */
+            high: number | null;
+            /** Key */
+            key: string;
+            /** Label */
+            label: string;
+            /**
+             * Leftoutnocarbon
+             * @default 0
+             */
+            leftOutNoCarbon: number;
+            /**
+             * Leftoutothercarbon
+             * @default 0
+             */
+            leftOutOtherCarbon: number;
+            /** Low */
+            low: number | null;
+            /** Recordids */
+            recordIds: string[];
+            /** Records */
+            records: components["schemas"]["BoundRecord"][];
+            /** Sampling */
+            sampling: ("triangular" | "uniform" | "fixed") | null;
+            source: components["schemas"]["BasisSource"] | null;
+            /** Unit */
+            unit: string;
+            /** Value */
+            value: number | null;
+        };
+        /**
+         * ScenarioRunsResponse
+         * @description GET /api/proforma/runs: a scenario's newest run on this service, or
+         *     None when it has none.
+         */
+        ScenarioRunsResponse: {
+            artifact: components["schemas"]["Artifact"] | null;
+            /** Scenarioid */
+            scenarioId: string;
+        };
         /**
          * ScenarioValue
          * @description One value a scenario sets on its plant: the parameter's key, and the
@@ -6199,7 +7019,7 @@ export interface components {
          */
         SearchHit: {
             /** Citation */
-            citation?: string | null;
+            citation: string | null;
             /** Documentid */
             documentId: string;
             /**
@@ -6208,7 +7028,7 @@ export interface components {
              */
             isTable: boolean;
             /** Layers */
-            layers?: string[];
+            layers: string[];
             /** Licenceclass */
             licenceClass: string;
             /** Passageid */
@@ -6216,13 +7036,13 @@ export interface components {
             /** Score */
             score: number;
             /** Sectionpath */
-            sectionPath?: string | null;
+            sectionPath: string | null;
             /** Text */
             text: string;
             /** Title */
             title: string;
             /** Year */
-            year?: number | null;
+            year: number | null;
         };
         /**
          * SearchResponse
@@ -6231,9 +7051,9 @@ export interface components {
          */
         SearchResponse: {
             /** Degradedstages */
-            degradedStages?: string[];
+            degradedStages: string[];
             /** Hits */
-            hits?: components["schemas"]["SearchHit"][];
+            hits: components["schemas"]["SearchHit"][];
             /** Profile */
             profile: string;
             /** Query */
@@ -6254,6 +7074,61 @@ export interface components {
             role: "biomass" | "product" | "substrate";
             /** Scatter */
             scatter: number;
+        };
+        /** SimulationCeiling */
+        SimulationCeiling: {
+            /** Computeat */
+            computeAt: string;
+            /** Empty */
+            empty: string | null;
+            /**
+             * Flagged
+             * @default false
+             */
+            flagged: boolean;
+            /** Product */
+            product: string;
+            /** Rows */
+            rows: components["schemas"]["SimulationCeilingRow"][];
+            /** Strain */
+            strain: string;
+            /** Sugar */
+            sugar: string;
+        };
+        /**
+         * SimulationCeilingRow
+         * @description Yp/s beside the newest stored geneOS ceiling of one host model on
+         *     the sugar, read and never clamped.
+         */
+        SimulationCeilingRow: {
+            /** Above */
+            above: boolean;
+            /** Artifactid */
+            artifactId: string;
+            /** Ceilinggperg */
+            ceilingGPerG: number;
+            /**
+             * Match
+             * @enum {string}
+             */
+            match: "strain" | "species";
+            /** Matchwords */
+            matchWords: string;
+            /** Modelid */
+            modelId: string;
+            /** Modelname */
+            modelName: string;
+            /**
+             * Provenance
+             * @enum {string}
+             */
+            provenance: "measured" | "gold" | "verified" | "curated" | "computed" | "unverified" | "user" | "industry-estimate" | "assumed";
+            /** Words */
+            words: string;
+            /** Yieldachievedgperg */
+            yieldAchievedGPerG: number | null;
+            /** Ypsgperg */
+            ypsGPerG: number | null;
         };
         /**
          * SimulationRequest
@@ -6295,6 +7170,109 @@ export interface components {
             sugar?: string | null;
         };
         /**
+         * SimulationResult
+         * @description One kept `fermos.simulation` artifact as every reader reads it.
+         */
+        SimulationResult: {
+            /** Aerobic */
+            aerobic: boolean;
+            /** Artifactid */
+            artifactId: string;
+            basis: components["schemas"]["ComputedBasis"];
+            ceiling: components["schemas"]["SimulationCeiling"] | null;
+            /** End */
+            end: {
+                [key: string]: number;
+            };
+            /** Family */
+            family: string;
+            /** Finaltitre */
+            finalTitre: number | null;
+            /** Flags */
+            flags: string[];
+            /** Harvesth */
+            harvestH: number;
+            massBalance: components["schemas"]["MassBalance"];
+            /** Notes */
+            notes: string[];
+            our: components["schemas"]["OxygenUptake"];
+            /** Parameters */
+            parameters: components["schemas"]["ParameterValue"][];
+            /** Product */
+            product: string | null;
+            /** Productivity */
+            productivity: number | null;
+            /**
+             * Provenance
+             * @enum {string}
+             */
+            provenance: "measured" | "gold" | "verified" | "curated" | "computed" | "unverified" | "user" | "industry-estimate" | "assumed";
+            /** Series */
+            series: {
+                [key: string]: number[];
+            };
+            /** Start */
+            start: components["schemas"]["ParameterValue"][];
+            steadyState: components["schemas"]["SteadyState"] | null;
+            /** Strain */
+            strain: string | null;
+            /** Sugar */
+            sugar: string | null;
+            /** Sugarrunsouth */
+            sugarRunsOutH: number | null;
+            /** Title */
+            title: string;
+            /** Units */
+            units: {
+                [key: string]: string;
+            };
+            /** Yieldachieved */
+            yieldAchieved: number | null;
+        };
+        /**
+         * SimulationSummary
+         * @description GET /api/fermos/simulations: one kept simulation, newest first.
+         */
+        SimulationSummary: {
+            /** Artifactid */
+            artifactId: string;
+            /** Createdat */
+            createdAt: string;
+            /** Family */
+            family: string;
+            /** Finaltitre */
+            finalTitre: number | null;
+            /** Harvesth */
+            harvestH: number | null;
+            /** Product */
+            product: string | null;
+            /**
+             * Provenance
+             * @enum {string}
+             */
+            provenance: "measured" | "gold" | "verified" | "curated" | "computed" | "unverified" | "user" | "industry-estimate" | "assumed";
+            /** Strain */
+            strain: string | null;
+            /** Sugar */
+            sugar: string | null;
+            /** Title */
+            title: string;
+        };
+        /**
+         * SimulatorStatus
+         * @description GET /api/proforma/status: where the Proforma worker is (cold,
+         *     starting, ready or failed), and the words of a start that failed.
+         */
+        SimulatorStatus: {
+            /** Error */
+            error: string | null;
+            /**
+             * Status
+             * @enum {string}
+             */
+            status: "cold" | "starting" | "ready" | "failed";
+        };
+        /**
          * StateWrite
          * @description PUT /api/state/{kind}/{id}: the row as the page keeps it, and who.
          */
@@ -6306,6 +7284,95 @@ export interface components {
             by: string;
             /** Value */
             value: unknown;
+        };
+        /**
+         * SteadyState
+         * @description chemostat_v1's steady state and washout (D5 as built, 6).
+         */
+        SteadyState: {
+            /** P */
+            P: number;
+            /** S */
+            S: number;
+            /** X */
+            X: number;
+            /**
+             * Bistable
+             * @default false
+             */
+            bistable: boolean;
+            /** Dwashout */
+            dWashout: number;
+            /** Dwashoutd5 */
+            dWashoutD5: number;
+            /** Dwashoutmax */
+            dWashoutMax: number | null;
+            /** Dilutionrate */
+            dilutionRate: number;
+            /** Productivity */
+            productivity: number | null;
+            /** Reached */
+            reached: ("culture" | "washout") | null;
+            /** Washout */
+            washout: boolean;
+            /** Words */
+            words: string;
+        };
+        /**
+         * StoredAnswer
+         * @description GET /api/protparam and GET /api/thermo/volatility: the answer stored
+         *     for the same product, or None when it has not been asked here.
+         */
+        StoredAnswer: {
+            artifact: components["schemas"]["Artifact"] | null;
+        };
+        /** StreamImpurity */
+        StreamImpurity: {
+            /** Chemical */
+            chemical: string;
+            /** Massfraction */
+            massFraction: number;
+        };
+        /**
+         * StreamPurity
+         * @description One stream of a train run: the product's share of its mass, and its
+         *     largest other components by mass, read from the stream table.
+         */
+        StreamPurity: {
+            /** Impurities */
+            impurities: components["schemas"]["StreamImpurity"][];
+            /** Massflow */
+            massFlow: number;
+            /** Productfraction */
+            productFraction: number | null;
+            /** Stream */
+            stream: string;
+        };
+        /**
+         * StreamRow
+         * @description One stream of the base case, as BioSTEAM holds it after the run.
+         */
+        StreamRow: {
+            /** P */
+            P: number;
+            /** T */
+            T: number;
+            /** Id */
+            id: string;
+            /** Massflow */
+            massFlow: number;
+            /** Massflows */
+            massFlows: {
+                [key: string]: number;
+            };
+            /** Phase */
+            phase: string;
+            /** Price */
+            price: number | null;
+            /** Sink */
+            sink: string | null;
+            /** Source */
+            source: string | null;
         };
         /**
          * StudyComparison
@@ -6353,7 +7420,7 @@ export interface components {
             /** By */
             by: string;
             /** Configuration */
-            configuration?: string | null;
+            configuration: string | null;
             /** Id */
             id: string;
             /**
@@ -6363,15 +7430,147 @@ export interface components {
              */
             kind: "engine";
             /** Note */
-            note?: string | null;
+            note: string | null;
             /** Plant */
             plant: string;
             /** Runids */
-            runIds?: string[];
+            runIds: string[];
             /** Title */
             title: string;
             /** Values */
             values: components["schemas"]["ScenarioValue"][];
+        };
+        /**
+         * TeaBreakdown
+         * @description The TEA object's own numbers for the base case, read through its
+         *     attributes and methods, never recomputed.
+         */
+        TeaBreakdown: {
+            /** Fci */
+            FCI: number;
+            /** Foc */
+            FOC: number;
+            /** Irr */
+            IRR: number | null;
+            /** Tci */
+            TCI: number;
+            /** Basis */
+            basis: string | null;
+            /** Basisflow */
+            basisFlow: number | null;
+            /** Capitalrecovery */
+            capitalRecovery: number;
+            /** Coproductcredits */
+            coproductCredits: number;
+            /** Feedstock */
+            feedstock: string | null;
+            /** Feedstockcost */
+            feedstockCost: number | null;
+            /** Incometax */
+            incomeTax: number | null;
+            /** Installedequipmentcost */
+            installedEquipmentCost: number;
+            /** Laborcost */
+            laborCost: number | null;
+            /** Lines */
+            lines: components["schemas"]["TeaLine"][];
+            /** Materialcost */
+            materialCost: number;
+            /** Operatinghours */
+            operatingHours: number;
+            /** Othermaterialcost */
+            otherMaterialCost: number;
+            /** Product */
+            product: string;
+            /** Productprice */
+            productPrice: number | null;
+            /** Purchasecost */
+            purchaseCost: number;
+            /** Sales */
+            sales: number;
+            /** Teaclass */
+            teaClass: string;
+            /** Utilitycost */
+            utilityCost: number;
+        };
+        /**
+         * TeaLine
+         * @description One line of the price, per year and per unit of the price's basis.
+         *     The lines sum to the main product's revenue by construction.
+         */
+        TeaLine: {
+            /**
+             * Key
+             * @enum {string}
+             */
+            key: "feedstock" | "otherMaterials" | "utilities" | "otherVariable" | "fixedOperating" | "capitalRecovery" | "coproductCredits";
+            /** Label */
+            label: string;
+            /** Perunit */
+            perUnit: number | null;
+            /** Reads */
+            reads: string;
+            /** Usdperyear */
+            usdPerYear: number;
+        };
+        /**
+         * ThermoProps
+         * @description What a `thermo_props` artifact holds (its `output`): thermosteam's
+         *     answer for one mixture, every number the library's, in its units.
+         */
+        ThermoProps: {
+            /** Cp */
+            Cp: number | null;
+            /** P */
+            P: number;
+            /** Psource */
+            PSource: string;
+            /** T */
+            T: number;
+            /** Tsource */
+            TSource: string;
+            /** Bubblepoint */
+            bubblePoint: number | null;
+            /** Density */
+            density: number | null;
+            /** Dewpoint */
+            dewPoint: number | null;
+            /** Kind */
+            kind: string;
+            /** Library */
+            library: string;
+            /** Massfractions */
+            massFractions: {
+                [key: string]: number;
+            };
+            /** Notes */
+            notes: string[];
+            /** Phase */
+            phase: string;
+            /** Preset */
+            preset: string | null;
+            /** Recordid */
+            recordId: string | null;
+            /** Runartifactid */
+            runArtifactId: string | null;
+            /** Solved */
+            solved: {
+                [key: string]: unknown;
+            } | null;
+            /** Streamid */
+            streamId: string | null;
+            /** Subject */
+            subject: string;
+            /** Units */
+            units: {
+                [key: string]: string;
+            };
+            /** Vapouratbubble */
+            vapourAtBubble: {
+                [key: string]: number;
+            } | null;
+            /** Viscosity */
+            viscosity: number | null;
         };
         /**
          * ThermoPropsRequest
@@ -6389,6 +7588,16 @@ export interface components {
             streamId?: string | null;
         };
         /**
+         * ThermoPropsStored
+         * @description GET /api/thermo/props: the answer stored for the same question, its
+         *     artifact with what the artifact holds, or both None when nobody has
+         *     asked it here.
+         */
+        ThermoPropsStored: {
+            artifact: components["schemas"]["Artifact"] | null;
+            props: components["schemas"]["ThermoProps"] | null;
+        };
+        /**
          * ToolCallRecord
          * @description One tool call a turn made (GET /api/conversations/{id}/turns/{turn}/calls):
          *     the tool, what it was asked, what it answered the model, and what it
@@ -6396,27 +7605,27 @@ export interface components {
          */
         ToolCallRecord: {
             /** Artifactids */
-            artifactIds?: string[];
+            artifactIds: string[];
             /** At */
             at: string;
             /** By */
             by: string;
             /** Error */
-            error?: string | null;
+            error: string | null;
             /** Evidenceids */
-            evidenceIds?: string[];
+            evidenceIds: string[];
             /** Input */
             input: {
                 [key: string]: unknown;
             };
             /** Passageids */
-            passageIds?: string[];
+            passageIds: string[];
             /** Recordids */
-            recordIds?: string[];
+            recordIds: string[];
             /** Seq */
             seq: number;
             /** Summary */
-            summary?: {
+            summary: {
                 [key: string]: unknown;
             };
             /** Tool */
@@ -6445,25 +7654,25 @@ export interface components {
          */
         ToolResult: {
             /** Data */
-            data?: {
+            data: {
                 [key: string]: unknown;
             } | null;
-            draft?: components["schemas"]["RunbookDraft"] | null;
+            draft: components["schemas"]["RunbookDraft"] | null;
             /** Error */
-            error?: string | null;
+            error: string | null;
             /** Evidence */
-            evidence?: components["schemas"]["Evidence"][];
+            evidence: components["schemas"]["Evidence"][];
             /** Passages */
-            passages?: components["schemas"]["Passage"][];
+            passages: components["schemas"]["Passage"][];
             /** Recordids */
-            recordIds?: string[];
+            recordIds: string[];
             /** Rows */
-            rows?: components["schemas"]["ModuleRow"][];
+            rows: components["schemas"]["ModuleRow"][];
             /** Summary */
-            summary?: {
+            summary: {
                 [key: string]: unknown;
             };
-            usage?: components["schemas"]["Usage"];
+            usage: components["schemas"]["Usage"];
         };
         /**
          * TraceStep
@@ -6471,7 +7680,7 @@ export interface components {
          */
         TraceStep: {
             /** Input */
-            input?: {
+            input: {
                 [key: string]: unknown;
             } | null;
             /**
@@ -6488,7 +7697,86 @@ export interface components {
             /** Summary */
             summary: string;
             /** Tool */
-            tool?: string | null;
+            tool: string | null;
+        };
+        /**
+         * Train
+         * @description A run's train as pureOS reads it, for `/pureos/train/:scenarioId`
+         *     and `pureos_read`.
+         */
+        Train: {
+            /** Artifactid */
+            artifactId: string;
+            /** Createdat */
+            createdAt: string;
+            /** Flowsheet */
+            flowsheet: string | null;
+            /** Note */
+            note: string | null;
+            /** Overallrecovery */
+            overallRecovery: number | null;
+            /** Product */
+            product: string | null;
+            /** Productbasis */
+            productBasis: string;
+            /** Productlost */
+            productLost: number | null;
+            /** Productout */
+            productOut: number | null;
+            /** Productstream */
+            productStream: string | null;
+            /** Program */
+            program: string | null;
+            /**
+             * Provenance
+             * @enum {string}
+             */
+            provenance: "measured" | "gold" | "verified" | "curated" | "computed" | "unverified" | "user" | "industry-estimate" | "assumed";
+            /**
+             * Runs
+             * @default 1
+             */
+            runs: number;
+            /** Scenarioid */
+            scenarioId: string | null;
+            /** Scenarioname */
+            scenarioName: string | null;
+            /** Streams */
+            streams: components["schemas"]["StreamRow"][];
+            /** Tableunits */
+            tableUnits: {
+                [key: string]: string;
+            };
+            /** Tablessource */
+            tablesSource: string | null;
+            /**
+             * Tool
+             * @default proforma.run
+             */
+            tool: string;
+            /** Trainid */
+            trainId: string | null;
+            /** Trainname */
+            trainName: string | null;
+            /** Units */
+            units: components["schemas"]["TrainUnit"][];
+        };
+        /**
+         * TrainFromRun
+         * @description A run's train as data: every unit on the product's path whose class is
+         *     a catalogue type, in run order, each outlet routed as the run routed it;
+         *     the units it does not take; what it says of itself; and the refusals
+         *     its structure meets (validate's), which a person settles in the
+         *     Builder.
+         */
+        TrainFromRun: {
+            /** Notes */
+            notes: string[];
+            /** Refusals */
+            refusals: string[];
+            train: components["schemas"]["TrainSpec"];
+            /** Unmapped */
+            unmapped: components["schemas"]["TrainUnmapped"][];
         };
         /**
          * TrainFromRunRequest
@@ -6525,6 +7813,53 @@ export interface components {
             vessel?: string | null;
         };
         /**
+         * TrainInletRead
+         * @description What a train run's inlet was and where it came from (D10).
+         */
+        TrainInletRead: {
+            /** P */
+            P: number;
+            /** T */
+            T: number;
+            /** Absent */
+            absent: string | null;
+            /** Brothflow */
+            brothFlow: number | null;
+            /** Chemicals */
+            chemicals: string[];
+            /** Concentrations */
+            concentrations: {
+                [key: string]: number;
+            } | null;
+            /** Flows */
+            flows: {
+                [key: string]: number;
+            };
+            /** Harvesthour */
+            harvestHour: number | null;
+            /**
+             * Kind
+             * @enum {string}
+             */
+            kind: "simulation" | "run-stream" | "typed";
+            /** Notes */
+            notes: string[];
+            /** Phase */
+            phase: string;
+            /** Ref */
+            ref: string | null;
+            /** Reftool */
+            refTool: string | null;
+            /** Streamid */
+            streamId: string | null;
+            /** Vessel */
+            vessel: string | null;
+            /** Water */
+            water: number | null;
+            /** Waternote */
+            waterNote: string | null;
+        };
+        /**
          * TrainParam
          * @description A value a person typed for one parameter of a train's unit or inlet:
          *     an Override without its scope and key, which its place in the train
@@ -6543,6 +7878,83 @@ export interface components {
             note?: string | null;
             /** Value */
             value: number | string;
+        };
+        /**
+         * TrainProposal
+         * @description POST /api/pureos/propose: a train proposed by the written rules, or
+         *     none, with what is missing. (Named apart from `Proposal`, a write a
+         *     model proposed at a gate, OF-BLD-015 §7.4.)
+         */
+        TrainProposal: {
+            /** Artifacts */
+            artifacts: string[];
+            /** Host */
+            host: string;
+            /** Missing */
+            missing: components["schemas"]["ProposalMissing"][];
+            /** Notes */
+            notes: string[];
+            /** Product */
+            product: string;
+            /** Productclass */
+            productClass: string | null;
+            /** Program */
+            program: string | null;
+            /** Reasons */
+            reasons: components["schemas"]["ProposalReason"][];
+            train: components["schemas"]["TrainSpec"] | null;
+        };
+        /** TrainPurity */
+        TrainPurity: {
+            /** Impuritiesshown */
+            impuritiesShown: number;
+            /** Note */
+            note: string;
+            /** Product */
+            product: string;
+            /** Productfraction */
+            productFraction: number | null;
+            /** Productstream */
+            productStream: string | null;
+            /** Streams */
+            streams: components["schemas"]["StreamPurity"][];
+        };
+        /**
+         * TrainRun
+         * @description POST /api/pureos/train/run: the one `pureos.train_run` artifact, read.
+         */
+        TrainRun: {
+            /** Artifactid */
+            artifactId: string;
+            basis: components["schemas"]["ComputedBasis"];
+            /** Costs */
+            costs: components["schemas"]["TrainUnitCost"][];
+            /** Createdat */
+            createdAt: string;
+            /** Diagram */
+            diagram: string | null;
+            /** Diagramnote */
+            diagramNote: string | null;
+            /** Flags */
+            flags: string[];
+            inlet: components["schemas"]["TrainInletRead"];
+            /** Notes */
+            notes: string[];
+            /** Parameters */
+            parameters: components["schemas"]["TrainUnitParameters"][];
+            /**
+             * Provenance
+             * @enum {string}
+             */
+            provenance: "measured" | "gold" | "verified" | "curated" | "computed" | "unverified" | "user" | "industry-estimate" | "assumed";
+            purity: components["schemas"]["TrainPurity"];
+            spec: components["schemas"]["TrainSpec"];
+            train: components["schemas"]["Train"];
+            /** Unitorder */
+            unitOrder: string[];
+            /** Units */
+            units: components["schemas"]["UnitRow"][];
+            utilities: components["schemas"]["UtilityDuties"] | null;
         };
         /**
          * TrainRunRequest
@@ -6579,6 +7991,131 @@ export interface components {
             units?: components["schemas"]["TrainUnitSpec"][];
         };
         /**
+         * TrainSummary
+         * @description One train on file, for pureOS's index: the newest run of a scenario.
+         */
+        TrainSummary: {
+            /** Artifactid */
+            artifactId: string;
+            /** Createdat */
+            createdAt: string;
+            /** Flowsheet */
+            flowsheet: string | null;
+            /** Note */
+            note: string | null;
+            /** Overallrecovery */
+            overallRecovery: number | null;
+            /** Product */
+            product: string | null;
+            /** Program */
+            program: string | null;
+            /**
+             * Provenance
+             * @enum {string}
+             */
+            provenance: "measured" | "gold" | "verified" | "curated" | "computed" | "unverified" | "user" | "industry-estimate" | "assumed";
+            /**
+             * Runs
+             * @default 1
+             */
+            runs: number;
+            /** Scenarioid */
+            scenarioId: string | null;
+            /** Scenarioname */
+            scenarioName: string | null;
+            /**
+             * Tool
+             * @default proforma.run
+             */
+            tool: string;
+            /** Trainid */
+            trainId: string | null;
+            /** Trainname */
+            trainName: string | null;
+            /** Unitcount */
+            unitCount: number;
+        };
+        /**
+         * TrainUnit
+         * @description One unit of a run's train, in run order, with the product's flow
+         *     through it as the stream table states it.
+         */
+        TrainUnit: {
+            /** Cumulative */
+            cumulative: number | null;
+            /** Id */
+            id: string;
+            /** Ins */
+            ins: string[];
+            /** Line */
+            line: string | null;
+            /** Lostto */
+            lostTo: string[];
+            /** Massin */
+            massIn: number;
+            /** Massout */
+            massOut: number;
+            /** Note */
+            note: string | null;
+            /** Onpath */
+            onPath: boolean;
+            /** Order */
+            order: number;
+            /** Outs */
+            outs: string[];
+            /** Productin */
+            productIn: number | null;
+            /** Productlost */
+            productLost: number | null;
+            /** Productonward */
+            productOnward: number | null;
+            /** Productout */
+            productOut: number | null;
+            /** Recovery */
+            recovery: number | null;
+            /** Unitclass */
+            unitClass: string;
+        };
+        /**
+         * TrainUnitCost
+         * @description One unit's cost as BioSTEAM gives it, or why there is none.
+         */
+        TrainUnitCost: {
+            /** Costmodel */
+            costModel: boolean;
+            /** Installedcost */
+            installedCost: number | null;
+            /** Items */
+            items: {
+                [key: string]: number;
+            };
+            /** Note */
+            note: string | null;
+            /** Purchasecost */
+            purchaseCost: number | null;
+            /** Type */
+            type: string;
+            /** Unit */
+            unit: string;
+            /** Unitclass */
+            unitClass: string;
+        };
+        /**
+         * TrainUnitParameters
+         * @description One unit's parameters as its run's basis holds them, each with its
+         *     source.
+         */
+        TrainUnitParameters: {
+            /** Type */
+            type: string;
+            /** Unit */
+            unit: string;
+            /** Unitclass */
+            unitClass: string;
+            /** Values */
+            values: components["schemas"]["ParameterValue"][];
+        };
+        /**
          * TrainUnitReadFrom
          * @description A shelf flowsheet's own unit whose values a train's unit takes, as
          *     the flowsheet's package builds it: read from the built unit in the
@@ -6613,12 +8150,211 @@ export interface components {
             /** Type */
             type: string;
         };
+        /**
+         * TrainUnmapped
+         * @description A unit of the run the train does not take, and why, in words.
+         */
+        TrainUnmapped: {
+            /** Unitclass */
+            unitClass: string;
+            /** Unitid */
+            unitId: string;
+            /** Why */
+            why: string;
+        };
+        /**
+         * TrainValidation
+         * @description POST /api/pureos/train/validate: every refusal at once, in words;
+         *     runs nothing. POST /api/pureos/train/check answers in the same shape
+         *     with everything the run would refuse (OF-BLD-020 §5.3).
+         */
+        TrainValidation: {
+            /** Ok */
+            ok: boolean;
+            /** Places */
+            places: {
+                [key: string]: string[];
+            };
+            /** Refusals */
+            refusals: string[];
+        };
         /** TurnError */
         TurnError: {
             /** Message */
             message: string;
             /** Remedy */
             remedy: string;
+        };
+        /**
+         * UnitDefault
+         * @description A parameter's default as the class gives it, read from its code in
+         *     the worker, and where it was read; None when the class gives none or
+         *     decides at run time.
+         */
+        UnitDefault: {
+            /** Key */
+            key: string;
+            /** Readfrom */
+            readFrom: string;
+            /** Value */
+            value: number | string | null;
+        };
+        /**
+         * UnitNeed
+         * @description What a unit needs set before it runs: one of `alternatives`, each a
+         *     list of keys that must all hold a value.
+         */
+        UnitNeed: {
+            /** Alternatives */
+            alternatives: string[][];
+            /** Why */
+            why: string;
+        };
+        /**
+         * UnitParamMap
+         * @description How one spec reaches the class: under which of the class's own names,
+         *     as a constructor argument or an attribute set after construction, and
+         *     whether its key is a template expanded per component or per effect
+         *     (`split` → `split.<chemical>`, `P` → `P.<effect>`).
+         */
+        UnitParamMap: {
+            /** How */
+            how: string | null;
+            /** Key */
+            key: string;
+            /** Name */
+            name: string;
+            /** Per */
+            per: ("component" | "effect") | null;
+            /**
+             * Via
+             * @enum {string}
+             */
+            via: "argument" | "attribute";
+        };
+        /**
+         * UnitPort
+         * @description One inlet or outlet of a catalogue unit, in words.
+         */
+        UnitPort: {
+            /** Index */
+            index: number;
+            /**
+             * Many
+             * @default false
+             */
+            many: boolean;
+            /** Name */
+            name: string;
+            /**
+             * Onward
+             * @default false
+             */
+            onward: boolean;
+            /**
+             * Side
+             * @enum {string}
+             */
+            side: "in" | "out";
+            /** Source */
+            source: ("upstream" | "side" | "unit") | null;
+            /** What */
+            what: string;
+        };
+        /**
+         * UnitRow
+         * @description One unit operation, in run order.
+         */
+        UnitRow: {
+            /** Coolingduty */
+            coolingDuty: number | null;
+            /** Heatingduty */
+            heatingDuty: number | null;
+            /** Id */
+            id: string;
+            /** Ins */
+            ins: string[];
+            /** Installedcost */
+            installedCost: number;
+            /** Line */
+            line: string | null;
+            /** Order */
+            order: number;
+            /** Outs */
+            outs: string[];
+            /** Power */
+            power: number | null;
+            /** Purchasecost */
+            purchaseCost: number;
+            /** Unitclass */
+            unitClass: string;
+        };
+        /**
+         * UnitSpecs
+         * @description GET /api/pureos/catalogue/{id}/specs: an entry's ParameterSpecs with
+         *     the choices and bounds the class gives, each parameter's default read
+         *     from the class, and how each reaches it.
+         */
+        UnitSpecs: {
+            /** Biosteamclass */
+            biosteamClass: string | null;
+            /** Chemicals */
+            chemicals: string[];
+            /** Defaults */
+            defaults: components["schemas"]["UnitDefault"][];
+            /** Id */
+            id: string;
+            /** Inhouseclass */
+            inhouseClass: string | null;
+            /** Needs */
+            needs: components["schemas"]["UnitNeed"][];
+            /** Notoffered */
+            notOffered: components["schemas"]["NotOffered"][];
+            /** Notes */
+            notes: string[];
+            /** Params */
+            params: components["schemas"]["UnitParamMap"][];
+            /** Specs */
+            specs: components["schemas"]["ParameterSpec"][];
+            /** Versions */
+            versions: {
+                [key: string]: string;
+            };
+        };
+        /**
+         * UnitType
+         * @description A catalogue entry without its specs (GET /api/pureos/catalogue).
+         */
+        UnitType: {
+            /** Biosteamclass */
+            biosteamClass: string | null;
+            /** Costmodel */
+            costModel: boolean;
+            /** Id */
+            id: string;
+            /** Inhouseclass */
+            inhouseClass: string | null;
+            /** Insouts */
+            insOuts: components["schemas"]["UnitPort"][];
+            /** Line */
+            line: string;
+            /** Maps */
+            maps: string[];
+            /** Name */
+            name: string;
+            /** Needs */
+            needs: components["schemas"]["UnitNeed"][];
+            /** Notoffered */
+            notOffered: components["schemas"]["NotOffered"][];
+            /** Notes */
+            notes: string[];
+            /** Speccount */
+            specCount: number;
+            /**
+             * Stage
+             * @enum {string}
+             */
+            stage: "harvest" | "disruption" | "clarification" | "concentration" | "capture" | "polish" | "formulation" | "drying" | "utility";
         };
         /** Usage */
         Usage: {
@@ -6643,12 +8379,37 @@ export interface components {
              */
             inputTokens: number;
             /** Models */
-            models?: string[];
+            models: string[];
             /**
              * Outputtokens
              * @default 0
              */
             outputTokens: number;
+        };
+        /**
+         * UtilityDuties
+         * @description BioSTEAM's UnitGroup over the plant's units: each total with the unit
+         *     the UnitGroup states for it.
+         */
+        UtilityDuties: {
+            /** Cooling */
+            cooling: number;
+            /** Coolingunit */
+            coolingUnit: string;
+            /** Electricityconsumption */
+            electricityConsumption: number;
+            /** Electricityconsumptionunit */
+            electricityConsumptionUnit: string;
+            /** Electricityproduction */
+            electricityProduction: number;
+            /** Electricityproductionunit */
+            electricityProductionUnit: string;
+            /** Group */
+            group: string;
+            /** Heating */
+            heating: number;
+            /** Heatingunit */
+            heatingUnit: string;
         };
         /** ValidationError */
         ValidationError: {
@@ -6675,7 +8436,7 @@ export interface components {
             /** Costindex */
             costIndex: number;
             /** Costindexyear */
-            costIndexYear?: number | null;
+            costIndexYear: number | null;
             /** Installed */
             installed: number;
             /** Note */
@@ -6708,11 +8469,11 @@ export interface components {
             design: components["schemas"]["VesselDesignRow"][];
             evidence: components["schemas"]["Evidence"];
             /** Flags */
-            flags?: string[];
+            flags: string[];
             heat: components["schemas"]["VesselHeat"];
-            oxygen?: components["schemas"]["VesselOxygen"] | null;
+            oxygen: components["schemas"]["VesselOxygen"] | null;
             /** Oxygennote */
-            oxygenNote?: string | null;
+            oxygenNote: string | null;
             /** Parameters */
             parameters: components["schemas"]["ParameterValue"][];
             /**
@@ -6745,7 +8506,7 @@ export interface components {
                 [key: string]: string;
             };
             /** Vesseltype */
-            vesselType?: string | null;
+            vesselType: string | null;
         };
         /**
          * VesselDesignRow
@@ -6770,17 +8531,17 @@ export interface components {
             /** Bst */
             bst: number;
             /** Consumedkmolperh */
-            consumedKmolPerH?: number | null;
+            consumedKmolPerH: number | null;
             /** Convention */
-            convention?: number | null;
+            convention: number | null;
             /** Conventionnote */
             conventionNote: string;
             /** Dutynote */
-            dutyNote?: string | null;
+            dutyNote: string | null;
             /** Method */
-            method?: string | null;
+            method: string | null;
             /** Oxygenkmolperh */
-            oxygenKmolPerH?: number | null;
+            oxygenKmolPerH: number | null;
             /**
              * Unit
              * @default kJ/hr
@@ -6796,15 +8557,15 @@ export interface components {
             /** Aerated */
             aerated: boolean;
             /** Balanceduptake */
-            balancedUptake?: number | null;
+            balancedUptake: number | null;
             /** Cl */
-            cL?: number | null;
+            cL: number | null;
             /** Cstar */
-            cStar?: number | null;
+            cStar: number | null;
             /** Drivingforce */
-            drivingForce?: number | null;
+            drivingForce: number | null;
             /** Floorkmolperh */
-            floorKmolPerH?: number | null;
+            floorKmolPerH: number | null;
             /** Kla */
             kLa: number | null;
             /** Klaneededatpeak */
@@ -6818,23 +8579,23 @@ export interface components {
             /** Our */
             our: number[];
             /** Oxygenbasis */
-            oxygenBasis?: string | null;
+            oxygenBasis: string | null;
             /** Reactiono2Kmolperh */
-            reactionO2KmolPerH?: number | null;
+            reactionO2KmolPerH: number | null;
             /** Scale */
             scale: number;
             /** Scaledo2Kmolperh */
-            scaledO2KmolPerH?: number | null;
+            scaledO2KmolPerH: number | null;
             /** Short */
             short: number[][];
             /** Simulatedo2Kmolperh */
-            simulatedO2KmolPerH?: number | null;
+            simulatedO2KmolPerH: number | null;
             /** Sized */
-            sized?: number | null;
+            sized: number | null;
             /** T */
             t: number[];
             /** Targetuptake */
-            targetUptake?: number | null;
+            targetUptake: number | null;
             /** Unit */
             unit: string;
         };
@@ -6859,6 +8620,35 @@ export interface components {
             simulation?: string | null;
             /** Vesseltype */
             vesselType?: ("stirred-tank" | "bubble-column") | null;
+        };
+        /**
+         * VesselSummary
+         * @description GET /api/fermos/vessels: one kept `fermos.vessel` artifact.
+         */
+        VesselSummary: {
+            /** Artifactid */
+            artifactId: string;
+            /** Createdat */
+            createdAt: string;
+            /** Installed */
+            installed: number | null;
+            /**
+             * Provenance
+             * @enum {string}
+             */
+            provenance: "measured" | "gold" | "verified" | "curated" | "computed" | "unverified" | "user" | "industry-estimate" | "assumed";
+            /** Source */
+            source: string;
+            /** Sourcetool */
+            sourceTool: string;
+            /** Unitclass */
+            unitClass: string;
+            /** Vesseltype */
+            vesselType: string | null;
+            /** Vessels */
+            vessels: number | null;
+            /** Volume */
+            volume: number | null;
         };
     };
     responses: never;
@@ -7101,6 +8891,61 @@ export interface operations {
             };
         };
     };
+    artifacts_checks_api_biorepo_artifacts__artifact_id__checks_get: {
+        parameters: {
+            query?: {
+                /** @description The project the request acts in, where a header cannot be sent (an EventSource); the X-OpenFerment-Project header in its place. */
+                project?: string;
+            };
+            header?: {
+                /** @description The project the request acts in; ?project= in its place. */
+                "X-OpenFerment-Project"?: string;
+            };
+            path: {
+                artifact_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["RegressionCheck"][];
+                };
+            };
+            /** @description The project holds no artifact of that id, in words. A project the request names that the database does not hold is a 404 too, in words. */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Refusal"];
+                };
+            };
+            /** @description The stored artifact is damaged, in words. */
+            409: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Refusal"];
+                };
+            };
+            /** @description The artifact is of a tool whose artifacts hold no run's tables, in words naming the tools that hold them. */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Refusal"];
+                };
+            };
+        };
+    };
     artifacts_replay_api_biorepo_artifacts__artifact_id__replay_post: {
         parameters: {
             query?: {
@@ -7152,6 +8997,61 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    artifacts_tables_api_biorepo_artifacts__artifact_id__tables_get: {
+        parameters: {
+            query?: {
+                /** @description The project the request acts in, where a header cannot be sent (an EventSource); the X-OpenFerment-Project header in its place. */
+                project?: string;
+            };
+            header?: {
+                /** @description The project the request acts in; ?project= in its place. */
+                "X-OpenFerment-Project"?: string;
+            };
+            path: {
+                artifact_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ProformaTables"];
+                };
+            };
+            /** @description The project holds no artifact of that id, in words. A project the request names that the database does not hold is a 404 too, in words. */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Refusal"];
+                };
+            };
+            /** @description The stored artifact is damaged, in words. */
+            409: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Refusal"];
+                };
+            };
+            /** @description The artifact is of a tool whose artifacts hold no run's tables, in words naming the tools that hold them. */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Refusal"];
                 };
             };
         };
@@ -7828,9 +9728,7 @@ export interface operations {
                     [name: string]: unknown;
                 };
                 content: {
-                    "application/json": {
-                        [key: string]: unknown;
-                    };
+                    "application/json": components["schemas"]["FermosBinding"];
                 };
             };
             /** @description The project the request names is one the database does not hold, in words. */
@@ -7874,9 +9772,7 @@ export interface operations {
                     [name: string]: unknown;
                 };
                 content: {
-                    "application/json": {
-                        [key: string]: unknown;
-                    }[];
+                    "application/json": components["schemas"]["FamilyInfo"][];
                 };
             };
             /** @description The project the request names is one the database does not hold, in words. */
@@ -7913,9 +9809,7 @@ export interface operations {
                     [name: string]: unknown;
                 };
                 content: {
-                    "application/json": {
-                        [key: string]: unknown;
-                    };
+                    "application/json": components["schemas"]["FamilyInfo"];
                 };
             };
             /** @description The project the request names is one the database does not hold, in words. */
@@ -8008,9 +9902,7 @@ export interface operations {
                     [name: string]: unknown;
                 };
                 content: {
-                    "application/json": {
-                        [key: string]: unknown;
-                    }[];
+                    "application/json": components["schemas"]["FermosFitInfo"][];
                 };
             };
             /** @description The project the request names is one the database does not hold, in words. */
@@ -8104,9 +9996,7 @@ export interface operations {
                     [name: string]: unknown;
                 };
                 content: {
-                    "application/json": {
-                        [key: string]: unknown;
-                    };
+                    "application/json": components["schemas"]["FermosHarvest"];
                 };
             };
             /** @description The project the request names is one the database does not hold, in words. */
@@ -8154,9 +10044,7 @@ export interface operations {
                     [name: string]: unknown;
                 };
                 content: {
-                    "application/json": {
-                        [key: string]: unknown;
-                    };
+                    "application/json": components["schemas"]["SimulationResult"];
                 };
             };
             /** @description The project the request names is one the database does not hold, in words. */
@@ -8200,9 +10088,7 @@ export interface operations {
                     [name: string]: unknown;
                 };
                 content: {
-                    "application/json": {
-                        [key: string]: unknown;
-                    }[];
+                    "application/json": components["schemas"]["SimulationSummary"][];
                 };
             };
             /** @description The project the request names is one the database does not hold, in words. */
@@ -8288,9 +10174,7 @@ export interface operations {
                     [name: string]: unknown;
                 };
                 content: {
-                    "application/json": {
-                        [key: string]: unknown;
-                    };
+                    "application/json": components["schemas"]["ParamScope"];
                 };
             };
             /** @description The project the request names is one the database does not hold, in words. */
@@ -8334,9 +10218,7 @@ export interface operations {
                     [name: string]: unknown;
                 };
                 content: {
-                    "application/json": {
-                        [key: string]: unknown;
-                    }[];
+                    "application/json": components["schemas"]["VesselSummary"][];
                 };
             };
             /** @description The project the request names is one the database does not hold, in words. */
@@ -9533,9 +11415,7 @@ export interface operations {
                     [name: string]: unknown;
                 };
                 content: {
-                    "application/json": {
-                        [key: string]: unknown;
-                    };
+                    "application/json": components["schemas"]["Health"];
                 };
             };
         };
@@ -9565,9 +11445,7 @@ export interface operations {
                     [name: string]: unknown;
                 };
                 content: {
-                    "application/json": {
-                        [key: string]: unknown;
-                    };
+                    "application/json": components["schemas"]["CatalogueIntake"];
                 };
             };
             /** @description The project the request names is one the database does not hold, in words. */
@@ -10120,9 +11998,7 @@ export interface operations {
                     [name: string]: unknown;
                 };
                 content: {
-                    "application/json": {
-                        [key: string]: unknown;
-                    };
+                    "application/json": components["schemas"]["LiteratureStats"];
                 };
             };
             /** @description The project the request names is one the database does not hold, in words. */
@@ -10173,9 +12049,7 @@ export interface operations {
                     [name: string]: unknown;
                 };
                 content: {
-                    "application/json": {
-                        [key: string]: unknown;
-                    };
+                    "application/json": components["schemas"]["ParamScope"];
                 };
             };
             /** @description The project the request names is one the database does not hold, in words. */
@@ -10225,9 +12099,7 @@ export interface operations {
                     [name: string]: unknown;
                 };
                 content: {
-                    "application/json": {
-                        [key: string]: unknown;
-                    };
+                    "application/json": components["schemas"]["ParamResolveResult"];
                 };
             };
             /** @description The project the request names is one the database does not hold, in words. */
@@ -10456,9 +12328,7 @@ export interface operations {
                     [name: string]: unknown;
                 };
                 content: {
-                    "application/json": {
-                        [key: string]: unknown;
-                    };
+                    "application/json": components["schemas"]["ProformaScenarioInfo"];
                 };
             };
             /** @description The project the request names is one the database does not hold, in words. */
@@ -10507,9 +12377,7 @@ export interface operations {
                     [name: string]: unknown;
                 };
                 content: {
-                    "application/json": {
-                        [key: string]: unknown;
-                    };
+                    "application/json": components["schemas"]["CeilingCheck"];
                 };
             };
             /** @description The project the request names is one the database does not hold, in words. */
@@ -10557,9 +12425,7 @@ export interface operations {
                     [name: string]: unknown;
                 };
                 content: {
-                    "application/json": {
-                        [key: string]: unknown;
-                    };
+                    "application/json": components["schemas"]["ProformaRunResult"];
                 };
             };
             /** @description The project the request names is one the database does not hold, in words. */
@@ -10613,9 +12479,7 @@ export interface operations {
                     [name: string]: unknown;
                 };
                 content: {
-                    "application/json": {
-                        [key: string]: unknown;
-                    };
+                    "application/json": components["schemas"]["ScenarioRunsResponse"];
                 };
             };
             /** @description The project the request names is one the database does not hold, in words. */
@@ -10660,9 +12524,7 @@ export interface operations {
                     [name: string]: unknown;
                 };
                 content: {
-                    "application/json": {
-                        [key: string]: unknown;
-                    }[];
+                    "application/json": components["schemas"]["ProformaScenarioInfo"][];
                 };
             };
             /** @description The project the request names is one the database does not hold, in words. */
@@ -10706,9 +12568,7 @@ export interface operations {
                     [name: string]: unknown;
                 };
                 content: {
-                    "application/json": {
-                        [key: string]: unknown;
-                    }[];
+                    "application/json": components["schemas"]["FlowsheetInfo"][];
                 };
             };
             /** @description The project the request names is one the database does not hold, in words. */
@@ -10743,9 +12603,7 @@ export interface operations {
                     [name: string]: unknown;
                 };
                 content: {
-                    "application/json": {
-                        [key: string]: unknown;
-                    };
+                    "application/json": components["schemas"]["SimulatorStatus"];
                 };
             };
             /** @description The project the request names is one the database does not hold, in words. */
@@ -11010,9 +12868,7 @@ export interface operations {
                     [name: string]: unknown;
                 };
                 content: {
-                    "application/json": {
-                        [key: string]: unknown;
-                    };
+                    "application/json": components["schemas"]["StoredAnswer"];
                 };
             };
             /** @description The project the request names is one the database does not hold, in words. */
@@ -11104,9 +12960,7 @@ export interface operations {
                     [name: string]: unknown;
                 };
                 content: {
-                    "application/json": {
-                        [key: string]: unknown;
-                    }[];
+                    "application/json": components["schemas"]["UnitType"][];
                 };
             };
             /** @description The project the request names is one the database does not hold, in words. */
@@ -11143,9 +12997,7 @@ export interface operations {
                     [name: string]: unknown;
                 };
                 content: {
-                    "application/json": {
-                        [key: string]: unknown;
-                    };
+                    "application/json": components["schemas"]["UnitSpecs"];
                 };
             };
             /** @description The project the request names is one the database does not hold, in words. */
@@ -11193,9 +13045,7 @@ export interface operations {
                     [name: string]: unknown;
                 };
                 content: {
-                    "application/json": {
-                        [key: string]: unknown;
-                    };
+                    "application/json": components["schemas"]["TrainProposal"];
                 };
             };
             /** @description The project the request names is one the database does not hold, in words. */
@@ -11239,9 +13089,7 @@ export interface operations {
                     [name: string]: unknown;
                 };
                 content: {
-                    "application/json": {
-                        [key: string]: unknown;
-                    }[];
+                    "application/json": components["schemas"]["TrainSummary"][];
                 };
             };
             /** @description The project the request names is one the database does not hold, in words. */
@@ -11280,9 +13128,7 @@ export interface operations {
                     [name: string]: unknown;
                 };
                 content: {
-                    "application/json": {
-                        [key: string]: unknown;
-                    };
+                    "application/json": components["schemas"]["TrainValidation"];
                 };
             };
             /** @description The project the request names is one the database does not hold, in words. */
@@ -11330,9 +13176,7 @@ export interface operations {
                     [name: string]: unknown;
                 };
                 content: {
-                    "application/json": {
-                        [key: string]: unknown;
-                    };
+                    "application/json": components["schemas"]["TrainFromRun"];
                 };
             };
             /** @description The project the request names is one the database does not hold, in words. */
@@ -11380,9 +13224,7 @@ export interface operations {
                     [name: string]: unknown;
                 };
                 content: {
-                    "application/json": {
-                        [key: string]: unknown;
-                    };
+                    "application/json": components["schemas"]["TrainRun"];
                 };
             };
             /** @description The project the request names is one the database does not hold, in words. */
@@ -11430,9 +13272,7 @@ export interface operations {
                     [name: string]: unknown;
                 };
                 content: {
-                    "application/json": {
-                        [key: string]: unknown;
-                    };
+                    "application/json": components["schemas"]["TrainValidation"];
                 };
             };
             /** @description The project the request names is one the database does not hold, in words. */
@@ -11478,9 +13318,7 @@ export interface operations {
                     [name: string]: unknown;
                 };
                 content: {
-                    "application/json": {
-                        [key: string]: unknown;
-                    };
+                    "application/json": components["schemas"]["Train"];
                 };
             };
             /** @description The project the request names is one the database does not hold, in words. */
@@ -11524,9 +13362,7 @@ export interface operations {
                     [name: string]: unknown;
                 };
                 content: {
-                    "application/json": {
-                        [key: string]: unknown;
-                    }[];
+                    "application/json": components["schemas"]["TrainSummary"][];
                 };
             };
             /** @description The project the request names is one the database does not hold, in words. */
@@ -11561,9 +13397,7 @@ export interface operations {
                     [name: string]: unknown;
                 };
                 content: {
-                    "application/json": {
-                        [key: string]: unknown;
-                    }[];
+                    "application/json": components["schemas"]["KeptTrain"][];
                 };
             };
             /** @description The project the request names is one the database does not hold, in words. */
@@ -12363,9 +14197,7 @@ export interface operations {
                     [name: string]: unknown;
                 };
                 content: {
-                    "application/json": {
-                        [key: string]: unknown;
-                    };
+                    "application/json": components["schemas"]["ThermoPropsStored"];
                 };
             };
             /** @description The project the request names is one the database does not hold, in words. */
@@ -12458,9 +14290,7 @@ export interface operations {
                     [name: string]: unknown;
                 };
                 content: {
-                    "application/json": {
-                        [key: string]: unknown;
-                    };
+                    "application/json": components["schemas"]["StoredAnswer"];
                 };
             };
             /** @description The project the request names is one the database does not hold, in words. */

@@ -315,12 +315,14 @@ def client():
 
 def test_post_answers_get_reads_and_neither_takes_a_number(store, worker, client):
     q = {"artifactId": RUN_ID, "streamId": "beer"}
-    assert client.get("/api/thermo/props", params=q).json() == {"artifact": None} and worker.calls == []
+    assert client.get("/api/thermo/props", params=q).json() == {"artifact": None, "props": None}
+    assert worker.calls == []
     made = client.post("/api/thermo/props", json=q)
     assert made.status_code == 200 and made.json()["tool"] == "thermo_props"
     ThermoProps.model_validate(made.json()["output"])
-    kept = client.get("/api/thermo/props", params=q).json()["artifact"]
-    assert kept["id"] == made.json()["id"] and len(worker.calls) == 1
+    kept = client.get("/api/thermo/props", params=q).json()
+    assert kept["artifact"]["id"] == made.json()["id"] and len(worker.calls) == 1
+    assert kept["props"] == ThermoProps.model_validate(made.json()["output"]).model_dump(mode="json")
 
 
 @pytest.mark.parametrize("body, status, words", [

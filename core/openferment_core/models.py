@@ -576,6 +576,23 @@ class SearchResponse(BaseModel):
     degradedStages: list[str] = Field(default_factory=list)
 
 
+class LiteratureStats(BaseModel):
+    """GET /api/literature/stats, in the kit's own names: the project's
+    documents, their chunks and their citations, counted by licence class,
+    source and embedding version; the concept graph's entities,
+    relationships and communities are the instance's, counted whole."""
+
+    documents: int
+    chunks: int
+    citations: int
+    entities: int
+    relationships: int
+    communities: int
+    license_classes: dict[str, int]
+    sources: dict[str, int]
+    embedding_versions: dict[str, int]
+
+
 class LiteratureQuestion(BaseModel):
     """POST /api/literature/answer: a question for a cited answer over the
     project's documents."""
@@ -1948,8 +1965,16 @@ class InputSensitivity(BaseModel):
     sourceKind: str
 
 
+class GridDim(BaseModel):
+    """One axis of a run's grid: the input it walks, by key, and the values
+    it takes, in the input's unit."""
+
+    key: str
+    values: list[float]
+
+
 class ProformaGrid(BaseModel):
-    dims: list[dict[str, Any]]
+    dims: list[GridDim]
     msp: list[float | None]
     costLines: dict[str, list[float | None]]
     infeasible: int
@@ -2360,6 +2385,22 @@ class ProformaTables(BaseModel):
 ProformaRunResult.model_rebuild()
 
 
+class ScenarioRunsResponse(BaseModel):
+    """GET /api/proforma/runs: a scenario's newest run on this service, or
+    None when it has none."""
+
+    scenarioId: str
+    artifact: Artifact | None
+
+
+class SimulatorStatus(BaseModel):
+    """GET /api/proforma/status: where the Proforma worker is (cold,
+    starting, ready or failed), and the words of a start that failed."""
+
+    status: Literal["cold", "starting", "ready", "failed"]
+    error: str | None
+
+
 # ── pureOS reads the train (OF-BLD-019 §4.1, D1) ────────────────────────
 #
 # A train is read from one `proforma.run` artifact's stream and unit tables
@@ -2521,6 +2562,15 @@ class ThermoProps(BaseModel):
     notes: list[str] = Field(default_factory=list)
 
 
+class ThermoPropsStored(BaseModel):
+    """GET /api/thermo/props: the answer stored for the same question, its
+    artifact with what the artifact holds, or both None when nobody has
+    asked it here."""
+
+    artifact: Artifact | None
+    props: ThermoProps | None
+
+
 # ── a product's properties (OF-BLD-020 §7.1, D12) ───────────────────────
 #
 # What pureOS's proposer reads about a product: from its sequence, through
@@ -2602,6 +2652,13 @@ class Volatility(BaseModel):
     units: dict[str, str] = Field(default_factory=dict)
     how: str = ""
     notes: list[str] = Field(default_factory=list)
+
+
+class StoredAnswer(BaseModel):
+    """GET /api/protparam and GET /api/thermo/volatility: the answer stored
+    for the same product, or None when it has not been asked here."""
+
+    artifact: Artifact | None
 
 
 # ── Runbook drafts (OF-BLD-014 §9.2) ────────────────────────────────────
@@ -4459,6 +4516,19 @@ class Refusal(BaseModel):
     that cannot answer (the engine routes declare each)."""
 
     detail: str
+
+
+class Health(BaseModel):
+    """GET /api/health: the service answering, the models a call goes to
+    (the primary, and the one a call falls back to), and whether it holds a
+    key, so a page can say the service is up with no key to call a model
+    with."""
+
+    ok: bool
+    service: str
+    model: str
+    fallbackModel: str
+    hasKey: bool
 
 
 class EngineInfo(BaseModel):
