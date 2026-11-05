@@ -553,7 +553,7 @@ export default function Guild() {
           <EmptyState
             icon={<ClipboardCheck size={22} />}
             title="Nothing waiting for review"
-            body="Every extraction in this session has already been decided. Queue a new batch from the Extract table — filter it first and only those rows enter the queue."
+            body="Every extraction the project holds has been decided. Queue a new batch from the Extract table — filter it first and only those rows enter the queue."
             action={
               <div className="flex gap-2">
                 <LinkButton to="/intake" variant="primary">
@@ -603,7 +603,7 @@ export default function Guild() {
           <div className="text-caption text-ink-soft">
             {origin === 'extract'
               ? 'Queued from the Extract table as it was filtered.'
-              : 'Auto-filled with every unverified record in this session.'}
+              : 'Auto-filled with every unverified record the box below lets in.'}
           </div>
           <label className="mt-1.5 flex items-start gap-2 text-caption">
             <input
@@ -822,9 +822,10 @@ export default function Guild() {
         <Card className="p-4 max-w-2xl">
           <Callout kind="warn" title="This queue entry no longer resolves">
             <p className="mb-2">
-              <span className="font-num">{queue[index]}</span> is in the queue but not in this
-              session&rsquo;s records. The queue itself is session-only — your decisions persist,
-              but a queue built before a reset can outlive the rows it points at.
+              <span className="font-num">{queue[index]}</span> is in the queue, and the project&rsquo;s
+              records, as this page read them, hold none by that id. The queue lives on this page alone,
+              and the decisions made in it are kept; a queue built before a reset can outlive the rows
+              it points at.
             </p>
             <Button size="sm" onClick={() => advanceReview(1)}>
               Skip past it <ChevronRight size={13} />
@@ -947,7 +948,7 @@ export default function Guild() {
 
           {record.corrected && (
             <div className="mt-3">
-              <Callout kind="info" title="Already corrected in this session">
+              <Callout kind="info" title="Already corrected">
                 Original extraction is preserved in the audit trail; the current value is{' '}
                 <span className="font-num">
                   {fmt(record.corrected.value)} {record.corrected.unit}

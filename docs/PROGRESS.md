@@ -327,7 +327,7 @@ prompt's §4).
 | [011](decisions/ADR-011-guards.md) | Guards and verify stages | accepted, stages 1 and 8 (Implementation 8: sixteen stages; alpha 2.2 E.15: `check:plan` keeps the provenance ranking alone, its pairs retired with `src/data/types.ts`, and verify keeps its sixteen stages) |
 | [012](decisions/ADR-012-licence-undecided.md) | Licence undecided | open (owner) |
 | [013](decisions/ADR-013-cornstover-package-test.md) | The corn stover plant's two values its package's own test fails, held to the package's measurement | accepted, stage 5 |
-| [014](decisions/ADR-014-durable-write-queue.md) | The Durable snapshot keeps the writes the service has not acknowledged | accepted, stage 7 (a departure; alpha 2.2 E.12: the snapshot keeps no lesson, a lesson's passing standing on the ledger) |
+| [014](decisions/ADR-014-durable-write-queue.md) | The Durable snapshot keeps the writes the service has not acknowledged | accepted, stage 7 (a departure; alpha 2.2 E.12: the snapshot keeps no lesson, a lesson's passing standing on the ledger; E.19: the screens say the service keeps a project's rows, and `check:state` holds their words to this record) |
 | [015](decisions/ADR-015-engine-contract.md) | Engines register through Python entry points, behind one contract | accepted, alpha 2.2 stage B (E.18: a thing may title its configurations, `EngineThing.configurationTitles`, words alone in no run's basis) |
 | [016](decisions/ADR-016-bench-readings-alone.md) | The bench records a locked runbook's readings alone | accepted, alpha 2.2 stage C (a departure from §11.5; alpha 2.2 E.12a: its first revisit condition met by ADR-017, the readings-alone mode standing beside a protocol's steps) |
 | [017](decisions/ADR-017-project-protocols.md) | A project keeps its protocols | accepted, alpha 2.2 E.12a (ADR-016's revisit condition; the owner may reverse it) |
@@ -500,6 +500,7 @@ prompt's §4).
 | pureOS → Train reads a Proforma run and a train run alone (`pureos.TABLE_RUNS`): a library run, which the Builder's run choosers offer (`lib/pureos.runChoices`), the reference plants' among them since C.6, and a reference run kept from a retired entry, which the choosers offer too, open no train page, and the Train page's **Build a train from this run** is reached for them through the Builder's **Start from a run's train** (`POST /api/pureos/train/from-run`): a kept dry-grind corn run reads into a train on the chemical set its entry named (`proforma.RETIRED`), and a kept corn stover reference run, whose entry named none, is refused in words, as before C.6 | when `pureos.train_of` reads a library run's train: its product from the plant's own product stream, its scenario none (the reference runs read the library shelf at C.6, D8, and the train page waits on this) |
 | `fermos.forecast_run` keeps `duration_h`, a length the calling code sets as its own convention, which only the tests and their stand-ins pass (`standins.py`, `test_fermos.py`, `test_fermos_3r.py`, `test_proforma_fermos.py`, `test_proforma_ceiling.py`); the routes, the tools and the engine set a forecast's length as a typed `t_end` | when those tests set a typed `t_end`, or reach `fermos.forecast()` through a helper of their own |
 | Paid: Studies' run card named a kinetics forecast's or vessel's configurations by their bare artifact ids. A thing may title its configurations (`EngineThing.configurationTitles`, optional: words by configuration name, `{}` when the engine gives none, in no run's basis or id); the kinetics engine titles each with the kind of artifact it names and when the project kept it, and the card reads each by its title beside its name, on its chooser and on the line for the run it made (`lib/studies.offeredConfigurations`, `lib/pureos.ranWhat`, held by `check:state`); the mirror, which gives none, conforms as it did (ADR-015's note of E.18; Departures, E.18) | alpha 2.2, E.18 |
+| Paid: screens placed in this browser, or in a session, rows the service keeps. Postdoc's empty list said its conversations were kept in this browser, across reloads, and the service has kept each one with the project since alpha 2.0's stage 6.1; pureOS called a Builder train a train of this browser and a run of a train the Builder lacks one built in another browser; Guild's ledger was the one this browser holds, and Settings' lessons the ones the store holds; the review queue, Witness, Intake, the protocol compare and the lesson embeds held the project's records, decisions, gold set and versions in this session; and a review decision made while the service is away was kept in this browser only. Each names the project now, or the write that waits for the service and when it is sent, and `pnpm check:state` holds every sentence under `src/` to ADR-014, `pnpm smoke` reading Postdoc's list on the screen (ADR-014's note of E.19) | alpha 2.2, E.19 |
 | Paid: the shelf's hand-written reference entries (`cornstover_benchmark`, `corn_drygrind`) retired; the reference run and its screen read the library shelf's `cornstover` and `corn`, and the runs a person kept from the entries replay through `workers/kept_references.py` (ADR-004's note) | alpha 2.2, C.6 |
 | What the library path cannot give yet of the retired reference entries: the benchmark's price per gallon (a library run prices its product per kilogram, and the package's own ethanol density per gallon waits for a library run to read it), and a Graphviz drawing of a library plant (a library run draws none; its SFF file's graph draws the plant on the run's page, and the run's Diagram card says so). A run kept from a retired entry has no runs row (no backfill, D3), so it has no run page: the plant's reference page lists it with its checks, Proforma's module rows list it, selling_price and stream_table cite its price, and BioRepo's page shows it whole | when a library run reads a plant's own per-gallon density, and draws its plant where Graphviz is on the host |
 | A ProcessModel plant runs on its default scenario; its scenario fields (cellulosic's feedstock, milk's feed, gas_fermentation's carbon source) are read and not offered | after alpha 2.0 (4.3 composes the cellulosic plant's pretreatment and fermentation instead) |
@@ -2838,6 +2839,38 @@ holds the numbers, the tables and the judgements).
     configuration `a kinetic fit, kept <date> <minute> UTC` and the vessel's the forecast and the fit, newest first;
     the card offered each as `<title> · <id>`, ran the forecast and named it so on its Ran line, with no console error;
     the service was stopped and its database dropped after.
+- E.19. The Postdoc screen says where conversations are kept, and every screen puts a project's rows with the service
+  (the Known debts row is paid; ADR-014's note of E.19). Built in a worktree beside stage F's live rebuild, with no
+  model call.
+  - Postdoc: the empty list of conversations said they were kept in this browser, across reloads. The service has
+    kept each conversation with the project since alpha 2.0's stage 6.1 (`docs/api/postdoc.md`), and the list says
+    so: each one is listed after a reload and on every page that opens the project (`live-conversations-none`).
+  - The search read every sentence under `src/` for words that give a browser or a session a row the service keeps.
+    pureOS: the Builder's copy of a model's train and a proposal's note say Save keeps the train with the project
+    (each said a train of this browser), and a train run whose train the Builder lacks says a model or a tool built
+    it, or it waits to be saved in the Builder (it said built in another browser). Guild: a check's entry and a person
+    missing from the ledger name the project's ledger as the page last read it (the ledger this browser holds), and
+    the review queue's empty words, its auto-fill line, a queue entry that no longer resolves and a corrected record's
+    callout name the project's extractions, records and decisions (each was this session's). Witness's gold set,
+    Intake's records of a document, the protocol compare's versions and the lesson embeds' queue, gold set and strip
+    plot name the project (each said this session); Settings names the lesson catalogue (the store); a review decision
+    made while the service is away says it waits in this browser and is sent when the project next loads with the
+    service answering (it said kept in this browser only); and Home's list of activity, the page's own, says nothing
+    has happened since the page opened (it said in this browser). The comments of pureOS's two screens follow.
+  - The check: `pnpm check:state` reads each file under `src/` with the TypeScript parser, a sentence being a string
+    or a template, a JSX attribute's words, or one element's text with the strings of its expressions (the words of
+    comments are the code's own), and holds every sentence to ADR-014: one that keeps something in this browser names
+    a write that waits for the service or a preference, a browser owns no row, and a session holds what it loaded.
+    Run before the words changed, it named eighteen of the nineteen sentences above (Home's title names no keeping);
+    it reads 19,166 sentences now and names none. A second check reads Postdoc's empty list, and `pnpm smoke` reads it
+    on the screen of the empty project it opens.
+  - Checks: `typecheck`; `check:plan`; `check:state`, two checks more, 83 in all, which fails on the words before this
+    commit, naming the eighteen; `check:figures`; `check:guild`; `check:tools`; `test:reconcile`; `check:secrets`;
+    `build`; `pnpm smoke` with no key, 20 of 20 screens, Postdoc's list saying the service keeps each conversation;
+    `gen:api`, `gen:tools` and `gen:components` with `--check`, each file as the code writes it; `test_guidance.py`
+    and `test_no_seed.py`, which read the docs and the decision record this commit changes, with the database address
+    empty, on Python 3.13 and on 3.12, 53 passed each way; and `pnpm test:core` 2955 passed, 1 skipped, 175 deselected
+    (5 min 49 s). No Python changed, and neither the walk nor `prove.py`, so `test:sim` and `pnpm prove` did not run.
 
 ### Alpha 2.2 — Stage F — 2026-11-05
 

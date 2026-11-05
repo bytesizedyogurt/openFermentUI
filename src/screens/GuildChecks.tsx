@@ -559,7 +559,7 @@ function OneCheck({ ctx, check: c, id, asked, down }: { ctx: GuildContext; check
               </ol>
               <div className="mt-3 border-t border-line pt-2">
                 <div className="text-caption uppercase tracking-wide text-ink-soft">On the ledger</div>
-                {entry ? <EvidenceRow e={entry} ctx={ctx} /> : <p className="text-caption text-ink-soft">The entry is not in the ledger this browser holds.</p>}
+                {entry ? <EvidenceRow e={entry} ctx={ctx} /> : <p className="text-caption text-ink-soft">The project&rsquo;s ledger, as this page last read it, holds no such entry.</p>}
               </div>
             </Card>
           );

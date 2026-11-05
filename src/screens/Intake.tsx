@@ -532,7 +532,7 @@ export default function Intake() {
             body={
               paperParam
                 ? scopedPaper
-                  ? `${scopedPaper.title} is in the corpus but nothing has been extracted from it in this session. Run the extractor from the paper reader to stage candidate records.`
+                  ? `${scopedPaper.title} is in the corpus, and the project holds no record extracted from it yet. Run the extractor from the paper reader to stage candidate records.`
                   : `${paperParam} is not a document this project holds.`
                 : 'Documents arrive through Intake. Fetch a paper from the ingest queue, then run the extractor to stage candidate records here.'
             }

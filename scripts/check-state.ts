@@ -35,10 +35,16 @@
  * (src/engine/interp.ts); and the runbooks a page makes (src/store.ts): a
  * draft's predictions and measures kept as the service wrote them, the lock
  * taken over them, and a runbook adopted, revised or promoted on the page
- * among the rows the page sends. Run by `pnpm check:state`, offline: the
+ * among the rows the page sends; and the words every screen, component and
+ * module shows, which put a project's rows with the service and keep in this
+ * browser its preferences and the writes that wait for the service (ADR-014;
+ * alpha 2.2 E.19). Run by `pnpm check:state`, offline: the
  * service is a stand-in for `fetch`. A fixture of a shape the service's
  * models define is a whole value of its generated type (src/api/types.gen.ts).
  */
+import { readdirSync, readFileSync } from 'node:fs';
+import { join, relative } from 'node:path';
+import ts from 'typescript';
 import {
   EMPTY_STATE,
   applyEntries,
@@ -733,6 +739,114 @@ async function callAgainst(answer: { status: number; body?: unknown }, healthy =
     "a lesson's body is said in words, and one with none says so",
     bodyWords(lesson) === '5 min, 2 blocks, 1 checkpoint question' && bodyWords({ minutes: null, blocks: [], checkpoint: [] }) === 'no body yet',
     bodyWords(lesson),
+  );
+}
+
+// ── where the screens say a project's rows are kept (alpha 2.2 E.19; ADR-014) ──
+// The service keeps every row a project holds, for every page that opens the project: its conversations,
+// depositions, runbooks and their locks, scenarios, trains, overrides and fits, its ledger, records and decisions,
+// catalogues and protocols. This browser keeps its preferences and the writes the service has not yet acknowledged
+// (src/lib/durable.ts). The words a person reads say so: a sentence that keeps something in this browser names a
+// write that waits for the service or a preference, a browser owns no row, and a session holds what it loaded and
+// what lives on the page alone (a run at the bench, an export, a proposal, an undo). A sentence here is a string or
+// a template, a JSX attribute's words, or one JSX element's text with the strings of its expressions; the words of
+// comments are the code's own.
+
+{
+  const SRC = join(import.meta.dirname, '..', 'src');
+  /** Every source file under `dir` with words a person may read; the generated types hold the service's own. */
+  const sourcesUnder = (dir: string): string[] =>
+    readdirSync(dir, { withFileTypes: true }).flatMap((d) => {
+      const path = join(dir, d.name);
+      if (d.isDirectory()) return sourcesUnder(path);
+      return /\.tsx?$/.test(d.name) && !d.name.endsWith('.gen.ts') ? [path] : [];
+    });
+  const ENTITIES: Record<string, string> = {
+    rsquo: '’', lsquo: '‘', ldquo: '“', rdquo: '”', mdash: '—', ndash: '–', amp: '&', nbsp: ' ', hellip: '…', middot: '·', rarr: '→', larr: '←', times: '×',
+  };
+  const plain = (text: string) =>
+    text
+      .replace(/&(#\d+|[a-z]+);/g, (whole, name: string) => (name.startsWith('#') ? String.fromCharCode(Number(name.slice(1))) : (ENTITIES[name] ?? whole)))
+      .replace(/\s+/g, ' ')
+      .trim();
+  /** The sentences a file shows, each with its line and the test id of the element that draws it. */
+  const sentencesOf = (path: string): { line: number; text: string; testid: string | null }[] => {
+    const file = ts.createSourceFile(path, readFileSync(path, 'utf8'), ts.ScriptTarget.Latest, true, path.endsWith('.tsx') ? ts.ScriptKind.TSX : ts.ScriptKind.TS);
+    const joined = new Map<ts.Node, string[]>();
+    // A string joins the JSX attribute or element that shows it, or else the strings it is joined or chosen with.
+    const sentenceOf = (node: ts.Node): ts.Node => {
+      let words: ts.Node = node;
+      let joining = true;
+      for (let at = node.parent; at && !ts.isSourceFile(at); at = at.parent) {
+        if (ts.isJsxAttribute(at) || ts.isJsxElement(at) || ts.isJsxFragment(at)) return at;
+        const joins =
+          ts.isTemplateExpression(at) || ts.isTemplateSpan(at) || ts.isConditionalExpression(at) || ts.isParenthesizedExpression(at) ||
+          (ts.isBinaryExpression(at) && at.operatorToken.kind === ts.SyntaxKind.PlusToken);
+        if (joining && joins) words = at;
+        else joining = false;
+      }
+      return words;
+    };
+    const visit = (node: ts.Node) => {
+      const text =
+        ts.isJsxText(node) || ts.isStringLiteral(node) || ts.isNoSubstitutionTemplateLiteral(node) || ts.isTemplateHead(node) ||
+        ts.isTemplateMiddle(node) || ts.isTemplateTail(node)
+          ? node.text
+          : null;
+      if (text && text.trim()) {
+        const at = sentenceOf(node);
+        joined.set(at, [...(joined.get(at) ?? []), text]);
+      }
+      ts.forEachChild(node, visit);
+    };
+    visit(file);
+    const testidOf = (node: ts.Node): string | null => {
+      const opening = ts.isJsxElement(node) ? node.openingElement : null;
+      const id = opening?.attributes.properties.find((p) => ts.isJsxAttribute(p) && p.name.getText(file) === 'data-testid');
+      return id && ts.isJsxAttribute(id) && id.initializer && ts.isStringLiteral(id.initializer) ? id.initializer.text : null;
+    };
+    return [...joined].map(([node, parts]) => ({
+      line: file.getLineAndCharacterOfPosition(node.getStart(file)).line + 1,
+      text: plain(parts.join(' ')),
+      testid: testidOf(node),
+    }));
+  };
+
+  /** A sentence that keeps something in this browser, or has this browser hold it. */
+  const KEPT_IN_THIS_BROWSER =
+    /\b(?:kept|keeps|held|holds|stored|stores|saved|saves|lives|waits)\b[^.;]{0,40}\bin (?:this|the) browser\b|\bthis browser (?:keeps|holds|stores|saves|kept|held|stored|saved)\b|\bthe store (?:keeps|holds)\b/i;
+  /** What this browser keeps (ADR-014): a write the service has not yet acknowledged, or a preference (the reviewer's name, the person it acts as). */
+  const WAITS_OR_PREFERS =
+    /\buntil\b|\bnot yet\b|\bhas not\b|\bhad not\b|\bis away\b|\bwas away\b|\bstopped answering\b|\bsent when\b|\bbeing sent\b|\bsent only with\b|\bwould refuse\b|\bpreferences\b|\b(?:the|your|reviewer['’]s) name\b|\bacts as\b/i;
+  /** A row as one browser's own, or as made in another: a project's rows are the project's on every page. */
+  const A_BROWSERS_OWN = /\bof (?:this|that|another|each) browser\b|\b(?:in|from|by) (?:another|other|a different) browser\b|\banother browser['’]s\b/i;
+  /** A session holding what the service keeps. */
+  const KEPT_IN_THIS_SESSION =
+    /\b(?:records?|extract(?:ed|ions?)|decisions?|decided|corrected|gold(?: set| annotations?)?|versions?|conversations?|trains?|ledger|depositions?|scenarios?|protocols?|lessons?)\b[^.;]*\b(?:in|of|from) this session\b|\bthis session['’]s (?:records?|extractions?|decisions?|gold set|ledger|conversations?|trains?|scenarios?|protocols?|versions?)\b/i;
+  /** What a session holds of them: what it loaded. */
+  const LOADED = /\bloaded\b/i;
+
+  const misplaced: string[] = [];
+  let read = 0;
+  for (const path of sourcesUnder(SRC)) {
+    for (const { line, text } of sentencesOf(path)) {
+      read++;
+      const where = `${relative(join(SRC, '..'), path)}:${line}`;
+      if (A_BROWSERS_OWN.test(text)) misplaced.push(`${where} gives a browser a row the project keeps: “${text}”`);
+      else if (KEPT_IN_THIS_BROWSER.test(text) && !WAITS_OR_PREFERS.test(text)) misplaced.push(`${where} keeps in this browser what the service keeps: “${text}”`);
+      else if (KEPT_IN_THIS_SESSION.test(text) && !LOADED.test(text)) misplaced.push(`${where} keeps in this session what the service keeps: “${text}”`);
+    }
+  }
+  check(
+    'the words on every screen put a project’s rows with the service, and in this browser its preferences and the writes that wait for the service',
+    misplaced.length === 0,
+    misplaced.length ? misplaced.map((m) => `\n    ${m}`).join('') : `${read} sentences read`,
+  );
+  const none = sentencesOf(join(SRC, 'screens', 'Postdoc.tsx')).find((s) => s.testid === 'live-conversations-none');
+  check(
+    'Postdoc’s empty list says the service keeps each conversation with the project, for every page that opens it',
+    !!none && /\bThe service keeps each conversation with the project\b/.test(none.text) && /\bevery page that opens the project\b/.test(none.text),
+    none?.text ?? 'no live-conversations-none words in src/screens/Postdoc.tsx',
   );
 }
 

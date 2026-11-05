@@ -2791,7 +2791,10 @@ export const useStore = create<OFState>()((set, get) => ({
       }
       if (e instanceof IntakeDown) {
         set({ serviceUp: false });
-        get().toast({ text: `${e.message} The decision on ${decision.recordId} is kept in this browser only.`, kind: 'error' });
+        get().toast({
+          text: `${e.message} The decision on ${decision.recordId} waits in this browser and is sent when the project next loads with the service answering.`,
+          kind: 'error',
+        });
         return;
       }
       throw e;

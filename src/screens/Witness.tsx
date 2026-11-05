@@ -570,7 +570,7 @@ export default function Witness() {
         <div className="mb-4">
           <Callout
             kind="warn"
-            title="No gold annotations in this session"
+            title="No gold annotations yet"
           >
             Precision and recall are undefined without a gold set. Flag records for gold in the
             review queue and this screen fills in.

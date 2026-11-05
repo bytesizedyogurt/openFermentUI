@@ -139,7 +139,7 @@ function Ledger({ ctx, personId }: { ctx: GuildContext; personId: string }) {
         <Card className="max-w-2xl">
           <EmptyState
             title="Nobody by that id"
-            body={`${personId} is not on the ledger this browser holds.`}
+            body={`The project’s ledger, as this page last read it, holds nobody by the id ${personId}.`}
             action={<LinkButton to="/guild/people">All people</LinkButton>}
           />
         </Card>

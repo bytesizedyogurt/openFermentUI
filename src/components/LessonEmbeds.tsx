@@ -136,7 +136,7 @@ function MiniQueue() {
           <p className="text-body">
             {decided.length > 0
               ? `${decided.length} decision${decided.length === 1 ? '' : 's'} recorded — they are live, and the strain pages and validation metrics have already moved.`
-              : 'No unverified records left in this session.'}
+              : 'No unverified record waits for review.'}
           </p>
           <Button className="mt-3" onClick={() => navigate('/guild')}>
             Open the full review queue <ArrowRight size={13} />
@@ -239,7 +239,7 @@ function MetricsTiles() {
         </Tick>
       </div>
       <p className="text-caption text-ink-soft mt-2">
-        Computed from this session's gold set. TP {metrics.micro.tp} · FP {metrics.micro.fp} · FN{' '}
+        Computed from the project's gold set. TP {metrics.micro.tp} · FP {metrics.micro.fp} · FN{' '}
         {metrics.micro.fn}.{' '}
         <button className="text-accent hover:underline" onClick={() => navigate('/biorepo/witness')}>
           Open the full dashboard
@@ -276,7 +276,7 @@ function StripPlot({ field }: { field: FieldId }) {
   if (!def || points.length === 0) {
     return (
       <Frame label="Strip plot">
-        <p className="text-body text-ink-soft">No records for this parameter in this session.</p>
+        <p className="text-body text-ink-soft">The project holds no record of this parameter yet.</p>
       </Frame>
     );
   }

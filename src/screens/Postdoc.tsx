@@ -389,9 +389,9 @@ export default function Postdoc({ sessionId, initialQuery }: { sessionId?: strin
           </Button>
           <div className="flex-1 overflow-y-auto space-y-1" data-testid="live-conversations">
             {liveConversations.length === 0 && (
-              <p className="text-caption text-ink-soft px-2.5 py-2">
-                No conversation yet: a person asks the first question. Conversations asked here are kept in
-                this browser, across reloads.
+              <p className="text-caption text-ink-soft px-2.5 py-2" data-testid="live-conversations-none">
+                No conversation yet: a person asks the first question. The service keeps each conversation with the
+                project, so it is listed here after a reload and on every page that opens the project.
               </p>
             )}
             {liveConversations.map((c) => (

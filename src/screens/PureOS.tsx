@@ -39,7 +39,7 @@
 // /api/pureos/trains-kept`); *Made by Postdoc* lists each with its name,
 // product, units, the model that made it and when, and its newest run (the
 // service's train runs, joined by the run's `trainId`). **Open a copy** opens it in the Builder
-// as a new train of this browser (`?copy=`); the kept train stays the model's.
+// as a new train, which Save keeps with the project (`?copy=`); the kept train stays the model's.
 //
 // A TRAIN IS PROPOSED BY RULES (OF-BLD-020 §7.2, D12). **Propose a train**
 // (PureOSPropose.tsx) sends a product, a host and optionally an inlet, and
@@ -215,7 +215,7 @@ function TrainsBuiltHere({ runs, problem }: { runs: TrainSummary[] | null; probl
  * The trains a model built, kept on the service (OF-BLD-020 §5.4, §5.R): each
  * with its name, product, units, the model that made it and when, and its
  * newest run on the service (joined by the run's `trainId`). Open a copy
- * opens one in the Builder as a new train of this browser.
+ * opens one in the Builder as a new train, which Save keeps with the project.
  */
 function TrainsMadeByPostdoc({ runs, problem: runsProblem }: { runs: TrainSummary[] | null; problem: string | null }) {
   const [kept, setKept] = useState<KeptTrain[] | null>(null);
@@ -344,7 +344,7 @@ function TrainRunsOnFile({ runs, problem }: { runs: TrainSummary[] | null; probl
                       </a>
                     </>
                   ) : (
-                    ' · built in another browser or by a tool'
+                    ' · its train built by a model or a tool, or not yet saved in the Builder'
                   )}
                 </div>
               </li>

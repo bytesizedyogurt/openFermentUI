@@ -1074,7 +1074,7 @@ const FIDELITY_ROWS: { feature: string; fidelity: string; notes: string }[] = [
     feature: 'Learn lessons and checkpoints',
     fidelity: 'Full',
     notes:
-      'No lesson ships with this build. Navigation, live embeds, checkpoint grading and progress tracking work for any lesson the store holds.',
+      'No lesson ships with this build. Navigation, live embeds, checkpoint grading and progress tracking work for any lesson the project’s lesson catalogue keeps; passing one writes its entries on the ledger.',
   },
   {
     feature: 'Guided tour',

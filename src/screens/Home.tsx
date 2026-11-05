@@ -874,7 +874,7 @@ export default function Home() {
         <Card className="overflow-hidden">
           {activity.length === 0 ? (
             <EmptyState
-              title="Nothing has happened in this browser yet"
+              title="Nothing has happened since this page opened"
               body={
                 <>
                   What a person does here is listed as it happens: a paper fetched, a record

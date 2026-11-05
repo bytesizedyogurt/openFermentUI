@@ -16,11 +16,11 @@
 // proposed in this session (the store's `proposedTrains`, under the id
 // **Propose a train** gave it): its units in order, what the rules miss above
 // the steps (`ProposalMissingList`) and each unit's reason beside its card
-// (`ProposalReasonLine`); Save makes it a train of this browser.
+// (`ProposalReasonLine`); Save keeps it as one of the project's trains.
 // `?copy=<id>` opens a copy of a train a model built (`GET
-// /api/pureos/trains-kept`, pureOS's **Made by Postdoc**) as a new train of
-// this browser, naming the train it copies; the kept train stays the
-// model's. Save moves a new train to its own address; what the page showed (its run, what it was read or copied
+// /api/pureos/trains-kept`, pureOS's **Made by Postdoc**) as a new train
+// that names the train it copies, and Save keeps it with the project; the
+// kept train stays the model's. Save moves a new train to its own address; what the page showed (its run, what it was read or copied
 // from, Price this in Proforma) is kept by train id in the store
 // (`builderShown`), so the page mounted at the new address shows it still.
 //
@@ -405,8 +405,8 @@ function CopyNote({ info }: { info: CopyInfo }) {
       <Callout kind="info" title={`A copy of train ${k.spec.id}, which Postdoc built`}>
         <p className="text-caption" data-testid="builder-copy-of" data-kept={k.spec.id}>
           Built by {k.madeBy}
-          {k.effort ? ` at effort ${k.effort}` : ''}, {stamp(k.at)}, last changed {stamp(k.updatedAt)}. This page holds a copy of it as a new train of
-          this browser: change it here and Save keeps the copy under your name, while the train the model built stays the model&rsquo;s, as it is.
+          {k.effort ? ` at effort ${k.effort}` : ''}, {stamp(k.at)}, last changed {stamp(k.updatedAt)}. This page opens a copy of it as a new
+          train: change it here, and Save keeps the copy with the project under your name; the train the model built stays the model&rsquo;s, as it is.
         </p>
       </Callout>
     </div>
@@ -421,7 +421,7 @@ function ProposalNote({ proposal }: { proposal: TrainProposal }) {
         <p className="text-caption">
           For <span className="font-num">{proposal.product}</span> made in <span className="font-num">{proposal.host}</span>
           {proposal.productClass ? `, a ${proposal.productClass}` : ''}. Each unit below carries the rule that put it there and the property it read;
-          every parameter is at its library default or waits for a person. Save keeps it as a train of this browser.
+          every parameter is at its library default or waits for a person. Save keeps it as one of the project&rsquo;s trains.
         </p>
       </Callout>
       <ProposalMissingList missing={proposal.missing} />

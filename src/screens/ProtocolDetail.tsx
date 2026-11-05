@@ -560,7 +560,7 @@ function CompareBody({
         {picker}
         <EmptyState
           title="Version unavailable"
-          body="One of the selected versions is no longer in this session."
+          body={`The project keeps no version ${a ? bVersion : aVersion} of this protocol; choose one of the versions it keeps above.`}
         />
       </>
     );
