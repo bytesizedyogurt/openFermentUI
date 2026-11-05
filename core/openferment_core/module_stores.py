@@ -15,9 +15,10 @@ Where each module's rows come from:
   take as a measurement (measurements.py), the measured evidence a
   reconciliation released, and the BioSTEAM scenarios made with New
   scenario;
-- the module projection (protocols, geneOS's hosts and pathways, Primer's
-  lessons): no store holds these catalogues yet, so each list is empty, and
-  a test hands its own in;
+- the project's protocols (protocols.py), each with its versions;
+- the module projection: geneOS's hosts and Primer's lessons from the
+  project's catalogues (catalogues.py), and geneOS's pathways, which no
+  store holds, so their list is empty; a test hands its own projection in;
 - pureOS's unit operations, from `schema/vocabulary.yaml`;
 - the service's own stores (records and candidates through the evidence
   pool, artifacts, Guild's ledger and checks, Intake's fetch state, the
@@ -202,6 +203,9 @@ class Sources:
     # The measured evidence a reconciliation released (project_state's
     # measuredEvidence rows).
     measured: Callable[[], list[Any]] = list
+    # The project's protocols, each as the runbooks module lists it
+    # (protocols.as_listed).
+    protocols: Callable[[], list[Any]] = list
 
 
 def _kept_trains() -> list[Any]:
@@ -210,10 +214,11 @@ def _kept_trains() -> list[Any]:
     return list(kept.read().trains)
 
 
-# The catalogues a module reads that no store holds yet (protocols, hosts and
-# pathways, lessons), each list empty; a test hands its own in through
-# `Sources.projection`, or in place of `_projection`, and may hand runbooks and
-# scenarios this way beside the project's own (`Sources.runbooks`,
+# What a module reads beside its rows (the hosts and pathways, the lessons),
+# each list empty until `_projection` fills it from the project's
+# catalogues; a test hands its own in through `Sources.projection`, or in
+# place of `_projection`, and may hand runbooks, protocols and scenarios this
+# way beside the project's own (`Sources.runbooks`, `Sources.protocols`,
 # `Sources.scenarios`).
 EMPTY_PROJECTION: dict[str, Any] = {
     "runbooks": {"runbooks": [], "protocols": []},
@@ -233,6 +238,15 @@ def _projection() -> dict[str, Any]:
     out["geneos"]["hosts"] = catalogues.as_hosts()
     out["primer"]["lessons"] = catalogues.as_lessons()
     return out
+
+
+def _project_protocols() -> list[dict[str, Any]]:
+    """The open project's protocols, as the runbooks module lists them, read
+    apart from the projection, which a train's resolution reads for its
+    strains' names alone (proforma._strain_labels)."""
+    from . import protocols
+
+    return protocols.as_listed(protocols.held())
 
 
 def _scenarios() -> list[Any]:
@@ -286,6 +300,7 @@ def default_sources(pool_factory: Callable[[], Any] | None = None) -> Sources:
         runbooks=_project_runbooks,
         depositions=_project_depositions,
         measured=_project_measured,
+        protocols=_project_protocols,
     )
 
 
@@ -554,7 +569,7 @@ class Stores:
                       words=" ".join([r["kind"], r.get("productId") or "", r.get("strainId") or ""] + predictions),
                       detail={"kind": r["kind"], "productId": r.get("productId"), "strainId": r.get("strainId"),
                               "lockedAt": r.get("lockedAt"), "predictions": predictions})
-        for x in p["protocols"]:
+        for x in [*self._get("protocols"), *p["protocols"]]:
             organisms = list(x.get("organisms", []))
             yield Row("runbooks", "protocol", x["id"], x["title"], "approved", f"version {x['currentVersion']} current",
                       words=" ".join([x["category"], x.get("purpose") or ""] + organisms),
@@ -814,10 +829,16 @@ class Stores:
                       words=" ".join(c.skillIds), detail={"skillIds": c.skillIds})
 
     def _primer(self) -> Iterable[Row]:
+        # A lesson of the project's catalogue: its title, its words, the skills
+        # it counts toward and its minutes. A projection a test hands in may
+        # name the module it sits in, as alpha 1.0's did.
         for lesson in self._get("projection")["primer"]["lessons"]:
+            module = lesson.get("moduleTitle")
+            said = [module or "", lesson.get("blurb") or "", lesson.get("summary") or "", lesson.get("note") or ""]
+            detail = {"skills": lesson.get("skills", []), "minutes": lesson.get("minutes")}
             yield Row("primer", "lesson", lesson["id"], lesson["title"], "approved", "published",
-                      words=" ".join([lesson["moduleTitle"], lesson.get("blurb") or ""] + lesson.get("skills", [])),
-                      detail={"module": lesson["moduleTitle"], "skills": lesson.get("skills", [])})
+                      words=" ".join(said + lesson.get("skills", [])),
+                      detail={"module": module, **detail} if module else detail)
 
     def _intake(self) -> Iterable[Row]:
         for document_id, held in self._get("intake").items():

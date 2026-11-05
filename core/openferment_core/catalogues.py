@@ -20,20 +20,25 @@ is now a kind of row in the project's `catalogue` table, kept whole as a
               witnessed check, and the skills it needs first (`prerequisites`);
               Guild rates nobody on a skill kept with no policy
               (competence.unrated)
-    lesson    a Primer lesson and the skills it counts toward
+    lesson    a Primer lesson: the skills it counts toward, how many minutes
+              it takes, its body (prose and the embeds its page draws, in
+              order) and its checkpoint, the questions a learner answers to
+              pass it (ADR-018)
 
 The readers take them in the shapes they always read (`as_*`): geneOS's hosts
 and the strain aliases (module_stores), ProtParam's products, the proposer's
 catalogue, Guild's projection. A catalogue holds names and words, never a
-measured value: a number a paper reports is a record (ADR-006).
+measured value: a number a paper reports is a record (ADR-006). The numbers
+it holds are a person's own writing: a skill's policy, and a lesson's minutes
+and the answers its checkpoint grades against.
 
 Entries arrive by the route (`POST /api/catalogues/{kind}`, which the
 catalogues screen at /catalogues sends), by Postdoc's `catalogue_write`
 (marked as the model's), or by Intake from a file of entries
 (`POST /api/intake/catalogue`, JSON or CSV). Nothing here deletes an entry:
 taking a person's entry out of a live instance is the owner's call. A skill's
-policy is a person's to write: the route and a file take it, and
-`catalogue_write` takes no number.
+policy and a lesson's body are a person's to write: the route and a file take
+them, and `catalogue_write` takes no number and no lesson's body.
 
 WHO KEPT AN ENTRY (alpha 2.2 D.0). Each entry names its keeper (`by`), the
 lane it was kept in (`agent`): `person` for the route, a file and a call
@@ -55,12 +60,12 @@ import csv
 import io
 import json
 from datetime import datetime, timezone
-from typing import Any, Literal, get_args
+from typing import Annotated, Any, Literal, get_args
 
-from pydantic import BaseModel, Field, ValidationError, ValidationInfo, field_validator, model_validator
+from pydantic import BaseModel, Field, FiniteFloat, ValidationError, ValidationInfo, field_validator, model_validator
 from sqlalchemy import select
 
-from . import db, projects
+from . import db, projects, units
 from .competence import POLICY as SKILL_POLICY
 from .db import models as t
 from .db import rows
@@ -84,8 +89,91 @@ RESIDUES = frozenset("ACDEFGHIKLMNPQRSTVWY")
 MAX_FILE_ROWS = 2000
 
 
+# A lesson's body (ADR-018): the embeds a lesson's page draws beside its prose
+# (src/components/LessonEmbeds.tsx), each on what its argument names.
+LessonEmbedName = Literal["chip-demo", "record-card", "mini-queue", "metrics-tiles", "strip-plot", "protocol-card",
+                          "ask-prompt", "scenario-widget", "skill-steps"]
+QUESTION_ID = r"^[A-Za-z0-9][A-Za-z0-9._-]{0,39}$"
+
+
 class CatalogueRefused(ValueError):
     """An entry or a file the catalogue will not keep, in words."""
+
+
+class LessonProse(BaseModel):
+    """A run of a lesson's prose, in Markdown."""
+
+    kind: Literal["prose"]
+    md: str = Field(min_length=1, max_length=20000)
+
+
+class LessonEmbed(BaseModel):
+    """One of the embeds a lesson's page draws, with what it is drawn on when
+    it takes one: a paper's id, a record's, a field's, a protocol's, a
+    scenario's or a skill's, or a question to ask."""
+
+    kind: Literal["embed"]
+    embed: LessonEmbedName
+    arg: str | None = Field(default=None, max_length=2000)
+
+
+LessonBlock = Annotated[LessonProse | LessonEmbed, Field(discriminator="kind")]
+
+
+class CheckpointAnswer(BaseModel):
+    """A numeric question's answer as the lesson's author writes it: a value,
+    its unit (empty for a pure number, else one the unit converter reads, so
+    an answer in any unit of its family grades), and how far from the value an
+    answer may stand, in percent of it."""
+
+    value: FiniteFloat
+    unit: str = Field(max_length=40)
+    tolerancePct: FiniteFloat = Field(ge=0, le=100)
+
+    @field_validator("unit")
+    @classmethod
+    def _a_unit_the_converter_reads(cls, v: str) -> str:
+        v = v.strip()
+        if v and units.normalize(v) is None:
+            raise ValueError(f"a numeric answer's unit is one the unit converter reads, or empty for a pure number, "
+                             f"and the converter reads no {v!r}")
+        return v
+
+
+class CheckpointQuestion(BaseModel):
+    """One question of a lesson's checkpoint: a multiple-choice question names
+    its options and the one that answers it (`answerIndex`, from 0); a
+    numeric one holds its answer."""
+
+    id: str = Field(pattern=QUESTION_ID)
+    prompt: str = Field(min_length=1, max_length=2000)
+    kind: Literal["mc", "numeric"]
+    options: list[str] = Field(default_factory=list, max_length=12)
+    answerIndex: int | None = None
+    answer: CheckpointAnswer | None = None
+    # What the learner reads once they answer.
+    explanation: str = Field(default="", max_length=4000)
+    # A paper or a record the question points to, by its id.
+    evidenceChip: str | None = Field(default=None, max_length=120)
+
+    @model_validator(mode="after")
+    def _answered_its_own_way(self) -> "CheckpointQuestion":
+        if self.kind == "mc":
+            if len(self.options) < 2:
+                raise ValueError(f"multiple-choice question {self.id} offers two options or more")
+            if self.answerIndex is None or not 0 <= self.answerIndex < len(self.options):
+                raise ValueError(f"multiple-choice question {self.id} names its answer among its options "
+                                 f"(answerIndex, from 0 to {len(self.options) - 1})")
+            if self.answer is not None:
+                raise ValueError(f"a value to answer with belongs to a numeric question, and {self.id} is multiple "
+                                 "choice")
+        else:
+            if self.answer is None:
+                raise ValueError(f"numeric question {self.id} holds its answer: a value, a unit and a tolerance")
+            if self.options or self.answerIndex is not None:
+                raise ValueError(f"options and an answer's index belong to a multiple-choice question, and {self.id} "
+                                 "is numeric")
+        return self
 
 
 class CatalogueEntryNotFound(KeyError):
@@ -124,8 +212,13 @@ class CatalogueEntry(BaseModel):
     recencyDays: int | None = Field(default=None, ge=1, le=MAX_RECENCY_DAYS)
     supervisedRuns: int | None = Field(default=None, ge=0)
     prerequisites: list[str] = Field(default_factory=list, max_length=40)
-    # A lesson: the skills it counts toward, by their ids.
+    # A lesson: the skills it counts toward, by their ids; how many minutes
+    # it takes; its body, prose and the embeds its page draws, in order; and
+    # its checkpoint, the questions a learner answers to pass it.
     skills: list[str] = Field(default_factory=list, max_length=40)
+    minutes: int | None = Field(default=None, ge=1, le=600)
+    blocks: list[LessonBlock] = Field(default_factory=list, max_length=200)
+    checkpoint: list[CheckpointQuestion] = Field(default_factory=list, max_length=40)
     note: str | None = Field(default=None, max_length=2000)
     # Where the entry came from, in words: a person, a document, a file.
     source: str | None = Field(default=None, max_length=400)
@@ -176,6 +269,12 @@ class CatalogueEntry(BaseModel):
             self.sequence = seq
         if self.skills and self.kind != "lesson":
             raise ValueError("the skills an entry counts toward belong to a lesson")
+        if (self.minutes is not None or self.blocks or self.checkpoint) and self.kind != "lesson":
+            raise ValueError("minutes, blocks and a checkpoint belong to a lesson")
+        asked = [q.id for q in self.checkpoint]
+        twice = sorted({q for q in asked if asked.count(q) > 1})
+        if twice:
+            raise ValueError(f"a lesson's checkpoint asks question {twice[0]} twice; each question has an id of its own")
         if (self.aliases or self.species or self.program) and self.kind != "strain":
             raise ValueError("a species, a chemical set and other names belong to a strain")
         if self.location is not None and self.kind != "product":
@@ -462,7 +561,10 @@ def as_skills() -> list[dict[str, Any]]:
 
 
 def as_lessons() -> list[dict[str, Any]]:
-    return [{"lessonId": e.id, "id": e.id, "title": e.name, "skills": list(e.skills)} for e in _entries("lesson")]
+    """The lessons as Guild and the module reads read them: the skills each
+    counts toward, its title, its words and its minutes."""
+    return [{"lessonId": e.id, "id": e.id, "title": e.name, "skills": list(e.skills), "minutes": e.minutes,
+             "summary": e.summary, "note": e.note} for e in _entries("lesson")]
 
 
 async def _count(project_id: str) -> dict[str, int]:

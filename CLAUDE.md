@@ -77,6 +77,8 @@
 - C: The browser's Durable snapshot keeps preferences and the writes the service has not acknowledged (ADR-014).
 - C: Engines register through the entry-point group `openferment.engines` behind one contract: the core's `biosteam`, `kinetics` (fermOS) and `train` (pureOS), every run one `runs` row with its `engine`, each held by `conform` (kinetics with `--inputs`, train with `--project`) (ADR-015).
 - C: The bench records a locked runbook's readings alone beside a protocol's steps, the readings a scenario's `measurement` value names (ADR-016).
+- C: A project keeps its protocols, made once and each version kept as it was kept, each step's skills held to the skill catalogue; Guild, Practice and the module reads read their steps (ADR-017).
+- C: A lesson keeps its body in the lesson catalogue: its minutes, its blocks (prose and the nine named embeds) and its checkpoint, a numeric answer a value, a unit and a tolerance a person writes (ADR-018).
 
 ## Communication contracts
 
@@ -88,7 +90,7 @@
 - C: Engines: what a package declares and its worker answers, and the eight conformance checks (`docs/api/engines.md`; `python -m openferment_core.engine.conform <name>`).
 - C: Engine runs: a run's inputs with their origins, its outputs, tables, SFF file and versions (`docs/api/runs.md`).
 - C: SFF: the schema version, the record kept for a file, and what openFerment adds in `metadata` (`docs/api/sff.md`).
-- C: Studies: scenarios, comparisons, runbooks and the export package (`docs/api/studies.md`).
+- C: Studies: scenarios, comparisons, runbooks, a project's protocols and the export package (`docs/api/studies.md`).
 - C: Intake: the collectors, the `CorpusEntry` fields and the routes documents enter by (`docs/api/intake.md`).
 - C: The tool registry: `core/openferment_core/tools/__init__.py` is the one place a tool exists, and `docs/TOOLS.md` is generated from it (`pnpm gen:tools`).
 - C: MCP: the `openferment` server over the registry and the kit's `sci-rag` server (its graph tools left off), both in `.mcp.json`, each acting in the project `--project` names and refusing in words without one (`docs/TOOLS.md`; ADR-002).
@@ -123,7 +125,9 @@
 - C: ADR-010: a deleted piece proves needed, restored from `alpha-1.0` with a decision record. ADR-011: a guard proves necessary again and returns with a negative test.
 - C: ADR-013: biosteam, thermosteam or biorefineries changes version, or the package's test values change upstream. ADR-014: the owner asks for the queue to go, or accounts give pending writes a home on the service.
 - C: ADR-015: a second scientific engine beyond the three in the tree, or the SFF toolkit ships an importer (ADR-003).
-- C: ADR-016: a project keeps protocols in its store, or the owner asks for the bench to stay protocol-only.
+- C: ADR-016: the owner asks for the bench to stay protocol-only; a project's protocols (ADR-017) stand beside the readings-alone mode.
+- C: ADR-017: the owner declines it, a protocol needs a review state before a version becomes current, or a protocol's own fields need to change after it is made.
+- C: ADR-018: the owner declines it, a lesson needs a block beyond the nine embeds, or lessons need an order and a grouping of their own.
 
 ## Stop conditions (ask the owner first; execution prompt §11.1)
 
@@ -140,4 +144,4 @@
 - R: Tag `alpha-1.0` marks `d19224f`, the tree before this build, and a deleted piece returns from it (ADR-010); the tag's push waits on the owner (`docs/PROGRESS.md`, Blockers).
 - C: `docs/handoff/2026-10/` holds the owner's handoff documents (white paper, development plan, reference atlas), with extracted text in `txt/`.
 - C: A citation such as OF-BLD-012 §2.3, OF-DES or OF-COR-001 in code or tests names an alpha 1.0 document; those kept are in `docs/history/`, and none carries authority.
-- C: `docs/decisions/` holds ADR-000 to ADR-016; `docs/PROGRESS.md` holds the log of every stage, the departures, the debts and the blockers; `docs/reports/` holds measured reports.
+- C: `docs/decisions/` holds ADR-000 to ADR-018; `docs/PROGRESS.md` holds the log of every stage, the departures, the debts and the blockers; `docs/reports/` holds measured reports.

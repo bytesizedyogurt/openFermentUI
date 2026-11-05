@@ -170,6 +170,51 @@ leaves out stays out, because the digest reads an absent field and a null one di
 | `GET /api/studies/runbooks/{id}` | Any runbook of the project, a lock the row does not carry laid on; 404 for one it does not hold |
 | `POST /api/studies/runbooks/{id}/lock` | `{by}`: locked; 422 when locked already or empty, 404 for an unknown runbook |
 
+## Protocols
+
+A protocol is what the bench walks: a row of the project's `protocols` (migration 0010;
+`core/openferment_core/protocols.py`; ADR-017), kept whole as `Protocol`
+(`core/openferment_core/models.py`) and served whole. Its own fields are written when it is made;
+each version is kept as it was kept, with who kept it (`by`) and when (`at`, ISO 8601 in UTC), the
+service writing both, and `currentVersion` names the current one. Every keep is audited in the
+keeper's name, a name held to the rule a person's recorded name keeps, and nothing takes a protocol
+or a version out.
+
+| Field | What it is |
+|---|---|
+| `id` | A letter or a digit first, then letters, digits, `.`, `_` or `-`, at most 80 characters, with no colon, since Practice names a step `<protocol>:<step>` |
+| `title`, `purpose`, `provenanceNote` | Words: what it is called, what it is for and where it comes from |
+| `category` | `media`, `culture`, `analytics`, `harvest`, `fermentation` or `sop` |
+| `organisms`, `bsl` | The organisms it is written for, in words, and its biosafety level, 1 or 2 |
+| `versions` | One or more `ProtocolVersion`s, each version held once |
+| `currentVersion` | One of the versions |
+
+A version (`ProtocolVersion`) holds its `version`, a `changelog`, the `baseBatch` its amounts are
+written for (`{value, unit, label}`), its `materials`, `equipment` and `safety` notes, its `steps`,
+its `estMinutes` (`{active, total}`) and its `references` (`{paperId, recordId, note}`). A material
+(`Material`) holds its `name`, its `amount` and `unit` for the base batch, its `scaling`
+(`per_batch_volume`, `fixed` or `per_unit_biomass`), the `precision` a scaled amount is rounded to,
+a `stock` it is drawn from (`{conc, unit}`) and the `sourceRecordId` of a record it rests on. A
+step (`Step`) holds its `id`, its `text`, with `{{qty:<material>}}` where a material's amount stands
+and `{{stock:<material>}}` where the volume of its stock does, a timer (`timerSec`, `timerLabel`),
+`multiCheck` items, a `note`, `refs` to records and papers, and the `skills` a person needs to do
+it, by their ids in the project's skill catalogue. Every number is finite, `{{qty:...}}` names a
+material of its version and `{{stock:...}}` one with a stock, and a version holds each step id and
+each material name once; a protocol that breaks one of these is a 422 with a list of field errors.
+
+| Route | What it does |
+|---|---|
+| `GET /api/protocols` | The project's protocols, by id, each whole |
+| `GET /api/protocols/{id}` | One protocol; 404 in words for one the project does not keep |
+| `POST /api/protocols` | `{protocol, by}`: a protocol made with its versions; 422 in words for an id the project keeps already (a new version is kept at the next route), a step needing a skill the skill catalogue does not hold, and a keep that names nobody or a placeholder |
+| `POST /api/protocols/{id}/versions` | `{version, by}`: a new version, made the current one, and the protocol whole as it now stands; 422 in words for a version the protocol holds already, a step needing a skill the skill catalogue does not hold, and a keep that names nobody or a placeholder; 404 for a protocol the project does not keep |
+
+The readers: Guild's ledger holds an entry recorded at a step to the skills the step needs in any
+version of its protocol (`guild.step_skills`); Practice quotes, and a check's brief reads, the
+current version of each protocol a step of which needs a skill, its steps in the words the bench
+shows at the base batch (a material's amount rounded to its precision, the volume of its stock
+rounded to a tenth); and the runbooks module's read lists each protocol with its versions.
+
 ## Exports
 
 The project's studies as one zip that opens with nothing of openFerment's: the standard library

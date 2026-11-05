@@ -477,6 +477,34 @@
         "title": "Band",
         "type": "object"
       },
+      "BaseBatch": {
+        "description": "The batch a version's amounts are written for: its size, its unit and\nwhat it is called.",
+        "properties": {
+          "label": {
+            "maxLength": 200,
+            "title": "Label",
+            "type": "string"
+          },
+          "unit": {
+            "maxLength": 40,
+            "minLength": 1,
+            "title": "Unit",
+            "type": "string"
+          },
+          "value": {
+            "exclusiveMinimum": 0.0,
+            "title": "Value",
+            "type": "number"
+          }
+        },
+        "required": [
+          "value",
+          "unit",
+          "label"
+        ],
+        "title": "BaseBatch",
+        "type": "object"
+      },
       "BasisInput": {
         "properties": {
           "name": {
@@ -1046,6 +1074,28 @@
             "title": "At",
             "type": "string"
           },
+          "blocks": {
+            "items": {
+              "discriminator": {
+                "mapping": {
+                  "embed": "#/components/schemas/LessonEmbed",
+                  "prose": "#/components/schemas/LessonProse"
+                },
+                "propertyName": "kind"
+              },
+              "oneOf": [
+                {
+                  "$ref": "#/components/schemas/LessonProse"
+                },
+                {
+                  "$ref": "#/components/schemas/LessonEmbed"
+                }
+              ]
+            },
+            "maxItems": 200,
+            "title": "Blocks",
+            "type": "array"
+          },
           "by": {
             "default": "",
             "maxLength": 200,
@@ -1076,6 +1126,14 @@
               }
             ],
             "title": "Category"
+          },
+          "checkpoint": {
+            "items": {
+              "$ref": "#/components/schemas/CheckpointQuestion"
+            },
+            "maxItems": 40,
+            "title": "Checkpoint",
+            "type": "array"
           },
           "criticality": {
             "anyOf": [
@@ -1141,6 +1199,19 @@
             "maxItems": 40,
             "title": "Mastery",
             "type": "array"
+          },
+          "minutes": {
+            "anyOf": [
+              {
+                "maximum": 600.0,
+                "minimum": 1.0,
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Minutes"
           },
           "name": {
             "maxLength": 200,
@@ -2182,6 +2253,111 @@
           "scheduledFor"
         ],
         "title": "CheckSchedule",
+        "type": "object"
+      },
+      "CheckpointAnswer": {
+        "description": "A numeric question's answer as the lesson's author writes it: a value,\nits unit (empty for a pure number, else one the unit converter reads, so\nan answer in any unit of its family grades), and how far from the value an\nanswer may stand, in percent of it.",
+        "properties": {
+          "tolerancePct": {
+            "maximum": 100.0,
+            "minimum": 0.0,
+            "title": "Tolerancepct",
+            "type": "number"
+          },
+          "unit": {
+            "maxLength": 40,
+            "title": "Unit",
+            "type": "string"
+          },
+          "value": {
+            "title": "Value",
+            "type": "number"
+          }
+        },
+        "required": [
+          "value",
+          "unit",
+          "tolerancePct"
+        ],
+        "title": "CheckpointAnswer",
+        "type": "object"
+      },
+      "CheckpointQuestion": {
+        "description": "One question of a lesson's checkpoint: a multiple-choice question names\nits options and the one that answers it (`answerIndex`, from 0); a\nnumeric one holds its answer.",
+        "properties": {
+          "answer": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/CheckpointAnswer"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "answerIndex": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Answerindex"
+          },
+          "evidenceChip": {
+            "anyOf": [
+              {
+                "maxLength": 120,
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Evidencechip"
+          },
+          "explanation": {
+            "default": "",
+            "maxLength": 4000,
+            "title": "Explanation",
+            "type": "string"
+          },
+          "id": {
+            "pattern": "^[A-Za-z0-9][A-Za-z0-9._-]{0,39}$",
+            "title": "Id",
+            "type": "string"
+          },
+          "kind": {
+            "enum": [
+              "mc",
+              "numeric"
+            ],
+            "title": "Kind",
+            "type": "string"
+          },
+          "options": {
+            "items": {
+              "type": "string"
+            },
+            "maxItems": 12,
+            "title": "Options",
+            "type": "array"
+          },
+          "prompt": {
+            "maxLength": 2000,
+            "minLength": 1,
+            "title": "Prompt",
+            "type": "string"
+          }
+        },
+        "required": [
+          "id",
+          "prompt",
+          "kind"
+        ],
+        "title": "CheckpointQuestion",
         "type": "object"
       },
       "Checks": {
@@ -3746,6 +3922,27 @@
           "precision"
         ],
         "title": "EngineThing",
+        "type": "object"
+      },
+      "EstMinutes": {
+        "description": "How long a run of the version takes, hands on and in all, in minutes.",
+        "properties": {
+          "active": {
+            "minimum": 0.0,
+            "title": "Active",
+            "type": "number"
+          },
+          "total": {
+            "minimum": 0.0,
+            "title": "Total",
+            "type": "number"
+          }
+        },
+        "required": [
+          "active",
+          "total"
+        ],
+        "title": "EstMinutes",
         "type": "object"
       },
       "Evidence": {
@@ -6057,6 +6254,71 @@
         "title": "KineticFit",
         "type": "object"
       },
+      "LessonEmbed": {
+        "description": "One of the embeds a lesson's page draws, with what it is drawn on when\nit takes one: a paper's id, a record's, a field's, a protocol's, a\nscenario's or a skill's, or a question to ask.",
+        "properties": {
+          "arg": {
+            "anyOf": [
+              {
+                "maxLength": 2000,
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Arg"
+          },
+          "embed": {
+            "enum": [
+              "chip-demo",
+              "record-card",
+              "mini-queue",
+              "metrics-tiles",
+              "strip-plot",
+              "protocol-card",
+              "ask-prompt",
+              "scenario-widget",
+              "skill-steps"
+            ],
+            "title": "Embed",
+            "type": "string"
+          },
+          "kind": {
+            "const": "embed",
+            "title": "Kind",
+            "type": "string"
+          }
+        },
+        "required": [
+          "kind",
+          "embed"
+        ],
+        "title": "LessonEmbed",
+        "type": "object"
+      },
+      "LessonProse": {
+        "description": "A run of a lesson's prose, in Markdown.",
+        "properties": {
+          "kind": {
+            "const": "prose",
+            "title": "Kind",
+            "type": "string"
+          },
+          "md": {
+            "maxLength": 20000,
+            "minLength": 1,
+            "title": "Md",
+            "type": "string"
+          }
+        },
+        "required": [
+          "kind",
+          "md"
+        ],
+        "title": "LessonProse",
+        "type": "object"
+      },
       "LibraryBuild": {
         "description": "Whether a plant built here in one configuration (None: its own), as\nthe discovery command found when it built each: its units and whether a\nTEA prices it, or the package's own error.",
         "properties": {
@@ -6906,6 +7168,94 @@
           "note"
         ],
         "title": "MassBalance",
+        "type": "object"
+      },
+      "Material": {
+        "description": "One material of a version, its amount written for the base batch.",
+        "properties": {
+          "amount": {
+            "minimum": 0.0,
+            "title": "Amount",
+            "type": "number"
+          },
+          "name": {
+            "maxLength": 200,
+            "minLength": 1,
+            "title": "Name",
+            "type": "string"
+          },
+          "precision": {
+            "minimum": 0.0,
+            "title": "Precision",
+            "type": "number"
+          },
+          "scaling": {
+            "enum": [
+              "per_batch_volume",
+              "fixed",
+              "per_unit_biomass"
+            ],
+            "title": "Scaling",
+            "type": "string"
+          },
+          "sourceRecordId": {
+            "anyOf": [
+              {
+                "maxLength": 120,
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Sourcerecordid"
+          },
+          "stock": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/MaterialStock"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "unit": {
+            "maxLength": 40,
+            "title": "Unit",
+            "type": "string"
+          }
+        },
+        "required": [
+          "name",
+          "amount",
+          "unit",
+          "scaling",
+          "precision"
+        ],
+        "title": "Material",
+        "type": "object"
+      },
+      "MaterialStock": {
+        "description": "The stock solution a material is drawn from: how much of the material\none of `unit` of stock holds, in the material's own unit.",
+        "properties": {
+          "conc": {
+            "exclusiveMinimum": 0.0,
+            "title": "Conc",
+            "type": "number"
+          },
+          "unit": {
+            "maxLength": 40,
+            "minLength": 1,
+            "title": "Unit",
+            "type": "string"
+          }
+        },
+        "required": [
+          "conc",
+          "unit"
+        ],
+        "title": "MaterialStock",
         "type": "object"
       },
       "Measure": {
@@ -10491,6 +10841,250 @@
         "title": "ProposeRequest",
         "type": "object"
       },
+      "Protocol": {
+        "description": "A protocol a project keeps (mirrors `Protocol` in src/data/types.ts):\nits own fields, written when it is made, and its versions, the current\none named by `currentVersion`.",
+        "properties": {
+          "bsl": {
+            "enum": [
+              1,
+              2
+            ],
+            "title": "Bsl",
+            "type": "integer"
+          },
+          "category": {
+            "enum": [
+              "media",
+              "culture",
+              "analytics",
+              "harvest",
+              "fermentation",
+              "sop"
+            ],
+            "title": "Category",
+            "type": "string"
+          },
+          "currentVersion": {
+            "title": "Currentversion",
+            "type": "string"
+          },
+          "id": {
+            "pattern": "^[A-Za-z0-9][A-Za-z0-9._-]{0,79}$",
+            "title": "Id",
+            "type": "string"
+          },
+          "organisms": {
+            "items": {
+              "type": "string"
+            },
+            "maxItems": 40,
+            "title": "Organisms",
+            "type": "array"
+          },
+          "provenanceNote": {
+            "default": "",
+            "maxLength": 2000,
+            "title": "Provenancenote",
+            "type": "string"
+          },
+          "purpose": {
+            "default": "",
+            "maxLength": 4000,
+            "title": "Purpose",
+            "type": "string"
+          },
+          "title": {
+            "maxLength": 200,
+            "minLength": 1,
+            "title": "Title",
+            "type": "string"
+          },
+          "versions": {
+            "items": {
+              "$ref": "#/components/schemas/ProtocolVersion"
+            },
+            "maxItems": 200,
+            "minItems": 1,
+            "title": "Versions",
+            "type": "array"
+          }
+        },
+        "required": [
+          "id",
+          "title",
+          "category",
+          "bsl",
+          "versions",
+          "currentVersion"
+        ],
+        "title": "Protocol",
+        "type": "object"
+      },
+      "ProtocolKeep": {
+        "description": "POST /api/protocols: a protocol the project does not keep yet, with its\nversions, and the name of the person who keeps it.",
+        "properties": {
+          "by": {
+            "default": "",
+            "title": "By",
+            "type": "string"
+          },
+          "protocol": {
+            "$ref": "#/components/schemas/Protocol"
+          }
+        },
+        "required": [
+          "protocol"
+        ],
+        "title": "ProtocolKeep",
+        "type": "object"
+      },
+      "ProtocolReference": {
+        "description": "A paper or a record the version rests on, by id, with what it gives.",
+        "properties": {
+          "note": {
+            "anyOf": [
+              {
+                "maxLength": 2000,
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Note"
+          },
+          "paperId": {
+            "anyOf": [
+              {
+                "maxLength": 120,
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Paperid"
+          },
+          "recordId": {
+            "anyOf": [
+              {
+                "maxLength": 120,
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Recordid"
+          }
+        },
+        "title": "ProtocolReference",
+        "type": "object"
+      },
+      "ProtocolVersion": {
+        "description": "One version of a protocol, kept as it was kept: its base batch, its\nmaterials, equipment and safety notes, its steps, the minutes a run takes\nand what it rests on. The service writes who kept it (`by`) and when\n(`at`, ISO 8601 in UTC) over what a version sends.",
+        "properties": {
+          "at": {
+            "default": "",
+            "title": "At",
+            "type": "string"
+          },
+          "baseBatch": {
+            "$ref": "#/components/schemas/BaseBatch"
+          },
+          "by": {
+            "default": "",
+            "maxLength": 200,
+            "title": "By",
+            "type": "string"
+          },
+          "changelog": {
+            "anyOf": [
+              {
+                "maxLength": 4000,
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Changelog"
+          },
+          "equipment": {
+            "items": {
+              "type": "string"
+            },
+            "maxItems": 100,
+            "title": "Equipment",
+            "type": "array"
+          },
+          "estMinutes": {
+            "$ref": "#/components/schemas/EstMinutes"
+          },
+          "materials": {
+            "items": {
+              "$ref": "#/components/schemas/Material"
+            },
+            "maxItems": 200,
+            "title": "Materials",
+            "type": "array"
+          },
+          "references": {
+            "items": {
+              "$ref": "#/components/schemas/ProtocolReference"
+            },
+            "maxItems": 100,
+            "title": "References",
+            "type": "array"
+          },
+          "safety": {
+            "items": {
+              "type": "string"
+            },
+            "maxItems": 100,
+            "title": "Safety",
+            "type": "array"
+          },
+          "steps": {
+            "items": {
+              "$ref": "#/components/schemas/Step"
+            },
+            "maxItems": 500,
+            "title": "Steps",
+            "type": "array"
+          },
+          "version": {
+            "pattern": "^[A-Za-z0-9][A-Za-z0-9._-]{0,39}$",
+            "title": "Version",
+            "type": "string"
+          }
+        },
+        "required": [
+          "version",
+          "baseBatch",
+          "estMinutes"
+        ],
+        "title": "ProtocolVersion",
+        "type": "object"
+      },
+      "ProtocolVersionKeep": {
+        "description": "POST /api/protocols/{id}/versions: a new version of a protocol the\nproject keeps, under a version of its own, and the name of the person who\nkeeps it; it becomes the protocol's current version.",
+        "properties": {
+          "by": {
+            "default": "",
+            "title": "By",
+            "type": "string"
+          },
+          "version": {
+            "$ref": "#/components/schemas/ProtocolVersion"
+          }
+        },
+        "required": [
+          "version"
+        ],
+        "title": "ProtocolVersionKeep",
+        "type": "object"
+      },
       "Quantity": {
         "description": "A value and its unit; a categorical field carries a string value. A\nnumber a model, a person or a library supplies carries its origin\n(ADR-006); a value code derives from another (the SI form of a record's\nvalue) carries none, the thing it was derived from being its source.",
         "properties": {
@@ -13320,6 +13914,88 @@
           "reached"
         ],
         "title": "SteadyState",
+        "type": "object"
+      },
+      "Step": {
+        "description": "One step of a version: what the person does, with `{{qty:<material>}}`\nwhere a material's amount stands and `{{stock:<material>}}` where the\nvolume of its stock does, each at the batch's scale.",
+        "properties": {
+          "id": {
+            "pattern": "^[A-Za-z0-9][A-Za-z0-9._-]{0,39}$",
+            "title": "Id",
+            "type": "string"
+          },
+          "multiCheck": {
+            "items": {
+              "type": "string"
+            },
+            "maxItems": 40,
+            "title": "Multicheck",
+            "type": "array"
+          },
+          "note": {
+            "anyOf": [
+              {
+                "maxLength": 2000,
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Note"
+          },
+          "refs": {
+            "items": {
+              "type": "string"
+            },
+            "maxItems": 40,
+            "title": "Refs",
+            "type": "array"
+          },
+          "skills": {
+            "items": {
+              "type": "string"
+            },
+            "maxItems": 20,
+            "title": "Skills",
+            "type": "array"
+          },
+          "text": {
+            "maxLength": 4000,
+            "minLength": 1,
+            "title": "Text",
+            "type": "string"
+          },
+          "timerLabel": {
+            "anyOf": [
+              {
+                "maxLength": 200,
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Timerlabel"
+          },
+          "timerSec": {
+            "anyOf": [
+              {
+                "exclusiveMinimum": 0.0,
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Timersec"
+          }
+        },
+        "required": [
+          "id",
+          "text"
+        ],
+        "title": "Step",
         "type": "object"
       },
       "StoredAnswer": {
@@ -24264,6 +24940,290 @@
           }
         },
         "summary": "Proposals Dismiss",
+        "x-openferment-scope": "project"
+      }
+    },
+    "/api/protocols": {
+      "get": {
+        "description": "The open project's protocols, by id, each whole: its own fields and every version as it was kept, each\nversion with who kept it (`by`) and when (`at`, ISO 8601 in UTC), the current one named by `currentVersion`.",
+        "operationId": "protocols_listed_api_protocols_get",
+        "parameters": [
+          {
+            "description": "The project the request acts in; ?project= in its place.",
+            "in": "header",
+            "name": "X-OpenFerment-Project",
+            "required": false,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "description": "The project the request acts in, where a header cannot be sent (an EventSource); the X-OpenFerment-Project header in its place.",
+            "in": "query",
+            "name": "project",
+            "required": false,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "items": {
+                    "$ref": "#/components/schemas/Protocol"
+                  },
+                  "title": "Response Protocols Listed Api Protocols Get",
+                  "type": "array"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "404": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Refusal"
+                }
+              }
+            },
+            "description": "The project the request names is one the database does not hold, in words."
+          }
+        },
+        "summary": "Protocols Listed",
+        "x-openferment-scope": "project"
+      },
+      "post": {
+        "description": "A protocol made in the open project in the name of `by`, with every version it holds, the protocol whole as\nkept: the service writes each version's keeper and time (`by`, `at`) over what it sends, and audits the keep.\nA protocol is made once under its id; a new version of it is kept at `/api/protocols/{id}/versions`. Every\nskill a step names is one the project's skill catalogue holds (`/api/catalogues/skill`).",
+        "operationId": "protocol_make_api_protocols_post",
+        "parameters": [
+          {
+            "description": "The project the request acts in; ?project= in its place.",
+            "in": "header",
+            "name": "X-OpenFerment-Project",
+            "required": false,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "description": "The project the request acts in, where a header cannot be sent (an EventSource); the X-OpenFerment-Project header in its place.",
+            "in": "query",
+            "name": "project",
+            "required": false,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/ProtocolKeep"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Protocol"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "404": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Refusal"
+                }
+              }
+            },
+            "description": "The project the request names is one the database does not hold, in words."
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "anyOf": [
+                    {
+                      "$ref": "#/components/schemas/Refusal"
+                    },
+                    {
+                      "$ref": "#/components/schemas/HTTPValidationError"
+                    }
+                  ]
+                }
+              }
+            },
+            "description": "A protocol the service will not keep, in words: a list of field errors, each with its place and why, for a protocol whose own fields refuse it (a step binding a material its version lacks, a stock asked of a material with none, a version held twice, a current version that is none of its versions, a number that is not finite); and the service's words for a protocol the project keeps already, a step needing a skill the skill catalogue does not hold, and a keep that names nobody."
+          }
+        },
+        "summary": "Protocol Make",
+        "x-openferment-scope": "project"
+      }
+    },
+    "/api/protocols/{protocol_id}": {
+      "get": {
+        "description": "One of the open project's protocols, whole; 404 in words when the project keeps none of that id.",
+        "operationId": "protocol_read_api_protocols__protocol_id__get",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "protocol_id",
+            "required": true,
+            "schema": {
+              "title": "Protocol Id",
+              "type": "string"
+            }
+          },
+          {
+            "description": "The project the request acts in; ?project= in its place.",
+            "in": "header",
+            "name": "X-OpenFerment-Project",
+            "required": false,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "description": "The project the request acts in, where a header cannot be sent (an EventSource); the X-OpenFerment-Project header in its place.",
+            "in": "query",
+            "name": "project",
+            "required": false,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Protocol"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "404": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Refusal"
+                }
+              }
+            },
+            "description": "The project keeps no protocol of that id, in words. A project the request names that the database does not hold is a 404 too, in words."
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Protocol Read",
+        "x-openferment-scope": "project"
+      }
+    },
+    "/api/protocols/{protocol_id}/versions": {
+      "post": {
+        "description": "A new version of one of the open project's protocols, kept in the name of `by` and made its current version:\nthe protocol whole, as it now stands. Every version kept before stays as it was kept, and the keep is audited.\n404 in words when the project keeps no protocol of that id.",
+        "operationId": "protocol_version_api_protocols__protocol_id__versions_post",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "protocol_id",
+            "required": true,
+            "schema": {
+              "title": "Protocol Id",
+              "type": "string"
+            }
+          },
+          {
+            "description": "The project the request acts in; ?project= in its place.",
+            "in": "header",
+            "name": "X-OpenFerment-Project",
+            "required": false,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "description": "The project the request acts in, where a header cannot be sent (an EventSource); the X-OpenFerment-Project header in its place.",
+            "in": "query",
+            "name": "project",
+            "required": false,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/ProtocolVersionKeep"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Protocol"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "404": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Refusal"
+                }
+              }
+            },
+            "description": "The project keeps no protocol of that id, in words. A project the request names that the database does not hold is a 404 too, in words."
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "anyOf": [
+                    {
+                      "$ref": "#/components/schemas/Refusal"
+                    },
+                    {
+                      "$ref": "#/components/schemas/HTTPValidationError"
+                    }
+                  ]
+                }
+              }
+            },
+            "description": "A version the service will not keep, in words: a list of field errors for a version whose own fields refuse it, and the service's words for a version the protocol holds already (a kept version stays as it was kept), a step needing a skill the skill catalogue does not hold, and a keep that names nobody."
+          }
+        },
+        "summary": "Protocol Version",
         "x-openferment-scope": "project"
       }
     },

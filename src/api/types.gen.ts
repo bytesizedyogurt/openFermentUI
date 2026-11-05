@@ -2029,6 +2029,76 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/protocols": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Protocols Listed
+         * @description The open project's protocols, by id, each whole: its own fields and every version as it was kept, each
+         *     version with who kept it (`by`) and when (`at`, ISO 8601 in UTC), the current one named by `currentVersion`.
+         */
+        get: operations["protocols_listed_api_protocols_get"];
+        put?: never;
+        /**
+         * Protocol Make
+         * @description A protocol made in the open project in the name of `by`, with every version it holds, the protocol whole as
+         *     kept: the service writes each version's keeper and time (`by`, `at`) over what it sends, and audits the keep.
+         *     A protocol is made once under its id; a new version of it is kept at `/api/protocols/{id}/versions`. Every
+         *     skill a step names is one the project's skill catalogue holds (`/api/catalogues/skill`).
+         */
+        post: operations["protocol_make_api_protocols_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/protocols/{protocol_id}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Protocol Read
+         * @description One of the open project's protocols, whole; 404 in words when the project keeps none of that id.
+         */
+        get: operations["protocol_read_api_protocols__protocol_id__get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/protocols/{protocol_id}/versions": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Protocol Version
+         * @description A new version of one of the open project's protocols, kept in the name of `by` and made its current version:
+         *     the protocol whole, as it now stands. Every version kept before stays as it was kept, and the keep is audited.
+         *     404 in words when the project keeps no protocol of that id.
+         */
+        post: operations["protocol_version_api_protocols__protocol_id__versions_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/protparam": {
         parameters: {
             query?: never;
@@ -2958,6 +3028,19 @@ export interface components {
             /** Unit */
             unit: string;
         };
+        /**
+         * BaseBatch
+         * @description The batch a version's amounts are written for: its size, its unit and
+         *     what it is called.
+         */
+        BaseBatch: {
+            /** Label */
+            label: string;
+            /** Unit */
+            unit: string;
+            /** Value */
+            value: number;
+        };
         /** BasisInput */
         BasisInput: {
             /** Name */
@@ -3147,6 +3230,8 @@ export interface components {
              * @default
              */
             at: string;
+            /** Blocks */
+            blocks?: (components["schemas"]["LessonProse"] | components["schemas"]["LessonEmbed"])[];
             /**
              * By
              * @default
@@ -3154,6 +3239,8 @@ export interface components {
             by: string;
             /** Category */
             category?: ("molecular_biology_enzyme" | "diagnostic" | "research_protein" | "food_protein" | "sweet_protein" | "structural_protein" | "industrial_enzyme" | "therapeutic_protein" | "hmo" | "terpene" | "glycoside" | "biopolymer") | null;
+            /** Checkpoint */
+            checkpoint?: components["schemas"]["CheckpointQuestion"][];
             /** Criticality */
             criticality?: ("routine" | "critical") | null;
             /** Family */
@@ -3169,6 +3256,8 @@ export interface components {
             location?: ("secreted" | "intracellular") | null;
             /** Mastery */
             mastery?: string[];
+            /** Minutes */
+            minutes?: number | null;
             /** Name */
             name: string;
             /** Note */
@@ -3516,6 +3605,50 @@ export interface components {
             by: string;
             /** Scheduledfor */
             scheduledFor: string;
+        };
+        /**
+         * CheckpointAnswer
+         * @description A numeric question's answer as the lesson's author writes it: a value,
+         *     its unit (empty for a pure number, else one the unit converter reads, so
+         *     an answer in any unit of its family grades), and how far from the value an
+         *     answer may stand, in percent of it.
+         */
+        CheckpointAnswer: {
+            /** Tolerancepct */
+            tolerancePct: number;
+            /** Unit */
+            unit: string;
+            /** Value */
+            value: number;
+        };
+        /**
+         * CheckpointQuestion
+         * @description One question of a lesson's checkpoint: a multiple-choice question names
+         *     its options and the one that answers it (`answerIndex`, from 0); a
+         *     numeric one holds its answer.
+         */
+        CheckpointQuestion: {
+            answer?: components["schemas"]["CheckpointAnswer"] | null;
+            /** Answerindex */
+            answerIndex?: number | null;
+            /** Evidencechip */
+            evidenceChip?: string | null;
+            /**
+             * Explanation
+             * @default
+             */
+            explanation: string;
+            /** Id */
+            id: string;
+            /**
+             * Kind
+             * @enum {string}
+             */
+            kind: "mc" | "numeric";
+            /** Options */
+            options?: string[];
+            /** Prompt */
+            prompt: string;
         };
         /**
          * Checks
@@ -4167,6 +4300,16 @@ export interface components {
             precision: components["schemas"]["EnginePrecision"];
             /** Title */
             title: string;
+        };
+        /**
+         * EstMinutes
+         * @description How long a run of the version takes, hands on and in all, in minutes.
+         */
+        EstMinutes: {
+            /** Active */
+            active: number;
+            /** Total */
+            total: number;
         };
         /**
          * Evidence
@@ -5039,6 +5182,39 @@ export interface components {
             series?: components["schemas"]["FermosSeries"][];
         };
         /**
+         * LessonEmbed
+         * @description One of the embeds a lesson's page draws, with what it is drawn on when
+         *     it takes one: a paper's id, a record's, a field's, a protocol's, a
+         *     scenario's or a skill's, or a question to ask.
+         */
+        LessonEmbed: {
+            /** Arg */
+            arg?: string | null;
+            /**
+             * Embed
+             * @enum {string}
+             */
+            embed: "chip-demo" | "record-card" | "mini-queue" | "metrics-tiles" | "strip-plot" | "protocol-card" | "ask-prompt" | "scenario-widget" | "skill-steps";
+            /**
+             * @description discriminator enum property added by openapi-typescript
+             * @enum {string}
+             */
+            kind: "embed";
+        };
+        /**
+         * LessonProse
+         * @description A run of a lesson's prose, in Markdown.
+         */
+        LessonProse: {
+            /**
+             * @description discriminator enum property added by openapi-typescript
+             * @enum {string}
+             */
+            kind: "prose";
+            /** Md */
+            md: string;
+        };
+        /**
          * LibraryBuild
          * @description Whether a plant built here in one configuration (None: its own), as
          *     the discovery command found when it built each: its units and whether a
@@ -5364,6 +5540,39 @@ export interface components {
             note: string;
             /** Ok */
             ok: boolean;
+        };
+        /**
+         * Material
+         * @description One material of a version, its amount written for the base batch.
+         */
+        Material: {
+            /** Amount */
+            amount: number;
+            /** Name */
+            name: string;
+            /** Precision */
+            precision: number;
+            /**
+             * Scaling
+             * @enum {string}
+             */
+            scaling: "per_batch_volume" | "fixed" | "per_unit_biomass";
+            /** Sourcerecordid */
+            sourceRecordId?: string | null;
+            stock?: components["schemas"]["MaterialStock"] | null;
+            /** Unit */
+            unit: string;
+        };
+        /**
+         * MaterialStock
+         * @description The stock solution a material is drawn from: how much of the material
+         *     one of `unit` of stock holds, in the material's own unit.
+         */
+        MaterialStock: {
+            /** Conc */
+            conc: number;
+            /** Unit */
+            unit: string;
         };
         /**
          * Measure
@@ -6603,6 +6812,118 @@ export interface components {
             product: string;
         };
         /**
+         * Protocol
+         * @description A protocol a project keeps (mirrors `Protocol` in src/data/types.ts):
+         *     its own fields, written when it is made, and its versions, the current
+         *     one named by `currentVersion`.
+         */
+        Protocol: {
+            /**
+             * Bsl
+             * @enum {integer}
+             */
+            bsl: 1 | 2;
+            /**
+             * Category
+             * @enum {string}
+             */
+            category: "media" | "culture" | "analytics" | "harvest" | "fermentation" | "sop";
+            /** Currentversion */
+            currentVersion: string;
+            /** Id */
+            id: string;
+            /** Organisms */
+            organisms?: string[];
+            /**
+             * Provenancenote
+             * @default
+             */
+            provenanceNote: string;
+            /**
+             * Purpose
+             * @default
+             */
+            purpose: string;
+            /** Title */
+            title: string;
+            /** Versions */
+            versions: components["schemas"]["ProtocolVersion"][];
+        };
+        /**
+         * ProtocolKeep
+         * @description POST /api/protocols: a protocol the project does not keep yet, with its
+         *     versions, and the name of the person who keeps it.
+         */
+        ProtocolKeep: {
+            /**
+             * By
+             * @default
+             */
+            by: string;
+            protocol: components["schemas"]["Protocol"];
+        };
+        /**
+         * ProtocolReference
+         * @description A paper or a record the version rests on, by id, with what it gives.
+         */
+        ProtocolReference: {
+            /** Note */
+            note?: string | null;
+            /** Paperid */
+            paperId?: string | null;
+            /** Recordid */
+            recordId?: string | null;
+        };
+        /**
+         * ProtocolVersion
+         * @description One version of a protocol, kept as it was kept: its base batch, its
+         *     materials, equipment and safety notes, its steps, the minutes a run takes
+         *     and what it rests on. The service writes who kept it (`by`) and when
+         *     (`at`, ISO 8601 in UTC) over what a version sends.
+         */
+        ProtocolVersion: {
+            /**
+             * At
+             * @default
+             */
+            at: string;
+            baseBatch: components["schemas"]["BaseBatch"];
+            /**
+             * By
+             * @default
+             */
+            by: string;
+            /** Changelog */
+            changelog?: string | null;
+            /** Equipment */
+            equipment?: string[];
+            estMinutes: components["schemas"]["EstMinutes"];
+            /** Materials */
+            materials?: components["schemas"]["Material"][];
+            /** References */
+            references?: components["schemas"]["ProtocolReference"][];
+            /** Safety */
+            safety?: string[];
+            /** Steps */
+            steps?: components["schemas"]["Step"][];
+            /** Version */
+            version: string;
+        };
+        /**
+         * ProtocolVersionKeep
+         * @description POST /api/protocols/{id}/versions: a new version of a protocol the
+         *     project keeps, under a version of its own, and the name of the person who
+         *     keeps it; it becomes the protocol's current version.
+         */
+        ProtocolVersionKeep: {
+            /**
+             * By
+             * @default
+             */
+            by: string;
+            version: components["schemas"]["ProtocolVersion"];
+        };
+        /**
          * Quantity
          * @description A value and its unit; a categorical field carries a string value. A
          *     number a model, a person or a library supplies carries its origin
@@ -7696,6 +8017,30 @@ export interface components {
             washout: boolean;
             /** Words */
             words: string;
+        };
+        /**
+         * Step
+         * @description One step of a version: what the person does, with `{{qty:<material>}}`
+         *     where a material's amount stands and `{{stock:<material>}}` where the
+         *     volume of its stock does, each at the batch's scale.
+         */
+        Step: {
+            /** Id */
+            id: string;
+            /** Multicheck */
+            multiCheck?: string[];
+            /** Note */
+            note?: string | null;
+            /** Refs */
+            refs?: string[];
+            /** Skills */
+            skills?: string[];
+            /** Text */
+            text: string;
+            /** Timerlabel */
+            timerLabel?: string | null;
+            /** Timersec */
+            timerSec?: number | null;
         };
         /**
          * StoredAnswer
@@ -13246,6 +13591,185 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    protocols_listed_api_protocols_get: {
+        parameters: {
+            query?: {
+                /** @description The project the request acts in, where a header cannot be sent (an EventSource); the X-OpenFerment-Project header in its place. */
+                project?: string;
+            };
+            header?: {
+                /** @description The project the request acts in; ?project= in its place. */
+                "X-OpenFerment-Project"?: string;
+            };
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Protocol"][];
+                };
+            };
+            /** @description The project the request names is one the database does not hold, in words. */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Refusal"];
+                };
+            };
+        };
+    };
+    protocol_make_api_protocols_post: {
+        parameters: {
+            query?: {
+                /** @description The project the request acts in, where a header cannot be sent (an EventSource); the X-OpenFerment-Project header in its place. */
+                project?: string;
+            };
+            header?: {
+                /** @description The project the request acts in; ?project= in its place. */
+                "X-OpenFerment-Project"?: string;
+            };
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["ProtocolKeep"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Protocol"];
+                };
+            };
+            /** @description The project the request names is one the database does not hold, in words. */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Refusal"];
+                };
+            };
+            /** @description A protocol the service will not keep, in words: a list of field errors, each with its place and why, for a protocol whose own fields refuse it (a step binding a material its version lacks, a stock asked of a material with none, a version held twice, a current version that is none of its versions, a number that is not finite); and the service's words for a protocol the project keeps already, a step needing a skill the skill catalogue does not hold, and a keep that names nobody. */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Refusal"] | components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    protocol_read_api_protocols__protocol_id__get: {
+        parameters: {
+            query?: {
+                /** @description The project the request acts in, where a header cannot be sent (an EventSource); the X-OpenFerment-Project header in its place. */
+                project?: string;
+            };
+            header?: {
+                /** @description The project the request acts in; ?project= in its place. */
+                "X-OpenFerment-Project"?: string;
+            };
+            path: {
+                protocol_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Protocol"];
+                };
+            };
+            /** @description The project keeps no protocol of that id, in words. A project the request names that the database does not hold is a 404 too, in words. */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Refusal"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    protocol_version_api_protocols__protocol_id__versions_post: {
+        parameters: {
+            query?: {
+                /** @description The project the request acts in, where a header cannot be sent (an EventSource); the X-OpenFerment-Project header in its place. */
+                project?: string;
+            };
+            header?: {
+                /** @description The project the request acts in; ?project= in its place. */
+                "X-OpenFerment-Project"?: string;
+            };
+            path: {
+                protocol_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["ProtocolVersionKeep"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Protocol"];
+                };
+            };
+            /** @description The project keeps no protocol of that id, in words. A project the request names that the database does not hold is a 404 too, in words. */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Refusal"];
+                };
+            };
+            /** @description A version the service will not keep, in words: a list of field errors for a version whose own fields refuse it, and the service's words for a version the protocol holds already (a kept version stays as it was kept), a step needing a skill the skill catalogue does not hold, and a keep that names nobody. */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Refusal"] | components["schemas"]["HTTPValidationError"];
                 };
             };
         };

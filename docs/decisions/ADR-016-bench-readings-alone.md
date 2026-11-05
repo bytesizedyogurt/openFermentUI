@@ -48,7 +48,13 @@ adds.
 - Guild's protocols, when a project keeps them, start a deposition as before; the readings-alone
   mode stands beside that path.
 
+## Implementation note (alpha 2.2 E.12a)
+
+The first revisit condition came to pass with ADR-017: a project keeps its protocols, and a
+deposition opened from a kept protocol walks its steps. The readings-alone mode stays beside that
+path, as the consequences above say, so the decision stands; the condition left is the owner's.
+
 ## Revisit condition
 
-A project keeps protocols in its store (Guild's protocols reach the bench), or the owner asks for
-the bench to stay protocol-only.
+The owner asks for the bench to stay protocol-only. (A project keeping its protocols, the first
+condition, came with ADR-017 at alpha 2.2 E.12a.)

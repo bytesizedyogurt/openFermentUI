@@ -298,6 +298,11 @@ eval_runs = _scoped("eval_runs", Column("question_id", Text, nullable=False),
 catalogue = _scoped("catalogue", Column("kind", Text, nullable=False), Index(None, "project_id", "kind"),
                     updated=True)
 
+# A project's protocols (alpha 2.2 E.12a, ADR-017; protocols.py): one row a
+# protocol, kept whole by its id, its versions appended and each kept as it
+# was kept.
+protocols = _scoped("protocols", updated=True)
+
 jobs = _scoped("jobs", Column("kind", Text, nullable=False), Column("state", Text, nullable=False), updated=True)
 
 # ── Guild and Primer ──────────────────────────────────────────────────────

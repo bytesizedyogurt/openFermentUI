@@ -38,6 +38,8 @@ from openferment_core.models import (
 
 FIXTURE = Path(__file__).parent / "fixtures" / "competence.json"
 TODAY = date.today().isoformat()
+# Guild's own projection, before conftest hands every test alpha 1.0's frozen export in its place.
+GUILD_PROJECTION = guild.projection
 
 
 @pytest.fixture(autouse=True)
@@ -184,6 +186,36 @@ def test_a_run_calls_every_criterion_and_says_what_was_seen(team):
     level = Competence(guild.read().evidence, guild.skills(), TODAY).level("p-patrick", "SK-OD")
     assert level == 3, "a passed check on a ready trainee qualifies them"
     refused("state", checks.record, c.id, good)
+
+
+def test_the_ranking_and_a_run_read_guilds_own_projection_before_their_transaction(monkeypatch):
+    """Guild's own projection reads the project's skill catalogue and its
+    protocols through `db.run`, which refuses a read on the database's own
+    thread, where a transaction's coroutine runs. The ranking and a run read
+    the skills before their transaction begins (alpha 2.2 E.12a), and each
+    runs on a skill kept in the catalogue. Every name and criterion here is a
+    placeholder."""
+    from openferment_core import catalogues
+
+    monkeypatch.setattr(guild, "projection", GUILD_PROJECTION)
+    catalogues.keep(catalogues.CatalogueEntry(kind="skill", id="SK-PH-RUN", name="A placeholder skill",
+                                              family="placeholder", mastery=["criterion one", "criterion two"],
+                                              criticality="routine", recencyDays=30, supervisedRuns=1), by="Ada")
+    guild.write_person(person("p-sean", "Sean Creighton", "lead", None))
+    guild.write_person(person("p-eric", "Eric Habimana"))
+    guild.write_person(person("p-patrick", "Patrick Mugisha"))
+    day = (date.today() - timedelta(days=20)).isoformat()
+    guild.write_evidence(entry("e-desig-ph", "p-eric", "designation", day, skill="SK-PH-RUN", observer="p-sean"))
+    guild.write_evidence(entry("e-know-ph", "p-patrick", "knowledge", day, skill="SK-PH-RUN"))
+    guild.write_evidence(entry("e-sup-ph", "p-patrick", "supervised", day, skill="SK-PH-RUN"))
+    (c,) = [c for c in checks.propose(None) if c.personId == "p-patrick"]
+    assert c.skillIds == ["SK-PH-RUN"] and c.state == "proposed"
+    done = checks.record(c.id, CheckRecord(
+        by="p-eric", at=TODAY, results=[CheckResult(skillId="SK-PH-RUN", criterion=i, meets=True, note="")
+                                        for i in range(2)],
+        notes=[CheckNote(skillId="SK-PH-RUN", text="Saw both placeholder criteria met")]))
+    (e,) = [x for x in guild.read().evidence if x.id in done.evidenceIds]
+    assert (done.state, e.kind, e.outcome, e.skillId) == ("done", "witnessed", "pass", "SK-PH-RUN")
 
 
 def test_one_criterion_needing_work_fails_the_skill(team):

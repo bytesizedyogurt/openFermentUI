@@ -226,6 +226,7 @@ Heavy libraries run in workers (OF-BLD-014 §3.4, E.6).
 | `proforma.py` | Proforma on the service's side (OF-BLD-014 §8.1). |
 | `project_state.py` | What a project keeps of the work done in its pages (execution prompt §5.5, stage 2; ADR-001, ADR-005). |
 | `proposals.py` | Proposals (OF-BLD-015 §7.4): what a model asked for at a gate, kept until a person carries it out or dismisses it. |
+| `protocols.py` | A project's protocols (alpha 2.2 E.12a; ADR-017): each protocol the lab writes, kept whole, and read by Guild, Practice and the module reads. |
 | `protparam.py` | A protein product's properties from its sequence (OF-BLD-020 §7.1, D12). |
 | `quotes.py` | Sentences, and whether a quote is whole ones of its passage. |
 | `ready.py` | Is this machine ready for the live loop? (OF-BLD-012 §B.9) |

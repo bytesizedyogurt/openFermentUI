@@ -198,6 +198,10 @@ def _id(prefix: str) -> str:
 
 
 def _protocols() -> list[dict[str, Any]]:
+    """The protocols a scenario may quote: the current version of each of the
+    project's protocols a step of which needs a skill, its steps in the words
+    the bench shows at the base batch (protocols.as_quoted), read through
+    Guild's projection (a test hands in its own)."""
     return list(guild.projection().get("protocols", []))
 
 

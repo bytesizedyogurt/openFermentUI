@@ -27,8 +27,8 @@ session continues from this file and `git log` alone.
      OPENFERMENT_EFFORT <command>`).
 3. First tests to run: `pnpm test:core`, then `pnpm test:sim`.
 4. **Next step: stage E, the screens on the generated types** (the prompt's §6.5 in order, one
-   commit per screen or lib; its plan of eighteen commits is drafted outside the tree, with two
-   decision records it proposes, ADR-017 and ADR-018, to weigh first). Stage D is done: D.0 sealed
+   commit per screen or lib; its plan of eighteen commits is drafted outside the tree, and the two
+   decision records it proposed, ADR-017 and ADR-018, landed with E.12a). Stage D is done: D.0 sealed
    the handoff pages before the core's commit was recorded (`CORE=6f85338`, D.1), and both
    strangers finished in their first round with no core file changed: the mirror engine
    (`examples/engines/openferment-engine-mirror/`) and the record-reader agent
@@ -248,6 +248,7 @@ DOI or PMID. Each now reads the project's rows.
 | 2026-11-05 01:38 | E.9: `pnpm test:core` on the final tree; `test_prove_examples.py` with the database address empty and on Python 3.12; `typecheck`, `check:plan`, `check:state`, `check:figures`, `check:guild`, `check:secrets`; `gen:api --check` and `gen:components --check`; `build`; `smoke` with no key; `pnpm prove --steps 9`, offline, twice, the first with `--keep` for a scratch check of the screens that read the store's strains and products | 2895 passed, 1 skipped, 175 deselected; 9 passed each way; every check green, `check:state` 57 checks, `check:guild` 126; the document and COMPONENTS.md as they were; 13 of 13 screens; 48 of 48 checks each time, no call in the proof's spend table; 25 of 25, no 4xx and no 5xx | 4 min 31 s (`test:core`); 97 s and 89 s (the proof) | E.9 |
 | 2026-11-05 02:06 | E.10: `pnpm test:core`, twice, the second on the final tree; `typecheck`, `check:plan`, `check:state`, `check:figures`, `check:guild`, `check:secrets`; `gen:api --check`, `gen:tools --check` and `gen:components --check`; `build`; `smoke` with no key; `pnpm prove --steps 9 --keep`, offline, its service kept for a scratch check of the runbook pages | 2895 passed, 1 skipped, 175 deselected, each time; every check green, `check:state` 57 checks, `check:guild` 126; the document and TOOLS.md as they were, COMPONENTS.md with `src/engine/`'s 14 files; 13 of 13 screens; 48 of 48 checks, no call in the proof's spend table; 20 of 20, no 4xx and no 5xx | 4 min 45 s and 4 min 41 s (`test:core`); 97 s (the proof) | E.10 |
 | 2026-11-05 02:36 | E.11: `pnpm test:core` on the final tree; `typecheck`, `check:plan`, `check:state`, `check:figures`, `check:guild`, `test:reconcile`, `check:secrets`; `gen:api --check`, `gen:tools --check` and `gen:components --check`; `export:lock-fixtures`; `build`; `smoke` with no key; `pnpm prove --steps 5,9 --keep`, offline, its service kept for a scratch check of the runbook and deposition pages | 2895 passed, 1 skipped, 175 deselected; every check green, `check:state` 62 checks, `check:guild` 126, the reconciliation's 10; the document, TOOLS.md and COMPONENTS.md as they were; the lock digests byte for byte; 13 of 13 screens; 48 of 48 checks, no call in the proof's spend table; 33 of 33, no 4xx and no 5xx | 4 min 37 s (`test:core`); 99 s (the proof) | E.11 |
+| 2026-11-05 03:28 | E.12a: `pnpm test:core` on the final tree; the new and changed tests with the tests of the service code they cover, with the database address empty, on Python 3.13 and on 3.12; `test_propose.py`'s sim test; `gen:api`, `gen:tools` and `gen:components` with each `--check`; `typecheck`, `check:plan`, `check:state`, `check:figures`, `check:guild`, `check:tools`, `check:secrets`; `build`; `smoke` with no key; `pnpm prove`, offline, steps 1 to 10 | 2926 passed, 1 skipped, 175 deselected; 484 passed each way; 1 passed; every check green, `check:state` 62 checks, `check:guild` 126; the document, TOOLS.md and COMPONENTS.md as the service writes them; 13 of 13 screens; 89 of 89 checks, no call in the proof's spend table | 4 min 47 s (`test:core`); 204 s (the proof) | E.12a |
 | 2026-10-30 06:47 | `test:core` with 2.2; `check:tools`; `pnpm smoke` (own database, project made through the API) | 1920 passed, 2 skipped, 128 deselected; passed; 11 of 11 rail entries open in the project | 4 min 26 s | 2.2 |
 
 ## Spend (alpha 2.1)
@@ -293,7 +294,9 @@ prompt's §4).
 | [013](decisions/ADR-013-cornstover-package-test.md) | The corn stover plant's two values its package's own test fails, held to the package's measurement | accepted, stage 5 |
 | [014](decisions/ADR-014-durable-write-queue.md) | The Durable snapshot keeps the writes the service has not acknowledged | accepted, stage 7 (a departure) |
 | [015](decisions/ADR-015-engine-contract.md) | Engines register through Python entry points, behind one contract | accepted, alpha 2.2 stage B |
-| [016](decisions/ADR-016-bench-readings-alone.md) | The bench records a locked runbook's readings alone | accepted, alpha 2.2 stage C (a departure from §11.5) |
+| [016](decisions/ADR-016-bench-readings-alone.md) | The bench records a locked runbook's readings alone | accepted, alpha 2.2 stage C (a departure from §11.5; alpha 2.2 E.12a: its first revisit condition met by ADR-017, the readings-alone mode standing beside a protocol's steps) |
+| [017](decisions/ADR-017-project-protocols.md) | A project keeps its protocols | accepted, alpha 2.2 E.12a (ADR-016's revisit condition; the owner may reverse it) |
+| [018](decisions/ADR-018-lesson-body.md) | A lesson keeps its body in the lesson catalogue | accepted, alpha 2.2 E.12a (the owner may reverse it) |
 
 ## Departures from the execution prompt
 
@@ -421,7 +424,7 @@ prompt's §4).
 | `proforma._strain_labels`' per-program species map serves the vessel's organism check; with no catalogue it is empty in production, and its two notes are hashed into vessel designs | with the `program` key above |
 | A retrieval report over a project's own corpus with the lanes that call a model (the graph, HyDE, a judge grading the answers): alpha 1.0's paid lanes (Live owed, §4.5) | after alpha 2.0, with the key: `pnpm lit:report` extended to a project and a judge route |
 | The kit's `search_entities` and `get_entity_relationships` read the concept graph whole (every project's entities, relationships and evidence quotes), so the kit's MCP server leaves them off; nothing in openFerment builds the graph yet | before a graph is built: scope both to the project's chunks, or serve them from openFerment's registry |
-| Paid in part: the catalogues are project stores (migration 0007, `catalogues.py`): strains and their aliases, products, Guild's skills and Primer's lessons, each with a route, `catalogue_read` and `catalogue_write`, and an Intake path for a file of entries; the proposer, ProtParam, Guild and the module reads read them (alpha 2.1, D.1). The catalogues screen at `/catalogues` lists, adds and edits each kind in the name Settings holds and takes in a file; a skill's entry holds the policy Guild's levels read, and a product's the class and the place the cells leave it, which pureOS's proposer reads (alpha 2.2 E.8). The store reads the project's strains and products from the catalogues as the page opens and after each keep and file on the catalogues screen, so geneOS's hosts and their pages, the strain choosers of fermOS and pureOS, pureOS's proposal chooser, the runbooks, the protocols and the palette name what the catalogues keep (alpha 2.2 E.9). Still open: the protocol steps' skills (Guild's `steps`), and the store's skills and lessons, which stay empty until the store reads those catalogues, Primer's lessons among them | alpha 2.1, D.1; alpha 2.2 E.8 and E.9; the rest at alpha 2.2 E.12a and E.12 (protocol steps, skills, lessons) |
+| Paid in part: the catalogues are project stores (migration 0007, `catalogues.py`): strains and their aliases, products, Guild's skills and Primer's lessons, each with a route, `catalogue_read` and `catalogue_write`, and an Intake path for a file of entries; the proposer, ProtParam, Guild and the module reads read them (alpha 2.1, D.1). The catalogues screen at `/catalogues` lists, adds and edits each kind in the name Settings holds and takes in a file; a skill's entry holds the policy Guild's levels read, and a product's the class and the place the cells leave it, which pureOS's proposer reads (alpha 2.2 E.8). The store reads the project's strains and products from the catalogues as the page opens and after each keep and file on the catalogues screen, so geneOS's hosts and their pages, the strain choosers of fermOS and pureOS, pureOS's proposal chooser, the runbooks, the protocols and the palette name what the catalogues keep (alpha 2.2 E.9). A project keeps its protocols in a store of their own (migration 0010, `protocols.py`, ADR-017), each step's skills held to the skill catalogue, and Guild's steps, Practice's sources, a check's brief and the runbooks module read them; a lesson keeps its body, its minutes, blocks and checkpoint (ADR-018), and the Primer module's read lists a catalogue lesson (alpha 2.2 E.12a). Still open: the store's skills, lessons and protocols, which stay empty until the store reads them, Primer's lessons among them | alpha 2.1, D.1; alpha 2.2 E.8, E.9 and E.12a; the rest at alpha 2.2 E.12 (the store's skills, lessons and protocols) |
 | `src/engine/competence.ts` and `checks.ts` read a skill's policy as present, and the service leaves a skill kept with no policy out of every level in words (`competence.unrated`, alpha 2.2 E.8). Nothing in the browser meets such a skill yet: the store's skills stay empty until it reads the skills catalogue, and the competence fixture holds skills that each carry a policy | alpha 2.2 E.12, which fills the store's skills from the catalogue and teaches competence.ts and checks.ts the same, the fixture holding the two equal |
 | Paid: `stream_table` on a scenario's kept run lost its test with the seed scenarios; `test_tools` reads the stream table of the run it makes of a kept scenario, from the run's artifact | alpha 2.1, D.6 |
 | Paid: the module reads list a project's depositions, each reading a run may take and the measured evidence a reconciliation released; `module_stores.PARTIAL` holds no runbooks line | alpha 2.2, C.5 |
@@ -2460,3 +2463,43 @@ holds the numbers, the tables and the judgements).
   read the walk's deposition's record and the depositions list; and opened a new bench of the readings alone,
   its staged screen listing the runbook's measures: 33 of 33, no console error, no 4xx and no 5xx; its database
   dropped after.
+- E.12a. A project keeps its protocols, and a lesson keeps its body (the stage plan's E.12a; ADR-017 and
+  ADR-018, each accepted, the owner free to reverse either). ADR-017 answers ADR-016's revisit condition:
+  `models.py` gains `Protocol`, `ProtocolVersion`, `Step`, `Material` with `MaterialStock`, `BaseBatch`,
+  `EstMinutes` and `ProtocolReference`, written from the page's hand shapes (a category and a material's
+  scaling as Literals, every number finite, a step's placeholders binding materials its version holds, each
+  step id and material name held once), with `ProtocolKeep` and `ProtocolVersionKeep`; migration 0010 makes
+  the `protocols` table, one row a protocol; and `protocols.py` keeps them: `POST /api/protocols` makes a
+  protocol once under its id, `POST /api/protocols/{id}/versions` adds a version under a version of its own
+  and makes it the current one, a version held already refused in words so a kept version stays as it was
+  kept, and `GET /api/protocols` and `GET /api/protocols/{id}` serve each protocol whole. The service writes
+  each version's keeper and time, holds the keeper's name to the rule a person's recorded name keeps, audits
+  each keep in that name, and refuses in words a step naming a skill the project's skill catalogue does not
+  hold. `guild.projection()` reads every version's steps with their skills, so `guild.step_skills` answers
+  for a kept protocol, and the current version of each protocol a step of which needs a skill, its steps in
+  the words the bench shows at the base batch (`protocols.as_quoted`), which Practice quotes and a check's
+  brief reads; the runbooks module's read lists each protocol from a source of its own (`Sources.protocols`),
+  apart from the projection a train's resolution reads for its strains' names, which the conformance copy's
+  test holds (the first run of `pnpm test:core` found the train's resolution reading the new table). ADR-018
+  gives the lesson kind `minutes`, `blocks` (prose in Markdown and the nine embeds Primer's page draws) and
+  `checkpoint` (a multiple-choice question with its options and the index of its answer; a numeric one with
+  a value, a unit the converter reads or none, and a tolerance in percent), each refused in words on any
+  other kind and where a question does not stand; a JSON file takes the body, `catalogue_write` keeps a
+  lesson with none, and `catalogue_read` lists a lesson with its skills and minutes, its body left to the
+  catalogues screen and Primer (`docs/TOOLS.md`). Two defects of alpha 2.1 D.1 found and repaired on the way,
+  each with a test: the check ranking and a check's run read Guild's own projection inside their transaction,
+  where `db.run` refuses to run, so each raised a RuntimeError in any project, the nightly ranking among
+  them (the frozen fixture the tests hand in place of the projection hid it); each now reads the skills
+  before its transaction begins (`checks._propose`, `guild.write_check_entries_in`). And the Primer module's read raised `KeyError: 'moduleTitle'` on every
+  catalogue lesson, which names no module; it reads a lesson's title, words, skills and minutes. The document
+  holds 285 schemas, 14 of them new, 182 marked as written, none split; CLAUDE.md gains both records' lines
+  and says ADR-000 to ADR-018, ADR-016 gains its implementation note, `docs/api/studies.md` documents the
+  protocols, `docs/api/intake.md` a lesson's body, and BASE.md's content line both. Checks: `pnpm test:core`
+  2926 passed, 1 skipped, 175 deselected (4 min 47 s, on the final tree); the new and changed tests with the
+  tests of the service code they cover, 16 files, with the database address empty on Python 3.13 and on
+  Python 3.12, 484 passed each way; `gen:api`, `gen:tools` and `gen:components` with each `--check`, the
+  document, `docs/TOOLS.md` and `COMPONENTS.md` as the service writes them; `typecheck`; `check:plan`, 1629
+  fields across 218 types; `check:state`, 62 checks; `check:figures`; `check:guild`, 126 checks;
+  `check:tools`; `check:secrets`; `build`; `pnpm smoke` with no key, 13 of 13 screens; `test_propose.py`'s sim
+  test through the real worker, 1 passed; `pnpm prove`, offline, steps 1 to 10, 89 of 89 checks, the four
+  engines' eight checks each among them, no call in the proof's spend table.

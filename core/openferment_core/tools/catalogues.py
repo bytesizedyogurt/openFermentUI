@@ -9,7 +9,11 @@ of door (Postdoc's loop, or an outside assistant's) and is refused in words
 over any other keeper's (alpha 2.2 D.0, catalogues.keep); nothing here takes
 an entry out. A catalogue holds names and words, never a measured value, and
 a skill's policy (its numbers) is a person's to write on the catalogues
-screen, so `catalogue_write` keeps a skill with none (alpha 2.2 E.8).
+screen, so `catalogue_write` keeps a skill with none (alpha 2.2 E.8). A
+lesson's body (its minutes, blocks and checkpoint) is a person's to write
+there too: `catalogue_write` keeps a lesson with none, and `catalogue_read`
+lists a lesson with its body left to the catalogues screen and Primer
+(alpha 2.2 E.12a, ADR-018).
 """
 from __future__ import annotations
 
@@ -44,7 +48,8 @@ def _read(inp: CatalogueReadInput, ctx: ToolContext) -> ToolResult:
         said = " ".join([e.id, e.name, *(e.aliases or []), e.species or "", e.category or "", e.family or ""]).lower()
         if words and not all(w in said for w in words):
             continue
-        rows.append(e.model_dump(mode="json", exclude_none=True))
+        # A lesson's body is long, and the catalogues screen and Primer show it.
+        rows.append(e.model_dump(mode="json", exclude_none=True, exclude={"blocks", "checkpoint"}))
     return ToolResult(summary={"kind": kind, "matched": len(rows), "entries": rows[: inp.limit],
                                "note": "catalogue_write keeps an entry, marked as yours."})
 
@@ -83,7 +88,9 @@ READ_TOOL = register(Tool(
         "Read one of the project's catalogues: its strains (each with its species, the chemical set its trains use "
         "and the other names papers give it), its products (each with its class, where the cells leave it and a "
         "protein's sequence), Guild's skills (each with the policy a person wrote for it, when one did) or Primer's "
-        "lessons. Narrow by words. Returns {kind, matched, entries, note}: matched counts every "
+        "lessons (each with the skills it counts toward and the minutes it takes; its body, the blocks and the "
+        "checkpoint a person writes, is left to the catalogues screen and Primer). Narrow by words. Returns {kind, "
+        "matched, entries, note}: matched counts every "
         f"entry the words match, and entries holds the first limit of them ({ROWS} when limit is left out, at most "
         f"{MAX_ROWS}), in id order, each an entry with its fields as kept and its null fields left out: its kind, "
         "id, name and the fields of its kind, who kept it (by), the lane it was kept in (agent: person or model), "
@@ -109,7 +116,8 @@ WRITE_TOOL = register(Tool(
         "reads), location, sequence and sequenceSource; a skill's are family and mastery; a lesson's is skills; "
         "every kind takes name, summary and note, and a field of another kind is refused in words. A skill kept here "
         "holds no policy, which a person writes on the catalogues screen, and Guild rates nobody on it until one "
-        "does. The result's summary is the entry as kept, its null fields left out and "
+        "does; a lesson kept here holds no body (its minutes, blocks and checkpoint), which a person writes there "
+        "too. The result's summary is the entry as kept, its null fields left out and "
         "a protein's sequence left to catalogue_read: its kind, id, name and fields, its own note, by (the name "
         "you are kept under), agent (model), via (the door: postdoc, mcp or http), source and at, beside state "
         "(open) and meaning (the service's word on the keep). Its audit row names the module that reads the kind "

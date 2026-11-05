@@ -155,6 +155,9 @@ from .models import (
     ProjectState,
     StateKept,
     StateTakenBack,
+    Protocol,
+    ProtocolKeep,
+    ProtocolVersionKeep,
 )
 from . import llm
 from .engine import library as _library  # noqa: F401  (registers the library.run tool for compute and replay)
@@ -1190,6 +1193,75 @@ def catalogue_intake(kind: str = Form(...), by: str = Form(..., min_length=1, ma
     try:
         return catalogues.intake(_catalogue_kind(kind), data, file.filename or "", by=by)
     except catalogues.CatalogueRefused as e:
+        raise HTTPException(status_code=422, detail=str(e)) from e
+
+
+# ── a project's protocols (alpha 2.2 E.12a, ADR-017; protocols.py) ───────
+
+
+NO_PROTOCOL = {"model": Refusal, "description": "The project keeps no protocol of that id, in words."}
+
+
+def _protocol_refusals(what: str) -> dict[str, Any]:
+    return {"description": what, "content": {"application/json": {"schema": {"anyOf": [
+        {"$ref": "#/components/schemas/Refusal"}, {"$ref": "#/components/schemas/HTTPValidationError"}]}}}}
+
+
+@app.get("/api/protocols", response_model=list[Protocol])
+def protocols_listed() -> list[Protocol]:
+    """The open project's protocols, by id, each whole: its own fields and every version as it was kept, each
+    version with who kept it (`by`) and when (`at`, ISO 8601 in UTC), the current one named by `currentVersion`."""
+    from . import protocols
+
+    return protocols.listed()
+
+
+@app.get("/api/protocols/{protocol_id}", response_model=Protocol, responses={404: NO_PROTOCOL})
+def protocol_read(protocol_id: str) -> Protocol:
+    """One of the open project's protocols, whole; 404 in words when the project keeps none of that id."""
+    from . import protocols
+
+    try:
+        return protocols.get(protocol_id)
+    except protocols.ProtocolNotFound as e:
+        raise HTTPException(status_code=404, detail=str(e).strip("'\"")) from e
+
+
+@app.post("/api/protocols", response_model=Protocol, responses={422: _protocol_refusals(
+    "A protocol the service will not keep, in words: a list of field errors, each with its place and why, for a "
+    "protocol whose own fields refuse it (a step binding a material its version lacks, a stock asked of a material "
+    "with none, a version held twice, a current version that is none of its versions, a number that is not finite); "
+    "and the service's words for a protocol the project keeps already, a step needing a skill the skill catalogue "
+    "does not hold, and a keep that names nobody.")})
+def protocol_make(asked: ProtocolKeep) -> Protocol:
+    """A protocol made in the open project in the name of `by`, with every version it holds, the protocol whole as
+    kept: the service writes each version's keeper and time (`by`, `at`) over what it sends, and audits the keep.
+    A protocol is made once under its id; a new version of it is kept at `/api/protocols/{id}/versions`. Every
+    skill a step names is one the project's skill catalogue holds (`/api/catalogues/skill`)."""
+    from . import protocols
+
+    try:
+        return protocols.make(asked.protocol, by=asked.by)
+    except protocols.ProtocolRefused as e:
+        raise HTTPException(status_code=422, detail=str(e)) from e
+
+
+@app.post("/api/protocols/{protocol_id}/versions", response_model=Protocol, responses={404: NO_PROTOCOL, 422: (
+    _protocol_refusals(
+        "A version the service will not keep, in words: a list of field errors for a version whose own fields refuse "
+        "it, and the service's words for a version the protocol holds already (a kept version stays as it was "
+        "kept), a step needing a skill the skill catalogue does not hold, and a keep that names nobody."))})
+def protocol_version(protocol_id: str, asked: ProtocolVersionKeep) -> Protocol:
+    """A new version of one of the open project's protocols, kept in the name of `by` and made its current version:
+    the protocol whole, as it now stands. Every version kept before stays as it was kept, and the keep is audited.
+    404 in words when the project keeps no protocol of that id."""
+    from . import protocols
+
+    try:
+        return protocols.add_version(protocol_id, asked.version, by=asked.by)
+    except protocols.ProtocolNotFound as e:
+        raise HTTPException(status_code=404, detail=str(e).strip("'\"")) from e
+    except protocols.ProtocolRefused as e:
         raise HTTPException(status_code=422, detail=str(e)) from e
 
 

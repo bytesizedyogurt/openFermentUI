@@ -17,7 +17,8 @@ import math
 import re
 from typing import Annotated, Any, Literal
 
-from pydantic import BaseModel, ConfigDict, Field, ValidationInfo, field_validator, model_serializer, model_validator
+from pydantic import (BaseModel, ConfigDict, Field, FiniteFloat, ValidationInfo, field_validator, model_serializer,
+                      model_validator)
 
 # Mirrors the Provenance union in src/data/types.ts, weakest last. The order IS
 # the ranking: `weakest_provenance` walks this list, so adding a class in the
@@ -4959,3 +4960,202 @@ class StateTakenBack(BaseModel):
     kind: str
     id: str
     removed: bool
+
+
+# ── A project's protocols (protocols.py; alpha 2.2 E.12a, ADR-017) ──────
+#
+# A protocol as the lab writes it, kept whole as a row of `protocols`
+# (migration 0010) and served whole: its own fields, written when it is made,
+# and its versions, each kept as it was kept and never replaced. Its numbers
+# are what the protocol says, written for its base batch (an amount, a stock's
+# concentration, a timer, the minutes a run takes); a material that rests on a
+# record names the record by its id.
+
+ProtocolCategory = Literal["media", "culture", "analytics", "harvest", "fermentation", "sop"]
+# How a material's amount moves when the batch is scaled: with the batch's
+# volume, with the biomass, or not at all.
+ScalingClass = Literal["per_batch_volume", "fixed", "per_unit_biomass"]
+# A protocol's id, a version's and a step's: a letter or a digit first, then
+# letters, digits, '.', '_' or '-'. Practice names a step as
+# "<protocol>:<step>", so neither holds a colon.
+PROTOCOL_ID = r"^[A-Za-z0-9][A-Za-z0-9._-]{0,79}$"
+PART_ID = r"^[A-Za-z0-9][A-Za-z0-9._-]{0,39}$"
+# A step's placeholders: a material's amount at the batch's scale, and the
+# volume of its stock that holds that amount (src/engine/scale.ts).
+PLACEHOLDER = re.compile(r"\{\{(qty|stock):([^}]+)\}\}")
+
+
+class MaterialStock(BaseModel):
+    """The stock solution a material is drawn from: how much of the material
+    one of `unit` of stock holds, in the material's own unit."""
+
+    conc: FiniteFloat = Field(gt=0)
+    unit: str = Field(min_length=1, max_length=40)
+
+
+class Material(BaseModel):
+    """One material of a version, its amount written for the base batch."""
+
+    name: str = Field(min_length=1, max_length=200)
+    amount: FiniteFloat = Field(ge=0)
+    unit: str = Field(max_length=40)
+    scaling: ScalingClass
+    # The increment an amount is rounded to at a scale, so a scaled amount
+    # stays one the bench can measure; 0 rounds nothing.
+    precision: FiniteFloat = Field(ge=0)
+    stock: MaterialStock | None = None
+    # The record the amount rests on, by its id.
+    sourceRecordId: str | None = Field(default=None, max_length=120)
+
+    @field_validator("name")
+    @classmethod
+    def _a_name_a_step_can_bind(cls, v: str) -> str:
+        if not v.strip():
+            raise ValueError("a material has a name")
+        if "{" in v or "}" in v:
+            raise ValueError(f"a material's name is one a step binds with {{{{qty:name}}}}, and {v!r} holds a brace")
+        return v
+
+
+class Step(BaseModel):
+    """One step of a version: what the person does, with `{{qty:<material>}}`
+    where a material's amount stands and `{{stock:<material>}}` where the
+    volume of its stock does, each at the batch's scale."""
+
+    id: str = Field(pattern=PART_ID)
+    text: str = Field(min_length=1, max_length=4000)
+    timerSec: FiniteFloat | None = Field(default=None, gt=0)
+    timerLabel: str | None = Field(default=None, max_length=200)
+    # The checks the person ticks off within the step.
+    multiCheck: list[str] = Field(default_factory=list, max_length=40)
+    # Why the step is done as written.
+    note: str | None = Field(default=None, max_length=2000)
+    # The records and papers the step rests on, by id.
+    refs: list[str] = Field(default_factory=list, max_length=40)
+    # The skills a person needs to do the step, by their ids in the project's
+    # skill catalogue, which a keep holds them to: Guild's matrix and the
+    # run's gate read them (guild.step_skills).
+    skills: list[str] = Field(default_factory=list, max_length=20)
+
+    @field_validator("text")
+    @classmethod
+    def _says_something(cls, v: str) -> str:
+        if not v.strip():
+            raise ValueError("a step says what the person does")
+        return v
+
+    @field_validator("skills", "refs")
+    @classmethod
+    def _ids(cls, v: list[str]) -> list[str]:
+        return list(dict.fromkeys(s.strip() for s in v if s and s.strip()))
+
+
+class BaseBatch(BaseModel):
+    """The batch a version's amounts are written for: its size, its unit and
+    what it is called."""
+
+    value: FiniteFloat = Field(gt=0)
+    unit: str = Field(min_length=1, max_length=40)
+    label: str = Field(max_length=200)
+
+
+class EstMinutes(BaseModel):
+    """How long a run of the version takes, hands on and in all, in minutes."""
+
+    active: FiniteFloat = Field(ge=0)
+    total: FiniteFloat = Field(ge=0)
+
+
+class ProtocolReference(BaseModel):
+    """A paper or a record the version rests on, by id, with what it gives."""
+
+    paperId: str | None = Field(default=None, max_length=120)
+    recordId: str | None = Field(default=None, max_length=120)
+    note: str | None = Field(default=None, max_length=2000)
+
+
+class ProtocolVersion(BaseModel):
+    """One version of a protocol, kept as it was kept: its base batch, its
+    materials, equipment and safety notes, its steps, the minutes a run takes
+    and what it rests on. The service writes who kept it (`by`) and when
+    (`at`, ISO 8601 in UTC) over what a version sends."""
+
+    version: str = Field(pattern=PART_ID)
+    # What changed from the version before, in words.
+    changelog: str | None = Field(default=None, max_length=4000)
+    baseBatch: BaseBatch
+    materials: list[Material] = Field(default_factory=list, max_length=200)
+    equipment: list[str] = Field(default_factory=list, max_length=100)
+    safety: list[str] = Field(default_factory=list, max_length=100)
+    steps: list[Step] = Field(default_factory=list, max_length=500)
+    estMinutes: EstMinutes
+    references: list[ProtocolReference] = Field(default_factory=list, max_length=100)
+    by: str = Field(default="", max_length=200)
+    at: str = ""
+
+    @model_validator(mode="after")
+    def _its_steps_bind_its_materials(self) -> "ProtocolVersion":
+        materials: dict[str, Material] = {}
+        for m in self.materials:
+            if m.name in materials:
+                raise ValueError(f"version {self.version} names the material {m.name!r} twice")
+            materials[m.name] = m
+        seen: set[str] = set()
+        for st in self.steps:
+            if st.id in seen:
+                raise ValueError(f"version {self.version} has two steps {st.id}")
+            seen.add(st.id)
+            for kind, name in PLACEHOLDER.findall(st.text):
+                held = materials.get(name)
+                if held is None:
+                    raise ValueError(f"step {st.id} binds {name!r}, which is no material of version {self.version}")
+                if kind == "stock" and held.stock is None:
+                    raise ValueError(f"step {st.id} asks for a volume of the stock of {name!r}, and {name!r} names "
+                                     "no stock solution")
+        return self
+
+
+class Protocol(BaseModel):
+    """A protocol a project keeps (mirrors `Protocol` in src/data/types.ts):
+    its own fields, written when it is made, and its versions, the current
+    one named by `currentVersion`."""
+
+    id: str = Field(pattern=PROTOCOL_ID)
+    title: str = Field(min_length=1, max_length=200)
+    category: ProtocolCategory
+    # The organisms it is written for, in words.
+    organisms: list[str] = Field(default_factory=list, max_length=40)
+    bsl: Literal[1, 2]
+    purpose: str = Field(default="", max_length=4000)
+    versions: list[ProtocolVersion] = Field(min_length=1, max_length=200)
+    currentVersion: str
+    # Where the protocol comes from, in words.
+    provenanceNote: str = Field(default="", max_length=2000)
+
+    @model_validator(mode="after")
+    def _current_is_one_of_its_versions(self) -> "Protocol":
+        held = [v.version for v in self.versions]
+        twice = sorted({v for v in held if held.count(v) > 1})
+        if twice:
+            raise ValueError(f"{self.id} holds version {twice[0]} twice; a version is kept once")
+        if self.currentVersion not in held:
+            raise ValueError(f"{self.id}'s current version {self.currentVersion!r} is none of its versions "
+                             f"({', '.join(held)})")
+        return self
+
+
+class ProtocolKeep(BaseModel):
+    """POST /api/protocols: a protocol the project does not keep yet, with its
+    versions, and the name of the person who keeps it."""
+
+    protocol: Protocol
+    by: str = ""
+
+
+class ProtocolVersionKeep(BaseModel):
+    """POST /api/protocols/{id}/versions: a new version of a protocol the
+    project keeps, under a version of its own, and the name of the person who
+    keeps it; it becomes the protocol's current version."""
+
+    version: ProtocolVersion
+    by: str = ""

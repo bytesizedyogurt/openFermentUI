@@ -282,12 +282,16 @@ def propose(by: str | None, *, today: str | None = None, limit: int = PROPOSALS_
     if by is not None and not (_lead(ledger, by) or _assessor_anywhere(ledger, by)):
         raise CheckRefused("authority", "the ranking is run by an assessor or the lead")
     day = today or date.today().isoformat()
-    made = db.run(_propose(projects.current(), ledger, by, day, limit))
+    made = db.run(_propose(projects.current(), ledger, guild.skills(), by, day, limit))
     log.info("checks: %d proposed%s", len(made), f" by {by}" if by else " by the nightly ranking")
     return made
 
 
-async def _propose(project_id: str, ledger: Guild, by: str | None, day: str, limit: int) -> list[Check]:
+async def _propose(project_id: str, ledger: Guild, known: dict[str, dict[str, Any]], by: str | None, day: str,
+                   limit: int) -> list[Check]:
+    """The ranking's checks kept, against the skills its caller read before
+    the transaction began: this runs on the database's own thread, where a
+    store's read through `db.run` is refused."""
     async with db.session() as s:
         checks = await _locked(s, project_id)
         made = [
@@ -300,7 +304,7 @@ async def _propose(project_id: str, ledger: Guild, by: str | None, day: str, lim
                 proposedAt=_now(),
                 proposedBy=by,
             )
-            for p in propose_from(ledger, guild.skills(), day, covered(checks), limit)
+            for p in propose_from(ledger, known, day, covered(checks), limit)
         ]
         for c in made:
             await _keep(s, project_id, c)
@@ -469,7 +473,7 @@ async def _record(
         ]
         # Asked against one ledger and written in this transaction with the
         # check's close: the run lands whole or not at all.
-        stored = await guild.write_check_entries_in(s, project_id, entries, c)
+        stored = await guild.write_check_entries_in(s, project_id, entries, c, known)
         done = c.model_copy(
             update={
                 "state": "done",

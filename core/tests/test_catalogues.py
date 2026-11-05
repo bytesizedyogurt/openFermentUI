@@ -5,9 +5,13 @@ lessons are rows of the project's `catalogue` table: kept by the route, by
 Postdoc's `catalogue_write` (marked as the model's, audited) or by Intake from
 a file, and read by every reader that had read an empty list: geneOS's hosts
 and the strain aliases, ProtParam's products, the proposer's catalogue and
-Guild's skills. Entries here are test material, words with no measured value.
+Guild's skills. A lesson keeps its body: its minutes, its blocks and its
+checkpoint (alpha 2.2 E.12a, ADR-018). Entries here are test material, words
+and placeholder numbers with no measured value.
 """
 from __future__ import annotations
+
+import json
 
 import pytest
 from fastapi.testclient import TestClient
@@ -370,3 +374,100 @@ def test_a_run_of_a_skill_with_no_policy_is_refused_in_words(monkeypatch):
     cosigned = alone.model_copy(update={"id": "e-cosign-1", "kind": "supervised", "observerId": "p-lead"})
     with pytest.raises(guild.GuildRefused, match="nobody cosigns it until its catalogue entry holds its policy"):
         guild.write_evidence(cosigned)
+
+
+# ── alpha 2.2 E.12a: a lesson keeps its body (ADR-018) ──
+
+
+def _a_unit_the_converter_reads() -> str:
+    """A unit from the converter's own table, read at run time."""
+    from openferment_core import units
+
+    return next(iter(units.tables()["table"]))
+
+
+def lesson_with_a_body(**over) -> dict:
+    body = {"kind": "lesson", "id": "l-body", "name": "A placeholder lesson", "skills": ["SK-A"], "minutes": 5,
+            "blocks": [{"kind": "prose", "md": "A placeholder paragraph."},
+                       {"kind": "embed", "embed": "ask-prompt", "arg": "A placeholder question?"},
+                       {"kind": "embed", "embed": "mini-queue"}],
+            "checkpoint": [{"id": "q1", "prompt": "A placeholder choice?", "kind": "mc",
+                            "options": ["Option one", "Option two"], "answerIndex": 1,
+                            "explanation": "A placeholder explanation."},
+                           {"id": "q2", "prompt": "A placeholder number?", "kind": "numeric",
+                            "answer": {"value": 1.5, "unit": "", "tolerancePct": 5}},
+                           {"id": "q3", "prompt": "A placeholder quantity?", "kind": "numeric",
+                            "answer": {"value": 2, "unit": _a_unit_the_converter_reads(), "tolerancePct": 0}}]}
+    body.update(over)
+    return body
+
+
+def test_a_lesson_keeps_its_body_and_the_routes_serve_it_whole():
+    client = TestClient(api.app, base_url="http://127.0.0.1")
+    made = client.post("/api/catalogues/lesson", json={"entry": lesson_with_a_body(), "by": "Ada"})
+    assert made.status_code == 200, made.text
+    held = client.get("/api/catalogues/lesson/l-body").json()
+    assert held["minutes"] == 5 and [b["kind"] for b in held["blocks"]] == ["prose", "embed", "embed"]
+    assert held["blocks"][2] == {"kind": "embed", "embed": "mini-queue", "arg": None}
+    assert [q["kind"] for q in held["checkpoint"]] == ["mc", "numeric", "numeric"]
+    assert held["checkpoint"][1]["answer"] == {"value": 1.5, "unit": "", "tolerancePct": 5.0}
+    assert held["checkpoint"][2]["answer"]["unit"] == _a_unit_the_converter_reads()
+    (lesson,) = catalogues.as_lessons()
+    assert (lesson["minutes"], lesson["skills"]) == (5, ["SK-A"])
+    stores = module_stores.Stores()
+    (row,) = stores.rows("primer")
+    assert (row.id, row.label, row.detail) == ("l-body", "A placeholder lesson", {"skills": ["SK-A"], "minutes": 5})
+    assert stores.error("primer") is None, "a catalogue lesson reads, with no module of alpha 1.0 around it"
+
+
+@pytest.mark.parametrize("change, said", [
+    ({"kind": "skill", "skills": []}, "minutes, blocks and a checkpoint belong to a lesson"),
+    ({"blocks": [{"kind": "embed", "embed": "a-placeholder-embed"}]}, "Input should be 'chip-demo'"),
+    ({"blocks": [{"kind": "verse", "md": "A placeholder line."}]}, "does not match any of the expected tags"),
+    ({"checkpoint": [{"id": "q1", "prompt": "P?", "kind": "mc", "options": ["One"], "answerIndex": 0}]},
+     "multiple-choice question q1 offers two options or more"),
+    ({"checkpoint": [{"id": "q1", "prompt": "P?", "kind": "mc", "options": ["One", "Two"], "answerIndex": 2}]},
+     "names its answer among its options (answerIndex, from 0 to 1)"),
+    ({"checkpoint": [{"id": "q1", "prompt": "P?", "kind": "mc", "options": ["One", "Two"], "answerIndex": 0,
+                      "answer": {"value": 1, "unit": "", "tolerancePct": 5}}]},
+     "a value to answer with belongs to a numeric question, and q1 is multiple choice"),
+    ({"checkpoint": [{"id": "q1", "prompt": "P?", "kind": "numeric"}]},
+     "numeric question q1 holds its answer: a value, a unit and a tolerance"),
+    ({"checkpoint": [{"id": "q1", "prompt": "P?", "kind": "numeric", "options": ["One", "Two"],
+                      "answer": {"value": 1, "unit": "", "tolerancePct": 5}}]},
+     "options and an answer's index belong to a multiple-choice question, and q1 is numeric"),
+    ({"checkpoint": [{"id": "q1", "prompt": "P?", "kind": "numeric",
+                      "answer": {"value": 1, "unit": "placeholder-unit", "tolerancePct": 5}}]},
+     "the converter reads no 'placeholder-unit'"),
+    ({"checkpoint": [{"id": "q1", "prompt": "P?", "kind": "numeric",
+                      "answer": {"value": float("nan"), "unit": "", "tolerancePct": 5}}]}, "finite number"),
+    ({"checkpoint": [{"id": "q1", "prompt": "P?", "kind": "numeric",
+                      "answer": {"value": 1, "unit": "", "tolerancePct": 101}}]}, "less than or equal to 100"),
+    ({"checkpoint": [{"id": "q1", "prompt": "P?", "kind": "mc", "options": ["One", "Two"], "answerIndex": 0}] * 2},
+     "asks question q1 twice"),
+    ({"minutes": 0}, "greater than or equal to 1"),
+])
+def test_a_lessons_body_is_refused_in_words_where_it_does_not_stand(change, said):
+    with pytest.raises(ValueError) as caught:
+        catalogues.CatalogueEntry.model_validate(lesson_with_a_body(**change))
+    assert said in str(caught.value)
+
+
+def test_a_file_of_lessons_takes_their_bodies_and_postdoc_reads_a_lesson_with_its_body_left_out():
+    rows = [lesson_with_a_body(), lesson_with_a_body(id="l-bad", checkpoint=[{"id": "q1", "prompt": "P?",
+                                                                              "kind": "numeric"}])]
+    got = catalogues.intake("lesson", json.dumps(rows).encode(), "lessons.json", by="Ada")
+    assert got.kept == ["l-body"] and got.refused == [
+        "row 2: checkpoint.0: numeric question q1 holds its answer: a value, a unit and a tolerance"]
+    assert len(catalogues.get("lesson", "l-body").checkpoint) == 3
+    ctx = tools.ToolContext(model="test-model-a")
+    (entry,) = tools.run("catalogue_read", {"kind": "lesson"}, ctx).summary["entries"]
+    assert entry["minutes"] == 5 and entry["skills"] == ["SK-A"] and {"blocks", "checkpoint"}.isdisjoint(entry)
+    numbered = tools.run("catalogue_write", {"kind": "lesson", "id": "l-model", "name": "A model's placeholder lesson",
+                                             "minutes": 3}, ctx)
+    assert numbered.error.startswith("catalogue_write refused: a number was typed into minutes")
+    wrote = tools.run("catalogue_write", {"kind": "lesson", "id": "l-model", "name": "A model's placeholder lesson",
+                                          "blocks": [{"kind": "prose", "md": "A placeholder."}]}, ctx)
+    assert wrote.error is None
+    kept = catalogues.get("lesson", "l-model")
+    assert (kept.minutes, kept.blocks, kept.checkpoint) == (None, [], []), "a model's write keeps no lesson's body"

@@ -57,11 +57,15 @@ The rules, by name:
 Nothing is repaired on the way through. The skills, the protocol steps that
 need them and the lessons that count toward them come from `projection()`:
 the skills and the lessons from the project's catalogues (catalogues.py),
-each skill with the policy its entry holds; no store holds protocol steps'
-skills yet, so a step needs none, and the tests hand in a frozen fixture. A
-skill kept with no policy is left out of every level (competence.unrated):
-nobody holds it, so a run of it alone and a cosign of it are refused in
-words that say so.
+each skill with the policy its entry holds, and the steps from the project's
+protocols (protocols.py), each step with the skills a keep held to the skill
+catalogue; most tests hand in a frozen fixture in its place. A skill kept
+with no policy is left out of every level (competence.unrated): nobody holds
+it, so a run of it alone and a cosign of it are refused in words that say
+so. The projection is read before a transaction begins, and a write inside
+one takes what its caller read (`write_check_entries_in`): a store's read
+goes through `db.run`, which refuses to run on the database's own thread,
+where a transaction's coroutine runs.
 """
 from __future__ import annotations
 
@@ -142,21 +146,27 @@ class GuildRefused(ValueError):
 
 
 # alpha 2.0 deleted the TypeScript skills, protocols and lessons these were
-# projected from (ADR-010), and no store holds them yet: a lab has defined no
-# skill, and every list is empty. Tests hand in alpha 1.0's frozen export in
-# place of `projection`.
+# projected from (ADR-010); a project keeps its own (catalogues.py,
+# protocols.py), and a project that keeps none, like no project open, reads
+# every list empty. Most tests hand in alpha 1.0's frozen export in place of
+# `projection`.
 EMPTY_PROJECTION: dict[str, Any] = {"skills": [], "steps": [], "lessons": [], "protocols": []}
 
 
 def projection() -> dict[str, Any]:
     """The skills and the lessons that count toward them, from the open
-    project's catalogues (catalogues.py), a copy of its own for each caller;
-    no store holds protocol steps' skills yet, so a step needs none."""
-    from . import catalogues
+    project's catalogues (catalogues.py), and the steps that need a skill,
+    from its protocols (protocols.py): every version's steps with their
+    skills, and the current version of each protocol a step of which needs
+    one, as Practice quotes it. A copy of its own for each caller."""
+    from . import catalogues, protocols
 
     out = copy.deepcopy(EMPTY_PROJECTION)
     out["skills"] = catalogues.as_skills()
     out["lessons"] = [{"lessonId": lesson["lessonId"], "skills": lesson["skills"]} for lesson in catalogues.as_lessons()]
+    held = protocols.held()
+    out["steps"] = protocols.as_steps(held)
+    out["protocols"] = protocols.as_quoted(held)
     return out
 
 
@@ -486,11 +496,12 @@ async def _write_prechecked(
 
 
 async def write_check_entries_in(
-    s: AsyncSession, project_id: str, entries: list[GuildEvidence], check: Check, *, dry_run: bool = False
+    s: AsyncSession, project_id: str, entries: list[GuildEvidence], check: Check, known: dict[str, dict[str, Any]],
+    *, dry_run: bool = False
 ) -> list[GuildEvidence]:
     """`write_check_entries` inside the run's own transaction, so the entries
-    and the check they close commit together (`checks.record`)."""
-    known = skills()
+    and the check they close commit together (`checks.record`), against the
+    skills its caller read before the transaction began (`skills()`)."""
     days = [_precheck(e, known, check.id, check) for e in entries]
     return await _admit_and_keep(s, project_id, entries, days, known, dry_run)
 

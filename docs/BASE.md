@@ -53,8 +53,8 @@ A module adds capability through a contract and edits nothing in the base:
   MCP server of its own (`docs/decisions/ADR-002-sci-rag-kit.md`).
 - **Postdoc**: the first agent, which stays in the repository with its screen; nothing in the
   base depends on it.
-- **Content**: Guild's protocols and skills, Primer's lessons, kept as catalogue entries of a
-  project.
+- **Content**: Guild's protocols, kept as a project's protocols (`docs/api/studies.md`), and
+  its skills and Primer's lessons, kept as catalogue entries of a project (`docs/api/intake.md`).
 
 ## The two handoff tests
 

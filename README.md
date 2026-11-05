@@ -54,7 +54,7 @@ pnpm build && pnpm prove      # the end-to-end proof, offline, on a database of 
 
 - [`docs/PROGRESS.md`](docs/PROGRESS.md): where things stand, how to resume, the debts and the blockers.
 - [`CLAUDE.md`](CLAUDE.md): the working guidance, every line labelled.
-- [`docs/decisions/`](docs/decisions/): the decision records, ADR-000 to ADR-016.
+- [`docs/decisions/`](docs/decisions/): the decision records, ADR-000 to ADR-018.
 - [`docs/api/`](docs/api/): the contracts (OpenAPI, events, engines, workers, runs, SFF, studies, Intake);
   [`docs/TOOLS.md`](docs/TOOLS.md): the tool registry; [`COMPONENTS.md`](COMPONENTS.md): the package map.
 - [`docs/history/`](docs/history/): the guidance written before alpha 2.0, kept as evidence.
