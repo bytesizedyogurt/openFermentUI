@@ -11,8 +11,8 @@ tested. An output is `values.<name>`, an entry of a run's outputs.values
 run `outputs.<key>` of a flowsheet's outputs or `price.<key>` of the price
 block as well. Each prediction gets a measure the bench records at
 harvest. The runbook is a row of `runbooks` in the shape the runbook page
-keeps (`src/data/types.ts` `Runbook`), so it lists and opens there beside a
-person's.
+keeps (`Runbook`, models.py and src/lib/studies.ts), so it lists and opens
+there beside a person's.
 
 Locking freezes it. The service writes the digest the browser's own code
 writes (runbook_lock.py, a port of src/engine/lock.ts) and the moment, into

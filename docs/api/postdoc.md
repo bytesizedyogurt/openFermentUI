@@ -12,7 +12,7 @@ Three tables of the project (migration 0005 split the conversations the page kep
 | Table | A row is | Its body |
 |---|---|---|
 | `conversations` | One conversation | `{id, title, startedAt, by}`: its first question as its title (at most 120 characters), when it began, who began it |
-| `turns` | One question, in its place (`seq`) in its conversation | `LiveTurn` (`models.py`, paired with `types.ts` by `check:plan`): the question, when it was asked, who asked, the loop's steps as they completed, the validated plan or the failure in words (`error`: message and remedy), the status, and `artifactIds`, the artifacts its tool calls produced and its plan cites |
+| `turns` | One question, in its place (`seq`) in its conversation | `LiveTurn` (`models.py`; the browser reads its generated twin in `src/lib/postdoc.ts`): the question, when it was asked, who asked, the loop's steps as they completed, the validated plan or the failure in words (`error`: message and remedy), the status, and `artifactIds`, the artifacts its tool calls produced and its plan cites |
 | `tool_calls` | One tool call of a turn, in order | `ToolCallRecord`: the tool, its input, what it answered the model (`summary`, `error`) and what it offered to cite (`evidenceIds`, `recordIds`, `passageIds`, `artifactIds`), who asked and when |
 
 A turn's status is one of:
@@ -49,7 +49,7 @@ value read from a computed value names its evidence id in `source` and carries o
 (the evidence's artifact); one read from a record names the record and carries origin `record`;
 the answering model's estimate carries origin `model-estimate` with the model's id, the moment
 and what it rests on, and the claim stating it is `assumed`. A value's evidence or record is
-cited by its claim. The browser's `ClaimValue` mirrors it (`check:plan`).
+cited by its claim. The browser reads it as the generated `ClaimValue` (`src/lib/postdoc.ts`).
 
 ## The page's writes
 

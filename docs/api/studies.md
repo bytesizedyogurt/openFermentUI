@@ -139,8 +139,9 @@ named twice, and a run the project does not hold.
 ## Runbooks
 
 A study's runbook is a row of the project's `runbooks` in the shape the runbook page keeps
-(`Runbook` in `src/data/types.ts` and `core/openferment_core/models.py`, paired by `check:plan`), so
-it lists and opens there beside a person's. Made from one engine run (`RunbookCreate`):
+(`Runbook` in `core/openferment_core/models.py`, which the browser reads as its generated twin in
+`src/lib/studies.ts`), so it lists and opens there beside a person's. Made from one engine run
+(`RunbookCreate`):
 
 | Field | What it is |
 |---|---|

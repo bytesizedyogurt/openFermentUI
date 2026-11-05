@@ -2854,7 +2854,7 @@
       },
       "Deposition": {
         "additionalProperties": true,
-        "description": "The bench's record of a run against a runbook (mirrors `Deposition` in\nsrc/data/types.ts): its readings and observations, appended as they are\ntaken, its state from staged to running to closed, and its\nreconciliation. A write to one the project keeps is held to what the\nbench does (`project_state.deposition_refusal`).",
+        "description": "The bench's record of a run against a runbook (the browser's\n`Deposition`, src/lib/studies.ts): its readings and observations,\nappended as they are taken, its state from staged to running to closed,\nand its reconciliation. A write to one the project keeps is held to what\nthe bench does (`project_state.deposition_refusal`).",
         "properties": {
           "closedAt": {
             "anyOf": [
@@ -2971,7 +2971,7 @@
       },
       "DepositionEntry": {
         "additionalProperties": true,
-        "description": "One reading taken at the bench against a runbook's measure (mirrors\n`DepositionEntry` in src/data/types.ts): the words the operator said or\ntyped (`raw`), the number read from them, and whether a person read it\nback. A correction is a new entry on the same measure, keeping the `at`\nof the reading it corrects and saying when it was typed\n(`correctedAt`).",
+        "description": "One reading taken at the bench against a runbook's measure (the\nbrowser's `DepositionEntry`, src/lib/studies.ts): the words the operator\nsaid or typed (`raw`), the number read from them, and whether a person\nread it back. A correction is a new entry on the same measure, keeping\nthe `at` of the reading it corrects and saying when it was typed\n(`correctedAt`).",
         "properties": {
           "at": {
             "title": "At",
@@ -3032,7 +3032,7 @@
       },
       "DepositionObservation": {
         "additionalProperties": true,
-        "description": "Something the operator reported that fits no measure (mirrors\n`Observation` in src/data/types.ts): the words kept as they were said,\nand a structured reading of them, None until a person adds one.",
+        "description": "Something the operator reported that fits no measure (one of a\ndeposition's `observations`): the words kept as they were said,\nand a structured reading of them, None until a person adds one.",
         "properties": {
           "at": {
             "title": "At",
@@ -4911,7 +4911,7 @@
         "type": "object"
       },
       "FetchedSection": {
-        "description": "One section of a paper's own text. Same shape as PaperSection.",
+        "description": "One section of a paper's own text.",
         "properties": {
           "heading": {
             "title": "Heading",
@@ -7030,7 +7030,7 @@
         "type": "object"
       },
       "LiveConversation": {
-        "description": "A Postdoc conversation, its turns oldest first (mirrors\n`LiveConversation` in src/data/types.ts; GET /api/conversations/{id}).",
+        "description": "A Postdoc conversation, its turns oldest first (the browser's\n`LiveConversation`, src/lib/postdoc.ts; GET /api/conversations/{id}).",
         "properties": {
           "id": {
             "title": "Id",
@@ -7062,7 +7062,7 @@
         "type": "object"
       },
       "LiveTurn": {
-        "description": "One turn of a Postdoc conversation (mirrors `LiveTurn` in\nsrc/data/types.ts): the question, its loop's steps, the validated plan or\nthe failure in words, and its status. The service keeps it\n(postdoc/conversations.py) with who asked and the artifacts its tool calls\nproduced; a turn the service was answering when it stopped reads\n`interrupted`.",
+        "description": "One turn of a Postdoc conversation (the browser's `LiveTurn`,\nsrc/lib/postdoc.ts): the question, its loop's steps, the validated plan or\nthe failure in words, and its status. The service keeps it\n(postdoc/conversations.py) with who asked and the artifacts its tool calls\nproduced; a turn the service was answering when it stopped reads\n`interrupted`.",
         "properties": {
           "artifactIds": {
             "items": {
@@ -7259,7 +7259,7 @@
         "type": "object"
       },
       "Measure": {
-        "description": "Mirrors `Measure` in src/data/types.ts.",
+        "description": "What the bench measures for a runbook: a labelled reading in its unit\nat its timepoint, and the prediction it tests where it tests one (the\nbrowser's `Measure`, src/lib/studies.ts).",
         "properties": {
           "id": {
             "title": "Id",
@@ -7339,7 +7339,7 @@
       },
       "MeasuredEvidence": {
         "additionalProperties": true,
-        "description": "A measured value a reconciliation released (mirrors `MeasuredEvidence`\nin src/data/types.ts): evidence about the run that produced it, kept with\nits conditions and the run's deviations, and linked to the prediction it\ntests.",
+        "description": "A measured value a reconciliation released (the browser's\n`MeasuredEvidence`, src/lib/studies.ts): evidence about the run that\nproduced it, kept with its conditions and the run's deviations, and\nlinked to the prediction it tests.",
         "properties": {
           "at": {
             "title": "At",
@@ -9525,7 +9525,7 @@
         "type": "object"
       },
       "Prediction": {
-        "description": "Mirrors `Prediction` in src/data/types.ts (§9.1).",
+        "description": "What a runbook predicts before the run: a labelled value in its unit,\nwith its confidence and its basis (§9.1; the browser's `Prediction`,\nsrc/lib/studies.ts).",
         "properties": {
           "artifactId": {
             "anyOf": [
@@ -10072,7 +10072,7 @@
       },
       "ProformaScenario": {
         "additionalProperties": true,
-        "description": "A scenario a person made in Proforma (mirrors `Scenario` in\nsrc/data/types.ts): the shelf flowsheet it runs (`modelId`), its name,\nwhether it is pinned, and, on `custom_train_v1`, the kept vessel design\nand train run it is built from. A row an earlier page wrote keeps the\nfields it carried beside these, alpha 1.0's `dims`, `point` and\n`assumptions` among them.",
+        "description": "A scenario a person made in Proforma (the browser's `Scenario`,\nsrc/lib/proforma.ts): the shelf flowsheet it runs (`modelId`), its name,\nwhether it is pinned, and, on `custom_train_v1`, the kept vessel design\nand train run it is built from. A row an earlier page wrote keeps the\nfields it carried beside these, alpha 1.0's `dims`, `point` and\n`assumptions` among them.",
         "properties": {
           "createdAt": {
             "anyOf": [
@@ -10842,7 +10842,7 @@
         "type": "object"
       },
       "Protocol": {
-        "description": "A protocol a project keeps (mirrors `Protocol` in src/data/types.ts):\nits own fields, written when it is made, and its versions, the current\none named by `currentVersion`.",
+        "description": "A protocol a project keeps (the browser's `Protocol`,\nsrc/lib/protocols.ts): its own fields, written when it is made, and its\nversions, the current one named by `currentVersion`.",
         "properties": {
           "bsl": {
             "enum": [
@@ -11174,7 +11174,7 @@
       },
       "Reconciliation": {
         "additionalProperties": true,
-        "description": "A deposition's readings set beside the runbook's predictions (mirrors\n`Reconciliation` in src/data/types.ts), made once and kept as it was\nmade.",
+        "description": "A deposition's readings set beside the runbook's predictions (a\ndeposition's `reconciliation`), made once and kept as it was made.",
         "properties": {
           "at": {
             "title": "At",
@@ -11730,7 +11730,7 @@
         "type": "object"
       },
       "Runbook": {
-        "description": "Mirrors `Runbook` in src/data/types.ts: a row of the project's\n`runbooks`, a person's or a study's (studies/runbooks.py). It is read\nand written with `exclude_unset`, so a row comes back as it was kept:\nthe lock's digest reads a prediction's absent field and a null one\ndifferently (runbook_lock.py).",
+        "description": "A row of the project's `runbooks`, a person's or a study's\n(studies/runbooks.py; the browser's `Runbook`, src/lib/studies.ts). It is\nread and written with `exclude_unset`, so a row comes back as it was\nkept: the lock's digest reads a prediction's absent field and a null one\ndifferently (runbook_lock.py).",
         "properties": {
           "estCostUsd": {
             "anyOf": [
@@ -11973,7 +11973,7 @@
         "type": "object"
       },
       "RunbookStage": {
-        "description": "Mirrors `RunbookStage` in src/data/types.ts.",
+        "description": "One stage of a runbook and where it stands (the browser's\n`RunbookStage`, src/lib/studies.ts).",
         "properties": {
           "detail": {
             "anyOf": [

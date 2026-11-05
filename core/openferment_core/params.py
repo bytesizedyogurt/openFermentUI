@@ -1,8 +1,8 @@
 """One parameter panel, declared in Python (OF-BLD-020 Phase 2, D2–D4).
 
 Every model family, vessel design, catalogue unit and shelf flowsheet
-declares its parameters once, as `ParameterSpec`s (models.py, mirrored in
-src/data/types.ts through PAIRS). This module resolves them to
+declares its parameters once, as `ParameterSpec`s (models.py; the browser
+reads the generated twin, src/lib/params.ts). This module resolves them to
 `ParameterValue`s, each naming where its value came from, and turns a
 person's change into a named assumption. The browser renders what it is
 served; no screen writes a form for a parameter of its own.

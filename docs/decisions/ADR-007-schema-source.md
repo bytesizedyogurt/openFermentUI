@@ -315,3 +315,23 @@ Never; this is how the drift stops recurring.
   to `lib/durable.ts`, with the seven fields the browser wrote; the store reads each as a person's assumption.
   `src/data/types.ts` re-exports `ActivityEvent` until E.15 and keeps its own `InputAssumption`, check:plan's twin of
   the model the service binds a scenario's values with, its origin and reading among its fields; no route serves it.
+
+### Alpha 2.2, E.15 (2026-11-05): the hand-kept types retire
+
+- `src/data/types.ts` is deleted, as the decision above and the alpha 2.2 prompt's §3 say. Every screen, component,
+  `src/lib` module and script reads the generated `src/api/types.gen.ts`, each lib naming the schemas it answers
+  (E.1 to E.14, the notes above), and the browser's own types live with their owners: `CostLine`,
+  `ResultGrid` and `SensitivityRow` in `lib/proforma.ts`; `FieldId`, `ParameterDef` and `ParameterFamily` in
+  `data/ontology.ts`; `UnitOperationStage`, `UnitOperation` and `CarbonSource` in `data/vocabulary.ts`;
+  `SkillFamily` and `SkillFamilyId` in `data/skillFamilies.ts`; `InputAssumption` in `lib/durable.ts`; and `Job`,
+  `JobStage`, `ActivityEvent`, `RunState`, `TimerState` and `Deviation` in the store.
+- `PAIRS` retires with the file: 218 types and 1629 fields at its last run (E.14). `gen:api --check` holds the
+  document and the generated types to models.py, and `pnpm typecheck` holds every reader to the generated types, so
+  a field the service drops or renames fails the build wherever a screen reads it, and a field it adds reaches the
+  screens with `pnpm gen:api`. `check:plan` keeps the provenance ranking alone (ADR-011's note of E.15).
+- Where a service docstring, which the document carries as the schema's description, named a hand twin, it names
+  the lib where the browser reads the model (`src/lib/postdoc.ts`, `src/lib/studies.ts` and the rest);
+  `docs/api/postdoc.md` and `docs/api/studies.md` say the same.
+- `core/tests/test_schema.py`'s mirror of `fields.yaml`, `vocabulary.yaml` and `units.json` stands as it is:
+  `data/ontology.ts` and `data/vocabulary.ts` hold their own types beside the values it compares, and
+  `pnpm export:unit-fixtures` reads them for it.

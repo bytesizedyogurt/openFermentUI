@@ -1,7 +1,7 @@
 """pureOS's train: data, checked, resolved, run, and kept (OF-BLD-020 §5.2;
 D9, D10, E.2‴, E.3‴).
 
-A TRAIN IS DATA (D9). `TrainSpec` (models.py, mirrored in types.ts) is an id,
+A TRAIN IS DATA (D9). `TrainSpec` (models.py; src/lib/pureos.ts) is an id,
 a name, a program, a product, an inlet, and units in order: each a catalogue
 type (pureos/catalogue.py), the values a person typed for it (Override-shaped,
 D3), record ids named for a parameter, where each outlet goes (`onward`,

@@ -34,7 +34,7 @@ from test_project_state import kept_before_its_model
 from test_runbook_lock import cases
 from test_studies import asked
 
-# A runbook as the page keeps one (src/data/types.ts `Runbook`).
+# A runbook as the page keeps one (`Runbook`, models.py and src/lib/studies.ts).
 PAGE_ROW = {"id": "rb-1", "kind": "research", "title": "A person's runbook", "status": "draft", "stages": [], "note": "",
             "eta": None, "outputs": [], "productId": None, "progressPct": 0, "estCostUsd": None, "strainId": None,
             "predictions": [], "measurementSchema": [], "lockedAt": None, "lockHash": None}

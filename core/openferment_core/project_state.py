@@ -10,10 +10,10 @@ is now rows of its table under the project; a page loads them all from
 `GET /api/state` and writes one at a time, and the browser keeps only the
 writes the service has not yet acknowledged.
 
-A row holds what the page sent, in the shape the page's types give it
-(`src/data/types.ts`), and each kind has its model in models.py (alpha 2.2
-E.0b): a deposition, measured evidence, a runbook, a Proforma scenario, a
-train the Builder saved, an override, a lock, a Live conversation. What is
+A row holds what the page sent, in the shape the page's generated types give
+it (`src/api/types.gen.ts`), and each kind has its model in models.py (alpha
+2.2 E.0b): a deposition, measured evidence, a runbook, a Proforma scenario,
+a train the Builder saved, an override, a lock, a Live conversation. What is
 checked here is what makes a row a row: a known kind, an id of the right
 shape that the value repeats, a value that reads as its kind's model, a size
 a page can send, and, once a runbook is locked, predictions and measures

@@ -1,9 +1,10 @@
 """AnswerPlan (OF-BLD-007 §3).
 
-The only representation of an answer in the system. Defined here and mirrored
-exactly in `src/data/types.ts`; `pnpm check:plan` fails the build if the two
-drift, because a shape that exists twice and is enforced once is a shape that
-is about to disagree with itself.
+The only representation of an answer in the system, defined here with every
+other shape the service serves. The browser's types are generated from the
+OpenAPI document the service writes from these models (`docs/api/openapi.json`
+and `src/api/types.gen.ts`, `pnpm gen:api`; ADR-007), and verify fails the
+build when either file drifts from them (`gen:api --check`).
 
 THE PLAN IS NOT A TRANSCRIPT. The scripted path this replaces replayed prose a
 human wrote. A plan is a set of claims, each one a sentence with no number in
@@ -20,9 +21,11 @@ from typing import Annotated, Any, Literal
 from pydantic import (BaseModel, ConfigDict, Field, FiniteFloat, ValidationInfo, field_validator, model_serializer,
                       model_validator)
 
-# Mirrors the Provenance union in src/data/types.ts, weakest last. The order IS
-# the ranking: `weakest_provenance` walks this list, so adding a class in the
-# wrong place silently changes what a claim claims.
+# The provenance classes, strongest first and weakest last; the browser's union
+# is generated from this one (`src/api/types.gen.ts`). The order IS the ranking:
+# `weakest_provenance` walks PROVENANCE_ORDER below, which `check:plan` holds to
+# these classes, so adding a class in the wrong place silently changes what a
+# claim claims.
 Provenance = Literal[
     "measured",
     "gold",
@@ -383,8 +386,8 @@ class TurnError(BaseModel):
 
 
 class LiveTurn(BaseModel):
-    """One turn of a Postdoc conversation (mirrors `LiveTurn` in
-    src/data/types.ts): the question, its loop's steps, the validated plan or
+    """One turn of a Postdoc conversation (the browser's `LiveTurn`,
+    src/lib/postdoc.ts): the question, its loop's steps, the validated plan or
     the failure in words, and its status. The service keeps it
     (postdoc/conversations.py) with who asked and the artifacts its tool calls
     produced; a turn the service was answering when it stopped reads
@@ -402,8 +405,8 @@ class LiveTurn(BaseModel):
 
 
 class LiveConversation(BaseModel):
-    """A Postdoc conversation, its turns oldest first (mirrors
-    `LiveConversation` in src/data/types.ts; GET /api/conversations/{id})."""
+    """A Postdoc conversation, its turns oldest first (the browser's
+    `LiveConversation`, src/lib/postdoc.ts; GET /api/conversations/{id})."""
 
     id: str
     title: str
@@ -431,15 +434,10 @@ class ToolCallRecord(BaseModel):
 
 
 # ── Intake (OF-BLD-012 §2.5, §5) ────────────────────────────────────────
-#
-# Mirrored in src/data/types.ts and named in scripts/check-plan.mjs PAIRS, like
-# everything else in this file. `FetchedSection` mirrors the browser's
-# `PaperSection` under a different name because that interface already exists
-# and this is the service's word for the same shape.
 
 
 class FetchedSection(BaseModel):
-    """One section of a paper's own text. Same shape as PaperSection."""
+    """One section of a paper's own text."""
 
     id: str
     heading: str
@@ -666,8 +664,9 @@ class Overlay(BaseModel):
 # ── Extraction and review (OF-BLD-012 §2.5, §6, §7) ──────────────────────
 
 RecordStatus = Literal["unverified", "verified", "rejected"]
-# Mirrors ExtractorRun in types.ts. 'claude-1' is the first run that runs for
-# real: Claude Opus 5.5, with Claude Sonnet 5.5 where Opus declined (llm.py).
+# The browser names it `ExtractorRun` too (src/lib/review.ts). 'claude-1' is the
+# first run that runs for real: Claude Opus 5.5, with Claude Sonnet 5.5 where
+# Opus declined (llm.py).
 ExtractorRun = Literal["claude-1"]
 Outcome = Literal["match", "value_mismatch", "unit_error", "span_error", "miss"]
 
@@ -1083,8 +1082,8 @@ class ExtractResponse(BaseModel):
 # Who may verify, extended from records to the people running protocol steps.
 # The ledger is the project's rows of `guild_people` and `guild_evidence`,
 # written only by `guild.write_*`; a competence ledger is personnel data and
-# never enters the public repository. Mirrored in src/data/types.ts and held
-# to it by `check:plan`.
+# never enters the public repository. The browser names the ledger's types in
+# src/lib/guild.ts, each a generated twin of one here.
 
 GuildRole = Literal["member", "lead", "auditor"]
 
@@ -2675,7 +2674,9 @@ class StoredAnswer(BaseModel):
 
 
 class Prediction(BaseModel):
-    """Mirrors `Prediction` in src/data/types.ts (§9.1)."""
+    """What a runbook predicts before the run: a labelled value in its unit,
+    with its confidence and its basis (§9.1; the browser's `Prediction`,
+    src/lib/studies.ts)."""
 
     id: str
     label: str
@@ -2690,7 +2691,9 @@ class Prediction(BaseModel):
 
 
 class Measure(BaseModel):
-    """Mirrors `Measure` in src/data/types.ts."""
+    """What the bench measures for a runbook: a labelled reading in its unit
+    at its timepoint, and the prediction it tests where it tests one (the
+    browser's `Measure`, src/lib/studies.ts)."""
 
     id: str
     label: str
@@ -2741,7 +2744,8 @@ RunbookStageStatus = Literal["done", "running", "queued", "pending", "review", "
 
 
 class RunbookStage(BaseModel):
-    """Mirrors `RunbookStage` in src/data/types.ts."""
+    """One stage of a runbook and where it stands (the browser's
+    `RunbookStage`, src/lib/studies.ts)."""
 
     name: str
     status: RunbookStageStatus
@@ -2750,10 +2754,10 @@ class RunbookStage(BaseModel):
 
 
 class Runbook(BaseModel):
-    """Mirrors `Runbook` in src/data/types.ts: a row of the project's
-    `runbooks`, a person's or a study's (studies/runbooks.py). It is read
-    and written with `exclude_unset`, so a row comes back as it was kept:
-    the lock's digest reads a prediction's absent field and a null one
+    """A row of the project's `runbooks`, a person's or a study's
+    (studies/runbooks.py; the browser's `Runbook`, src/lib/studies.ts). It is
+    read and written with `exclude_unset`, so a row comes back as it was
+    kept: the lock's digest reads a prediction's absent field and a null one
     differently (runbook_lock.py)."""
 
     id: str
@@ -4724,9 +4728,9 @@ class RunbookCreate(BaseModel):
 
 # ── What a project keeps of its pages (project_state.py; alpha 2.2 E.0b) ─
 #
-# Each kind of row a page writes through `PUT /api/state/{kind}/{id}`, as the
-# page's types write it (src/data/types.ts until the screens move to the
-# generated types). A row keeps every field the page sent, those named here
+# Each kind of row a page writes through `PUT /api/state/{kind}/{id}`, in the
+# shape the page's generated types give it (src/api/types.gen.ts, written
+# from these models). A row keeps every field the page sent, those named here
 # and any other (`extra="allow"`), and `GET /api/state` serves it as kept
 # (`response_model_exclude_unset`, api.AS_KEPT): a field the page left out
 # stays out of the answer. A field a row may leave out defaults to None or to
@@ -4734,11 +4738,11 @@ class RunbookCreate(BaseModel):
 
 
 class DepositionEntry(BaseModel):
-    """One reading taken at the bench against a runbook's measure (mirrors
-    `DepositionEntry` in src/data/types.ts): the words the operator said or
-    typed (`raw`), the number read from them, and whether a person read it
-    back. A correction is a new entry on the same measure, keeping the `at`
-    of the reading it corrects and saying when it was typed
+    """One reading taken at the bench against a runbook's measure (the
+    browser's `DepositionEntry`, src/lib/studies.ts): the words the operator
+    said or typed (`raw`), the number read from them, and whether a person
+    read it back. A correction is a new entry on the same measure, keeping
+    the `at` of the reading it corrects and saying when it was typed
     (`correctedAt`)."""
 
     model_config = ConfigDict(extra="allow")
@@ -4755,8 +4759,8 @@ class DepositionEntry(BaseModel):
 
 
 class DepositionObservation(BaseModel):
-    """Something the operator reported that fits no measure (mirrors
-    `Observation` in src/data/types.ts): the words kept as they were said,
+    """Something the operator reported that fits no measure (one of a
+    deposition's `observations`): the words kept as they were said,
     and a structured reading of them, None until a person adds one."""
 
     model_config = ConfigDict(extra="allow")
@@ -4782,9 +4786,8 @@ class ReconciliationDelta(BaseModel):
 
 
 class Reconciliation(BaseModel):
-    """A deposition's readings set beside the runbook's predictions (mirrors
-    `Reconciliation` in src/data/types.ts), made once and kept as it was
-    made."""
+    """A deposition's readings set beside the runbook's predictions (a
+    deposition's `reconciliation`), made once and kept as it was made."""
 
     model_config = ConfigDict(extra="allow")
 
@@ -4798,11 +4801,11 @@ DepositionState = Literal["staged", "running", "closed"]
 
 
 class Deposition(BaseModel):
-    """The bench's record of a run against a runbook (mirrors `Deposition` in
-    src/data/types.ts): its readings and observations, appended as they are
-    taken, its state from staged to running to closed, and its
-    reconciliation. A write to one the project keeps is held to what the
-    bench does (`project_state.deposition_refusal`)."""
+    """The bench's record of a run against a runbook (the browser's
+    `Deposition`, src/lib/studies.ts): its readings and observations,
+    appended as they are taken, its state from staged to running to closed,
+    and its reconciliation. A write to one the project keeps is held to what
+    the bench does (`project_state.deposition_refusal`)."""
 
     model_config = ConfigDict(extra="allow")
 
@@ -4837,10 +4840,10 @@ class MeasuredConditions(BaseModel):
 
 
 class MeasuredEvidence(BaseModel):
-    """A measured value a reconciliation released (mirrors `MeasuredEvidence`
-    in src/data/types.ts): evidence about the run that produced it, kept with
-    its conditions and the run's deviations, and linked to the prediction it
-    tests."""
+    """A measured value a reconciliation released (the browser's
+    `MeasuredEvidence`, src/lib/studies.ts): evidence about the run that
+    produced it, kept with its conditions and the run's deviations, and
+    linked to the prediction it tests."""
 
     model_config = ConfigDict(extra="allow")
 
@@ -4861,8 +4864,8 @@ class MeasuredEvidence(BaseModel):
 
 
 class ProformaScenario(BaseModel):
-    """A scenario a person made in Proforma (mirrors `Scenario` in
-    src/data/types.ts): the shelf flowsheet it runs (`modelId`), its name,
+    """A scenario a person made in Proforma (the browser's `Scenario`,
+    src/lib/proforma.ts): the shelf flowsheet it runs (`modelId`), its name,
     whether it is pinned, and, on `custom_train_v1`, the kept vessel design
     and train run it is built from. A row an earlier page wrote keeps the
     fields it carried beside these, alpha 1.0's `dims`, `point` and
@@ -5116,9 +5119,9 @@ class ProtocolVersion(BaseModel):
 
 
 class Protocol(BaseModel):
-    """A protocol a project keeps (mirrors `Protocol` in src/data/types.ts):
-    its own fields, written when it is made, and its versions, the current
-    one named by `currentVersion`."""
+    """A protocol a project keeps (the browser's `Protocol`,
+    src/lib/protocols.ts): its own fields, written when it is made, and its
+    versions, the current one named by `currentVersion`."""
 
     id: str = Field(pattern=PROTOCOL_ID)
     title: str = Field(min_length=1, max_length=200)

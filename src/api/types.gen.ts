@@ -3879,11 +3879,11 @@ export interface components {
         };
         /**
          * Deposition
-         * @description The bench's record of a run against a runbook (mirrors `Deposition` in
-         *     src/data/types.ts): its readings and observations, appended as they are
-         *     taken, its state from staged to running to closed, and its
-         *     reconciliation. A write to one the project keeps is held to what the
-         *     bench does (`project_state.deposition_refusal`).
+         * @description The bench's record of a run against a runbook (the browser's
+         *     `Deposition`, src/lib/studies.ts): its readings and observations,
+         *     appended as they are taken, its state from staged to running to closed,
+         *     and its reconciliation. A write to one the project keeps is held to what
+         *     the bench does (`project_state.deposition_refusal`).
          */
         Deposition: {
             /** Closedat */
@@ -3921,11 +3921,11 @@ export interface components {
         };
         /**
          * DepositionEntry
-         * @description One reading taken at the bench against a runbook's measure (mirrors
-         *     `DepositionEntry` in src/data/types.ts): the words the operator said or
-         *     typed (`raw`), the number read from them, and whether a person read it
-         *     back. A correction is a new entry on the same measure, keeping the `at`
-         *     of the reading it corrects and saying when it was typed
+         * @description One reading taken at the bench against a runbook's measure (the
+         *     browser's `DepositionEntry`, src/lib/studies.ts): the words the operator
+         *     said or typed (`raw`), the number read from them, and whether a person
+         *     read it back. A correction is a new entry on the same measure, keeping
+         *     the `at` of the reading it corrects and saying when it was typed
          *     (`correctedAt`).
          */
         DepositionEntry: {
@@ -3952,8 +3952,8 @@ export interface components {
         };
         /**
          * DepositionObservation
-         * @description Something the operator reported that fits no measure (mirrors
-         *     `Observation` in src/data/types.ts): the words kept as they were said,
+         * @description Something the operator reported that fits no measure (one of a
+         *     deposition's `observations`): the words kept as they were said,
          *     and a structured reading of them, None until a person adds one.
          */
         DepositionObservation: {
@@ -4674,7 +4674,7 @@ export interface components {
         };
         /**
          * FetchedSection
-         * @description One section of a paper's own text. Same shape as PaperSection.
+         * @description One section of a paper's own text.
          */
         FetchedSection: {
             /** Heading */
@@ -5489,8 +5489,8 @@ export interface components {
         };
         /**
          * LiveConversation
-         * @description A Postdoc conversation, its turns oldest first (mirrors
-         *     `LiveConversation` in src/data/types.ts; GET /api/conversations/{id}).
+         * @description A Postdoc conversation, its turns oldest first (the browser's
+         *     `LiveConversation`, src/lib/postdoc.ts; GET /api/conversations/{id}).
          */
         LiveConversation: {
             /** Id */
@@ -5504,8 +5504,8 @@ export interface components {
         };
         /**
          * LiveTurn
-         * @description One turn of a Postdoc conversation (mirrors `LiveTurn` in
-         *     src/data/types.ts): the question, its loop's steps, the validated plan or
+         * @description One turn of a Postdoc conversation (the browser's `LiveTurn`,
+         *     src/lib/postdoc.ts): the question, its loop's steps, the validated plan or
          *     the failure in words, and its status. The service keeps it
          *     (postdoc/conversations.py) with who asked and the artifacts its tool calls
          *     produced; a turn the service was answering when it stopped reads
@@ -5576,7 +5576,9 @@ export interface components {
         };
         /**
          * Measure
-         * @description Mirrors `Measure` in src/data/types.ts.
+         * @description What the bench measures for a runbook: a labelled reading in its unit
+         *     at its timepoint, and the prediction it tests where it tests one (the
+         *     browser's `Measure`, src/lib/studies.ts).
          */
         Measure: {
             /** Id */
@@ -5608,10 +5610,10 @@ export interface components {
         };
         /**
          * MeasuredEvidence
-         * @description A measured value a reconciliation released (mirrors `MeasuredEvidence`
-         *     in src/data/types.ts): evidence about the run that produced it, kept with
-         *     its conditions and the run's deviations, and linked to the prediction it
-         *     tests.
+         * @description A measured value a reconciliation released (the browser's
+         *     `MeasuredEvidence`, src/lib/studies.ts): evidence about the run that
+         *     produced it, kept with its conditions and the run's deviations, and
+         *     linked to the prediction it tests.
          */
         MeasuredEvidence: {
             /** At */
@@ -6351,7 +6353,9 @@ export interface components {
         };
         /**
          * Prediction
-         * @description Mirrors `Prediction` in src/data/types.ts (§9.1).
+         * @description What a runbook predicts before the run: a labelled value in its unit,
+         *     with its confidence and its basis (§9.1; the browser's `Prediction`,
+         *     src/lib/studies.ts).
          */
         Prediction: {
             /** Artifactid */
@@ -6525,8 +6529,8 @@ export interface components {
         };
         /**
          * ProformaScenario
-         * @description A scenario a person made in Proforma (mirrors `Scenario` in
-         *     src/data/types.ts): the shelf flowsheet it runs (`modelId`), its name,
+         * @description A scenario a person made in Proforma (the browser's `Scenario`,
+         *     src/lib/proforma.ts): the shelf flowsheet it runs (`modelId`), its name,
          *     whether it is pinned, and, on `custom_train_v1`, the kept vessel design
          *     and train run it is built from. A row an earlier page wrote keeps the
          *     fields it carried beside these, alpha 1.0's `dims`, `point` and
@@ -6813,9 +6817,9 @@ export interface components {
         };
         /**
          * Protocol
-         * @description A protocol a project keeps (mirrors `Protocol` in src/data/types.ts):
-         *     its own fields, written when it is made, and its versions, the current
-         *     one named by `currentVersion`.
+         * @description A protocol a project keeps (the browser's `Protocol`,
+         *     src/lib/protocols.ts): its own fields, written when it is made, and its
+         *     versions, the current one named by `currentVersion`.
          */
         Protocol: {
             /**
@@ -6952,9 +6956,8 @@ export interface components {
         };
         /**
          * Reconciliation
-         * @description A deposition's readings set beside the runbook's predictions (mirrors
-         *     `Reconciliation` in src/data/types.ts), made once and kept as it was
-         *     made.
+         * @description A deposition's readings set beside the runbook's predictions (a
+         *     deposition's `reconciliation`), made once and kept as it was made.
          */
         Reconciliation: {
             /** At */
@@ -7190,10 +7193,10 @@ export interface components {
         };
         /**
          * Runbook
-         * @description Mirrors `Runbook` in src/data/types.ts: a row of the project's
-         *     `runbooks`, a person's or a study's (studies/runbooks.py). It is read
-         *     and written with `exclude_unset`, so a row comes back as it was kept:
-         *     the lock's digest reads a prediction's absent field and a null one
+         * @description A row of the project's `runbooks`, a person's or a study's
+         *     (studies/runbooks.py; the browser's `Runbook`, src/lib/studies.ts). It is
+         *     read and written with `exclude_unset`, so a row comes back as it was
+         *     kept: the lock's digest reads a prediction's absent field and a null one
          *     differently (runbook_lock.py).
          */
         Runbook: {
@@ -7292,7 +7295,8 @@ export interface components {
         };
         /**
          * RunbookStage
-         * @description Mirrors `RunbookStage` in src/data/types.ts.
+         * @description One stage of a runbook and where it stands (the browser's
+         *     `RunbookStage`, src/lib/studies.ts).
          */
         RunbookStage: {
             /** Detail */

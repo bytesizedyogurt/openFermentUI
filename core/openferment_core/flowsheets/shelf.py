@@ -4,7 +4,8 @@ Pure data: what each flowsheet is, where it comes from, which program it
 belongs to, the inputs it takes and the outputs it reports. The service
 serves it at `GET /api/proforma/shelf` and must never import BioSTEAM to do
 so, so this module imports nothing heavier than the models (test_proforma
-holds it to that). src/data/types.ts mirrors `FlowsheetInfo` through PAIRS.
+holds it to that). The browser reads `FlowsheetInfo` as its generated twin
+(src/lib/proforma.ts).
 
 A scenario names a flowsheet by id and nothing else about its structure.
 No input here carries a value: records bind the process inputs and a named
