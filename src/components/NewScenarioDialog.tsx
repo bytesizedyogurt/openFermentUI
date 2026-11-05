@@ -43,9 +43,8 @@ import { useEffect, useMemo, useRef, useState } from 'react';
 import { Play } from 'lucide-react';
 import { useStore } from '@/store';
 import { href, navigate } from '@/router';
-import { fmt } from '@/engine/units';
 import { Button, Modal, cx } from './ui';
-import { minute } from './ReadingOrigin';
+import { ReadingChoice } from './ReadingOrigin';
 import {
   ProformaDown,
   builtFromParts,
@@ -389,41 +388,6 @@ interface Setting {
 /** The readings of one unit as the service listed them: null while it is asked, with its words when it could not answer. */
 type Listed = { readings: DepositionReading[] | null; problem: string | null };
 
-/** A reading as a person chooses it: its measure, its value and unit (and in the parameter's, where it converts), its runbook, its time and its person. */
-function ReadingChoice({ reading, setting, chosen, onChoose }: { reading: DepositionReading; setting: Setting; chosen: boolean; onChoose: () => void }) {
-  const converted = reading.inUnit != null && reading.unit !== setting.unit;
-  return (
-    <label
-      className={cx('card p-2 flex items-start gap-2 cursor-pointer min-h-[44px]', chosen && 'border-accent')}
-      data-testid="scenario-reading"
-      data-ref={reading.ref}
-    >
-      <input type="radio" className="mt-1" name={`scenario-reading-${setting.key}`} checked={chosen} onChange={onChoose} aria-label={`Reading ${reading.ref}`} />
-      <span className="min-w-0">
-        {/* What the reading measured, and what it would set: the pairing is the person's to choose, and the service holds the unit alone. */}
-        <span className="block">
-          a reading of {reading.measure ?? `measure ${reading.measureId}`}:{' '}
-          <span className="font-num" title={String(reading.value)}>
-            {fmt(reading.value, 6)} {reading.unit}
-          </span>
-          {converted && (
-            <span className="font-num text-ink-soft">
-              {' '}
-              = {fmt(reading.inUnit ?? 0, 6)} {setting.unit}
-            </span>
-          )}
-          , set as <span className="font-medium">{setting.label}</span>
-        </span>
-        <span className="block text-caption text-ink-soft">
-          {reading.runbook ? <>runbook {reading.runbook}</> : <>runbook {reading.runbookId ?? 'not named'}, which the project does not hold</>} · taken{' '}
-          <span className="font-num">{minute(reading.at)}</span>
-          {reading.hours != null && <> at hour {reading.hours}</>} · deposited by {reading.by} · <span className="font-num">{reading.ref}</span>
-        </span>
-      </span>
-    </label>
-  );
-}
-
 /**
  * A study scenario from an engine run (the module's header): parameters found by words, each set to the person's
  * own value or to a deposition's reading, the scenario made and run in their name, and the new run's page opened.
@@ -610,7 +574,16 @@ function ScenarioFromRun({ open, onClose, report }: { open: boolean; onClose: ()
                         </p>
                       ) : (
                         held.readings.map((r) => (
-                          <ReadingChoice key={r.ref} reading={r} setting={s} chosen={s.reading === r.ref} onChoose={() => change(s.key, { reading: r.ref })} />
+                          <ReadingChoice
+                            key={r.ref}
+                            reading={r}
+                            label={s.label}
+                            unit={s.unit}
+                            name={`scenario-reading-${s.key}`}
+                            chosen={s.reading === r.ref}
+                            onChoose={() => change(s.key, { reading: r.ref })}
+                            testid="scenario-reading"
+                          />
                         ))
                       )}
                       <input

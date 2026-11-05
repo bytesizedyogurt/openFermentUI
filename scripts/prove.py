@@ -80,7 +80,13 @@ packages stay installed while the kept service runs, each said with the command 
        that reading chosen and nothing typed, and run; its run's page read: provenance measured,
        the reading's origin linked to its deposition. The service then holds each as the walk
        left it: the deposition, the reading with its depositor and time, the scenario resting
-       on the reading alone, and its run `measured` with the measurement among its inputs; then,
+       on the reading alone, and its run `measured` with the measurement among its inputs; then
+       a Proforma scenario made on the shelf's glucose-to-ethanol flowsheet through New scenario,
+       and on its parameter panel a parameter set to that same reading, chosen among those its row
+       offers, the row's chip measured and its words naming the reading as deposited; the service
+       then keeps the scenario's override in the reading's own value and unit, by its depositor at
+       the time it was taken, and a tool reading the kept scenario binds the reading from that row
+       with nothing left waiting for it and no refusal of the lookup (alpha 2.2 E.17); then,
        for each engine a package under examples/engines/ registers, its first thing run on its own
        defaults from the Runs screen (Studies' run card, the engine chosen), the run's page opened,
        and its provenance, its outputs and its diagnostics read there as the service keeps them;
@@ -108,6 +114,7 @@ from __future__ import annotations
 import argparse
 import json
 import os
+import re
 import shutil
 import signal
 import socket
@@ -145,6 +152,11 @@ REFERENCE_FILE = "SF_BST_15"
 READING_PARAMETER = "stream.cornstover.price"
 READING_UNIT = "USD/kg"
 READING_VALUE = 1.0
+# The Proforma scenario's flowsheet and the parameter of it the walk sets on its parameter panel to that same reading
+# (step 9, alpha 2.2 E.17): a placeholder pairing chosen by unit, as the reading's own is. The parameter is
+# denominated in another spelling of the reading's unit, so the service sets the reading in it as a conversion.
+PANEL_FLOWSHEET = "ethanol_glucose_v0"
+PANEL_PARAMETER = "glucose_price"
 # The placeholder strain the walk keeps on the catalogues screen (step 9): an id whose entry stands for no strain.
 WALK_STRAIN = "walk-placeholder-strain"
 # Sci RAG Kit's demo corpus (five fictional documents, CC0), and the one the extraction reads.
@@ -180,7 +192,7 @@ TITLES = {
        "its history",
     7: "a reference SFF file imported; it draws",
     8: "the service restarted: everything reloads; an artifact replays within its tolerance",
-    9: "the UI walk: Home, the project, ingest, search, a run report and its SFF graph, a scenario begun from it, the plants Studies offers, the SFF flowsheets, a placeholder strain kept on the catalogues screen and shown among geneOS's hosts, a lesson renamed on the form with its body kept, a skill with no policy said in words on Guild, a protocol and its editor opened by their address, a conversation, a runbook; a reading at the bench, a scenario on it, its run measured; each example engine's first thing run from the Runs screen",
+    9: "the UI walk: Home, the project, ingest, search, a run report and its SFF graph, a scenario begun from it, the plants Studies offers, the SFF flowsheets, a placeholder strain kept on the catalogues screen and shown among geneOS's hosts, a lesson renamed on the form with its body kept, a skill with no policy said in words on Guild, a protocol and its editor opened by their address, a conversation, a runbook; a reading at the bench, a scenario on it, its run measured; that reading chosen on a Proforma scenario's parameter panel, kept in its own value and unit; each example engine's first thing run from the Runs screen",
     10: "the engines: each registered one listed, the core's three among them, the eight conformance checks made on "
         "it, its verdict kept, the proof's project as it was; a train made on step 4's run for the train engine's",
 }
@@ -984,13 +996,19 @@ def step_9(proof: Proof) -> None:
         if READING_UNIT not in units:
             raise Stop(f"runbook {runbook[0]} measures in {', '.join(sorted(units))}, and the walk's reading is for "
                        f"{READING_PARAMETER}, in {READING_UNIT}")
+    # The panel's reading is set on a parameter of a shelf flowsheet: the shelf holds it, the parameter among its inputs.
+    shelf = {f["id"]: f for f in api(proof, "GET", "/api/proforma/shelf")}
+    if PANEL_PARAMETER not in {i["key"] for i in (shelf.get(PANEL_FLOWSHEET) or {}).get("inputs") or []}:
+        raise Stop(f"the service's shelf holds no flowsheet {PANEL_FLOWSHEET} taking {PANEL_PARAMETER}, the parameter the "
+                   "walk sets to its reading on a Proforma scenario's panel")
     examples = proof.made.get("examples") or []
     if not examples:
         print("  no engine installed from examples/engines/, so the walk runs none of theirs")
     env = {**os.environ, "WALK_ORIGIN": proof.origin, "WALK_PROJECT": proof.project, "WALK_RUN": proof.made["flowsheet"],
            "WALK_CONVERSATION": proof.made["conversation"], "WALK_RUNBOOK": runbook[0] if runbook else "",
            "WALK_PERSON": PERSON, "WALK_READING": f"{READING_VALUE:g}", "WALK_READING_UNIT": READING_UNIT,
-           "WALK_READING_PARAMETER": READING_PARAMETER, "WALK_STRAIN": WALK_STRAIN, "WALK_ENGINES": ",".join(examples)}
+           "WALK_READING_PARAMETER": READING_PARAMETER, "WALK_PANEL_FLOWSHEET": PANEL_FLOWSHEET,
+           "WALK_PANEL_PARAMETER": PANEL_PARAMETER, "WALK_STRAIN": WALK_STRAIN, "WALK_ENGINES": ",".join(examples)}
     walked = subprocess.run(["npx", "tsx", "scripts/walk.ts"], cwd=ROOT, text=True, capture_output=True, env=env,
                             timeout=1500)
     lines = [line.strip() for line in walked.stdout.splitlines() if line.strip().startswith(("✓", "✗"))]
@@ -1001,6 +1019,8 @@ def step_9(proof: Proof) -> None:
     catalogued_by_the_walk(proof)
     if runbook:
         measured_by_the_walk(proof, runbook[0])
+        made = re.search(r"^\s*panel scenario (\S+)\s*$", walked.stdout, re.M)
+        read_on_the_panel(proof, runbook[0], made.group(1) if made else "")
 
 
 def catalogued_by_the_walk(proof: Proof) -> None:
@@ -1065,6 +1085,37 @@ def measured_by_the_walk(proof: Proof, runbook: str) -> None:
                 f"its inputs {', '.join(sorted(kinds))}")
     proof.made["measuredRun"] = run["id"]
     proof.made["deposition"] = d["id"]
+
+
+def read_on_the_panel(proof: Proof, runbook: str, made: str) -> None:
+    """What the walk kept on a Proforma scenario's parameter panel, read back through the API (alpha 2.2 E.17): the
+    scenario it made and named, on PANEL_FLOWSHEET, whose scope's one override sets PANEL_PARAMETER to the walk's
+    reading in that reading's own value and unit (`Override.unit`), by its depositor at the time it was taken; and a
+    tool reading the kept scenario (`selling_price`, a read: no run is kept) binds the reading from that row, through
+    `project_state.run_request`, `proforma.inputs_of` and the lookup, with nothing left waiting for it and no refusal
+    of the lookup's."""
+    state = api(proof, "GET", "/api/state")
+    scenario = next((s for s in state["scenarios"] if s["id"] == made), {}) if made else {}
+    rows = state["overrides"].get(f"proforma:{made}") or [] if made else []
+    readings = [r for r in api(proof, "GET", f"/api/depositions/readings?unit={quote(READING_UNIT)}")
+                if r["runbookId"] == runbook]
+    r = readings[0] if len(readings) == 1 else {}
+    o = rows[0] if len(rows) == 1 else {}
+    if not proof.check(bool(scenario) and scenario.get("modelId") == PANEL_FLOWSHEET and bool(r)
+                       and o.get("key") == PANEL_PARAMETER
+                       and (o.get("origin"), o.get("ref"), o.get("value"), o.get("unit"), o.get("by"), o.get("at"))
+                       == ("measurement", r.get("ref"), READING_VALUE, READING_UNIT, PERSON, r.get("at"))
+                       and o.get("low") is None and o.get("high") is None,
+                       f"the walk's Proforma scenario {made or 'unnamed'} on {scenario.get('modelId')}: "
+                       + (f"{PANEL_PARAMETER} kept as reading {o.get('ref')} in its own {o.get('value')} {o.get('unit')}, "
+                          f"deposited by {o.get('by')} and taken {o.get('at')}, one value" if o
+                          else f"{len(rows)} overrides kept for its scope")):
+        return
+    said = api(proof, "POST", "/api/tools/selling_price", {"scenarioId": made}).get("error") or ""
+    proof.check(f"no run of {made} is on file here" in said and "could not be bound" not in said
+                and PANEL_PARAMETER not in said and "a measurement carries" not in said,
+                f"selling_price on {made}: the kept row binds {PANEL_PARAMETER} to the reading as the lookup sets it, "
+                f"nothing waits for it and no lookup refusal stands (\"{said[:200].rsplit(' ', 1)[0]}…\")")
 
 
 def make_train(proof: Proof) -> str:

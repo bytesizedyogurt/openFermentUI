@@ -29,7 +29,9 @@
 // resolve here, fermOS's bind, simulation, vessel and forecast, pureOS's train
 // run, Proforma's run) sends them as typed inputs through `inputsOf`, each in
 // the unit its parameter is in, and the service converts each back into that
-// Override at its door.
+// Override at its door. A deposition's reading chosen on a Proforma
+// scenario's panel is kept in its own value and unit (`Override.unit`, alpha
+// 2.2 E.17) and goes so, and the service sets it in its parameter's unit.
 import type { components } from '@/api/types.gen';
 import type { EngineInput } from './studies';
 import { ServiceDown, ServiceRefused, call } from './http';
@@ -43,7 +45,8 @@ export type ParameterValue = S['ParameterValue'];
 /**
  * A person's change to one parameter of one scope, kept in the project's rows and sent with every request the scope
  * makes. The service serves a row as the page kept it, so a row kept before `origin` was written carries none, and it
- * reads as a person's assumption here as on the service (`inputsOf`).
+ * reads as a person's assumption here as on the service (`inputsOf`). A deposition's reading a person chose holds the
+ * reading's own value and `unit`; every other change holds its value in its parameter's unit and names none.
  */
 export type Override = S['Override'];
 /** `GET /api/params/{scope}`: a scope's specs with their current values. */
@@ -100,9 +103,11 @@ export const paramScope = (scope: string, ask: ParamAsk = {}, signal?: AbortSign
  * scope's `specs`: the key's own spec, or for a key expanded per item,
  * `<key>.<item>`, its template's), with the person or the model that set it,
  * the day and the note as its origin, and a deposition's reading with its ref
- * and its depositor. The one place an Override becomes an
- * input (core/tests/standins.py's `as_inputs` mirrors it); a key the specs do
- * not name goes with no unit, and the service says why it cannot stand.
+ * and its depositor, in its own value and unit where its row names that unit
+ * (`Override.unit`), for the service to set in its parameter's. The one place
+ * an Override becomes an input (core/tests/standins.py's `as_inputs` and the
+ * service's `proforma.inputs_of` mirror it); a key the specs do not name goes
+ * with no unit, and the service says why it cannot stand.
  */
 export function inputsOf(overrides: Override[], specs: Pick<ParameterSpec, 'key' | 'unit'>[]): EngineInput[] {
   const unit = new Map(specs.map((s) => [s.key, s.unit]));
@@ -110,7 +115,7 @@ export function inputsOf(overrides: Override[], specs: Pick<ParameterSpec, 'key'
     name: o.key,
     quantity: {
       value: o.value,
-      unit: unit.get(o.key) ?? unit.get(o.key.split('.')[0]) ?? '',
+      unit: o.unit ?? unit.get(o.key) ?? unit.get(o.key.split('.')[0]) ?? '',
       ...(o.low != null ? { low: o.low } : {}),
       ...(o.high != null ? { high: o.high } : {}),
       origin: {

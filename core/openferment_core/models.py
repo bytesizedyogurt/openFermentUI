@@ -2960,7 +2960,14 @@ class Override(BaseModel):
     person's assumption, a model's estimate (ADR-006), `by` naming the
     person or the model, or a deposition's reading (a measurement), `by` the
     person who deposited it, `at` the time it was taken and `ref` the
-    reading, `<deposition id>/<entry id>`."""
+    reading, `<deposition id>/<entry id>`.
+
+    Its value is in its parameter's own unit, as a person's assumption, a
+    model's estimate and every Override a resolver takes are, and `unit`
+    stays empty. A reading a page keeps (a Proforma scenario's parameter
+    panel) names its own unit: its value and `unit` are the reading's as
+    deposited, which the door it is sent to sets in the parameter's unit
+    (measurements.py), the conversion stated in the value's note."""
 
     scope: str
     key: str
@@ -2973,6 +2980,10 @@ class Override(BaseModel):
     origin: OverrideOrigin = "person-assumption"
     # The reading a measurement is; None for a person's or a model's value.
     ref: str | None = None
+    # The unit a reading's own value is in, as deposited, when a page keeps a
+    # reading so; None for a value in its parameter's own unit, as a person's
+    # assumption, a model's estimate and every Override a resolver takes are.
+    unit: str | None = None
 
     @field_validator("value", "low", "high", mode="before")
     @classmethod
@@ -2987,6 +2998,10 @@ class Override(BaseModel):
     def _a_measurement_names_its_reading(self) -> "Override":
         if self.origin == "measurement" and not READING_REF.fullmatch((self.ref or "").strip()):
             raise ValueError(f"the measurement of {self.key} names its reading as <deposition id>/<entry id> (ref)")
+        if self.unit is not None and self.origin != "measurement":
+            said = "a model's estimate" if self.origin == "model-estimate" else "a person's assumption"
+            raise ValueError(f"the override of {self.key} keeps a unit of its own for a deposition's reading alone, "
+                             f"and {said} is in its parameter's unit")
         return self
 
 

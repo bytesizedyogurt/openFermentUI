@@ -258,3 +258,31 @@ task (development plan §8).
 - The browser's `Quantity`, `Origin`, `OriginKind` and `OverrideOrigin` are the service's own,
   generated into `src/api/types.gen.ts`, and `check:plan`'s pairs, `Origin` among them, retired with
   `src/data/types.ts` (ADR-007's note of E.15). The 4.4b note above stands as written then.
+
+### Alpha 2.2 E.17 (2026-11-05): a reading on Proforma's parameter panel
+
+- A Proforma scenario's parameter panel offers, on each numeric row whose rule takes a person's
+  value, the project's readings deposited at the bench that the parameter may take (`GET
+  /api/depositions/readings?unit=` in the parameter's unit, the lookup's own rules deciding),
+  beside a typed value. A chosen reading is kept as the scope's override in the reading's own value
+  and unit: `Override.unit` names that unit, its origin `measurement`, `ref` the reading, `by` its
+  depositor and `at` the time it was taken. An override keeps a unit of its own for a deposition's
+  reading alone, and a person's assumption or a model's estimate naming one is refused in words.
+  A typed value or the row's slider replaces the reading with the person's own.
+- The two senders send what the row holds: the browser's `inputsOf` (the panel's resolve, the run,
+  the ceiling check and geneOS's above-ceiling list) and the service's `proforma.inputs_of`
+  (`project_state.run_request`, which `selling_price`, `run_flowsheet` and `proforma_write` read)
+  send a reading in its own value and unit, and every other row in its parameter's unit. The lookup
+  holds the reading to its rules at each door and sets it in the parameter's unit, the conversion
+  stated in the value's note ("<value> <unit> as deposited, <value> <unit> in the parameter's unit
+  (units.convert)"), so the run's basis names both. The resolvers keep taking an Override in the
+  parameter's unit: `basis.override_of` returns one whose `unit` is empty.
+- A run's basis names the input, its low and its high each as a `deposition` source naming the
+  reading, the value held fixed; the run is `measured` resting on readings, records and the
+  package's defaults, and `assumed` beside a person's value (`basis.basis_provenance`, as the C.5
+  note states). The override row's maker and its audit row name the person who chose the reading;
+  the basis names its depositor.
+- No artifact id moves: a basis that names no reading is written as it was
+  (`core/tests/test_engine_pins.py`), and a row with no unit reads as it did.
+- The chooser stands on a Proforma scenario's panel alone. fermOS's panels and pureOS's Builder
+  render their rows with it off, and a saved train's `TrainParam` holds no reading (Known debts).

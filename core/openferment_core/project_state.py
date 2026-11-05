@@ -480,8 +480,9 @@ def run_request(scenario: dict[str, Any], by: str = "") -> Any:
     """A run of a Proforma scenario the project keeps, as its page sends it,
     asked for by `by`: the flowsheet and the parts a composite is built
     from, the values a person set on its page (the overrides the project
-    keeps for its scope, each sent as the typed input its parameter's unit
-    names, proforma.inputs_of), and the fermOS fits chosen for its inputs,
+    keeps for its scope, each sent as a typed input in its parameter's
+    unit, a reading in its own value and unit, proforma.inputs_of), and the
+    fermOS fits chosen for its inputs,
     each read from the project's rows. No value is typed here. A kept
     override that cannot be sent as an input (one that says no day, or
     names no one) is refused in words (proforma.ScenarioRefused)."""

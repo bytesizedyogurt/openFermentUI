@@ -19,7 +19,12 @@
  * back → a scenario made from the run through NewScenarioDialog with that
  * reading chosen and nothing typed, and run → the run's page: its provenance
  * measured, the reading's origin in words with a link that opens its
- * deposition, the parameter's chip measured (alpha 2.2 C.5) → for each engine
+ * deposition, the parameter's chip measured (alpha 2.2 C.5) → a Proforma
+ * scenario made on WALK_PANEL_FLOWSHEET through New scenario, and on its
+ * parameter panel WALK_PANEL_PARAMETER set to that same reading, chosen among
+ * the readings the row offers, its chip measured and its words naming the
+ * reading as deposited, the project's row kept in the reading's own value and
+ * unit (alpha 2.2 E.17) → for each engine
  * WALK_ENGINES names (the proof's: those a package under examples/engines/
  * registers), its first thing run on its own defaults from the Runs screen,
  * the engine chosen on Studies' run card, and the run's page opened: its
@@ -29,7 +34,11 @@
  *   WALK_ORIGIN=http://127.0.0.1:PORT WALK_PROJECT=<id> WALK_RUN=<run id> \
  *   WALK_CONVERSATION=<id> WALK_RUNBOOK=<id> WALK_PERSON=<name> \
  *   WALK_READING=<placeholder> WALK_READING_UNIT=<unit> WALK_READING_PARAMETER=<key> \
+ *   WALK_PANEL_FLOWSHEET=<flowsheet> WALK_PANEL_PARAMETER=<key> \
  *   [WALK_STRAIN=<id>] [WALK_ENGINES=<name>,<name>] npx tsx scripts/walk.ts
+ *
+ * The walk prints the scenario it made for the panel's reading as a line of its own, `panel scenario <id>`, which
+ * the proof reads back through the API.
  *
  * One line a check, ✓ or ✗ with what it saw; exit 1 when one fails. A console
  * error or an uncaught exception on any page is a failed check.
@@ -37,6 +46,8 @@
 import { existsSync } from 'node:fs';
 import { chromium, type Page } from 'playwright';
 import type { CatalogueEntry } from '../src/lib/catalogues';
+import type { Override } from '../src/lib/params';
+import type { ProjectState } from '../src/lib/projectState';
 import type { DepositionReading, RunReport } from '../src/lib/studies';
 import type { Protocol } from '../src/lib/protocols';
 
@@ -63,6 +74,10 @@ const PERSON = process.env.WALK_PERSON?.trim() || 'Walk Reviewer';
 const READING = env('WALK_READING');
 const READING_UNIT = env('WALK_READING_UNIT');
 const PARAMETER = env('WALK_READING_PARAMETER');
+// The shelf flowsheet a Proforma scenario is made on, and the parameter of it its panel sets to the same reading
+// (alpha 2.2 E.17): a placeholder pairing chosen by unit, as the reading's own is.
+const PANEL_FLOWSHEET = env('WALK_PANEL_FLOWSHEET');
+const PANEL_PARAMETER = env('WALK_PANEL_PARAMETER');
 // The placeholder strain the walk keeps on the catalogues screen: an id the proof names, a name and other names that
 // stand for no strain (the repository ships software alone), and the file the screen takes in naming it again.
 const STRAIN = process.env.WALK_STRAIN?.trim() || 'walk-placeholder-strain';
@@ -115,6 +130,23 @@ async function readingHeld(page: Page, ref: string): Promise<Reading> {
       if (found) return found;
     }
     if (Date.now() > deadline) throw new Error(`the service lists no reading ${ref} in ${READING_UNIT} 30 s after the bench kept it`);
+    await page.waitForTimeout(500);
+  }
+}
+
+/**
+ * The override the project keeps for `key` of `scope`, asked of the service until the page's write reaches it (the
+ * page sends each change as it is made, ADR-014).
+ */
+async function overrideHeld(page: Page, scope: string, key: string): Promise<Override> {
+  const deadline = Date.now() + 30_000;
+  for (;;) {
+    const answered = await page.request.get(`${ORIGIN}/api/state`, { headers: { 'X-OpenFerment-Project': PROJECT } });
+    if (answered.ok()) {
+      const found = ((await answered.json()) as ProjectState).overrides[scope]?.find((o) => o.key === key);
+      if (found) return found;
+    }
+    if (Date.now() > deadline) throw new Error(`the service keeps no override of ${key} in ${scope} 30 s after the panel kept it`);
     await page.waitForTimeout(500);
   }
 }
@@ -476,6 +508,36 @@ async function main(): Promise<void> {
     await origin.getByTestId('measurement-deposition').click();
     await page.locator(`[data-testid="deposition-entry"][data-entry="${entry}"][data-confirmed="true"]`).waitFor();
     return `run ${measured}: measured; ${PARAMETER} reads "${words}", its parameter's chip measured, and its link opens deposition ${deposition} at reading ${entry}`;
+  });
+
+  // alpha 2.2 E.17: the same reading chosen on a Proforma scenario's parameter panel, kept in its own value and unit.
+  await step('A reading on the parameter panel', async () => {
+    if (!ref) throw new Error('no reading was deposited to choose on the panel');
+    await at(page, '/proforma');
+    await page.getByTestId('new-scenario').click();
+    const dialog = page.getByTestId('new-scenario-dialog');
+    await dialog.locator(`[data-testid="new-scenario-flowsheet"][data-flowsheet="${PANEL_FLOWSHEET}"] input[type="radio"]`).check();
+    await dialog.getByTestId('new-scenario-name').fill('A reading on the panel');
+    await dialog.getByTestId('new-scenario-create').click();
+    const panel = page.getByTestId('parameter-panel');
+    await panel.waitFor();
+    const scope = (await panel.getAttribute('data-scope')) ?? '';
+    const made = scope.replace(/^proforma:/, '');
+    const row = panel.locator(`[data-testid="param-row"][data-key="${PANEL_PARAMETER}"]`);
+    await row.getByTestId('param-readings').locator('summary').click();
+    const choice = row.locator(`[data-testid="param-reading"][data-ref="${ref}"]`);
+    await choice.waitFor();
+    const offered = (await choice.innerText()).replace(/\s+/g, ' ').trim();
+    await choice.locator('input[type="radio"]').check();
+    await page.locator(`[data-testid="parameter-panel"][data-scope="${scope}"][data-resolved="true"]`).waitFor();
+    await row.locator(`[data-testid="param-chip"][data-origin="measurement"][data-ref="${ref}"]`).waitFor();
+    const detail = (await row.getByTestId('param-detail').innerText()).replace(/\s+/g, ' ').trim();
+    if (!detail.includes('as deposited')) throw new Error(`the row says "${detail}" of the reading`);
+    const kept = await overrideHeld(page, scope, PANEL_PARAMETER);
+    if (kept.origin !== 'measurement' || kept.ref !== ref || kept.value !== Number(READING) || kept.unit !== READING_UNIT || kept.by !== PERSON)
+      throw new Error(`the project keeps ${PANEL_PARAMETER} of ${scope} as ${JSON.stringify(kept)}`);
+    console.log(`  panel scenario ${made}`);
+    return `scenario ${made} made on ${PANEL_FLOWSHEET}; on its panel ${PANEL_PARAMETER} set to reading ${ref} (${offered}), the service saying "${detail}", and the project's row kept as ${kept.value} ${kept.unit}, the reading's own, deposited by ${kept.by}`;
   });
 
   // alpha 2.2 D0.8: each engine the walk is given, its first thing run on its own defaults from the Runs screen.

@@ -147,7 +147,10 @@ def override_of(scope: str, value: EngineInput, unit: str) -> Override:
     An Override holds its value in the parameter's own unit and names no
     basis of its own, so the quantity is set in `unit`, the parameter's, and
     carries no basis. A reading is looked up first (`resolved`), which sets
-    it in `unit` where its own unit converts into it. A quantity in another
+    it in `unit` where its own unit converts into it: a page keeps a reading
+    in its own value and unit (`Override.unit`) and sends it so, and the
+    Override this returns holds the value set in `unit`, its own `unit`
+    left empty. A quantity in another
     unit, one carrying a basis, one whose origin is a record, an artifact, a
     library default or a convention (the module that runs binds those
     itself), and one that does not say when it was set are each refused in

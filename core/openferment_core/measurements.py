@@ -46,9 +46,10 @@ the run's provenance is `measured` where nothing assumed stands beside it.
 
 What a person chooses from is `readings(unit)` (GET
 /api/depositions/readings, the readings NewScenarioDialog offers beside a
-typed value): every reading these rules let a run take in `unit`, each with
-the runbook and the measure it was recorded against, its depositor and its
-time.
+typed value, and a Proforma scenario's parameter panel on a row that takes a
+person's value): every reading these rules let a run take in `unit`, each
+with the runbook and the measure it was recorded against, its depositor and
+its time.
 """
 from __future__ import annotations
 
@@ -229,7 +230,8 @@ def readings(unit: str | None = None) -> list[DepositionReading]:
     taken first: each entry of its depositions a person confirmed that
     stands for its measure, with the runbook and the measure it was recorded
     against as the project keeps them, the person who deposited it and the
-    time it was taken (GET /api/depositions/readings; NewScenarioDialog).
+    time it was taken (GET /api/depositions/readings; NewScenarioDialog and
+    a Proforma scenario's parameter panel).
     With `unit`, the readings whose unit is `unit` or converts into it, each
     with its value in `unit` and the conversion in words. The lookup's own
     rules decide (`_held_to_rules`), so a reading listed is one a run takes

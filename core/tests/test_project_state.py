@@ -334,7 +334,11 @@ BUILT = {"train": {"id": "tr-2", "name": "A placeholder train", "program": "plac
 PANEL = [{"scope": "proforma:sc-1", "key": "a_placeholder_key", "value": 1.5, "low": None, "high": None,
           "by": "Ada Moreno", "at": AT, "note": None},
          {"scope": "proforma:sc-1", "key": "another_placeholder_key", "value": 2, "low": 1, "high": 3,
-          "by": "Ada Moreno", "at": AT, "note": "a placeholder", "origin": "measurement", "ref": "dep-2/de-2"}]
+          "by": "Ada Moreno", "at": AT, "note": "a placeholder", "origin": "measurement", "ref": "dep-2/de-2"},
+         # A reading as Proforma's parameter panel keeps one (alpha 2.2 E.17): its own value and unit, one value.
+         {"scope": "proforma:sc-1", "key": "a_third_placeholder_key", "value": 7.5, "unit": "placeholder-unit",
+          "low": None, "high": None, "by": "Ada Moreno", "at": AT, "note": None, "origin": "measurement",
+          "ref": "dep-2/de-1"}]
 PAGE_ROWS = [("depositions", "dep-1", DEPOSITION), ("depositions", "dep-2", CLOSED),
              ("measuredEvidence", "me-1", MEASURED), ("runbooks", "rb-1", RUNBOOK), ("scenarios", "sc-1", SCENARIO),
              ("scenarios", "sc-2", COMPOSITE), ("trains", "tr-1", TRAIN), ("trains", "tr-2", BUILT),
@@ -479,6 +483,10 @@ def test_a_runbooks_lock_digest_reads_the_same_through_the_state():
      "low and high are numbers or words, never true or false; nothing was kept"),
     ("overrides", "proforma:sc-1", [{k: v for k, v in PANEL[1].items() if k != "ref"}],
      "names its reading as <deposition id>/<entry id> (ref)"),
+    ("overrides", "proforma:sc-1", [{**PANEL[0], "unit": "placeholder-unit"}],
+     "the override of a_placeholder_key in proforma:sc-1 does not read as an override: the row: the override of "
+     "a_placeholder_key keeps a unit of its own for a deposition's reading alone, and a person's assumption is in "
+     "its parameter's unit; nothing was kept"),
 ])
 def test_a_row_that_does_not_read_as_its_kind_is_refused_in_words_and_nothing_is_kept(kind, item_id, value, words):
     with pytest.raises(project_state.StateRefused) as refused:

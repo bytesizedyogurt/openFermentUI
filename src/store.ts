@@ -3462,9 +3462,13 @@ export function overrideEnds(o: Pick<Override, 'value' | 'low' | 'high'>): { low
   return { low: o.low ?? o.value, high: o.high ?? o.value };
 }
 
-/** An override as a Proforma assumption; null for a value in words, which no Proforma input takes. */
+/**
+ * An override as a Proforma assumption; null for a value in words, which no Proforma input takes, and for a reading
+ * deposited at the bench, which is a measurement in its own value and unit (alpha 2.2 E.17), so the derived
+ * `proformaAssumptions` an older build reads holds a person's values alone.
+ */
 export function assumptionOfOverride(o: Override): ScenarioAssumption | null {
-  if (typeof o.value !== 'number' || !Number.isFinite(o.value)) return null;
+  if (o.origin === 'measurement' || typeof o.value !== 'number' || !Number.isFinite(o.value)) return null;
   const ends = overrideEnds(o);
   return { key: o.key, value: o.value, low: ends.low ?? o.value, high: ends.high ?? o.value, by: o.by, at: o.at, note: o.note ?? null };
 }

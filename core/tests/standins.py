@@ -432,11 +432,13 @@ def standin_ceiling(model_id: str, product: str, substrate: str, g_per_g: float,
 def as_input(o: Any, unit: str) -> Any:
     """An Override as the input a request sends: its key, and its value, low
     and high in `unit` (its parameter's), with its person or model, day and
-    note as the quantity's origin."""
+    note as the quantity's origin; a deposition's reading with its ref, in
+    its own unit where the override names one (`Override.unit`)."""
     from openferment_core.models import EngineInput, Origin, Quantity
 
-    origin = Origin(kind=o.origin, by=o.by, at=o.at, note=o.note)
-    return EngineInput(name=o.key, quantity=Quantity(value=o.value, unit=unit, low=o.low, high=o.high, origin=origin))
+    origin = Origin(kind=o.origin, by=o.by, at=o.at, note=o.note, ref=o.ref if o.origin == "measurement" else None)
+    return EngineInput(name=o.key, quantity=Quantity(value=o.value, unit=o.unit if o.unit is not None else unit,
+                                                     low=o.low, high=o.high, origin=origin))
 
 
 def unit_for(key: str, units: dict[str, str]) -> str:

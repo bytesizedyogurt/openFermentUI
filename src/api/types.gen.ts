@@ -5869,6 +5869,13 @@ export interface components {
          *     person or the model, or a deposition's reading (a measurement), `by` the
          *     person who deposited it, `at` the time it was taken and `ref` the
          *     reading, `<deposition id>/<entry id>`.
+         *
+         *     Its value is in its parameter's own unit, as a person's assumption, a
+         *     model's estimate and every Override a resolver takes are, and `unit`
+         *     stays empty. A reading a page keeps (a Proforma scenario's parameter
+         *     panel) names its own unit: its value and `unit` are the reading's as
+         *     deposited, which the door it is sent to sets in the parameter's unit
+         *     (measurements.py), the conversion stated in the value's note.
          */
         Override: {
             /** At */
@@ -5893,6 +5900,8 @@ export interface components {
             ref?: string | null;
             /** Scope */
             scope: string;
+            /** Unit */
+            unit?: string | null;
             /** Value */
             value: number | string;
         };

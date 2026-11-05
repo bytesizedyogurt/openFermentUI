@@ -7,7 +7,7 @@
 // call. The shapes the service answers are generated from its models into
 // src/api/types.gen.ts (ADR-007); the sliders' grid (`ResultGrid`) is kept here.
 import type { components } from '@/api/types.gen';
-import { useStore } from '@/store';
+import { overrideEnds, useStore } from '@/store';
 import { ServiceDown, ServiceRefused, call } from './http';
 import { inputsOf, type Override, type ParameterSpec } from './params';
 import type { Artifact, BasisInput, BasisSource, ComputedBasis, EngineRun, Provenance } from './studies';
@@ -963,6 +963,53 @@ export const QUESTIONS: Record<string, Record<string, string>> = {
     glucose_price: 'What does a kilogram of glucose cost delivered to the fermenter, from the sugar this plant would buy?',
   },
 };
+
+/**
+ * A scenario's inputs as the service bound them, with the scope's overrides laid over every input they name, records
+ * and fits included (OF-BLD-020 D3), as the service lays them on a run (`proforma._assume`): a person's value as their
+ * assumption, its interval as the service reads it (`overrideEnds`); a model's estimate under its model; and a reading
+ * deposited at the bench that a person chose as a named value is bound (alpha 2.2 E.17): one value held fixed, its
+ * source the reading (`isReading`), its value the reading's own where its unit is the input's and none where the
+ * service sets it in the input's unit. The scenario page binds by it, and the panel shows the service's own answer.
+ */
+export function laidOn(inputs: ScenarioInput[], overrides: Override[]): ScenarioInput[] {
+  const by = new Map(overrides.filter((o) => typeof o.value === 'number').map((o) => [o.key, o]));
+  return inputs.map((i): ScenarioInput => {
+    const o = by.get(i.key);
+    if (!o || typeof o.value !== 'number') return i;
+    const said = o.note ? `: ${o.note}` : '';
+    if (o.origin === 'measurement') {
+      const value = o.unit == null || o.unit === i.unit ? o.value : null;
+      return {
+        ...i,
+        binding: 'assumption',
+        value,
+        low: value,
+        high: value,
+        sampling: 'fixed',
+        source: { kind: 'deposition', id: o.ref ?? null, by: o.by, note: `measured on ${o.at}${said}` },
+        records: [],
+        recordIds: [],
+      };
+    }
+    // One end typed, the other is the value; neither, held at the value (overrideEnds, as the service reads it).
+    const ends = overrideEnds(o);
+    const low = ends.low ?? o.value;
+    const high = ends.high ?? o.value;
+    const estimate = o.origin === 'model-estimate';
+    return {
+      ...i,
+      binding: 'assumption',
+      value: o.value,
+      low,
+      high,
+      sampling: low === high ? 'fixed' : 'uniform',
+      source: { kind: estimate ? 'model-estimate' : 'assumption', id: null, by: o.by, note: `${estimate ? 'estimated' : 'typed'} on ${o.at}${said}` },
+      records: [],
+      recordIds: [],
+    };
+  });
+}
 
 /**
  * The inputs that rest on an assumption, ordered by how strongly they move

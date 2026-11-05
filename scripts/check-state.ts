@@ -11,14 +11,19 @@
  * in the service's words (src/lib/http.ts), a refusal of a request's own
  * fields among them; and the unit each person's change is sent in
  * (src/lib/params.ts, `inputsOf`), a panel that shows part of its scope
- * among them, a deposition's reading sent as the reading it names and a
- * change kept with no origin sent as a person's assumption; the
+ * among them, a deposition's reading sent as the reading it names, in its own
+ * value and unit where its row keeps them (alpha 2.2 E.17), and a change kept
+ * with no origin sent as a person's assumption; the
  * bench's readings as the service's lookup reads them (src/engine/readings.ts:
  * a correction, the numbers that wait to be read back, a series); a
  * train's changes named by their place (src/lib/pureos.ts,
  * `trainInputs`), a Proforma scenario's run carrying its changes as typed
  * inputs (src/lib/proforma.ts, `runBody`) and its ceiling check its typed
- * yield (`ceilingQuery`), a scenario card's counts (`inputCounts`, an input
+ * yield (`ceilingQuery`), a reading among them in its own value and unit, the
+ * scenario page's binding with a person's value and a reading laid on
+ * (`laidOn`) and the questions it asks (`modellerQuestions`), the Proforma
+ * assumptions an older build reads holding a person's values alone
+ * (src/store.ts, `assumptionOfOverride`), a scenario card's counts (`inputCounts`, an input
  * the vessel design binds apart from a chosen fit), the reference run a
  * plant's page reads in its default configuration (`referenceRunOf`) and the
  * runs kept from the retired reference entries it lists (`keptRunsOf`), and a
@@ -52,11 +57,22 @@ import { ServiceDown, ServiceRefused, call, detailWords } from '../src/lib/http'
 import { runnable, type LibraryPlant } from '../src/lib/library';
 import { inputsOf } from '../src/lib/params';
 import { trainInputs, unitScope, type TrainSpec } from '../src/lib/pureos';
-import { ceilingQuery, inputCounts, isReading, keptRunsOf, referenceRunOf, retiredEntryOf, runBody, runSpecs } from '../src/lib/proforma';
+import {
+  ceilingQuery,
+  inputCounts,
+  isReading,
+  keptRunsOf,
+  laidOn,
+  modellerQuestions,
+  referenceRunOf,
+  retiredEntryOf,
+  runBody,
+  runSpecs,
+} from '../src/lib/proforma';
 import { interpolate } from '../src/engine/interp';
 import { awaitingReadBack, correctedBy, correctionOf } from '../src/engine/readings';
 import { lockIntact, runbookLockHash } from '../src/engine/lock';
-import { projectStateOf, useStore } from '../src/store';
+import { assumptionOfOverride, projectStateOf, useStore } from '../src/store';
 
 let fails = 0;
 const check = (label: string, ok: boolean, extra = '') => {
@@ -330,6 +346,22 @@ async function callAgainst(answer: { status: number; body?: unknown }, healthy =
   const keptBefore = { scope: 'a-scope', key: 'x0', value: 1, by: 'Ada', at: AT } as Override;
   const [sentKept] = inputsOf([keptBefore], scope);
   check('a change kept with no origin is sent as a person’s assumption, as the service reads it', sentKept?.quantity.origin?.kind === 'person-assumption', JSON.stringify(sentKept));
+  // alpha 2.2 E.17: a reading Proforma's panel keeps holds the reading's own value and unit, which go as they are.
+  const own: Override = { ...typed('x0'), value: 1000, unit: 'placeholder-unit-c', by: 'Grace', at: AT, origin: 'measurement', ref: 'dep-1/de-1' };
+  const [sentOwn, sentBeside] = inputsOf([own, typed('mu_max')], scope);
+  check(
+    'a reading kept in its own unit goes in that value and unit, its ref, depositor and time beside it and no low or high; a person’s change beside it goes in its parameter’s unit',
+    sentOwn?.quantity.value === 1000 &&
+      sentOwn.quantity.unit === 'placeholder-unit-c' &&
+      sentOwn.quantity.origin?.kind === 'measurement' &&
+      sentOwn.quantity.origin.ref === 'dep-1/de-1' &&
+      sentOwn.quantity.origin.by === 'Grace' &&
+      sentOwn.quantity.origin.at === AT &&
+      !('low' in sentOwn.quantity) &&
+      !('high' in sentOwn.quantity) &&
+      sentBeside?.quantity.unit === 'placeholder-unit-b',
+    JSON.stringify([sentOwn, sentBeside]),
+  );
 }
 
 // ── the bench's readings, read as the service's lookup reads them (alpha 2.2 C.5; src/engine/readings.ts) ──
@@ -435,6 +467,58 @@ async function callAgainst(answer: { status: number; body?: unknown }, healthy =
     q.toString(),
   );
   check('a ceiling check with no typed yield sends no inputs', !ceilingQuery({ scenarioId: 'sc-1', host: null }).has('inputs'));
+  // alpha 2.2 E.17: a reading chosen on the panel goes in its own value and unit from the run and the ceiling check alike.
+  const reading = anOverride('proforma:sc-1', 'yield', 0.5, { unit: 'placeholder-share-b', origin: 'measurement', ref: 'dep-1/de-1' });
+  const ran = (runBody({ ...ask, overrides: [reading, typed('b', 2)], specs: runSpecs(panel, shelfOnly) }).inputs ?? []).map(
+    (i) => `${i.name} ${i.quantity.value} ${i.quantity.unit} ${i.quantity.origin?.ref ?? ''}`.trim(),
+  );
+  check('a scenario’s run sends a reading in its own value and unit, with its ref', ran.join(', ') === 'yield 0.5 placeholder-share-b dep-1/de-1, b 2 placeholder-unit-b', ran.join(', '));
+  const checked = JSON.parse(
+    ceilingQuery({ scenarioId: 'sc-1', host: null, overrides: [reading], specs: [{ key: 'yield', unit: 'placeholder-share' }] }).get('inputs') ?? '[]',
+  ) as { name: string; quantity: { value: number; unit: string; origin?: { ref?: string } } }[];
+  check(
+    'the ceiling check sends a yield set to a reading in the reading’s own value and unit',
+    checked.length === 1 && checked[0].quantity.value === 0.5 && checked[0].quantity.unit === 'placeholder-share-b' && checked[0].quantity.origin?.ref === 'dep-1/de-1',
+    JSON.stringify(checked),
+  );
+}
+
+// ── the scenario page's binding with its overrides laid on (alpha 2.2 E.17; src/lib/proforma.ts `laidOn`) ──
+
+{
+  const input = (key: string, unit: string): ScenarioInput => ({
+    key, label: key, unit, binding: 'waiting', value: null, low: null, high: null, sampling: null, source: null,
+    recordIds: [], records: [], leftOutNoCarbon: 0, leftOutOtherCarbon: 0, flags: [],
+  });
+  const inputs = [input('a', 'placeholder-unit-a'), input('b', 'placeholder-unit-b'), input('c', 'placeholder-unit-c'), input('d', 'placeholder-unit-d')];
+  const person = anOverride('proforma:sc-1', 'a', 2, { low: 1, note: 'a placeholder' });
+  const inItsUnit = anOverride('proforma:sc-1', 'b', 3, { unit: 'placeholder-unit-b', origin: 'measurement', ref: 'dep-1/de-1', by: 'Grace' });
+  const inAnother = anOverride('proforma:sc-1', 'c', 4, { unit: 'placeholder-unit-e', origin: 'measurement', ref: 'dep-1/de-2', by: 'Grace' });
+  const [a, b, c, d] = laidOn(inputs, [person, inItsUnit, inAnother]);
+  check(
+    'a person’s value binds as their assumption with its interval',
+    a.binding === 'assumption' && a.value === 2 && a.low === 1 && a.high === 2 && a.sampling === 'uniform' && a.source?.kind === 'assumption' && a.source.by === 'Ada' &&
+      a.source.note === `typed on ${AT}: a placeholder`,
+    JSON.stringify(a),
+  );
+  check(
+    'a reading in the input’s unit binds as the reading it is: one value held fixed, its source the reading',
+    b.binding === 'assumption' && b.value === 3 && b.low === 3 && b.high === 3 && b.sampling === 'fixed' && isReading(b.source) && b.source?.id === 'dep-1/de-1' && b.source.by === 'Grace',
+    JSON.stringify(b),
+  );
+  check(
+    'a reading in another unit binds as the reading with no value, which the service sets in the input’s unit',
+    c.binding === 'assumption' && c.value === null && c.sampling === 'fixed' && isReading(c.source) && c.source?.id === 'dep-1/de-2',
+    JSON.stringify(c),
+  );
+  check('an input no override names stands as the service bound it', d === inputs[3]);
+  const asked = modellerQuestions([a, b, c, d], null, null).map((q) => q.key);
+  check('the questions for a modeller ask of a person’s value and an input that waits, and of no reading', asked.join() === 'a,d', asked.join());
+  check(
+    'a Proforma assumption an older build reads holds a person’s value, and none for a reading',
+    assumptionOfOverride(inItsUnit) === null && assumptionOfOverride(person)?.value === 2,
+    JSON.stringify([assumptionOfOverride(inItsUnit), assumptionOfOverride(person)]),
+  );
 }
 
 // ── a scenario card's counts, the reference runs a page reads (src/lib/proforma.ts) ──

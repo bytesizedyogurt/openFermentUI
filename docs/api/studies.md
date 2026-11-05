@@ -82,7 +82,15 @@ and nothing in it checks that the reading measured the quantity the parameter is
 The screens: a run's page opens NewScenarioDialog, which offers these readings beside a typed
 value for each parameter a person sets, each said as what it measured and what it would set; the
 run's page reads a measurement in words, linked to the deposition its reading was recorded in,
-which opens at the reading, marked. A deposition records readings at the bench against a locked
+which opens at the reading, marked. A Proforma scenario's parameter panel offers them too (alpha
+2.2 E.17): each numeric row whose rule takes a person's value lists, on asking, the readings in
+its parameter's unit or one that converts into it (`GET /api/depositions/readings?unit=`), and a
+chosen one is kept as the scope's override in the reading's own value and unit (`Override.unit`,
+origin `measurement`, `ref` the reading, `by` its depositor and `at` the time it was taken), sent
+so by the panel's resolve, the run, the ceiling check and a tool's run of the kept scenario
+(`project_state.run_request`, `proforma.inputs_of`), and set in the parameter's unit by the
+lookup at each door, the conversion stated in the value's note. A typed value or the row's slider
+replaces it with the person's own. A deposition records readings at the bench against a locked
 runbook's measures alone, with no protocol's steps (RunbookDetail, *The readings alone*,
 `/runbooks/depositions/<id>/bench`), once the person has set their name in Settings.
 
@@ -99,7 +107,9 @@ Each row a page keeps reads as its kind's model in `models.py` (alpha 2.2 E.0b):
 as `Deposition` with its `DepositionEntry` readings, `DepositionObservation` observations and
 `Reconciliation`, measured evidence as `MeasuredEvidence`, a Proforma scenario as
 `ProformaScenario`, a saved train as `TrainMade`, an override as `Override`, a runbook as
-`Runbook`. A write that does not read is a 422 naming the fields, nothing kept. `GET /api/state`
+`Runbook`. An override keeps a unit of its own for a deposition's reading alone, its value the
+reading's own as deposited; a person's assumption or a model's estimate naming a unit is refused
+in words. A write that does not read is a 422 naming the fields, nothing kept. `GET /api/state`
 answers a `ProjectState`: each row as the page sent it, a field the page left out staying out (a
 deposition, measured evidence, a scenario and a saved train keep the fields their models do not
 name), and a row kept before its kind had a model that does not read named in `refused` with its

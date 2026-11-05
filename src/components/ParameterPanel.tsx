@@ -15,7 +15,14 @@
 //                change is an `Override` under the reviewer name, at now,
 //                kept in the open project's rows (`setOverride`;
 //                lib/projectState.ts); Reset to source drops it
-//                (`clearOverride`). With no
+//                (`clearOverride`). On a panel that offers readings (a
+//                Proforma scenario's, `readings`; alpha 2.2 E.17) the person
+//                may also choose a reading deposited at the bench for a row:
+//                it is kept as the override in the reading's own value and
+//                unit (`Override.unit`), its depositor and the time it was
+//                taken, with the person's words on why it stands for the
+//                parameter, and the service sets it in the parameter's unit
+//                each time it is sent. With no
 //                reviewer name every edit control is disabled and the row
 //                says where to set one;
 //   the service  is asked after each change, debounced, to lay the scope's
@@ -46,7 +53,7 @@ import {
   type ParamResolveResult,
   type ParamScope,
 } from '@/lib/params';
-import { ParameterRow, type ParameterChange } from './ParameterRow';
+import { ParameterRow, type ChosenReading, type ParameterChange } from './ParameterRow';
 
 export interface ParameterPanelProps {
   /** The scope the specs and overrides belong to: `proforma:<id>`, `fermos:family:<id>`, `fermos:vessel:<id>`, `pureos:unit:<train>:<unit>`. */
@@ -69,13 +76,35 @@ export interface ParameterPanelProps {
   recordsOf?: (key: string, value: ParameterValue) => ReactNode;
   /** The specs that name each override's unit when `data` shows fewer than the scope holds (FermOSForecast's batch fit shows its start values and run length); by default `data`'s own. */
   unitSpecs?: ParameterSpec[];
+  /** Offer, on each numeric row a person may change, the project's readings deposited at the bench it may take (a Proforma scenario's panel). */
+  readings?: boolean;
 }
 
 /** How long the panel waits after a change before asking the service to resolve it. */
 const RESOLVE_AFTER_MS = 350;
 
-/** A person's override as the row shows it while the service has not answered: their value, its interval as the service reads it (`overrideEnds`), their name. */
-function asTyped(o: Override, served: ParameterValue | undefined): ParameterValue {
+/**
+ * A person's override as the row shows it while the service has not answered: their value, its interval as the service
+ * reads it (`overrideEnds`), their name; a reading they chose as the reading it is, its value shown where its unit is
+ * the parameter's and none where the service has its conversion to make.
+ */
+function asTyped(o: Override, served: ParameterValue | undefined, spec: ParameterSpec): ParameterValue {
+  if (o.origin === 'measurement') {
+    return {
+      key: o.key,
+      value: o.unit == null || o.unit === spec.unit ? o.value : null,
+      low: null,
+      high: null,
+      source: { kind: 'deposition', id: o.ref ?? null, by: o.by, note: `measured on ${o.at}` },
+      origin: 'measurement',
+      identified: null,
+      overriddenBy: o.by,
+      libraryDefault: served?.libraryDefault ?? null,
+      recordIds: [],
+      detail: null,
+      outOfBounds: null,
+    };
+  }
   const ends = overrideEnds(o);
   return {
     key: o.key,
@@ -102,7 +131,7 @@ export function groupOrder(specs: ParameterSpec[], groups: string[] = []): strin
 /** The time an override is kept at: now, to the second, in UTC. */
 const nowStamp = () => `${new Date().toISOString().slice(0, 19)}Z`;
 
-export function ParameterPanel({ scope, data, request, onChange, onResolved, onRefused, groups, readOnly, recordsOf, unitSpecs }: ParameterPanelProps) {
+export function ParameterPanel({ scope, data, request, onChange, onResolved, onRefused, groups, readOnly, recordsOf, unitSpecs, readings = false }: ParameterPanelProps) {
   const overrides = useStore(overridesFor(scope));
   const reviewer = useStore((s) => s.reviewer).trim();
   const setOverride = useStore((s) => s.setOverride);
@@ -168,6 +197,14 @@ export function ParameterPanel({ scope, data, request, onChange, onResolved, onR
     clearOverride(scope, spec.key);
     onChange?.(useStore.getState().parameterOverrides[scope] ?? []);
   };
+  // A reading chosen for a row: its own value and unit, its depositor and the time it was taken, as the service listed
+  // it, kept in the reviewer's name with the project's rows; the service looks it up again and sets it in the
+  // parameter's unit each time it is sent.
+  const read = (spec: ParameterSpec, r: ChosenReading, note: string | null) => {
+    if (!reviewer) return;
+    setOverride({ scope, key: spec.key, value: r.value, unit: r.unit, low: null, high: null, by: r.by, at: r.at, note, origin: 'measurement', ref: r.ref });
+    onChange?.(useStore.getState().parameterOverrides[scope] ?? []);
+  };
 
   return (
     <div data-testid="parameter-panel" data-scope={scope} data-resolved={fresh ? 'true' : 'false'}>
@@ -185,7 +222,7 @@ export function ParameterPanel({ scope, data, request, onChange, onResolved, onR
             .filter((s) => s.group === g)
             .map((spec) => {
               const o = byKey.get(spec.key) ?? null;
-              const value = answered.get(spec.key) ?? (o ? asTyped(o, served.get(spec.key)) : served.get(spec.key) ?? null);
+              const value = answered.get(spec.key) ?? (o ? asTyped(o, served.get(spec.key), spec) : served.get(spec.key) ?? null);
               return (
                 <ParameterRow
                   key={spec.key}
@@ -198,6 +235,9 @@ export function ParameterPanel({ scope, data, request, onChange, onResolved, onR
                   records={value && value.origin === 'record' && recordsOf ? recordsOf(spec.key, value) : undefined}
                   onSet={(c) => change(spec, c)}
                   onReset={() => reset(spec)}
+                  offersReadings={readings}
+                  scope={scope}
+                  onRead={(r, note) => read(spec, r, note)}
                 />
               );
             })}

@@ -11,7 +11,10 @@ runs; a reading that stands is set in its parameter's unit with its depositor
 and the time it was taken, a conversion stated in its note; a study scenario
 resting on readings runs on the stand-in, and its run's provenance and its
 inputs' origins read back from GET /api/runs/{id}; a contract engine's run
-(the sample engine) and a fermOS simulation take readings; every door that
+(the sample engine) and a fermOS simulation take readings; a reading a
+Proforma scenario's parameter panel keeps, in its own value and unit, goes
+so from its row through the service's own sender to a run, the panel's
+resolve and a tool, each setting it in its parameter's unit; every door that
 takes values refuses an unheld reading with a 422 in words, and the study
 tool with an error; every reader of a value a run set reads a reading as
 set; and the runbooks and fermOS reads list the deposition.
@@ -500,6 +503,140 @@ def test_a_vessel_design_reads_a_reading_back_as_a_measurement(monkeypatch, tmp_
     refused = TestClient(api.app).post("/api/fermos/vessel", json={"simulation": AEROBIC_ID, "inputs": [
         reading("de-1", 1000.0, unit, name="plant_scale", deposition="dep-9")]})
     assert refused.status_code == 422 and "the project holds no deposition dep-9" in refused.json()["detail"]
+
+
+# ── a reading kept on a Proforma scenario's parameter panel (alpha 2.2 E.17) ──
+
+
+HELD = {"id": "sc-held-1", "name": "A held test scenario", "kind": "biosteam", "modelId": "ethanol_glucose_v0"}
+HELD_SCOPE = f"proforma:{HELD['id']}"
+# Who chose the reading on the panel: the maker of the scope's rows, another person than its depositor.
+CHOOSER = "Grace Hopper"
+
+
+@pytest.fixture
+def panel(monkeypatch, tmp_path):
+    """A held scenario on the glucose-to-ethanol flowsheet, run by the stand-in worker over the stand-in yeast
+    records, and test_custom_train.py's STAND-IN titre deposited twice: once in another spelling of the titre's
+    unit, once in a unit a factor away, its value the STAND-IN in that unit."""
+    from types import SimpleNamespace
+
+    import standins
+    from openferment_core import evidence_pool, intake, proforma
+    from standins import proforma_units
+
+    monkeypatch.setattr(intake, "DATA_DIR", tmp_path)
+    monkeypatch.setattr(proforma, "call", standins._standin_call)
+    monkeypatch.setattr(proforma, "held_scenarios", lambda: [HELD])
+    rs = standins._standin_yeast_records()
+    pool = SimpleNamespace(records=rs, records_by_id={r["id"]: r for r in rs})
+    monkeypatch.setattr(evidence_pool, "load", lambda *a, **k: pool)
+    unit_of = proforma_units("ethanol_glucose_v0")
+    in_mg = units.convert(TITRE, unit_of["titre"], "mg/L")
+    deposit([_entry("de-1", "m-titre", TITRE, "g/L"), _entry("de-2", "m-titre-mg", in_mg, "mg/L")], sampleTimes={})
+    return SimpleNamespace(pool=pool, unit_of=unit_of, in_mg=in_mg)
+
+
+def kept_on_the_panel(value: float, unit: str | None, entry: str = "de-2") -> None:
+    """The scope's rows as Proforma's parameter panel keeps them, kept by the person who chose the reading: titre
+    set to the reading (its value and unit as the row keeps them, its depositor and time), and the plant's scale and
+    the glucose price as that person's assumptions (test_proforma_overrides.py's STAND-INs)."""
+    read = {"scope": HELD_SCOPE, "key": "titre", "value": value, "low": None, "high": None, "by": DEPOSITOR,
+            "at": TAKEN, "note": None, "origin": "measurement", "ref": f"{DEPOSITION}/{entry}",
+            **({"unit": unit} if unit is not None else {})}
+    typed = [{"scope": HELD_SCOPE, "key": k, "value": v, "low": None, "high": None, "by": CHOOSER, "at": "2026-11-04",
+              "note": "a STAND-IN for a test", "origin": "person-assumption"}
+             for k, v in (("plant_scale", 100000.0), ("glucose_price", 0.4))]
+    project_state.put("overrides", HELD_SCOPE, [read, *typed], by=CHOOSER)
+
+
+def test_a_reading_kept_on_the_panel_goes_in_its_own_unit_and_runs_set_in_its_parameters(panel):
+    from openferment_core import proforma
+
+    kept_on_the_panel(panel.in_mg, "mg/L")
+    req = project_state.run_request(HELD, by=CHOOSER)
+    sent = {i.name: i.quantity for i in req.inputs}
+    # The reading goes in its own value and unit with its ref; a person's value in its parameter's unit.
+    assert (sent["titre"].value, sent["titre"].unit, sent["titre"].origin.kind, sent["titre"].origin.ref) == (
+        panel.in_mg, "mg/L", "measurement", "dep-1/de-2")
+    assert sent["glucose_price"].unit == panel.unit_of["glucose_price"]
+    r = proforma.run(req.model_copy(update={"samples": 8}), pool=panel.pool)
+    set_to = units.convert(panel.in_mg, "mg/L", panel.unit_of["titre"])
+    said = (f"{panel.in_mg:.12g} mg/L as deposited, {set_to:.12g} {panel.unit_of['titre']} in the parameter's unit "
+            "(units.convert)")
+    titre = {i.key: i for i in r.inputs}["titre"]
+    assert (titre.binding, titre.value, titre.low, titre.high, titre.sampling) == (
+        "assumption", set_to, set_to, set_to, "fixed")
+    assert titre.source == measurement_source("dep-1/de-2", DEPOSITOR, TAKEN, said)
+    row = runs.get(r.artifactId)
+    (got,) = [i.quantity for i in row.inputs if i.name == "titre"]
+    assert (got.value, got.unit, got.origin.kind, got.origin.ref, got.origin.by) == (
+        set_to, panel.unit_of["titre"], "measurement", "dep-1/de-2", DEPOSITOR)
+    assert r.provenance == "assumed" == row.provenance, "beside the person's prices"
+
+
+def test_a_reading_kept_in_its_parameters_unit_is_refused_in_the_lookups_words(panel):
+    from openferment_core import proforma
+
+    # The row the panel's path kept before E.17: the reading's value in the parameter's unit, naming no unit.
+    kept_on_the_panel(units.convert(panel.in_mg, "mg/L", panel.unit_of["titre"]), None)
+    req = project_state.run_request(HELD, by=CHOOSER)
+    (titre,) = [i.quantity for i in req.inputs if i.name == "titre"]
+    assert titre.unit == panel.unit_of["titre"]
+    with pytest.raises(proforma.ScenarioRefused, match="a measurement carries its reading's own value and unit"):
+        proforma.run(req.model_copy(update={"samples": 8}), pool=panel.pool)
+    assert not [a for a in artifacts.all_artifacts() if a.tool == proforma.RUN] and runs.listed() == []
+
+
+def test_the_panels_resolve_on_a_proforma_scope_sets_a_reading_in_its_parameters_unit(panel):
+    route = f"/api/params/{HELD_SCOPE}/resolve"
+    client = TestClient(api.app)
+    got = client.post(route, json={"flowsheet": "ethanol_glucose_v0",
+                                   "inputs": [reading("de-1", TITRE, "g/L", name="titre")]})
+    assert got.status_code == 200, got.text
+    answered = got.json()
+    (titre,) = [v for v in answered["values"] if v["key"] == "titre"]
+    set_to = units.convert(TITRE, "g/L", panel.unit_of["titre"])
+    assert (titre["value"], titre["origin"], titre["overriddenBy"]) == (set_to, "measurement", DEPOSITOR)
+    assert (titre["source"]["kind"], titre["source"]["id"], titre["source"]["by"]) == ("deposition", "dep-1/de-1", DEPOSITOR)
+    assert "g/L as deposited" in titre["detail"]
+    basis = {b["name"]: b for b in answered["basisInputs"]}
+    assert all(basis[n]["source"] == titre["source"] and basis[n]["value"] == set_to
+               for n in ("titre", "titre low", "titre high"))
+    # The reading sent in the parameter's unit, its value set there, is no reading's own value and unit.
+    refused = client.post(route, json={"flowsheet": "ethanol_glucose_v0",
+                                       "inputs": [reading("de-1", set_to, panel.unit_of["titre"], name="titre")]})
+    assert refused.status_code == 422, refused.text
+    assert "a measurement carries its reading's own value and unit" in refused.json()["detail"]
+
+
+def test_a_tool_binds_a_kept_reading_from_its_row(panel):
+    from types import SimpleNamespace
+
+    import standins
+
+    kept_on_the_panel(panel.in_mg, "mg/L")
+    # The stand-in records less titre's: the reading alone gives titre a source.
+    rs = [r for r in standins._standin_yeast_records() if r["field"] != "ethanol_titre"]
+    ctx = tools.ToolContext(pool_factory=lambda: SimpleNamespace(records=rs, records_by_id={r["id"]: r for r in rs}))
+    said = tools.run("selling_price", {"scenarioId": HELD["id"]}, ctx).error
+    assert said and f"no run of {HELD['id']} is on file here" in said, said
+    assert "every input has a source as the service binds it" in said and "could not be bound" not in said
+    assert "titre" not in said and artifacts.all_artifacts() == []
+
+
+def test_an_override_keeps_a_unit_of_its_own_for_a_reading_alone():
+    row = {"scope": HELD_SCOPE, "key": "glucose_price", "value": 0.4, "by": CHOOSER, "at": "2026-11-04",
+           "unit": "placeholder-unit"}
+    with pytest.raises(ValidationError, match="keeps a unit of its own for a deposition's reading alone, and a "
+                                              "person's assumption is in its parameter's unit"):
+        Override.model_validate(row)
+    with pytest.raises(ValidationError, match="and a model's estimate is in its parameter's unit"):
+        Override.model_validate({**row, "origin": "model-estimate"})
+    held = Override.model_validate({**row, "origin": "measurement", "ref": "dep-1/de-1"})
+    assert held.unit == "placeholder-unit"
+    # A resolver's Override, the one converter's, keeps its value in the parameter's unit and names none.
+    assert Override.model_validate({k: v for k, v in row.items() if k != "unit"}).unit is None
 
 
 # ── every reader of a value a run set ─────────────────────────────────

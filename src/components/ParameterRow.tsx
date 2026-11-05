@@ -11,19 +11,29 @@
 // nothing more: a typed value outside them is kept, never clamped (D4), and
 // the service's warning says so on the row.
 //
+// A row the caller lets offer readings (`offersReadings`: a Proforma
+// scenario's panel, alpha 2.2 E.17) also lists, on asking, the project's
+// readings deposited at the bench that this parameter may take (GET
+// /api/depositions/readings?unit=, the service's lookup deciding), and a
+// person may set the parameter to one: the panel keeps it as the scope's
+// override in the reading's own value and unit (`onRead`), and the service
+// sets it in the parameter's unit each time it is sent. A typed value or the
+// slider then replaces the reading with the person's own.
+//
 // The bench may use it (pureOS's Builder, fermOS at the fermenter), so the
 // constraints Deposition.tsx's header lists hold here too: every control is
 // labelled, every touch target is at least 44 px (the citation chips a
 // record-bound row opens included, through TOUCH_CHIP), nothing appears only
-// on hover (Why and the records are disclosures a key or a tap opens), and
-// the keyboard reaches every control, here and in the records Proforma
-// renders into a row.
-import { useEffect, useId, useState, type ReactNode } from 'react';
+// on hover (Why, the records and the readings are disclosures a key or a tap
+// opens), and the keyboard reaches every control, here and in the records
+// Proforma renders into a row.
+import { useEffect, useId, useRef, useState, type ReactNode } from 'react';
 import type { Override, ParameterSpec, ParameterValue } from '@/lib/params';
+import { StudiesDown, depositionReadings, type DepositionReading } from '@/lib/studies';
 import { href } from '@/router';
 import { fmt } from '@/engine/units';
 import { CitationChip } from './Chip';
-import { depositionPath, minute, readingOf } from './ReadingOrigin';
+import { ReadingChoice, depositionPath, minute, readingOf } from './ReadingOrigin';
 import { Button, cx } from './ui';
 
 /** A reading's basis note as the panel says it: the time it was taken to the minute, and what follows it. */
@@ -39,6 +49,9 @@ export interface ParameterChange {
   high: number | null;
   note: string | null;
 }
+
+/** A deposition's reading a person chose for a row, as the service listed it: the panel keeps its own value and unit. */
+export type ChosenReading = Pick<DepositionReading, 'ref' | 'value' | 'unit' | 'by' | 'at'>;
 
 export interface ParameterRowProps {
   spec: ParameterSpec;
@@ -56,6 +69,12 @@ export interface ParameterRowProps {
   records?: ReactNode;
   onSet: (change: ParameterChange) => void;
   onReset: () => void;
+  /** Offer the project's readings deposited at the bench this parameter may take, beside a typed value (a Proforma scenario's panel). */
+  offersReadings?: boolean;
+  /** The scope the row belongs to: it names the row's group of reading choices. */
+  scope?: string;
+  /** A reading the person chose, with why it stands for the parameter in their words: the panel keeps it as the override. */
+  onRead?: (reading: ChosenReading, note: string | null) => void;
 }
 
 /** Where the settings that hold the reviewer name live. */
@@ -406,22 +425,148 @@ function Slider({
   );
 }
 
-export function ParameterRow({ spec, value, override, reviewer, readOnly, warning, records, onSet, onReset }: ParameterRowProps) {
+/** The readings of the row's unit as the service listed them: null while it is asked, with its words when it could not answer. */
+type Listed = { readings: DepositionReading[] | null; problem: string | null };
+
+const listedProblem = (e: unknown) =>
+  e instanceof StudiesDown ? `${e.message} ${e.remedy ?? ''}`.trim() : e instanceof Error ? e.message : String(e);
+
+/**
+ * A reading deposited at the bench, as a row offers one (alpha 2.2 E.17): on first opening, the project's readings
+ * this parameter may take in its unit or one that converts into it, as the service's lookup lists them, each said as
+ * what it measured and what it would set; the one the row is set to is checked. Choosing one keeps it, with why it
+ * stands for the parameter in the person's words, through `onRead`.
+ */
+function Readings({
+  spec,
+  override,
+  scope,
+  disabled,
+  onRead,
+}: {
+  spec: ParameterSpec;
+  override: Override | null;
+  scope: string;
+  disabled: boolean;
+  onRead: (reading: ChosenReading, note: string | null) => void;
+}) {
+  const reading = override?.origin === 'measurement' ? override : null;
+  const [open, setOpen] = useState(reading !== null);
+  const [listed, setListed] = useState<Listed | null>(null);
+  // Why a reading stands for the parameter, typed before one is chosen; a chosen one keeps its own on the override.
+  const [draft, setDraft] = useState('');
+  const asked = useRef(false);
+  useEffect(() => {
+    if (!open || asked.current) return;
+    asked.current = true;
+    setListed({ readings: null, problem: null });
+    depositionReadings(spec.unit).then(
+      (readings) => setListed({ readings, problem: null }),
+      (e: unknown) => setListed({ readings: [], problem: listedProblem(e) }),
+    );
+  }, [open, spec.unit]);
+  const note = reading ? (reading.note ?? '') : draft;
+  const unit = spec.unit || 'no unit';
+  const held = reading && listed?.readings ? listed.readings.some((r) => r.ref === reading.ref) : true;
+  const chosen = (r: ChosenReading): ChosenReading => ({ ref: r.ref, value: r.value, unit: r.unit, by: r.by, at: r.at });
+  return (
+    <details
+      className="mt-1"
+      data-testid="param-readings"
+      open={open}
+      onToggle={(e) => setOpen((e.currentTarget as HTMLDetailsElement).open)}
+    >
+      <summary className="cursor-pointer text-caption text-ink-soft hover:text-accent inline-flex items-center min-h-[44px]">
+        A reading deposited at the bench
+      </summary>
+      <div className="mt-1 space-y-1 text-caption" data-unit={spec.unit}>
+        {!listed || listed.readings === null ? (
+          <p className="text-ink-soft">Asking the service for the project&rsquo;s readings in {unit}…</p>
+        ) : listed.problem ? (
+          <p className="text-signal-warn" data-testid="param-readings-problem">
+            {listed.problem}
+          </p>
+        ) : listed.readings.length === 0 ? (
+          <p className="text-ink-soft" data-testid="param-no-reading">
+            No confirmed reading of this project is in {unit} or in a unit that converts into it. A reading is deposited at the bench on a
+            locked runbook, from its page, and read back there.
+          </p>
+        ) : (
+          listed.readings.map((r) => (
+            <ReadingChoice
+              key={r.ref}
+              reading={r}
+              label={spec.label}
+              unit={spec.unit}
+              name={`param-reading-${scope}-${spec.key}`}
+              chosen={reading?.ref === r.ref}
+              disabled={disabled}
+              onChoose={() => onRead(chosen(r), note || null)}
+              testid="param-reading"
+            />
+          ))
+        )}
+        {reading && !held && (
+          <p className="text-signal-warn" data-testid="param-reading-gone" data-ref={reading.ref ?? ''}>
+            This value is set to reading <span className="font-num">{reading.ref}</span>, which has left the readings the service lists in{' '}
+            {unit}; the service&rsquo;s words above say why. Choose another reading here, type your own value, or reset it to its source.
+          </p>
+        )}
+        <p className="text-ink-soft">
+          The service sets a reading in this parameter&rsquo;s unit each time it is sent, and holds its unit to this parameter&rsquo;s. Which
+          measure stands for {spec.label} is your choice, kept in your name with the scenario.
+        </p>
+        <input
+          className="input w-full min-h-[44px]"
+          aria-label={`Why the reading stands for ${spec.label}`}
+          placeholder="Why this reading stands for it (optional)"
+          data-testid="param-reading-note"
+          value={note}
+          disabled={disabled}
+          onChange={(e) => {
+            const text = e.target.value;
+            if (reading?.ref && typeof reading.value === 'number')
+              onRead({ ref: reading.ref, value: reading.value, unit: reading.unit ?? spec.unit, by: reading.by, at: reading.at }, text || null);
+            else setDraft(text);
+          }}
+        />
+      </div>
+    </details>
+  );
+}
+
+export function ParameterRow({
+  spec,
+  value,
+  override,
+  reviewer,
+  readOnly,
+  warning,
+  records,
+  onSet,
+  onReset,
+  offersReadings = false,
+  scope = '',
+  onRead,
+}: ParameterRowProps) {
   const labelId = useId();
   const named = reviewer.trim() !== '';
   // A person may change a parameter whose rule takes a person's value; a
   // convention stated in words, or a library's default alone, is shown.
   const editable = !readOnly && spec.sourceRule.includes('assumption');
   const words = spec.choices != null;
-  const typed = override && typeof override.value === 'number' ? override.value : null;
+  // A reading set on the row is its one value: Your value stays empty, and a person's change builds on no part of it.
+  const read = override?.origin === 'measurement';
+  const own = read ? null : override;
+  const typed = own && typeof own.value === 'number' ? own.value : null;
   const current = typeof value?.value === 'number' ? value.value : null;
   const interval = intervalOf(value);
   const keep = (change: Partial<ParameterChange>) =>
     onSet({
-      value: change.value ?? override?.value ?? '',
-      low: change.low !== undefined ? change.low : override?.low ?? null,
-      high: change.high !== undefined ? change.high : override?.high ?? null,
-      note: change.note !== undefined ? change.note : override?.note ?? null,
+      value: change.value ?? own?.value ?? '',
+      low: change.low !== undefined ? change.low : own?.low ?? null,
+      high: change.high !== undefined ? change.high : own?.high ?? null,
+      note: change.note !== undefined ? change.note : own?.note ?? null,
     });
   return (
     <div
@@ -513,7 +658,10 @@ export function ParameterRow({ spec, value, override, reviewer, readOnly, warnin
           )}
         </div>
       )}
-      {editable && !words && (
+      {editable && !words && offersReadings && onRead && (
+        <Readings spec={spec} override={override} scope={scope} disabled={!named} onRead={onRead} />
+      )}
+      {editable && !words && !read && (
         <details className="mt-1" data-testid="param-more">
           <summary className="cursor-pointer text-caption text-ink-soft hover:text-accent inline-flex items-center min-h-[44px]">
             Its low, its high, and what it rests on

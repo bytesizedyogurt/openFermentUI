@@ -342,7 +342,10 @@ def _assume(inp, a) -> None:
 # and over a fermOS fit for its input, the input says how many records it
 # stands in place of, and the basis names the person
 # (basis.assumption_source) or the model (basis.estimate_source, ADR-006),
-# so the run is `assumed`. A run that sets a value writes one line more
+# so the run is `assumed`. A reading chosen on the panel is kept in its own
+# value and unit and sent so, its source the reading
+# (basis.measurement_source, set in the parameter's unit by the lookup at
+# the door). A run that sets a value writes one line more
 # (`values_read`), in the words the panel's overrides wrote before a run
 # took typed inputs: an artifact's id hashes its basis, so a run a person
 # makes through the panel keeps the artifact id it had (alpha 2.2 D6, the
@@ -456,16 +459,19 @@ def overrides_of(scenario_id: str, flowsheet: str, inputs: list | None) -> list:
 def inputs_of(flowsheet: str, overrides: list) -> list:
     """A scenario's Overrides (the rows the project keeps for its scope) as the
     inputs a run request carries, each in the unit of the parameter its key
-    names: the inverse of `overrides_of`, the service's mirror of the
-    browser's own (src/lib/params.ts `inputsOf`). A key the flowsheet takes no
-    value for goes with no unit, as the browser sends it, and the run refuses
-    it in words."""
+    names, and a deposition's reading in its own value and unit as its row
+    keeps it (`Override.unit`), which the run's lookup sets in the
+    parameter's unit: the inverse of `overrides_of`, the service's mirror of
+    the browser's own (src/lib/params.ts `inputsOf`). A key the flowsheet
+    takes no value for goes with no unit, as the browser sends it, and the
+    run refuses it in words."""
     from . import composite, params
     from .models import EngineInput, Origin, Quantity
 
     info = _shelf.info(flowsheet, allow_toy=True)
     units = params.units_of(params.flowsheet_specs(info) + (composite.finance_specs() if info.builtFrom else []))
-    return [EngineInput(name=o.key, quantity=Quantity(value=o.value, unit=units.get(o.key, ""), low=o.low, high=o.high,
+    return [EngineInput(name=o.key, quantity=Quantity(value=o.value, unit=o.unit if o.unit is not None else
+                                                      units.get(o.key, ""), low=o.low, high=o.high,
                                                       origin=Origin(kind=o.origin, by=o.by, at=o.at, note=o.note,
                                                                     ref=o.ref)))
             for o in overrides]
