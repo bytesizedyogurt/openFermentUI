@@ -6,30 +6,22 @@
 // (src/lib/durable.ts), and localStorage holds the last-open project alone.
 import { useMemo } from 'react';
 import { create } from 'zustand';
-import type {
-  Project,
-  InputAssumption,
-  ActivityEvent,
-  Deviation,
-  LearnModule,
-  Protocol,
-  RunState,
-  TimerState,
-  Guild,
-  GuildEvidence,
-  GuildPerson,
-  GuildPolicy,
-  GuildWithdrawal,
-  Practice,
-  PracticeScenario,
-  PracticeSession,
-  Check,
-  CheckNote,
-  CheckResult,
-  Checks,
-  Skill,
-} from '@/data/types';
-import { CataloguesDown, listProducts, listStrains, type Product, type Strain } from '@/lib/catalogues';
+import type { Project, InputAssumption, ActivityEvent } from '@/data/types';
+import {
+  CataloguesDown,
+  listLessons,
+  listProducts,
+  listSkills,
+  listStrains,
+  type Lesson,
+  type Product,
+  type Skill,
+  type Strain,
+} from '@/lib/catalogues';
+import type { Check, CheckNote, CheckResult, Checks } from '@/lib/checks';
+import type { Guild, GuildEvidence, GuildPerson, GuildPolicy, GuildWithdrawal } from '@/lib/guild';
+import type { Practice, PracticeScenario, PracticeSession } from '@/lib/practice';
+import { ProtocolsDown, keepVersion, listProtocols, type Protocol, type ProtocolVersion } from '@/lib/protocols';
 import type { FermosFitResponse } from '@/lib/fermos';
 import type { Override } from '@/lib/params';
 import type { LiveConversation, LiveTurn, RunbookDraft, TraceStep } from '@/lib/postdoc';
@@ -128,6 +120,63 @@ export interface Job {
   failReason?: string;
   href?: string;
   startedAt: number;
+}
+
+/** Something that went other than the protocol says, written at the step it happened at. */
+export interface Deviation {
+  at: string;
+  stepId: string;
+  text: string;
+}
+
+/**
+ * A run of a protocol at the bench, this page's own (alpha 2.2 E.12): the
+ * transient half of a deposition, its current step, live timers and checks.
+ */
+export interface RunState {
+  id: string;
+  protocolId: string;
+  version: string;
+  scale: number; // multiplier vs baseBatch
+  startedAt: number; // epoch ms
+  currentStep: number;
+  completed: Record<string, number>; // stepId -> epoch ms completed
+  skipped: Record<string, string>; // stepId -> reason
+  checks: Record<string, boolean[]>; // stepId -> multiCheck states
+  deviations: Deviation[];
+  timers: TimerState[];
+  finishedAt?: number;
+  /**
+   * The durable Deposition this session is writing into, when there is one
+   * (OF-BLD-006 §4.2).
+   *
+   * A RunState is the transient half — current step, live timers, scroll
+   * position — and it legitimately dies with the tab. The Deposition is the
+   * record, and it does not. Keeping the link here keeps the durable object
+   * free of a reference to something that will not survive alongside it.
+   */
+  depositionId?: string;
+  /**
+   * Who is performing the steps, from Guild's ledger (OF-BLD-013 §2). Starts
+   * as whoever is signing in Guild; a handover changes it. Null when the
+   * ledger has nobody on it, and then no step is gated.
+   */
+  operatorId?: string | null;
+  /** Who stood beside the operator, per step, for a step that needed a cosigner. */
+  cosigned?: Record<string, string>;
+  /** Steps whose completion has already written to Guild's ledger, so a redo does not count twice. */
+  guildRecorded?: Record<string, true>;
+}
+
+/** A countdown a step's timer started, as the bench shows it. */
+export interface TimerState {
+  id: string;
+  stepId: string;
+  label: string;
+  totalSec: number;
+  remainingSec: number;
+  running: boolean;
+  startedAt?: number;
 }
 
 interface UndoFrame {
@@ -319,10 +368,16 @@ export interface OFState {
    * run, not extractions from a paper (OF-BLD-006 §5).
    */
   measuredEvidence: MeasuredEvidence[];
+  /**
+   * The open project's protocols, each whole with every version kept of it
+   * (ADR-017; lib/protocols.ts), read from the service as the page opens and
+   * after each version a person keeps.
+   */
   protocols: Protocol[];
   scenarios: Scenario[];
-  modules: LearnModule[];
-  /** A lab's skills (stage 2 serves them); none ship with the app. */
+  /** The project's lessons, as its lesson catalogue keeps them, each with its body (ADR-018); none ship with the app. */
+  lessons: Lesson[];
+  /** The project's skills, as its skill catalogue keeps them; none ship with the app. */
   skills: Skill[];
   activity: ActivityEvent[];
   /**
@@ -341,7 +396,6 @@ export interface OFState {
   reviewIndex: number;
   reviewStats: { accepted: number; rejected: number; edited: number; skipped: number; gold: number; startedAt: number };
   undoStack: UndoFrame[];
-  learnProgress: Record<string, boolean>;
   /**
    * The runbooks the project keeps and those this page made, by id: each is one of the project's rows, sent when it
    * changes (lib/projectState.ts). A runbook adopted from a Postdoc draft (OF-BLD-014 §9.2), promoted from a research
@@ -451,7 +505,12 @@ export interface OFState {
   dismissTimer: (runId: string, timerId: string) => void;
   tickTimers: (dtMs: number) => void;
   finishRun: (runId: string) => void;
-  addProtocolVersion: (protocolId: string, version: Protocol['versions'][number]) => void;
+  /**
+   * Keep a new version of one of the project's protocols in the reviewer's
+   * name and make it the current one (ADR-017). Null when the service kept
+   * it, else why it did not, in words.
+   */
+  keepProtocolVersion: (protocolId: string, version: ProtocolVersion) => Promise<string | null>;
 
   // runbooks (OF-BLD-005 §7) — a slice of its own, never folded into jobs
   /** Research → industrial in one action, carrying the finding across. */
@@ -518,9 +577,6 @@ export interface OFState {
    * asked, so nothing is kept as if it had been.
    */
   dropLiveTurn: (conversationId: string, turnId: string) => void;
-
-  // learn
-  completeLesson: (lessonId: string) => void;
 
   // deposition (OF-BLD-006 §4)
   /**
@@ -623,17 +679,24 @@ export interface OFState {
   /** Load the open project's rows, lay the unsent ones over them, and send what is owed. */
   hydrateProjectState: () => Promise<void>;
   /**
-   * Whether the store holds the open project's strains and products, read from its catalogues this session; with no
-   * project open it holds none, and that is settled too.
+   * Whether the store holds the open project's strains, products, skills and lessons, read from its catalogues this
+   * session; with no project open it holds none, and that is settled too.
    */
   cataloguesRead: boolean;
-  /** Why the open project's strains and products could not be read, in words; null when they were. */
+  /** Why the open project's catalogues could not be read, in words; null when they were. */
   cataloguesProblem: string | null;
   /**
-   * Read the open project's strains and products from its catalogues (alpha 2.2 E.9), as the page opens and after
-   * the catalogues screen keeps an entry or takes in a file. What was read last stays when a read fails.
+   * Read the open project's strains and products (alpha 2.2 E.9) and its skills and lessons (E.12) from its
+   * catalogues, as the page opens and after the catalogues screen keeps an entry or takes in a file. What was read
+   * last stays when a read fails.
    */
   hydrateCatalogues: () => Promise<void>;
+  /** Whether the store holds the open project's protocols, read from the service this session. */
+  protocolsRead: boolean;
+  /** Why the open project's protocols could not be read, in words; null when they were. */
+  protocolsProblem: string | null;
+  /** Read the open project's protocols (ADR-017), as the page opens; what was read last stays when a read fails. */
+  hydrateProtocols: () => Promise<void>;
   /** Put a project's rows in the page. */
   applyProjectState: (state: ProjectState) => void;
   /** Send the outbox; what the service does not answer stays for the next try. */
@@ -825,9 +888,9 @@ const initialState = () => ({
   measuredEvidence: [] as MeasuredEvidence[],
   protocols: [] as Protocol[],
   scenarios: [] as Scenario[],
+  lessons: [] as Lesson[],
   // Activity starts empty: what lands in it is what a person did in this
   // browser, never an authored history (OF-BLD-016 §3.1).
-  modules: [] as LearnModule[],
   activity: [] as ActivityEvent[],
   liveConversations: [] as LiveConversation[],
   runs: {} as Record<string, RunState>,
@@ -840,7 +903,6 @@ const initialState = () => ({
   reviewIndex: 0,
   reviewStats: { accepted: 0, rejected: 0, edited: 0, skipped: 0, gold: 0, startedAt: Date.now() },
   undoStack: [] as UndoFrame[],
-  learnProgress: {} as Record<string, boolean>,
   proformaAssumptions: {} as Record<string, InputAssumption[]>,
   parameterOverrides: {} as Record<string, Override[]>,
   proformaFits: {} as Record<string, Record<string, string>>,
@@ -914,6 +976,8 @@ export const useStore = create<OFState>()((set, get) => ({
   stateProblem: null,
   cataloguesRead: false,
   cataloguesProblem: null,
+  protocolsRead: false,
+  protocolsProblem: null,
 
   loadProjects: async () => {
     let listed: Project[];
@@ -997,19 +1061,37 @@ export const useStore = create<OFState>()((set, get) => ({
   hydrateCatalogues: async () => {
     // The catalogues belong to one project: with none open the store holds none.
     if (!get().projectId) {
-      set({ strains: [], products: [], cataloguesRead: true, cataloguesProblem: null });
+      set({ strains: [], products: [], skills: [], lessons: [], cataloguesRead: true, cataloguesProblem: null });
       return;
     }
     // Reads overlap when the catalogues screen keeps two entries quickly; the newest read's answer is the one kept.
     const read = ++catalogueReads;
     try {
-      const [strains, products] = await Promise.all([listStrains(), listProducts()]);
-      if (read === catalogueReads) set({ strains, products, cataloguesRead: true, cataloguesProblem: null });
+      const [strains, products, skills, lessons] = await Promise.all([listStrains(), listProducts(), listSkills(), listLessons()]);
+      if (read === catalogueReads) set({ strains, products, skills, lessons, cataloguesRead: true, cataloguesProblem: null });
     } catch (e) {
       if (read === catalogueReads)
         set({
           cataloguesProblem:
             e instanceof CataloguesDown ? `${e.message} ${e.remedy}` : e instanceof Error ? e.message : String(e),
+        });
+    }
+  },
+
+  hydrateProtocols: async () => {
+    // A project keeps its protocols (ADR-017): with none open the store holds none.
+    if (!get().projectId) {
+      set({ protocols: [], protocolsRead: true, protocolsProblem: null });
+      return;
+    }
+    const read = ++protocolReads;
+    try {
+      const protocols = await listProtocols();
+      if (read === protocolReads) set({ protocols, protocolsRead: true, protocolsProblem: null });
+    } catch (e) {
+      if (read === protocolReads)
+        set({
+          protocolsProblem: e instanceof ProtocolsDown ? `${e.message} ${e.remedy}` : e instanceof Error ? e.message : String(e),
         });
     }
   },
@@ -1557,14 +1639,22 @@ export const useStore = create<OFState>()((set, get) => ({
     }
   },
 
-  addProtocolVersion: (protocolId, version) =>
-    set((s) => ({
-      protocols: s.protocols.map((p) =>
-        p.id === protocolId
-          ? { ...p, versions: [...p.versions, version], currentVersion: version.version }
-          : p,
-      ),
-    })),
+  keepProtocolVersion: async (protocolId, version) => {
+    const by = reviewerName();
+    if (!by) return 'Set your reviewer name in Settings first: a version of a protocol is kept in a person\u2019s name.';
+    try {
+      const kept = await keepVersion(protocolId, { version, by });
+      // The service answers the protocol whole, the new version its current one.
+      set((s) => ({
+        protocols: s.protocols.some((p) => p.id === kept.id)
+          ? s.protocols.map((p) => (p.id === kept.id ? kept : p))
+          : [...s.protocols, kept],
+      }));
+      return null;
+    } catch (e) {
+      return e instanceof ProtocolsDown ? `${e.message} ${e.remedy}` : e instanceof Error ? e.message : String(e);
+    }
+  },
 
   // ── runbooks (OF-BLD-005 §7, §8) ─────────────────────────────────────
 
@@ -2237,14 +2327,6 @@ export const useStore = create<OFState>()((set, get) => ({
       }),
     })),
 
-  // ── learn ────────────────────────────────────────────────────────────
-  // Lesson progress is this browser's and Durable (OF-BLD-013 §3.2): the map
-  // remembers which lessons were finished here across a refresh. Whether a
-  // person has passed one is the ledger's question, answered by
-  // `recordLessonForGuild` at the moment the checkpoint is passed.
-  completeLesson: (lessonId) =>
-    set((s) => ({ learnProgress: { ...s.learnProgress, [lessonId]: true } })),
-
   // ── Proforma's assumptions (OF-BLD-014 §8.4) ──────────────────────────
   // A typed value carries the person and the day; the service refuses one
   // without a name, so the screen asks for a reviewer name first. Since
@@ -2424,9 +2506,9 @@ export const useStore = create<OFState>()((set, get) => ({
         guildPendingWithdrawals: snap.guild?.withdrawals ?? [],
         guildActingId: snap.guild?.actingId ?? s.guildActingId,
         guildHydrated: true,
-        // §3.2 — lessons finished in this browser. Anything finished since the
-        // page loaded is kept beside what the snapshot remembers.
-        learnProgress: { ...(snap.learnProgress ?? {}), ...s.learnProgress },
+        // A lesson shows finished from the ledger's entries (alpha 2.2 E.12): an
+        // older snapshot's lessons finished here are left where they lie, and the
+        // next save leaves them out.
       };
     });
     if (get().serviceUp) void get().syncGuild();
@@ -2916,7 +2998,7 @@ export const useStore = create<OFState>()((set, get) => ({
     // The gate shows "Nobody chosen" for anyone else, and nothing is written for them.
     if (!canHold(operatorId)) return 0;
     const protocol = s.protocols.find((p) => p.id === run.protocolId);
-    const step = protocol?.versions.find((v) => v.version === run.version)?.steps.find((x) => x.id === stepId);
+    const step = protocol?.versions.find((v) => v.version === run.version)?.steps?.find((x) => x.id === stepId);
     const tags = step?.skills ?? [];
     if (!protocol || tags.length === 0) return 0;
     set((x) => ({
@@ -2984,7 +3066,7 @@ export const useStore = create<OFState>()((set, get) => ({
     const ledger = guildView(s);
     if (!operatorId || !ledger.people.some((p) => p.id === operatorId && p.active && p.role !== 'auditor')) return 0;
     const protocol = s.protocols.find((p) => p.id === run.protocolId);
-    const tags = protocol?.versions.find((v) => v.version === run.version)?.steps.find((x) => x.id === stepId)?.skills ?? [];
+    const tags = protocol?.versions.find((v) => v.version === run.version)?.steps?.find((x) => x.id === stepId)?.skills ?? [];
     if (!protocol || tags.length === 0) return 0;
     set((x) => ({
       runs: { ...x.runs, [runId]: { ...x.runs[runId], guildRecorded: { ...(x.runs[runId].guildRecorded ?? {}), [stepId]: true } } },
@@ -3006,7 +3088,7 @@ export const useStore = create<OFState>()((set, get) => ({
 
   recordLessonForGuild: async (lessonId) => {
     const s = get();
-    const lesson = s.modules.flatMap((m) => m.lessons).find((l) => l.id === lessonId);
+    const lesson = s.lessons.find((l) => l.id === lessonId);
     const counts = lesson?.skills ?? [];
     const personId = runOperatorDefault(s);
     if (!lesson || counts.length === 0 || !personId) return null;
@@ -3034,7 +3116,7 @@ export const useStore = create<OFState>()((set, get) => ({
         at: localToday(),
         observerId: null,
         source: { kind: 'lesson', ref: lessonId },
-        raw: `Primer lesson ${lessonId}, \u201c${lesson.title}\u201d: every checkpoint question answered correctly`,
+        raw: `Primer lesson ${lessonId}, \u201c${lesson.name}\u201d: every checkpoint question answered correctly`,
       }),
     );
     await Promise.all(writes);
@@ -3178,7 +3260,7 @@ export const useStore = create<OFState>()((set, get) => ({
     });
     if (serviceUp) void get().syncGuild();
     get().toast({
-      text: 'This browser’s data is cleared: the lessons finished here and every change it had not yet sent to the service are gone; the project’s rows load again from the service',
+      text: 'This browser’s data is cleared: every change it had not yet sent to the service is gone; the project’s rows load again from the service',
       kind: 'info',
     });
   },
@@ -3395,7 +3477,6 @@ export function snapshotOf(s: OFState): DurableSnapshot {
       withdrawals: s.guildPendingWithdrawals,
       actingId: s.guildActingId,
     },
-    learnProgress: Object.fromEntries(Object.keys(s.learnProgress).filter((k) => s.learnProgress[k]).map((k) => [k, true as const])),
     outbox: s.stateOutbox,
     // Rows kept here before alpha 2.0 stay until a project is open to take them.
     ...(legacy
@@ -3474,6 +3555,8 @@ let stateFlushing = false;
 let stateRetry: ReturnType<typeof setTimeout> | null = null;
 /** How many reads of the project's catalogues this page has asked for; only the newest one's answer is kept. */
 let catalogueReads = 0;
+/** How many reads of the project's protocols this page has asked for; only the newest one's answer is kept. */
+let protocolReads = 0;
 /** How long a project row the service did not answer waits before it is sent again. */
 const STATE_RETRY_MS = 15_000;
 
@@ -3520,7 +3603,6 @@ if (durableAvailable()) {
       s.guildPending === prev.guildPending &&
       s.guildPendingWithdrawals === prev.guildPendingWithdrawals &&
       s.guildActingId === prev.guildActingId &&
-      s.learnProgress === prev.learnProgress &&
       s.stateOutbox === prev.stateOutbox &&
       s.stateLegacy === prev.stateLegacy
     )

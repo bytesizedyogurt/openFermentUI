@@ -7,6 +7,7 @@
 import { useEffect, useMemo, useRef, useState } from 'react';
 import { createPortal } from 'react-dom';
 import {
+  BookOpen,
   Library,
   FlaskConical,
   Boxes,
@@ -74,6 +75,7 @@ export function CommandPalette() {
   const strains = useStore((s) => s.strains);
   const runbooks = useStore((s) => s.runbooks);
   const protocols = useStore((s) => s.protocols);
+  const lessons = useStore((s) => s.lessons);
   const scenarios = useStore((s) => s.scenarios);
   const records = useStore((s) => s.records);
   const [query, setQuery] = useState('');
@@ -157,6 +159,17 @@ export function CommandPalette() {
         run: () => navigate(`/runbooks/protocols/${p.id}`),
       });
     }
+    // A lesson is an entry of the project's lesson catalogue, addressed by its id alone (alpha 2.2 E.12).
+    for (const l of lessons) {
+      nav.push({
+        id: `ls-${l.id}`,
+        group: 'Navigate',
+        label: l.name,
+        hint: `${l.id} · lesson`,
+        icon: BookOpen,
+        run: () => navigate(`/primer/${l.id}`),
+      });
+    }
     for (const s of scenarios) {
       nav.push({
         id: `sc-${s.id}`,
@@ -219,7 +232,7 @@ export function CommandPalette() {
     ];
 
     return { items: [...nav, ...actions] };
-  }, [papers, strains, runbooks, protocols, scenarios, records]);
+  }, [papers, strains, runbooks, protocols, lessons, scenarios, records]);
 
   const results = useMemo(() => {
     const scored = items

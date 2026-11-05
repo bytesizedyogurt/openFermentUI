@@ -20,11 +20,7 @@ import {
   Timer,
   X,
 } from 'lucide-react';
-import type {
-  Protocol,
-  ProtocolCategory,
-  ProtocolVersion,
-} from '@/data/types';
+import type { Protocol, ProtocolCategory, ProtocolVersion } from '@/lib/protocols';
 import { strainWords, type Strain } from '@/lib/catalogues';
 import type { ExtractionRecord } from '@/lib/review';
 import { useStore, provenanceOf } from '@/store';
@@ -102,10 +98,10 @@ const CALC_TEXT_RE = /\{\{stock:|\b(?:calculat|dilut|inocul)|\b(?:adjust|make up
  *                calculation is happening, and it disappears once rendered.
  */
 export function capabilitiesOf(version: ProtocolVersion): Capabilities {
-  const scalableCount = version.materials.filter((m) => m.scaling !== 'fixed').length;
-  const timedCount = version.steps.filter((s) => s.timerSec !== undefined).length;
-  const stockCount = version.materials.filter((m) => !!m.stock).length;
-  const calcStepCount = version.steps.filter((s) => CALC_TEXT_RE.test(s.text)).length;
+  const scalableCount = (version.materials ?? []).filter((m) => m.scaling !== 'fixed').length;
+  const timedCount = (version.steps ?? []).filter((s) => s.timerSec != null).length;
+  const stockCount = (version.materials ?? []).filter((m) => !!m.stock).length;
+  const calcStepCount = (version.steps ?? []).filter((s) => CALC_TEXT_RE.test(s.text)).length;
   return {
     scalable: scalableCount > 0,
     timed: timedCount > 0,
@@ -179,12 +175,12 @@ export function provenanceFromRefs(
 export function protocolProvenance(version: ProtocolVersion, records: ExtractionRecord[]): ProvKind {
   const recordIds = new Set<string>();
   const paperIds = new Set<string>();
-  for (const m of version.materials) if (m.sourceRecordId) recordIds.add(m.sourceRecordId);
-  for (const r of version.references) {
+  for (const m of (version.materials ?? [])) if (m.sourceRecordId) recordIds.add(m.sourceRecordId);
+  for (const r of (version.references ?? [])) {
     if (r.recordId) recordIds.add(r.recordId);
     if (r.paperId) paperIds.add(r.paperId);
   }
-  for (const s of version.steps)
+  for (const s of (version.steps ?? []))
     for (const ref of s.refs ?? []) (ref.startsWith('r-') ? recordIds : paperIds).add(ref);
   return provenanceFromRefs(recordIds, paperIds, records);
 }
@@ -358,7 +354,7 @@ function ProtocolCard({ row, strains }: { row: ProtoRow; strains: Strain[] }) {
         <p className="text-body text-ink-soft line-clamp-2">{protocol.purpose}</p>
 
         <div className="flex flex-wrap items-center gap-1">
-          {protocol.organisms.length === 0 && (
+          {(protocol.organisms ?? []).length === 0 && (
             <span className="text-caption text-ink-soft">Organism-independent</span>
           )}
           {row.organisms.map((o) => {
@@ -380,7 +376,7 @@ function ProtocolCard({ row, strains }: { row: ProtoRow; strains: Strain[] }) {
         </div>
 
         <div className="text-caption text-ink-soft font-num">
-          {version.steps.length} steps · {fmtMinutes(version.estMinutes.active)} active ·{' '}
+          {(version.steps ?? []).length} steps · {fmtMinutes(version.estMinutes.active)} active ·{' '}
           {fmtMinutes(version.estMinutes.total)} total
         </div>
 
@@ -410,6 +406,8 @@ function ProtocolCard({ row, strains }: { row: ProtoRow; strains: Strain[] }) {
 
 export default function Protocols() {
   const protocols = useStore((s) => s.protocols);
+  const protocolsRead = useStore((s) => s.protocolsRead);
+  const protocolsProblem = useStore((s) => s.protocolsProblem);
   const records = useStore((s) => s.records);
   const strains = useStore((s) => s.strains);
   const runs = useStore((s) => s.runs);
@@ -428,7 +426,7 @@ export default function Protocols() {
         protocol.versions.find((v) => v.version === protocol.currentVersion) ?? protocol.versions[0];
       return {
         protocol,
-        organisms: protocol.organisms,
+        organisms: protocol.organisms ?? [],
         version,
         caps: capabilitiesOf(version),
         prov: protocolProvenance(version, records),
@@ -628,8 +626,8 @@ export default function Protocols() {
       width: '64px',
       numeric: true,
       priority: 2,
-      render: (r) => <span className="font-num">{r.version.steps.length}</span>,
-      value: (r) => r.version.steps.length,
+      render: (r) => <span className="font-num">{(r.version.steps ?? []).length}</span>,
+      value: (r) => (r.version.steps ?? []).length,
     },
     {
       key: 'active',
@@ -722,8 +720,14 @@ export default function Protocols() {
         {header}
         <Card>
           <EmptyState
-            title="No protocols yet"
-            body="No protocol ships with the app. The lab’s protocols appear here once they are on the service, each with its steps, materials and the records its quantities cite."
+            title={protocolsProblem ? 'The protocols could not be read' : protocolsRead ? 'No protocols yet' : 'Reading the project\u2019s protocols'}
+            body={
+              protocolsProblem
+                ? protocolsProblem
+                : protocolsRead
+                  ? 'No protocol ships with the app. A protocol the project keeps on the service appears here, each with its steps, materials and the records its quantities cite.'
+                  : 'The protocols are read from the service as the page opens.'
+            }
             icon={<ClipboardList size={22} />}
           />
         </Card>

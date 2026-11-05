@@ -455,57 +455,10 @@ export interface Protocol {
   provenanceNote: string;
 }
 
-export interface Deviation {
-  at: string;
-  stepId: string;
-  text: string;
-}
-
-export interface RunState {
-  id: string;
-  protocolId: string;
-  version: string;
-  scale: number; // multiplier vs baseBatch
-  startedAt: number; // epoch ms
-  currentStep: number;
-  completed: Record<string, number>; // stepId -> epoch ms completed
-  skipped: Record<string, string>; // stepId -> reason
-  checks: Record<string, boolean[]>; // stepId -> multiCheck states
-  deviations: Deviation[];
-  timers: TimerState[];
-  finishedAt?: number;
-  /**
-   * The durable Deposition this session is writing into, when there is one
-   * (OF-BLD-006 §4.2).
-   *
-   * A RunState is the transient half — current step, live timers, scroll
-   * position — and it legitimately dies with the tab. The Deposition is the
-   * record, and it does not. Keeping the link here rather than putting a runId
-   * on Deposition keeps the durable object free of a reference to something
-   * that will not survive alongside it.
-   */
-  depositionId?: string;
-  /**
-   * Who is performing the steps, from Guild's ledger (OF-BLD-013 §2). Starts
-   * as whoever is signing in Guild; a handover changes it. Null when the
-   * ledger has nobody on it, and then no step is gated.
-   */
-  operatorId?: string | null;
-  /** Who stood beside the operator, per step, for a step that needed a cosigner. */
-  cosigned?: Record<string, string>;
-  /** Steps whose completion has already written to Guild's ledger, so a redo does not count twice. */
-  guildRecorded?: Record<string, true>;
-}
-
-export interface TimerState {
-  id: string;
-  stepId: string;
-  label: string;
-  totalSec: number;
-  remainingSec: number;
-  running: boolean;
-  startedAt?: number;
-}
+// A run of a protocol at the bench, its timers and its deviations are the
+// store's own (src/store.ts, alpha 2.2 E.12); named here until this file goes
+// (E.15).
+export type { Deviation, RunState, TimerState } from '@/store';
 
 // The sliders' grid is the browser's own, kept in src/lib/proforma.ts beside
 // the run it reads (alpha 2.2 E.1); named here until this file goes (E.15).
@@ -1680,15 +1633,10 @@ export interface ReviewDecision {
 // an entry in Guild's ledger, and their level on that skill is computed from
 // those entries by `src/engine/competence.ts`. Nothing stores a level.
 
-/** The six trunk families. Working names until the skills content pass. */
-export type SkillFamilyId = 'contamination' | 'vessel' | 'monitoring' | 'qc' | 'records' | 'safety';
-
-export interface SkillFamily {
-  id: SkillFamilyId;
-  name: string;
-  /** Column-header form for the Matrix. */
-  short: string;
-}
+// A skill's family is vocabulary, kept in src/data/skillFamilies.ts (alpha 2.2
+// E.12); named here until this file goes (E.15).
+import type { SkillFamilyId } from './skillFamilies';
+export type { SkillFamily, SkillFamilyId } from './skillFamilies';
 
 export interface Skill {
   /** `SK-` followed by capitals, stable forever once a ledger names it. */

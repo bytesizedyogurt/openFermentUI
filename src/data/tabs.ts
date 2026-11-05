@@ -35,8 +35,8 @@ export const RUNBOOK_TABS: OwnerTab[] = [
   { label: 'Ledger', to: '/runbooks/ledger' },
 ];
 
-// OF-BLD-013 §3.3. The module map keeps /primer, so every link to it that
-// exists today still lands on it; a person's path sits beside it.
+// OF-BLD-013 §3.3. The project's lessons keep /primer, so every link to it
+// that exists today still lands on it; a person's path sits beside it.
 export const PRIMER_TABS: OwnerTab[] = [
   { label: 'Lessons', to: '/primer' },
   { label: 'My path', to: '/primer/path' },

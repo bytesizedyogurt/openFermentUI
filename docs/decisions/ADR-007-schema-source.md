@@ -276,3 +276,30 @@ Never; this is how the drift stops recurring.
 - The seam of E.3 goes: `store.adoptRunbookDraft` copies a draft's predictions and measures as the service wrote
   them, with no type assertion, and every reader passes a prediction's kind, interval, artifact and records on as
   they arrived; the lock digests the browser writes hold byte for byte (`core/tests/fixtures/lock-digests.json`).
+
+### Alpha 2.2, E.12 (2026-11-05): Guild, the protocols and Primer, a skill and a lesson as the project's catalogue entries
+
+- `lib/guild.ts` names the ledger (`Guild`, `GuildPerson`, `GuildRole`, `GuildEvidence`, `EvidenceKind`,
+  `EvidenceSource`, `GuildWithdrawal`, `GuildPolicy`, `GateMode`), `lib/checks.ts` the checks, and `lib/practice.ts`
+  Practice's scenarios and sessions. A new `lib/protocols.ts` names a project's protocols (ADR-017: `Protocol`,
+  `ProtocolVersion`, `Step`, `Material` and the rest, `ProtocolCategory` and `ScalingClass` read off their fields) with
+  their four routes, and `lib/catalogues.ts` a skill and a lesson as the catalogue's own entries
+  (`CatalogueEntry & { kind: 'skill' }` and `{ kind: 'lesson' }`), with a lesson's blocks and checkpoint (ADR-018).
+  Guild's screens, the protocol screens, Primer's, GuildBits, GuildGate, LessonEmbeds, the bench (Deposition and
+  BenchCheck), StrainPage, the engine modules competence, checks, path, diff and scale, `lib/proposals.ts`, the
+  store, the Durable snapshot, check:guild and the competence fixture's scripts read them there. The client's own
+  `RunState`, `TimerState` and `Deviation` live in the store and `SkillFamily` in `data/skillFamilies.ts`.
+- The store reads the project's skills and lessons with its strains and products (`hydrateCatalogues`) and its
+  protocols from `GET /api/protocols` (`hydrateProtocols`), each as the page opens; the editor keeps a version on
+  the service in the reviewer's name (`keepProtocolVersion`, `POST /api/protocols/{id}/versions`) and lays the
+  protocol the service answers in its place.
+- A protocol is served whole, so every field arrives and an absent one as null; the generated types name a list a
+  keep's body may leave out as optional, so a reader takes a version's steps, materials, equipment, safety notes and
+  references with `?? []` (or `stepsOf` and its kin in `lib/protocols.ts`), and tests a step's timer with `!= null`,
+  where the hand-kept shape left a timer absent.
+- A catalogue skill's policy may be absent. `src/engine/competence.ts` leaves a skill kept with no policy out of every
+  level (`rated`, and a status's `unrated`), as `competence.unrated` does on the service: nobody holds it, the
+  ranking proposes no check on it, a path shows it waiting for its policy, and a skill that needs it is held at
+  Learning. `core/tests/fixtures/competence-unrated.json` holds the two equal on such a skill, and
+  `competence.json` is byte for byte what it was. The ledger the service answers always keeps a policy
+  (`Guild.policy`); a ledger a check builds for itself may leave it to the default (`Ledger`).

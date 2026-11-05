@@ -31,7 +31,17 @@
 // true. That is the same rule `guild.write_evidence` applies when it asks
 // whether an observer may sign, so the screen and the service agree on who
 // is an assessor without either computing the other's answer.
-import type { GateMode, GuildEvidence, GuildPerson, GuildPolicy, Skill, Step } from '@/data/types';
+//
+// A SKILL WITH NO POLICY (alpha 2.2 E.12). The skills are the project's skill
+// catalogue (lib/catalogues.ts), and an entry there may be kept with no
+// policy: no criticality, no recency window, no count of supervised runs.
+// Such a skill is left out of every level (`rated`): its level is 0, nobody
+// holds it, nothing lapses or is suspended on it, and its status says so
+// (`unrated`). competence.py leaves it out the same way (`unrated`), and the
+// competence fixture holds the two equal on one.
+import type { Skill } from '@/lib/catalogues';
+import type { GateMode, Guild, GuildEvidence, GuildPerson, GuildPolicy } from '@/lib/guild';
+import type { Step } from '@/lib/protocols';
 
 export type Level = 0 | 1 | 2 | 3 | 4;
 
@@ -44,6 +54,17 @@ export const LEVEL_NAME: Record<Level, string> = {
 };
 
 export type Confidence = 'high' | 'medium' | 'low';
+
+/** A skill whose catalogue entry holds its policy: how critical it is, its recency window and its supervised runs. */
+export type RatedSkill = Skill & { criticality: 'routine' | 'critical'; recencyDays: number; supervisedRuns: number };
+
+/**
+ * Whether Guild rates anyone on `skill`: its catalogue entry holds its policy. A skill kept with none is left out of
+ * every level, as competence.unrated leaves it on the service.
+ */
+export function rated(skill: Skill | undefined): skill is RatedSkill {
+  return skill != null && skill.criticality != null && skill.recencyDays != null && skill.supervisedRuns != null;
+}
 
 export interface CompetenceStatus {
   personId: string;
@@ -68,6 +89,8 @@ export interface CompetenceStatus {
   blockedBy: string[];
   /** The entries the level rests on, oldest first. */
   basis: string[];
+  /** The skill's catalogue entry holds no policy, so Guild rates nobody on it and its level stands at 0 (`rated`). */
+  unrated: boolean;
 }
 
 export type StatusMap = Map<string, CompetenceStatus>;
@@ -138,13 +161,14 @@ export function competenceOf(
     const known = base.get(k);
     if (known !== undefined) return known;
     const skill = skills[skillId];
-    if (!skill || visiting.has(k)) return 0;
+    // A skill kept with no policy is left out of every level.
+    if (!rated(skill) || visiting.has(k)) return 0;
     visiting.add(k);
     const ev = byKey.get(k) ?? [];
     const pass = (kind: string) => ev.some((e) => e.kind === kind && e.outcome === 'pass');
     const knowledge = signedOff(ev);
     const supervised = ev.filter((e) => e.kind === 'supervised' && e.outcome === 'pass').length;
-    const prereqOK = skill.prerequisites.every((p) => levelOf(personId, p) >= 2);
+    const prereqOK = (skill.prerequisites ?? []).every((p) => levelOf(personId, p) >= 2);
     let level: Level = 0;
     if (pass('designation')) level = 4;
     else if (knowledge && prereqOK && pass('witnessed') && supervised >= skill.supervisedRuns) level = 3;
@@ -166,13 +190,27 @@ export function competenceOf(
       const supervisedCount = ev.filter((e) => e.kind === 'supervised' && e.outcome === 'pass').length;
       const performed = ev.filter((e) => PERFORMED.has(e.kind) && e.outcome === 'pass');
       const lastPerformedAt = performed.length ? performed[performed.length - 1].at.slice(0, 10) : null;
+      if (!rated(skill)) {
+        // Left out of every level: nothing lapses or is suspended, and the confidence sort has nothing to read.
+        out.set(k, {
+          ...NOTHING,
+          personId: person.id,
+          skillId: skill.id,
+          lastPerformedAt,
+          supervisedCount,
+          knowledgeComplete,
+          basis: ev.map((e) => e.id),
+          unrated: true,
+        });
+        continue;
+      }
       const witnessed = ev.filter((e) => e.kind === 'witnessed');
       const latestWitness = witnessed[witnessed.length - 1];
       const lapsesAt = level === 3 && lastPerformedAt ? addDays(lastPerformedAt, skill.recencyDays) : null;
       const lapsed = Boolean(lapsesAt && lapsesAt < today);
       const suspended = level === 3 && latestWitness?.outcome === 'fail';
       const effective: Level = lapsed || suspended ? 2 : level;
-      const blockedBy = skill.prerequisites.filter((p) => levelOf(person.id, p) < 2);
+      const blockedBy = (skill.prerequisites ?? []).filter((p) => levelOf(person.id, p) < 2);
 
       let score = 0;
       if (level === 4) score += 3;
@@ -199,6 +237,7 @@ export function competenceOf(
         knowledgeComplete,
         blockedBy,
         basis: ev.map((e) => e.id),
+        unrated: false,
       });
     }
   }
@@ -217,6 +256,7 @@ const NOTHING: Omit<CompetenceStatus, 'personId' | 'skillId'> = {
   knowledgeComplete: false,
   blockedBy: [],
   basis: [],
+  unrated: false,
 };
 
 export function statusOf(map: StatusMap, personId: string, skillId: string): CompetenceStatus {
@@ -225,7 +265,7 @@ export function statusOf(map: StatusMap, personId: string, skillId: string): Com
 
 /** Knowledge and supervised runs complete: a passed witnessed check would qualify them. */
 export function readyForCheck(st: CompetenceStatus, skill: Skill): boolean {
-  return st.level === 2 && st.blockedBy.length === 0 && st.supervisedCount >= skill.supervisedRuns;
+  return rated(skill) && st.level === 2 && st.blockedBy.length === 0 && st.supervisedCount >= skill.supervisedRuns;
 }
 
 /** Whether this person may witness and sign off this skill. */
@@ -268,8 +308,14 @@ export function gateFor(
 
 export const DEFAULT_POLICY: GuildPolicy = { routineGate: 'advise', criticalGate: 'enforce', checksPerQuarter: 1 };
 
-/** The ledger's policy, or the default for a ledger written before there was one. */
-export function policyOf(ledger: { policy?: GuildPolicy }): GuildPolicy {
+/**
+ * A ledger as the rules read one: its people and entries, and the lead's policy where it keeps one. The service's
+ * ledger always keeps one (`Guild`); a ledger a check builds for itself may leave it to the default.
+ */
+export type Ledger = Pick<Guild, 'people' | 'evidence'> & { policy?: GuildPolicy | null };
+
+/** The ledger's policy, or the default for a ledger that keeps none. */
+export function policyOf(ledger: Pick<Ledger, 'policy'>): GuildPolicy {
   return { ...DEFAULT_POLICY, ...(ledger.policy ?? {}) };
 }
 

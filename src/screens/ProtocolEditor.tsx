@@ -1,6 +1,9 @@
 // Structured protocol editor (OF-DES-001 §5.3 `/runbooks/protocols/:id/edit`, fidelity
 // item 14). Edits, reorders, and quantity binding are real; a saved draft
-// becomes a live new version for the rest of the session.
+// becomes the protocol's new current version, kept by the service in the
+// reviewer's name (ADR-017), every version before it standing as it was kept.
+// A step names the skills a person needs to do it, picked from the project's
+// skill catalogue, which the service holds every keep to.
 import { useMemo, useState } from 'react';
 import {
   ArrowDown,
@@ -12,9 +15,9 @@ import {
   Timer,
   Link2,
 } from 'lucide-react';
-import { useStore } from '@/store';
-import { navigate } from '@/router';
-import type { Material, ProtocolVersion, ScalingClass, Step } from '@/data/types';
+import { useSkills, useStore } from '@/store';
+import { href, navigate } from '@/router';
+import type { Material, ProtocolVersion, ScalingClass, Step } from '@/lib/protocols';
 import { renderStepText, scaleMaterial, batchLabel } from '@/engine/scale';
 import { fmt, normalizeUnit } from '@/engine/units';
 import { PageHeader, Card, Button, Callout, SectionTitle, cx, Modal, EmptyState } from '@/components/ui';
@@ -36,9 +39,14 @@ function bumpVersion(v: string): string {
 
 export default function ProtocolEditor({ protocolId }: { protocolId: string }) {
   const protocol = useStore((s) => s.protocols.find((p) => p.id === protocolId));
-  const addProtocolVersion = useStore((s) => s.addProtocolVersion);
+  const protocolsRead = useStore((s) => s.protocolsRead);
+  const keepProtocolVersion = useStore((s) => s.keepProtocolVersion);
   const logActivity = useStore((s) => s.logActivity);
   const toast = useStore((s) => s.toast);
+  const reviewer = useStore((s) => s.reviewer.trim());
+  const skills = useSkills();
+  const [saving, setSaving] = useState(false);
+  const [refusal, setRefusal] = useState<string | null>(null);
 
   const base = protocol?.versions.find((v) => v.version === protocol.currentVersion);
 
@@ -60,7 +68,14 @@ export default function ProtocolEditor({ protocolId }: { protocolId: string }) {
   const problems = useMemo(() => {
     const out: { level: 'error' | 'warn'; text: string }[] = [];
     const names = new Set(materials.map((m) => m.name));
+    const known = new Set(skills.map((k) => k.id));
     for (const s of steps) {
+      for (const k of s.skills ?? [])
+        if (!known.has(k))
+          out.push({
+            level: 'error',
+            text: `Step ${s.id} needs ${k}, which the project's skill catalogue does not hold; the service keeps no step naming it.`,
+          });
       for (const match of s.text.matchAll(/\{\{(?:qty|stock):([^}]+)\}\}/g)) {
         if (!names.has(match[1]))
           out.push({
@@ -91,15 +106,19 @@ export default function ProtocolEditor({ protocolId }: { protocolId: string }) {
     for (const m of unbound)
       out.push({ level: 'warn', text: `${m.name} is never referenced by a step — it will appear only in the materials table.` });
     return out;
-  }, [steps, materials]);
+  }, [steps, materials, skills]);
 
   const blocking = problems.filter((p) => p.level === 'error');
 
   if (!protocol || !base || !draftVersion) {
     return (
       <EmptyState
-        title="Protocol not found"
-        body={`No protocol with id ${protocolId} exists in this session.`}
+        title={protocolsRead ? 'Protocol not found' : 'Reading the project\u2019s protocols'}
+        body={
+          protocolsRead
+            ? `The project keeps no protocol ${protocolId}.`
+            : 'The protocols are read from the service as the page opens.'
+        }
         action={<Button onClick={() => navigate('/runbooks/protocols')}>Back to protocols</Button>}
       />
     );
@@ -119,17 +138,24 @@ export default function ProtocolEditor({ protocolId }: { protocolId: string }) {
   const patchMaterial = (i: number, patch: Partial<Material>) =>
     setMaterials((m) => m.map((mat, k) => (k === i ? { ...mat, ...patch } : mat)));
 
-  const save = () => {
-    addProtocolVersion(protocolId, draftVersion);
+  const save = async () => {
+    setSaving(true);
+    const why = await keepProtocolVersion(protocolId, draftVersion);
+    setSaving(false);
+    if (why) {
+      setRefusal(why);
+      return;
+    }
+    setRefusal(null);
     logActivity({
       at: new Date().toISOString().slice(0, 16).replace('T', ' '),
       icon: 'file',
-      text: `${protocol.title} — version ${draftVersion.version} published`,
+      text: `${protocol.title} — version ${draftVersion.version} kept in ${reviewer}\u2019s name`,
       href: `#/runbooks/protocols/${protocolId}`,
       provenance: 'user',
     });
     toast({
-      text: `Version ${draftVersion.version} published for this session`,
+      text: `Version ${draftVersion.version} kept; it is the protocol\u2019s current version`,
       kind: 'success',
       href: `#/runbooks/protocols/${protocolId}`,
       hrefLabel: 'Open',
@@ -138,6 +164,15 @@ export default function ProtocolEditor({ protocolId }: { protocolId: string }) {
     navigate(`/runbooks/protocols/${protocolId}`);
   };
 
+  const toggleSkill = (i: number, skillId: string) =>
+    setSteps((s) =>
+      s.map((step, k) => {
+        if (k !== i) return step;
+        const held = step.skills ?? [];
+        return { ...step, skills: held.includes(skillId) ? held.filter((x) => x !== skillId) : [...held, skillId] };
+      }),
+    );
+
   return (
     <div>
       <PageHeader
@@ -145,8 +180,9 @@ export default function ProtocolEditor({ protocolId }: { protocolId: string }) {
         title={protocol.title}
         subtitle={
           <>
-            Edits here create <strong>version {draftVersion.version}</strong>, live for the rest of this
-            session. Quantities bind to materials with{' '}
+            Edits here make <strong>version {draftVersion.version}</strong>, kept by the service in your name and
+            made the protocol&rsquo;s current version; every version before it stands as it was kept. Quantities
+            bind to materials with{' '}
             <code className="font-num text-[12px] bg-surface-0 px-1 rounded">{'{{qty:Name}}'}</code> and{' '}
             <code className="font-num text-[12px] bg-surface-0 px-1 rounded">{'{{stock:Name}}'}</code>,
             which re-render at whatever scale a run uses.
@@ -158,12 +194,24 @@ export default function ProtocolEditor({ protocolId }: { protocolId: string }) {
               <Eye size={14} /> {preview ? 'Hide preview' : 'Preview at scale'}
             </Button>
             <Button onClick={() => navigate(`/runbooks/protocols/${protocolId}`)}>Cancel</Button>
-            <Button variant="primary" disabled={blocking.length > 0} onClick={() => setConfirmOpen(true)}>
+            <Button variant="primary" disabled={blocking.length > 0 || !reviewer} onClick={() => setConfirmOpen(true)}>
               <Save size={14} /> Save as v{draftVersion.version}
             </Button>
           </>
         }
       />
+
+      {!reviewer && (
+        <div className="mb-4">
+          <Callout kind="warn" title="A version is kept in a person's name">
+            Set your reviewer name in{' '}
+            <a className="text-accent hover:underline" href={href('/settings/corpus')}>
+              Settings
+            </a>{' '}
+            before saving; the service keeps each version with who kept it.
+          </Callout>
+        </div>
+      )}
 
       {problems.length > 0 && (
         <div className="mb-4 space-y-2">
@@ -234,12 +282,12 @@ export default function ProtocolEditor({ protocolId }: { protocolId: string }) {
                           placeholder="—"
                           onChange={(e) =>
                             patchStep(i, {
-                              timerSec: e.target.value === '' ? undefined : Number(e.target.value),
+                              timerSec: e.target.value === '' ? null : Number(e.target.value),
                             })
                           }
                         />
                       </label>
-                      {step.timerSec !== undefined && (
+                      {step.timerSec != null && (
                         <input
                           className="input w-[200px]"
                           placeholder="Timer label"
@@ -253,6 +301,50 @@ export default function ProtocolEditor({ protocolId }: { protocolId: string }) {
                       ))}
                     </div>
 
+                    <div className="text-caption" role="group" aria-label={`Step ${i + 1} skills`}>
+                      <span className="text-ink-soft mr-1.5">Skills it needs</span>
+                      {skills.length === 0 ? (
+                        <span className="text-ink-soft">
+                          the project&rsquo;s skill catalogue holds none yet;{' '}
+                          <a className="text-accent hover:underline" href={href('/catalogues/skills')}>
+                            add one
+                          </a>
+                        </span>
+                      ) : (
+                        <span className="inline-flex flex-wrap gap-1 align-middle">
+                          {skills.map((k) => {
+                            const on = (step.skills ?? []).includes(k.id);
+                            return (
+                              <button
+                                key={k.id}
+                                type="button"
+                                className={cx('chip', on && 'chip-active')}
+                                aria-pressed={on}
+                                onClick={() => toggleSkill(i, k.id)}
+                                title={k.summary ?? undefined}
+                              >
+                                {k.name}
+                              </button>
+                            );
+                          })}
+                        </span>
+                      )}
+                      {(step.skills ?? [])
+                        .filter((id) => !skills.some((k) => k.id === id))
+                        .map((id) => (
+                          <button
+                            key={id}
+                            type="button"
+                            className="chip chip-active text-signal-error border-signal-error/40 ml-1"
+                            aria-pressed
+                            onClick={() => toggleSkill(i, id)}
+                            title="Not in the project's skill catalogue: press to take it off this step"
+                          >
+                            {id}
+                          </button>
+                        ))}
+                    </div>
+
                     <details className="text-caption">
                       <summary className="cursor-pointer text-ink-soft hover:text-ink">
                         Rationale note {step.note ? '' : '(none)'}
@@ -261,7 +353,7 @@ export default function ProtocolEditor({ protocolId }: { protocolId: string }) {
                         className="input mt-1.5 font-sans resize-y"
                         value={step.note ?? ''}
                         placeholder="Why this step is done this way — shown to the reader on request."
-                        onChange={(e) => patchStep(i, { note: e.target.value || undefined })}
+                        onChange={(e) => patchStep(i, { note: e.target.value || null })}
                         aria-label={`Step ${i + 1} rationale`}
                       />
                     </details>
@@ -448,19 +540,26 @@ export default function ProtocolEditor({ protocolId }: { protocolId: string }) {
 
       <Modal open={confirmOpen} onClose={() => setConfirmOpen(false)} title={`Publish v${draftVersion.version}?`}>
         <p className="text-body mb-3">
-          This creates version <span className="font-num">{draftVersion.version}</span> of{' '}
-          {protocol.title} with {steps.length} steps and {materials.length} materials, and makes it the
-          current version. It lives for this session only — session state resets on refresh.
+          This keeps version <span className="font-num">{draftVersion.version}</span> of {protocol.title} with{' '}
+          {steps.length} steps and {materials.length} materials in {reviewer ? <>{reviewer}&rsquo;s</> : 'your'} name, and
+          makes it the current version. Every version before it stays as it was kept.
         </p>
         {!changelog.trim() && (
           <Callout kind="warn">
             No changelog yet. The version diff will show what changed, but not why.
           </Callout>
         )}
+        {refusal && (
+          <div className="mt-3" role="alert">
+            <Callout kind="error" title="The service kept nothing">
+              {refusal}
+            </Callout>
+          </div>
+        )}
         <div className="flex justify-end gap-2 mt-4">
           <Button onClick={() => setConfirmOpen(false)}>Back to editing</Button>
-          <Button variant="primary" onClick={save}>
-            <Save size={14} /> Publish
+          <Button variant="primary" disabled={saving || !reviewer} onClick={() => void save()}>
+            <Save size={14} /> {saving ? 'Keeping…' : 'Keep this version'}
           </Button>
         </div>
       </Modal>

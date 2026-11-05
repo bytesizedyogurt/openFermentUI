@@ -1,19 +1,24 @@
 // Lesson page (OF-DES-001 §8.14). Reading column interleaved with live embeds,
-// closing on a checkpoint whose numeric grading is unit-aware.
+// closing on a checkpoint whose numeric grading is unit-aware. The lesson is
+// an entry of the project's lesson catalogue (alpha 2.2 E.12; ADR-018): its
+// words, the skills it counts toward, and its body, its minutes, blocks and
+// checkpoint. A lesson kept with no body shows its words and its skills.
 //
 // A lesson that names skills (OF-BLD-013 §3.2) counts toward them: the moment
 // its checkpoint is passed, Primer writes a knowledge entry for each skill on
 // the ledger of whoever is learning, which is whoever is signing in Guild.
-// That entry puts them at Learning. Supervised waits for an assessor's
+// That entry puts them at Learning, and it is how the lesson shows passed: the
+// browser keeps no lesson of its own. Supervised waits for an assessor's
 // training sign-off at the bench, and the page says so before and after.
 //
-// Previous and next walk every lesson of every module, in the modules' order.
-import { useMemo, useState } from 'react';
+// Previous and next walk the project's lessons in the catalogue's order.
+import { useState } from 'react';
 import { ArrowLeft, ArrowRight, Check, RotateCcw, X } from 'lucide-react';
 import { useSkillById, useStore } from '@/store';
 import { href, navigate } from '@/router';
-import type { CheckpointQuestion } from '@/data/types';
+import type { CheckpointQuestion } from '@/lib/catalogues';
 import { statusOf } from '@/engine/competence';
+import { lessonOnLedger } from '@/engine/path';
 import { ActingAs, useGuild } from '@/components/GuildBits';
 import { LevelGlyph, levelLabel } from '@/components/LevelGlyph';
 import { parseQuantity, quantityEquals } from '@/engine/units';
@@ -155,11 +160,10 @@ function Checkpoint({
   );
 }
 
-export default function PrimerLesson({ moduleId, lessonId }: { moduleId: string; lessonId: string }) {
+export default function PrimerLesson({ lessonId }: { lessonId: string }) {
   const SKILL_BY_ID = useSkillById();
-  const modules = useStore((s) => s.modules);
-  const progress = useStore((s) => s.learnProgress);
-  const completeLesson = useStore((s) => s.completeLesson);
+  const lessons = useStore((s) => s.lessons);
+  const read = useStore((s) => s.cataloguesRead);
   const recordLesson = useStore((s) => s.recordLessonForGuild);
   const toast = useStore((s) => s.toast);
   const ctx = useGuild();
@@ -168,50 +172,33 @@ export default function PrimerLesson({ moduleId, lessonId }: { moduleId: string;
   // passed it before anyone was chosen and wants it to count.
   const [attempt, setAttempt] = useState(0);
 
-  const mod = modules.find((m) => m.id === moduleId);
-  const lessonIndex = mod?.lessons.findIndex((l) => l.id === lessonId) ?? -1;
-  const lesson = lessonIndex >= 0 ? mod!.lessons[lessonIndex] : undefined;
+  const index = lessons.findIndex((l) => l.id === lessonId);
+  const lesson = index >= 0 ? lessons[index] : undefined;
+  const prev = index > 0 ? lessons[index - 1] : null;
+  const next = index >= 0 && index < lessons.length - 1 ? lessons[index + 1] : null;
 
-  const flat = useMemo(
-    () => modules.flatMap((m) => m.lessons.map((l) => ({ moduleId: m.id, lessonId: l.id, title: l.title }))),
-    [modules],
-  );
-  const flatIdx = flat.findIndex((f) => f.moduleId === moduleId && f.lessonId === lessonId);
-  const prev = flatIdx > 0 ? flat[flatIdx - 1] : null;
-  const next = flatIdx >= 0 && flatIdx < flat.length - 1 ? flat[flatIdx + 1] : null;
-
-  if (!mod || !lesson) {
+  if (!lesson) {
     return (
       <EmptyState
-        title="Lesson not found"
-        body={`No lesson ${lessonId} exists in module ${moduleId}.`}
+        title={read ? 'Lesson not found' : 'Reading the project\u2019s lessons'}
+        body={read ? `The project's lesson catalogue holds no lesson ${lessonId}.` : 'The lessons are read from the project\u2019s lesson catalogue as the page opens.'}
         action={<Button onClick={() => navigate('/primer')}>Back to Primer</Button>}
       />
     );
   }
 
-  const allCorrect =
-    lesson.checkpoint.length > 0 && lesson.checkpoint.every((q) => results[q.id]);
-  const isComplete = progress[lesson.id] || allCorrect;
+  const checkpoint = lesson.checkpoint ?? [];
+  const blocks = lesson.blocks ?? [];
+  const allCorrect = checkpoint.length > 0 && checkpoint.every((q) => results[q.id]);
 
   const counts = lesson.skills ?? [];
   const learner = ctx.acting && ctx.acting.active && ctx.acting.role !== 'auditor' ? ctx.acting : null;
-  const onLedger = learner
-    ? counts.filter((sk) =>
-        ctx.guild.evidence.some(
-          (e) =>
-            e.personId === learner.id &&
-            e.skillId === sk &&
-            e.source.kind === 'lesson' &&
-            e.source.ref === lesson.id &&
-            !e.withdrawnAt,
-        ),
-      )
-    : [];
+  const onLedger = learner ? lessonOnLedger(ctx.guild.evidence, learner.id, lesson) : [];
+  // Passed on the ledger, or answered correctly on this page just now.
+  const isComplete = (counts.length > 0 && onLedger.length === counts.length) || allCorrect;
   const skillNames = (ids: string[]) => ids.map((id) => SKILL_BY_ID[id]?.name ?? id).join(', ');
 
   const finish = () => {
-    completeLesson(lesson.id);
     void recordLesson(lesson.id).then((r) => {
       if (r && r.skills.length > 0) {
         const who = ctx.personById.get(r.personId)?.name ?? r.personId;
@@ -223,7 +210,7 @@ export default function PrimerLesson({ moduleId, lessonId }: { moduleId: string;
   const onResult = (q: CheckpointQuestion, correct: boolean) => {
     const nextR = { ...results, [q.id]: correct };
     setResults(nextR);
-    if (correct && lesson.checkpoint.every((x) => nextR[x.id])) finish();
+    if (correct && checkpoint.every((x) => nextR[x.id])) finish();
   };
 
   const answerAgain = () => {
@@ -236,11 +223,11 @@ export default function PrimerLesson({ moduleId, lessonId }: { moduleId: string;
       {/* Sticky nav */}
       <div className="sticky top-0 z-20 -mx-5 px-5 py-2.5 bg-surface-0/95 backdrop-blur border-b border-line mb-5">
         <div className="flex items-center gap-3">
-          <a href="#/primer" className="text-caption text-ink-soft hover:text-accent shrink-0">
-            Module {mod.index}
+          <a href={href('/primer')} className="text-caption text-ink-soft hover:text-accent shrink-0">
+            Primer
           </a>
           <span className="text-ink-soft">·</span>
-          <span className="text-caption text-ink-soft truncate flex-1">{mod.title}</span>
+          <span className="text-caption text-ink-soft truncate flex-1">The project&rsquo;s lessons</span>
           {isComplete && (
             <span className="chip text-accent border-accent/40 shrink-0">
               <Check size={11} /> complete
@@ -250,9 +237,10 @@ export default function PrimerLesson({ moduleId, lessonId }: { moduleId: string;
       </div>
 
       <div className="mb-1 text-caption uppercase tracking-wide text-ink-soft font-num">
-        Lesson {lessonIndex + 1} of {mod.lessons.length} · {lesson.minutes} min
+        Lesson {index + 1} of {lessons.length}
+        {lesson.minutes != null && <> · {lesson.minutes} min</>}
       </div>
-      <h1 className="font-serif text-page-title font-semibold mb-5">{lesson.title}</h1>
+      <h1 className="font-serif text-page-title font-semibold mb-5">{lesson.name}</h1>
 
       {counts.length > 0 && (
         <Card className="p-3 mb-6 space-y-2" aria-label="What this lesson counts toward">
@@ -294,28 +282,45 @@ export default function PrimerLesson({ moduleId, lessonId }: { moduleId: string;
         </Card>
       )}
 
+      {lesson.note && (
+        <div className="font-serif mb-5" style={{ fontSize: 16, lineHeight: '25px' }}>
+          <Markdown md={lesson.note} />
+        </div>
+      )}
+
       <div className="prose-reading">
-        {lesson.blocks.map((block, i) =>
+        {blocks.map((block, i) =>
           block.kind === 'prose' ? (
             <div key={i} className="font-serif" style={{ fontSize: 16, lineHeight: '25px' }}>
               <Markdown md={block.md} />
             </div>
           ) : (
-            <LessonEmbed key={i} embed={block.embed} arg={block.arg} />
+            <LessonEmbed key={i} embed={block.embed} arg={block.arg ?? undefined} />
           ),
         )}
       </div>
 
+      {blocks.length === 0 && checkpoint.length === 0 && (
+        <Card className="p-4 text-body text-ink-soft">
+          The lesson catalogue keeps this lesson&rsquo;s name, words and skills, and no body yet: no block to read and no
+          checkpoint to pass. A body kept in the{' '}
+          <a className="text-accent hover:underline" href={href('/catalogues/lessons')}>
+            lesson catalogue
+          </a>{' '}
+          appears here.
+        </Card>
+      )}
+
       {/* Checkpoint */}
-      {lesson.checkpoint.length > 0 && (
+      {checkpoint.length > 0 && (
         <section className="mt-8">
           <h2 className="font-serif text-section-title font-semibold mb-1">Checkpoint</h2>
           <p className="text-body text-ink-soft mb-3">
-            {lesson.checkpoint.length} question{lesson.checkpoint.length === 1 ? '' : 's'}. Retry as
-            many times as you like — the explanation is the point, not the score.
+            {checkpoint.length} question{checkpoint.length === 1 ? '' : 's'}. Retry as many times as you like: the
+            explanation is the point of each one.
           </p>
           <div className="space-y-3">
-            {lesson.checkpoint.map((q) => (
+            {checkpoint.map((q) => (
               <Checkpoint key={`${q.id}:${attempt}`} q={q} onResult={(c) => onResult(q, c)} />
             ))}
           </div>
@@ -325,7 +330,7 @@ export default function PrimerLesson({ moduleId, lessonId }: { moduleId: string;
       {isComplete && (
         <div className="mt-5">
           <Callout kind="info" title="Lesson complete">
-            <p>Kept in this browser across a refresh.</p>
+            {counts.length === 0 && <p>This lesson counts toward no skill, so its passing goes on no ledger.</p>}
             {counts.length > 0 && learner && onLedger.length === counts.length && (
               <p className="mt-1">
                 On {learner.name}&rsquo;s ledger as a lesson passed for {skillNames(counts)}.
@@ -352,27 +357,19 @@ export default function PrimerLesson({ moduleId, lessonId }: { moduleId: string;
       {/* Prev / next */}
       <nav className="flex items-center justify-between gap-3 mt-8 pt-4 border-t border-line">
         {prev ? (
-          <a
-            href={`#/primer/${prev.moduleId}/${prev.lessonId}`}
-            className="btn max-w-[45%]"
-            title={prev.title}
-          >
-            <ArrowLeft size={14} /> <span className="truncate">{prev.title}</span>
+          <a href={href(`/primer/${prev.id}`)} className="btn max-w-[45%]" title={prev.name}>
+            <ArrowLeft size={14} /> <span className="truncate">{prev.name}</span>
           </a>
         ) : (
           <span />
         )}
         {next ? (
-          <a
-            href={`#/primer/${next.moduleId}/${next.lessonId}`}
-            className={cx('btn max-w-[45%]', isComplete && 'btn-primary')}
-            title={next.title}
-          >
-            <span className="truncate">{next.title}</span> <ArrowRight size={14} />
+          <a href={href(`/primer/${next.id}`)} className={cx('btn max-w-[45%]', isComplete && 'btn-primary')} title={next.name}>
+            <span className="truncate">{next.name}</span> <ArrowRight size={14} />
           </a>
         ) : (
-          <a href="#/primer" className="btn">
-            Back to the module map <ArrowRight size={14} />
+          <a href={href('/primer')} className="btn">
+            Back to the lessons <ArrowRight size={14} />
           </a>
         )}
       </nav>

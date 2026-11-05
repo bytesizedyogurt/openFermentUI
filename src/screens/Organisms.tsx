@@ -260,7 +260,7 @@ export default function Organisms({ embedded = false }: { embedded?: boolean } =
       const unverified = live.filter((r) => r.status === 'unverified').length;
       // The papers the strain's records were read from.
       const paperCount = new Set(recs.map((r) => r.paperId)).size;
-      const protocolCount = protocols.filter((p) => p.organisms.includes(strain.id)).length;
+      const protocolCount = protocols.filter((p) => (p.organisms ?? []).includes(strain.id)).length;
       const scenarioCount = scenarios.filter((sc) => namesStrain(sc, strainNames(strain))).length;
       const prov: ProvKind = gold > 0 ? 'gold' : verified > 0 ? 'verified' : 'unverified';
       return {

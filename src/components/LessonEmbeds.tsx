@@ -9,7 +9,8 @@ import { useMemo, useState } from 'react';
 import { ArrowRight, Check, SkipForward, X } from 'lucide-react';
 import { useStore, provenanceOf, aggregateExclusion, isAggregatable, EXCLUSION_NOTE, useSkillById } from '@/store';
 import { href, navigate } from '@/router';
-import type { FieldId, LessonBlock } from '@/data/types';
+import type { FieldId } from '@/data/ontology';
+import type { LessonBlock } from '@/lib/catalogues';
 import { ONTOLOGY_BY_ID, fieldName } from '@/data/ontology';
 import { convert, fmt, asNumber } from '@/engine/units';
 import { computeRunMetrics } from '@/engine/metrics';
@@ -352,7 +353,7 @@ function ProtocolCard({ protocolId }: { protocolId: string }) {
         <div className="min-w-0">
           <div className="font-serif text-section-title font-semibold">{protocol.title}</div>
           <div className="text-caption text-ink-soft font-num">
-            {protocol.id} · v{protocol.currentVersion} · {v?.steps.length} steps ·{' '}
+            {protocol.id} · v{protocol.currentVersion} · {v?.steps?.length ?? 0} steps ·{' '}
             {v?.estMinutes.active} min active / {v?.estMinutes.total} min total
           </div>
           <p className="text-body text-ink-soft mt-1">{protocol.purpose}</p>
@@ -384,7 +385,7 @@ function SkillSteps({ skillId }: { skillId: string }) {
   }
   const uses = protocols.flatMap((p) => {
     const v = p.versions.find((x) => x.version === p.currentVersion) ?? p.versions[0];
-    return v.steps.filter((st) => st.skills?.includes(skillId)).map((st) => ({ p, v, st }));
+    return (v.steps ?? []).filter((st) => st.skills?.includes(skillId)).map((st) => ({ p, v, st }));
   });
   return (
     <Frame label={`Where ${skill.name} is used`}>
@@ -411,7 +412,7 @@ function SkillSteps({ skillId }: { skillId: string }) {
       <div className="mt-3 pt-2 border-t border-line">
         <div className="text-caption uppercase tracking-wide text-ink-soft mb-1">What an assessor watches for</div>
         <ul className="list-disc pl-5 space-y-0.5">
-          {skill.mastery.map((m) => (
+          {(skill.mastery ?? []).map((m) => (
             <li key={m} className="text-body">
               {m}
             </li>

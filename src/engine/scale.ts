@@ -1,6 +1,8 @@
 // Protocol scaling math (OF-DES-001 §8.11): quantities scale by declared
 // class, rounded to each material's precision spec so recipes stay pipettable.
-import type { Material, ProtocolVersion, Step } from '@/data/types';
+// A version is the project's (lib/protocols.ts, served whole): a material
+// list it keeps none of reads as empty, and a stock it keeps none of as null.
+import type { Material, ProtocolVersion, Step } from '@/lib/protocols';
 import { roundToPrecision, fmt } from './units';
 
 export interface ScaledMaterial extends Material {
@@ -24,17 +26,17 @@ export function scaleMaterial(m: Material, scale: number): ScaledMaterial {
   return out;
 }
 
-export function scaleMaterials(version: ProtocolVersion, scale: number): ScaledMaterial[] {
-  return version.materials.map((m) => scaleMaterial(m, scale));
+export function scaleMaterials(version: Pick<ProtocolVersion, 'materials'>, scale: number): ScaledMaterial[] {
+  return (version.materials ?? []).map((m) => scaleMaterial(m, scale));
 }
 
 /**
  * Render a step's text at scale: replaces {{qty:materialName}} with the
  * scaled amount + unit, and {{stock:materialName}} with the stock volume.
  */
-export function renderStepText(step: Step, version: ProtocolVersion, scale: number): string {
+export function renderStepText(step: Pick<Step, 'text'>, version: Pick<ProtocolVersion, 'materials'>, scale: number): string {
   return step.text.replace(/\{\{(qty|stock):([^}]+)\}\}/g, (_, kind, name) => {
-    const mat = version.materials.find((m) => m.name === name);
+    const mat = (version.materials ?? []).find((m) => m.name === name);
     if (!mat) return `⟨unknown material: ${name}⟩`;
     const scaled = scaleMaterial(mat, scale);
     if (kind === 'stock' && scaled.stockVolume) {

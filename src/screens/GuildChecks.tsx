@@ -11,7 +11,8 @@
 // record is theirs to read like anyone's. Every rule that decides a write is
 // the service's.
 import { useEffect, useMemo, useState } from 'react';
-import type { Check, CheckBrief, Protocol } from '@/data/types';
+import type { Check, CheckBrief } from '@/lib/checks';
+import type { Protocol } from '@/lib/protocols';
 import { useSkillById, useStore } from '@/store';
 import { Button, Callout, Card, EmptyState, LinkButton, SectionTitle, cx } from '@/components/ui';
 import { EvidenceRow, GuildHeader, nameOf, useChecks, useGuild, type GuildContext } from '@/components/GuildBits';
@@ -343,7 +344,7 @@ function SkillReasons({ ctx, check: c }: { ctx: GuildContext; check: Check }) {
 export function stepWords(protocols: readonly Protocol[], protocolId: string, stepId: string): string {
   const p = protocols.find((x) => x.id === protocolId);
   const v = p?.versions.find((x) => x.version === p.currentVersion) ?? p?.versions[0];
-  const st = v?.steps.find((x) => x.id === stepId);
+  const st = v?.steps?.find((x) => x.id === stepId);
   return st && v ? renderStepText(st, v, 1) : '';
 }
 
@@ -382,7 +383,7 @@ export function BriefView({ brief, large }: { brief: CheckBrief; large?: boolean
           <ul className="list-disc pl-5">
             {brief.criteria.map((cr) => (
               <li key={`${cr.skillId}:${cr.index}`} className={text}>
-                {SKILL_BY_ID[cr.skillId]?.mastery[cr.index] ?? `${cr.skillId} #${cr.index}`}{' '}
+                {SKILL_BY_ID[cr.skillId]?.mastery?.[cr.index] ?? `${cr.skillId} #${cr.index}`}{' '}
                 <span className={large ? 'text-body text-ink' : 'text-caption text-ink-soft'}>({SKILL_BY_ID[cr.skillId]?.name ?? cr.skillId})</span>
               </li>
             ))}
@@ -548,7 +549,7 @@ function OneCheck({ ctx, check: c, id, asked, down }: { ctx: GuildContext; check
               <ol className="space-y-1.5">
                 {calls.map((r) => (
                   <li key={r.criterion} className={cx('tick', r.meets ? 'tick-measured' : 'tick-rejected')}>
-                    <span className="text-body">{skill?.mastery[r.criterion] ?? `criterion ${r.criterion}`}</span>
+                    <span className="text-body">{skill?.mastery?.[r.criterion] ?? `criterion ${r.criterion}`}</span>
                     <span className={cx('ml-2 chip', r.meets ? 'text-accent border-accent/40' : 'text-signal-error border-signal-error/40')}>
                       {r.meets ? 'Meets' : 'Needs work'}
                     </span>

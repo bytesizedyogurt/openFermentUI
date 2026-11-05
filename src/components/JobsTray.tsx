@@ -60,7 +60,7 @@ export function JobsPanel({ onClose }: { onClose: () => void }) {
             </div>
             <div className="text-caption text-ink-soft mt-0.5 pl-6">
               {activeProto.title} · {Object.keys(activeRun.completed).length}/
-              {activeProto.versions.find((v) => v.version === activeRun.version)?.steps.length} steps
+              {activeProto.versions.find((v) => v.version === activeRun.version)?.steps?.length ?? 0} steps
               {activeRun.timers.filter((t) => t.running).length > 0 &&
                 ` · ${activeRun.timers.filter((t) => t.running).length} timer(s) running`}
             </div>

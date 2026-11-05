@@ -244,7 +244,7 @@ interface Counted {
   scenarios: number;
   runbooks: number;
   protocols: number;
-  modules: number;
+  lessons: number;
 }
 
 function stateOf(n: Counted): Record<string, { now: string; built: boolean }> {
@@ -257,7 +257,7 @@ function stateOf(n: Counted): Record<string, { now: string; built: boolean }> {
     pureOS: { now: `${UNIT_OPERATIONS.length} unit operations · no process model`, built: true },
     Proforma: { now: `${n.scenarios} scenarios`, built: true },
     Runbooks: { now: `${n.runbooks} runbooks · ${n.protocols} protocols`, built: true },
-    Primer: { now: `${n.modules} modules`, built: true },
+    Primer: { now: `${n.lessons} lesson${n.lessons === 1 ? '' : 's'}`, built: true },
     Guild: { now: 'review queue and roles', built: true },
     Catalogues: { now: 'kept on the service, each entry in its keeper’s name', built: true },
   };
@@ -316,7 +316,7 @@ export default function Home() {
   const scenarios = useStore((s) => s.scenarios);
   const runbooks = useStore((s) => s.runbooks);
   const strains = useStore((s) => s.strains);
-  const modules = useStore((s) => s.modules);
+  const lessons = useStore((s) => s.lessons);
   const liveConversations = useStore((s) => s.liveConversations);
   const activity = useStore((s) => s.activity);
   const runs = useStore((s) => s.runs);
@@ -335,9 +335,9 @@ export default function Home() {
         scenarios: scenarios.length,
         runbooks: runbooks.length,
         protocols: protocols.length,
-        modules: modules.length,
+        lessons: lessons.length,
       }),
-    [records, papers, strains, scenarios, runbooks, protocols, modules],
+    [records, papers, strains, scenarios, runbooks, protocols, lessons],
   );
 
   // ── band 1 numbers ───────────────────────────────────────────────────
@@ -378,7 +378,7 @@ export default function Home() {
     for (const p of protocols) {
       const v = p.versions.find((x) => x.version === p.currentVersion) ?? p.versions[0];
       if (!v) continue;
-      for (const m of v.materials) {
+      for (const m of (v.materials ?? [])) {
         const rec = m.sourceRecordId ? byId.get(m.sourceRecordId) : undefined;
         provs.push(rec ? (provenanceOf(rec) as ProvKind) : 'assumed');
       }
@@ -418,7 +418,7 @@ export default function Home() {
       activeProtocol.versions[activeProtocol.versions.length - 1])
     : null;
   const runDone = activeRun ? Object.keys(activeRun.completed).length : 0;
-  const runTotal = activeVersion ? activeVersion.steps.length : 0;
+  const runTotal = activeVersion ? (activeVersion.steps ?? []).length : 0;
 
   const unverifiedCount = status.unverified;
   const queueRemaining = Math.max(0, reviewQueue.length - reviewIndex);

@@ -253,18 +253,15 @@ function Screen() {
       if (b === 'ledger') return <RunbookLedger />;
       return b ? <RunbookDetail runbookId={b} /> : <Runbooks />;
     case 'primer':
-      // Lesson ids are globally unique, so /primer/l0-1 addresses a lesson on
-      // its own. /primer/m0/l0-1 still resolves — an old deep link should not
-      // need a redirect when the id it carries is enough. 'path' and
-      // 'practice' are reserved before the lesson lookup (OF-BLD-013 §3.3,
-      // §4.3), so a lesson that took either as an id would be unreachable.
+      // A lesson is an entry of the project's lesson catalogue (alpha 2.2 E.12),
+      // addressed by its id alone: /primer/<lesson>. An address of the module
+      // era, /primer/<module>/<lesson>, still reaches the lesson its last part
+      // names. 'path' and 'practice' are reserved before the lesson lookup
+      // (OF-BLD-013 §3.3, §4.3), so a lesson that took either as an id would be
+      // unreachable.
       if (b === 'path') return <PrimerPath />;
       if (b === 'practice') return <PrimerPractice id={c} />;
-      if (b && c) return <PrimerLesson moduleId={b} lessonId={c} />;
-      if (b) {
-        const owner = useStore.getState().modules.find((m) => m.lessons.some((l) => l.id === b));
-        if (owner) return <PrimerLesson moduleId={owner.id} lessonId={b} />;
-      }
+      if (b) return <PrimerLesson key={c ?? b} lessonId={c ?? b} />;
       return <Primer />;
     case 'guild':
       // OF-BLD-013 §1.4. 'matrix', 'people', 'skills' and 'checks' are
@@ -352,6 +349,7 @@ export default function App() {
   const loadProjects = useStore((s) => s.loadProjects);
   const hydrateProjectState = useStore((s) => s.hydrateProjectState);
   const hydrateCatalogues = useStore((s) => s.hydrateCatalogues);
+  const hydrateProtocols = useStore((s) => s.hydrateProtocols);
   const route = useRoute();
   const [gPressed, setGPressed] = useState(false);
   const lastFrame = useRef(performance.now());
@@ -369,14 +367,16 @@ export default function App() {
   useEffect(() => {
     // alpha 2.0 (ADR-005) — the projects first, so every later call to the
     // service names the open one; then the service's overlay, applied when
-    // the service answers and silent when it does not, and the project's
-    // strains and products from its catalogues (alpha 2.2 E.9); then, with
-    // what this browser still owes the service read, the open project's rows.
+    // the service answers and silent when it does not, the project's strains,
+    // products, skills and lessons from its catalogues (alpha 2.2 E.9, E.12)
+    // and its protocols (ADR-017); then, with what this browser still owes the
+    // service read, the open project's rows.
     const projects = loadProjects();
     void projects.then(() => hydrateOverlay());
     void projects.then(() => hydrateCatalogues());
+    void projects.then(() => hydrateProtocols());
     void Promise.all([hydrateDurable(), projects]).then(() => hydrateProjectState());
-  }, [hydrateDurable, hydrateOverlay, loadProjects, hydrateProjectState, hydrateCatalogues]);
+  }, [hydrateDurable, hydrateOverlay, loadProjects, hydrateProjectState, hydrateCatalogues, hydrateProtocols]);
 
   // Theme / density / motion applied at the document root.
   useEffect(() => {

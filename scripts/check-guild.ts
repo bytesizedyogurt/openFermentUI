@@ -27,6 +27,8 @@
  * reviews found, practice, enforce mode, and checks (§5.4): the ranking on
  * the ladder team, what a person may see, and the service's moves. The
  * bench's rules are the service's (checks.py, core/tests/test_checks.py).
+ * Part 12 holds a skill kept in the skill catalogue with no policy, which
+ * Guild rates nobody on (alpha 2.2 E.12; competence.unrated on the service).
  *
  * Runs with no service and no network: the service is a stub `fetch` here.
  */
@@ -34,7 +36,7 @@ import { useStore, guildView, actingIdOf } from '../src/store';
 import { TEST_PROTOCOLS, TEST_SKILLS as SKILLS, TEST_SKILL_BY_ID as SKILL_BY_ID } from './lib/guild-test-skills';
 import { sampleGuild, SAMPLE_LEAD } from './lib/guild-ladder';
 import { offlineRefusal } from '../src/lib/guild';
-import { REFRESH_WINDOW, pathOf } from '../src/engine/path';
+import { REFRESH_WINDOW, lessonPassed as shownPassed, pathOf } from '../src/engine/path';
 import {
   DEFAULT_POLICY,
   addDays,
@@ -43,11 +45,15 @@ import {
   holdFor,
   policyOf,
   isAssessor,
+  rated,
   readyForCheck,
   statusOf,
   verdictFor,
 } from '../src/engine/competence';
-import type { Checks, Guild, GuildEvidence, GuildPerson } from '../src/data/types';
+import type { Lesson, Skill } from '../src/lib/catalogues';
+import type { Checks } from '../src/lib/checks';
+import type { Guild, GuildEvidence, GuildPerson } from '../src/lib/guild';
+import type { PracticeSession } from '../src/lib/practice';
 import { mayQueue, proposeChecks } from '../src/engine/checks';
 import { needsActing, shownProposals, type Proposal } from '../src/lib/proposals';
 
@@ -74,6 +80,9 @@ const person = (id: string, role: GuildPerson['role'] = 'member'): GuildPerson =
 });
 const PEOPLE = [person('p-lead', 'lead'), person('p-ann'), person('p-tom'), person('p-qa', 'auditor')];
 
+/** A ledger as the service answers one: its people and entries under the default policy. */
+const ledger = (people: GuildPerson[], evidence: GuildEvidence[] = []): Guild => ({ version: 1, people, evidence, policy: DEFAULT_POLICY });
+
 let n = 0;
 const ev = (
   personId: string,
@@ -99,7 +108,7 @@ const level = (entries: GuildEvidence[], personId: string, skillId: string, toda
   statusOf(competenceOf(entries, PEOPLE, SKILLS_MAP, today), personId, skillId);
 
 const OD = SKILL_BY_ID['SK-OD'];
-check('SK-OD is the fixture this part assumes', OD.supervisedRuns === 3 && OD.recencyDays === 60 && OD.prerequisites.length === 0, {
+check('SK-OD is the fixture this part assumes', OD.supervisedRuns === 3 && OD.recencyDays === 60 && (OD.prerequisites ?? []).length === 0, {
   supervisedRuns: OD.supervisedRuns,
   recencyDays: OD.recencyDays,
 });
@@ -235,7 +244,7 @@ async function main() {
 
   // The service comes back: people, then entries, then withdrawals; one refused.
   const posted: string[] = [];
-  const server: Guild = { version: 1, people: [], evidence: [] };
+  const server: Guild = ledger([]);
   (globalThis as any).fetch = async (url: string, init?: { body: string }) => {
     const reply = (status: number, body: unknown) =>
       ({ ok: status === 200, status, json: async () => body }) as Response;
@@ -274,15 +283,14 @@ async function main() {
     serviceUp: false,
     skills: SKILLS,
     protocols: TEST_PROTOCOLS,
-    guild: {
-      version: 1,
-      people: [person('p-lead', 'lead'), person('p-ann'), person('p-tom')],
-      evidence: [
+    guild: ledger(
+      [person('p-lead', 'lead'), person('p-ann'), person('p-tom')],
+      [
         ev('p-ann', 'SK-OD', 'designation', '2026-02-01'),
         ev('p-ann', 'SK-DCW', 'designation', '2026-02-01'),
         ev('p-tom', 'SK-OD', 'knowledge', '2026-09-01'),
       ],
-    },
+    ),
     guildPending: [],
     guildActingId: 'p-tom',
   });
@@ -326,55 +334,68 @@ async function main() {
   check('a held skip is an entry the service would accept', skipEntries.every((e) => offlineRefusal(e, s().guild) === null));
 
   // ── 5. a lesson passed writes to the ledger (OF-BLD-013 §3.2) ───────
+  // The lessons are the project's lesson catalogue (alpha 2.2 E.12): two test
+  // entries on the test skills, the authored lessons having left with the seed
+  // (ADR-010). A lesson shows passed from the ledger alone.
+  const lessonOf = (id: string, name: string, skills: string[]): Lesson => ({
+    kind: 'lesson',
+    id,
+    name,
+    skills,
+    minutes: 1,
+    blocks: [],
+    checkpoint: [],
+    by: 'TEST FIXTURE',
+    at: '2026-01-01T00:00:00+00:00',
+  });
   useStore.setState({
     serviceUp: false,
-    guild: { version: 1, people: [person('p-lead', 'lead'), person('p-ann'), person('p-tom'), person('p-qa', 'auditor')], evidence: [] },
+    guild: ledger([person('p-lead', 'lead'), person('p-ann'), person('p-tom'), person('p-qa', 'auditor')]),
     guildPending: [],
     guildActingId: 'p-tom',
-    learnProgress: {},
-    // Two test lessons on the test skills: the authored lessons left with the seed (ADR-010).
-    modules: [
-      {
-        id: 'm-test',
-        index: 1,
-        title: 'Test module',
-        blurb: '',
-        lessons: [
-          { id: 'l-bench', title: 'A lesson toward two skills', minutes: 1, blocks: [], checkpoint: [], skills: ['SK-CIP', 'SK-OD'] },
-          { id: 'l-plain', title: 'A lesson toward none', minutes: 1, blocks: [], checkpoint: [] },
-        ],
-      },
-    ],
+    lessons: [lessonOf('l-bench', 'A lesson toward two skills', ['SK-CIP', 'SK-OD']), lessonOf('l-plain', 'A lesson toward none', [])],
   });
-  const bench = s().modules.flatMap((m) => m.lessons).find((l) => (l.skills ?? []).length >= 2);
-  const plain = s().modules.flatMap((m) => m.lessons).find((l) => (l.skills ?? []).length === 0);
-  check('the test module has a lesson that counts toward skills, and one that counts toward none', !!bench && !!plain);
+  const bench = s().lessons.find((l) => (l.skills ?? []).length >= 2);
+  const plain = s().lessons.find((l) => (l.skills ?? []).length === 0);
+  const benchSkills = bench?.skills ?? [];
+  check('the test catalogue has a lesson that counts toward skills, and one that counts toward none', !!bench && !!plain);
+  check('a lesson nobody has passed shows passed for nobody', !shownPassed(s().guild.evidence, 'p-tom', bench!));
   const wrote = await s().recordLessonForGuild(bench!.id);
   const lessonEntries = () => s().guild.evidence.filter((e) => e.source.kind === 'lesson');
   check(
     'a lesson passed writes one knowledge entry per skill, for whoever is learning, with no observer',
     wrote?.personId === 'p-tom' &&
-      wrote.skills.join() === bench!.skills!.join() &&
-      lessonEntries().length === bench!.skills!.length &&
+      wrote.skills.join() === benchSkills.join() &&
+      lessonEntries().length === benchSkills.length &&
       lessonEntries().every((e) => e.kind === 'knowledge' && e.personId === 'p-tom' && e.observerId === null && e.source.ref === bench!.id),
     lessonEntries().map((e) => [e.skillId, e.kind, e.observerId]),
   );
   check('the entries wait for the service like any other write', lessonEntries().every((e) => s().guildPending.includes(e.id)));
   const after5 = competenceOf(s().guild.evidence, s().guild.people, SKILL_BY_ID, TODAY);
-  check('and put the learner at Learning on each skill, no further', bench!.skills!.every((sk) => statusOf(after5, 'p-tom', sk).level === 1));
+  check('and put the learner at Learning on each skill, no further', benchSkills.every((sk) => statusOf(after5, 'p-tom', sk).level === 1));
+  check('the lesson shows passed for the learner, from the ledger alone', shownPassed(s().guild.evidence, 'p-tom', bench!));
+  check('and for nobody else', !shownPassed(s().guild.evidence, 'p-ann', bench!));
   const both = await Promise.all([s().recordLessonForGuild(bench!.id), s().recordLessonForGuild(bench!.id)]);
-  check('passing it again writes nothing, however the calls overlap', lessonEntries().length === bench!.skills!.length && both.every((r) => r?.skills.length === 0));
+  check('passing it again writes nothing, however the calls overlap', lessonEntries().length === benchSkills.length && both.every((r) => r?.skills.length === 0));
   check('a lesson that counts toward no skill writes nothing', (await s().recordLessonForGuild(plain!.id)) === null);
+  check('and shows passed for nobody, since no ledger holds it', !shownPassed(s().guild.evidence, 'p-tom', plain!));
   s().guildSetActing('p-qa');
   check('an auditor learning writes nothing', (await s().recordLessonForGuild(bench!.id)) === null);
   s().guildSetActing(null);
   check('nobody chosen writes nothing', (await s().recordLessonForGuild(bench!.id)) === null);
   s().guildSetActing('p-ann');
   await s().recordLessonForGuild(bench!.id);
-  check('the next learner gets entries of their own', lessonEntries().filter((e) => e.personId === 'p-ann').length === bench!.skills!.length);
+  check('the next learner gets entries of their own', lessonEntries().filter((e) => e.personId === 'p-ann').length === benchSkills.length);
   check('every lesson entry is one the service would accept, as far as the browser can tell', lessonEntries().every((e) => offlineRefusal(e, s().guild) === null));
-  s().completeLesson(bench!.id);
-  check('completing a lesson marks it finished in this browser', s().learnProgress[bench!.id] === true);
+  const withdrawnOne = lessonEntries().find((e) => e.personId === 'p-ann')!;
+  useStore.setState((x) => ({
+    guild: { ...x.guild, evidence: x.guild.evidence.map((e) => (e.id === withdrawnOne.id ? { ...e, withdrawnAt: TODAY } : e)) },
+  }));
+  check('a withdrawn entry takes the passing back on its skill', !shownPassed(s().guild.evidence, 'p-ann', bench!));
+  check(
+    'the store keeps no lesson of its own: no progress map, no way to mark one finished',
+    !('learnProgress' in s()) && !('completeLesson' in s()) && !('modules' in s()),
+  );
 
   // ── 6. a person's path (OF-BLD-013 §3.3) ────────────────────────────
   const PATH_PEOPLE = [person('p-lead', 'lead'), person('p-ann'), person('p-tom')];
@@ -431,13 +452,13 @@ async function main() {
   const reset7 = (extra: Partial<Parameters<typeof useStore.setState>[0]> = {}) =>
     useStore.setState({
       serviceUp: false,
-      guild: { version: 1, people: R_PEOPLE, evidence: [ev('p-ann', 'SK-OD', 'designation', '2026-02-01'), ev('p-tom', 'SK-OD', 'knowledge', '2026-09-01')] },
+      guild: ledger(R_PEOPLE, [ev('p-ann', 'SK-OD', 'designation', '2026-02-01'), ev('p-tom', 'SK-OD', 'knowledge', '2026-09-01')]),
       guildPending: [],
       guildPendingWithdrawals: [],
       guildActingId: 'p-ann',
       ...extra,
     } as never);
-  const server7: Guild = { version: 1, people: [...R_PEOPLE], evidence: [] };
+  const server7: Guild = ledger([...R_PEOPLE]);
   const posts7: string[] = [];
   let duringSync: (() => void) | null = null;
   (globalThis as any).fetch = async (url: string, init?: { body: string }) => {
@@ -514,7 +535,7 @@ async function main() {
 
 
   // ── 8. practice (OF-BLD-013 §4.3) ───────────────────────────────────
-  const closedSession = (personId: string | null, evidenceId: string | null) => ({
+  const closedSession = (personId: string | null, evidenceId: string | null): PracticeSession => ({
     id: 'pt-check-1',
     scenarioId: 'ps-check-1',
     skillId: 'SK-OD',
@@ -524,13 +545,13 @@ async function main() {
     startedAt: `${TODAY}T09:00:00Z`,
     closedAt: `${TODAY}T09:20:00Z`,
     evidenceId,
-    usage: { inputTokens: 0, outputTokens: 0, costUsd: 0, models: [] },
+    usage: { inputTokens: 0, outputTokens: 0, cacheReadTokens: 0, cacheWriteTokens: 0, costUsd: 0, models: [] },
   });
   reset7({ guildActingId: 'p-tom' });
   const realBefore = s().guild;
   await s().practiceClosed(closedSession(null, null), 'A reading above the range');
   check('a closed session on nobody\u2019s record writes nothing to the ledger', s().guild === realBefore);
-  const L8: Guild = { version: 1, people: R_PEOPLE, evidence: [] };
+  const L8: Guild = ledger(R_PEOPLE);
   const practised: GuildEvidence = ev('p-tom', 'SK-OD', 'scenario', TODAY, { observerId: null, source: { kind: 'scenario', ref: 'pt-check-1' } });
   check('the offline fallback takes a practice entry with no observer', offlineRefusal(practised, L8) === null);
   check('the offline fallback refuses practice that names an observer', offlineRefusal({ ...practised, observerId: 'p-ann' }, L8)?.rule === 'observer');
@@ -581,11 +602,12 @@ async function main() {
   s().guildSetActing('p-lead');
   check(
     'with the service down the lead is told the policy is the service\u2019s to keep',
-    (await s().guildSetPolicy({ routineGate: 'enforce', criticalGate: 'advise', checksPerQuarter: 3 })) === false && s().guild.policy === undefined,
+    (await s().guildSetPolicy({ routineGate: 'enforce', criticalGate: 'advise', checksPerQuarter: 3 })) === false &&
+      JSON.stringify(s().guild.policy) === JSON.stringify(DEFAULT_POLICY),
   );
 
   const audited = { ...ev('p-tom', 'SK-OD', 'witnessed', TODAY), observerId: 'p-qa' };
-  check('the offline fallback refuses an auditor as observer', offlineRefusal(audited, { version: 1, people: R_PEOPLE, evidence: [] })?.rule === 'authority');
+  check('the offline fallback refuses an auditor as observer', offlineRefusal(audited, ledger(R_PEOPLE))?.rule === 'authority');
 
   // ── 10. checks: the queue and the bench (OF-BLD-013 §5.4) ───────────
   //
@@ -630,7 +652,7 @@ async function main() {
   check('an assessor asking is told the service\u2019s rule and reason', told !== null && /duplicate/.test(told), told);
   await s().loadChecks();
   check('the queue is fetched from the service', s().checks === served10 || JSON.stringify(s().checks) === JSON.stringify(served10));
-  (globalThis as any).fetch = async () => ({ ok: true, status: 200, json: async () => ({ version: 1, people: [], evidence: [] }) }) as Response;
+  (globalThis as any).fetch = async () => ({ ok: true, status: 200, json: async () => ledger([]) }) as Response;
   await s().loadChecks();
   check('an answer with no list of checks is no answer about checks', s().checks === null);
 
@@ -655,6 +677,48 @@ async function main() {
     check('a check proposal shows to the lead', seen(who('p-sean', 'lead')) === 'pr-g,pr-l');
     check('a check proposal never shows to the person it names', seen(who('p-alex', 'lead')) === 'pr-l');
     check('carrying out a check proposal needs who is acting, and a lock does not', needsActing(checkP) && !needsActing(lockP));
+  }
+
+  // ── 12. a skill kept with no policy (alpha 2.2 E.12) ────────────────
+  // The skills are the project's skill catalogue, and an entry there may keep
+  // no policy. Guild rates nobody on such a skill, as competence.py does
+  // (competence.unrated), and competence-unrated.json holds the two equal.
+  {
+    const open: Skill = {
+      kind: 'skill',
+      id: 'SK-OPEN',
+      name: 'A skill with no policy',
+      family: 'qc',
+      prerequisites: [],
+      by: 'TEST FIXTURE',
+      at: '2026-01-01T00:00:00+00:00',
+    };
+    const needsIt: Skill = { ...SKILL_BY_ID['SK-OD'], id: 'SK-NEEDS-OPEN', prerequisites: ['SK-OPEN'] };
+    const skills12: Record<string, Skill> = { ...SKILLS_MAP, [open.id]: open, [needsIt.id]: needsIt };
+    const U: GuildEvidence[] = [
+      ev('p-ann', 'SK-OPEN', 'designation', '2026-02-01'),
+      ev('p-tom', 'SK-OPEN', 'knowledge', '2026-09-01'),
+      ev('p-tom', 'SK-OPEN', 'supervised', '2026-09-02'),
+      ev('p-tom', 'SK-OPEN', 'witnessed', '2026-09-10'),
+      ev('p-tom', 'SK-NEEDS-OPEN', 'knowledge', '2026-09-01'),
+    ];
+    const map12 = competenceOf(U, PEOPLE, skills12, TODAY);
+    check('a skill kept with no policy is unrated', !rated(open));
+    check('a skill whose policy is whole is rated', rated(SKILL_BY_ID['SK-OD']));
+    const tom12 = statusOf(map12, 'p-tom', 'SK-OPEN');
+    check(
+      'nobody holds it, whatever the ledger says, and its status says why',
+      tom12.level === 0 && tom12.effective === 0 && tom12.unrated && !tom12.lapsed && !tom12.suspended && tom12.supervisedCount === 1 && tom12.knowledgeComplete,
+      tom12,
+    );
+    check('a designation on it makes nobody an assessor', !isAssessor(map12, 'p-ann', 'SK-OPEN'));
+    const held12 = statusOf(map12, 'p-tom', 'SK-NEEDS-OPEN');
+    check('a skill that needs it is held at Learning by it', held12.level === 1 && held12.blockedBy.join() === 'SK-OPEN', held12.blockedBy);
+    check('a step needing it is blocked for everyone', gateFor({ skills: ['SK-OPEN'] }, 'p-ann', map12).state === 'blocked');
+    check('no check is proposed on it', proposeChecks(ledger(PEOPLE, U), skills12, TODAY).every((c) => !c.skillIds.includes('SK-OPEN')));
+    check('it is never ready for a check', !readyForCheck(tom12, open));
+    const path12 = pathOf({ personId: 'p-tom', skills: [open], status: map12, lessonsFor: {}, passed: () => false, soon: new Set(), today: TODAY });
+    check('a path says it waits for its policy', path12[0]?.section === 'waiting' && path12[0]?.step.kind === 'unrated');
   }
 
   console.log(fails ? `\n✗ ${fails} Guild check(s) failed` : '\n✓ Guild levels are computed the way the ladder says.');

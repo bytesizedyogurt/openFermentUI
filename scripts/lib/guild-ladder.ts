@@ -8,7 +8,7 @@
 // `competenceOf` computes every level from the entries alone, which makes the
 // ladder a working test of the engine: every level, a suspension, a lapse and
 // a prerequisite holding a skill back.
-import type { Guild, GuildEvidence, GuildPerson } from '../../src/data/types';
+import type { Guild, GuildEvidence, GuildPerson } from '../../src/lib/guild';
 import { TEST_SKILLS as SKILLS, TEST_SKILL_BY_ID as SKILL_BY_ID, TEST_STEP_FOR } from './guild-test-skills';
 import { DEFAULT_POLICY, addDays } from '../../src/engine/competence';
 

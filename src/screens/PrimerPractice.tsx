@@ -13,7 +13,7 @@
 // (practice.py). Nothing here grades: the tutor's close says what it saw.
 import { useEffect, useMemo, useState, type ReactNode } from 'react';
 import { MessageCircleQuestion, Send, Sparkles } from 'lucide-react';
-import type { PracticeScenario, PracticeSession, PracticeStepRef, PracticeValue } from '@/data/types';
+import type { PracticeScenario, PracticeSession, PracticeStepRef, PracticeValue } from '@/lib/practice';
 import { useSkillById, useSkills, useStore } from '@/store';
 import { PRIMER_TABS } from '@/data/tabs';
 import { statusOf } from '@/engine/competence';
@@ -105,7 +105,7 @@ function PracticeList({ asked }: { asked: boolean }) {
   const named = learner?.id ?? null;
   // Every skill a protocol step needs: a scenario is drafted from those steps.
   const tagged = useMemo(() => {
-    const needed = new Set(protocols.flatMap((p) => p.versions.flatMap((v) => v.steps.flatMap((st) => st.skills ?? []))));
+    const needed = new Set(protocols.flatMap((p) => p.versions.flatMap((v) => (v.steps ?? []).flatMap((st) => st.skills ?? []))));
     return SKILLS.filter((sk) => needed.has(sk.id));
   }, [protocols, SKILLS]);
   const skills = useMemo(() => {

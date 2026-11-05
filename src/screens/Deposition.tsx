@@ -40,7 +40,7 @@ import {
 } from 'lucide-react';
 import { useStore } from '@/store';
 import { href, navigate } from '@/router';
-import type { Step } from '@/data/types';
+import type { Step } from '@/lib/protocols';
 import { measuresOf, predictionsOf } from '@/lib/studies';
 import { renderStepText, batchLabel, scaleMaterials } from '@/engine/scale';
 import { fmt } from '@/engine/units';
@@ -771,7 +771,7 @@ export default function Deposition({ protocolId, runId }: { protocolId: string; 
               </div>
             )}
 
-            {step?.timerSec !== undefined && (
+            {step?.timerSec != null && (
               <div className="card p-4 mt-4 flex items-center gap-5">
                 {stepTimer ? (
                   <>

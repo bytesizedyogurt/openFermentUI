@@ -9,14 +9,17 @@
 // scores or streaks: a count appears only where a skill asks for one, as the
 // supervised runs it needs before a witnessed check.
 //
-// The lessons a path offers, the runs in progress it points at and the
-// protocol it sends someone to read are the store's own.
+// The lessons a path offers are the project's lesson catalogue, and a lesson
+// shows passed from the ledger's entries (alpha 2.2 E.12); the runs in
+// progress it points at are this page's, and the protocol it sends someone to
+// read is the project's (ADR-017).
 import { useMemo, useState, type ReactNode } from 'react';
-import type { Lesson, Protocol } from '@/data/types';
+import type { Lesson } from '@/lib/catalogues';
+import type { Protocol } from '@/lib/protocols';
 import { useSkillById, useSkills, useStore } from '@/store';
 import { PRIMER_TABS } from '@/data/tabs';
 import { isAssessor, mayCosign } from '@/engine/competence';
-import { REFRESH_WINDOW, pathOf, type PathItem, type PathSection } from '@/engine/path';
+import { REFRESH_WINDOW, passedLesson, pathOf, type PathItem, type PathSection } from '@/engine/path';
 import { ActingAs, useGuild, type GuildContext } from '@/components/GuildBits';
 import { LevelGlyph, levelLabel } from '@/components/LevelGlyph';
 import { OwnerTabs } from '@/components/OwnerTabs';
@@ -32,14 +35,14 @@ function few(names: string[]): string {
 
 export default function PrimerPath() {
   const ctx = useGuild();
-  const modules = useStore((s) => s.modules);
+  const lessons = useStore((s) => s.lessons);
   const runs = useStore((s) => s.runs);
 
   const lessonsFor = useMemo(() => {
     const out: Record<string, Lesson[]> = {};
-    for (const m of modules) for (const l of m.lessons) for (const sk of l.skills ?? []) (out[sk] ??= []).push(l);
+    for (const l of lessons) for (const sk of l.skills ?? []) (out[sk] ??= []).push(l);
     return out;
-  }, [modules]);
+  }, [lessons]);
 
   const openRuns = Object.values(runs).filter((r) => !r.finishedAt);
   const learner = ctx.acting && ctx.acting.active ? ctx.acting : null;
@@ -100,27 +103,19 @@ function Path({
   const others = ctx.members.filter((m) => m.id !== personId);
   const assessors = (sk: string) => few(others.filter((m) => isAssessor(ctx.status, m.id, sk)).map((m) => m.name));
   const cosigners = (sk: string) => few(others.filter((m) => mayCosign(ctx.status, m.id, [sk])).map((m) => m.name));
-  const passed = (sk: string, lessonId: string) =>
-    ctx.guild.evidence.some(
-      (e) =>
-        e.personId === personId &&
-        e.skillId === sk &&
-        e.source.kind === 'lesson' &&
-        e.source.ref === lessonId &&
-        !e.withdrawnAt,
-    );
+  const passed = (sk: string, lessonId: string) => passedLesson(ctx.guild.evidence, personId, sk, lessonId);
   const needs = (protocolId: string, version: string, sk: string) =>
     protocols
       .find((p) => p.id === protocolId)
       ?.versions.find((v) => v.version === version)
-      ?.steps.some((st) => st.skills?.includes(sk)) ?? false;
+      ?.steps?.some((st) => st.skills?.includes(sk)) ?? false;
   /** The run in progress that needs this skill, else the first protocol that does. */
   const bench = (sk: string): { to: string; cta: string } | null => {
     const run = openRuns.find((r) => needs(r.protocolId, r.version, sk));
     if (run) return { to: `/runbooks/protocols/${run.protocolId}/run/${run.id}`, cta: `Open the ${run.protocolId} run in progress` };
     // Otherwise the protocol that asks the most of it.
     const uses = (x: Protocol) =>
-      x.versions.find((v) => v.version === x.currentVersion)?.steps.filter((st) => st.skills?.includes(sk)).length ?? 0;
+      x.versions.find((v) => v.version === x.currentVersion)?.steps?.filter((st) => st.skills?.includes(sk)).length ?? 0;
     const p = protocols.filter((x) => uses(x) > 0).sort((x, y) => uses(y) - uses(x))[0];
     return p ? { to: `/runbooks/protocols/${p.id}`, cta: `Open ${p.id}` } : null;
   };
@@ -165,6 +160,17 @@ function Path({
         return { text: null };
       case 'waiting':
         return { text: <>Waits for {i.step.on.map((b) => SKILL_BY_ID[b]?.name ?? b).join(' and ')} to reach Supervised.</> };
+      case 'unrated':
+        return {
+          text: (
+            <>
+              Its entry in the project&rsquo;s skill catalogue holds no policy (how critical it is, how long a qualification stands
+              and how many supervised runs come before a witnessed check), so Guild rates nobody on it yet.
+            </>
+          ),
+          to: '/catalogues/skills',
+          cta: 'Open the skill catalogue',
+        };
       case 'witnessed-check':
         return {
           text: <>Supervised runs done. Ready for a witnessed check: an assessor watches you perform it against the criteria. Assessors: {assessors(sk)}.</>,
@@ -187,7 +193,7 @@ function Path({
         return {
           text: (
             <>
-              Take the lesson &ldquo;{lesson?.title ?? i.step.lessonId}&rdquo;
+              Take the lesson &ldquo;{lesson?.name ?? i.step.lessonId}&rdquo;
               {i.step.total > 1 && (
                 <>
                   {' '}

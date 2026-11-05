@@ -1,14 +1,15 @@
 // Guild · Skills (OF-BLD-013 §1.4). What each skill is, what an assessor
 // watches for, which protocol steps need it, and who holds it at each level.
-// The skills are the store's: none ship with the app (alpha 2.0, ADR-010), so
-// until the lab adds its own the index says so.
+// The skills are the project's skill catalogue (alpha 2.2 E.12): none ship
+// with the app (ADR-010), so until the lab keeps its own the index says so.
+// A skill kept with no policy is listed, and Guild rates nobody on it.
 import type { ReactNode } from 'react';
 import { Card, EmptyState, LinkButton, SectionTitle, cx } from '@/components/ui';
 import { GuildHeader, useGuild } from '@/components/GuildBits';
 import { LevelGlyph } from '@/components/LevelGlyph';
-import { FAMILIES, FAMILY_BY_ID } from '@/data/skillFamilies';
+import { familyGroups, familyOf } from '@/data/skillFamilies';
 import { useSkillById, useSkills, useStore } from '@/store';
-import { LEVEL_NAME, statusOf, type Level } from '@/engine/competence';
+import { LEVEL_NAME, rated, statusOf, type Level } from '@/engine/competence';
 import { renderStepText } from '@/engine/scale';
 import { href } from '@/router';
 
@@ -28,15 +29,24 @@ function SkillsIndex() {
           <Card>
             <EmptyState
               title="No skills yet"
-              body="No skill ships with the app. A skill the lab adds appears here under its family, with what an assessor watches for, the protocol steps that need it and who holds it."
+              body={
+                <>
+                  No skill ships with the app. A skill the project keeps in its{' '}
+                  <a className="text-accent hover:underline" href={href('/catalogues/skills')}>
+                    skill catalogue
+                  </a>{' '}
+                  appears here under its family, with what an assessor watches for, the protocol steps that need it and
+                  who holds it.
+                </>
+              }
             />
           </Card>
         )}
-        {FAMILIES.filter((f) => SKILLS.some((s) => s.family === f.id)).map((f) => (
+        {familyGroups(SKILLS).filter((f) => SKILLS.some((s) => familyOf(s).id === f.id)).map((f) => (
           <div key={f.id}>
             <SectionTitle>{f.name}</SectionTitle>
             <Card>
-              {SKILLS.filter((s) => s.family === f.id).map((s) => {
+              {SKILLS.filter((s) => familyOf(s).id === f.id).map((s) => {
                 const current = ctx.members.filter((m) => statusOf(ctx.status, m.id, s.id).effective >= 3).length;
                 const assessors = ctx.members.filter((m) => statusOf(ctx.status, m.id, s.id).effective === 4).length;
                 return (
@@ -51,6 +61,7 @@ function SkillsIndex() {
                       {current} can run it alone · {assessors} assessor{assessors === 1 ? '' : 's'}
                     </span>
                     {s.criticality === 'critical' && <span className="chip text-signal-warn border-signal-warn/40">critical</span>}
+                    {!rated(s) && <span className="chip text-ink-soft">no policy yet</span>}
                   </a>
                 );
               })}
@@ -74,26 +85,39 @@ function SkillPage({ skillId }: { skillId: string }) {
       <>
         <GuildHeader title="Skills" subtitle="The trunk skills that protocol steps need." />
         <Card className="max-w-2xl">
-          <EmptyState title="No such skill" body={`${skillId} is not among the lab’s skills.`} action={<LinkButton to="/guild/skills">All skills</LinkButton>} />
+          <EmptyState title="No such skill" body={`The project's skill catalogue holds no skill ${skillId}.`} action={<LinkButton to="/guild/skills">All skills</LinkButton>} />
         </Card>
       </>
     );
   }
   const uses = protocols.flatMap((p) => {
     const v = p.versions.find((x) => x.version === p.currentVersion) ?? p.versions[0];
-    return v.steps.filter((st) => st.skills?.includes(skillId)).map((st) => ({ p, st, v }));
+    return (v.steps ?? []).filter((st) => st.skills?.includes(skillId)).map((st) => ({ p, st, v }));
   });
 
   return (
     <>
-      <GuildHeader title={skill.name} subtitle={`${FAMILY_BY_ID[skill.family]?.name} · ${skill.summary}`} />
+      <GuildHeader
+        title={skill.name}
+        subtitle={[skill.family ? (familyOf(skill).id ? familyOf(skill).name : skill.family) : null, skill.summary].filter(Boolean).join(' · ')}
+      />
+      {!rated(skill) && (
+        <Card className="p-4 mb-5 max-w-3xl text-body">
+          This skill&rsquo;s entry in the project&rsquo;s{' '}
+          <a className="text-accent hover:underline" href={href('/catalogues/skills')}>
+            skill catalogue
+          </a>{' '}
+          holds no policy yet (how critical it is, how many days a qualification stands and how many supervised runs come
+          before a witnessed check), so Guild rates nobody on it until the entry holds one.
+        </Card>
+      )}
       <div className="grid lg:grid-cols-[minmax(0,1fr)_320px] gap-5">
         <div className="space-y-5 min-w-0">
           <div>
             <SectionTitle>What an assessor watches for</SectionTitle>
             <Card className="p-4">
               <ol className="space-y-2 list-decimal pl-5">
-                {skill.mastery.map((m) => (
+                {(skill.mastery ?? []).map((m) => (
                   <li key={m} className="text-reading">
                     {m}
                   </li>
@@ -171,9 +195,9 @@ function SkillPage({ skillId }: { skillId: string }) {
                 <span className="font-num">{skill.supervisedRuns}</span>
               </Row>
               <Row label="Prerequisites">
-                {skill.prerequisites.length === 0
+                {(skill.prerequisites ?? []).length === 0
                   ? 'None'
-                  : skill.prerequisites.map((p, i) => (
+                  : (skill.prerequisites ?? []).map((p, i) => (
                       <span key={p}>
                         {i > 0 && ', '}
                         <a className="text-accent hover:underline" href={href(`/guild/skills/${p}`)}>

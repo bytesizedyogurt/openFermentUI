@@ -789,8 +789,8 @@ function CorpusSection() {
         <SectionTitle>This browser&rsquo;s data</SectionTitle>
         <Card className="p-3">
           <p className="text-body text-ink-soft max-w-3xl">
-            Depositions, review decisions, runbook locks, lessons finished, Postdoc&rsquo;s conversations
-            and Guild entries the service has not stored yet are kept in this browser (the Durable tier).
+            Depositions, review decisions, runbook locks, Postdoc&rsquo;s conversations and Guild entries
+            the service has not stored yet are kept in this browser (the Durable tier).
             Clearing them leaves what the service keeps untouched.
           </p>
           <div className="mt-3">

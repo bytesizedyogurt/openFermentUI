@@ -4,7 +4,10 @@
 // src/screens/Guild.tsx shares only the tab strip.
 import { useEffect, useMemo, useState, type ReactNode } from 'react';
 import { Check, Download, UserPlus, X } from 'lucide-react';
-import type { Check as GuildCheck, Guild, GuildEvidence, GuildPerson, GuildRole, Protocol, Skill } from '@/data/types';
+import type { Skill } from '@/lib/catalogues';
+import type { Check as GuildCheck } from '@/lib/checks';
+import type { Guild, GuildEvidence, GuildPerson, GuildRole } from '@/lib/guild';
+import type { Protocol } from '@/lib/protocols';
 import type { DecisionCheck } from '@/lib/review';
 import { useStore, guildView, actingIdOf, useSkillById } from '@/store';
 import { GUILD_TABS } from '@/data/tabs';
@@ -17,6 +20,7 @@ import {
   competenceOf,
   isAssessor,
   localToday,
+  rated,
   readyForCheck,
   statusOf,
   type StatusMap,
@@ -325,7 +329,7 @@ function stepsNeeding(skillId: string, protocols: readonly Protocol[]): { ref: s
   const out: { ref: string; stepId: string; text: string }[] = [];
   for (const p of protocols) {
     const v = p.versions.find((x) => x.version === p.currentVersion) ?? p.versions[0];
-    for (const st of v.steps) if (st.skills?.includes(skillId)) out.push({ ref: p.id, stepId: st.id, text: st.text });
+    for (const st of (v.steps ?? [])) if (st.skills?.includes(skillId)) out.push({ ref: p.id, stepId: st.id, text: st.text });
   }
   return out;
 }
@@ -488,7 +492,7 @@ function SheetBody({ personId, skillId, onClose }: { personId: string; skillId: 
 
             {kind === 'witnessed' && (
               <ol className="space-y-1.5">
-                {skill.mastery.map((m, i) => (
+                {(skill.mastery ?? []).map((m, i) => (
                   <li key={m} className="flex flex-wrap items-center gap-2">
                     <span className="flex-1 min-w-[180px] text-body">{m}</span>
                     <span className="flex gap-1">
@@ -558,7 +562,7 @@ function SheetBody({ personId, skillId, onClose }: { personId: string; skillId: 
             {kind === 'witnessed' && allMarked && (
               <p className={cx('text-body', passed ? 'text-accent' : 'text-signal-error')}>
                 {passed
-                  ? `Every criterion met. Signing records a passed check${st.knowledgeComplete && st.supervisedCount >= skill.supervisedRuns ? ', which makes this Qualified' : ''}.`
+                  ? `Every criterion met. Signing records a passed check${rated(skill) && st.knowledgeComplete && st.supervisedCount >= skill.supervisedRuns ? ', which makes this Qualified' : ''}.`
                   : `Not every criterion met. Signing records a check that did not pass${st.level >= 3 ? ', which suspends this skill until one does' : ''}.`}
               </p>
             )}

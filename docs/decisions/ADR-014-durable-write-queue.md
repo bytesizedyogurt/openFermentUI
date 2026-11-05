@@ -11,7 +11,7 @@ keeps theme, density, panel state and the last-open project" (§5.5), and A3 hol
 project: review decisions, Guild's ledger, depositions, measured evidence, runbooks and their
 locks, overrides, fits, scenarios, trains and conversations (`lib/projectState.ts`). What the
 snapshot still writes, besides the preferences (the reviewer's name, the Guild person the
-browser acts as, the lessons finished here), is a queue: review decisions, Guild entries and
+browser acts as, and until alpha 2.2 E.12 the lessons finished here), is a queue: review decisions, Guild entries and
 project rows made while the service did not answer, each removed once the service acknowledges
 it, and the rows a browser from before alpha 2.0 kept, until a project takes them.
 
@@ -33,3 +33,12 @@ outage is lost on the next reload, the safety problem OF-BLD-006 §4.6 kept Dura
 
 The owner asks for the queue to go, or accounts (after alpha 2.0) give a person's pending writes a
 home on the service.
+
+## Implementation note (alpha 2.2 E.12, 2026-11-05)
+
+The snapshot keeps no lesson. The lessons are the project's lesson catalogue (ADR-018), and a lesson shows passed
+from the ledger's entries for whoever is learning: passing its checkpoint writes a knowledge entry for each skill
+it counts toward, which waits in the queue like any other Guild write while the service is away. A snapshot that
+holds the lessons finished in a browser before this commit (`learnProgress`) still loads; nothing reads that field,
+and the next save leaves it out. The preferences the snapshot keeps are the reviewer's name and the Guild person the
+browser acts as.

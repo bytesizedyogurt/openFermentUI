@@ -18,8 +18,10 @@ no policy: no criticality, no recency, no count of supervised runs. Such a
 skill is left out of every level (`unrated`): its level is 0, nobody holds
 it, and the rules that read a level (guild.py's cosign and run alone,
 checks.py's ranking and a check asked for by name) say so in words. The
-fixture holds skills that each carry a policy; the browser's skills come
-from the catalogue at alpha 2.2 E.12, which teaches competence.ts the same.
+browser's skills are the same catalogue's (alpha 2.2 E.12), and
+competence.ts leaves such a skill out the same way: the competence fixture
+holds skills that each carry a policy, and competence-unrated.json a skill
+kept with none beside one that needs it, each held equal here.
 """
 from __future__ import annotations
 

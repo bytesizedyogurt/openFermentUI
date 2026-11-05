@@ -27,7 +27,7 @@ import {
   Table2,
   X,
 } from 'lucide-react';
-import type { Protocol } from '@/data/types';
+import type { Protocol } from '@/lib/protocols';
 import { keptIn } from '@/lib/catalogues';
 import { namesStrain, strainNames } from '@/lib/geneos';
 import type { ExtractionRecord } from '@/lib/review';
@@ -638,7 +638,7 @@ export default function StrainPage({ strainId }: { strainId: string }) {
   // ── linked assets ────────────────────────────────────────────────────
 
   const linkedProtocols = useMemo(
-    () => protocols.filter((p) => p.organisms.includes(strainId)),
+    () => protocols.filter((p) => (p.organisms ?? []).includes(strainId)),
     [protocols, strainId],
   );
 
@@ -667,8 +667,8 @@ export default function StrainPage({ strainId }: { strainId: string }) {
       .filter((p) => p.category === 'media')
       .map((p) => {
         const v = currentVersionOf(p);
-        const cited = v ? v.materials.filter((m) => m.sourceRecordId && recordIds.has(m.sourceRecordId)).length : 0;
-        return { protocol: p, version: v, cited, materials: v ? v.materials.length : 0 };
+        const cited = v ? (v.materials ?? []).filter((m) => m.sourceRecordId && recordIds.has(m.sourceRecordId)).length : 0;
+        return { protocol: p, version: v, cited, materials: v ? (v.materials ?? []).length : 0 };
       });
     return scored.sort((a, b) => b.cited - a.cited || b.materials - a.materials);
   }, [linkedProtocols, recordIds]);

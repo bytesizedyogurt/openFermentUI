@@ -22,9 +22,22 @@
 //
 // and one more for a critical skill. A person's three highest pairs make one
 // check; the highest checks are proposed first. A pair an open check already
-// covers is not proposed again.
-import type { Check, CheckReason, Guild, GuildPerson, Skill } from '@/data/types';
-import { competenceOf, daysBetween, isAssessor, policyOf, readyForCheck, statusOf, type StatusMap } from './competence';
+// covers is not proposed again, and neither is a skill whose catalogue entry
+// holds no policy, which nobody is rated on (`rated` in ./competence).
+import type { Skill } from '@/lib/catalogues';
+import type { Check, CheckReason } from '@/lib/checks';
+import type { GuildPerson } from '@/lib/guild';
+import {
+  competenceOf,
+  daysBetween,
+  isAssessor,
+  policyOf,
+  rated,
+  readyForCheck,
+  statusOf,
+  type Ledger,
+  type StatusMap,
+} from './competence';
 
 export const LAPSING_DAYS = 21;
 export const DEVIATION_DAYS = 30;
@@ -65,7 +78,7 @@ export function quarterStart(day: string): string {
 }
 
 export function rankPairs(
-  ledger: Guild,
+  ledger: Ledger,
   skills: Record<string, Skill>,
   today: string,
   covered: Set<string> = new Set(),
@@ -78,7 +91,8 @@ export function rankPairs(
   for (const person of ledger.people) {
     if (!person.active || person.role === 'auditor') continue;
     for (const skill of Object.values(skills)) {
-      if (covered.has(`${person.id}|${skill.id}`)) continue;
+      // A skill kept with no policy is left out of every level, and of the ranking with them.
+      if (covered.has(`${person.id}|${skill.id}`) || !rated(skill)) continue;
       const st = statusOf(map, person.id, skill.id);
       if (st.level !== 2 && st.level !== 3) continue;
       const mine = live.filter((e) => e.personId === person.id && e.skillId === skill.id);
@@ -119,7 +133,7 @@ export function rankPairs(
  * person|skill pairs an open check already covers.
  */
 export function proposeChecks(
-  ledger: Guild,
+  ledger: Ledger,
   skills: Record<string, Skill>,
   today: string,
   covered: Set<string> = new Set(),

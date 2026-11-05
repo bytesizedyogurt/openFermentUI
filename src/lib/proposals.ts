@@ -3,10 +3,10 @@
 // button, and their reviewer name goes on the proposal and the audit log.
 //
 // A proposal and a person's act on it are the service's shapes, generated
-// from its models into src/api/types.gen.ts (ADR-007). The person acting is
-// Guild's, named on the hand-kept types until Guild's lib moves.
+// from its models into src/api/types.gen.ts (ADR-007), and so is the person
+// acting, a person on Guild's ledger (lib/guild.ts).
 import type { components } from '@/api/types.gen';
-import type { GuildPerson } from '@/data/types';
+import type { GuildPerson } from './guild';
 import { mayQueue } from '@/engine/checks';
 import type { StatusMap } from '@/engine/competence';
 import { apiFetch } from './project';

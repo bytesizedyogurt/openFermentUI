@@ -9,17 +9,19 @@
 //
 // So state is split by lifetime rather than persisted wholesale:
 //
-//   Reference  papers, protocols, products, vocabulary — never mutated, so
-//              there is nothing to persist. Reloading gets them from source.
+//   Reference  papers, vocabulary — never mutated, so there is nothing to
+//              persist. Reloading gets them from source.
 //   Service    since alpha 2.0 (stage 2) every scientific record lives on the
 //              service, in the open project: review decisions, Guild's
 //              ledger, depositions, measured evidence, runbooks and their
 //              locks, overrides, fits, scenarios, trains and Live
-//              conversations (lib/projectState.ts).
-//   Durable    who is deciding and who is acting, the lessons finished here,
-//              and the writes the service has not yet acknowledged: review
-//              decisions, Guild changes and project rows made while it was
-//              away — must survive until they are sent.
+//              conversations (lib/projectState.ts), and since alpha 2.2 its
+//              catalogues and protocols, a lesson's passing among the
+//              ledger's entries (E.12).
+//   Durable    who is deciding and who is acting, and the writes the service
+//              has not yet acknowledged: review decisions, Guild changes and
+//              project rows made while it was away — must survive until they
+//              are sent.
 //   Ephemeral  open panels, density, theme, sim speed — must NOT survive. A
 //              theme that follows you across sessions is a preference; a
 //              collapsed panel that does is a bug.
@@ -34,7 +36,8 @@
 // persistence is bad; refusing to open the screen because persistence is
 // unavailable would be worse.
 import type { components } from '@/api/types.gen';
-import type { Guild, GuildWithdrawal, InputAssumption } from '@/data/types';
+import type { Guild, GuildWithdrawal } from '@/lib/guild';
+import type { InputAssumption } from '@/data/types';
 import type { Deposition, MeasuredEvidence, Provenance, Runbook } from './studies';
 import type { RecordStatus, ReviewDecision } from './review';
 import type { Override } from './params';
@@ -138,10 +141,10 @@ export interface DurableSnapshot {
     actingId: string | null;
   };
   /**
-   * Lessons finished in this browser, by id (OF-BLD-013 §3.2). Optional for
-   * the same reason as `guild`. What a lesson counts toward a person's skills
-   * lives on the ledger; this only keeps the module map honest across a
-   * refresh.
+   * LEGACY, left where it lies. The lessons finished in this browser, by id,
+   * as a snapshot before alpha 2.2 E.12 kept them; a lesson shows finished
+   * from the ledger's entries for whoever is learning, so nothing reads this,
+   * and the next save leaves it out.
    */
   learnProgress?: Record<string, true>;
   /**

@@ -1,14 +1,24 @@
 // TEST FIXTURE: the skills, skill families and step tags Guild's ladder and
-// its checks run on (check:guild, export-competence-fixtures), in the shape of
-// the alpha 1.0 seed (src/data/skills.ts and the three generic-method
-// protocols that tagged them). The ids, families, criticality and the
-// ladder's policy are kept; every summary and criterion is a placeholder, the
-// authored text having left with the seed (alpha 2.0, ADR-010). The app ships
-// with no skill: a lab adds its own (stage 2). Never imported under src/.
-import type { Protocol, Skill } from '../../src/data/types';
+// its checks run on (check:guild, export-competence-fixtures), from the
+// alpha 1.0 seed (src/data/skills.ts and the three generic-method protocols
+// that tagged them), each laid into the shape the project's catalogue and its
+// protocols keep (alpha 2.2 E.12): a skill as a skill catalogue entry with its
+// policy, a protocol as the service serves one. The ids, families,
+// criticality and the ladder's policy are kept; every summary and criterion
+// is a placeholder, the authored text having left with the seed (alpha 2.0,
+// ADR-010). The app ships with no skill: a lab adds its own. Never imported
+// under src/.
+import type { RatedSkill } from '../../src/engine/competence';
+import type { Protocol } from '../../src/lib/protocols';
 import guildProjection from '../../core/tests/fixtures/guild-projection.json';
 
-export const TEST_SKILLS: Skill[] = [
+/** Who keeps the test entries, and when, as a catalogue entry and a protocol's version name both. */
+const KEPT = { by: 'TEST FIXTURE', at: '2026-01-01T00:00:00+00:00' } as const;
+
+/** A test skill's own fields, in the order the competence fixture writes them (export-competence-fixtures). */
+type AsWritten = Omit<RatedSkill, 'kind' | 'by' | 'at'>;
+
+const AS_WRITTEN: AsWritten[] = [
   {
     "id": "SK-ASEP",
     "name": "Aseptic transfer",
@@ -238,7 +248,10 @@ export const TEST_SKILLS: Skill[] = [
   }
 ];
 
-export const TEST_SKILL_BY_ID: Record<string, Skill> = Object.fromEntries(TEST_SKILLS.map((s) => [s.id, s]));
+/** Each test skill as the project's skill catalogue keeps one, its policy whole. */
+export const TEST_SKILLS: RatedSkill[] = AS_WRITTEN.map((s) => ({ ...s, kind: 'skill', ...KEPT }));
+
+export const TEST_SKILL_BY_ID: Record<string, RatedSkill> = Object.fromEntries(TEST_SKILLS.map((s) => [s.id, s]));
 
 /** The first protocol step each skill is tagged on, as the seed's protocols tagged them. */
 export const TEST_STEP_FOR: Record<string, { ref: string; stepId: string }> = {
@@ -301,9 +314,9 @@ export const TEST_STEP_FOR: Record<string, { ref: string; stepId: string }> = {
 };
 
 /**
- * The three protocols the step tags name, as the store holds a protocol: the
- * placeholder steps of core/tests/fixtures/guild-projection.json, each with
- * the skills it is tagged with, and nothing else.
+ * The three protocols the step tags name, as the service serves a protocol:
+ * the placeholder steps of core/tests/fixtures/guild-projection.json, each
+ * with the skills it is tagged with, and nothing else.
  */
 export const TEST_PROTOCOLS: Protocol[] = guildProjection.protocols.map((p) => ({
   id: p.protocolId,
@@ -317,6 +330,7 @@ export const TEST_PROTOCOLS: Protocol[] = guildProjection.protocols.map((p) => (
   versions: [
     {
       version: p.version,
+      ...KEPT,
       baseBatch: { value: 1, unit: 'batch', label: 'a test batch' },
       materials: [],
       equipment: [],

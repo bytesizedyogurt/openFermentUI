@@ -6,17 +6,38 @@
 // screens say so. The rules live in `core/openferment_core/practice.py`; a
 // refusal comes back as the rule and the reason, and nothing here repeats
 // them.
-import type {
-  Practice,
-  PracticeDeposition,
-  PracticeDraftRequest,
-  PracticeScenario,
-  PracticeSession,
-  PracticeTurnRequest,
-} from '@/data/types';
+//
+// Every shape here is the service's own, generated from its models into
+// src/api/types.gen.ts (ADR-007).
+import type { components } from '@/api/types.gen';
 import type { Deposition, Runbook } from './studies';
 import { IntakeDown } from './intake';
 import { apiFetch } from './project';
+
+type S = components['schemas'];
+
+/** `GET /api/practice`: every scenario drafted and every session held in the project. */
+export type Practice = S['Practice'];
+/** A protocol's step a scenario or a turn bears on. */
+export type PracticeStepRef = S['PracticeStepRef'];
+/** What a value in the evidence pane was copied from. */
+export type PracticeSource = S['PracticeSource'];
+/** One item in the evidence pane: the model's label, the source's words and number. */
+export type PracticeValue = S['PracticeValue'];
+/** A drafted scenario: the situation, the prompt, what a sound answer reaches, and the evidence it cites. */
+export type PracticeScenario = S['PracticeScenario'];
+/** One turn of a session, the trainee's or the tutor's. */
+export type PracticeTurn = S['PracticeTurn'];
+/** What the tutor observed, with the steps it bears on. No grade. */
+export type PracticeObservation = S['PracticeObservation'];
+/** One tutor session on a scenario, with its turns and what was observed. */
+export type PracticeSession = S['PracticeSession'];
+/** A deposition as the browser sends it for drafting. */
+export type PracticeDeposition = S['PracticeDeposition'];
+/** `POST /api/practice/draft`: the skill to practise and the depositions a scenario may draw on. */
+export type PracticeDraftRequest = S['PracticeDraftRequest'];
+/** `POST /api/practice/turn`: the trainee's answer, in a session or to begin one. */
+export type PracticeTurnRequest = S['PracticeTurnRequest'];
 
 /** The service refused what the model wrote, or the request, and said which rule held. */
 export class PracticeRefused extends Error {

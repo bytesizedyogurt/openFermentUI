@@ -4,9 +4,9 @@
 import { useState } from 'react';
 import { UserPlus } from 'lucide-react';
 import { useStore } from '@/store';
-import { FAMILIES } from '@/data/skillFamilies';
+import { familyGroups, familyOf } from '@/data/skillFamilies';
 import { useSkills } from '@/store';
-import type { GuildPerson, GuildRole } from '@/data/types';
+import type { GuildPerson, GuildRole } from '@/lib/guild';
 import { Button, Card, EmptyState, LinkButton, SectionTitle, cx } from '@/components/ui';
 import {
   AddPersonForm,
@@ -166,8 +166,8 @@ function Ledger({ ctx, personId }: { ctx: GuildContext; personId: string }) {
         {person.role !== 'auditor' && (
           <>
             <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-6 gap-3">
-              {FAMILIES.map((f) => {
-                const fs = SKILLS.filter((s) => s.family === f.id);
+              {familyGroups(SKILLS).map((f) => {
+                const fs = SKILLS.filter((s) => familyOf(s).id === f.id);
                 const q = fs.filter((s) => statusOf(ctx.status, personId, s.id).effective >= 3).length;
                 return (
                   <Card key={f.id} className="p-3">
@@ -216,14 +216,14 @@ function Ledger({ ctx, personId }: { ctx: GuildContext; personId: string }) {
                         <th className="px-4 py-2 font-normal text-right">Supervised runs</th>
                       </tr>
                     </thead>
-                    {FAMILIES.map((f) => (
+                    {familyGroups(SKILLS).map((f) => (
                       <tbody key={f.id}>
                         <tr>
                           <td colSpan={6} className="px-4 pt-3 pb-1 text-caption uppercase tracking-wide text-ink-soft">
                             {f.name}
                           </td>
                         </tr>
-                        {SKILLS.filter((s) => s.family === f.id).map((s) => {
+                        {SKILLS.filter((s) => familyOf(s).id === f.id).map((s) => {
                           const st = statusOf(ctx.status, personId, s.id);
                           const soon = st.lapsesAt && !st.lapsed && daysBetween(ctx.today, st.lapsesAt) <= 30;
                           return (

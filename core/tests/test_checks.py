@@ -37,6 +37,8 @@ from openferment_core.models import (
 )
 
 FIXTURE = Path(__file__).parent / "fixtures" / "competence.json"
+# A skill kept in the project's skill catalogue with no policy (alpha 2.2 E.12), which both sides rank nobody on.
+UNRATED = Path(__file__).parent / "fixtures" / "competence-unrated.json"
 TODAY = date.today().isoformat()
 # Guild's own projection, before conftest hands every test alpha 1.0's frozen export in its place.
 GUILD_PROJECTION = guild.projection
@@ -51,8 +53,8 @@ def _files(monkeypatch, tmp_path):
 # ── the ranking, against the reference ─────────────────────────────────
 
 
-def _cases():
-    data = json.loads(FIXTURE.read_text())
+def _cases(path: Path = FIXTURE):
+    data = json.loads(path.read_text())
     skills = {s["id"]: s for s in data["skills"]}
     for case in data["cases"]:
         ledger = Guild(
@@ -74,6 +76,18 @@ def test_every_pair_and_proposal_matches_the_reference():
     assert compared > 50
     names = {case["name"] for case, _, _ in _cases()}
     assert {"sample, two pairs covered", "awkward, a stricter lead, someone gone"} <= names, "the fixture tries a covered pair, an inactive person and a stricter rate"
+
+
+def test_a_skill_with_no_policy_is_ranked_as_the_reference_ranks_it():
+    compared = 0
+    for case, ledger, skills in _cases(UNRATED):
+        cover = set(case.get("covered") or [])
+        pairs = checks.rank_pairs(ledger, skills, case["today"], cover)
+        assert pairs == case["pairs"], f"{case['name']}: pairs differ"
+        assert checks.propose_from(ledger, skills, case["today"], cover) == case["proposals"], f"{case['name']}: proposals differ"
+        assert not any(p["skillId"] == "SK-OPEN" for p in pairs), f"{case['name']}: a skill with no policy was ranked"
+        compared += 1
+    assert compared == 2
 
 
 def test_a_covered_pair_is_not_proposed_again():

@@ -13,7 +13,9 @@
 //
 // The store reads the project's strains and products through `listStrains` and `listProducts` (alpha 2.2 E.9):
 // geneOS's hosts and their pages, the strain choosers of fermOS and pureOS, the runbooks and the protocols name a
-// strain as its entry does, and a product likewise.
+// strain as its entry does, and a product likewise. It reads the skills and the lessons through `listSkills` and
+// `listLessons` (alpha 2.2 E.12): Guild rates people on the skills its catalogue keeps, a protocol's step names
+// them, and Primer teaches the lessons, each with its body (ADR-018).
 //
 // Every shape here is the service's own, generated from its models into src/api/types.gen.ts (ADR-007). The keep's
 // body is the entry as the catalogue answers one (`CatalogueKeep.entry`), so the generated entry names every field
@@ -41,6 +43,27 @@ export type SkillCriticality = NonNullable<CatalogueEntry['criticality']>;
 export type Strain = CatalogueEntry & { kind: 'strain' };
 /** A product the project works with, as its product catalogue keeps it: its name, class, location and sequence. */
 export type Product = CatalogueEntry & { kind: 'product' };
+/**
+ * A skill Guild rates people on, as the project's skill catalogue keeps it: its family, its summary, what an assessor
+ * watches for, and the policy its levels read (criticality, recency, supervised runs, prerequisites). An entry kept
+ * with no policy rates nobody (`hasPolicy`; competence.unrated on the service, `rated` in src/engine/competence.ts).
+ */
+export type Skill = CatalogueEntry & { kind: 'skill' };
+/**
+ * A lesson Primer teaches, as the project's lesson catalogue keeps it: its name, its words, the skills it counts
+ * toward, and its body (ADR-018): its minutes, its blocks and its checkpoint. A lesson kept with no body shows its
+ * name, its words and its skills.
+ */
+export type Lesson = CatalogueEntry & { kind: 'lesson' };
+/** One block of a lesson's body: prose in Markdown, or one of the nine embeds Primer's page draws. */
+export type LessonBlock = S['LessonProse'] | S['LessonEmbed'];
+/** Which embed a block draws: the nine Primer's page knows. */
+export type LessonEmbedName = S['LessonEmbed']['embed'];
+/**
+ * One question of a lesson's checkpoint: a multiple-choice question with its options and the index of its answer, or a
+ * numeric one with its answer's value, unit and tolerance in percent.
+ */
+export type CheckpointQuestion = S['CheckpointQuestion'];
 
 export { ServiceDown as CataloguesDown, ServiceRefused as CataloguesRefused };
 
@@ -60,6 +83,14 @@ export const listStrains = (signal?: AbortSignal) =>
 /** The open project's products, as its product catalogue keeps them. */
 export const listProducts = (signal?: AbortSignal) =>
   listCatalogue('product', signal).then((entries) => entries.filter((e): e is Product => e.kind === 'product'));
+
+/** The open project's skills, as its skill catalogue keeps them. */
+export const listSkills = (signal?: AbortSignal) =>
+  listCatalogue('skill', signal).then((entries) => entries.filter((e): e is Skill => e.kind === 'skill'));
+
+/** The open project's lessons, as its lesson catalogue keeps them, each with its body. */
+export const listLessons = (signal?: AbortSignal) =>
+  listCatalogue('lesson', signal).then((entries) => entries.filter((e): e is Lesson => e.kind === 'lesson'));
 
 /** A strain in words, as a chooser or a label names it: its species, where its entry keeps one, then its name. */
 export const strainWords = (s: Pick<CatalogueEntry, 'name' | 'species'>): string => [s.species, s.name].filter(Boolean).join(' ');

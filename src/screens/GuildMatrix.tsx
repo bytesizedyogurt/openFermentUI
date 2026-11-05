@@ -5,9 +5,9 @@
 // somewhere, and who cannot run it yet. A cell opens the sign-off sheet.
 import { useMemo, useState } from 'react';
 import { ChevronDown, Users } from 'lucide-react';
-import { FAMILIES } from '@/data/skillFamilies';
+import { familyGroups, familyOf } from '@/data/skillFamilies';
 import { useSkills, useStore } from '@/store';
-import type { Protocol } from '@/data/types';
+import type { Protocol } from '@/lib/protocols';
 import { Card, EmptyState, cx } from '@/components/ui';
 import { AddPersonForm, GuildHeader, SignoffSheet, useGuild } from '@/components/GuildBits';
 import { LevelGlyph, LevelLegend, levelLabel } from '@/components/LevelGlyph';
@@ -20,7 +20,8 @@ const VERDICT = {
   blocked: { dot: 'bg-signal-error', text: 'Cannot run it yet' },
 } as const;
 
-const stepsOf = (p: Protocol) => (p.versions.find((v) => v.version === p.currentVersion) ?? p.versions[0]).steps;
+/** The current version's steps, or the first version's; none where the protocol keeps no version that names a step. */
+const stepsOf = (p: Protocol) => (p.versions.find((v) => v.version === p.currentVersion) ?? p.versions[0])?.steps ?? [];
 
 /** Protocols whose current version tags at least one step. */
 const taggedOf = (protocols: readonly Protocol[]): Protocol[] =>
@@ -37,9 +38,9 @@ export default function GuildMatrix() {
 
   const columns = useMemo(() => {
     const needed = protocol ? new Set(stepsOf(protocol).flatMap((s) => s.skills ?? [])) : null;
-    return FAMILIES.map((f) => ({
+    return familyGroups(SKILLS).map((f) => ({
       family: f,
-      skills: SKILLS.filter((s) => s.family === f.id && (!needed || needed.has(s.id))),
+      skills: SKILLS.filter((s) => familyOf(s).id === f.id && (!needed || needed.has(s.id))),
     })).filter((g) => g.skills.length > 0);
   }, [protocol, SKILLS]);
   const flat = columns.flatMap((g) => g.skills);
@@ -145,7 +146,7 @@ export default function GuildMatrix() {
                       <a
                         href={href(`/guild/skills/${s.id}`)}
                         className="block text-[11px] leading-[14px] text-ink hover:text-accent"
-                        title={s.summary}
+                        title={s.summary ?? undefined}
                       >
                         {s.name}
                       </a>
