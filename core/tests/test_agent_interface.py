@@ -111,6 +111,39 @@ def test_a_writes_answer_names_its_audit_row_with_its_note_and_a_read_names_none
     assert refused.error and refused.auditIds == [] and len(audit.read()) == 1
 
 
+def test_a_call_that_fails_after_its_write_names_the_row_that_stands(monkeypatch):
+    """A write that committed before its tool raised keeps its audit row, and the failed call's answer names it; a
+    row added inside a transaction the failure rolled back is gone, and no id is named for it."""
+    import dataclasses
+
+    from openferment_core import db, projects
+
+    def committed_then_raises(parsed, ctx):
+        audit.append(agent="model", who=MODEL, module="guild", action="catalogue_write", state="open",
+                     target="skill/placeholder-a")
+        raise RuntimeError("a placeholder failure after the write")
+
+    async def rolled_back() -> None:
+        async with db.session():
+            await audit.add(projects.current(), agent="model", who=MODEL, module="guild", action="catalogue_write",
+                            state="open", target="skill/placeholder-b")
+            raise RuntimeError("a placeholder failure inside the write")
+
+    def raises_inside(parsed, ctx):
+        db.run(rolled_back())
+
+    held = tools.REGISTRY["catalogue_write"]
+    monkeypatch.setitem(tools.REGISTRY, "catalogue_write", dataclasses.replace(held, run=committed_then_raises))
+    failed = tools.run("catalogue_write", SKILL, tools.ToolContext(model=MODEL))
+    (row,) = audit.read()
+    assert failed.error and "a placeholder failure after the write" in failed.error
+    assert failed.auditIds == [row.id] and row.target == "skill/placeholder-a"
+    monkeypatch.setitem(tools.REGISTRY, "catalogue_write", dataclasses.replace(held, run=raises_inside))
+    gone = tools.run("catalogue_write", SKILL, tools.ToolContext(model=MODEL))
+    assert gone.error and "a placeholder failure inside the write" in gone.error
+    assert gone.auditIds == [] and [a.target for a in audit.read()] == ["skill/placeholder-a"]
+
+
 def test_a_gated_writes_answer_names_the_row_its_proposal_left():
     """The proposal's row is written inside the proposal's own transaction,
     on the database's thread, and the answer names it all the same."""

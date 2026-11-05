@@ -6,7 +6,11 @@
  * report and its SFF graph → a scenario begun from the run → the plants Studies
  * offers to run → the project's SFF flowsheets → the catalogues screen, where
  * the person keeps a placeholder strain, edits it, takes in a file naming it
- * again and reads it back as their own (alpha 2.2 E.8) → geneOS's Hosts, where
+ * again and reads it back as their own (alpha 2.2 E.8) → a lesson taken in from a
+ * file with its body and renamed on the form, its body read back whole; a skill
+ * kept with no policy, which its Guild page says in words; and a protocol kept
+ * after the page opened, found at its address, its editor opened by its address
+ * on a fresh load showing the steps kept (alpha 2.2 E.gate) → geneOS's Hosts, where
  * that strain has its card, and its page with the other names its entry keeps
  * (alpha 2.2 E.9) → a conversation with
  * its labelled estimate → a runbook → a reading deposited at the bench on that
@@ -32,6 +36,9 @@
  */
 import { existsSync } from 'node:fs';
 import { chromium, type Page } from 'playwright';
+import type { CatalogueEntry } from '../src/lib/catalogues';
+import type { DepositionReading, RunReport } from '../src/lib/studies';
+import type { Protocol } from '../src/lib/protocols';
 
 const env = (name: string): string => {
   const v = process.env[name]?.trim();
@@ -62,6 +69,12 @@ const STRAIN = process.env.WALK_STRAIN?.trim() || 'walk-placeholder-strain';
 const STRAIN_NAME = 'A placeholder strain the walk keeps';
 const STRAIN_ALIASES = ['WALK-1', 'WALK-2'];
 const STRAIN_FILE = 'walk-strains.csv';
+// The placeholder lesson, skill and protocol the walk keeps (alpha 2.2 E.gate): words and numbers a person writes, each
+// standing for nothing (the repository ships software alone).
+const LESSON = 'walk-placeholder-lesson';
+const LESSON_FILE = 'walk-lessons.json';
+const UNRATED_SKILL = 'walk-placeholder-skill';
+const PROTOCOL = 'walk-placeholder-protocol';
 // The engines whose first thing the walk runs from the Runs screen, comma-separated; none when unset.
 const ENGINES = (process.env.WALK_ENGINES ?? '')
   .split(',')
@@ -80,36 +93,12 @@ function check(ok: boolean, words: string): void {
 
 let current: Page | null = null;
 
-/** A run as the service keeps it (GET /api/runs/{id}), as far as the walk reads it. */
-interface HeldRun {
-  id: string;
-  engine: string;
-  plant: string;
-  status: string;
-  provenance: string | null;
-  outputs: { values?: unknown[] };
-  diagnostics?: unknown[];
-}
-
-/** A catalogue entry as the service keeps it (GET /api/catalogues/{kind}/{id}), as far as the walk reads it. */
-interface HeldEntry {
-  id: string;
-  name: string;
-  aliases?: string[];
-  by: string;
-  agent?: string | null;
-  via?: string | null;
-  source?: string | null;
-}
-
-/** A reading as the service lists it (GET /api/depositions/readings). */
-interface Reading {
-  ref: string;
-  value: number;
-  unit: string;
-  by: string;
-  at: string;
-}
+// Each answer the walk reads back is the service's own model, generated from it (ADR-007): a run's report
+// (GET /api/runs/{id}), a catalogue entry (GET /api/catalogues/{kind}/{id}) and a reading a run may take
+// (GET /api/depositions/readings).
+type HeldReport = RunReport;
+type HeldEntry = CatalogueEntry;
+type Reading = DepositionReading;
 
 /**
  * The reading `ref` as the service lists it among those a run takes in the walk's unit, asked until the bench's
@@ -284,6 +273,109 @@ async function main(): Promise<void> {
 
   // alpha 2.2 E.9: geneOS's hosts are the project's strain catalogue, which the store reads, so the strain the person
   // kept has its card on Hosts and its own page, named as its entry names it.
+  // alpha 2.2 E.gate: a lesson taken in from a file with its body, then renamed on the form, keeps its body whole.
+  await step('A lesson edited on the form', async () => {
+    await at(page, '/catalogues/lessons');
+    await page.locator('[data-testid="catalogues"][data-kind="lesson"]').waitFor();
+    const lesson = {
+      kind: 'lesson',
+      id: LESSON,
+      name: 'A placeholder lesson the walk keeps',
+      minutes: 5,
+      blocks: [{ kind: 'prose', md: 'A placeholder paragraph.' }, { kind: 'embed', embed: 'mini-queue' }],
+      checkpoint: [{ id: 'q1', prompt: 'A placeholder choice?', kind: 'mc', options: ['One', 'Two'], answerIndex: 1 }],
+    };
+    await page.getByTestId('catalogue-intake-file').setInputFiles({ name: LESSON_FILE, mimeType: 'application/json', buffer: Buffer.from(JSON.stringify([lesson])) });
+    await page.getByTestId('catalogue-intake-go').click();
+    await page.locator('[data-testid="catalogue-intake-result"][data-kept="1"][data-refused="0"]').waitFor();
+    const row = page.locator(`[data-testid="catalogue-entry"][data-entry="${LESSON}"]`);
+    await row.locator('[data-testid="catalogue-lesson-row-body"][data-blocks="2"][data-questions="1"]').waitFor();
+    await row.getByTestId('catalogue-edit').click();
+    const edit = page.locator(`[data-testid="catalogue-form"][data-mode="edit"][data-entry="${LESSON}"]`);
+    await edit.getByTestId('catalogue-field-name').fill('A placeholder lesson the walk keeps, renamed');
+    await edit.getByTestId('catalogue-keep').click();
+    await page.locator(`[data-testid="catalogue-kept"][data-entry="${LESSON}"]`).waitFor();
+    const answered = await page.request.get(`${ORIGIN}/api/catalogues/lesson/${encodeURIComponent(LESSON)}`, {
+      headers: { 'X-OpenFerment-Project': PROJECT },
+    });
+    if (!answered.ok()) throw new Error(`GET /api/catalogues/lesson/${LESSON} answered ${answered.status()}`);
+    const held = (await answered.json()) as HeldEntry;
+    const blocks = (held.blocks ?? []).length;
+    const questions = (held.checkpoint ?? []).length;
+    if (held.name !== 'A placeholder lesson the walk keeps, renamed' || held.minutes !== 5 || blocks !== 2 || questions !== 1 || held.by !== PERSON)
+      throw new Error(`the service keeps ${LESSON} as "${held.name}" by ${held.by} with ${held.minutes} min, ${blocks} blocks and ${questions} questions`);
+    return `placeholder lesson ${LESSON} taken in from ${LESSON_FILE} with its body, renamed on the form in ${PERSON}'s name, and read back from the service with its ${held.minutes} min, ${blocks} blocks and ${questions} checkpoint question whole`;
+  });
+
+  // alpha 2.2 E.gate: a skill kept with no policy reads so in words on Guild's skill page.
+  await step('A skill with no policy', async () => {
+    await at(page, '/catalogues/skills');
+    await page.locator('[data-testid="catalogues"][data-kind="skill"]').waitFor();
+    await page.getByTestId('catalogue-add').click();
+    const add = page.locator('[data-testid="catalogue-form"][data-mode="add"]');
+    await add.getByTestId('catalogue-field-id').fill(UNRATED_SKILL);
+    await add.getByTestId('catalogue-field-name').fill('A placeholder skill the walk keeps');
+    await add.getByTestId('catalogue-keep').click();
+    await page.locator(`[data-testid="catalogue-entry"][data-entry="${UNRATED_SKILL}"] [data-testid="catalogue-policy"][data-policy="none"]`).waitFor();
+    await at(page, `/guild/skills/${UNRATED_SKILL}`);
+    await page.getByTestId('guild-skill-no-policy').waitFor();
+    await page.getByTestId('guild-skill-no-mastery').waitFor();
+    return `placeholder skill ${UNRATED_SKILL} kept with no policy; its Guild page says it holds none and names no criterion, in words`;
+  });
+
+  // alpha 2.2 E.gate: a protocol kept after the page opened is found by its address, and its editor opened by its
+  // address on a fresh load starts from the steps the service keeps.
+  await step('A protocol opened by its address', async () => {
+    const version = {
+      version: '1.0',
+      baseBatch: { value: 1, unit: 'placeholder-unit', label: 'a placeholder batch' },
+      materials: [{ name: 'Placeholder material', amount: 1, unit: 'placeholder-unit', scaling: 'fixed', precision: 0 }],
+      steps: [
+        { id: 's1', text: 'Add {{qty:Placeholder material}}.' },
+        { id: 's2', text: 'A placeholder second step.' },
+      ],
+      estMinutes: { active: 1, total: 2 },
+    };
+    const made = await page.request.post(`${ORIGIN}/api/protocols`, {
+      headers: { 'X-OpenFerment-Project': PROJECT, 'Content-Type': 'application/json' },
+      data: { protocol: { id: PROTOCOL, title: 'A placeholder protocol the walk keeps', category: 'sop', bsl: 1, versions: [version], currentVersion: '1.0' }, by: PERSON },
+    });
+    if (!made.ok()) throw new Error(`POST /api/protocols answered ${made.status()}: ${await made.text()}`);
+    await at(page, `/runbooks/protocols/${PROTOCOL}`);
+    await page.getByRole('heading', { name: 'A placeholder protocol the walk keeps' }).first().waitFor();
+    await at(page, `/runbooks/protocols/${PROTOCOL}/edit`);
+    await page.reload();
+    await page.getByLabel('Step 2 instruction').waitFor();
+    const boxes = await page.getByLabel(/^Step \d+ instruction$/).count();
+    if (boxes !== 2) throw new Error(`the editor opened by its address shows ${boxes} steps of the 2 version 1.0 keeps`);
+    return `placeholder protocol ${PROTOCOL} kept in ${PERSON}'s name after the page opened, found at its address, and its editor opened by its address on a fresh load showing the 2 steps version 1.0 keeps`;
+  });
+
+  // alpha 2.2 E.gate: a protocol begun on the protocols page, in the person's name, opens in its editor.
+  await step('A protocol begun on the page', async () => {
+    await at(page, '/runbooks/protocols');
+    await page.getByTestId('begin-protocol-open').click();
+    const form = page.getByTestId('begin-protocol');
+    await form.getByTestId('begin-protocol-id').fill(`${PROTOCOL}-begun`);
+    await form.getByTestId('begin-protocol-title').fill('A placeholder protocol the walk begins');
+    await form.getByTestId('begin-protocol-batchValue').fill('1');
+    await form.getByTestId('begin-protocol-batchUnit').fill('placeholder-unit');
+    await form.getByTestId('begin-protocol-active').fill('1');
+    await form.getByTestId('begin-protocol-total').fill('2');
+    await form.getByTestId('begin-protocol-steps').fill('A placeholder first step.\nA placeholder second step.');
+    await form.getByTestId('begin-protocol-keep').click();
+    await page.getByLabel('Step 2 instruction').waitFor();
+    const answered = await page.request.get(`${ORIGIN}/api/protocols/${encodeURIComponent(`${PROTOCOL}-begun`)}`, {
+      headers: { 'X-OpenFerment-Project': PROJECT },
+    });
+    if (!answered.ok()) throw new Error(`GET /api/protocols/${PROTOCOL}-begun answered ${answered.status()}`);
+    const held = (await answered.json()) as Protocol;
+    const steps = held.versions[0]?.steps ?? [];
+    if (held.currentVersion !== '1.0' || steps.length !== 2 || held.versions[0]?.by !== PERSON)
+      throw new Error(`the service keeps ${held.id} at version ${held.currentVersion} with ${steps.length} steps, kept by ${held.versions[0]?.by}`);
+    return `placeholder protocol ${held.id} begun on the protocols page in ${PERSON}'s name with version 1.0 and its 2 steps, and opened in its editor`;
+  });
+
   await step('Hosts', async () => {
     await at(page, '/geneos/hosts');
     const card = page.locator(`[data-testid="strain-card"][data-strain="${STRAIN}"]`);
@@ -415,7 +507,7 @@ async function main(): Promise<void> {
       await page.locator(`[data-testid="proforma-run"][data-run="${id}"][data-status="done"]`).waitFor();
       const answered = await page.request.get(`${ORIGIN}/api/runs/${id}`, { headers: { 'X-OpenFerment-Project': PROJECT } });
       if (!answered.ok()) throw new Error(`GET /api/runs/${id} answered ${answered.status()}`);
-      const held = ((await answered.json()) as { run: HeldRun }).run;
+      const held = ((await answered.json()) as HeldReport).run;
       const provenance = await page.getByTestId('run-provenance').getAttribute('data-provenance');
       if (held.engine !== name || held.plant !== first || provenance !== held.provenance)
         throw new Error(`the page reads ${provenance} for run ${id}, which the service keeps as ${held.engine}'s run of ${held.plant}, ${held.provenance}`);

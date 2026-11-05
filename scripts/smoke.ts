@@ -1,7 +1,12 @@
 /**
  * The stage 1 smoke: the app starts and every rail entry opens (execution
  * prompt §10, stage 1 gate), and so do the screens beyond the rail that an
- * empty project opens too (`ALSO`: the studies of stage 5).
+ * empty project opens too (`ALSO`: the studies of stage 5, Settings, the
+ * catalogues' other tabs, the flowsheets, the protocols and the
+ * depositions). The service runs with no model key whatever the shell or
+ * core/.env holds, as the proof's does (an empty key stands over
+ * core/.env's, which the service loads without overriding what is set), so
+ * every screen opens with none, and Postdoc's says so in words.
  *
  * It runs the real service on loopback with dist/ mounted, so the page and its
  * /api calls share one origin the way the host serves them, and opens each
@@ -38,7 +43,18 @@ const MIN_TEXT = 60;
 const SERVER = process.env.OPENFERMENT_TEST_DATABASE_URL?.trim() || 'postgresql://openferment:openferment@127.0.0.1:5432/openferment_test';
 const PROJECT = { name: 'Smoke', by: 'Smoke Test' };
 /** Screens beyond the rail that open on an empty project (execution prompt §9.1 step 5), each with the test id its screen draws. */
-const ALSO = [{ label: 'Studies', to: '/proforma/studies', testid: 'proforma-studies' }];
+const ALSO = [
+  { label: 'Studies', to: '/proforma/studies', testid: 'proforma-studies' },
+  { label: 'Settings', to: '/settings' },
+  { label: 'Products', to: '/catalogues/products', testid: 'catalogues' },
+  { label: 'Skills', to: '/catalogues/skills', testid: 'catalogues' },
+  { label: 'Lessons', to: '/catalogues/lessons', testid: 'catalogues' },
+  { label: 'Flowsheets', to: '/flowsheets', testid: 'flowsheets-held' },
+  { label: 'Protocols', to: '/runbooks/protocols' },
+  { label: 'Depositions', to: '/runbooks/depositions' },
+];
+/** What a screen says with no model key: Postdoc's callout, which the service's health makes it draw. */
+const NO_KEY: Record<string, string> = { '/postdoc': 'postdoc-no-key' };
 const SCREENS: { label: string; to: string; testid?: string }[] = [...RAIL.map((e) => ({ label: e.label, to: e.to })), ...ALSO];
 
 function freePort(): Promise<number> {
@@ -81,7 +97,8 @@ function startService(port: number, dataDir: string, database: string, log: stri
   const child = spawn(command, argv, {
     cwd: CORE,
     env: {
-      ...process.env,
+      ...Object.fromEntries(Object.entries(process.env).filter(([k]) => k !== 'OPENFERMENT_API_KEY' && k !== 'ANTHROPIC_API_KEY')),
+      ANTHROPIC_API_KEY: '',
       OPENFERMENT_DIST_DIR: DIST,
       OPENFERMENT_DATA_DIR: dataDir,
       OPENFERMENT_DATABASE_URL: onServer(SERVER, database),
@@ -169,6 +186,8 @@ async function main(): Promise<number> {
           if (open !== PROJECT.name) problems.push(`the top bar names the project ${JSON.stringify(open)}, not ${PROJECT.name}`);
           if (/Route not found/i.test(text)) problems.push('the path opened the not-found page');
           if (entry.testid && !(await page.locator(`[data-testid="${entry.testid}"]`).count())) problems.push(`the path drew no ${entry.testid} screen`);
+          const noKey = NO_KEY[entry.to];
+          if (noKey && !(await page.locator(`[data-testid="${noKey}"]`).count())) problems.push('the screen does not say it runs with no model key');
           if (problems.length) {
             failures.push(label);
             console.log(`✗ ${label}`);
@@ -207,7 +226,7 @@ async function main(): Promise<number> {
   console.log(
     failures.length
       ? `\n${failures.length} failed of ${SCREENS.length} screens`
-      : `\nall ${SCREENS.length} screens open: ${RAIL.length} rail entries and ${ALSO.length} more`,
+      : `\nall ${SCREENS.length} screens open with no model key: ${RAIL.length} rail entries and ${ALSO.length} more, Postdoc's saying it runs with none`,
   );
   return failures.length ? 1 : 0;
 }

@@ -59,6 +59,8 @@ from __future__ import annotations
 import csv
 import io
 import json
+import logging
+import re
 from datetime import datetime, timezone
 from typing import Annotated, Any, Literal, get_args
 
@@ -87,6 +89,16 @@ MAX_RECENCY_DAYS = 36500
 # The twenty amino acids a protein's sequence is written in, one letter each.
 RESIDUES = frozenset("ACDEFGHIKLMNPQRSTVWY")
 MAX_FILE_ROWS = 2000
+# An entry's id: a letter or a digit first, then letters, digits, '.', '_',
+# ':' or '-', at most 80 characters in all.
+ENTRY_ID = re.compile(r"^[A-Za-z0-9][A-Za-z0-9._:-]{0,79}$")
+# A skill's policy, each part named as the catalogues screen names it, with
+# the field that holds it.
+POLICY_WORDS = {"criticality": "how critical it is (criticality)",
+                "recencyDays": "the days a qualification stands (recencyDays)",
+                "supervisedRuns": "the supervised runs before a check (supervisedRuns)"}
+
+log = logging.getLogger(__name__)
 
 
 # A lesson's body (ADR-018): the embeds a lesson's page draws beside its prose
@@ -184,7 +196,8 @@ class CatalogueEntry(BaseModel):
     """One entry of a project's catalogue; the fields a kind does not use stay empty."""
 
     kind: CatalogueKind
-    id: str = Field(pattern=r"^[A-Za-z0-9][A-Za-z0-9._:-]{0,79}$")
+    # The pattern is the document's; `_an_id` holds an id to it in words.
+    id: str = Field(json_schema_extra={"pattern": ENTRY_ID.pattern})
     name: str = Field(min_length=1, max_length=200)
     # A strain: its species, the chemical set its trains use, its other names.
     species: str | None = Field(default=None, max_length=200)
@@ -235,6 +248,15 @@ class CatalogueEntry(BaseModel):
     via: Literal["postdoc", "mcp", "http"] | None = None
     at: str = ""
 
+    @field_validator("id")
+    @classmethod
+    def _an_id(cls, v: str) -> str:
+        if not ENTRY_ID.fullmatch(v):
+            shown = v if len(v) <= 90 else f"{v[:90]}…"
+            raise ValueError(f"an entry's id starts with a letter or a digit, then holds letters, digits, '.', '_', "
+                             f"':' or '-', at most 80 characters in all, and {shown!r} does not")
+        return v
+
     @field_validator("aliases", "mastery", "skills", "prerequisites")
     @classmethod
     def _words(cls, v: list[str]) -> list[str]:
@@ -283,9 +305,9 @@ class CatalogueEntry(BaseModel):
         if (self.mastery or self.family or policy or self.prerequisites) and self.kind != "skill":
             raise ValueError("a family, what mastery means and a policy belong to a skill")
         if (policy or self.prerequisites) and len(policy) < len(SKILL_POLICY):
-            left = _listed_words([k for k in SKILL_POLICY if getattr(self, k) is None])
-            raise ValueError(f"a skill's policy names {_listed_words(list(SKILL_POLICY))} together, and this one "
-                             f"leaves out {left}")
+            left = _listed_words([POLICY_WORDS[k] for k in SKILL_POLICY if getattr(self, k) is None])
+            whole = _listed_words([POLICY_WORDS[k] for k in SKILL_POLICY])
+            raise ValueError(f"a skill's policy names {whole} together, and this one leaves out {left}")
         if self.id in self.prerequisites:
             raise ValueError("a skill's prerequisites are other skills, and this one names itself")
         return self
@@ -367,10 +389,27 @@ def _as_kept(body: dict[str, Any]) -> CatalogueEntry:
     return entry.model_copy(update={"agent": keeper(entry), "via": door(entry)})
 
 
+def _readable(kind: str, bodies: list[Any]) -> list[CatalogueEntry]:
+    """Each row that reads as an entry, read one at a time. A row that does
+    not, one kept in a shape an earlier model allowed, is left out and logged
+    with its kind, its id and why, so one row never stops the rest of its
+    catalogue, nor any reader of it, from reading; a person's keep under its
+    id writes it afresh."""
+    out: list[CatalogueEntry] = []
+    for body in bodies:
+        try:
+            out.append(_as_kept(body))
+        except ValidationError as e:
+            held = body.get("id") if isinstance(body, dict) else None
+            log.warning("the %s catalogue's row %s does not read as an entry and is left out: %s", kind,
+                        held if isinstance(held, str) else "with no id", _first_error(e))
+    return out
+
+
 async def _listed(project_id: str, kind: str) -> list[CatalogueEntry]:
     async with db.session() as s:
         bodies = await rows.bodies(s, t.catalogue, project_id, t.catalogue.c.kind == kind)
-    return sorted((_as_kept(b) for b in bodies), key=lambda e: e.id)
+    return sorted(_readable(kind, bodies), key=lambda e: e.id)
 
 
 def listed(kind: str) -> list[CatalogueEntry]:
@@ -403,7 +442,13 @@ async def _keep(project_id: str, entries: list[CatalogueEntry]) -> None:
             if e.agent == "model":
                 held = await rows.body(s, t.catalogue, project_id, row_id)
                 if held is not None:
-                    was = CatalogueEntry.model_validate(held)
+                    try:
+                        was = CatalogueEntry.model_validate(held)
+                    except ValidationError as err:
+                        raise CatalogueRefused(
+                            f"the project's {e.kind} catalogue holds a row under {e.id} that no longer reads as an "
+                            f"entry ({_first_error(err)}); a person keeps it afresh on the catalogues screen, so "
+                            "nothing was written") from None
                     if keeper(was) != "model" or was.by != e.by or _side(was) != _side(e):
                         raise CatalogueRefused(_taken(was))
             await rows.put(s, t.catalogue, project_id, row_id, e.model_dump(mode="json"), by=e.by, kind=e.kind)

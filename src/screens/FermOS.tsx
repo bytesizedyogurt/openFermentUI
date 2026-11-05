@@ -315,7 +315,8 @@ function Fits() {
 function BrothProperties() {
   const records = useStore((s) => s.records);
   const titres = useMemo(
-    () => records.filter((r) => r.field === TITRE_FIELD && typeof r.value === 'number' && r.status !== 'rejected'),
+    () =>
+      records.flatMap((r) => (r.field === TITRE_FIELD && typeof r.value === 'number' && r.status !== 'rejected' ? [{ ...r, value: r.value }] : [])),
     [records],
   );
   const [picked, setPicked] = useState('');
@@ -331,7 +332,7 @@ function BrothProperties() {
                 <option value="">pick one</option>
                 {titres.map((r) => (
                   <option key={r.id} value={r.id}>
-                    {r.id} · {fmt(r.value as number)} {r.unit} · {r.paperId}
+                    {r.id} · {fmt(r.value)} {r.unit} · {r.paperId}
                   </option>
                 ))}
               </select>

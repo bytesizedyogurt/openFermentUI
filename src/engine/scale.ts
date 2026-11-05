@@ -63,9 +63,9 @@ export function materialsChecklist(version: ProtocolVersion, scale: number, titl
   ];
   for (const m of scaleMaterials(version, scale)) {
     const fixedNote = m.scales ? '' : ' (fixed — does not scale)';
-    const stockNote = m.stockVolume
-      ? ` — use ${fmt(m.stockVolume.value)} ${m.stockVolume.unit} of stock (${fmt(m.stock!.conc)} ${m.unit}/${m.stock!.unit === 'mL' ? 'mL' : m.stock!.unit})`
-      : '';
+    const stock = m.stock;
+    const stockNote =
+      m.stockVolume && stock ? ` — use ${fmt(m.stockVolume.value)} ${m.stockVolume.unit} of stock (${fmt(stock.conc)} ${m.unit}/${stock.unit})` : '';
     lines.push(`[ ] ${m.name}: ${fmt(m.scaledAmount)} ${m.unit}${fixedNote}${stockNote}`);
   }
   return lines.join('\n');

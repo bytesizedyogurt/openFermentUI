@@ -16,6 +16,12 @@ project's skill catalogue (catalogues.py), and a keep holds every one of
 them to that catalogue: a step naming a skill the catalogue does not hold is
 refused in words naming the step and the skill.
 
+A protocol is kept whole in one row, so a keep is held to MAX_BYTES as the
+row it writes, refused in words past it, as a page's row is (project_state).
+A row that does not read as a protocol, one kept in a shape an earlier model
+allowed, is left out of every read and logged with why, so one row never
+stops the rest from reading.
+
 A protocol's numbers are what the protocol says, written for its base batch:
 an amount, a stock's concentration, a timer, the minutes a run takes. A
 material that rests on a record names it (`sourceRecordId`). No tool writes
@@ -28,6 +34,8 @@ reads (guild.projection), and the runbooks module's protocol rows
 """
 from __future__ import annotations
 
+import json
+import logging
 import math
 from datetime import datetime, timezone
 from typing import Any
@@ -38,6 +46,13 @@ from . import audit, db, projects
 from .db import models as t
 from .db import rows
 from .models import PLACEHOLDER, Material, Protocol, ProtocolVersion, Step
+
+
+# The most a protocol may hold as its row keeps it, every version with it, as
+# a page's row is held (project_state.MAX_BYTES).
+MAX_BYTES = 2_000_000
+
+log = logging.getLogger(__name__)
 
 
 class ProtocolRefused(ValueError):
@@ -89,13 +104,36 @@ def _read(body: dict[str, Any]) -> Protocol:
     return Protocol.model_validate(body)
 
 
+def _readable(bodies: list[Any]) -> list[Protocol]:
+    """Each row that reads as a protocol, read one at a time; a row that does
+    not is left out and logged with its id and why."""
+    out: list[Protocol] = []
+    for body in bodies:
+        try:
+            out.append(_read(body))
+        except ValidationError as e:
+            held = body.get("id") if isinstance(body, dict) else None
+            log.warning("the protocols' row %s does not read as a protocol and is left out: %s",
+                        held if isinstance(held, str) else "with no id", first_error(e))
+    return out
+
+
+def _within(protocol: Protocol) -> None:
+    """A protocol as its row keeps it is MAX_BYTES or less, or the keep is
+    refused in words."""
+    size = len(json.dumps(protocol.model_dump(mode="json")))
+    if size > MAX_BYTES:
+        raise ProtocolRefused(f"protocol {protocol.id} with every version it keeps comes to {size:,} bytes as its row "
+                              f"keeps it, over the {MAX_BYTES:,} a protocol may hold, so nothing was kept")
+
+
 # ── the store ──────────────────────────────────────────────────────────
 
 
 async def _listed(project_id: str) -> list[Protocol]:
     async with db.session() as s:
         bodies = await rows.bodies(s, t.protocols, project_id)
-    return sorted((_read(b) for b in bodies), key=lambda p: p.id)
+    return sorted(_readable(bodies), key=lambda p: p.id)
 
 
 def listed() -> list[Protocol]:
@@ -103,19 +141,23 @@ def listed() -> list[Protocol]:
     return db.run(_listed(projects.current()))
 
 
-async def _one(project_id: str, protocol_id: str) -> Protocol | None:
+async def _one(project_id: str, protocol_id: str) -> Any:
     async with db.session() as s:
-        body = await rows.body(s, t.protocols, project_id, protocol_id)
-    return None if body is None else _read(body)
+        return await rows.body(s, t.protocols, project_id, protocol_id)
 
 
 def get(protocol_id: str) -> Protocol:
     """One of the open project's protocols, whole; ProtocolNotFound when it
-    keeps none of that id."""
-    found = db.run(_one(projects.current(), protocol_id))
-    if found is None:
+    keeps none of that id, or keeps a row under it that no longer reads as a
+    protocol, said in words."""
+    body = db.run(_one(projects.current(), protocol_id))
+    if body is None:
         raise ProtocolNotFound(f"the project keeps no protocol {protocol_id}")
-    return found
+    try:
+        return _read(body)
+    except ValidationError as e:
+        raise ProtocolNotFound(f"the project keeps a row under {protocol_id} that no longer reads as a protocol "
+                               f"({first_error(e)}), so every read leaves it out") from None
 
 
 def _stamped(versions: list[ProtocolVersion], who: str, at: str) -> list[ProtocolVersion]:
@@ -145,6 +187,7 @@ def make(protocol: Protocol, *, by: str) -> Protocol:
     who = _keeper(by)
     _skills_held(protocol.versions)
     made = protocol.model_copy(update={"versions": _stamped(protocol.versions, who, _now())})
+    _within(made)
     return db.run(_make(projects.current(), made, who))
 
 
@@ -154,7 +197,11 @@ async def _add(project_id: str, protocol_id: str, version: ProtocolVersion, who:
         body = await rows.body(s, t.protocols, project_id, protocol_id, for_update=True)
         if body is None:
             raise ProtocolNotFound(f"the project keeps no protocol {protocol_id}")
-        held = _read(body)
+        try:
+            held = _read(body)
+        except ValidationError as e:
+            raise ProtocolRefused(f"the project keeps a row under {protocol_id} that no longer reads as a protocol "
+                                  f"({first_error(e)}), so no version is added to it") from None
         if any(v.version == version.version for v in held.versions):
             raise ProtocolRefused(f"version {version.version} of {protocol_id} is kept as it was kept; a change is a "
                                   "new version, under a version of its own")
@@ -163,6 +210,7 @@ async def _add(project_id: str, protocol_id: str, version: ProtocolVersion, who:
             grown = Protocol.model_validate(grown.model_dump(mode="json"))
         except ValidationError as e:
             raise ProtocolRefused(first_error(e)) from None
+        _within(grown)
         await rows.put(s, t.protocols, project_id, protocol_id, grown.model_dump(mode="json"), by=who)
         await audit.add(project_id, agent="person", who=who, module="runbooks", action="keep_protocol_version",
                         state="kept", target=f"{protocol_id}/{version.version}", detail={"version": version.version})

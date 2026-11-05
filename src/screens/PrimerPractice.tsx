@@ -199,6 +199,19 @@ function PracticeList({ asked }: { asked: boolean }) {
         {learner ? 'Skills still open for this learner come first.' : 'Every skill a protocol step needs.'} Drafting is one model call, and its
         scenario is kept for everyone learning that skill.
       </p>
+      {skills.length === 0 && (
+        <p className="text-body text-ink-soft" data-testid="practice-no-skill">
+          No protocol step names a skill yet. A skill reaches this list when a step of one of the project&rsquo;s{' '}
+          <a className="text-accent hover:underline" href={href('/runbooks/protocols')}>
+            protocols
+          </a>{' '}
+          names it from the{' '}
+          <a className="text-accent hover:underline" href={href('/catalogues/skills')}>
+            skills catalogue
+          </a>
+          .
+        </p>
+      )}
       <div className="space-y-3">
         {skills.map((sk) => {
           const st = learner ? statusOf(ctx.status, learner.id, sk.id) : null;
@@ -487,7 +500,7 @@ function sourceLink(v: PracticeValue): { to: string; label: string } {
 
 function EvidenceItem({ v }: { v: PracticeValue }) {
   const link = sourceLink(v);
-  const quantity = typeof v.value === 'number';
+  const quantity = typeof v.value === 'number' ? v.value : null;
   return (
     <Card className="p-3" id={`evidence-${v.id}`}>
       <div className="flex flex-wrap items-baseline gap-x-2 gap-y-1">
@@ -496,9 +509,9 @@ function EvidenceItem({ v }: { v: PracticeValue }) {
           {link.label}
         </a>
       </div>
-      {quantity ? (
+      {quantity !== null ? (
         <div className="mt-1">
-          <span className="font-num text-[22px] leading-tight">{fmt(v.value as number)}</span>{' '}
+          <span className="font-num text-[22px] leading-tight">{fmt(quantity)}</span>{' '}
           <span className="text-body text-ink-soft">{v.unit}</span>
           <div className="text-caption text-ink-soft">
             {v.source.kind === 'entry' ? (

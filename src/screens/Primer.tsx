@@ -150,6 +150,7 @@ export default function Primer() {
                         </span>
                         <span className="flex-1 min-w-0">
                           <span className="block text-body truncate">{lesson.name}</span>
+                          {lesson.summary && <span className="block text-caption text-ink truncate">{lesson.summary}</span>}
                           <span className="block text-caption text-ink-soft truncate">
                             {counts.length > 0
                               ? `Counts toward ${counts.map((id) => SKILL_BY_ID[id]?.name ?? id).join(', ')}`
@@ -162,7 +163,7 @@ export default function Primer() {
                           </span>
                         )}
                         <span className="text-caption text-ink-soft shrink-0 hidden sm:inline font-num">
-                          {checks} check{checks === 1 ? '' : 's'}
+                          {checks === 0 ? 'no checkpoint' : `${checks} checkpoint question${checks === 1 ? '' : 's'}`}
                         </span>
                       </a>
                     );

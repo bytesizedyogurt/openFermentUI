@@ -58,6 +58,8 @@ export type SimulationSummary = S['SimulationSummary'];
 export type FermosHarvest = S['FermosHarvest'];
 /** `POST /api/fermos/vessel`: what a design is asked with, and the one `fermos.vessel` artifact it answers, read. */
 export type VesselRequest = S['VesselRequest'];
+/** `POST /api/fermos/simulate`: what a simulation is asked with. */
+export type SimulationRequest = S['SimulationRequest'];
 export type VesselDesign = S['VesselDesign'];
 
 const post = <T>(path: string, body: unknown, signal?: AbortSignal) =>
@@ -86,18 +88,12 @@ export const forecastScope = (fitArtifactId: string) => `fermos:forecast:${fitAr
 export const UNTIL_RUN_OUT = 'until-sugar-runs-out';
 export const FIT_LENGTH = 'fit-length';
 
-/** What a simulation is asked with besides the overrides: ids and words alone. */
-export interface SimulateAsk {
-  family: string;
-  /** Null: any strain the bound records name. */
-  strain: string | null;
-  product: string | null;
-  sugar: string | null;
-  fitArtifact: string | null;
-  /** 'records', 'fit', or 'simulation:<artifact id>'. */
-  startFrom: string;
-  durationPreset: typeof UNTIL_RUN_OUT | typeof FIT_LENGTH;
-}
+/**
+ * What a simulation is asked with besides the overrides, ids and words alone, each one the request names
+ * (`SimulationRequest`): the family; the strain (null: any strain the bound records name), the product and the sugar;
+ * the fit a person chose; where it starts ('records', 'fit', or 'simulation:<artifact id>'); and its run-length preset.
+ */
+export type SimulateAsk = Required<Pick<SimulationRequest, 'family' | 'strain' | 'product' | 'sugar' | 'fitArtifact' | 'startFrom' | 'durationPreset'>>;
 
 /** The parameter panel's ask for the same binding (GET /api/params/fermos:family:<id>). */
 export const paramAskOf = (ask: SimulateAsk) => ({
@@ -269,21 +265,24 @@ export function curve(fit: KineticFit, role: string, tmax: number, n = 60): { t:
   return out;
 }
 
+/** A series that names the role it plays in the run. */
+export type RoledSeries = FermosSeries & { role: NonNullable<FermosSeries['role']> };
+/** Whether a series names its role. */
+export const hasRole = (s: FermosSeries): s is RoledSeries => s.role != null;
+
 /** The figure for one run: readings, residuals and the fitted curves. */
 export function fitFigureSeries(series: FermosSeries[], fit: KineticFit | null): TrajectorySeries[] {
   const tmax = Math.max(1e-9, ...series.flatMap((s) => (s.points ?? []).map((p) => p.t)));
-  return series
-    .filter((s) => s.role)
-    .map((s) => {
-      const q = fit?.quality?.find((x) => x.measureId === s.measureId);
-      return {
-        role: s.role!,
-        label: s.label,
-        unit: s.unit,
-        readings: (s.points ?? []).map((p, i) => ({ t: p.t, value: p.value, residual: q?.residuals?.[i] ?? null })),
-        fitted: fit?.params?.length ? curve(fit, s.role!, tmax) : undefined,
-      };
-    });
+  return series.filter(hasRole).map((s) => {
+    const q = fit?.quality?.find((x) => x.measureId === s.measureId);
+    return {
+      role: s.role,
+      label: s.label,
+      unit: s.unit,
+      readings: (s.points ?? []).map((p, i) => ({ t: p.t, value: p.value, residual: q?.residuals?.[i] ?? null })),
+      fitted: fit?.params?.length ? curve(fit, s.role, tmax) : undefined,
+    };
+  });
 }
 
 
@@ -301,7 +300,7 @@ export const VESSEL_FIT_FLOWSHEET = 'ethanol_glucose_v0';
 /** The vessel scope of a simulation or a fit: `fermos:vessel:<artifact id>`. */
 export const vesselScope = (sourceId: string) => `fermos:vessel:${sourceId}`;
 
-export type VesselType = 'stirred-tank' | 'bubble-column';
+export type VesselType = NonNullable<VesselRequest['vesselType']>;
 
 /** BioSTEAM's word for each vessel type (the `design` parameter's choices), to the request's. */
 export const VESSEL_TYPE_OF_DESIGN: Record<string, VesselType> = { 'Stirred tank': 'stirred-tank', 'Bubble column': 'bubble-column' };

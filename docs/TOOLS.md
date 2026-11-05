@@ -28,7 +28,8 @@ What a module read answers, and what each kind of row holds, closes [Module read
   whole of a large output travels in `data`, which no model reads, and a refusal is `error`, in
   words. `auditIds` names each audit row the call wrote, oldest first, by the id `GET /api/audit`
   serves it under: a write names the row of what it kept, a gated write the row of its proposal,
-  and a read names none.
+  and a read names none. A call that fails after a write committed names that write's row beside
+  its `error`, and a write the failure rolled back left no row to name.
 - **Scope**: every tool acts in one project (ADR-005): the request's, the question's, or the one the
   MCP server was started in.
 - **Writes**: a tool marked *writes* keeps something new in the project, audited as its caller's,
@@ -718,7 +719,7 @@ A module row's `detail` holds the few named fields of its kind below, each text 
 
 *writes · scope: project · loose*
 
-Write to Runbooks, through the module's own write function. Actions — draft: refused, every call (use the draft_runbook tool: it takes the evidence ids and record ids this run returned and writes every number from them); lock: lock a runbook's predictions before a run (gated) [gated: lock a prediction a person will test; becomes a proposal a person carries out on Home]; deposit: start a deposition of a protocol on the bench (gated) (fields: protocolId) [gated: send a protocol to the bench; becomes a proposal a person carries out on Home]; run: send a runbook's protocol to the bench (gated) (fields: protocolId) [gated: send a protocol to the bench; becomes a proposal a person carries out on Home]; publish: publish a runbook and its ledger to the commons (gated) [gated: publish to the commons; becomes a proposal a person carries out on Home]; revise_protocol: refused, every call (a protocol is revised by a person in the protocol editor; the service has no write function for protocols). Pass action, target (an id), fields (names to words) and note (why). What is written lands in the open lane marked as its caller's, in the audit log, until a person promotes it; a refusal says why, and goes in gaps.
+Write to Runbooks, through the module's own write function. Actions — draft: refused, every call (use the draft_runbook tool: it takes the evidence ids and record ids this run returned and writes every number from them); lock: lock a runbook's predictions before a run (gated) [gated: lock a prediction a person will test; becomes a proposal a person carries out on Home]; deposit: start a deposition of a protocol on the bench (gated) (fields: protocolId) [gated: send a protocol to the bench; becomes a proposal a person carries out on Home]; run: send a runbook's protocol to the bench (gated) (fields: protocolId) [gated: send a protocol to the bench; becomes a proposal a person carries out on Home]; publish: publish a runbook and its ledger to the commons (gated) [gated: publish to the commons; becomes a proposal a person carries out on Home]; revise_protocol: refused, every call (a person keeps a protocol's new version in the protocol editor, in their own name, and no tool writes one (ADR-017)). Pass action, target (an id), fields (names to words) and note (why). What is written lands in the open lane marked as its caller's, in the audit log, until a person promotes it; a refusal says why, and goes in gaps.
 
 | Field | Type | Required | What it is |
 |---|---|---|---|

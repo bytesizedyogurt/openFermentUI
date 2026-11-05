@@ -11,7 +11,7 @@ import { useStore, provenanceOf, aggregateExclusion, isAggregatable, EXCLUSION_N
 import { href, navigate } from '@/router';
 import type { FieldId } from '@/data/ontology';
 import type { LessonBlock } from '@/lib/catalogues';
-import { ONTOLOGY_BY_ID, fieldName } from '@/data/ontology';
+import { ONTOLOGY_BY_ID, fieldName, isFieldId } from '@/data/ontology';
 import { convert, fmt, asNumber } from '@/engine/units';
 import { computeRunMetrics } from '@/engine/metrics';
 import { renderStepText } from '@/engine/scale';
@@ -483,7 +483,7 @@ export function LessonEmbed({ embed, arg }: { embed: EmbedKind; arg?: string }) 
     case 'metrics-tiles':
       return <MetricsTiles />;
     case 'strip-plot':
-      return <StripPlot field={(arg as FieldId) ?? 'growth_rate_mu'} />;
+      return <StripPlot field={arg && isFieldId(arg) ? arg : 'growth_rate_mu'} />;
     case 'protocol-card':
       return arg ? <ProtocolCard protocolId={arg} /> : <Unnamed label="Protocol" what="protocol" />;
     case 'ask-prompt':

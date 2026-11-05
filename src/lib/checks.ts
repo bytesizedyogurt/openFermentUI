@@ -10,6 +10,7 @@
 import type { components } from '@/api/types.gen';
 import { IntakeDown } from './intake';
 import { apiFetch } from './project';
+import { detailWords } from './http';
 
 type S = components['schemas'];
 
@@ -17,8 +18,6 @@ type S = components['schemas'];
 export type Checks = S['Checks'];
 /** One witnessed check: who it is for, on which skills and why, and where it stands. */
 export type Check = S['Check'];
-/** Where a check stands: proposed, scheduled, done or dismissed. */
-export type CheckState = Check['state'];
 /** Why a check is proposed, written by fixed rules from the ledger. */
 export type CheckReason = S['CheckReason'];
 /** What the model suggests the assessor watch for: references and questions with no number. */
@@ -61,7 +60,7 @@ async function call<T>(path: string, body?: unknown): Promise<T> {
   let detail = '';
   if (!response.ok) {
     try {
-      detail = String(((await response.json()) as { detail?: string }).detail ?? '');
+      detail = detailWords(((await response.json()) as { detail?: unknown }).detail);
     } catch {
       /* the status is the message */
     }

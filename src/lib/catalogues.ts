@@ -57,8 +57,6 @@ export type Skill = CatalogueEntry & { kind: 'skill' };
 export type Lesson = CatalogueEntry & { kind: 'lesson' };
 /** One block of a lesson's body: prose in Markdown, or one of the nine embeds Primer's page draws. */
 export type LessonBlock = S['LessonProse'] | S['LessonEmbed'];
-/** Which embed a block draws: the nine Primer's page knows. */
-export type LessonEmbedName = S['LessonEmbed']['embed'];
 /**
  * One question of a lesson's checkpoint: a multiple-choice question with its options and the index of its answer, or a
  * numeric one with its answer's value, unit and tolerance in percent.
@@ -69,8 +67,6 @@ export { ServiceDown as CataloguesDown, ServiceRefused as CataloguesRefused };
 
 /** The four catalogues, in the order the screen shows them. */
 export const KINDS: CatalogueKind[] = ['strain', 'product', 'skill', 'lesson'];
-
-const id = (s: string) => encodeURIComponent(s);
 
 /** The open project's entries of one catalogue, by id. */
 export const listCatalogue = (kind: CatalogueKind, signal?: AbortSignal) =>
@@ -94,10 +90,6 @@ export const listLessons = (signal?: AbortSignal) =>
 
 /** A strain in words, as a chooser or a label names it: its species, where its entry keeps one, then its name. */
 export const strainWords = (s: Pick<CatalogueEntry, 'name' | 'species'>): string => [s.species, s.name].filter(Boolean).join(' ');
-
-/** One entry of the open project's catalogue of `kind`. */
-export const catalogueEntry = (kind: CatalogueKind, entryId: string, signal?: AbortSignal) =>
-  call<CatalogueEntry>(`/api/catalogues/${kind}/${id(entryId)}`, { signal });
 
 /**
  * One entry kept in the catalogue of its kind in `by`'s name, as a person's keep: an entry under its id is replaced,
@@ -126,6 +118,31 @@ export function takeInCatalogue(kind: CatalogueKind, file: File, by: string): Pr
 /** An empty entry of `kind`, as the screen begins one. */
 export function blankEntry(kind: CatalogueKind): CatalogueEntry {
   return { kind, id: '', name: '', by: '', at: '' };
+}
+
+/**
+ * The entry a keep from the catalogues screen's form sends: the entry as it was opened, with the fields the form holds
+ * laid over it. A field the form shows no box for goes back as it arrived, so a keep that changes a lesson's name or
+ * skills sends its minutes, its blocks and its checkpoint as the lesson holds them (ADR-018), and the keep, which
+ * replaces the entry whole, keeps its body. The keeper, the lane, the door and the time go blank: the service writes
+ * each over what an entry sends.
+ */
+export function edited(start: CatalogueEntry, fields: Partial<CatalogueEntry>): CatalogueEntry {
+  return { ...start, ...fields, kind: start.kind, by: '', at: '', agent: null, via: null };
+}
+
+/** What a lesson's body holds, in words: its minutes, its blocks and its checkpoint's questions, or that it has none. */
+export function bodyWords(lesson: Pick<CatalogueEntry, 'minutes' | 'blocks' | 'checkpoint'>): string {
+  const blocks = (lesson.blocks ?? []).length;
+  const questions = (lesson.checkpoint ?? []).length;
+  if (lesson.minutes == null && blocks === 0 && questions === 0) return 'no body yet';
+  return [
+    lesson.minutes != null ? `${lesson.minutes} min` : null,
+    `${blocks} block${blocks === 1 ? '' : 's'}`,
+    `${questions} checkpoint question${questions === 1 ? '' : 's'}`,
+  ]
+    .filter(Boolean)
+    .join(', ');
 }
 
 /** Whose lane an entry was kept in, in words: a person's keep, or a model's write through the door it came in by. */

@@ -3877,14 +3877,15 @@ export interface components {
          * DecisionCheck
          * @description What `POST /api/biorepo/check` answers (OF-BLD-012.1 F1.5): whether
          *     `biorepo.write` would store this decision, and the rule it would refuse
-         *     it under. The browser asks before the reviewer presses the key, so the
-         *     screen says what the service would say rather than a mirror of it.
+         *     it under, with why (both null when it would store it). The browser asks
+         *     before the reviewer presses the key, so the screen says what the service
+         *     would say.
          */
         DecisionCheck: {
             /** Ok */
             ok: boolean;
             /** Rule */
-            rule: string | null;
+            rule: ("record" | "reviewer" | "fulltext" | "quote" | "paper" | "unit" | "status" | "estimate") | null;
             /** Why */
             why: string | null;
         };
@@ -4344,6 +4345,21 @@ export interface components {
             unit: string;
             /** Value */
             value: number | string;
+        };
+        /**
+         * EvidenceCheck
+         * @description What `POST /api/guild/check` answers: whether `guild.write_evidence`
+         *     would keep this entry, and the rule it would refuse it under, with why
+         *     (both null when it would keep it). The sign-off sheet asks before anyone
+         *     signs, so it says what the service would say.
+         */
+        EvidenceCheck: {
+            /** Ok */
+            ok: boolean;
+            /** Rule */
+            rule: ("name" | "role" | "added" | "duplicate" | "person" | "skill" | "source" | "observer" | "authority" | "outcome" | "note" | "date" | "evidence" | "policy") | null;
+            /** Why */
+            why: string | null;
         };
         /**
          * EvidenceSource
@@ -8618,9 +8634,9 @@ export interface components {
         };
         /**
          * TrainMade
-         * @description A train a person built in pureOS's Builder and saved (mirrors
-         *     `TrainMade` in src/lib/durable.ts): the train as data, when it was saved,
-         *     and the name it was saved under.
+         * @description A train a person built in pureOS's Builder and saved (the browser
+         *     reads it as `TrainMade`, src/lib/durable.ts): the train as data, when it
+         *     was saved, and the name it was saved under.
          */
         TrainMade: {
             /** By */
@@ -11632,7 +11648,7 @@ export interface operations {
                     [name: string]: unknown;
                 };
                 content: {
-                    "application/json": components["schemas"]["DecisionCheck"];
+                    "application/json": components["schemas"]["EvidenceCheck"];
                 };
             };
             /** @description The project the request names is one the database does not hold, in words. */

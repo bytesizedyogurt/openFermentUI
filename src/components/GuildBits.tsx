@@ -6,9 +6,8 @@ import { useEffect, useMemo, useState, type ReactNode } from 'react';
 import { Check, Download, UserPlus, X } from 'lucide-react';
 import type { Skill } from '@/lib/catalogues';
 import type { Check as GuildCheck } from '@/lib/checks';
-import type { Guild, GuildEvidence, GuildPerson, GuildRole } from '@/lib/guild';
+import type { EvidenceCheck, Guild, GuildEvidence, GuildPerson, GuildRole } from '@/lib/guild';
 import type { Protocol } from '@/lib/protocols';
-import type { DecisionCheck } from '@/lib/review';
 import { useStore, guildView, actingIdOf, useSkillById } from '@/store';
 import { GUILD_TABS } from '@/data/tabs';
 import { OwnerTabs } from '@/components/OwnerTabs';
@@ -287,9 +286,9 @@ export function EvidenceRow({
 // ── asking the service ─────────────────────────────────────────────────
 
 /** The service's answer about an entry, asked shortly after it stops changing. Null while unknown. */
-function useServiceCheck(entry: GuildEvidence | null): DecisionCheck | null {
+function useServiceCheck(entry: GuildEvidence | null): EvidenceCheck | null {
   const serviceUp = useStore((s) => s.serviceUp);
-  const [answer, setAnswer] = useState<DecisionCheck | null>(null);
+  const [answer, setAnswer] = useState<EvidenceCheck | null>(null);
   const key = entry ? JSON.stringify({ ...entry, id: '' }) : '';
   useEffect(() => {
     setAnswer(null);
@@ -443,7 +442,7 @@ function SheetBody({ personId, skillId, onClose }: { personId: string; skillId: 
           </Fact>
           <Fact label="Supervised runs">
             <span className="font-num">
-              {st.supervisedCount} of {skill.supervisedRuns}
+              {rated(skill) ? `${st.supervisedCount} of ${skill.supervisedRuns}` : `${st.supervisedCount}, and the skill holds no policy yet`}
             </span>
           </Fact>
           <Fact label="Training">{st.knowledgeComplete ? 'Signed off' : 'Not yet'}</Fact>

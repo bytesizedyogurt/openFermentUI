@@ -16,11 +16,11 @@ import { HIT_RATE_MIN_TESTED, ledgerCounts, ledgerRows, type LedgerCounts } from
 export function LedgerCountsLine({ c }: { c: LedgerCounts }) {
   return (
     <div className="flex flex-wrap gap-x-5 gap-y-1 text-body" data-testid="ledger-counts">
-      <span><span className="font-num">{c.locked}</span> predictions locked</span>
+      <span><span className="font-num">{c.locked}</span> prediction{c.locked === 1 ? '' : 's'} locked</span>
       <span><span className="font-num">{c.tested}</span> tested</span>
       <span><span className="font-num">{c.held}</span> held</span>
       <span><span className="font-num">{c.missed}</span> missed</span>
-      <span><span className="font-num">{c.inconclusiveRuns}</span> runs recorded as inconclusive</span>
+      <span><span className="font-num">{c.inconclusiveRuns}</span> run{c.inconclusiveRuns === 1 ? '' : 's'} recorded as inconclusive</span>
       <span data-testid="hit-rate">
         {c.hitRate === null
           ? `Hit rate: too few tested to state (shown from ${HIT_RATE_MIN_TESTED})`

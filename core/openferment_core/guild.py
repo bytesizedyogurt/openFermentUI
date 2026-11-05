@@ -73,7 +73,7 @@ import copy
 import logging
 import re
 from datetime import date, datetime, timedelta, timezone
-from typing import TYPE_CHECKING, Any
+from typing import TYPE_CHECKING, Any, get_args
 
 from sqlalchemy import select, update
 from sqlalchemy.ext.asyncio import AsyncSession
@@ -83,7 +83,7 @@ from .biorepo import MIN_REVIEWER_CHARS, PLACEHOLDER_REVIEWERS
 from .competence import Competence, unrated
 from .db import models as t
 from .db import rows
-from .models import Guild, GuildEvidence, GuildPerson, GuildPolicy, GuildWithdrawal
+from .models import Guild, GuildEvidence, GuildPerson, GuildPolicy, GuildRule, GuildWithdrawal
 
 if TYPE_CHECKING:
     from .models import Check
@@ -93,22 +93,8 @@ log = logging.getLogger("openferment.guild")
 # Where the lead's policy sits in the project's settings.
 POLICY_KEY = "guildPolicy"
 
-RULES = (
-    "name",
-    "role",
-    "added",
-    "duplicate",
-    "person",
-    "skill",
-    "source",
-    "observer",
-    "authority",
-    "outcome",
-    "note",
-    "date",
-    "evidence",
-    "policy",
-)
+# The rules an entry is refused under, in order: the check route answers each by name (models.GuildRule).
+RULES: tuple[str, ...] = get_args(GuildRule)
 
 # What the ledger accepts, kind by kind, and from which sources (OF-BLD-013
 # §1, §2, §3). A sign-off is an assessor's; a designation is the lead's; a run

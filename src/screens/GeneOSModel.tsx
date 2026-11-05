@@ -204,14 +204,9 @@ export default function GeneOSModel() {
     [records, substrate, product],
   );
   const known = yieldFieldKnown(product);
-  const ceilings: Ceiling[] = (loaded?.ceilings ?? [])
-    .filter((c) => c.evidence)
-    .map((c) => ({
-      value: Number(c.evidence!.value),
-      model: `${c.modelId} ceiling`,
-      basis: c.evidence!.basis,
-      provenance: c.evidence!.provenance,
-    }));
+  const ceilings: Ceiling[] = (loaded?.ceilings ?? []).flatMap((c) =>
+    c.evidence ? [{ value: Number(c.evidence.value), model: `${c.modelId} ceiling`, basis: c.evidence.basis, provenance: c.evidence.provenance }] : [],
+  );
   const findings = [
     ...(loaded?.ceilings ?? []).filter((c) => c.finding).map((c) => `${c.modelId}: ${c.finding}`),
     ...(loaded?.failed ?? []),

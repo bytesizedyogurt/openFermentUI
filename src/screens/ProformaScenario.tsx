@@ -1117,7 +1117,7 @@ export default function ProformaScenario({ scenarioId }: { scenarioId: string })
     return (
       <EmptyState
         title="Scenario not found"
-        body={`No BioSTEAM scenario with id ${scenarioId} exists in this session.`}
+        body={`The project keeps no BioSTEAM scenario ${scenarioId}. The link may be from another project.`}
         action={<Button onClick={() => navigate('/proforma')}>Back to Proforma</Button>}
       />
     );

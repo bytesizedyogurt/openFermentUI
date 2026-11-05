@@ -13,7 +13,9 @@
 //
 // Every shape here is the service's own, generated from its models into src/api/types.gen.ts (ADR-007). A protocol
 // is served whole, so every field arrives, an absent one as null; the generated types name a field with a default as
-// one a reader may find absent, since a keep's body takes the same models.
+// one a reader may find absent, since a keep's body takes the same models, so a reader reads a version's lists with
+// `?? []` where it stands. A screen that names a protocol by its address reads it through the store's `useProtocol`,
+// which asks `protocolOf` for one made after the page opened.
 import type { components } from '@/api/types.gen';
 import { ServiceDown, ServiceRefused, call } from './http';
 
@@ -66,14 +68,3 @@ export const makeProtocol = (asked: ProtocolKeep) => call<Protocol>('/api/protoc
 /** A new version kept in `asked.by`'s name and made the protocol's current one: the protocol whole, as it now stands. */
 export const keepVersion = (protocolId: string, asked: ProtocolVersionKeep) =>
   call<Protocol>(`/api/protocols/${id(protocolId)}/versions`, posted(asked));
-
-/** The version a protocol names as its current one, when it holds it. */
-export const currentOf = (p: Pick<Protocol, 'versions' | 'currentVersion'>): ProtocolVersion | undefined =>
-  p.versions.find((v) => v.version === p.currentVersion);
-
-/** A version's steps, materials, equipment, safety notes and references, each as a list, empty where it keeps none. */
-export const stepsOf = (v: Pick<ProtocolVersion, 'steps'>): Step[] => v.steps ?? [];
-export const materialsOf = (v: Pick<ProtocolVersion, 'materials'>): Material[] => v.materials ?? [];
-export const equipmentOf = (v: Pick<ProtocolVersion, 'equipment'>): string[] => v.equipment ?? [];
-export const safetyOf = (v: Pick<ProtocolVersion, 'safety'>): string[] => v.safety ?? [];
-export const referencesOf = (v: Pick<ProtocolVersion, 'references'>): ProtocolReference[] => v.references ?? [];

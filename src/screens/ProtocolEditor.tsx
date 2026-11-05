@@ -3,7 +3,9 @@
 // becomes the protocol's new current version, kept by the service in the
 // reviewer's name (ADR-017), every version before it standing as it was kept.
 // A step names the skills a person needs to do it, picked from the project's
-// skill catalogue, which the service holds every keep to.
+// skill catalogue, which the service holds every keep to. The form opens on
+// the protocol's current version once the service has answered with it, so an
+// editor opened by its address starts from the steps and materials kept.
 import { useMemo, useState } from 'react';
 import {
   ArrowDown,
@@ -15,9 +17,9 @@ import {
   Timer,
   Link2,
 } from 'lucide-react';
-import { useSkills, useStore } from '@/store';
+import { useProtocol, useSkills, useStore } from '@/store';
 import { href, navigate } from '@/router';
-import type { Material, ProtocolVersion, ScalingClass, Step } from '@/lib/protocols';
+import type { Material, Protocol, ProtocolVersion, ScalingClass, Step } from '@/lib/protocols';
 import { renderStepText, scaleMaterial, batchLabel } from '@/engine/scale';
 import { fmt, normalizeUnit } from '@/engine/units';
 import { PageHeader, Card, Button, Callout, SectionTitle, cx, Modal, EmptyState } from '@/components/ui';
@@ -38,29 +40,49 @@ function bumpVersion(v: string): string {
 }
 
 export default function ProtocolEditor({ protocolId }: { protocolId: string }) {
-  const protocol = useStore((s) => s.protocols.find((p) => p.id === protocolId));
-  const protocolsRead = useStore((s) => s.protocolsRead);
+  const { protocol, state, problem } = useProtocol(protocolId);
+  const base = protocol?.versions.find((v) => v.version === protocol.currentVersion);
+  if (!protocol || !base) {
+    const title =
+      state === 'problem' ? 'The protocols could not be read' : state === 'reading' ? 'Reading the project\u2019s protocols' : 'Protocol not found';
+    const body =
+      state === 'problem'
+        ? (problem ?? '')
+        : state === 'reading'
+          ? 'The protocols are read from the service as the page opens.'
+          : protocol
+            ? `Protocol ${protocolId} names ${protocol.currentVersion} as its current version and holds no version of that name.`
+            : `The project keeps no protocol ${protocolId}.`;
+    return (
+      <EmptyState title={title} body={body} action={<Button onClick={() => navigate('/runbooks/protocols')}>Back to protocols</Button>} />
+    );
+  }
+  // A version kept while the form is open makes a new current version: the form starts again from it.
+  return <VersionEditor key={`${protocol.id}@${protocol.currentVersion}`} protocol={protocol} base={base} />;
+}
+
+/** The form over one protocol's current version, its state begun from that version's steps and materials. */
+function VersionEditor({ protocol, base }: { protocol: Protocol; base: ProtocolVersion }) {
+  const protocolId = protocol.id;
   const keepProtocolVersion = useStore((s) => s.keepProtocolVersion);
   const logActivity = useStore((s) => s.logActivity);
   const toast = useStore((s) => s.toast);
   const reviewer = useStore((s) => s.reviewer.trim());
   const skills = useSkills();
+  // Until the skill catalogue is read, no step's skill is called one it does not hold.
+  const skillsRead = useStore((s) => s.cataloguesRead);
   const [saving, setSaving] = useState(false);
   const [refusal, setRefusal] = useState<string | null>(null);
 
-  const base = protocol?.versions.find((v) => v.version === protocol.currentVersion);
-
-  const [steps, setSteps] = useState<Step[]>(() => structuredClone(base?.steps ?? []));
-  const [materials, setMaterials] = useState<Material[]>(() =>
-    structuredClone(base?.materials ?? []),
-  );
+  const [steps, setSteps] = useState<Step[]>(() => structuredClone(base.steps ?? []));
+  const [materials, setMaterials] = useState<Material[]>(() => structuredClone(base.materials ?? []));
   const [changelog, setChangelog] = useState('');
   const [preview, setPreview] = useState(false);
   const [previewScale, setPreviewScale] = useState(1);
   const [confirmOpen, setConfirmOpen] = useState(false);
 
-  const draftVersion: ProtocolVersion | null = useMemo(
-    () => (base ? { ...base, steps, materials, version: bumpVersion(base.version), changelog } : null),
+  const draftVersion: ProtocolVersion = useMemo(
+    () => ({ ...base, steps, materials, version: bumpVersion(base.version), changelog }),
     [base, steps, materials, changelog],
   );
 
@@ -69,9 +91,17 @@ export default function ProtocolEditor({ protocolId }: { protocolId: string }) {
     const out: { level: 'error' | 'warn'; text: string }[] = [];
     const names = new Set(materials.map((m) => m.name));
     const known = new Set(skills.map((k) => k.id));
+    if (steps.length === 0)
+      out.push({
+        level: 'error',
+        text:
+          (base.steps ?? []).length > 0
+            ? `This version holds no step, and version ${base.version} holds ${(base.steps ?? []).length}: a version a run follows holds its steps.`
+            : 'This version holds no step yet: a version a run follows holds its steps.',
+      });
     for (const s of steps) {
       for (const k of s.skills ?? [])
-        if (!known.has(k))
+        if (skillsRead && !known.has(k))
           out.push({
             level: 'error',
             text: `Step ${s.id} needs ${k}, which the project's skill catalogue does not hold; the service keeps no step naming it.`,
@@ -106,23 +136,9 @@ export default function ProtocolEditor({ protocolId }: { protocolId: string }) {
     for (const m of unbound)
       out.push({ level: 'warn', text: `${m.name} is never referenced by a step — it will appear only in the materials table.` });
     return out;
-  }, [steps, materials, skills]);
+  }, [steps, materials, skills, skillsRead, base]);
 
   const blocking = problems.filter((p) => p.level === 'error');
-
-  if (!protocol || !base || !draftVersion) {
-    return (
-      <EmptyState
-        title={protocolsRead ? 'Protocol not found' : 'Reading the project\u2019s protocols'}
-        body={
-          protocolsRead
-            ? `The project keeps no protocol ${protocolId}.`
-            : 'The protocols are read from the service as the page opens.'
-        }
-        action={<Button onClick={() => navigate('/runbooks/protocols')}>Back to protocols</Button>}
-      />
-    );
-  }
 
   const move = (i: number, delta: number) => {
     const j = i + delta;
@@ -541,7 +557,8 @@ export default function ProtocolEditor({ protocolId }: { protocolId: string }) {
       <Modal open={confirmOpen} onClose={() => setConfirmOpen(false)} title={`Publish v${draftVersion.version}?`}>
         <p className="text-body mb-3">
           This keeps version <span className="font-num">{draftVersion.version}</span> of {protocol.title} with{' '}
-          {steps.length} steps and {materials.length} materials in {reviewer ? <>{reviewer}&rsquo;s</> : 'your'} name, and
+          {steps.length} step{steps.length === 1 ? '' : 's'} and {materials.length} material{materials.length === 1 ? '' : 's'} in{' '}
+          {reviewer ? <>{reviewer}&rsquo;s</> : 'your'} name, and
           makes it the current version. Every version before it stays as it was kept.
         </p>
         {!changelog.trim() && (

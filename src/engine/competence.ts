@@ -56,7 +56,7 @@ export const LEVEL_NAME: Record<Level, string> = {
 export type Confidence = 'high' | 'medium' | 'low';
 
 /** A skill whose catalogue entry holds its policy: how critical it is, its recency window and its supervised runs. */
-export type RatedSkill = Skill & { criticality: 'routine' | 'critical'; recencyDays: number; supervisedRuns: number };
+export type RatedSkill = Skill & { criticality: NonNullable<Skill['criticality']>; recencyDays: number; supervisedRuns: number };
 
 /**
  * Whether Guild rates anyone on `skill`: its catalogue entry holds its policy. A skill kept with none is left out of

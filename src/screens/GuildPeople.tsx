@@ -18,7 +18,7 @@ import {
   type GuildContext,
 } from '@/components/GuildBits';
 import { LevelGlyph, levelLabel } from '@/components/LevelGlyph';
-import { daysBetween, isAssessor, statusOf } from '@/engine/competence';
+import { daysBetween, isAssessor, rated, statusOf } from '@/engine/competence';
 import { quarterStart } from '@/engine/checks';
 import { href, navigate } from '@/router';
 
@@ -248,7 +248,7 @@ function Ledger({ ctx, personId }: { ctx: GuildContext; personId: string }) {
                                 {st.lapsesAt ?? '·'}
                               </td>
                               <td className="px-4 py-2 font-num text-right text-ink-soft">
-                                {isAssessor(ctx.status, personId, s.id) ? '·' : `${st.supervisedCount} of ${s.supervisedRuns}`}
+                                {isAssessor(ctx.status, personId, s.id) ? '·' : rated(s) ? `${st.supervisedCount} of ${s.supervisedRuns}` : 'no policy yet'}
                               </td>
                             </tr>
                           );

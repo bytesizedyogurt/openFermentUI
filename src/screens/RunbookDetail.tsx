@@ -593,7 +593,7 @@ export default function RunbookDetail({ runbookId }: { runbookId: string }) {
           <EmptyState
             icon={<GitBranch size={22} aria-hidden />}
             title={`No runbook with the id “${runbookId}”`}
-            body="The board lists every runbook in this session, grouped by what it is waiting on."
+            body="The project keeps no runbook of that id; the link may be from another project. The board lists every runbook the project keeps, grouped by what it is waiting on."
             action={<LinkButton to="/runbooks">Back to the board</LinkButton>}
           />
         </Card>

@@ -290,9 +290,12 @@ def test_a_skills_policy_is_kept_whole_or_refused_and_a_file_takes_it():
     kept = catalogues.keep(catalogues.CatalogueEntry(kind="skill", id="SK-A", name="Skill A", **POLICY,
                                                      prerequisites=["SK-B", " SK-B "]), by="Ada")
     assert (kept.criticality, kept.recencyDays, kept.supervisedRuns, kept.prerequisites) == ("routine", 30, 1, ["SK-B"])
-    with pytest.raises(ValueError, match="leaves out criticality and supervisedRuns"):
+    # Each part of a policy is named as the catalogues screen names it, with the field that holds it.
+    with pytest.raises(ValueError, match=r"leaves out how critical it is \(criticality\) and the supervised runs "
+                                         r"before a check \(supervisedRuns\) \["):
         catalogues.CatalogueEntry(kind="skill", id="SK-C", name="C", recencyDays=30)
-    with pytest.raises(ValueError, match="leaves out criticality, recencyDays and supervisedRuns"):
+    with pytest.raises(ValueError, match=r"leaves out how critical it is \(criticality\), the days a qualification "
+                                         r"stands \(recencyDays\) and the supervised runs before a check"):
         catalogues.CatalogueEntry(kind="skill", id="SK-C", name="C", prerequisites=["SK-A"])
     with pytest.raises(ValueError, match="names itself"):
         catalogues.CatalogueEntry(kind="skill", id="SK-C", name="C", **POLICY, prerequisites=["SK-C"])
@@ -305,8 +308,9 @@ def test_a_skills_policy_is_kept_whole_or_refused_and_a_file_takes_it():
            b"SK-E,Skill E,,30,,\n")
     got = catalogues.intake("skill", csv, "skills.csv", by="Ada")
     assert got.kept == ["SK-D"] and got.refused == [
-        "row 2: the entry: a skill's policy names criticality, recencyDays and supervisedRuns together, and this one "
-        "leaves out criticality and supervisedRuns"]
+        "row 2: the entry: a skill's policy names how critical it is (criticality), the days a qualification stands "
+        "(recencyDays) and the supervised runs before a check (supervisedRuns) together, and this one leaves out how "
+        "critical it is (criticality) and the supervised runs before a check (supervisedRuns)"]
     d = catalogues.get("skill", "SK-D")
     assert (d.criticality, d.recencyDays, d.supervisedRuns, d.prerequisites) == ("critical", 30, 2, ["SK-A", "SK-B"])
     held = {s["id"]: s for s in catalogues.as_skills()}
@@ -471,3 +475,77 @@ def test_a_file_of_lessons_takes_their_bodies_and_postdoc_reads_a_lesson_with_it
     assert wrote.error is None
     kept = catalogues.get("lesson", "l-model")
     assert (kept.minutes, kept.blocks, kept.checkpoint) == (None, [], []), "a model's write keeps no lesson's body"
+
+
+def test_a_lesson_edited_on_the_catalogues_screen_keeps_its_body():
+    """The screen's form edits a lesson's name, words and skills, and sends the entry as it opened it with those laid
+    over it (src/lib/catalogues.ts `edited`): its body as the lesson holds it, its keeper, lane, door and time blank.
+    The keep replaces the entry whole, so the body the edit sends back is the body kept."""
+    client = TestClient(api.app, base_url="http://127.0.0.1")
+    assert client.post("/api/catalogues/lesson", json={"entry": lesson_with_a_body(), "by": "Ada"}).status_code == 200
+    held = client.get("/api/catalogues/lesson/l-body").json()
+    sent = {**held, "name": "A placeholder lesson, renamed", "skills": [], "by": "", "at": "", "agent": None,
+            "via": None}
+    again = client.post("/api/catalogues/lesson", json={"entry": sent, "by": "Ben"})
+    assert again.status_code == 200, again.text
+    after = client.get("/api/catalogues/lesson/l-body").json()
+    assert (after["name"], after["skills"], after["by"], after["agent"]) == ("A placeholder lesson, renamed", [],
+                                                                            "Ben", "person")
+    assert (after["minutes"], after["blocks"], after["checkpoint"]) == (held["minutes"], held["blocks"],
+                                                                        held["checkpoint"]), "the body stays whole"
+
+
+def test_an_entrys_id_outside_the_rule_is_refused_in_the_words_the_form_uses():
+    with pytest.raises(ValueError, match="an entry's id starts with a letter or a digit, then holds letters, digits"):
+        catalogues.CatalogueEntry(kind="strain", id="-placeholder", name="A placeholder strain")
+    client = TestClient(api.app, base_url="http://127.0.0.1")
+    refused = client.post("/api/catalogues/strain", json={"entry": {"kind": "strain", "id": "-bad", "name": "S"},
+                                                         "by": "Ada"})
+    assert refused.status_code == 422
+    (said,) = refused.json()["detail"]
+    assert said["loc"] == ["body", "entry", "id"] and "should match pattern" not in said["msg"]
+    assert said["msg"].startswith("Value error, an entry's id starts with a letter or a digit")
+    got = catalogues.intake("strain", b"id,name\n-bad,A placeholder strain\nok-1,A placeholder strain\n", "s.csv",
+                            by="Ada")
+    assert got.kept == ["ok-1"] and got.refused[0].startswith("row 1: id: an entry's id starts with a letter")
+    # The document still states the rule, for a client that checks an id before it sends one.
+    assert catalogues.CatalogueEntry.model_json_schema()["properties"]["id"]["pattern"] == catalogues.ENTRY_ID.pattern
+
+
+def _kept_in_an_older_shape(kind: str, entry_id: str, body: dict) -> None:
+    """A row kept before the model held its kind to what it reads now, written straight into its table."""
+    from openferment_core import db, projects
+    from openferment_core.db import models as t
+    from openferment_core.db import rows
+
+    async def put() -> None:
+        async with db.session() as s:
+            await rows.put(s, t.catalogue, projects.current(), f"{kind}/{entry_id}",
+                           {"kind": kind, "id": entry_id, "by": "Ada", "agent": "person",
+                            "at": "2026-11-01T00:00:00+00:00", **body}, by="Ada", kind=kind)
+
+    db.run(put())
+
+
+def test_one_row_the_model_no_longer_reads_leaves_its_catalogue_and_every_reader_reading(monkeypatch, caplog):
+    monkeypatch.setattr(guild, "projection", GUILD_PROJECTION)
+    catalogues.keep(STRAIN, by="Ada")
+    # A product's free-text class and a strain's class, as catalogue_write took them before alpha 2.2 E.8.
+    _kept_in_an_older_shape("product", "p-old", {"name": "An older placeholder product", "category": "a word"})
+    _kept_in_an_older_shape("strain", "s-old", {"name": "An older placeholder strain", "category": "a word"})
+    client = TestClient(api.app, base_url="http://127.0.0.1", raise_server_exceptions=False)
+    with caplog.at_level("WARNING", logger="openferment_core.catalogues"):
+        strains = client.get("/api/catalogues/strain")
+        products = client.get("/api/catalogues/product")
+    assert strains.status_code == 200 and [e["id"] for e in strains.json()] == ["test-strain-1"]
+    assert products.status_code == 200 and products.json() == []
+    assert any("row s-old does not read as an entry and is left out" in r.getMessage() for r in caplog.records)
+    assert [h["id"] for h in catalogues.as_hosts()] == ["test-strain-1"]
+    assert guild.projection()["skills"] == []
+    # A model's write under the id is refused in words; a person's keep writes the entry afresh.
+    ctx = tools.ToolContext(model="test-model-a")
+    wrote = tools.run("catalogue_write", {"kind": "strain", "id": "s-old", "name": "A model's placeholder"}, ctx)
+    assert wrote.error and "no longer reads as an entry" in wrote.error
+    catalogues.keep(catalogues.CatalogueEntry(kind="strain", id="s-old", name="An older placeholder strain, kept "
+                                                                                "afresh"), by="Ada")
+    assert [e.id for e in catalogues.listed("strain")] == ["s-old", "test-strain-1"]

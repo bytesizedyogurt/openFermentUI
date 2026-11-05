@@ -125,7 +125,7 @@ export type EngineThing = components['schemas']['EngineThing'];
  */
 export type DepositionReading = components['schemas']['DepositionReading'];
 import { downloadBlob } from './csv';
-import { ServiceDown, ServiceRefused, call } from './http';
+import { ServiceDown, ServiceRefused, call, detailWords } from './http';
 import { apiFetch } from './project';
 
 export { ServiceDown as StudiesDown, ServiceRefused as StudiesRefused };
@@ -210,7 +210,7 @@ async function fetchFile(path: string, fallback: string): Promise<string> {
   if (!response.ok) {
     let detail = '';
     try {
-      detail = String(((await response.json()) as { detail?: unknown }).detail ?? '');
+      detail = detailWords(((await response.json()) as { detail?: unknown }).detail);
     } catch {
       /* the status is the message */
     }

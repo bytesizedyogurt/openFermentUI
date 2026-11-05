@@ -16,6 +16,7 @@ import type { components } from '@/api/types.gen';
 import type { DecisionCheck, Overlay, OverlayPaper, ReviewDecision } from './review';
 import { START_COMMAND, postdocHealth } from './postdoc';
 import { apiFetch } from './project';
+import { detailWords } from './http';
 
 type S = components['schemas'];
 
@@ -79,7 +80,7 @@ export async function explain(response: Response, signal?: AbortSignal): Promise
   }
   let detail = '';
   try {
-    detail = String(((await response.json()) as { detail?: string }).detail ?? '');
+    detail = detailWords(((await response.json()) as { detail?: unknown }).detail);
   } catch {
     /* not JSON — the status is the message */
   }
@@ -127,7 +128,7 @@ export async function postDecision(decision: ReviewDecision, signal?: AbortSigna
   if (response.status === 422) {
     let detail = '';
     try {
-      detail = String(((await response.json()) as { detail?: string }).detail ?? '');
+      detail = detailWords(((await response.json()) as { detail?: unknown }).detail);
     } catch {
       /* the status is the message */
     }
@@ -212,7 +213,7 @@ export async function loadOverlay(signal?: AbortSignal): Promise<OverlayLoad> {
     if (!response.ok) {
       let detail = '';
       try {
-        detail = String(((await response.json()) as { detail?: string }).detail ?? '');
+        detail = detailWords(((await response.json()) as { detail?: unknown }).detail);
       } catch {
         /* not JSON — the status is the message */
       }

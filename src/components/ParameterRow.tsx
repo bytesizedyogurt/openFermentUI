@@ -350,10 +350,22 @@ function NumberBox({
 /** Steps of a slider on a log scale: the position is a share of the decades between the bounds. */
 const LOG_STEPS = 1000;
 
-/** The slider, inside the spec's bounds and on its scale; a way of choosing a number and nothing more. */
-function Slider({ spec, value, disabled, onNumber }: { spec: ParameterSpec; value: number | null; disabled: boolean; onNumber: (n: number) => void }) {
-  const min = spec.min as number;
-  const max = spec.max as number;
+/** The slider, inside the spec's bounds (the caller draws one only for a spec with both) and on its scale; a way of choosing a number and nothing more. */
+function Slider({
+  spec,
+  min,
+  max,
+  value,
+  disabled,
+  onNumber,
+}: {
+  spec: ParameterSpec;
+  min: number;
+  max: number;
+  value: number | null;
+  disabled: boolean;
+  onNumber: (n: number) => void;
+}) {
   const log = spec.scale === 'log' && min > 0 && max > min;
   const label = `${spec.label} slider`;
   if (log) {
@@ -494,7 +506,7 @@ export function ParameterRow({ spec, value, override, reviewer, readOnly, warnin
                   <span className="block">
                     Within <span className="font-num">{boundsWords(spec)}</span>
                   </span>
-                  <Slider spec={spec} value={typed ?? current} disabled={!named} onNumber={(n) => keep({ value: n })} />
+                  <Slider spec={spec} min={spec.min} max={spec.max} value={typed ?? current} disabled={!named} onNumber={(n) => keep({ value: n })} />
                 </label>
               )}
             </>

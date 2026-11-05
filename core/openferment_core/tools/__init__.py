@@ -541,14 +541,22 @@ def run(name: str, raw: Any, ctx: ToolContext | None = None) -> ToolResult:
     except ValidationError as e:
         problems = "; ".join(f"{'.'.join(str(p) for p in err['loc']) or 'input'}: {err['msg']}" for err in e.errors())
         return ToolResult(error=f"{name} refused its input: {problems}")
-    try:
-        from .. import audit, projects
+    from .. import audit, projects
 
+    # The ids of the audit rows the call adds, filled while it runs (audit.written).
+    audited: list[str] = []
+    try:
         acting = projects.using(ctx.project) if ctx.project else contextlib.nullcontext()
         with audit.written() as audited, acting:
             result = tool.run(parsed, ctx)
     except Exception as e:  # a defect or an outage, said in words to the caller
-        return ToolResult(error=f"{name} failed: {type(e).__name__}: {e}")
+        # A write that committed before the call raised stands, and its row is named; a row added inside a
+        # transaction the failure rolled back is gone, and none is named for it (audit.standing).
+        try:
+            standing = audit.standing(audited, ctx.project) if audited else []
+        except Exception:  # the store that failed the call may fail this read too: name no row
+            standing = []
+        return ToolResult(error=f"{name} failed: {type(e).__name__}: {e}", auditIds=standing)
     size = len(json.dumps(result.summary, ensure_ascii=False, default=str))
     if size > MAX_SUMMARY_CHARS:
         # Nothing the model never read may become citable (§5.R): the ids go

@@ -52,6 +52,7 @@
 // chosen becomes a prediction in the run's unit, measured at harvest
 // (POST /api/studies/runbooks), and opens on the runbook's page, where it is
 // locked.
+import type { components } from '@/api/types.gen';
 import { SffGraph } from '@/components/SffGraph';
 import { useEffect, useState, type ReactNode } from 'react';
 import { BookOpen, Download, ListChecks, Play } from 'lucide-react';
@@ -116,11 +117,12 @@ function Parameters({ runId, data }: { runId: string; data: ParamScope }) {
   );
 }
 
-/** One output a run kept (`outputs.values`): its name and the quantity, in its unit, with its origin. */
-interface RunOutput {
-  name: string;
-  quantity: Quantity;
-}
+/**
+ * One output a run kept (`outputs.values`): its name and the quantity, in its unit, with its origin, the shape the
+ * service writes an input in (`RunInput`). A run's outputs are the engine's own (`EngineRun.outputs`), so each is read
+ * through the guard below (Departures).
+ */
+type RunOutput = components['schemas']['RunInput'];
 
 /** The artifact tools whose run builds no plant, so it keeps no SFF file by design: the kinetics engine's (docs/api/runs.md). */
 const NO_PLANT_TOOLS = new Set(['fermos.simulation', 'growth_forecast', 'fermos.vessel']);
@@ -320,6 +322,8 @@ function TrainInput({ value, train }: { value: unknown; train: { name: string; u
 function Inputs({ report }: { report: EngineRunReport }) {
   const train = trainOfRun(report.run);
   const reading = (i: EngineRunReport['run']['inputs'][number]) => i.quantity.origin?.kind === 'measurement';
+  // Each input's origin when it is a reading, in the inputs' order; null for every other input.
+  const measuredOrigins = report.run.inputs.map((i) => (i.quantity.origin?.kind === 'measurement' ? i.quantity.origin : null));
   const rows = report.run.inputs.map((i) => [
     i.name,
     String(i.quantity.value),
@@ -372,8 +376,8 @@ function Inputs({ report }: { report: EngineRunReport }) {
                       <TrainInput value={report.run.inputs[i]?.quantity.value} train={train} />
                     ) : j === 1 ? (
                       shown(report.run.inputs[i]?.quantity.value ?? c)
-                    ) : j === 3 && report.run.inputs[i]?.quantity.origin?.kind === 'measurement' ? (
-                      <ReadingOrigin origin={report.run.inputs[i].quantity.origin!} />
+                    ) : j === 3 && measuredOrigins[i] ? (
+                      <ReadingOrigin origin={measuredOrigins[i]} />
                     ) : j === 5 ? (
                       <span title={c}>{plainNote(c)}</span>
                     ) : (

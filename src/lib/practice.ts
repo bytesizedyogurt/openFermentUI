@@ -13,6 +13,7 @@ import type { components } from '@/api/types.gen';
 import type { Deposition, Runbook } from './studies';
 import { IntakeDown } from './intake';
 import { apiFetch } from './project';
+import { detailWords } from './http';
 
 type S = components['schemas'];
 
@@ -66,7 +67,7 @@ async function call<T>(path: string, body?: unknown, signal?: AbortSignal): Prom
   let detail = '';
   if (!response.ok) {
     try {
-      detail = String(((await response.json()) as { detail?: string }).detail ?? '');
+      detail = detailWords(((await response.json()) as { detail?: unknown }).detail);
     } catch {
       /* the status is the message */
     }

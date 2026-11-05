@@ -2819,7 +2819,7 @@
         "type": "object"
       },
       "DecisionCheck": {
-        "description": "What `POST /api/biorepo/check` answers (OF-BLD-012.1 F1.5): whether\n`biorepo.write` would store this decision, and the rule it would refuse\nit under. The browser asks before the reviewer presses the key, so the\nscreen says what the service would say rather than a mirror of it.",
+        "description": "What `POST /api/biorepo/check` answers (OF-BLD-012.1 F1.5): whether\n`biorepo.write` would store this decision, and the rule it would refuse\nit under, with why (both null when it would store it). The browser asks\nbefore the reviewer presses the key, so the screen says what the service\nwould say.",
         "properties": {
           "ok": {
             "title": "Ok",
@@ -2828,6 +2828,16 @@
           "rule": {
             "anyOf": [
               {
+                "enum": [
+                  "record",
+                  "reviewer",
+                  "fulltext",
+                  "quote",
+                  "paper",
+                  "unit",
+                  "status",
+                  "estimate"
+                ],
                 "type": "string"
               },
               {
@@ -4026,6 +4036,60 @@
           "figure"
         ],
         "title": "Evidence",
+        "type": "object"
+      },
+      "EvidenceCheck": {
+        "description": "What `POST /api/guild/check` answers: whether `guild.write_evidence`\nwould keep this entry, and the rule it would refuse it under, with why\n(both null when it would keep it). The sign-off sheet asks before anyone\nsigns, so it says what the service would say.",
+        "properties": {
+          "ok": {
+            "title": "Ok",
+            "type": "boolean"
+          },
+          "rule": {
+            "anyOf": [
+              {
+                "enum": [
+                  "name",
+                  "role",
+                  "added",
+                  "duplicate",
+                  "person",
+                  "skill",
+                  "source",
+                  "observer",
+                  "authority",
+                  "outcome",
+                  "note",
+                  "date",
+                  "evidence",
+                  "policy"
+                ],
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Rule"
+          },
+          "why": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Why"
+          }
+        },
+        "required": [
+          "ok",
+          "rule",
+          "why"
+        ],
+        "title": "EvidenceCheck",
         "type": "object"
       },
       "EvidenceSource": {
@@ -15665,7 +15729,7 @@
       },
       "TrainMade": {
         "additionalProperties": true,
-        "description": "A train a person built in pureOS's Builder and saved (mirrors\n`TrainMade` in src/lib/durable.ts): the train as data, when it was saved,\nand the name it was saved under.",
+        "description": "A train a person built in pureOS's Builder and saved (the browser\nreads it as `TrainMade`, src/lib/durable.ts): the train as data, when it\nwas saved, and the name it was saved under.",
         "properties": {
           "by": {
             "title": "By",
@@ -21630,7 +21694,7 @@
             "content": {
               "application/json": {
                 "schema": {
-                  "$ref": "#/components/schemas/DecisionCheck"
+                  "$ref": "#/components/schemas/EvidenceCheck"
                 }
               }
             },

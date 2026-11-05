@@ -196,7 +196,7 @@ export default function Runbooks() {
         <Card data-testid="runbooks-empty">
           <EmptyState
             icon={<GitBranch size={22} aria-hidden />}
-            title="No runbooks in this session"
+            title="The project keeps no runbook yet"
             body="A runbook starts as a draft in Postdoc: ask it to draft one from the evidence, then press Turn into a runbook, and it lands here."
             action={<LinkButton to="/postdoc">Draft a runbook in Postdoc</LinkButton>}
           />

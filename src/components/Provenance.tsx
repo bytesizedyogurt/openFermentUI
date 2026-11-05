@@ -2,7 +2,6 @@
 // one `provenance` value so they can never disagree (OF-DES-001 §7.4).
 import type { ReactNode } from 'react';
 import { Award, ShieldCheck, CircleDashed, UserPen, FlaskConical, Ban, BookMarked, Microscope, TrendingUp, Calculator } from 'lucide-react';
-import type { ExtractionRecord } from '@/lib/review';
 import type { Provenance } from '@/lib/studies';
 import { aggregateExclusion } from '@/store';
 import { Explain, cx } from './ui';
@@ -125,7 +124,7 @@ const LEGEND_ORDER: ProvKind[] = ['measured', 'gold', 'verified', 'curated', 'co
  * the aggregates apply.
  */
 const entersAggregates = (p: Provenance): boolean =>
-  aggregateExclusion({ provenance: p, status: 'verified', isPrimary: true } as ExtractionRecord) === null;
+  aggregateExclusion({ provenance: p, status: 'verified', isPrimary: true }) === null;
 
 /**
  * The legend, and — behind a disclosure — what each level means for aggregates.

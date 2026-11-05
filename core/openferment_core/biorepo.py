@@ -47,7 +47,7 @@ from __future__ import annotations
 
 import logging
 import re
-from typing import Any
+from typing import Any, get_args
 
 from sqlalchemy import func, insert, select
 
@@ -55,13 +55,14 @@ from . import db, extract, projects
 from .basis import EstimateRefused, refuse_estimates
 from .literature import kit
 from .db import models as t
-from .models import BioRepo, Candidate, Quantity, ReviewDecision
+from .models import BioRepo, Candidate, DecisionRule, Quantity, ReviewDecision
 from .units import UnitError, field as ontology_field, to_canonical
 from .validate import anchor_candidate
 
 log = logging.getLogger("openferment.biorepo")
 
-RULES = ("record", "reviewer", "fulltext", "quote", "paper", "unit", "status", "estimate")
+# The rules a decision is refused under, in order: the API answers each by name (models.DecisionRule).
+RULES: tuple[str, ...] = get_args(DecisionRule)
 
 # Names that are not a person (OF-BLD-012.1 F2). The README says a verified
 # record is one a NAMED reviewer promoted; a decision signed 'you' is signed

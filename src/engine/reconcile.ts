@@ -31,7 +31,7 @@ export interface Delta {
   held: boolean;
 }
 
-export type PredictionKind = 'point' | 'interval' | 'bound';
+export type PredictionKind = NonNullable<Prediction['kind']>;
 
 export const kindOf = (p: Prediction): PredictionKind => p.kind ?? 'point';
 
@@ -118,7 +118,7 @@ export function unmeasured(deposition: Deposition, runbook: Runbook): Prediction
 }
 
 export interface OutcomeSuggestion {
-  outcome: 'confirmed' | 'refuted' | 'inconclusive';
+  outcome: NonNullable<Deposition['reconciliation']>['outcome'];
   /** Why, in one sentence, for the person who has to agree or disagree. */
   why: string;
 }

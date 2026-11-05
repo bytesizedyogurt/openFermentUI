@@ -59,6 +59,7 @@ import {
   fitFigureSeries,
   fitSeriesOf,
   forecastScope,
+  hasRole,
   paramAskOf,
   simulateFromFitPath,
   timeCourseOf,
@@ -220,8 +221,9 @@ export default function FermOSForecast() {
   const readings = useMemo(() => {
     if (!sim || !fit) return [];
     return seriesFor(fit.depositionId)
-      .filter((s) => s.role && STATE_OF_ROLE[s.role] && normalizeUnit(s.unit) !== null && normalizeUnit(s.unit) === normalizeUnit(sim.units[STATE_OF_ROLE[s.role]] ?? ''))
-      .map((s) => ({ key: STATE_OF_ROLE[s.role!], points: (s.points ?? []).map((p) => ({ t: p.t, value: p.value })), provenance: 'measured' as const }));
+      .filter(hasRole)
+      .filter((s) => STATE_OF_ROLE[s.role] && normalizeUnit(s.unit) !== null && normalizeUnit(s.unit) === normalizeUnit(sim.units[STATE_OF_ROLE[s.role]] ?? ''))
+      .map((s) => ({ key: STATE_OF_ROLE[s.role], points: (s.points ?? []).map((p) => ({ t: p.t, value: p.value })), provenance: 'measured' as const }));
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [sim, fit, depositions, runbooks]);
 

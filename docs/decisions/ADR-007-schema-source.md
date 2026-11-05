@@ -335,3 +335,20 @@ Never; this is how the drift stops recurring.
 - `core/tests/test_schema.py`'s mirror of `fields.yaml`, `vocabulary.yaml` and `units.json` stands as it is:
   `data/ontology.ts` and `data/vocabulary.ts` hold their own types beside the values it compares, and
   `pnpm export:unit-fixtures` reads them for it.
+
+### Alpha 2.2, E.gate (2026-11-05): the review's fixes to the generated shapes
+
+- A version's lists are read with `?? []` where they stand, and `lib/protocols.ts` keeps no reader
+  helpers beside the calls (the E.12 note's `stepsOf` and its kin had no reader and are gone); a
+  screen that names a protocol by its address reads it through the store's `useProtocol`, which asks
+  `GET /api/protocols/{id}` for one made after the page opened.
+- `DecisionCheck.rule` is the eight rules `biorepo.write` refuses under (`models.DecisionRule`,
+  `biorepo.RULES` read from it), so the browser's `RefusalRule` is the generated union, and a
+  refusal of a model's estimate reads as its own rule. `POST /api/guild/check`, which answered the
+  same model, answers an `EvidenceCheck` of its own, its rule one of the fourteen
+  `guild.write_evidence` refuses an entry under (`models.GuildRule`, `guild.RULES` read from it). Each hand copy of a generated request or
+  union is derived from its schema (`ParamAsk`, `SimulateAsk`, `VesselType`, `PredictionKind`, an
+  outcome, a rated skill's criticality, `StateKind`), and the browser's own Proforma assumption is
+  `ScenarioAssumption`, a name the service's models do not hold.
+- A Proforma run's view is built from `ProformaRunResult` field by field, every field typed by the
+  answer's model; an artifact's `output` stays the engine's own dict, read per tool (Departures).

@@ -225,8 +225,8 @@ export type ReviewAction = 'accept' | 'reject' | 'gold';
  * keeps the decision, the service is simply never asked — where the other
  * two mean the action cannot be taken at all until something changes.
  */
-/** The rules `biorepo.write` refuses under (§2.3). The service names one; the fallback below can only see three of them. */
-export type RefusalRule = 'record' | 'reviewer' | 'fulltext' | 'quote' | 'paper' | 'unit' | 'status';
+/** The rules `biorepo.write` refuses under (§2.3; models.DecisionRule). The service names one; the fallback below can only see three of them. */
+export type RefusalRule = NonNullable<DecisionCheck['rule']>;
 
 export interface Refusal {
   rule: RefusalRule;
@@ -298,7 +298,9 @@ export function writeRefusal(
  */
 export function refusalOf(check: DecisionCheck, fallback: Refusal | null): Refusal | null {
   if (check.ok) return null;
-  const rule = (check.rule ?? 'fulltext') as RefusalRule;
+  // A refusal names its rule (the check routes answer `biorepo.write`'s); one that names none takes the fallback's, else
+  // stops the action as a refusal of the record would.
+  const rule: RefusalRule = check.rule ?? fallback?.rule ?? 'record';
   return {
     rule,
     why:

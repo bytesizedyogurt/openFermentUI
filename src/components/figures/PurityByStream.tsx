@@ -116,7 +116,7 @@ export function PurityByStream(props: PurityByStreamProps) {
                 {s.stream}
                 <tspan opacity={0.6}>{` · ${from} → ${to}`}</tspan>
               </text>
-              {why ? (
+              {why != null || s.productFraction == null ? (
                 <text x={L + 4} y={y0 + ROW / 2 + 4} fontSize={10} fill="currentColor" opacity={0.65}>
                   {why}
                 </text>
@@ -125,7 +125,7 @@ export function PurityByStream(props: PurityByStreamProps) {
                   data-testid="purity-bar"
                   x={x(0)}
                   y={y0 + 6}
-                  width={Math.max(0.5, x(s.productFraction!) - x(0))}
+                  width={Math.max(0.5, x(s.productFraction) - x(0))}
                   height={ROW - 12}
                   fill={color}
                   fillOpacity={0.3}

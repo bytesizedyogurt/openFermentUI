@@ -97,9 +97,10 @@ function ReconciliationPanel({ deposition }: { deposition: Deposition }) {
         <div className="mb-3">
           <IntervalLedger
             title="What was predicted, and what did this run measure?"
-            rows={deltas.map((d) => {
-              const p = predictionsOf(runbook).find((x) => x.id === d.predictionId)!;
-              return { key: d.predictionId, label: d.label, prediction: p, lockedAt: runbook.lockedAt ?? null, observed: { value: d.observed, unit: d.unit }, held: d.held };
+            rows={deltas.flatMap((d) => {
+              // A delta names a prediction of its runbook; one whose prediction the runbook no longer lists draws no row.
+              const p = predictionsOf(runbook).find((x) => x.id === d.predictionId);
+              return p ? [{ key: d.predictionId, label: d.label, prediction: p, lockedAt: runbook.lockedAt ?? null, observed: { value: d.observed, unit: d.unit }, held: d.held }] : [];
             })}
             csvName={`reconciliation-${deposition.id}`}
           />

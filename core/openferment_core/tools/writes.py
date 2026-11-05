@@ -169,8 +169,8 @@ CURATED_NOTE = {
               "vocabulary.yaml, core/openferment_core/pureos/catalogue.py); the service has no write function for them",
 }
 NO_WRITE_ACTION = {
-    ("runbooks", "revise_protocol"): "a protocol is revised by a person in the protocol editor; the service has no "
-                                     "write function for protocols",
+    ("runbooks", "revise_protocol"): "a person keeps a protocol's new version in the protocol editor, in their own "
+                                     "name, and no tool writes one (ADR-017)",
     ("runbooks", "draft"): "use the draft_runbook tool: it takes the evidence ids and record ids this run returned and "
                            "writes every number from them",
     ("fermos", "fit"): "a person fits a deposition's series on fermOS's fit page, which sends it to POST /api/fermos/fit; "

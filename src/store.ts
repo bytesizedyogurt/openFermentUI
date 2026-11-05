@@ -4,7 +4,7 @@
 // (lib/projectState.ts and the service's own stores); what this browser keeps
 // is its preferences and the writes the service has not yet acknowledged
 // (src/lib/durable.ts), and localStorage holds the last-open project alone.
-import { useMemo } from 'react';
+import { useEffect, useMemo, useRef, useState } from 'react';
 import { create } from 'zustand';
 import {
   CataloguesDown,
@@ -20,7 +20,7 @@ import {
 import type { Check, CheckNote, CheckResult, Checks } from '@/lib/checks';
 import type { Guild, GuildEvidence, GuildPerson, GuildPolicy, GuildWithdrawal } from '@/lib/guild';
 import type { Practice, PracticeScenario, PracticeSession } from '@/lib/practice';
-import { ProtocolsDown, keepVersion, listProtocols, type Protocol, type ProtocolVersion } from '@/lib/protocols';
+import { ProtocolsDown, ProtocolsRefused, keepVersion, listProtocols, makeProtocol as makeProtocolOnService, protocolOf, type Protocol, type ProtocolVersion } from '@/lib/protocols';
 import type { FermosFitResponse } from '@/lib/fermos';
 import type { Override } from '@/lib/params';
 import type { LiveConversation, LiveTurn, RunbookDraft, TraceStep } from '@/lib/postdoc';
@@ -52,7 +52,7 @@ import {
   loadDurable,
   saveDurable,
   type DurableSnapshot,
-  type InputAssumption,
+  type ScenarioAssumption,
   type TrainMade,
 } from '@/lib/durable';
 import { DecisionRefused, IntakeDown, extractPaper, loadOverlay, postDecision } from '@/lib/intake';
@@ -425,9 +425,9 @@ export interface OFState {
    * geneOS read the overrides, and the field is kept, derived, for the
    * snapshot an older build reads and the one-time migration.
    */
-  proformaAssumptions: Record<string, InputAssumption[]>;
+  proformaAssumptions: Record<string, ScenarioAssumption[]>;
   /** Writes the override `proforma:<scenarioId>` holds for the input, through `setOverride`. */
-  setProformaAssumption: (scenarioId: string, a: InputAssumption) => void;
+  setProformaAssumption: (scenarioId: string, a: ScenarioAssumption) => void;
   /** Removes it, through `clearOverride`. */
   clearProformaAssumption: (scenarioId: string, key: string) => void;
   /**
@@ -523,6 +523,11 @@ export interface OFState {
    * it, else why it did not, in words.
    */
   keepProtocolVersion: (protocolId: string, version: ProtocolVersion) => Promise<string | null>;
+  /**
+   * Begin a protocol in the open project in the reviewer's name, with its first version (ADR-017): the service keeps it
+   * once under its id and the store holds it as kept. Answers null when it was kept, else the service's words.
+   */
+  beginProtocol: (protocol: Protocol) => Promise<string | null>;
 
   // runbooks (OF-BLD-005 §7) — a slice of its own, never folded into jobs
   /** Research → industrial in one action, carrying the finding across. */
@@ -709,6 +714,12 @@ export interface OFState {
   protocolsProblem: string | null;
   /** Read the open project's protocols (ADR-017), as the page opens; what was read last stays when a read fails. */
   hydrateProtocols: () => Promise<void>;
+  /**
+   * Read one of the open project's protocols from the service and hold it beside the rest: a protocol made after the
+   * page read them (`POST /api/protocols`, in a person's name) reaches a screen that names it. Answers null when the
+   * service held it, 'missing' when the project keeps none of the id, and the service's words when it could not say.
+   */
+  readProtocol: (protocolId: string) => Promise<null | 'missing' | string>;
   /** Put a project's rows in the page. */
   applyProjectState: (state: ProjectState) => void;
   /** Send the outbox; what the service does not answer stays for the next try. */
@@ -915,7 +926,7 @@ const initialState = () => ({
   reviewIndex: 0,
   reviewStats: { accepted: 0, rejected: 0, edited: 0, skipped: 0, gold: 0, startedAt: Date.now() },
   undoStack: [] as UndoFrame[],
-  proformaAssumptions: {} as Record<string, InputAssumption[]>,
+  proformaAssumptions: {} as Record<string, ScenarioAssumption[]>,
   parameterOverrides: {} as Record<string, Override[]>,
   proformaFits: {} as Record<string, Record<string, string>>,
   trainsMade: {} as Record<string, TrainMade>,
@@ -1105,6 +1116,18 @@ export const useStore = create<OFState>()((set, get) => ({
         set({
           protocolsProblem: e instanceof ProtocolsDown ? `${e.message} ${e.remedy}` : e instanceof Error ? e.message : String(e),
         });
+    }
+  },
+
+  readProtocol: async (protocolId) => {
+    if (!get().projectId) return 'missing';
+    try {
+      const held = await protocolOf(protocolId);
+      set((s) => ({ protocols: [...s.protocols.filter((p) => p.id !== held.id), held].sort((a, b) => (a.id < b.id ? -1 : a.id > b.id ? 1 : 0)) }));
+      return null;
+    } catch (e) {
+      if (e instanceof ProtocolsRefused && e.status === 404) return 'missing';
+      return e instanceof ProtocolsDown ? `${e.message} ${e.remedy}` : e instanceof Error ? e.message : String(e);
     }
   },
 
@@ -1648,6 +1671,18 @@ export const useStore = create<OFState>()((set, get) => ({
         href: `#/runbooks/protocols/${proto.id}`,
         provenance: 'user',
       });
+    }
+  },
+
+  beginProtocol: async (protocol) => {
+    const by = reviewerName();
+    if (!by) return 'Set your reviewer name in Settings first: a protocol is kept in a person\u2019s name.';
+    try {
+      const kept = await makeProtocolOnService({ protocol, by });
+      set((s) => ({ protocols: [...s.protocols.filter((p) => p.id !== kept.id), kept].sort((a, b) => (a.id < b.id ? -1 : a.id > b.id ? 1 : 0)) }));
+      return null;
+    } catch (e) {
+      return e instanceof ProtocolsDown ? `${e.message} ${e.remedy}` : e instanceof Error ? e.message : String(e);
     }
   },
 
@@ -3399,7 +3434,7 @@ export function overridesFor(scope: string): (s: Pick<OFState, 'parameterOverrid
  * finding 10: kept, they held every later value to the old one, and the
  * service refused it as outside its own low and high).
  */
-export function overrideOfAssumption(scenarioId: string, a: InputAssumption): Override {
+export function overrideOfAssumption(scenarioId: string, a: ScenarioAssumption): Override {
   const fixed = a.low === a.value && a.high === a.value;
   return {
     scope: proformaScope(scenarioId),
@@ -3428,18 +3463,18 @@ export function overrideEnds(o: Pick<Override, 'value' | 'low' | 'high'>): { low
 }
 
 /** An override as a Proforma assumption; null for a value in words, which no Proforma input takes. */
-export function assumptionOfOverride(o: Override): InputAssumption | null {
+export function assumptionOfOverride(o: Override): ScenarioAssumption | null {
   if (typeof o.value !== 'number' || !Number.isFinite(o.value)) return null;
   const ends = overrideEnds(o);
   return { key: o.key, value: o.value, low: ends.low ?? o.value, high: ends.high ?? o.value, by: o.by, at: o.at, note: o.note ?? null };
 }
 
 /** `proformaAssumptions` as the overrides of every `proforma:` scope give it, by scenario id. */
-export function assumptionsFromOverrides(overrides: Record<string, Override[]>): Record<string, InputAssumption[]> {
-  const out: Record<string, InputAssumption[]> = {};
+export function assumptionsFromOverrides(overrides: Record<string, Override[]>): Record<string, ScenarioAssumption[]> {
+  const out: Record<string, ScenarioAssumption[]> = {};
   for (const [scope, list] of Object.entries(overrides)) {
     if (!scope.startsWith(PROFORMA_SCOPE)) continue;
-    out[scope.slice(PROFORMA_SCOPE.length)] = list.map(assumptionOfOverride).filter((a): a is InputAssumption => a !== null);
+    out[scope.slice(PROFORMA_SCOPE.length)] = list.map(assumptionOfOverride).filter((a): a is ScenarioAssumption => a !== null);
   }
   return out;
 }
@@ -3654,6 +3689,44 @@ export function useSkills(): Skill[] {
   return useStore((s) => s.skills);
 }
 
+/** Where a screen's protocol stands: read and held, still being read, kept by no one under the id, or unreadable. */
+export interface HeldProtocol {
+  protocol: Protocol | undefined;
+  /** `reading` until the project's protocols (or this one) are read; `problem` names why they could not be. */
+  state: 'held' | 'reading' | 'missing' | 'problem';
+  problem: string | null;
+}
+
+/**
+ * The open project's protocol `protocolId`, for a screen that names one by its address. The store reads the project's
+ * protocols as the page opens; a protocol it does not hold once they are read is asked of the service by its id
+ * (`readProtocol`), so one made after the page opened is found, and only the service's answer that the project keeps
+ * none of the id reads as missing.
+ */
+export function useProtocol(protocolId: string): HeldProtocol {
+  const protocol = useStore((s) => s.protocols.find((p) => p.id === protocolId));
+  const read = useStore((s) => s.protocolsRead);
+  const problem = useStore((s) => s.protocolsProblem);
+  const readProtocol = useStore((s) => s.readProtocol);
+  // The service's answer for each id this screen asked after a miss, and the id being asked now.
+  const [answers, setAnswers] = useState<Record<string, null | 'missing' | string>>({});
+  const asking = useRef<string | null>(null);
+  useEffect(() => {
+    if (protocol || !read || protocolId in answers || asking.current === protocolId) return;
+    asking.current = protocolId;
+    void readProtocol(protocolId).then((answer) => {
+      asking.current = null;
+      setAnswers((was) => ({ ...was, [protocolId]: answer }));
+    });
+  }, [protocol, read, protocolId, answers, readProtocol]);
+  if (protocol) return { protocol, state: 'held', problem: null };
+  if (!read) return problem ? { protocol, state: 'problem', problem } : { protocol, state: 'reading', problem: null };
+  const answer = answers[protocolId];
+  if (answer === 'missing') return { protocol, state: 'missing', problem: null };
+  if (typeof answer === 'string') return { protocol, state: 'problem', problem: answer };
+  return { protocol, state: 'reading', problem: null };
+}
+
 /** The lab's skills by id, for a component. */
 export function useSkillById(): Record<string, Skill> {
   const skills = useSkills();
@@ -3689,7 +3762,7 @@ export function provenanceOf(r: ExtractionRecord): Provenance {
  */
 export type AggregateExclusion = 'rejected' | 'industry-estimate' | 'computed' | 'assumed' | 'not-primary';
 
-export function aggregateExclusion(r: ExtractionRecord): AggregateExclusion | null {
+export function aggregateExclusion(r: Pick<ExtractionRecord, 'provenance' | 'status' | 'isPrimary'>): AggregateExclusion | null {
   if (r.status === 'rejected') return 'rejected';
   if (r.provenance === 'industry-estimate') return 'industry-estimate';
   // A computed value is derived from inputs already counted on their own

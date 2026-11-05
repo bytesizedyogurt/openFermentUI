@@ -107,6 +107,7 @@ from .models import (
     GeneosModelInfo,
     GeneosResult,
     Guild,
+    EvidenceCheck,
     GuildEvidence,
     GuildPerson,
     GuildPolicy,
@@ -2263,15 +2264,15 @@ def guild_evidence(entry: GuildEvidence) -> GuildEvidence:
         raise HTTPException(status_code=503, detail=str(e)) from e
 
 
-@app.post("/api/guild/check", response_model=DecisionCheck)
-def guild_check(entry: GuildEvidence) -> DecisionCheck:
+@app.post("/api/guild/check", response_model=EvidenceCheck)
+def guild_check(entry: GuildEvidence) -> EvidenceCheck:
     """Would `guild.write_evidence` keep this entry? Every rule runs and
     nothing is written. A refusal is an answer, so it comes back 200."""
     try:
         guild.write_evidence(entry, dry_run=True)
-        return DecisionCheck(ok=True)
+        return EvidenceCheck(ok=True)
     except guild.GuildRefused as e:
-        return DecisionCheck(ok=False, rule=e.rule, why=e.why)
+        return EvidenceCheck(ok=False, rule=e.rule, why=e.why)
     except FileNotFoundError as e:
         raise HTTPException(status_code=503, detail=str(e)) from e
 

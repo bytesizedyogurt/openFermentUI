@@ -224,3 +224,49 @@ def test_no_project_open_reads_no_protocol():
         assert protocols.held() == []
         with pytest.raises(projects.ProjectRequired):
             protocols.listed()
+
+
+def _kept_in_an_older_shape(protocol_id: str, body: dict) -> None:
+    """A protocol row kept in a shape the model no longer reads, written straight into its table."""
+    from openferment_core import db, projects
+    from openferment_core.db import models as t
+    from openferment_core.db import rows
+
+    async def put() -> None:
+        async with db.session() as s:
+            await rows.put(s, t.protocols, projects.current(), protocol_id, body, by="Ada")
+
+    db.run(put())
+
+
+def test_one_row_that_does_not_read_leaves_the_rest_and_every_reader_reading(monkeypatch, caplog):
+    monkeypatch.setattr(guild, "projection", GUILD_PROJECTION)
+    skill("SK-PH-A")
+    assert client().post("/api/protocols", json={"protocol": protocol(), "by": "Ada"}).status_code == 200
+    _kept_in_an_older_shape("PR-OLDER", {**protocol("PR-OLDER"), "category": "a placeholder word"})
+    unraised = TestClient(api.app, base_url="http://127.0.0.1", raise_server_exceptions=False)
+    with caplog.at_level("WARNING", logger="openferment_core.protocols"):
+        listed = unraised.get("/api/protocols")
+    assert listed.status_code == 200 and [p["id"] for p in listed.json()] == ["PR-PLACEHOLDER"]
+    assert any("row PR-OLDER does not read as a protocol and is left out" in r.getMessage() for r in caplog.records)
+    one = unraised.get("/api/protocols/PR-OLDER")
+    assert one.status_code == 404 and "no longer reads as a protocol" in one.json()["detail"]
+    grown = unraised.post("/api/protocols/PR-OLDER/versions", json={"version": version("1.1"), "by": "Ada"})
+    assert grown.status_code == 422 and "so no version is added to it" in grown.json()["detail"]
+    assert [p["protocolId"] for p in guild.projection()["protocols"]] == ["PR-PLACEHOLDER"]
+
+
+def test_a_protocol_is_held_to_its_rows_size(monkeypatch):
+    skill("SK-PH-A")
+    monkeypatch.setattr(protocols, "MAX_BYTES", 4000)
+    many = [{"id": f"s{n}", "text": "A placeholder step, written out at some length to fill the row."}
+            for n in range(1, 60)]
+    refused = client().post("/api/protocols", json={"protocol": protocol(versions=[version(materials=[], steps=many)]),
+                                                    "by": "Ada"})
+    assert refused.status_code == 422 and "bytes as its row keeps it, over the 4,000" in refused.json()["detail"]
+    assert client().get("/api/protocols").json() == [], "nothing kept"
+    assert client().post("/api/protocols", json={"protocol": protocol(), "by": "Ada"}).status_code == 200
+    grown = client().post("/api/protocols/PR-PLACEHOLDER/versions",
+                          json={"version": version("1.1", materials=[], steps=many), "by": "Ada"})
+    assert grown.status_code == 422 and "bytes as its row keeps it, over the 4,000" in grown.json()["detail"]
+    assert [v["version"] for v in client().get("/api/protocols/PR-PLACEHOLDER").json()["versions"]] == ["1.0"]

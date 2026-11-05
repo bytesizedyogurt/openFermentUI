@@ -164,6 +164,7 @@ export default function PrimerLesson({ lessonId }: { lessonId: string }) {
   const SKILL_BY_ID = useSkillById();
   const lessons = useStore((s) => s.lessons);
   const read = useStore((s) => s.cataloguesRead);
+  const problem = useStore((s) => s.cataloguesProblem);
   const recordLesson = useStore((s) => s.recordLessonForGuild);
   const toast = useStore((s) => s.toast);
   const ctx = useGuild();
@@ -180,8 +181,12 @@ export default function PrimerLesson({ lessonId }: { lessonId: string }) {
   if (!lesson) {
     return (
       <EmptyState
-        title={read ? 'Lesson not found' : 'Reading the project\u2019s lessons'}
-        body={read ? `The project's lesson catalogue holds no lesson ${lessonId}.` : 'The lessons are read from the project\u2019s lesson catalogue as the page opens.'}
+        title={read ? 'Lesson not found' : problem ? 'The lessons could not be read' : 'Reading the project\u2019s lessons'}
+        body={
+          read
+            ? `The project's lesson catalogue holds no lesson ${lessonId}.`
+            : (problem ?? 'The lessons are read from the project\u2019s lesson catalogue as the page opens.')
+        }
         action={<Button onClick={() => navigate('/primer')}>Back to Primer</Button>}
       />
     );
@@ -240,7 +245,12 @@ export default function PrimerLesson({ lessonId }: { lessonId: string }) {
         Lesson {index + 1} of {lessons.length}
         {lesson.minutes != null && <> · {lesson.minutes} min</>}
       </div>
-      <h1 className="font-serif text-page-title font-semibold mb-5">{lesson.name}</h1>
+      <h1 className={cx('font-serif text-page-title font-semibold', lesson.summary ? 'mb-1' : 'mb-5')}>{lesson.name}</h1>
+      {lesson.summary && (
+        <p className="text-body text-ink-soft mb-5" data-testid="primer-lesson-summary">
+          {lesson.summary}
+        </p>
+      )}
 
       {counts.length > 0 && (
         <Card className="p-3 mb-6 space-y-2" aria-label="What this lesson counts toward">

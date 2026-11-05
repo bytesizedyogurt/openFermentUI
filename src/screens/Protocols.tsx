@@ -402,6 +402,167 @@ function ProtocolCard({ row, strains }: { row: ProtoRow; strains: Strain[] }) {
   );
 }
 
+// ── Begin a protocol (ADR-017) ─────────────────────────────────────────
+
+/** A protocol's id, as the service holds one: a letter or a digit first, then letters, digits, '.', '_' or '-'. */
+const PROTOCOL_ID = /^[A-Za-z0-9][A-Za-z0-9._-]{0,79}$/;
+
+/**
+ * A protocol begun on this page: its own fields and a first version, version 1.0, with its base batch, the minutes a
+ * run takes and its steps, one a line. The service keeps it in the reviewer's name, once under its id; its materials,
+ * equipment, safety notes and each step's skills are written in the editor next, which keeps them as version 1.1.
+ */
+function BeginProtocol({ onClose }: { onClose: () => void }) {
+  const reviewer = useStore((s) => s.reviewer).trim();
+  const beginProtocol = useStore((s) => s.beginProtocol);
+  const [f, setF] = useState({
+    id: '',
+    title: '',
+    category: 'sop' as ProtocolCategory,
+    bsl: 1 as 1 | 2,
+    purpose: '',
+    organisms: '',
+    batchValue: '',
+    batchUnit: '',
+    batchLabel: '',
+    active: '',
+    total: '',
+    steps: '',
+  });
+  const [busy, setBusy] = useState(false);
+  const [problem, setProblem] = useState<string | null>(null);
+  const set = <K extends keyof typeof f>(k: K, v: (typeof f)[K]) => setF((was) => ({ ...was, [k]: v }));
+  const lines = (t: string) =>
+    t
+      .split('\n')
+      .map((x) => x.trim())
+      .filter(Boolean);
+  const steps = lines(f.steps);
+  const batch = Number(f.batchValue);
+  const missing = [
+    !PROTOCOL_ID.test(f.id.trim()) && 'an id: a letter or a digit first, then letters, digits, ".", "_" or "-"',
+    !f.title.trim() && 'a title',
+    !(f.batchValue.trim() && Number.isFinite(batch) && batch > 0) && 'a base batch above zero',
+    !f.batchUnit.trim() && "the base batch's unit",
+    !(f.active.trim() && Number(f.active) >= 0 && f.total.trim() && Number(f.total) >= 0) && 'the minutes a run takes, hands on and in all',
+    steps.length === 0 && 'a first step',
+  ].filter((x): x is string => Boolean(x));
+  const begin = () => {
+    setBusy(true);
+    setProblem(null);
+    const protocol: Protocol = {
+      id: f.id.trim(),
+      title: f.title.trim(),
+      category: f.category,
+      bsl: f.bsl,
+      purpose: f.purpose.trim(),
+      organisms: lines(f.organisms),
+      currentVersion: '1.0',
+      provenanceNote: '',
+      versions: [
+        {
+          version: '1.0',
+          changelog: 'The first version.',
+          baseBatch: { value: batch, unit: f.batchUnit.trim(), label: f.batchLabel.trim() },
+          materials: [],
+          equipment: [],
+          safety: [],
+          steps: steps.map((text, i) => ({ id: `s${i + 1}`, text })),
+          estMinutes: { active: Number(f.active), total: Number(f.total) },
+          references: [],
+          // The service writes who kept the version, and when.
+          by: '',
+          at: '',
+        },
+      ],
+    };
+    void beginProtocol(protocol).then((why) => {
+      setBusy(false);
+      if (why) setProblem(why);
+      else navigate(`/runbooks/protocols/${protocol.id}/edit`);
+    });
+  };
+  const box = (k: 'id' | 'title' | 'batchValue' | 'batchUnit' | 'batchLabel' | 'active' | 'total', label: string, hint?: string) => (
+    <label className="block text-caption text-ink-soft">
+      {label}
+      <input className="input text-body block mt-0.5 w-full" value={f[k]} onChange={(e) => set(k, e.target.value)} aria-label={label} data-testid={`begin-protocol-${k}`} />
+      {hint && <span className="block mt-0.5 text-ink-soft/80">{hint}</span>}
+    </label>
+  );
+  return (
+    <Card className="p-4 mb-4" data-testid="begin-protocol">
+      <h2 className="font-serif text-section-title font-semibold mb-1">Begin a protocol</h2>
+      <p className="text-caption text-ink-soft mb-3">
+        The service keeps it once under its id, in your name, with version 1.0. Its materials, equipment, safety notes and the skills each
+        step needs are written in the editor next, which keeps them as version 1.1.
+      </p>
+      <div className="grid gap-3 sm:grid-cols-2">
+        {box('id', 'Id', 'A letter or a digit first, then letters, digits, ".", "_" or "-".')}
+        {box('title', 'Title')}
+        <label className="block text-caption text-ink-soft">
+          Category
+          <select className="input text-body block mt-0.5 w-full" value={f.category} onChange={(e) => set('category', e.target.value as ProtocolCategory)} aria-label="Category">
+            {(Object.keys(CATEGORY_META) as ProtocolCategory[]).map((c) => (
+              <option key={c} value={c}>
+                {CATEGORY_META[c].label}
+              </option>
+            ))}
+          </select>
+        </label>
+        <label className="block text-caption text-ink-soft">
+          Biosafety level
+          <select className="input text-body block mt-0.5 w-full" value={f.bsl} onChange={(e) => set('bsl', e.target.value === '2' ? 2 : 1)} aria-label="Biosafety level">
+            <option value={1}>BSL-1</option>
+            <option value={2}>BSL-2</option>
+          </select>
+        </label>
+        {box('batchValue', 'Base batch', 'The batch its amounts are written for.')}
+        {box('batchUnit', "The base batch's unit")}
+        {box('batchLabel', 'What the batch is called')}
+        <div className="grid grid-cols-2 gap-2">
+          {box('active', 'Minutes hands on')}
+          {box('total', 'Minutes in all')}
+        </div>
+        <label className="block text-caption text-ink-soft sm:col-span-2">
+          Purpose
+          <textarea className="input font-sans text-body block mt-0.5 w-full min-h-[56px]" value={f.purpose} onChange={(e) => set('purpose', e.target.value)} aria-label="Purpose" />
+        </label>
+        <label className="block text-caption text-ink-soft sm:col-span-2">
+          The organisms it is written for, one a line
+          <textarea className="input font-sans text-body block mt-0.5 w-full min-h-[44px]" value={f.organisms} onChange={(e) => set('organisms', e.target.value)} aria-label="Organisms" />
+        </label>
+        <label className="block text-caption text-ink-soft sm:col-span-2">
+          Its steps, one a line
+          <textarea className="input font-sans text-body block mt-0.5 w-full min-h-[88px]" value={f.steps} onChange={(e) => set('steps', e.target.value)} aria-label="Steps" data-testid="begin-protocol-steps" />
+        </label>
+      </div>
+      {missing.length > 0 && <p className="text-caption text-ink-soft mt-2">To begin it, write {missing.join('; ')}.</p>}
+      <div className="flex flex-wrap items-center gap-2 mt-3">
+        <Button variant="primary" disabled={busy || missing.length > 0 || !reviewer} onClick={begin} data-testid="begin-protocol-keep">
+          {busy ? 'Keeping…' : 'Begin it'}
+        </Button>
+        <Button onClick={onClose} disabled={busy}>
+          Close
+        </Button>
+        {!reviewer && (
+          <span className="text-caption text-ink-soft">
+            A protocol is kept in a person&rsquo;s name: set yours in{' '}
+            <a className="underline underline-offset-2 hover:text-accent" href={href('/settings/corpus')}>
+              Settings
+            </a>{' '}
+            first.
+          </span>
+        )}
+      </div>
+      {problem && (
+        <p className="text-caption text-signal-warn mt-2" data-testid="begin-protocol-problem">
+          {problem}
+        </p>
+      )}
+    </Card>
+  );
+}
+
 // ── Screen ─────────────────────────────────────────────────────────────
 
 export default function Protocols() {
@@ -414,6 +575,7 @@ export default function Protocols() {
   const density = useStore((s) => s.ui.density);
 
   const [view, setView] = useState<'cards' | 'table'>('cards');
+  const [beginning, setBeginning] = useState(false);
   const [query, setQuery] = useState('');
   const [selection, setSelection] = useState<Record<FacetKey, string[]>>(EMPTY_SELECTION);
 
@@ -434,6 +596,7 @@ export default function Protocols() {
       };
     });
   }, [protocols, records, runs]);
+  const versionCount = allRows.reduce((n, r) => n + r.protocol.versions.length, 0);
 
   const matchesQuery = useMemo(() => {
     const q = query.trim().toLowerCase();
@@ -678,12 +841,16 @@ export default function Protocols() {
       subtitle={
         <>
           Executable bench procedures whose quantities are bound to materials, so a batch-size change
-          rewrites every number. <span className="font-num">{allRows.length}</span> protocols across{' '}
-          <span className="font-num">{allRows.reduce((n, r) => n + r.protocol.versions.length, 0)}</span>{' '}
-          versions. Capability icons are computed from content, never declared.
+          rewrites every number. <span className="font-num">{allRows.length}</span> protocol{allRows.length === 1 ? '' : 's'} across{' '}
+          <span className="font-num">{versionCount}</span> version{versionCount === 1 ? '' : 's'}. Capability icons are computed from
+          content, never declared.
         </>
       }
       actions={
+        <>
+        <Button size="sm" onClick={() => setBeginning(true)} disabled={!protocolsRead} data-testid="begin-protocol-open">
+          Begin a protocol
+        </Button>
         <div className="flex items-center gap-1 rounded-btn border border-line p-0.5" role="group" aria-label="View">
           <button
             className={cx(
@@ -708,9 +875,11 @@ export default function Protocols() {
             <Table2 size={13} /> Table
           </button>
         </div>
+        </>
       }
     />
     <OwnerTabs tabs={RUNBOOK_TABS} />
+    {beginning && <BeginProtocol onClose={() => setBeginning(false)} />}
     </>
   );
 
@@ -725,10 +894,17 @@ export default function Protocols() {
               protocolsProblem
                 ? protocolsProblem
                 : protocolsRead
-                  ? 'No protocol ships with the app. A protocol the project keeps on the service appears here, each with its steps, materials and the records its quantities cite.'
+                  ? 'No protocol ships with the app. A protocol enters the project in a person\u2019s name, begun here (or kept through POST /api/protocols), and appears with its steps, materials and the records its quantities cite.'
                   : 'The protocols are read from the service as the page opens.'
             }
             icon={<ClipboardList size={22} />}
+            action={
+              protocolsRead && !beginning ? (
+                <Button onClick={() => setBeginning(true)} data-testid="begin-protocol-empty">
+                  Begin a protocol
+                </Button>
+              ) : undefined
+            }
           />
         </Card>
       </>

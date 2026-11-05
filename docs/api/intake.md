@@ -88,5 +88,6 @@ here, and a product's class and location are read from its entry), Guild's skill
 policies and the lessons that count toward them. Postdoc reads a catalogue with `catalogue_read` and
 keeps an entry, marked as its own and audited, with `catalogue_write` (`docs/TOOLS.md`), which
 takes no number: a skill a model keeps holds no policy until a person writes one, and a lesson a
-model keeps holds no body. `catalogue_read` lists a lesson with its skills and minutes, its body
-left to the catalogues screen and Primer.
+model keeps holds no body. `catalogue_read` lists a lesson with its skills and minutes; Primer
+draws its body, and the catalogues screen counts its blocks and checkpoint questions and keeps the
+body as the lesson holds it when a person edits the lesson's other fields.

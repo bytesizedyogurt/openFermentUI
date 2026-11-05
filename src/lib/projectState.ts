@@ -18,16 +18,8 @@ import type { components } from '@/api/types.gen';
 import type { LiveConversation } from './postdoc';
 import { ServiceDown, ServiceRefused, call } from './http';
 
-export type StateKind =
-  | 'depositions'
-  | 'measuredEvidence'
-  | 'runbooks'
-  | 'runbookLocks'
-  | 'overrides'
-  | 'fits'
-  | 'scenarios'
-  | 'trains'
-  | 'conversations';
+/** Each kind of row a project keeps of its pages: every field of `ProjectState` that holds rows. */
+export type StateKind = Exclude<keyof ProjectState, 'depositedBy' | 'refused'>;
 
 /** A row the service keeps that does not read as its kind, and why; the store says each in words. */
 export type RefusedRow = components['schemas']['RefusedRow'];

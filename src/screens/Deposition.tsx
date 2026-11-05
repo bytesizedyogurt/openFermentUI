@@ -38,7 +38,7 @@ import {
   StickyNote,
   X,
 } from 'lucide-react';
-import { useStore } from '@/store';
+import { useProtocol, useStore } from '@/store';
 import { href, navigate } from '@/router';
 import type { Step } from '@/lib/protocols';
 import { measuresOf, predictionsOf } from '@/lib/studies';
@@ -108,7 +108,8 @@ function TimerRing({ remaining, total }: { remaining: number; total: number }) {
 
 export default function Deposition({ protocolId, runId }: { protocolId: string; runId: string }) {
   const run = useStore((s) => s.runs[runId]);
-  const protocol = useStore((s) => s.protocols.find((p) => p.id === protocolId));
+  // The protocol is the project's, read from the service (useProtocol); the run is this page's own.
+  const { protocol, state: protocolState, problem: protocolProblem } = useProtocol(protocolId);
   const setRunStep = useStore((s) => s.setRunStep);
   const completeStep = useStore((s) => s.completeStep);
   const skipStep = useStore((s) => s.skipStep);
@@ -265,12 +266,24 @@ export default function Deposition({ protocolId, runId }: { protocolId: string; 
     }));
   }, [run, version, steps]);
 
-  if (!protocol || !version) {
+  if (!protocol) {
     return (
       <div className="p-8">
         <EmptyState
-          title="Protocol not found"
-          body={`No protocol with id ${protocolId} exists in this session.`}
+          title={
+            protocolState === 'problem'
+              ? 'The protocols could not be read'
+              : protocolState === 'reading'
+                ? 'Reading the project\u2019s protocols'
+                : 'Protocol not found'
+          }
+          body={
+            protocolState === 'problem'
+              ? (protocolProblem ?? '')
+              : protocolState === 'reading'
+                ? 'The protocols are read from the service as the page opens.'
+                : `The project keeps no protocol ${protocolId}.`
+          }
           action={<Button onClick={() => navigate('/runbooks/protocols')}>Back to protocols</Button>}
         />
       </div>
@@ -282,7 +295,7 @@ export default function Deposition({ protocolId, runId }: { protocolId: string; 
       <div className="p-8">
         <EmptyState
           title="This run is no longer active"
-          body="Run state lives in memory for the session and does not survive a page refresh — that is a stated constraint of this simulation, and it is why every run offers a text-log export before you leave it."
+          body="A run at the bench lives in this page's memory, so a reload ends it; every run offers its text log to export before you leave it. The protocol stands as the project keeps it, and a fresh run starts from its current version."
           action={
             <div className="flex gap-2">
               <Button
@@ -297,6 +310,18 @@ export default function Deposition({ protocolId, runId }: { protocolId: string; 
               <Button onClick={() => navigate(`/runbooks/protocols/${protocolId}`)}>Open the protocol</Button>
             </div>
           }
+        />
+      </div>
+    );
+  }
+
+  if (!version) {
+    return (
+      <div className="p-8">
+        <EmptyState
+          title="This run's version is not one the protocol keeps"
+          body={`Run ${runId} follows version ${run.version} of ${protocol.title}, and the protocol keeps ${protocol.versions.map((v) => v.version).join(', ')}.`}
+          action={<Button onClick={() => navigate(`/runbooks/protocols/${protocolId}`)}>Open the protocol</Button>}
         />
       </div>
     );

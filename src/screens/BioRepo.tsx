@@ -322,8 +322,8 @@ export default function BioRepo() {
       title="BioRepo"
       subtitle={
         <>
-          Papers that arrived through Intake — <span className="font-num">{allRows.length}</span> papers carrying{' '}
-          <span className="font-num">{records.length}</span> extraction records. Filters combine with AND
+          Papers that arrived through Intake: <span className="font-num">{allRows.length}</span> paper{allRows.length === 1 ? '' : 's'} carrying{' '}
+          <span className="font-num">{records.length}</span> extraction record{records.length === 1 ? '' : 's'}. Filters combine with AND
           across groups and OR inside a group.
         </>
       }

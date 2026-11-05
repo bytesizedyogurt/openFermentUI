@@ -140,7 +140,7 @@ function ReferenceFiles({ held }: { held: SFFFlowsheet[] }) {
       .catch((e: unknown) => !ctrl.signal.aborted && setListProblem(problemOf(e)));
     return () => ctrl.abort();
   }, []);
-  const kept = new Map(held.filter((r) => r.libraryId).map((r) => [r.libraryId as string, r.id]));
+  const kept = new Map(held.flatMap((r) => (r.libraryId ? [[r.libraryId, r.id] as const] : [])));
   const keep = (f: SFFLibraryEntry) => {
     setBusy(f.id);
     setProblem(null);

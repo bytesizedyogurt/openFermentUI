@@ -17,9 +17,9 @@
 // project's skill catalogue (lib/catalogues.ts, `Skill`).
 import type { components } from '@/api/types.gen';
 import { DEFAULT_POLICY } from '@/engine/competence';
-import type { DecisionCheck } from './review';
 import { IntakeDown } from './intake';
 import { apiFetch } from './project';
+import { detailWords } from './http';
 
 type S = components['schemas'];
 
@@ -30,9 +30,9 @@ export type GuildPerson = S['GuildPerson'];
 /** What a person may do on the ledger: a member holds skills, the lead designates assessors, an auditor reads. */
 export type GuildRole = GuildPerson['role'];
 /** One thing a person did that bears on one skill. Append-only. */
+/** `POST /api/guild/check`: whether the service would keep an entry, and the rule of Guild's it would refuse it under. */
+export type EvidenceCheck = S['EvidenceCheck'];
 export type GuildEvidence = S['GuildEvidence'];
-/** Every kind of entry the ledger holds. */
-export type EvidenceKind = GuildEvidence['kind'];
 /** What an entry rests on: a sign-off, the lead, a run at the bench, a lesson, a practice session or a check. */
 export type EvidenceSource = S['EvidenceSource'];
 /** `POST /api/guild/withdraw`: an entry taken back, by whom, when and why; the entry stays on the ledger, marked. */
@@ -76,7 +76,7 @@ async function call<T>(path: string, body?: unknown, signal?: AbortSignal): Prom
   if (response.status === 422) {
     let detail = '';
     try {
-      detail = String(((await response.json()) as { detail?: string }).detail ?? '');
+      detail = detailWords(((await response.json()) as { detail?: unknown }).detail);
     } catch {
       /* the status is the message */
     }
@@ -100,7 +100,7 @@ export const postPerson = (p: GuildPerson, signal?: AbortSignal) => call<GuildPe
 export const postEvidence = (e: GuildEvidence, signal?: AbortSignal) => call<GuildEvidence>('/api/guild/evidence', e, signal);
 export const postWithdrawal = (w: GuildWithdrawal, signal?: AbortSignal) =>
   call<GuildEvidence>('/api/guild/withdraw', w, signal);
-export const checkEvidence = (e: GuildEvidence, signal?: AbortSignal) => call<DecisionCheck>('/api/guild/check', e, signal);
+export const checkEvidence = (e: GuildEvidence, signal?: AbortSignal) => call<EvidenceCheck>('/api/guild/check', e, signal);
 export const postPolicy = (p: GuildPolicy) => call<GuildPolicy>('/api/guild/policy', p);
 
 // ── ids ────────────────────────────────────────────────────────────────

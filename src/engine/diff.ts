@@ -1,6 +1,10 @@
 // Structural diff of two protocol versions (OF-DES-001 §8.11). A version is
 // the project's (lib/protocols.ts, served whole): a list it keeps none of
-// reads as empty, and a timer it keeps none of as null.
+// reads as empty, and a timer it keeps none of as null. A step differs in any
+// field it keeps (its words, its timer and the timer's label, its sub-checks,
+// its note, its references and the skills it needs), and a material in any of
+// its own (its amount, unit, scaling, rounding, stock and the record it rests
+// on), each named in words by `stepChanges` and `materialChanges`.
 import type { ProtocolVersion, Step, Material } from '@/lib/protocols';
 
 export interface StepDiff {
@@ -22,6 +26,33 @@ export interface VersionDiff {
   changelog?: string | null;
 }
 
+const list = (v: readonly string[] | null | undefined) => JSON.stringify(v ?? []);
+
+/** What differs between two versions of one step, each field in words, in the order the step shows them. */
+export function stepChanges(a: Step, b: Step): string[] {
+  return [
+    a.text !== b.text ? 'instruction' : null,
+    (a.timerSec ?? null) !== (b.timerSec ?? null) ? 'timer' : null,
+    (a.timerLabel ?? null) !== (b.timerLabel ?? null) ? 'timer label' : null,
+    list(a.multiCheck) !== list(b.multiCheck) ? 'sub-checks' : null,
+    (a.note ?? null) !== (b.note ?? null) ? 'note' : null,
+    list(a.refs) !== list(b.refs) ? 'references' : null,
+    list(a.skills) !== list(b.skills) ? 'skills' : null,
+  ].filter((c): c is string => c !== null);
+}
+
+/** What differs between two versions of one material, each field in words. */
+export function materialChanges(a: Material, b: Material): string[] {
+  return [
+    a.amount !== b.amount ? 'amount' : null,
+    a.unit !== b.unit ? 'unit' : null,
+    a.scaling !== b.scaling ? 'scaling' : null,
+    a.precision !== b.precision ? 'rounding' : null,
+    JSON.stringify(a.stock ?? null) !== JSON.stringify(b.stock ?? null) ? 'stock' : null,
+    (a.sourceRecordId ?? null) !== (b.sourceRecordId ?? null) ? 'record' : null,
+  ].filter((c): c is string => c !== null);
+}
+
 export function diffVersions(a: ProtocolVersion, b: ProtocolVersion): VersionDiff {
   const steps: StepDiff[] = [];
   const aList = a.steps ?? [];
@@ -32,12 +63,7 @@ export function diffVersions(a: ProtocolVersion, b: ProtocolVersion): VersionDif
   for (const s of bList) {
     const prev = aSteps.get(s.id);
     if (!prev) steps.push({ kind: 'added', b: s });
-    else if (
-      prev.text !== s.text ||
-      (prev.timerSec ?? null) !== (s.timerSec ?? null) ||
-      JSON.stringify(prev.multiCheck?.length ? prev.multiCheck : null) !== JSON.stringify(s.multiCheck?.length ? s.multiCheck : null)
-    )
-      steps.push({ kind: 'modified', a: prev, b: s });
+    else if (stepChanges(prev, s).length > 0) steps.push({ kind: 'modified', a: prev, b: s });
     else steps.push({ kind: 'unchanged', a: prev, b: s });
   }
   for (const s of aList) {
@@ -52,8 +78,7 @@ export function diffVersions(a: ProtocolVersion, b: ProtocolVersion): VersionDif
   for (const m of bMatList) {
     const prev = aMats.get(m.name);
     if (!prev) materials.push({ kind: 'added', name: m.name, b: m });
-    else if (prev.amount !== m.amount || prev.unit !== m.unit || prev.scaling !== m.scaling)
-      materials.push({ kind: 'modified', name: m.name, a: prev, b: m });
+    else if (materialChanges(prev, m).length > 0) materials.push({ kind: 'modified', name: m.name, a: prev, b: m });
     else materials.push({ kind: 'unchanged', name: m.name, a: prev, b: m });
   }
   for (const m of aMatList) {

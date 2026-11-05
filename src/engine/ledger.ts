@@ -37,14 +37,15 @@ export function ledgerRows(runbooks: Runbook[], depositions: Deposition[]): Ledg
   const rows: LedgerRow[] = [];
   for (const rb of runbooks) {
     if (!rb.lockedAt) continue;
+    // Each reconciled run with its reconciliation, so no reader below meets a run without one.
     const runs = depositions
-      .filter((d) => d.runbookId === rb.id && d.reconciliation && d.reconciliation.outcome !== 'inconclusive')
-      .sort((a, b) => (a.reconciliation!.at < b.reconciliation!.at ? -1 : 1));
+      .flatMap((d) => (d.runbookId === rb.id && d.reconciliation && d.reconciliation.outcome !== 'inconclusive' ? [{ d, r: d.reconciliation }] : []))
+      .sort((a, b) => (a.r.at < b.r.at ? -1 : 1));
     for (const p of rb.predictions ?? []) {
       let observed: LedgerRow['observed'] = null;
-      for (const d of runs) {
-        const delta = d.reconciliation!.deltas.find((x) => x.predictionId === p.id);
-        if (delta) observed = { value: delta.observed, unit: delta.unit, depositionId: d.id, at: d.reconciliation!.at };
+      for (const { d, r } of runs) {
+        const delta = r.deltas.find((x) => x.predictionId === p.id);
+        if (delta) observed = { value: delta.observed, unit: delta.unit, depositionId: d.id, at: r.at };
       }
       rows.push({
         runbookId: rb.id,

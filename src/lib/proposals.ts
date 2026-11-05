@@ -10,6 +10,7 @@ import type { GuildPerson } from './guild';
 import { mayQueue } from '@/engine/checks';
 import type { StatusMap } from '@/engine/competence';
 import { apiFetch } from './project';
+import { detailWords } from './http';
 
 type S = components['schemas'];
 
@@ -56,7 +57,7 @@ async function act(id: string, verb: 'carry-out' | 'dismiss', body: ProposalActi
   if (!response.ok) {
     let detail = `${response.status}`;
     try {
-      detail = String(((await response.json()) as { detail?: string }).detail ?? detail);
+      detail = detailWords(((await response.json()) as { detail?: unknown }).detail) || detail;
     } catch {
       /* the status is the message */
     }

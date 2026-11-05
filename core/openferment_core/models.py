@@ -982,14 +982,40 @@ class Candidate(BaseModel):
     valueBasis: ValueBasis | None = None
 
 
+# The rules `biorepo.write` refuses a decision under (OF-BLD-012.1 §2.3),
+# `biorepo.RULES` in this order: no such record, no reviewer named, no full
+# text to verify against, a quote that fails anchoring, a paper with no
+# identifier, a value that does not convert into its field's unit, a status
+# the decision cannot hold, and a model's estimate (ADR-006).
+DecisionRule = Literal["record", "reviewer", "fulltext", "quote", "paper", "unit", "status", "estimate"]
+
+
 class DecisionCheck(BaseModel):
     """What `POST /api/biorepo/check` answers (OF-BLD-012.1 F1.5): whether
     `biorepo.write` would store this decision, and the rule it would refuse
-    it under. The browser asks before the reviewer presses the key, so the
-    screen says what the service would say rather than a mirror of it."""
+    it under, with why (both null when it would store it). The browser asks
+    before the reviewer presses the key, so the screen says what the service
+    would say."""
 
     ok: bool
-    rule: str | None = None
+    rule: DecisionRule | None = None
+    why: str | None = None
+
+
+# The rules `guild.write_evidence` refuses an entry under, `guild.RULES` in
+# this order.
+GuildRule = Literal["name", "role", "added", "duplicate", "person", "skill", "source", "observer", "authority",
+                    "outcome", "note", "date", "evidence", "policy"]
+
+
+class EvidenceCheck(BaseModel):
+    """What `POST /api/guild/check` answers: whether `guild.write_evidence`
+    would keep this entry, and the rule it would refuse it under, with why
+    (both null when it would keep it). The sign-off sheet asks before anyone
+    signs, so it says what the service would say."""
+
+    ok: bool
+    rule: GuildRule | None = None
     why: str | None = None
 
 
@@ -4931,9 +4957,9 @@ class ProformaScenario(BaseModel):
 
 
 class TrainMade(BaseModel):
-    """A train a person built in pureOS's Builder and saved (mirrors
-    `TrainMade` in src/lib/durable.ts): the train as data, when it was saved,
-    and the name it was saved under."""
+    """A train a person built in pureOS's Builder and saved (the browser
+    reads it as `TrainMade`, src/lib/durable.ts): the train as data, when it
+    was saved, and the name it was saved under."""
 
     model_config = ConfigDict(extra="allow")
 

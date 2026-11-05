@@ -140,6 +140,7 @@ function LivePanel({
       {/* The service is up but cannot answer. A different problem from being
           down, and a different fix — restarting it would not help. */}
       {health && health.ok && !health.hasKey && (
+        <div data-testid="postdoc-no-key">
         <Callout kind="warn" title="Postdoc is running without an API key">
           {/* The variable is deliberately NOT named here. check:secrets forbids
               src/ from naming it at all — src/ is the browser bundle, and the
@@ -152,6 +153,7 @@ function LivePanel({
             is the whole reason the service exists.
           </p>
         </Callout>
+        </div>
       )}
 
       {turns.map((t, i) => (

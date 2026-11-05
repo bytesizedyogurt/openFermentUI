@@ -70,7 +70,8 @@ What a module read answers, and what each kind of row holds, closes [Module read
   whole of a large output travels in `data`, which no model reads, and a refusal is `error`, in
   words. `auditIds` names each audit row the call wrote, oldest first, by the id `GET /api/audit`
   serves it under: a write names the row of what it kept, a gated write the row of its proposal,
-  and a read names none.
+  and a read names none. A call that fails after a write committed names that write's row beside
+  its `error`, and a write the failure rolled back left no row to name.
 - **Scope**: every tool acts in one project (ADR-005): the request's, the question's, or the one the
   MCP server was started in.
 - **Writes**: a tool marked *writes* keeps something new in the project, audited as its caller's,

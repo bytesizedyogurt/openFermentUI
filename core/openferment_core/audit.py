@@ -117,6 +117,24 @@ async def _read(project_id: str, limit: int, action: str | None, target: str | N
     return [AuditRow.model_validate({**body, "id": str(seq)}) for seq, body in reversed(found)]
 
 
+async def _standing(project_id: str, ids: list[int]) -> set[int]:
+    async with db.session() as s:
+        found = (await s.execute(select(t.audit.c.seq).where(t.audit.c.project_id == project_id,
+                                                              t.audit.c.seq.in_(ids)))).scalars()
+        return set(found)
+
+
+def standing(ids: list[str], project_id: str | None = None) -> list[str]:
+    """The ids among `ids` whose rows the project's table holds (the project
+    named, else the current one), in the order given: a row added in a
+    transaction that was rolled back is gone, and its id is left out."""
+    numbers = [int(i) for i in ids if i.isdigit()]
+    if not numbers:
+        return []
+    held = db.run(_standing(project_id or projects.current(), numbers))
+    return [i for i in ids if i.isdigit() and int(i) in held]
+
+
 def read(limit: int = MAX_READ, *, action: str | None = None, target: str | None = None,
          who: str | None = None) -> list[AuditRow]:
     """The current project's newest `limit` rows, newest last; given an

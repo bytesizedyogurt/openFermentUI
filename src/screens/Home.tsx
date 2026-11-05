@@ -249,14 +249,14 @@ interface Counted {
 
 function stateOf(n: Counted): Record<string, { now: string; built: boolean }> {
   return {
-    Intake: { now: `${n.records} extraction records`, built: true },
-    BioRepo: { now: `${n.papers} papers · gold set not yet annotated`, built: true },
+    Intake: { now: `${n.records} extraction record${n.records === 1 ? '' : 's'}`, built: true },
+    BioRepo: { now: `${n.papers} paper${n.papers === 1 ? '' : 's'} · gold set not yet annotated`, built: true },
     Postdoc: { now: 'live through openferment-core, on the model it is configured with', built: true },
-    geneOS: { now: `${n.strains} hosts · no sequence tooling`, built: true },
+    geneOS: { now: `${n.strains} host${n.strains === 1 ? '' : 's'} · no sequence tooling`, built: true },
     fermOS: { now: 'empty — no kinetics, no transport, no scale-up', built: false },
     pureOS: { now: `${UNIT_OPERATIONS.length} unit operations · no process model`, built: true },
-    Proforma: { now: `${n.scenarios} scenarios`, built: true },
-    Runbooks: { now: `${n.runbooks} runbooks · ${n.protocols} protocols`, built: true },
+    Proforma: { now: `${n.scenarios} scenario${n.scenarios === 1 ? '' : 's'}`, built: true },
+    Runbooks: { now: `${n.runbooks} runbook${n.runbooks === 1 ? '' : 's'} · ${n.protocols} protocol${n.protocols === 1 ? '' : 's'}`, built: true },
     Primer: { now: `${n.lessons} lesson${n.lessons === 1 ? '' : 's'}`, built: true },
     Guild: { now: 'review queue and roles', built: true },
     Catalogues: { now: 'kept on the service, each entry in its keeper’s name', built: true },

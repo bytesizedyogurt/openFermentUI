@@ -13,10 +13,11 @@
 // product's class and where the cells leave it; Postdoc reads the strains among geneOS's hosts and finds a strain a
 // question names by any of its names; ProtParam computes from a product's sequence; Guild rates people on each skill
 // by its policy, and nobody on a skill kept with none; a lesson passed counts toward the skills it names. The store
-// reads the strains and the products (alpha 2.2 E.9) as the page opens and again after each keep and each file taken
-// in here, so geneOS's hosts, the strain choosers and the runbooks name what this screen keeps; its own lists of
-// skills and lessons stay empty until it reads those catalogues too (E.12). Every shape is the service's own
-// (src/lib/catalogues.ts).
+// reads all four catalogues (alpha 2.2 E.9 and E.12) as the page opens and again after each keep and each file taken
+// in here, so geneOS's hosts, the strain choosers, the runbooks, Guild, the protocols and Primer name what this screen
+// keeps. A lesson's body (its minutes, its blocks and its checkpoint, ADR-018) arrives in a file of lessons; the form
+// edits the rest of a lesson and sends its body back as the lesson holds it (`edited`). Every shape is the service's
+// own (src/lib/catalogues.ts).
 import { useEffect, useMemo, useRef, useState, type ReactNode } from 'react';
 import { BookMarked, Pencil, Plus, Upload } from 'lucide-react';
 import { href } from '@/router';
@@ -25,6 +26,8 @@ import { stamp } from '@/lib/proforma';
 import {
   CataloguesDown,
   blankEntry,
+  bodyWords,
+  edited,
   hasPolicy,
   keepEntry,
   keptIn,
@@ -129,16 +132,19 @@ const lines = (s: string): string[] =>
 /** A count a person typed, or none when the box is empty; the service refuses one that is no whole number, in words. */
 const count = (s: string): number | null => (s.trim() === '' ? null : Number(s));
 
-/** The entry a draft sends: the fields its kind takes, a blank field as none. The service writes who kept it and when. */
-function entryOf(kind: CatalogueKind, d: Draft): CatalogueEntry {
-  const base: CatalogueEntry = { kind, id: d.id.trim(), name: d.name.trim(), summary: words(d.summary), note: words(d.note), source: words(d.source), by: '', at: '' };
+/**
+ * The entry a draft sends: the entry as the form opened it with the fields its kind's form holds laid over it, a blank
+ * field as none (`edited`), so a lesson's body goes back as the lesson holds it. The service writes who kept it and when.
+ */
+function entryOf(kind: CatalogueKind, d: Draft, start: CatalogueEntry): CatalogueEntry {
+  const base: Partial<CatalogueEntry> = { id: d.id.trim(), name: d.name.trim(), summary: words(d.summary), note: words(d.note), source: words(d.source) };
   switch (kind) {
     case 'strain':
-      return { ...base, species: words(d.species), program: words(d.program), aliases: lines(d.aliases) };
+      return edited(start, { ...base, species: words(d.species), program: words(d.program), aliases: lines(d.aliases) });
     case 'product':
-      return { ...base, category: d.category || null, location: d.location || null, sequence: words(d.sequence), sequenceSource: words(d.sequenceSource) };
+      return edited(start, { ...base, category: d.category || null, location: d.location || null, sequence: words(d.sequence), sequenceSource: words(d.sequenceSource) });
     case 'skill':
-      return {
+      return edited(start, {
         ...base,
         family: words(d.family),
         mastery: lines(d.mastery),
@@ -146,9 +152,9 @@ function entryOf(kind: CatalogueKind, d: Draft): CatalogueEntry {
         recencyDays: count(d.recencyDays),
         supervisedRuns: count(d.supervisedRuns),
         prerequisites: d.prerequisites,
-      };
+      });
     case 'lesson':
-      return { ...base, skills: d.skills };
+      return edited(start, { ...base, skills: d.skills });
   }
 }
 
@@ -255,7 +261,7 @@ function EntryForm({
   const keep = () => {
     setBusy(true);
     setProblem(null);
-    keepEntry({ entry: entryOf(kind, d), by: reviewer })
+    keepEntry({ entry: entryOf(kind, d, start), by: reviewer })
       .then(onKept)
       .catch((e: unknown) => setProblem(problemOf(e)))
       .finally(() => setBusy(false));
@@ -343,10 +349,18 @@ function EntryForm({
         {kind === 'lesson' && (
           <div className="sm:col-span-2">
             <SkillChoice label="Skills it counts toward" held={skills} chosen={d.skills} onChange={(ids) => set('skills', ids)} testid="catalogue-field-skills" />
+            <p className="text-caption text-ink-soft mt-1" data-testid="catalogue-lesson-body">
+              Its body ({bodyWords(start)}) is written in a file of lessons taken in below, and keeping this form keeps the body as the
+              lesson holds it.
+            </p>
           </div>
         )}
-        <div className="sm:col-span-2">{area('summary', 'Summary', 'What it is, in plain words.')}</div>
-        {box('note', 'Note', 'What the entry rests on, in words.')}
+        <div className="sm:col-span-2">
+          {area('summary', 'Summary', kind === 'lesson' ? 'What the lesson is about, in plain words: Primer shows it under the lesson’s name.' : 'What it is, in plain words.')}
+        </div>
+        {kind === 'lesson'
+          ? box('note', 'Opening words', 'The words Primer opens the lesson with, before its blocks; Markdown.')
+          : box('note', 'Note', 'What the entry rests on, in words.')}
         {box('source', 'Where it came from', 'A document, a record, a person.')}
       </div>
       {kind === 'skill' && (
@@ -489,7 +503,20 @@ function Cells({ entry }: { entry: CatalogueEntry }) {
         </>
       );
     case 'lesson':
-      return <td className="py-1 pr-2 font-num">{entry.skills?.length ? entry.skills.join(', ') : none}</td>;
+      return (
+        <>
+          <td className="py-1 pr-2 font-num">{entry.skills?.length ? entry.skills.join(', ') : none}</td>
+          <td
+            className="py-1 pr-2"
+            data-testid="catalogue-lesson-row-body"
+            data-minutes={entry.minutes ?? ''}
+            data-blocks={(entry.blocks ?? []).length}
+            data-questions={(entry.checkpoint ?? []).length}
+          >
+            {bodyWords(entry)}
+          </td>
+        </>
+      );
   }
 }
 
@@ -497,7 +524,7 @@ const COLUMNS: Record<CatalogueKind, string[]> = {
   strain: ['Species', 'Chemical set', 'Other names'],
   product: ['Class', 'Where the cells leave it', 'Sequence'],
   skill: ['Family', 'Policy', 'Needs first'],
-  lesson: ['Counts toward'],
+  lesson: ['Counts toward', 'Body'],
 };
 
 export default function Catalogues({ view }: { view?: string }) {
@@ -509,7 +536,7 @@ export default function Catalogues({ view }: { view?: string }) {
   const [kept, setKept] = useState<CatalogueEntry | null>(null);
   const [version, setVersion] = useState(0);
   const hydrateCatalogues = useStore((s) => s.hydrateCatalogues);
-  // After a keep or a file, this tab reads its catalogue again, and the store its strains and products.
+  // After a keep or a file, this tab reads its catalogue again, and the store reads all four catalogues again.
   const reread = () => {
     setVersion((v) => v + 1);
     void hydrateCatalogues();
@@ -637,7 +664,15 @@ export default function Catalogues({ view }: { view?: string }) {
             onDone={() => setEditing(null)}
           />
         )}
-        <TakeInFile key={kind} kind={kind} onTaken={reread} />
+        <TakeInFile
+          key={kind}
+          kind={kind}
+          onTaken={() => {
+            // The line naming the last keep from the form gives way to the file's own result.
+            setKept(null);
+            reread();
+          }}
+        />
       </div>
     </div>
   );

@@ -151,7 +151,7 @@ export interface DurableSnapshot {
    * (OF-BLD-014 §8.4); a snapshot that holds them with no
    * `parameterOverrides` entry for a scenario is read into that scope (D3).
    */
-  proformaAssumptions?: Record<string, InputAssumption[]>;
+  proformaAssumptions?: Record<string, ScenarioAssumption[]>;
   /** LEGACY, read once: the parameter panel's overrides, by scope (OF-BLD-020 D3). */
   parameterOverrides?: Record<string, Override[]>;
   /** LEGACY, read once: the fermOS fits chosen for a scenario's inputs (OF-BLD-019 §5.1). */
@@ -179,7 +179,7 @@ export type TrainMade = components['schemas']['TrainMade'];
  * scenario's overrides, each a person's assumption), and as the store reads a `proforma:` scope's numeric overrides
  * (`assumptionsFromOverrides`).
  */
-export interface InputAssumption {
+export interface ScenarioAssumption {
   key: string;
   value: number;
   low: number;

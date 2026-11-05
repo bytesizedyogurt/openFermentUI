@@ -24,7 +24,7 @@ import {
 import type { MaterialStock, Protocol, ProtocolReference, ProtocolVersion, Step } from '@/lib/protocols';
 import type { RunState } from '@/store';
 import type { ExtractionRecord } from '@/lib/review';
-import { useSkillById, useStore } from '@/store';
+import { useProtocol, useSkillById, useStore } from '@/store';
 import { href, navigate } from '@/router';
 import {
   batchLabel,
@@ -33,7 +33,7 @@ import {
   scaleMaterials,
   type ScaledMaterial,
 } from '@/engine/scale';
-import { diffVersions } from '@/engine/diff';
+import { diffVersions, materialChanges, stepChanges } from '@/engine/diff';
 import { convert, fmt, normalizeUnit, sameFamily } from '@/engine/units';
 import { CitationChip } from '@/components/Chip';
 import { Markdown, inlineMarkdown } from '@/components/Markdown';
@@ -476,6 +476,16 @@ function MaterialsTable({
 
 // ── version compare ────────────────────────────────────────────────────
 
+/** The skills a step needs on one side of a compare, by name where the skill catalogue holds them. */
+function StepSkills({ ids }: { ids: string[] }) {
+  const byId = useSkillById();
+  return (
+    <div className="text-caption text-ink-soft mt-1" data-testid="compare-step-skills">
+      {ids.length === 0 ? 'needs no skill' : `needs ${ids.map((id) => byId[id]?.name ?? id).join(', ')}`}
+    </div>
+  );
+}
+
 function ChangeBadge({ kind }: { kind: 'added' | 'removed' | 'modified' | 'unchanged' }) {
   const cls =
     kind === 'added'
@@ -647,9 +657,10 @@ function CompareBody({
                       </td>
                       <td className="px-2 py-1.5">
                         <ChangeBadge kind={m.kind} />
-                        {m.kind === 'modified' && m.a && m.b && m.a.scaling !== m.b.scaling && (
-                          <div className="text-caption text-ink-soft mt-0.5">
-                            scaling {m.a.scaling} → {m.b.scaling}
+                        {m.kind === 'modified' && m.a && m.b && (
+                          <div className="text-caption text-ink-soft mt-0.5" data-testid="compare-material-changes">
+                            {materialChanges(m.a, m.b).join(', ')}
+                            {m.a.scaling !== m.b.scaling && ` (scaling ${m.a.scaling} → ${m.b.scaling})`}
                           </div>
                         )}
                       </td>
@@ -688,14 +699,8 @@ function CompareBody({
                   <span className="font-num text-caption text-ink-soft">{id}</span>
                   <ChangeBadge kind={d.kind} />
                   {d.kind === 'modified' && d.a && d.b && (
-                    <span className="text-caption text-ink-soft">
-                      {[
-                        d.a.text !== d.b.text ? 'instruction' : null,
-                        (d.a.timerSec ?? null) !== (d.b.timerSec ?? null) ? 'timer' : null,
-                        JSON.stringify(d.a.multiCheck ?? []) !== JSON.stringify(d.b.multiCheck ?? []) ? 'sub-checks' : null,
-                      ]
-                        .filter(Boolean)
-                        .join(', ')}
+                    <span className="text-caption text-ink-soft" data-testid="compare-step-changes">
+                      {stepChanges(d.a, d.b).join(', ')}
                     </span>
                   )}
                 </div>
@@ -715,6 +720,7 @@ function CompareBody({
                           {d.a!.multiCheck?.length === 1 ? '' : 's'}
                         </div>
                       )}
+                      {stepChanges(d.a!, d.b!).includes('skills') && <StepSkills ids={d.a!.skills ?? []} />}
                     </div>
                     <div className="rounded-input border border-accent/30 bg-accent-wash/60 p-2">
                       <div className="text-caption text-ink-soft font-num mb-1">v{b.version}</div>
@@ -730,6 +736,7 @@ function CompareBody({
                           {d.b!.multiCheck?.length === 1 ? '' : 's'}
                         </div>
                       )}
+                      {stepChanges(d.a!, d.b!).includes('skills') && <StepSkills ids={d.b!.skills ?? []} />}
                     </div>
                   </div>
                 ) : (
@@ -761,8 +768,8 @@ function CompareBody({
         <SectionTitle>Other changes</SectionTitle>
         {other.length === 0 ? (
           <p className="text-body text-ink-soft">
-            No other field differs — equipment, safety, timings, references, step order and material
-            specs are identical.
+            No other field differs: the equipment, the safety notes, the timings, the references and the step
+            order are the same.
           </p>
         ) : (
           <ul className="space-y-1.5">
@@ -786,8 +793,8 @@ function CompareBody({
 // ── screen ─────────────────────────────────────────────────────────────
 
 export default function ProtocolDetail({ protocolId }: { protocolId: string }) {
-  const protocol = useStore((s) => s.protocols.find((p) => p.id === protocolId));
-  const protocolsRead = useStore((s) => s.protocolsRead);
+  // A protocol made after the page opened is read from the service by its id (useProtocol).
+  const { protocol, state: protocolState, problem: protocolProblem } = useProtocol(protocolId);
   const records = useStore((s) => s.records);
   const strains = useStore((s) => s.strains);
   const runs = useStore((s) => s.runs);
@@ -849,11 +856,19 @@ export default function ProtocolDetail({ protocolId }: { protocolId: string }) {
         <PageHeader title="Protocol not found" eyebrow="Protocols" />
         <Card>
           <EmptyState
-            title={protocolsRead ? 'No such protocol' : 'Reading the project\u2019s protocols'}
+            title={
+              protocolState === 'problem'
+                ? 'The protocols could not be read'
+                : protocolState === 'reading'
+                  ? 'Reading the project\u2019s protocols'
+                  : 'No such protocol'
+            }
             body={
-              protocolsRead
-                ? `The project keeps no protocol “${protocolId}”. The link may be from another project.`
-                : 'The protocols are read from the service as the page opens.'
+              protocolState === 'problem'
+                ? (protocolProblem ?? '')
+                : protocolState === 'reading'
+                  ? 'The protocols are read from the service as the page opens.'
+                  : `The project keeps no protocol “${protocolId}”. The link may be from another project.`
             }
             icon={<ClipboardList size={22} />}
             action={<LinkButton to="/runbooks/protocols">Back to all protocols</LinkButton>}

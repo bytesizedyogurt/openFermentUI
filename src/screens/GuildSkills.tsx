@@ -116,17 +116,27 @@ function SkillPage({ skillId }: { skillId: string }) {
           <div>
             <SectionTitle>What an assessor watches for</SectionTitle>
             <Card className="p-4">
-              <ol className="space-y-2 list-decimal pl-5">
-                {(skill.mastery ?? []).map((m) => (
-                  <li key={m} className="text-reading">
-                    {m}
-                  </li>
-                ))}
-              </ol>
+              {(skill.mastery ?? []).length === 0 ? (
+                <p className="text-body text-ink-soft" data-testid="guild-skill-no-mastery">
+                  The skill&rsquo;s entry names no criterion yet. What mastery means is written on the{' '}
+                  <a className="text-accent hover:underline" href={href('/catalogues/skills')}>
+                    skills catalogue
+                  </a>
+                  , one criterion a line, and an assessor marks each one at a witnessed check.
+                </p>
+              ) : (
+                <ol className="space-y-2 list-decimal pl-5">
+                  {(skill.mastery ?? []).map((m) => (
+                    <li key={m} className="text-reading">
+                      {m}
+                    </li>
+                  ))}
+                </ol>
+              )}
             </Card>
           </div>
           <div>
-            <SectionTitle right={<span className="text-caption text-ink-soft font-num">{uses.length} steps</span>}>Steps that need it</SectionTitle>
+            <SectionTitle right={<span className="text-caption text-ink-soft font-num">{uses.length} step{uses.length === 1 ? '' : 's'}</span>}>Steps that need it</SectionTitle>
             <Card>
               {uses.length === 0 ? (
                 <p className="px-4 py-3 text-body text-ink-soft">No protocol step names this skill yet.</p>
@@ -185,15 +195,28 @@ function SkillPage({ skillId }: { skillId: string }) {
           <div>
             <SectionTitle>How it is held</SectionTitle>
             <Card className="p-4 space-y-2 text-body">
-              <Row label="Criticality">
-                <span className={cx(skill.criticality === 'critical' && 'text-signal-warn')}>{skill.criticality}</span>
-              </Row>
-              <Row label="Recency window">
-                <span className="font-num">{skill.recencyDays} days</span>
-              </Row>
-              <Row label="Supervised runs before a check">
-                <span className="font-num">{skill.supervisedRuns}</span>
-              </Row>
+              {rated(skill) ? (
+                <>
+                  <Row label="Criticality">
+                    <span className={cx(skill.criticality === 'critical' && 'text-signal-warn')}>{skill.criticality}</span>
+                  </Row>
+                  <Row label="Recency window">
+                    <span className="font-num">{skill.recencyDays} days</span>
+                  </Row>
+                  <Row label="Supervised runs before a check">
+                    <span className="font-num">{skill.supervisedRuns}</span>
+                  </Row>
+                </>
+              ) : (
+                <Row label="Policy">
+                  <span className="text-signal-warn" data-testid="guild-skill-no-policy">
+                    none yet, so Guild rates nobody on it; one is written on the{' '}
+                    <a className="text-accent hover:underline" href={href('/catalogues/skills')}>
+                      skills catalogue
+                    </a>
+                  </span>
+                </Row>
+              )}
               <Row label="Prerequisites">
                 {(skill.prerequisites ?? []).length === 0
                   ? 'None'

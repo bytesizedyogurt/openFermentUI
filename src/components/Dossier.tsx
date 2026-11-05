@@ -60,10 +60,10 @@ export interface Gathered {
  * said once.
  */
 export async function gatherLinks(
-  pointed: { label: string; artifactId?: string | null }[],
+  pointed: { label: string; artifactId: string }[],
   fetch: (id: string) => Promise<Artifact>,
 ): Promise<Gathered> {
-  const settled = await Promise.allSettled(pointed.map((p) => fetch(p.artifactId!)));
+  const settled = await Promise.allSettled(pointed.map((p) => fetch(p.artifactId)));
   const links: Link[] = [];
   const failed: Gathered['failed'] = [];
   let down: string | null = null;
@@ -148,7 +148,8 @@ function Figure({ link }: { link: Link }) {
 }
 
 export function Dossier({ runbook }: { runbook: Runbook }) {
-  const pointed = (runbook.predictions ?? []).filter((p) => p.artifactId);
+  // Each prediction that names the artifact it was read from, with that id.
+  const pointed = (runbook.predictions ?? []).flatMap((p) => (p.artifactId ? [{ label: p.label, artifactId: p.artifactId }] : []));
   const [got, setGot] = useState<Gathered | null>(null);
   const key = pointed.map((p) => p.artifactId).join(',');
 

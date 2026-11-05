@@ -713,15 +713,43 @@ export function runViewOfArtifact(art: Artifact): RunView | null {
   });
 }
 
-/** A run as `POST /api/proforma/run` answers it: the same output, its basis in its evidence. */
+/**
+ * A run as `POST /api/proforma/run` answers it: the same output as its artifact keeps, every field typed by the
+ * answer's model, and its basis in its evidence. A grid that sweeps no dimension reads as none, as an artifact's does.
+ */
 export function runViewOfResult(r: ProformaRunResult): RunView {
-  return viewOf(r as unknown as Record<string, unknown>, {
+  const basis = r.evidence.basis;
+  return {
     artifactId: r.artifactId,
-    createdAt: r.evidence?.basis?.at ?? null,
+    createdAt: basis.at ?? null,
     durationMs: null,
     provenance: r.provenance,
-    basis: r.evidence.basis,
-  });
+    basis,
+    scenarioId: r.scenarioId,
+    flowsheet: r.flowsheet ?? str(basis.inputs.find((i) => i.name === 'flowsheet')?.value),
+    basePrice: r.basePrice,
+    baseInfeasible: r.baseInfeasible,
+    quantiles: r.quantiles,
+    histogram: r.histogram,
+    sensitivity: r.sensitivity,
+    samples: r.samples,
+    feasible: r.feasible,
+    infeasible: r.infeasible,
+    grid: r.grid.dims.length > 0 ? r.grid : null,
+    readBack: r.readBack,
+    tables: {
+      flowsheet: r.flowsheet ?? str(basis.inputs.find((i) => i.name === 'flowsheet')?.value),
+      tablesSource: r.tablesSource,
+      tea: r.tea,
+      streams: r.streams,
+      units: r.units,
+      utilities: r.utilities,
+      diagram: r.diagram,
+      diagramNote: r.diagramNote,
+      unitOrder: r.unitOrder,
+      tableUnits: r.tableUnits,
+    },
+  };
 }
 
 /** The tool every engine run of a library plant or a flowsheet is kept under (engine/library.py LIBRARY_RUN). */

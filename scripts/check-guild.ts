@@ -56,6 +56,7 @@ import type { Checks } from '../src/lib/checks';
 import type { Guild, GuildEvidence, GuildPerson } from '../src/lib/guild';
 import type { PracticeSession } from '../src/lib/practice';
 import { mayQueue, proposeChecks } from '../src/engine/checks';
+import { diffVersions, materialChanges, stepChanges } from '../src/engine/diff';
 import { needsActing, shownProposals, type Proposal } from '../src/lib/proposals';
 
 let fails = 0;
@@ -725,6 +726,28 @@ async function main() {
     check('it is never ready for a check', !readyForCheck(tom12, open));
     const path12 = pathOf({ personId: 'p-tom', skills: [open], status: map12, lessonsFor: {}, passed: () => false, soon: new Set(), today: TODAY });
     check('a path says it waits for its policy', path12[0]?.section === 'waiting' && path12[0]?.step.kind === 'unrated');
+  }
+
+  // ── two versions of a protocol, compared (alpha 2.2 E.gate) ──
+  {
+    const protocol = TEST_PROTOCOLS.find((p) => p.versions.some((v) => (v.steps ?? []).length > 1)) ?? TEST_PROTOCOLS[0];
+    const was = protocol.versions.find((v) => (v.steps ?? []).length > 0) ?? protocol.versions[0];
+    const steps = was.steps ?? [];
+    const target = steps[steps.length - 1];
+    // A version that changes one step's skills alone, as the editor's skill picker makes one.
+    const skillsOnly = { ...was, version: `${was.version}.1`, steps: steps.map((st) => (st.id === target.id ? { ...st, skills: [...(st.skills ?? []), 'SK-PLACEHOLDER'] } : st)) };
+    const diff = diffVersions(was, skillsOnly);
+    const changed = diff.steps.filter((d) => d.kind === 'modified');
+    check('a version that changes a step’s skills alone differs from the one before it', changed.length === 1 && changed[0].b?.id === target.id, diff.steps.map((d) => d.kind));
+    check('and the change is named as the skills', changed.length === 1 && stepChanges(changed[0].a!, changed[0].b!).join() === 'skills', changed.map((d) => stepChanges(d.a!, d.b!)));
+    const noted = { ...target, note: 'A placeholder note.', refs: ['r-placeholder'], timerLabel: 'A placeholder timer' };
+    check('a step’s note, references and timer label are compared too', stepChanges(target, noted).join() === 'timer label,note,references', stepChanges(target, noted));
+    const m = { name: 'Placeholder material', amount: 1, unit: 'placeholder-unit', scaling: 'fixed' as const, precision: 0 };
+    check(
+      'a material’s rounding, stock and record are compared',
+      materialChanges(m, { ...m, precision: 0.5, stock: { conc: 1, unit: 'placeholder-unit' }, sourceRecordId: 'r-placeholder' }).join() === 'rounding,stock,record',
+    );
+    check('a version compared with itself differs in nothing', diffVersions(was, was).steps.every((d) => d.kind === 'unchanged'));
   }
 
   console.log(fails ? `\n✗ ${fails} Guild check(s) failed` : '\n✓ Guild levels are computed the way the ladder says.');

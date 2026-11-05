@@ -47,6 +47,7 @@ import type { Artifact, BasisSource, Deposition, EngineRun, Prediction } from '.
 import { loadOverlay } from '../src/lib/intake';
 import { recordOf, type Candidate } from '../src/lib/review';
 import { ONTOLOGY } from '../src/data/ontology';
+import { bodyWords, edited, type CatalogueEntry } from '../src/lib/catalogues';
 import { ServiceDown, ServiceRefused, call, detailWords } from '../src/lib/http';
 import { runnable, type LibraryPlant } from '../src/lib/library';
 import { inputsOf } from '../src/lib/params';
@@ -567,6 +568,38 @@ async function callAgainst(answer: { status: number; body?: unknown }, healthy =
   check('a grid holding a dimension at one value reads its own number at the base point', base === 1.5, String(base));
   check('and interpolates along the dimension it sweeps', Math.abs(between - 1.75) < 1e-12, String(between));
   check('a point off a held dimension is held to its one value', interpolate(grid, { 'held-a': 50, 'held-b': 0.45, swept: 0.3 }) === 1.0);
+}
+
+// ── a catalogue entry as the catalogues screen's form keeps it (alpha 2.2 E.gate) ──
+
+{
+  // A lesson taken in from a file with its body (ADR-018), every word and number a placeholder.
+  const lesson: CatalogueEntry = {
+    kind: 'lesson',
+    id: 'placeholder-lesson',
+    name: 'A placeholder lesson',
+    skills: ['placeholder-skill'],
+    minutes: 5,
+    blocks: [{ kind: 'prose', md: 'A placeholder paragraph.' }, { kind: 'embed', embed: 'mini-queue', arg: null }],
+    checkpoint: [{ id: 'q1', prompt: 'A placeholder choice?', kind: 'mc', options: ['One', 'Two'], answerIndex: 1, explanation: '' }],
+    by: 'Placeholder Keeper',
+    at: '2026-11-01T00:00:00+00:00',
+    agent: 'person',
+    via: null,
+  };
+  const sent = edited(lesson, { name: 'A placeholder lesson, renamed', skills: [] });
+  check(
+    'a lesson edited on the catalogues form sends its minutes, its blocks and its checkpoint as it holds them',
+    sent.minutes === 5 && JSON.stringify(sent.blocks) === JSON.stringify(lesson.blocks) && JSON.stringify(sent.checkpoint) === JSON.stringify(lesson.checkpoint),
+    JSON.stringify(sent),
+  );
+  check('with the fields the form holds laid over them', sent.name === 'A placeholder lesson, renamed' && (sent.skills ?? []).length === 0 && sent.kind === 'lesson');
+  check('and leaves its keeper, lane, door and time for the service to write', sent.by === '' && sent.at === '' && sent.agent === null && sent.via === null);
+  check(
+    "a lesson's body is said in words, and one with none says so",
+    bodyWords(lesson) === '5 min, 2 blocks, 1 checkpoint question' && bodyWords({ minutes: null, blocks: [], checkpoint: [] }) === 'no body yet',
+    bodyWords(lesson),
+  );
 }
 
 console.log(fails ? `\n✗ ${fails} check(s) failed` : '\n✓ The project rows are sent as the page changes them, and kept until the service answers; a refusal is never an outage.');

@@ -252,3 +252,9 @@ task (development plan §8).
   name, as an MCP client's is in the server's own process (ADR-008, Implementation 12). The MCP
   server's `--service` mode sends its client's declared name there, and the estimate keeps the
   same origin whichever way the server reaches the project.
+
+### Alpha 2.2 E.15 (2026-11-05): the browser's quantity types are generated
+
+- The browser's `Quantity`, `Origin`, `OriginKind` and `OverrideOrigin` are the service's own,
+  generated into `src/api/types.gen.ts`, and `check:plan`'s pairs, `Origin` among them, retired with
+  `src/data/types.ts` (ADR-007's note of E.15). The 4.4b note above stands as written then.

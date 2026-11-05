@@ -8,6 +8,7 @@ import type { components } from '@/api/types.gen';
 import { START_COMMAND, postdocHealth } from './postdoc';
 import { apiFetch } from './project';
 import type { Artifact } from './studies';
+import { detailWords } from './http';
 
 /** A replay of an artifact: the output computed again from its kept inputs, set beside the one kept. */
 export type ReplayResult = components['schemas']['ReplayResult'];
@@ -44,7 +45,7 @@ async function call<T>(path: string, init?: RequestInit): Promise<T> {
   if (response.status === 404 || response.status === 409) {
     let detail = '';
     try {
-      detail = String(((await response.json()) as { detail?: string }).detail ?? '');
+      detail = detailWords(((await response.json()) as { detail?: unknown }).detail);
     } catch {
       /* the status is the message */
     }

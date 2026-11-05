@@ -32,7 +32,6 @@
 // Override at its door.
 import type { components } from '@/api/types.gen';
 import type { EngineInput } from './studies';
-import type { TrainSpec } from './pureos';
 import { ServiceDown, ServiceRefused, call } from './http';
 
 type S = components['schemas'];
@@ -55,32 +54,17 @@ export type ParamResolveResult = S['ParamResolveResult'];
 
 export { ServiceDown as ParamsDown, ServiceRefused as ParamsRefused };
 
-/** What a scope is asked with besides its name: a Proforma scenario names its flowsheet (one not yet saved binds by it, ADR-014); host and fits bind as Proforma's binding does; a vessel scope names the vessel type its design is (OF-BLD-020 §4.2); a family scope binds as a simulation binds (§3.3). */
-export interface ParamAsk {
-  flowsheet?: string | null;
-  host?: string | null;
-  fits?: Record<string, string>;
-  vesselType?: 'stirred-tank' | 'bubble-column' | null;
-  // fermOS's family scope (OF-BLD-020 §3.2–§3.3), bound as a simulation
-  // binds: the strain whose records bind (none: every strain the evidence
-  // pool holds), the product, the sugar, the fit a person chose, where the
-  // simulation starts and the run-length preset.
-  strain?: string | null;
-  product?: string | null;
-  sugar?: string | null;
-  fit?: string | null;
-  startFrom?: string | null;
-  durationPreset?: 'until-sugar-runs-out' | 'fit-length' | null;
-  /** A Proforma scenario on `custom_train_v1` (OF-BLD-020 §6.1): the vessel design and the train run it is built from. */
-  vessel?: string | null;
-  trainRun?: string | null;
-  // pureOS's unit scope (OF-BLD-020 §5.3): the whole train the unit belongs
-  // to, so its per-component keys expand over the train's chemicals and its
-  // records bind by its program and product (`?train=` as JSON on the GET,
-  // `train` in the resolve's body), and the unit's catalogue type.
-  train?: TrainSpec | null;
-  unitType?: string | null;
-}
+/**
+ * What a scope is asked with besides its name, the resolve's body without its inputs: a Proforma scenario names its
+ * flowsheet (one not yet saved binds by it, ADR-014); host and fits bind as Proforma's binding does; a vessel scope
+ * names the vessel type its design is (OF-BLD-020 §4.2); a family scope binds as a simulation binds (§3.3), by the
+ * strain whose records bind (none: every strain the evidence pool holds), the product, the sugar, the fit a person
+ * chose, where the simulation starts and the run-length preset; a Proforma scenario on `custom_train_v1` (§6.1) names
+ * the vessel design and the train run it is built from; and pureOS's unit scope (§5.3) names the whole train the unit
+ * belongs to, so its per-component keys expand over the train's chemicals and its records bind by its program and
+ * product (`?train=` as JSON on the GET, `train` in the resolve's body), and the unit's catalogue type.
+ */
+export type ParamAsk = Omit<ParamResolveRequest, 'inputs'>;
 
 /** The fermOS fields of an ask, as query parameters and as the resolve's body fields alike. */
 const FERMOS_ASK = ['strain', 'product', 'sugar', 'fit', 'startFrom', 'durationPreset'] as const;
