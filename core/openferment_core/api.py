@@ -1103,9 +1103,12 @@ def flowsheets_file(record_id: str):
 
 
 class CatalogueKeep(BaseModel):
-    """POST /api/catalogues/{kind}: one entry and who keeps it."""
+    """POST /api/catalogues/{kind}: one entry of the catalogue's kind, written
+    as the catalogue answers one, and who keeps it. The service writes the
+    entry's keeper, lane, door and time (`by`, `agent`, `via`, `at`) over
+    whatever the entry sends."""
 
-    entry: dict[str, Any]
+    entry: CatalogueEntry
     by: str = ""
 
 
@@ -1147,26 +1150,28 @@ def catalogue_entry(kind: str, entry_id: str) -> CatalogueEntry:
 
 
 @app.post("/api/catalogues/{kind}", response_model=CatalogueEntry, responses={404: NO_CATALOGUE, 422: {
-    "description": "An entry the kind does not take, or a keep that names nobody, in words (a list of field errors "
-                   "when the body is no object of `entry` and `by`).",
+    "description": "An entry the kind does not take, an entry of another kind, or a keep that names nobody, in "
+                   "words: a list of field errors, each with its place and why, for an entry whose own fields its "
+                   "kind refuses (a sequence on a strain, a category outside the classes pureOS's proposer reads, "
+                   "a skill's policy with a part left out), and the service's words for the rest.",
     "content": {"application/json": {"schema": {"anyOf": [
         {"$ref": "#/components/schemas/Refusal"}, {"$ref": "#/components/schemas/HTTPValidationError"}]}}}}})
 def catalogue_keep(kind: str, asked: CatalogueKeep) -> CatalogueEntry:
     """One entry kept in the open project's catalogue of `kind`, in the name of
     `by`, as a person's keep (`agent: person`); an entry already held under its
-    id is replaced, whoever kept it. 422 in words for an entry the kind does
-    not take, and for a keep that names nobody (`by` empty)."""
-    from pydantic import ValidationError
-
+    id is replaced, whoever kept it. The entry names its kind, the
+    catalogue's own: the catalogues screen sends an entry as the catalogue
+    answers one. 422 in words for an entry the kind does not take, for an
+    entry of another kind, and for a keep that names nobody (`by` empty)."""
     from . import catalogues
 
+    kind = _catalogue_kind(kind)
+    if asked.entry.kind != kind:
+        raise HTTPException(status_code=422, detail=f"the entry names its kind as {asked.entry.kind}, and this is the "
+                                                    f"{kind} catalogue: an entry is kept at "
+                                                    f"/api/catalogues/{asked.entry.kind}")
     try:
-        entry = catalogues.CatalogueEntry.model_validate({**asked.entry, "kind": _catalogue_kind(kind)})
-        return catalogues.keep(entry, by=asked.by)
-    except ValidationError as e:
-        first = e.errors()[0]
-        raise HTTPException(status_code=422, detail=f"{'.'.join(str(x) for x in first.get('loc', ())) or 'the entry'}: "
-                                                    f"{first.get('msg')}") from e
+        return catalogues.keep(asked.entry, by=asked.by)
     except catalogues.CatalogueRefused as e:
         raise HTTPException(status_code=422, detail=str(e)) from e
 

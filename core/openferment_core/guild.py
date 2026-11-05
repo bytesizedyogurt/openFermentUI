@@ -55,9 +55,13 @@ The rules, by name:
   policy      a check rate outside none to twelve a quarter
 
 Nothing is repaired on the way through. The skills, the protocol steps that
-need them and the lessons that count toward them come from `projection()`;
-no store holds a skills catalogue yet, so there are none, and the tests hand
-in a frozen fixture.
+need them and the lessons that count toward them come from `projection()`:
+the skills and the lessons from the project's catalogues (catalogues.py),
+each skill with the policy its entry holds; no store holds protocol steps'
+skills yet, so a step needs none, and the tests hand in a frozen fixture. A
+skill kept with no policy is left out of every level (competence.unrated):
+nobody holds it, so a run of it alone and a cosign of it are refused in
+words that say so.
 """
 from __future__ import annotations
 
@@ -72,7 +76,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 from . import db, projects
 from .biorepo import MIN_REVIEWER_CHARS, PLACEHOLDER_REVIEWERS
-from .competence import Competence
+from .competence import Competence, unrated
 from .db import models as t
 from .db import rows
 from .models import Guild, GuildEvidence, GuildPerson, GuildPolicy, GuildWithdrawal
@@ -544,6 +548,8 @@ def _admit(
     if person.role == "auditor":
         raise GuildRefused("role", f"{person.name} is an auditor; an auditor reads the ledger and holds no skills")
     skill_name = known[entry.skillId]["name"]
+    # Why nobody holds the skill whatever the ledger says, when its catalogue entry holds no policy.
+    no_policy = unrated(known[entry.skillId])
 
     def holds(person_id: str) -> bool:
         # Judged on the day the step was run, from what the ledger held
@@ -574,6 +580,8 @@ def _admit(
         if kind == "independent" and not holds(person.id):
             raise GuildRefused(
                 "authority",
+                f"{no_policy}: nobody holds it, and a run of it alone is a deviation until its catalogue entry "
+                "holds its policy" if no_policy else
                 f"{person.name} does not hold {skill_name} today, so a run of it alone is a deviation, "
                 "or a supervised run with a cosigner",
             )
@@ -596,7 +604,8 @@ def _admit(
             if not holds(observer.id):
                 raise GuildRefused(
                     "authority",
-                    f"{observer.name} does not hold {skill_name} today, so cannot cosign it",
+                    f"{no_policy}: nobody holds it, and nobody cosigns it until its catalogue entry holds its "
+                    "policy" if no_policy else f"{observer.name} does not hold {skill_name} today, so cannot cosign it",
                 )
         elif not _assessor_on(ledger, observer.id, entry.skillId):
             raise GuildRefused(

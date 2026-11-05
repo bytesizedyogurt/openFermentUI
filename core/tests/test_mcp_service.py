@@ -367,8 +367,8 @@ def test_a_person_named_with_by_is_read_as_the_door_reads_a_name():
     (line,) = [a for a in audit.read() if a.action == "catalogue_write"]
     assert (line.agent, line.who) == ("person", "Ada Moreno") and "via" not in line.detail
     assert catalogues.get("skill", ENTRY["id"]).by == "Ada Moreno"
-    keep = client.post("/api/catalogues/skill", json={"entry": {"id": "example-test.other", "name": "Another"},
-                                                      "by": "Grace\tHopper\u200b"})
+    keep = client.post("/api/catalogues/skill", json={"entry": {"kind": "skill", "id": "example-test.other",
+                                                                "name": "Another"}, "by": "Grace\tHopper\u200b"})
     assert keep.status_code == 200 and (keep.json()["by"], keep.json()["agent"]) == ("Grace Hopper", "person")
 
 

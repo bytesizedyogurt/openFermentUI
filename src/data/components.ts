@@ -27,7 +27,8 @@ export type Destination =
   | 'Proforma'
   | 'Runbooks'
   | 'Primer'
-  | 'Guild';
+  | 'Guild'
+  | 'Catalogues';
 
 export type ComponentLayer =
   | 'The agent'
@@ -342,6 +343,13 @@ export const UNNAMED: {
     layer: 'Evidence in',
     livesIn: ['core/openferment_core/db/', 'core/openferment_core/projects/', 'core/openferment_core/migrations.py'],
     role: 'PostgreSQL: every project\u2019s documents, records, decisions, runs, studies and conversations',
+  },
+  {
+    // alpha 2.2 E.8 — the catalogues screen over the project's catalogue rows.
+    what: 'the catalogues',
+    layer: 'Evidence in',
+    livesIn: ['src/screens/Catalogues.tsx', 'src/lib/catalogues.ts', 'core/openferment_core/catalogues.py'],
+    role: 'The strains and their other names, the products, the skills and the lessons a project keeps, each entry in its keeper\u2019s name, read by geneOS, pureOS, ProtParam, Guild and Primer',
   },
   {
     // OF-BLD-014 §3.4 — heavy simulators run in their own processes.

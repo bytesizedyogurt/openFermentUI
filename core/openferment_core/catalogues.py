@@ -11,8 +11,15 @@ is now a kind of row in the project's `catalogue` table, kept whole as a
               its trains use (pureOS's `program`) and the other names papers
               give it; a pureOS proposal's host is a strain of this kind
     product   a product a train recovers or ProtParam reads: its class
-              (`category`) and, for a protein, its sequence
-    skill     a Guild skill: its family, what it is and what mastery means
+              (`category`, one of the classes pureOS's proposer reads), where
+              the cells leave it (`location`: secreted, or intracellular) and,
+              for a protein, its sequence
+    skill     a Guild skill: its family, what it is and what mastery means,
+              and its policy: how critical it is, how many days a
+              qualification stands, how many supervised runs come before a
+              witnessed check, and the skills it needs first (`prerequisites`);
+              Guild rates nobody on a skill kept with no policy
+              (competence.unrated)
     lesson    a Primer lesson and the skills it counts toward
 
 The readers take them in the shapes they always read (`as_*`): geneOS's hosts
@@ -20,10 +27,13 @@ and the strain aliases (module_stores), ProtParam's products, the proposer's
 catalogue, Guild's projection. A catalogue holds names and words, never a
 measured value: a number a paper reports is a record (ADR-006).
 
-Entries arrive by the route (`POST /api/catalogues/{kind}`), by Postdoc's
-`catalogue_write` (marked as the model's), or by Intake from a file of entries
+Entries arrive by the route (`POST /api/catalogues/{kind}`, which the
+catalogues screen at /catalogues sends), by Postdoc's `catalogue_write`
+(marked as the model's), or by Intake from a file of entries
 (`POST /api/intake/catalogue`, JSON or CSV). Nothing here deletes an entry:
-taking a person's entry out of a live instance is the owner's call.
+taking a person's entry out of a live instance is the owner's call. A skill's
+policy is a person's to write: the route and a file take it, and
+`catalogue_write` takes no number.
 
 WHO KEPT AN ENTRY (alpha 2.2 D.0). Each entry names its keeper (`by`), the
 lane it was kept in (`agent`): `person` for the route, a file and a call
@@ -45,17 +55,30 @@ import csv
 import io
 import json
 from datetime import datetime, timezone
-from typing import Any, Literal
+from typing import Any, Literal, get_args
 
-from pydantic import BaseModel, Field, ValidationError, field_validator, model_validator
+from pydantic import BaseModel, Field, ValidationError, ValidationInfo, field_validator, model_validator
 from sqlalchemy import select
 
 from . import db, projects
+from .competence import POLICY as SKILL_POLICY
 from .db import models as t
 from .db import rows
 
 CatalogueKind = Literal["strain", "product", "skill", "lesson"]
 KINDS: tuple[str, ...] = ("strain", "product", "skill", "lesson")
+# A product's class, as pureOS's proposer reads one (pureos/proposer.py
+# CLASS_OF_CATEGORY, each a protein, a small molecule or a polymer);
+# test_catalogues.py holds the two to one list. Each class is a word.
+ProductCategory = Literal["molecular_biology_enzyme", "diagnostic", "research_protein", "food_protein",
+                          "sweet_protein", "structural_protein", "industrial_enzyme", "therapeutic_protein", "hmo",
+                          "terpene", "glycoside", "biopolymer"]
+PRODUCT_CATEGORIES: tuple[str, ...] = get_args(ProductCategory)
+# Where the cells leave a product, as the proposer's rules split on it.
+ProductLocation = Literal["secreted", "intracellular"]
+# The longest a qualification may stand, in days: a hundred years, so the day
+# it lapses stays a calendar date (Python's dates end with the year 9999).
+MAX_RECENCY_DAYS = 36500
 # The twenty amino acids a protein's sequence is written in, one letter each.
 RESIDUES = frozenset("ACDEFGHIKLMNPQRSTVWY")
 MAX_FILE_ROWS = 2000
@@ -79,8 +102,10 @@ class CatalogueEntry(BaseModel):
     species: str | None = Field(default=None, max_length=200)
     program: str | None = Field(default=None, max_length=80)
     aliases: list[str] = Field(default_factory=list, max_length=40)
-    # A product: its class as the proposer's rules read it, and a protein's sequence.
-    category: str | None = Field(default=None, max_length=80)
+    # A product: its class as the proposer's rules read it, where the cells
+    # leave it (secreted, or kept inside them), and a protein's sequence.
+    category: ProductCategory | None = None
+    location: ProductLocation | None = None
     sequence: str | None = Field(default=None, max_length=20000)
     # Where the sequence was read, in words (a UniProt entry, a paper's table):
     # ProtParam computes from a sequence that names it, and from no other.
@@ -89,6 +114,16 @@ class CatalogueEntry(BaseModel):
     family: str | None = Field(default=None, max_length=80)
     summary: str | None = Field(default=None, max_length=2000)
     mastery: list[str] = Field(default_factory=list, max_length=40)
+    # A skill's policy (SKILL_POLICY), as Guild's levels read it: a critical
+    # skill is one where a mistake hurts a person or loses a batch; how many
+    # days a qualification stands with nobody seeing the person perform; how
+    # many cosigned runs come before a witnessed check can qualify; and the
+    # skills that must be at Supervised or above first, by their ids. All
+    # three of the first or none: Guild rates nobody on a skill with none.
+    criticality: Literal["routine", "critical"] | None = None
+    recencyDays: int | None = Field(default=None, ge=1, le=MAX_RECENCY_DAYS)
+    supervisedRuns: int | None = Field(default=None, ge=0)
+    prerequisites: list[str] = Field(default_factory=list, max_length=40)
     # A lesson: the skills it counts toward, by their ids.
     skills: list[str] = Field(default_factory=list, max_length=40)
     note: str | None = Field(default=None, max_length=2000)
@@ -107,11 +142,25 @@ class CatalogueEntry(BaseModel):
     via: Literal["postdoc", "mcp", "http"] | None = None
     at: str = ""
 
-    @field_validator("aliases", "mastery", "skills")
+    @field_validator("aliases", "mastery", "skills", "prerequisites")
     @classmethod
     def _words(cls, v: list[str]) -> list[str]:
         out = [w.strip() for w in v if w and w.strip()]
         return list(dict.fromkeys(out))
+
+    @field_validator("category", mode="before")
+    @classmethod
+    def _a_products_class(cls, v: Any, info: ValidationInfo) -> Any:
+        """A product's class, one of those the proposer reads, in words when it
+        is another; blank reads as none stated."""
+        if v is None or (isinstance(v, str) and not v.strip()):
+            return None
+        if info.data.get("kind") != "product":
+            raise ValueError("a category belongs to a product: the class pureOS's proposer reads")
+        if v not in PRODUCT_CATEGORIES:
+            raise ValueError(f"a product's category is one of the classes pureOS's proposer reads "
+                             f"({', '.join(PRODUCT_CATEGORIES)}), and {v!r} is outside them")
+        return v
 
     @model_validator(mode="after")
     def _fits_its_kind(self) -> "CatalogueEntry":
@@ -129,9 +178,23 @@ class CatalogueEntry(BaseModel):
             raise ValueError("the skills an entry counts toward belong to a lesson")
         if (self.aliases or self.species or self.program) and self.kind != "strain":
             raise ValueError("a species, a chemical set and other names belong to a strain")
-        if (self.mastery or self.family) and self.kind != "skill":
-            raise ValueError("a family and what mastery means belong to a skill")
+        if self.location is not None and self.kind != "product":
+            raise ValueError("a location belongs to a product: where the cells leave it")
+        policy = [k for k in SKILL_POLICY if getattr(self, k) is not None]
+        if (self.mastery or self.family or policy or self.prerequisites) and self.kind != "skill":
+            raise ValueError("a family, what mastery means and a policy belong to a skill")
+        if (policy or self.prerequisites) and len(policy) < len(SKILL_POLICY):
+            left = _listed_words([k for k in SKILL_POLICY if getattr(self, k) is None])
+            raise ValueError(f"a skill's policy names {_listed_words(list(SKILL_POLICY))} together, and this one "
+                             f"leaves out {left}")
+        if self.id in self.prerequisites:
+            raise ValueError("a skill's prerequisites are other skills, and this one names itself")
         return self
+
+
+def _listed_words(names: list[str]) -> str:
+    """`a`, `a and b`, `a, b and c`."""
+    return names[0] if len(names) == 1 else f"{', '.join(names[:-1])} and {names[-1]}"
 
 
 def _now() -> str:
@@ -267,7 +330,7 @@ def keep(entry: CatalogueEntry, *, by: str, agent: Literal["model", "person"] = 
 def _first_error(err: ValidationError) -> str:
     first = err.errors()[0]
     where = ".".join(str(p) for p in first.get("loc", ())) or "the entry"
-    return f"{where}: {first.get('msg')}"
+    return f"{where}: {str(first.get('msg')).removeprefix('Value error, ')}"
 
 
 def keep_fields(kind: str, fields: dict[str, Any], *, by: str, source: str,
@@ -295,7 +358,7 @@ class CatalogueIntake(BaseModel):
     refused: list[str] = Field(default_factory=list)
 
 
-_LISTS = ("aliases", "mastery", "skills")
+_LISTS = ("aliases", "mastery", "skills", "prerequisites")
 
 
 def _rows_of(data: bytes, filename: str) -> list[dict[str, Any]]:
@@ -383,14 +446,19 @@ def as_strain_aliases() -> dict[str, str]:
 
 
 def as_products() -> list[dict[str, Any]]:
-    """The products as ProtParam and the proposer read them."""
-    return [{"id": e.id, "name": e.name, "category": e.category, "sequence": e.sequence,
+    """The products as ProtParam and the proposer read them: the proposer
+    reads a product's class and where the cells leave it."""
+    return [{"id": e.id, "name": e.name, "category": e.category, "location": e.location, "sequence": e.sequence,
              "sequenceSource": e.sequenceSource, "source": e.source} for e in _entries("product")]
 
 
 def as_skills() -> list[dict[str, Any]]:
-    return [{"id": e.id, "name": e.name, "family": e.family, "summary": e.summary, "mastery": list(e.mastery)}
-            for e in _entries("skill")]
+    """The skills as Guild reads them (guild.projection): what each is and
+    what mastery means, and the policy its levels read, None where the entry
+    holds none (competence.unrated)."""
+    return [{"id": e.id, "name": e.name, "family": e.family, "summary": e.summary, "mastery": list(e.mastery),
+             "criticality": e.criticality, "recencyDays": e.recencyDays, "supervisedRuns": e.supervisedRuns,
+             "prerequisites": list(e.prerequisites)} for e in _entries("skill")]
 
 
 def as_lessons() -> list[dict[str, Any]]:

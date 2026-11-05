@@ -65,7 +65,10 @@ packages stay installed while the kept service runs, each said with the command 
     9  the UI walk (scripts/walk.ts, Chromium): Home, the project at its own address with its
        live trace, a document pasted in and searched, the flowsheet run's report and its SFF
        graph, a scenario begun from that run, the plants Studies offers to run, the project's
-       SFF flowsheets, the conversation of step 6 with its estimate marked, the runbook of step 5;
+       SFF flowsheets, the catalogues screen keeping a placeholder strain in the proof's person's
+       name (added, edited, taken in again from a file through the screen, and read back as the
+       person's; the service then holds it as the strain catalogue's one entry, the person's keep
+       from that file), the conversation of step 6 with its estimate marked, the runbook of step 5;
        then a reading deposited at the bench on that locked runbook, the readings alone, by the
        proof's person, in the unit of the scenario parameter step 5 sets, the placeholder the
        person types; a scenario made from step 5's flowsheet run through NewScenarioDialog with
@@ -137,6 +140,8 @@ REFERENCE_FILE = "SF_BST_15"
 READING_PARAMETER = "stream.cornstover.price"
 READING_UNIT = "USD/kg"
 READING_VALUE = 1.0
+# The placeholder strain the walk keeps on the catalogues screen (step 9): an id whose entry stands for no strain.
+WALK_STRAIN = "walk-placeholder-strain"
 # Sci RAG Kit's demo corpus (five fictional documents, CC0), and the one the extraction reads.
 DEMO = CORE / "tests" / "fixtures" / "kit-demo"
 DEMO_LICENCE = "CC0, as the manifest of Sci RAG Kit's demo corpus states (core/tests/fixtures/kit-demo/manifest.jsonl)"
@@ -170,7 +175,7 @@ TITLES = {
        "its history",
     7: "a reference SFF file imported; it draws",
     8: "the service restarted: everything reloads; an artifact replays within its tolerance",
-    9: "the UI walk: Home, the project, ingest, search, a run report and its SFF graph, a scenario begun from it, the plants Studies offers, the SFF flowsheets, a conversation, a runbook; a reading at the bench, a scenario on it, its run measured; each example engine's first thing run from the Runs screen",
+    9: "the UI walk: Home, the project, ingest, search, a run report and its SFF graph, a scenario begun from it, the plants Studies offers, the SFF flowsheets, a placeholder strain kept on the catalogues screen, a conversation, a runbook; a reading at the bench, a scenario on it, its run measured; each example engine's first thing run from the Runs screen",
     10: "the engines: each registered one listed, the core's three among them, the eight conformance checks made on "
         "it, its verdict kept, the proof's project as it was; a train made on step 4's run for the train engine's",
 }
@@ -980,7 +985,7 @@ def step_9(proof: Proof) -> None:
     env = {**os.environ, "WALK_ORIGIN": proof.origin, "WALK_PROJECT": proof.project, "WALK_RUN": proof.made["flowsheet"],
            "WALK_CONVERSATION": proof.made["conversation"], "WALK_RUNBOOK": runbook[0] if runbook else "",
            "WALK_PERSON": PERSON, "WALK_READING": f"{READING_VALUE:g}", "WALK_READING_UNIT": READING_UNIT,
-           "WALK_READING_PARAMETER": READING_PARAMETER, "WALK_ENGINES": ",".join(examples)}
+           "WALK_READING_PARAMETER": READING_PARAMETER, "WALK_STRAIN": WALK_STRAIN, "WALK_ENGINES": ",".join(examples)}
     walked = subprocess.run(["npx", "tsx", "scripts/walk.ts"], cwd=ROOT, text=True, capture_output=True, env=env,
                             timeout=1500)
     lines = [line.strip() for line in walked.stdout.splitlines() if line.strip().startswith(("✓", "✗"))]
@@ -988,8 +993,22 @@ def step_9(proof: Proof) -> None:
         proof.check(line.startswith("✓"), line[1:].strip())
     proof.check(walked.returncode == 0 and bool(lines), "the walk ended clean" if walked.returncode == 0 else
                 f"the walk exited {walked.returncode}: {(walked.stderr or '').strip()[-300:]}")
+    catalogued_by_the_walk(proof)
     if runbook:
         measured_by_the_walk(proof, runbook[0])
+
+
+def catalogued_by_the_walk(proof: Proof) -> None:
+    """The strain the walk kept on the catalogues screen, read back through the API (alpha 2.2 E.8): the strain
+    catalogue's one entry, under WALK_STRAIN, a person's keep in the proof's person's name (no model's door), with
+    its other names and a file as its source, as the screen's file intake kept it last."""
+    held = api(proof, "GET", "/api/catalogues/strain")
+    e = held[0] if len(held) == 1 else {}
+    proof.check(e.get("id") == WALK_STRAIN and e.get("by") == PERSON and e.get("agent") == "person" and e.get("via") is None
+                and bool(e.get("aliases")) and str(e.get("source") or "").startswith("the file ") and bool(e.get("at")),
+                f"the walk's strain {e.get('id')}: kept by {e.get('by')} as a {e.get('agent')}'s keep at {e.get('at')}, its "
+                f"other names {', '.join(e.get('aliases') or [])}, from {e.get('source')}, the strain catalogue's one entry"
+                if e else f"the strain catalogue holds {len(held)} entries, and the walk kept one")
 
 
 def measured_by_the_walk(proof: Proof, runbook: str) -> None:

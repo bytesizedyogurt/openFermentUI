@@ -7,12 +7,15 @@ and audited as its write, through `writes.keep_catalogue`. A model's write
 replaces an entry it kept itself under the same name through the same kind
 of door (Postdoc's loop, or an outside assistant's) and is refused in words
 over any other keeper's (alpha 2.2 D.0, catalogues.keep); nothing here takes
-an entry out. A catalogue holds names and words, never a measured value.
+an entry out. A catalogue holds names and words, never a measured value, and
+a skill's policy (its numbers) is a person's to write on the catalogues
+screen, so `catalogue_write` keeps a skill with none (alpha 2.2 E.8).
 """
 from __future__ import annotations
 
 from pydantic import BaseModel, Field
 
+from ..catalogues import PRODUCT_CATEGORIES
 from ..models import ToolResult
 from . import Tool, ToolContext, register
 
@@ -56,7 +59,9 @@ class CatalogueWriteInput(BaseModel):
     program: str = Field(default="", max_length=80, description="A strain's chemical set, as pureOS names it.")
     aliases: list[str] = Field(default_factory=list, description="A strain's other names, as papers give them.")
     category: str = Field(default="", max_length=80, description=(
-        "The entry's class, in words; a product's as the proposer's rules read it."))
+        "A product's class, one of those pureOS's proposer reads: " + ", ".join(PRODUCT_CATEGORIES) + "."))
+    location: str = Field(default="", max_length=20, description=(
+        "Where the cells leave a product, as a document states it: secreted, or intracellular."))
     sequence: str = Field(default="", max_length=20000, description="A protein product's sequence, one letter a residue.")
     sequenceSource: str = Field(default="", max_length=400, description="Where the sequence was read, in words; a sequence needs it.")
     family: str = Field(default="", max_length=80, description="A skill's family.")
@@ -76,8 +81,9 @@ READ_TOOL = register(Tool(
     name="catalogue_read",
     description=(
         "Read one of the project's catalogues: its strains (each with its species, the chemical set its trains use "
-        "and the other names papers give it), its products (each with its class and a protein's sequence), Guild's "
-        "skills or Primer's lessons. Narrow by words. Returns {kind, matched, entries, note}: matched counts every "
+        "and the other names papers give it), its products (each with its class, where the cells leave it and a "
+        "protein's sequence), Guild's skills (each with the policy a person wrote for it, when one did) or Primer's "
+        "lessons. Narrow by words. Returns {kind, matched, entries, note}: matched counts every "
         f"entry the words match, and entries holds the first limit of them ({ROWS} when limit is left out, at most "
         f"{MAX_ROWS}), in id order, each an entry with its fields as kept and its null fields left out: its kind, "
         "id, name and the fields of its kind, who kept it (by), the lane it was kept in (agent: person or model), "
@@ -99,9 +105,11 @@ WRITE_TOOL = register(Tool(
         "another caller kept under it stays as it is, and the call is refused in words naming the entry and who "
         "kept it, so keep yours under an id of its own, one that starts with your name, its / written as a dot "
         "(example-agent.0.1-a-skill for example-agent/0.1). Say in the note what the entry rests on. A strain's own "
-        "fields are species, program and aliases; a product's are sequence and sequenceSource; a skill's are family "
-        "and mastery; a lesson's is skills; every kind takes name, summary, category and note, and a field of "
-        "another kind is refused in words. The result's summary is the entry as kept, its null fields left out and "
+        "fields are species, program and aliases; a product's are category (one of the classes pureOS's proposer "
+        "reads), location, sequence and sequenceSource; a skill's are family and mastery; a lesson's is skills; "
+        "every kind takes name, summary and note, and a field of another kind is refused in words. A skill kept here "
+        "holds no policy, which a person writes on the catalogues screen, and Guild rates nobody on it until one "
+        "does. The result's summary is the entry as kept, its null fields left out and "
         "a protein's sequence left to catalogue_read: its kind, id, name and fields, its own note, by (the name "
         "you are kept under), agent (model), via (the door: postdoc, mcp or http), source and at, beside state "
         "(open) and meaning (the service's word on the keep). Its audit row names the module that reads the kind "

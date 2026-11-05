@@ -280,6 +280,9 @@ async function callAgainst(answer: { status: number; body?: unknown }, healthy =
   const missing = detailWords([{ type: 'missing', loc: ['body', 'inputs', 0, 'quantity'], msg: 'Field required' }]);
   check('a field the request lacks is named where it stands, and no reload is asked for', missing === "The service refused the request's fields: inputs.0.quantity: Field required.", missing);
   check('the service’s own words stand as they are', detailWords('a placeholder refusal') === 'a placeholder refusal');
+  // alpha 2.2 E.8: a catalogue entry's own refusal reaches the page as a field error, which Pydantic writes after "Value error, ".
+  const own = detailWords([{ type: 'value_error', loc: ['body', 'entry'], msg: 'Value error, a placeholder refusal of the entry' }]);
+  check('a model’s own refusal of a field is said in its own words', own === "The service refused the request's fields: entry: a placeholder refusal of the entry.", own);
 }
 
 // ── the unit each change is sent in (alpha 2.2 D2; src/lib/params.ts) ──

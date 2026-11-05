@@ -1055,7 +1055,20 @@
           "category": {
             "anyOf": [
               {
-                "maxLength": 80,
+                "enum": [
+                  "molecular_biology_enzyme",
+                  "diagnostic",
+                  "research_protein",
+                  "food_protein",
+                  "sweet_protein",
+                  "structural_protein",
+                  "industrial_enzyme",
+                  "therapeutic_protein",
+                  "hmo",
+                  "terpene",
+                  "glycoside",
+                  "biopolymer"
+                ],
                 "type": "string"
               },
               {
@@ -1063,6 +1076,21 @@
               }
             ],
             "title": "Category"
+          },
+          "criticality": {
+            "anyOf": [
+              {
+                "enum": [
+                  "routine",
+                  "critical"
+                ],
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Criticality"
           },
           "family": {
             "anyOf": [
@@ -1091,6 +1119,21 @@
             "title": "Kind",
             "type": "string"
           },
+          "location": {
+            "anyOf": [
+              {
+                "enum": [
+                  "secreted",
+                  "intracellular"
+                ],
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Location"
+          },
           "mastery": {
             "items": {
               "type": "string"
@@ -1117,6 +1160,14 @@
             ],
             "title": "Note"
           },
+          "prerequisites": {
+            "items": {
+              "type": "string"
+            },
+            "maxItems": 40,
+            "title": "Prerequisites",
+            "type": "array"
+          },
           "program": {
             "anyOf": [
               {
@@ -1128,6 +1179,19 @@
               }
             ],
             "title": "Program"
+          },
+          "recencyDays": {
+            "anyOf": [
+              {
+                "maximum": 36500.0,
+                "minimum": 1.0,
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Recencydays"
           },
           "sequence": {
             "anyOf": [
@@ -1197,6 +1261,18 @@
             ],
             "title": "Summary"
           },
+          "supervisedRuns": {
+            "anyOf": [
+              {
+                "minimum": 0.0,
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Supervisedruns"
+          },
           "via": {
             "anyOf": [
               {
@@ -1217,23 +1293,7 @@
         "required": [
           "kind",
           "id",
-          "name",
-          "species",
-          "program",
-          "aliases",
-          "category",
-          "sequence",
-          "sequenceSource",
-          "family",
-          "summary",
-          "mastery",
-          "skills",
-          "note",
-          "source",
-          "by",
-          "agent",
-          "via",
-          "at"
+          "name"
         ],
         "title": "CatalogueEntry",
         "type": "object"
@@ -1275,7 +1335,7 @@
         "type": "object"
       },
       "CatalogueKeep": {
-        "description": "POST /api/catalogues/{kind}: one entry and who keeps it.",
+        "description": "POST /api/catalogues/{kind}: one entry of the catalogue's kind, written\nas the catalogue answers one, and who keeps it. The service writes the\nentry's keeper, lane, door and time (`by`, `agent`, `via`, `at`) over\nwhatever the entry sends.",
         "properties": {
           "by": {
             "default": "",
@@ -1283,9 +1343,7 @@
             "type": "string"
           },
           "entry": {
-            "additionalProperties": true,
-            "title": "Entry",
-            "type": "object"
+            "$ref": "#/components/schemas/CatalogueEntry"
           }
         },
         "required": [
@@ -18194,7 +18252,7 @@
         "x-openferment-scope": "project"
       },
       "post": {
-        "description": "One entry kept in the open project's catalogue of `kind`, in the name of\n`by`, as a person's keep (`agent: person`); an entry already held under its\nid is replaced, whoever kept it. 422 in words for an entry the kind does\nnot take, and for a keep that names nobody (`by` empty).",
+        "description": "One entry kept in the open project's catalogue of `kind`, in the name of\n`by`, as a person's keep (`agent: person`); an entry already held under its\nid is replaced, whoever kept it. The entry names its kind, the\ncatalogue's own: the catalogues screen sends an entry as the catalogue\nanswers one. 422 in words for an entry the kind does not take, for an\nentry of another kind, and for a keep that names nobody (`by` empty).",
         "operationId": "catalogue_keep_api_catalogues__kind__post",
         "parameters": [
           {
@@ -18271,7 +18329,7 @@
                 }
               }
             },
-            "description": "An entry the kind does not take, or a keep that names nobody, in words (a list of field errors when the body is no object of `entry` and `by`)."
+            "description": "An entry the kind does not take, an entry of another kind, or a keep that names nobody, in words: a list of field errors, each with its place and why, for an entry whose own fields its kind refuses (a sequence on a strain, a category outside the classes pureOS's proposer reads, a skill's policy with a part left out), and the service's words for the rest."
           }
         },
         "summary": "Catalogue Keep",

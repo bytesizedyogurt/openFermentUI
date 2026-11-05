@@ -54,7 +54,7 @@ def test_the_readers_that_read_an_empty_list_read_the_catalogues(monkeypatch):
     monkeypatch.setattr(guild, "projection", GUILD_PROJECTION)
     catalogues.keep(STRAIN, by="Ada")
     catalogues.keep(catalogues.CatalogueEntry(kind="product", id="test-protein", name="A test protein",
-                                              category="protein", sequence="MKTAYIAK",
+                                              category="research_protein", location="secreted", sequence="MKTAYIAK",
                                               sequenceSource="a test's own words"), by="Ada")
     catalogues.keep(catalogues.CatalogueEntry(kind="skill", id="SK-TEST", name="A test skill", family="testing",
                                               mastery=["criterion one"]), by="Ada")
@@ -67,6 +67,8 @@ def test_the_readers_that_read_an_empty_list_read_the_catalogues(monkeypatch):
     assert protparam.sequence_of("test-protein")[0] == "MKTAYIAK"
     held = proposer._catalogue()
     assert [h["id"] for h in held.strains] == ["test-strain-1"] and [p["id"] for p in held.products] == ["test-protein"]
+    assert (held.products[0]["category"], held.products[0]["location"]) == ("research_protein", "secreted"), \
+        "the proposer reads a product's class and where the cells leave it"
     assert set(guild.skills()) == {"SK-TEST"} and guild.lesson_skills("l-test") == ["SK-TEST"]
     assert module_stores._projection()["primer"]["lessons"][0]["lessonId"] == "l-test"
 
@@ -95,8 +97,9 @@ def test_the_routes_keep_list_and_take_a_file():
     assert [e["id"] for e in client.get("/api/catalogues/strain").json()] == ["test-strain-1"]
     assert client.get("/api/catalogues/strain/test-strain-1").json()["species"] == "Testus exemplaris"
     assert client.get("/api/catalogues/enzyme").status_code == 404
-    refused = client.post("/api/catalogues/product", json={"entry": {"id": "p", "name": "P", "species": "x"}, "by": "Ada"})
-    assert refused.status_code == 422 and "belong to a strain" in refused.json()["detail"]
+    refused = client.post("/api/catalogues/product", json={"entry": {"kind": "product", "id": "p", "name": "P",
+                                                                     "species": "x"}, "by": "Ada"})
+    assert refused.status_code == 422 and any("belong to a strain" in d["msg"] for d in refused.json()["detail"])
     up = client.post("/api/intake/catalogue", data={"kind": "lesson", "by": "Ada"},
                      files={"file": ("lessons.csv", b"id,name,skills\nl-1,Lesson one,SK-A;SK-B\n", "text/csv")})
     assert up.status_code == 200 and up.json()["kept"] == ["l-1"]
@@ -152,8 +155,9 @@ def test_a_model_replaces_its_own_entry_and_leaves_another_callers():
 def test_a_persons_keep_replaces_whatever_the_id_holds_in_either_lane():
     tools.run("catalogue_write", SKILL, tools.ToolContext(model="test-model-a"))
     client = TestClient(api.app)
-    replaced = client.post("/api/catalogues/skill", json={"entry": {"id": "test-skill-lane", "name": "A person's now",
-                                                                    "agent": "model"}, "by": "Ada Moreno"})
+    replaced = client.post("/api/catalogues/skill", json={"entry": {"kind": "skill", "id": "test-skill-lane",
+                                                                    "name": "A person's now", "agent": "model"},
+                                                          "by": "Ada Moreno"})
     assert replaced.status_code == 200 and (replaced.json()["by"], replaced.json()["agent"]) == ("Ada Moreno", "person")
     by_tool = tools.run("catalogue_write", {**SKILL, "name": "Another person's"}, tools.ToolContext(person="Grace Hopper"))
     assert by_tool.error is None and catalogues.get("skill", "test-skill-lane").agent == "person"
@@ -219,3 +223,150 @@ def test_catalogue_write_answers_the_entry_as_kept():
     read = tools.run("catalogue_read", {"kind": "skill"}, tools.ToolContext(model="test-model-a")).summary
     (entry,) = read["entries"]
     assert entry["at"] == s["at"] and entry["via"] == "postdoc" and set(read) == {"kind", "matched", "entries", "note"}
+
+
+# ── alpha 2.2 E.8: a skill's policy, a product's class and where the cells leave it ──
+
+POLICY = {"criticality": "routine", "recencyDays": 30, "supervisedRuns": 1}
+
+
+def test_a_products_class_is_one_the_proposer_reads_refused_in_words_at_every_door():
+    assert set(catalogues.PRODUCT_CATEGORIES) == set(proposer.CLASS_OF_CATEGORY), "one list of a product's classes"
+    with pytest.raises(ValueError, match="one of the classes pureOS's proposer reads"):
+        catalogues.CatalogueEntry(kind="product", id="p", name="P", category="protein")
+    with pytest.raises(ValueError, match="a category belongs to a product"):
+        catalogues.CatalogueEntry(kind="strain", id="s", name="S", category="biopolymer")
+    with pytest.raises(ValueError, match="a location belongs to a product"):
+        catalogues.CatalogueEntry(kind="strain", id="s", name="S", location="secreted")
+    assert catalogues.CatalogueEntry(kind="product", id="p", name="P", category=" ").category is None, "blank is none"
+    client = TestClient(api.app, base_url="http://127.0.0.1")
+    keep = client.post("/api/catalogues/product", json={"entry": {"kind": "product", "id": "p", "name": "P",
+                                                                  "category": "protein"}, "by": "Ada"})
+    assert keep.status_code == 422 and "and 'protein' is outside them" in keep.json()["detail"][0]["msg"]
+    got = catalogues.intake("product", b"id,name,category,location\np-1,Product one,biopolymer,intracellular\n"
+                                       b"p-2,Product two,protein,\n", "products.csv", by="Ada")
+    assert got.kept == ["p-1"] and got.refused == [
+        "row 2: category: a product's category is one of the classes pureOS's proposer reads ("
+        + ", ".join(catalogues.PRODUCT_CATEGORIES) + "), and 'protein' is outside them"]
+    assert catalogues.as_products()[0]["location"] == "intracellular"
+    wrote = tools.run("catalogue_write", {"kind": "product", "id": "test-model-a.p", "name": "P", "category": "protein"},
+                      tools.ToolContext(model="test-model-a"))
+    assert wrote.error and "is outside them" in wrote.error and "Value error" not in wrote.error
+
+
+def test_a_product_kept_with_no_class_is_proposed_nothing_in_words():
+    catalogues.keep(STRAIN, by="Ada")
+    catalogues.keep(catalogues.CatalogueEntry(kind="product", id="p-open", name="A placeholder product"), by="Ada")
+    made = proposer.propose("p-open", "test-strain-1")
+    assert made.train is None and [m.property for m in made.missing] == ["class"]
+    assert made.missing[0].why.startswith("product p-open's products catalogue entry states no category, and the rules "
+                                          "read a product's class from it")
+
+
+def test_the_keep_route_takes_the_entry_as_the_catalogue_answers_one():
+    client = TestClient(api.app, base_url="http://127.0.0.1")
+    doc = api.app.openapi()
+    assert doc["components"]["schemas"]["CatalogueKeep"]["properties"]["entry"] == {
+        "$ref": "#/components/schemas/CatalogueEntry"}
+    made = client.post("/api/catalogues/strain", json={"entry": STRAIN.model_dump(mode="json"), "by": "Ada"}).json()
+    again = client.post("/api/catalogues/strain", json={"entry": {**made, "aliases": ["TS-1"]}, "by": "Grace"})
+    assert again.status_code == 200 and (again.json()["by"], again.json()["aliases"]) == ("Grace", ["TS-1"])
+    other = client.post("/api/catalogues/product", json={"entry": made, "by": "Ada"})
+    assert other.status_code == 422 and other.json()["detail"] == (
+        "the entry names its kind as strain, and this is the product catalogue: an entry is kept at "
+        "/api/catalogues/strain")
+    kindless = client.post("/api/catalogues/strain", json={"entry": {"id": "s", "name": "S"}, "by": "Ada"})
+    assert kindless.status_code == 422 and kindless.json()["detail"][0]["loc"] == ["body", "entry", "kind"]
+    nobody = client.post("/api/catalogues/strain", json={"entry": made, "by": " "})
+    assert nobody.status_code == 422 and "a person's or a model's name" in nobody.json()["detail"]
+    assert [e.id for e in catalogues.listed("strain")] == ["test-strain-1"] and catalogues.listed("product") == []
+
+
+def test_a_skills_policy_is_kept_whole_or_refused_and_a_file_takes_it():
+    kept = catalogues.keep(catalogues.CatalogueEntry(kind="skill", id="SK-A", name="Skill A", **POLICY,
+                                                     prerequisites=["SK-B", " SK-B "]), by="Ada")
+    assert (kept.criticality, kept.recencyDays, kept.supervisedRuns, kept.prerequisites) == ("routine", 30, 1, ["SK-B"])
+    with pytest.raises(ValueError, match="leaves out criticality and supervisedRuns"):
+        catalogues.CatalogueEntry(kind="skill", id="SK-C", name="C", recencyDays=30)
+    with pytest.raises(ValueError, match="leaves out criticality, recencyDays and supervisedRuns"):
+        catalogues.CatalogueEntry(kind="skill", id="SK-C", name="C", prerequisites=["SK-A"])
+    with pytest.raises(ValueError, match="names itself"):
+        catalogues.CatalogueEntry(kind="skill", id="SK-C", name="C", **POLICY, prerequisites=["SK-C"])
+    with pytest.raises(ValueError, match="a policy belong to a skill"):
+        catalogues.CatalogueEntry(kind="lesson", id="l", name="L", criticality="critical")
+    with pytest.raises(ValueError, match="less than or equal to"):
+        catalogues.CatalogueEntry(kind="skill", id="SK-C", name="C", **{**POLICY, "recencyDays": 10 ** 9})
+    csv = (b"id,name,criticality,recencyDays,supervisedRuns,prerequisites\n"
+           b"SK-D,Skill D,critical,30,2,SK-A; SK-B\n"
+           b"SK-E,Skill E,,30,,\n")
+    got = catalogues.intake("skill", csv, "skills.csv", by="Ada")
+    assert got.kept == ["SK-D"] and got.refused == [
+        "row 2: the entry: a skill's policy names criticality, recencyDays and supervisedRuns together, and this one "
+        "leaves out criticality and supervisedRuns"]
+    d = catalogues.get("skill", "SK-D")
+    assert (d.criticality, d.recencyDays, d.supervisedRuns, d.prerequisites) == ("critical", 30, 2, ["SK-A", "SK-B"])
+    held = {s["id"]: s for s in catalogues.as_skills()}
+    assert {k: held["SK-D"][k] for k in ("criticality", "recencyDays", "supervisedRuns", "prerequisites")} == {
+        "criticality": "critical", "recencyDays": 30, "supervisedRuns": 2, "prerequisites": ["SK-A", "SK-B"]}
+
+
+def _ledger_with_a_member():
+    from test_guild import person
+
+    guild.write_person(person("p-lead", "Lead Person", role="lead", added_by=None))
+    guild.write_person(person("p-member", "Member Person", added_by="p-lead"))
+
+
+def test_guild_rates_a_catalogue_skill_by_its_policy_and_leaves_one_with_none_out_in_words(monkeypatch):
+    """The defect E.8 repairs: as_skills handed Guild no prerequisites, and
+    Competence.level read them (KeyError: 'prerequisites'). A skill with a
+    policy is rated; one kept with none is left out of every level, of the
+    checks' ranking and of a check asked for by name, each in words."""
+    from openferment_core import checks
+    from openferment_core.competence import Competence, unrated
+    from openferment_core.models import CheckRequest, EvidenceSource, GuildEvidence
+
+    monkeypatch.setattr(guild, "projection", GUILD_PROJECTION)
+    catalogues.keep(catalogues.CatalogueEntry(kind="skill", id="SK-RATED", name="A rated skill", **POLICY), by="Ada")
+    catalogues.keep(catalogues.CatalogueEntry(kind="skill", id="SK-OPEN", name="A skill with no policy"), by="Ada")
+    skills = guild.skills()
+    assert unrated(skills["SK-RATED"]) is None
+    assert unrated(skills["SK-OPEN"]).startswith("A skill with no policy has no policy in the project's skills catalogue")
+    signed = [GuildEvidence(id=f"e-know-{k}", personId="p-member", skillId=k, kind="knowledge", at="2026-11-01",
+                            observerId="p-lead", source=EvidenceSource(kind="signoff", ref="a placeholder record"),
+                            raw="Signed off at a placeholder briefing") for k in ("SK-RATED", "SK-OPEN")]
+    c = Competence(signed, skills, "2026-11-04")
+    assert (c.level("p-member", "SK-RATED"), c.level("p-member", "SK-OPEN")) == (2, 0)
+    left_out = c.status("p-member", "SK-OPEN")
+    assert (left_out.level, left_out.effective, left_out.knowledgeComplete) == (0, 0, True)
+    assert not c.holds("p-member", "SK-OPEN")
+    _ledger_with_a_member()
+    ranked = checks.rank_pairs(guild.read(), skills, "2026-11-04")
+    assert all(p["skillId"] != "SK-OPEN" for p in ranked)
+    with pytest.raises(checks.CheckRefused) as caught:
+        checks.request(CheckRequest(personId="p-member", skillIds=["SK-OPEN"], by="p-member"))
+    assert caught.value.rule == "skill" and "has no policy" in caught.value.why
+    assert caught.value.why.endswith("a check of it waits until its catalogue entry holds its policy")
+
+
+def test_a_run_of_a_skill_with_no_policy_is_refused_in_words(monkeypatch):
+    from openferment_core.models import EvidenceSource, GuildEvidence
+
+    catalogues.keep(catalogues.CatalogueEntry(kind="skill", id="SK-OPEN", name="A skill with no policy"), by="Ada")
+    monkeypatch.setattr(guild, "projection", lambda: {
+        "skills": catalogues.as_skills(), "lessons": [], "protocols": [],
+        "steps": [{"protocolId": "PR-PLACEHOLDER", "stepId": "s1", "skills": ["SK-OPEN"]}]})
+    _ledger_with_a_member()
+    alone = GuildEvidence(id="e-alone-1", personId="p-member", skillId="SK-OPEN", kind="independent", observerId=None,
+                          at="2026-11-04", source=EvidenceSource(kind="deposition", ref="PR-PLACEHOLDER", stepId="s1"),
+                          raw="Ran the placeholder step alone")
+    with pytest.raises(guild.GuildRefused) as caught:
+        guild.write_evidence(alone)
+    assert caught.value.rule == "authority"
+    assert caught.value.why == (
+        "A skill with no policy has no policy in the project's skills catalogue (its criticality, how many days a "
+        "qualification stands and how many supervised runs come before a witnessed check), so Guild rates nobody on "
+        "it: nobody holds it, and a run of it alone is a deviation until its catalogue entry holds its policy")
+    cosigned = alone.model_copy(update={"id": "e-cosign-1", "kind": "supervised", "observerId": "p-lead"})
+    with pytest.raises(guild.GuildRefused, match="nobody cosigns it until its catalogue entry holds its policy"):
+        guild.write_evidence(cosigned)

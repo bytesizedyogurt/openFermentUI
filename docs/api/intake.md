@@ -55,22 +55,35 @@ project held it before) or `failed` with the `reason` in words, and `transient` 
 that was the network's condition. A failure is an answer the Intake board renders: the route
 raises no 5xx for a document it could not collect.
 
-## A project's catalogues (alpha 2.1)
+## A project's catalogues (alpha 2.1; alpha 2.2 E.8)
 
 The strains and their other names, the products, Guild's skills and Primer's lessons are kinds of
 row in the project's `catalogue` table (migration 0007; `core/openferment_core/catalogues.py`), each
 kept whole with who added it and where it came from. Names and words only: a number a paper
-reports is a record. Nothing here deletes an entry.
+reports is a record. Nothing here deletes an entry. The catalogues screen (`/catalogues`, a tab a
+kind) lists each catalogue, adds and edits an entry in the name Settings holds, and takes in a file
+through `POST /api/intake/catalogue`.
+
+Every kind takes `id`, `name`, `summary`, `note` and `source`; each kind's own fields are these, and
+a field of another kind is refused in words:
+
+| Kind | Its own fields |
+|---|---|
+| `strain` | `species`; `program`, the chemical set its trains use, as pureOS names it; `aliases`, the other names papers give it |
+| `product` | `category`, one of the classes pureOS's proposer reads (`molecular_biology_enzyme`, `diagnostic`, `research_protein`, `food_protein`, `sweet_protein`, `structural_protein`, `industrial_enzyme`, `therapeutic_protein`, `hmo`, `terpene`, `glycoside`, `biopolymer`), any other refused in words at the keep and at the file; `location`, `secreted` or `intracellular`, which the proposer's rules split a protein or a polymer on; `sequence` with `sequenceSource`, where it was read |
+| `skill` | `family`; `mastery`, what an assessor watches for; and its policy: `criticality` (`routine` or `critical`), `recencyDays` (how many days a qualification stands with nobody seeing the person perform), `supervisedRuns` (how many cosigned runs come before a witnessed check can qualify) and `prerequisites` (the ids of the skills that must be at Supervised or above first). A policy names its first three together, all three or none; Guild rates nobody on a skill kept with none, and the cosign, the run alone and a check asked for by name say so in words |
+| `lesson` | `skills`, the ids of the skills it counts toward |
 
 | Route | Answers |
 |---|---|
 | `GET /api/catalogues/{kind}` | The entries of `strain`, `product`, `skill` or `lesson`, by id; 404 in words for another kind |
 | `GET /api/catalogues/{kind}/{id}` | One entry; 404 in words when the catalogue holds none |
-| `POST /api/catalogues/{kind}` | `{"entry": {...}, "by": "<name>"}` kept, an entry under the same id replaced; 422 in words for a field the kind does not take (a sequence on a strain, a species on a product, a sequence with no `sequenceSource`) |
-| `POST /api/intake/catalogue` | A file of entries of one kind (form fields `kind`, `by`, `file`): a JSON list of objects (or one under `entries`), or a CSV with `id` and `name` columns and a list's items split by `;`. Every row that is an entry is kept with the file as its source; every other row is refused with its reason (`{"kind", "kept", "refused"}`) |
+| `POST /api/catalogues/{kind}` | `{"entry": {"kind": "<kind>", "id": "...", "name": "...", ...}, "by": "<name>"}`, the entry as the catalogue answers one, kept as a person's keep, an entry under the same id replaced; the service writes `by`, `agent`, `via` and `at` over what the entry sends. 422 with a list of field errors for a field the kind does not take (a sequence on a strain, a species on a product, a sequence with no `sequenceSource`, a category outside the classes, a policy with a part left out), and in the service's words for an entry of another kind and for a keep that names nobody |
+| `POST /api/intake/catalogue` | A file of entries of one kind (form fields `kind`, `by`, `file`): a JSON list of objects (or one under `entries`), or a CSV with `id` and `name` columns and a list's items split by `;` (`aliases`, `mastery`, `skills`, `prerequisites`). Every row that is an entry is kept with the file as its source; every other row is refused with its reason (`{"kind", "kept", "refused"}`) |
 
 The readers that had read an empty list read these: geneOS's hosts and the strain aliases
 (`module_stores`), ProtParam's products, pureOS's proposer (a proposal's host is a strain kept
-here), Guild's skills and the lessons that count toward them. Postdoc reads a catalogue with
-`catalogue_read` and keeps an entry, marked as its own and audited, with `catalogue_write`
-(`docs/TOOLS.md`).
+here, and a product's class and location are read from its entry), Guild's skills with their
+policies and the lessons that count toward them. Postdoc reads a catalogue with `catalogue_read` and
+keeps an entry, marked as its own and audited, with `catalogue_write` (`docs/TOOLS.md`), which
+takes no number: a skill a model keeps holds no policy until a person writes one.

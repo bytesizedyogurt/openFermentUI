@@ -293,8 +293,10 @@ export interface paths {
          * Catalogue Keep
          * @description One entry kept in the open project's catalogue of `kind`, in the name of
          *     `by`, as a person's keep (`agent: person`); an entry already held under its
-         *     id is replaced, whoever kept it. 422 in words for an entry the kind does
-         *     not take, and for a keep that names nobody (`by` empty).
+         *     id is replaced, whoever kept it. The entry names its kind, the
+         *     catalogue's own: the catalogues screen sends an entry as the catalogue
+         *     answers one. 422 in words for an entry the kind does not take, for an
+         *     entry of another kind, and for a keep that names nobody (`by` empty).
          */
         post: operations["catalogue_keep_api_catalogues__kind__post"];
         delete?: never;
@@ -3137,9 +3139,9 @@ export interface components {
          */
         CatalogueEntry: {
             /** Agent */
-            agent: ("model" | "person") | null;
+            agent?: ("model" | "person") | null;
             /** Aliases */
-            aliases: string[];
+            aliases?: string[];
             /**
              * At
              * @default
@@ -3151,9 +3153,11 @@ export interface components {
              */
             by: string;
             /** Category */
-            category: string | null;
+            category?: ("molecular_biology_enzyme" | "diagnostic" | "research_protein" | "food_protein" | "sweet_protein" | "structural_protein" | "industrial_enzyme" | "therapeutic_protein" | "hmo" | "terpene" | "glycoside" | "biopolymer") | null;
+            /** Criticality */
+            criticality?: ("routine" | "critical") | null;
             /** Family */
-            family: string | null;
+            family?: string | null;
             /** Id */
             id: string;
             /**
@@ -3161,28 +3165,36 @@ export interface components {
              * @enum {string}
              */
             kind: "strain" | "product" | "skill" | "lesson";
+            /** Location */
+            location?: ("secreted" | "intracellular") | null;
             /** Mastery */
-            mastery: string[];
+            mastery?: string[];
             /** Name */
             name: string;
             /** Note */
-            note: string | null;
+            note?: string | null;
+            /** Prerequisites */
+            prerequisites?: string[];
             /** Program */
-            program: string | null;
+            program?: string | null;
+            /** Recencydays */
+            recencyDays?: number | null;
             /** Sequence */
-            sequence: string | null;
+            sequence?: string | null;
             /** Sequencesource */
-            sequenceSource: string | null;
+            sequenceSource?: string | null;
             /** Skills */
-            skills: string[];
+            skills?: string[];
             /** Source */
-            source: string | null;
+            source?: string | null;
             /** Species */
-            species: string | null;
+            species?: string | null;
             /** Summary */
-            summary: string | null;
+            summary?: string | null;
+            /** Supervisedruns */
+            supervisedRuns?: number | null;
             /** Via */
-            via: ("postdoc" | "mcp" | "http") | null;
+            via?: ("postdoc" | "mcp" | "http") | null;
         };
         /**
          * CatalogueIntake
@@ -3201,7 +3213,10 @@ export interface components {
         };
         /**
          * CatalogueKeep
-         * @description POST /api/catalogues/{kind}: one entry and who keeps it.
+         * @description POST /api/catalogues/{kind}: one entry of the catalogue's kind, written
+         *     as the catalogue answers one, and who keeps it. The service writes the
+         *     entry's keeper, lane, door and time (`by`, `agent`, `via`, `at`) over
+         *     whatever the entry sends.
          */
         CatalogueKeep: {
             /**
@@ -3209,10 +3224,7 @@ export interface components {
              * @default
              */
             by: string;
-            /** Entry */
-            entry: {
-                [key: string]: unknown;
-            };
+            entry: components["schemas"]["CatalogueEntry"];
         };
         /**
          * CeilingCheck
@@ -9664,7 +9676,7 @@ export interface operations {
                     "application/json": components["schemas"]["Refusal"];
                 };
             };
-            /** @description An entry the kind does not take, or a keep that names nobody, in words (a list of field errors when the body is no object of `entry` and `by`). */
+            /** @description An entry the kind does not take, an entry of another kind, or a keep that names nobody, in words: a list of field errors, each with its place and why, for an entry whose own fields its kind refuses (a sequence on a strain, a category outside the classes pureOS's proposer reads, a skill's policy with a part left out), and the service's words for the rest. */
             422: {
                 headers: {
                     [name: string]: unknown;

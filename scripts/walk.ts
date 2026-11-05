@@ -4,8 +4,10 @@
  * loopback and holds a project the proof has filled (scripts/prove.py step 9
  * starts it): Home → the project → a document pasted in and searched → a run's
  * report and its SFF graph → a scenario begun from the run → the plants Studies
- * offers to run → the project's SFF flowsheets → a conversation with its
- * labelled estimate → a runbook → a reading deposited at the bench on that
+ * offers to run → the project's SFF flowsheets → the catalogues screen, where
+ * the person keeps a placeholder strain, edits it, takes in a file naming it
+ * again and reads it back as their own (alpha 2.2 E.8) → a conversation with
+ * its labelled estimate → a runbook → a reading deposited at the bench on that
  * locked runbook, the readings alone, in the unit a scenario parameter of the
  * project is denominated in, the placeholder value the person types and reads
  * back → a scenario made from the run through NewScenarioDialog with that
@@ -21,7 +23,7 @@
  *   WALK_ORIGIN=http://127.0.0.1:PORT WALK_PROJECT=<id> WALK_RUN=<run id> \
  *   WALK_CONVERSATION=<id> WALK_RUNBOOK=<id> WALK_PERSON=<name> \
  *   WALK_READING=<placeholder> WALK_READING_UNIT=<unit> WALK_READING_PARAMETER=<key> \
- *   [WALK_ENGINES=<name>,<name>] npx tsx scripts/walk.ts
+ *   [WALK_STRAIN=<id>] [WALK_ENGINES=<name>,<name>] npx tsx scripts/walk.ts
  *
  * One line a check, ✓ or ✗ with what it saw; exit 1 when one fails. A console
  * error or an uncaught exception on any page is a failed check.
@@ -52,6 +54,12 @@ const PERSON = process.env.WALK_PERSON?.trim() || 'Walk Reviewer';
 const READING = env('WALK_READING');
 const READING_UNIT = env('WALK_READING_UNIT');
 const PARAMETER = env('WALK_READING_PARAMETER');
+// The placeholder strain the walk keeps on the catalogues screen: an id the proof names, a name and other names that
+// stand for no strain (the repository ships software alone), and the file the screen takes in naming it again.
+const STRAIN = process.env.WALK_STRAIN?.trim() || 'walk-placeholder-strain';
+const STRAIN_NAME = 'A placeholder strain the walk keeps';
+const STRAIN_ALIASES = ['WALK-1', 'WALK-2'];
+const STRAIN_FILE = 'walk-strains.csv';
 // The engines whose first thing the walk runs from the Runs screen, comma-separated; none when unset.
 const ENGINES = (process.env.WALK_ENGINES ?? '')
   .split(',')
@@ -79,6 +87,17 @@ interface HeldRun {
   provenance: string | null;
   outputs: { values?: unknown[] };
   diagnostics?: unknown[];
+}
+
+/** A catalogue entry as the service keeps it (GET /api/catalogues/{kind}/{id}), as far as the walk reads it. */
+interface HeldEntry {
+  id: string;
+  name: string;
+  aliases?: string[];
+  by: string;
+  agent?: string | null;
+  via?: string | null;
+  source?: string | null;
 }
 
 /** A reading as the service lists it (GET /api/depositions/readings). */
@@ -223,6 +242,42 @@ async function main(): Promise<void> {
     await page.getByTestId('flowsheets-import-url').waitFor();
     await page.getByTestId('flowsheets-library-file').first().waitFor();
     return `${runs} record${runs === 1 ? '' : 's'} written by runs listed, with an import by file or by address and the toolkit's reference files`;
+  });
+
+  // alpha 2.2 E.8: the catalogues screen keeps a placeholder strain in the person's name, edits it, takes in a file
+  // naming it again, and the service reads it back as the person's.
+  await step('Catalogues', async () => {
+    await at(page, '/catalogues');
+    await page.locator('[data-testid="catalogues"][data-kind="strain"]').waitFor();
+    await page.getByTestId('catalogue-add').click();
+    const add = page.locator('[data-testid="catalogue-form"][data-mode="add"]');
+    await add.getByTestId('catalogue-field-id').fill(STRAIN);
+    await add.getByTestId('catalogue-field-name').fill(STRAIN_NAME);
+    await add.getByTestId('catalogue-field-aliases').fill(STRAIN_ALIASES[0]);
+    await add.getByTestId('catalogue-field-note').fill('A placeholder the walk keeps; it stands for no strain.');
+    await add.getByTestId('catalogue-keep').click();
+    const row = page.locator(`[data-testid="catalogue-entry"][data-entry="${STRAIN}"]`);
+    await row.waitFor();
+    await row.getByTestId('catalogue-edit').click();
+    const edit = page.locator(`[data-testid="catalogue-form"][data-mode="edit"][data-entry="${STRAIN}"]`);
+    await edit.getByTestId('catalogue-field-aliases').fill(STRAIN_ALIASES.join('\n'));
+    await edit.getByTestId('catalogue-keep').click();
+    await page.locator(`[data-testid="catalogue-kept"][data-entry="${STRAIN}"]`).waitFor();
+    await row.getByText(STRAIN_ALIASES.join(', ')).waitFor();
+    const csv = `id,name,aliases\n${STRAIN},${STRAIN_NAME},${STRAIN_ALIASES.join(';')}\n`;
+    await page.getByTestId('catalogue-intake-file').setInputFiles({ name: STRAIN_FILE, mimeType: 'text/csv', buffer: Buffer.from(csv) });
+    await page.getByTestId('catalogue-intake-go').click();
+    await page.locator('[data-testid="catalogue-intake-result"][data-kept="1"][data-refused="0"]').waitFor();
+    await row.getByText(`from the file ${STRAIN_FILE}`).waitFor();
+    const answered = await page.request.get(`${ORIGIN}/api/catalogues/strain/${encodeURIComponent(STRAIN)}`, {
+      headers: { 'X-OpenFerment-Project': PROJECT },
+    });
+    if (!answered.ok()) throw new Error(`GET /api/catalogues/strain/${STRAIN} answered ${answered.status()}`);
+    const held = (await answered.json()) as HeldEntry;
+    const aliases = (held.aliases ?? []).join(', ');
+    if (held.by !== PERSON || held.agent !== 'person' || held.via != null || held.name !== STRAIN_NAME || aliases !== STRAIN_ALIASES.join(', ') || held.source !== `the file ${STRAIN_FILE}`)
+      throw new Error(`the service keeps ${STRAIN} as "${held.name}" (${aliases}) by ${held.by} in the ${held.agent} lane from ${held.source}`);
+    return `placeholder strain ${STRAIN} kept on the catalogues screen in ${PERSON}'s name, edited to the other names ${aliases}, taken in again from ${STRAIN_FILE} through the screen, and read back from the service as ${PERSON}'s keep from that file`;
   });
 
   await step('Conversation', async () => {

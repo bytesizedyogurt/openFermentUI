@@ -215,3 +215,19 @@ Never; this is how the drift stops recurring.
   where a hand mirror stood in `lib/durable.ts`.
 - The vocabulary's own types (`UnitOperationStage`, `UnitOperation`, `CarbonSource`) move to
   `data/vocabulary.ts` beside its lists; `src/data/types.ts` re-exports them until E.15.
+
+### Alpha 2.2, E.8 (2026-11-05): the catalogues' lib, born on the generated types
+
+- `lib/catalogues.ts` names the generated schemas of a project's catalogues: an entry
+  (`CatalogueEntry`), a keep (`CatalogueKeep`) and what a file came to (`CatalogueIntake`), with a
+  product's class, where the cells leave it and a skill's criticality read from the entry's own
+  fields. The catalogues screen reads every shape there and names no hand-kept type.
+  `data/labels.ts`' class labels read the generated union, the twelve classes pureOS's proposer
+  reads, beside the labels of a location and a criticality. The stage plan gave `ProductCategory`
+  to E.9, and it moves here with its first generated reader, the screen; StrainPage and Runbooks
+  read the labels with the hand-kept class, whose eleven classes are among the twelve.
+- A keep sends the entry as the catalogue answers one (`CatalogueKeep.entry` takes the entry's
+  model), so the generated `CatalogueEntry` keeps Pydantic's required list (E.0a's rule) and names
+  each field with a default as one a reader may find absent. The service writes every field of an
+  entry it answers; the screen reads a list field through `?? []` and a word through `?? ''`, and a
+  keep sends `by` and `at` empty for the service to write.

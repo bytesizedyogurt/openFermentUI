@@ -3,6 +3,7 @@
 import { ProjectHome } from '@/screens/ProjectHome';
 import { FlowsheetPage } from '@/screens/FlowsheetPage';
 import Flowsheets from '@/screens/Flowsheets';
+import Catalogues from '@/screens/Catalogues';
 import { Component, useEffect, useRef, useState, type ReactNode } from 'react';
 import {
   FlaskConical,
@@ -172,6 +173,9 @@ function Screen() {
   if (route.project && !a) return <ProjectHome project={route.project} />;
   if (!a) return <Home />;
   if (a === 'flowsheets') return b ? <FlowsheetPage recordId={b} /> : <Flowsheets />;
+  // alpha 2.2 E.8 — the project's catalogues, a tab a kind: /catalogues (the strains), /catalogues/products,
+  // /catalogues/skills, /catalogues/lessons.
+  if (a === 'catalogues') return <Catalogues view={b} />;
   switch (a) {
     case 'intake':
       if (b === 'ingest') return <IntakeIngest />;
@@ -529,9 +533,9 @@ export default function App() {
                       {/* §7 — the gloss. Eight invented words with no
                           explanation is friction the names have not earned
                           yet, and this is the cheapest possible fix. */}
-                      {/* Wraps to two lines rather than truncating. Eleven
-                          entries at two lines still fit the shortest rail
-                          this ships on. */}
+                      {/* Wraps to two lines, so a gloss reads whole. The
+                          rail scrolls when its twelve entries run past the
+                          window's height. */}
                       <span
                         className={cx(
                           'block text-caption leading-tight',

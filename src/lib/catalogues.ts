@@ -1,0 +1,91 @@
+// A project's catalogues, the browser's side (alpha 2.2 E.8; core/openferment_core/catalogues.py):
+//
+//   GET  /api/catalogues/{kind}          the entries of one catalogue (strain, product, skill, lesson), by id
+//   GET  /api/catalogues/{kind}/{id}     one entry, with who kept it, in which lane, when and from where
+//   POST /api/catalogues/{kind}          one entry kept in a person's name, an entry under its id replaced
+//   POST /api/intake/catalogue           a file of entries of one kind, JSON or CSV, every row kept or refused
+//
+// The catalogues screen (/catalogues) lists, adds and edits entries through these, each keep in the name Settings
+// holds. The service decides what an entry may hold: it refuses, in words, a field its kind does not take, a
+// product's class outside the twelve pureOS's proposer reads, a skill's policy with a part left out, and a keep
+// that names nobody. With the service down a call says so (ServiceDown); a refusal comes back in the service's
+// words (ServiceRefused). Nothing here takes an entry out.
+//
+// Every shape here is the service's own, generated from its models into src/api/types.gen.ts (ADR-007). The keep's
+// body is the entry as the catalogue answers one (`CatalogueKeep.entry`), so the generated entry names every field
+// with a default as one a reader may find absent.
+import type { components } from '@/api/types.gen';
+import { ServiceDown, ServiceRefused, call } from './http';
+
+type S = components['schemas'];
+
+/** One entry of a project's catalogue; the fields a kind does not use stay empty. */
+export type CatalogueEntry = S['CatalogueEntry'];
+/** Which catalogue: strain, product, skill or lesson. */
+export type CatalogueKind = CatalogueEntry['kind'];
+/** POST /api/catalogues/{kind}: one entry and who keeps it. */
+export type CatalogueKeep = S['CatalogueKeep'];
+/** What a file of entries came to: the ids kept, and each row refused with why. */
+export type CatalogueIntake = S['CatalogueIntake'];
+/** A product's class, one of those pureOS's proposer reads. */
+export type ProductCategory = NonNullable<CatalogueEntry['category']>;
+/** Where the cells leave a product: secreted, or kept inside them. */
+export type ProductLocation = NonNullable<CatalogueEntry['location']>;
+/** A skill's criticality: a critical skill is one where a mistake hurts a person or loses a batch. */
+export type SkillCriticality = NonNullable<CatalogueEntry['criticality']>;
+
+export { ServiceDown as CataloguesDown, ServiceRefused as CataloguesRefused };
+
+/** The four catalogues, in the order the screen shows them. */
+export const KINDS: CatalogueKind[] = ['strain', 'product', 'skill', 'lesson'];
+
+const id = (s: string) => encodeURIComponent(s);
+
+/** The open project's entries of one catalogue, by id. */
+export const listCatalogue = (kind: CatalogueKind, signal?: AbortSignal) =>
+  call<CatalogueEntry[]>(`/api/catalogues/${kind}`, { signal });
+
+/** One entry of the open project's catalogue of `kind`. */
+export const catalogueEntry = (kind: CatalogueKind, entryId: string, signal?: AbortSignal) =>
+  call<CatalogueEntry>(`/api/catalogues/${kind}/${id(entryId)}`, { signal });
+
+/**
+ * One entry kept in the catalogue of its kind in `by`'s name, as a person's keep: an entry under its id is replaced,
+ * whoever kept it. The service writes the keeper, the lane, the door and the time over what the entry sends.
+ */
+export const keepEntry = (asked: CatalogueKeep) =>
+  call<CatalogueEntry>(`/api/catalogues/${asked.entry.kind}`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify(asked),
+  });
+
+/**
+ * A file of entries of one kind taken in, JSON (a list of objects, or one under `entries`) or CSV (with `id` and
+ * `name` columns, a list's items split by `;`), in `by`'s name: every row that is an entry is kept with the file as
+ * its source, and every other row is refused with its reason.
+ */
+export function takeInCatalogue(kind: CatalogueKind, file: File, by: string): Promise<CatalogueIntake> {
+  const form = new FormData();
+  form.append('kind', kind);
+  form.append('by', by);
+  form.append('file', file);
+  return call<CatalogueIntake>('/api/intake/catalogue', { method: 'POST', body: form });
+}
+
+/** An empty entry of `kind`, as the screen begins one. */
+export function blankEntry(kind: CatalogueKind): CatalogueEntry {
+  return { kind, id: '', name: '', by: '', at: '' };
+}
+
+/** Whose lane an entry was kept in, in words: a person's keep, or a model's write through the door it came in by. */
+export function keptIn(entry: CatalogueEntry): string {
+  if (entry.agent !== 'model') return 'a person’s keep';
+  if (entry.via === 'mcp') return 'a model’s write, over MCP';
+  if (entry.via === 'http') return 'a model’s write, at the HTTP endpoint';
+  return 'Postdoc’s write';
+}
+
+/** Whether a skill's entry holds its policy, which Guild's levels read; Guild rates nobody on a skill with none. */
+export const hasPolicy = (entry: CatalogueEntry): boolean =>
+  entry.criticality != null && entry.recencyDays != null && entry.supervisedRuns != null;

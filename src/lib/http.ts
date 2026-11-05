@@ -34,8 +34,10 @@ export class ServiceRefused extends Error {
  * A refusal's detail in words. The service's own words stand as they are. A
  * request whose fields the service refused answers a list of field errors
  * (FastAPI's 422, each with the field's place and why), said here field by
- * field; a field the service does not hold means this page was loaded before
- * the service changed, and the words say to reload it.
+ * field, each in a model's own words (Pydantic writes a model's refusal after
+ * the words "Value error, ", which are left off); a field the service does not
+ * hold means this page was loaded before the service changed, and the words
+ * say to reload it.
  */
 export function detailWords(detail: unknown): string {
   if (typeof detail === 'string') return detail;
@@ -43,7 +45,7 @@ export function detailWords(detail: unknown): string {
     const fields = detail.map((d) => {
       const e = (d ?? {}) as { loc?: unknown; msg?: unknown };
       const where = Array.isArray(e.loc) ? e.loc.filter((x) => x !== 'body').join('.') : '';
-      return `${where ? `${where}: ` : ''}${typeof e.msg === 'string' && e.msg ? e.msg : 'refused'}`;
+      return `${where ? `${where}: ` : ''}${typeof e.msg === 'string' && e.msg ? e.msg.replace(/^Value error, /, '') : 'refused'}`;
     });
     const older = detail.some((d) => (d as { type?: unknown } | null)?.type === 'extra_forbidden');
     return (

@@ -21,12 +21,14 @@ proposal; nothing here runs a train.
 
 WHAT A RULE READS, AND WHERE IT IS HELD.
 
-- The product's CLASS. A products catalogue entry (`_catalogue().products`,
-  none until a store holds a catalogue) states it as its `category`, read as a word by
-  `CLASS_OF_CATEGORY` (each protein category a protein; a human milk
-  oligosaccharide, a terpene and a glycoside a small molecule; a biopolymer a
-  polymer). A product the catalogue holds no entry for but thermosteam's
-  library is asked about by name (`thermo.CHEMICALS`, ethanol tonight) is a
+- The product's CLASS. An entry of the project's products catalogue
+  (`_catalogue().products`, catalogues.py) states it as its `category`, read
+  as a word by `CLASS_OF_CATEGORY` (each protein category a protein; a human
+  milk oligosaccharide, a terpene and a glycoside a small molecule; a
+  biopolymer a polymer); the catalogue keeps a category of these twelve alone
+  (`catalogues.ProductCategory`), and an entry may state none. A product the
+  catalogue holds no entry for but thermosteam's library is asked about by
+  name (`thermo.CHEMICALS`, ethanol tonight) is a
   small molecule when the library gives it a normal boiling point (`Tb`, the
   `volatility` artifact's `boilingPoint`): a chemical that boils as a pure
   compound. A class nobody states is missing, never guessed from a name. The
@@ -434,7 +436,11 @@ def propose(product: str, host: str, inlet_ref: str | None = None) -> TrainPropo
     vol = None
     if entry is not None:
         product_class = CLASS_OF_CATEGORY.get(str(entry.get("category") or ""))
-        if product_class is None:
+        if product_class is None and not entry.get("category"):
+            missing.append(ProposalMissing(property="class", why=(
+                f"product {pid}'s products catalogue entry states no category, and the rules read a product's class "
+                f"from it ({CLASS_WHY})")))
+        elif product_class is None:
             missing.append(ProposalMissing(property="class", why=(
                 f"product {pid}'s category, {entry.get('category')!r}, names no class the rules read ({CLASS_WHY})")))
         else:

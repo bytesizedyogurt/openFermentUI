@@ -1,11 +1,11 @@
 // The navigation vocabulary (OF-BLD-006 §2.2 as reversed, OF-BLD-008 §1).
 //
 // ═══════════════════════════════════════════════════════════════════════
-// THE RAIL. Home plus ten destinations:
+// THE RAIL. Home plus eleven destinations:
 //
 //     Home
 //     Intake · BioRepo · Postdoc · geneOS · fermOS · pureOS · Proforma
-//     Runbooks · Primer · Guild
+//     Runbooks · Primer · Guild · Catalogues
 //
 // alpha 2.0 retired the closed-map rule and Dominion with its seeded
 // catalogue (ADR-000, ADR-010). Projects become the organizing object at
@@ -24,6 +24,7 @@
 //   - an alias, so typing the old word in the palette still finds the thing;
 //   - a redirect, so an old link lands on the new screen instead of a 404.
 import {
+  BookMarked,
   Dna,
   FlaskConical,
   Filter,
@@ -62,18 +63,24 @@ export interface NavSurface {
 }
 
 /**
- * THE RAIL. Home, then the ten destinations, in order.
+ * THE RAIL. Home, then the eleven destinations, in order.
  *
  * Four things that used to be here are views inside their owner: the strain
  * catalogue is geneOS's default view (as Hosts), Protocols and Depositions are
- * Runbooks tabs, and Witness is a BioRepo tab. A catalogue of strains is not a
- * destination — it is what one of them happens to hold.
+ * Runbooks tabs, and Witness is a BioRepo tab. Hosts is where a person chooses
+ * a strain as a chassis.
  *
- * OF-BLD-011 §1 corrected which one. The catalogue sat under fermOS until the
+ * OF-BLD-011 §1 settled which destination holds Hosts. It sat under fermOS until the
  * three OS components were re-cut along the three stages of making something —
  * geneOS the organism, fermOS the reactor, pureOS downstream. Choosing a
  * chassis is a genetic design decision, so Hosts moved to geneOS and
  * `/fermos/organisms` redirects.
+ *
+ * alpha 2.2 E.8 put the catalogues on the rail: the strains, the products,
+ * Guild's skills and Primer's lessons a person keeps, one screen for four
+ * kinds that several destinations read. Catalogues is where a person adds and
+ * edits them; geneOS's Hosts, Guild and Primer read the store's own lists,
+ * which read the catalogues from alpha 2.2 E.9 and E.12.
  */
 export const RAIL: (NavSurface & { key: string })[] = [
   {
@@ -232,9 +239,18 @@ export const RAIL: (NavSurface & { key: string })[] = [
     component: 'Guild',
     key: 'g',
   },
+  {
+    // alpha 2.2 E.8. Its chord key is 'a', since Proforma holds 'c'.
+    label: 'Catalogues',
+    to: '/catalogues',
+    descriptor: 'strains, products, skills, lessons',
+    aliases: ['catalogue', 'catalogues', 'strains', 'strain catalogue', 'aliases', 'other names'],
+    icon: BookMarked,
+    key: 'a',
+  },
 ];
 
-/** The ten destinations: the rail, less Home. */
+/** The eleven destinations: the rail, less Home. */
 export const DESTINATIONS = RAIL.filter((r) => r.to !== '/');
 
 /**
@@ -447,6 +463,31 @@ export const SUB_VIEWS: (NavSurface & { owner: string })[] = [
     aliases: ['ingest', 'fetch', 'queue'],
     icon: Table2,
     owner: 'Intake',
+  },
+  // alpha 2.2 E.8 — the catalogues' other three tabs; the strains are the destination's own path.
+  {
+    label: 'Products',
+    to: '/catalogues/products',
+    descriptor: 'the products a train recovers: each one’s class, where the cells leave it, its sequence',
+    aliases: ['products', 'product catalogue', 'product class', 'secreted', 'intracellular', 'sequence'],
+    icon: BookMarked,
+    owner: 'Catalogues',
+  },
+  {
+    label: 'Skill policies',
+    to: '/catalogues/skills',
+    descriptor: 'each skill’s policy: how critical it is, how long a qualification stands, what it needs first',
+    aliases: ['skill policy', 'skills catalogue', 'criticality', 'recency', 'supervised runs', 'prerequisites'],
+    icon: BookMarked,
+    owner: 'Catalogues',
+  },
+  {
+    label: 'Lessons',
+    to: '/catalogues/lessons',
+    descriptor: 'Primer’s lessons, and the skills each counts toward',
+    aliases: ['lessons', 'lesson catalogue'],
+    icon: BookMarked,
+    owner: 'Catalogues',
   },
 ];
 

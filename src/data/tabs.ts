@@ -75,3 +75,12 @@ export const PUREOS_TABS: OwnerTab[] = [
   { label: 'Builder', to: '/pureos/build' },
   { label: 'Train', to: '/pureos/train' },
 ];
+
+// alpha 2.2 E.8 — the project's catalogues, one tab a kind: the strains (the
+// destination's own path), the products, Guild's skills and Primer's lessons.
+export const CATALOGUE_TABS: OwnerTab[] = [
+  { label: 'Strains', to: '/catalogues' },
+  { label: 'Products', to: '/catalogues/products' },
+  { label: 'Skills', to: '/catalogues/skills' },
+  { label: 'Lessons', to: '/catalogues/lessons' },
+];

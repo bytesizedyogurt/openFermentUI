@@ -259,6 +259,7 @@ function stateOf(n: Counted): Record<string, { now: string; built: boolean }> {
     Runbooks: { now: `${n.runbooks} runbooks · ${n.protocols} protocols`, built: true },
     Primer: { now: `${n.modules} modules`, built: true },
     Guild: { now: 'review queue and roles', built: true },
+    Catalogues: { now: 'kept on the service, each entry in its keeper’s name', built: true },
   };
 }
 

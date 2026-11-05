@@ -1,8 +1,13 @@
 // Labels and orders the screens read: words for an enum, never a value.
 // alpha 2.0 kept these when it deleted the seed files they lived in
 // (src/data/products.ts and runbooks.ts at tag alpha-1.0; ADR-010).
-import type { ProductCategory, RunbookStatus } from './types';
+import type { ProductCategory, ProductLocation, SkillCriticality } from '@/lib/catalogues';
+import type { RunbookStatus } from './types';
 
+/**
+ * A product's class as the products catalogue keeps it: the classes pureOS's proposer reads (the generated
+ * `CatalogueEntry.category`, alpha 2.2 E.8), each a protein, a small molecule or a polymer.
+ */
 export const PRODUCT_CATEGORY_LABEL: Record<ProductCategory, string> = {
   molecular_biology_enzyme: 'Molecular biology enzyme',
   diagnostic: 'Diagnostic antigen',
@@ -15,6 +20,19 @@ export const PRODUCT_CATEGORY_LABEL: Record<ProductCategory, string> = {
   glycoside: 'Glycoside',
   industrial_enzyme: 'Industrial enzyme',
   therapeutic_protein: 'Therapeutic protein',
+  biopolymer: 'Biopolymer',
+};
+
+/** Where the cells leave a product, as the proposer's rules split on it. */
+export const PRODUCT_LOCATION_LABEL: Record<ProductLocation, string> = {
+  secreted: 'Secreted by the cells',
+  intracellular: 'Kept inside the cells',
+};
+
+/** A skill's criticality, as Guild's checks weigh it. */
+export const SKILL_CRITICALITY_LABEL: Record<SkillCriticality, string> = {
+  routine: 'Routine',
+  critical: 'Critical: a mistake hurts a person or loses a batch',
 };
 
 export const RUNBOOK_STATUS_ORDER: RunbookStatus[] = [
