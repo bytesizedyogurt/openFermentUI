@@ -26,7 +26,7 @@ import {
   type TrainSummary,
   type VesselSummary,
 } from './proforma';
-import { listRuns, type Artifact, type EngineInput } from './studies';
+import { listRuns, titledConfiguration, type Artifact, type EngineInput } from './studies';
 
 export { ServiceDown as PureosDown, ServiceRefused as PureosRefused };
 
@@ -199,11 +199,16 @@ export function trainOfRun(run: { engine: string; inputs: { name: string; quanti
 
 /**
  * What a run ran, as a person reads it, from its runs row: a train run names its train's name beside its id
- * (`trainOfRun`), any other its thing and the configuration it ran in.
+ * (`trainOfRun`), any other its thing and the configuration it ran in, read by the engine's title for it beside its
+ * name where the reader holds the thing's titles (`titles`, `titledConfiguration`: Studies' run card holds them from
+ * GET /api/engines).
  */
-export function ranWhat(run: { engine: string; plant: string; configuration?: string | null; inputs: { name: string; quantity: { value: unknown } }[] }): string {
+export function ranWhat(
+  run: { engine: string; plant: string; configuration?: string | null; inputs: { name: string; quantity: { value: unknown } }[] },
+  titles?: Record<string, string> | null,
+): string {
   const t = trainOfRun(run);
-  return t ? `${t.name} (${run.plant})` : run.plant + (run.configuration ? ` (${run.configuration})` : '');
+  return t ? `${t.name} (${run.plant})` : run.plant + (run.configuration ? ` (${titledConfiguration(run.configuration, titles)})` : '');
 }
 
 /**

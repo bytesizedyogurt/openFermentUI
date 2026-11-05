@@ -4299,9 +4299,17 @@ export interface components {
         };
         /**
          * EngineThing
-         * @description One thing an engine can run, with the configurations it runs in.
+         * @description One thing an engine can run, with the configurations it runs in and,
+         *     where the engine gives them, the words a person reads for each.
          */
         EngineThing: {
+            /**
+             * Configurationtitles
+             * @description Words a person reads for a configuration, by its name: each key one of `configurations`, each title 1 to 200 characters. A configuration with no title is read by its name; `{}` when the engine gives none.
+             */
+            configurationTitles: {
+                [key: string]: string;
+            };
             /** Configurations */
             configurations: string[];
             /** Defaultconfiguration */

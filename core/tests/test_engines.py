@@ -42,7 +42,11 @@ gives counts and names no project, train or run; the copy holds every row a
 train's resolution reads; the checks' database is dropped when SIGTERM ends
 the command and when a rollback cannot close; and `pnpm ready` says why a
 failed engine fails and why no command checks an engine that names nothing
-its things rest on.
+its things rest on. Alpha 2.2 E.18: a thing titles its configurations, each
+title one of them and words, through the worker's answer as through a model,
+a title outside them breaking the contract as a stray default does; and the
+kinetics engine titles each kept fit, forecast and simulation with its kind
+and when the project kept it.
 """
 from __future__ import annotations
 
@@ -63,9 +67,9 @@ from openferment_core import api, artifacts, events, llm, ready, tools
 from openferment_core.engine import EngineBroken, EngineRefused, conform, contract, library, registry, runs, simulator
 from openferment_core.engine.sample import SAMPLE
 from openferment_core.literature import KIT_SETTINGS
-from openferment_core.models import (CONFIGURATION_MAX, EngineCheck, EngineInput, EngineParameter, EngineRun,
-                                     EngineThing, ParameterSpec, Quantity)
-from openferment_core.workers import WorkerCrashed, WorkerTimeout, withheld
+from openferment_core.models import (CONFIGURATION_MAX, CONFIGURATION_TITLE_MAX, EngineCheck, EngineInput,
+                                     EngineParameter, EngineRun, EngineThing, ParameterSpec, Quantity)
+from openferment_core.workers import WorkerCrashed, WorkerTimeout, sample_worker, withheld
 
 SAMPLE_ENTRY = "openferment_core.engine.sample:SAMPLE"
 ROOT = Path(__file__).resolve().parents[2]
@@ -236,6 +240,33 @@ def test_a_parameter_is_a_parameter_spec_with_its_default_and_where_it_comes_fro
             EngineParameter(**{**p.model_dump(exclude={"sourceRule"}), **bad})
 
 
+def test_a_thing_may_title_its_configurations_and_each_title_names_one_it_runs_in():
+    base = {"id": "a-thing", "title": "A placeholder thing", "configurations": ["one way", "another way"],
+            "precision": {"rtol": 0, "atol": 0}}
+    plain = EngineThing.model_validate(base)
+    # A thing that titles none reads {} and is served so: each configuration is then read by its name.
+    assert plain.configurationTitles == {} and plain.model_dump(mode="json")["configurationTitles"] == {}
+    titled = EngineThing.model_validate({**base, "configurationTitles": {"another way": "A placeholder way, in words"}})
+    assert titled.configurationTitles == {"another way": "A placeholder way, in words"}
+    assert (titled.configurations, titled.defaultConfiguration) == (["one way", "another way"], None)
+    longest = "w" * CONFIGURATION_TITLE_MAX
+    assert EngineThing.model_validate({**base, "configurationTitles": {"one way": longest}}).configurationTitles == {
+        "one way": longest}
+    for bad, says in [
+        ({"configurationTitles": {"sideways": "A placeholder way"}},
+         "a-thing's configurationTitles name 'sideways', and each title names one of its configurations: 'one way', "
+         "'another way'"),
+        ({"configurations": [], "configurationTitles": {"sideways": "A placeholder way"}},
+         "a-thing's configurationTitles name 'sideways', and it takes no configuration to title"),
+        ({"configurationTitles": {"one way": "  "}},
+         "a-thing's title for 'one way' is blank: a title is words a person reads"),
+        ({"configurationTitles": {"one way": ""}}, "at least 1 character"),
+        ({"configurationTitles": {"one way": "w" * (CONFIGURATION_TITLE_MAX + 1)}}, "at most 200 characters"),
+    ]:
+        with pytest.raises(ValidationError, match=re.escape(says)):
+            EngineThing.model_validate({**base, **bad})
+
+
 def test_the_service_registers_biosteam_through_its_own_entry_point():
     registry.reset()
     try:
@@ -250,6 +281,8 @@ def test_get_api_engines_lists_each_with_its_things_worker_and_error(engines):
     sample = listed["sample"]
     assert sample["entryPoint"] == SAMPLE_ENTRY and sample["worker"] == SAMPLE.worker and sample["error"] is None
     assert [t["id"] for t in sample["things"]] == ["placeholder", "placeholder-configured", "refuses"]
+    # The sample titles one configuration through its worker, and leaves the other to its name.
+    assert [t["configurationTitles"] for t in sample["things"]] == [{}, {"one way": sample_worker.ONE_WAY_TITLE}, {}]
     assert sample["version"] == {"openferment-core": "0.1.0"} and sample["conformance"] is None
     assert listed["broken"]["error"].startswith("openferment_core.engine.no_such_module:ENGINE could not be loaded")
     assert listed["biosteam"]["worker"] == "openferment_core.workers.proforma_worker"
@@ -782,6 +815,31 @@ def test_a_worker_whose_things_or_file_answer_outside_the_protocol_is_broken(eng
         engine.parameters("placeholder", None)
     with pytest.raises(EngineBroken, match="a flowsheet that is no JSON object"):
         engine.sff_document("placeholder", None, [])
+
+
+def test_a_worker_whose_titles_name_a_configuration_it_lists_none_of_is_broken(monkeypatch):
+    """A title for a configuration the thing lists none of breaks the
+    contract as a default outside them does: the engine's things are refused
+    in the contract's words, its parameters and runs answer 503, and the
+    listing names the engine with those words."""
+    engine = contract.WorkerEngine(name="sample", worker=SAMPLE.worker, distributions=("openferment-core",))
+    stray = {"id": "placeholder-configured", "title": "A placeholder thing", "configurations": ["one way"],
+             "configurationTitles": {"sideways": "A placeholder way, in words"}, "precision": {"rtol": 0, "atol": 0}}
+    monkeypatch.setattr(engine, "call", lambda op, args, *, timeout_s=None: {"things": [stray]})
+    says = ("answered things outside their shape: things: Value error, placeholder-configured's configurationTitles "
+            "name 'sideways', and each title names one of its configurations: 'one way'")
+    with pytest.raises(EngineBroken, match=re.escape(says)):
+        engine.things()
+    monkeypatch.setattr(registry, "found", lambda: {"sample": registry.Found("sample", SAMPLE_ENTRY, engine)})
+    monkeypatch.setattr(conform, "latest", lambda name: None)
+    listed = registry.info("sample")
+    assert listed.things == [] and listed.error.startswith("its things could not be listed: EngineBroken:")
+    assert says in listed.error
+    client = TestClient(api.app)
+    params = client.get("/api/engines/sample/parameters", params={"thing": "placeholder-configured"})
+    ran = client.post("/api/engines/sample/run", json={"thing": "placeholder-configured", "configuration": "one way"})
+    assert (params.status_code, ran.status_code) == (503, 503) and says in ran.json()["detail"]
+    assert runs.listed("sample") == []
 
 
 def test_a_worker_that_fails_writing_the_file_says_the_job_failed_and_keeps_no_row(engines, monkeypatch):
@@ -1342,7 +1400,7 @@ def test_a_contract_engines_parameter_with_no_default_waits_for_the_run_to_set_i
 # STAND-IN, typed as those tests type it, or conformance's placeholder.
 
 from openferment_core import evidence_pool, fermos, fermos_engine, intake, kinetics, proforma, vessel  # noqa: E402
-from openferment_core.models import VesselRequest  # noqa: E402
+from openferment_core.models import Artifact, VesselRequest  # noqa: E402
 from standins import as_inputs  # noqa: E402
 
 KINETICS_ENTRY = "openferment_core.fermos_engine:ENGINE"
@@ -1403,8 +1461,8 @@ def test_get_api_engines_lists_kinetics_with_the_families_that_simulate_and_no_w
                             "thermosteam": library._installed("thermosteam")}
     # light_v1 is a socket, and the contract has no kinetics socket; a project holding no fit and no
     # simulation lists no forecast and no vessel.
-    assert [(t["id"], t["configurations"], t["defaultConfiguration"], t["precision"]) for t in k["things"]] == [
-        (f, [], None, {"rtol": 0.0, "atol": 0.0}) for f in FAMILIES]
+    assert [(t["id"], t["configurations"], t["defaultConfiguration"], t["configurationTitles"], t["precision"])
+            for t in k["things"]] == [(f, [], None, {}, {"rtol": 0.0, "atol": 0.0}) for f in FAMILIES]
 
 
 def test_a_familys_parameters_keep_each_convention_and_leave_the_rest_to_the_run(kinetics_engines):
@@ -1496,6 +1554,12 @@ def test_a_forecast_and_a_vessel_are_things_while_the_project_holds_what_they_ta
     assert things["forecast"].configurations == [fit.kineticArtifactId] and things["forecast"].defaultConfiguration is None
     # A logistic fit designs the anaerobic vessel, so it is a configuration of the vessel too.
     assert things["vessel"].configurations == [fit.kineticArtifactId]
+    # Each configuration is titled with the kind of artifact it names and when the project kept it.
+    at = artifacts.get(fit.kineticArtifactId).createdAt
+    fitted = f"a kinetic fit, kept {at[:10]} {at[11:16]} UTC"
+    assert re.fullmatch(r"a kinetic fit, kept \d{4}-\d{2}-\d{2} \d{2}:\d{2} UTC", fitted), fitted
+    assert things["forecast"].configurationTitles == things["vessel"].configurationTitles == {
+        fit.kineticArtifactId: fitted}
     params_ = {p.key: p for p in KINETICS.parameters("forecast", fit.kineticArtifactId)}
     assert set(params_) == {"x0", "s0", "p0", "t_end"} and all(p.value is None for p in params_.values())
     with pytest.raises(EngineRefused, match="forecast is run in one of its configurations, named in the request"):
@@ -1515,6 +1579,11 @@ def test_a_forecast_and_a_vessel_are_things_while_the_project_holds_what_they_ta
     served = {t["id"]: t["configurations"] for t in listed["things"]}
     assert served["forecast"] == [fit.kineticArtifactId]
     assert set(served["vessel"]) == {fit.kineticArtifactId, run.artifactId}
+    made = artifacts.get(run.artifactId).createdAt
+    titles = {t["id"]: t["configurationTitles"] for t in listed["things"]}
+    assert titles["forecast"] == {fit.kineticArtifactId: fitted}
+    assert titles["vessel"] == {fit.kineticArtifactId: fitted,
+                                run.artifactId: f"a forecast, kept {made[:10]} {made[11:16]} UTC"}
 
 
 def test_a_run_reads_only_the_artifact_its_configuration_names(kinetics_engines, monkeypatch):
@@ -1535,9 +1604,25 @@ def test_a_run_reads_only_the_artifact_its_configuration_names(kinetics_engines,
     assert [p.key for p in KINETICS.parameters("batch_v1", None)] == [s.key for s in kinetics.family("batch_v1").specs()]
     with pytest.raises(EngineRefused, match="batch_v1 takes no configuration, and 'a-placeholder' was named"):
         KINETICS.run("batch_v1", "a-placeholder", [], "Ada Moreno")
-    monkeypatch.setattr(fermos_engine, "_kept", lambda: ([fit.kineticArtifactId], [fit.kineticArtifactId]))
+    monkeypatch.setattr(fermos_engine, "_kept", lambda: ({fit.kineticArtifactId: "a kinetic fit"},
+                                                         {fit.kineticArtifactId: "a kinetic fit"}))
     with pytest.raises(EngineRefused, match=f"forecast runs in {fit.kineticArtifactId}; '0000000000000000' is none"):
         KINETICS.run("forecast", "0000000000000000", [], "Ada Moreno")
+
+
+def test_a_kept_artifacts_title_says_its_kind_and_when_the_project_kept_it():
+    def kept(tool, at, output=None):
+        return Artifact(id="0" * 16, tool=tool, toolVersion="a placeholder version", inputs=[], output=output or {},
+                        outputHash="", provenance="assumed", createdAt=at, durationMs=0)
+
+    at = "2026-10-21T00:00:00Z"
+    assert (fermos_engine.kept_at(at), fermos_engine.kept_at("")) == ("2026-10-21 00:00 UTC", "")
+    assert [fermos_engine.configuration_title(a) for a in (
+        kept(fermos.KINETIC, at), kept(fermos.FORECAST, at), kept(fermos.SIMULATION, at, {"family": "batch_v1"}))] == [
+        "a kinetic fit, kept 2026-10-21 00:00 UTC", "a forecast, kept 2026-10-21 00:00 UTC",
+        "a batch_v1 simulation, kept 2026-10-21 00:00 UTC"]
+    # A time that names no ISO date and minute leaves the kind alone.
+    assert fermos_engine.configuration_title(kept(fermos.KINETIC, "a placeholder time")) == "a kinetic fit"
 
 
 def test_a_vessel_design_is_a_run_of_its_simulation_and_the_same_request_twice_is_that_row(kinetics_engines,
@@ -1549,6 +1634,7 @@ def test_a_vessel_design_is_a_run_of_its_simulation_and_the_same_request_twice_i
     monkeypatch.setattr(vessel, "_SPECS", {})
     things = {t.id: t for t in KINETICS.things()}
     assert things["vessel"].configurations == [AEROBIC_ID] and "forecast" not in things
+    assert things["vessel"].configurationTitles == {AEROBIC_ID: "a batch_v1 simulation, kept 2026-10-21 00:00 UTC"}
     params_ = {p.key: p for p in KINETICS.parameters("vessel", AEROBIC_ID)}
     assert params_["plant_scale"].value is None and params_["plant_scale"].origin is None
     assert (params_["oxygen_basis"].value, params_["oxygen_basis"].origin.kind) == ("peak", "convention")

@@ -205,7 +205,7 @@ object, which runs in the service's process.
 | `worker` | `str` or `None` | The dotted module of the engine's worker: the service runs it as `python -m <worker>` would (The worker, below) and speaks the protocol of `docs/api/workers.md`. Heavy imports live here alone. `None` for an engine that computes in the service's own process with nothing heavy, whose `heavy` is then `()`, as the core's `kinetics` is; `GET /api/engines` lists its worker's status as `none`. Such an engine's computation may call a worker of the core's own (the kinetics engine's vessel design runs in the Proforma worker), and a route that worker cannot answer is a 503 naming the worker its computation called |
 | `heavy` | `tuple[str, ...]` | The modules the worker computes with, which the service keeps out of its process (conformance check 6); each name covers its module and every module below it (`a.b` covers `a.b` and `a.b.c`). `()` for an engine that computes with nothing heavy. The service keeps `biosteam`, `thermosteam`, `biorefineries`, `pisces_sff` and `cobra` out for every engine, whatever it declares |
 | `version()` | `dict[str, str]` | The distributions the engine runs on, each with the version its installed metadata records: `{"openferment-engine-example": "0.1.0"}`; a distribution that is not installed reads `"not installed"`, and enters the version string so. It is the run's `versions`, and it enters every run's id. It changes whenever the engine's computation changes: an editable install keeps its version across edits of its code, so a new version goes with every change to what a run computes (installed again, as above), and the service then computes the request afresh |
-| `things()` | `list[EngineThing]` | What the engine can run, each with its configurations and its precision. The service asks it afresh on every listing and every run, in the request's project, so an engine may list what the project holds: the kinetics engine lists its forecast while the project keeps a fit, and the train engine lists each train the project holds. A `WorkerEngine` answers every ask from its worker's first answer, kept for the life of the process (below) |
+| `things()` | `list[EngineThing]` | What the engine can run, each with its configurations, the words naming each where the engine gives them, and its precision. The service asks it afresh on every listing and every run, in the request's project, so an engine may list what the project holds: the kinetics engine lists its forecast while the project keeps a fit, and the train engine lists each train the project holds. A `WorkerEngine` answers every ask from its worker's first answer, kept for the life of the process (below) |
 | `things_are` | `str`, optional | Words saying what the engine's things are, declared by an engine every one of whose things is a project's own: the train engine's are `a project's trains, each saved in pureOS's Builder or built by a model`. `GET /api/engines` lists them as `thingsAre`, so a project that holds none of the things says what one would be. A database made for the checks holds none of them, so such an engine is checked in a copy of a project the command names (`--project`, Conformance, below), and `pnpm ready` names that command on every database, the production one among them. An engine that declares none is checked on a database of its own |
 | `rests_on()` | `dict[str, dict[str, list[str]] \| None]`, required beside `things_are` | What the current project's things rest on, as rows by table. Each key is a table of the `openferment` schema that holds a project's rows, one with a `project_id` column (`core/openferment_core/db/models.py`); its value is `None` for every row of the project in the table, or the columns that pick the rows, each with the values it holds (`{"id": [...]}`). Conformance copies those rows into a database of its own, the project's own row always among them (Conformance, below). It reads the store and writes nothing. An engine that declares `things_are` with no `rests_on` loads and runs; conformance refuses it in words, and `pnpm ready` says those words in its row |
 | `unready(thing, inputs)` | `str` or `None`, optional, beside `things_are` | Why a thing cannot be checked as it stands, in words saying what it is, or `None` when a run of it with `inputs` would compute; it runs nothing and keeps nothing. Conformance leaves out each thing it gives words for, and lists the thing with them; with no `unready`, every thing is checked. The train engine says `a saved draft, which cannot be built as it stands`, with its validation's words; `a train whose values wait for a source`, with the words of its run's check; or `a train whose run is refused before it computes`, with the run's words |
@@ -219,15 +219,26 @@ object, which runs in the service's process.
 ```json
 {"id": "a-thing", "title": "A thing the engine runs", "kind": "placeholder",
  "configurations": ["one way", "another way"], "defaultConfiguration": "one way",
+ "configurationTitles": {"another way": "The placeholder thing's second way, in words"},
  "precision": {"rtol": 1e-12, "atol": 0}}
 ```
 
 - The fields are those `GET /api/library` answers for a plant (`id`, `title`, `kind`,
-  `configurations`, `defaultConfiguration`), with the thing's `precision`.
+  `configurations`, `defaultConfiguration`), with the thing's `precision` and, where the engine
+  gives them, `configurationTitles`.
 - `id`: starts with a letter or a digit, then letters, digits, `.`, `_` and `-`, at most 80
   characters. A run names it as its `plant`.
 - `configurations`: the configurations it runs in, each name 1 to 80 characters, or `[]` when it
   takes none. `defaultConfiguration` is one of them, or null.
+- `configurationTitles`, optional: the words a person reads for a configuration, by its name,
+  each title 1 to 200 characters; left out, it reads `{}`. Studies' run card shows a
+  configuration by its title beside its name, on its chooser and on the line for the run it
+  made, and by its name where the engine gives none. A title is words alone: a run, its basis,
+  its id and its replay name the configuration by its name, so a title the engine changes moves
+  no run. A key outside `configurations`, or a title of spaces alone, breaks the contract
+  (`EngineBroken`), as a `defaultConfiguration` outside them does. The kinetics engine titles
+  each configuration with the kind of artifact it names and when the project kept it (The core's
+  `kinetics`, below).
 - A request that names no configuration runs in `defaultConfiguration`. A thing with
   configurations and no `defaultConfiguration` is run with a configuration named, and a request
   naming none is refused in words; so is a configuration the thing does not name, and any
@@ -671,8 +682,8 @@ the simulator starts; a vessel's route that worker cannot answer is a 503 naming
 | Thing | Configurations | A run of it |
 |---|---|---|
 | Each family that simulates: `batch_v1`, `fedbatch_v1`, `chemostat_v1` (the light_v1 socket stays out) | none | `fermos.simulate`, the family with the run's inputs and `by`; the tool `fermos.simulation` |
-| `forecast`, listed while the project keeps a kinetic fit a forecast draws from (logistic_v0) | those fits' artifact ids, newest first, and no default | `fermos.forecast_run` of the fit; the tool `growth_forecast` |
-| `vessel`, listed while the project keeps a batch_v1 simulation, a kinetic fit a forecast draws from, or a forecast | those artifacts' ids, newest first, and no default | `vessel.design` for the simulation, the fit or the forecast; the tool `fermos.vessel` |
+| `forecast`, listed while the project keeps a kinetic fit a forecast draws from (logistic_v0) | those fits' artifact ids, newest first, each titled `a kinetic fit, kept <YYYY-MM-DD HH:MM> UTC`, and no default | `fermos.forecast_run` of the fit; the tool `growth_forecast` |
+| `vessel`, listed while the project keeps a batch_v1 simulation, a kinetic fit a forecast draws from, or a forecast | those artifacts' ids, newest first, each titled with its kind and when the project kept it (`a batch_v1 simulation, kept …`, `a kinetic fit, kept …`, `a forecast, kept …`), and no default | `vessel.design` for the simulation, the fit or the forecast; the tool `fermos.vessel` |
 
 - Each thing's precision is `rtol` 0 and `atol` 0: fermOS replays a computation identically.
 - `parameters(thing, configuration)` is the thing's own parameter scope (`fermos:family:<id>`,
@@ -875,7 +886,11 @@ says so in words naming `OPENFERMENT_DATABASE_URL`, and exits 2.
   2. `pnpm prove` step 10 makes a train in the proof's own project and checks the train engine
   with `--project` there.
 - Each thing is checked in its default configuration, or in the first it names when it has no
-  default.
+  default. No check reads a configuration's title, which is words for a person. A `things`
+  answer outside `EngineThing`'s shape, a title for a configuration the thing lists none of among
+  them, stops the checks before the first: the command says the engine's words, exits 1 and
+  keeps no verdict, while `GET /api/engines` lists the engine with those words and its
+  parameters and runs answer 503.
 - Check 1 needs nothing of the engine beyond a first thing: its numbers stand where the route's
   and the tool's own fields refuse them. Check 2 holds every default to an origin naming what it
   rests on, one of the five a default may rest on (a library-default, a record or an artifact its

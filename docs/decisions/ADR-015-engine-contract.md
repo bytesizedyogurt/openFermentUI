@@ -272,6 +272,31 @@ Stage C put the core's other two engines behind the contract and every run on on
   `core/tests/test_engine_pins.py` holds; a row kept from an artifact an earlier ask computed (its
   SFF step failed then) holds none, since nothing computed for it.
 
+## Implementation (alpha 2.2 E.18, 2026-11-05)
+
+- **Configuration titles.** Studies' run card named a kinetics forecast's or vessel's configurations
+  by their bare artifact ids, which say neither the kind of artifact nor when the project kept it (a
+  Known debt alpha 2.1 gave stage E). A thing may now title its configurations:
+  `EngineThing.configurationTitles`, words by configuration name, optional, `{}` when the engine
+  gives none. Each key is one of the thing's configurations and each title is words, 1 to 200
+  characters (an output's longest name), held at every read as `defaultConfiguration` is held to
+  them; a worker's answer outside the rule is `EngineBroken`, its words naming the field, as a stray
+  default has been since stage B. A title is words alone: no basis, run id, artifact id, replay or
+  pin names one, so a title an engine changes moves no run, and the eight checks read none. The
+  kinetics engine titles each kept fit, forecast and simulation with its kind and when the project
+  kept it (`fermos_engine.configuration_title`, the time written as the screens write one), from the
+  artifacts its listing reads already, so neither the service nor the card reads anything more; the
+  card shows a configuration by its title beside its name, on its chooser and on the line for the
+  run it made (`lib/studies.offeredConfigurations`, `lib/pureos.ranWhat`). An engine that gives none
+  stands as built: its answer reads `{}`, a core before E.18 leaves a sent title unread (Pydantic's
+  default, which `EngineThing` keeps, ignores a field the model does not declare), and the mirror
+  (`examples/engines/openferment-engine-mirror/`, untouched since `37e6bd0`) conforms as it did. The
+  debt's other way, the card reading each configuration's artifact, reads every kept fit's,
+  forecast's and simulation's body on each opening of the card, moments after the service read the
+  same bodies to list them, and holds the kinetics engine's meaning of its configurations in the
+  client. `engine_plants` lists a thing's configurations by name, as before: a title holds a time,
+  whose digits ADR-006 keeps out of a claim's words.
+
 ## Revisit condition
 
 A second scientific engine arriving beyond the three in the tree, or the SFF toolkit shipping an
@@ -355,3 +380,11 @@ importer (ADR-003).
   checks. `core/tests/test_finite_inputs.py` (D.0): a number that is NaN or infinite refused in
   words at every door, the tool door, a scenario, the bind reads' query, a caller in code and
   `conform --inputs`, each a 422 where a route answers.
+- `core/tests/test_engines.py` (E.18): a thing titling one of its configurations, a thing titling
+  none reading `{}`, and a title for a configuration it lists none of, a blank title and a title
+  past 200 characters each refused in words; the sample worker's title served through
+  `GET /api/engines` and the eight checks holding on it; a worker whose title names a
+  configuration it lists none of broken, its parameters and runs a 503 and the listing naming it
+  with the words; the kinetics engine's titles for a kept fit, the forecast made of it and a batch
+  simulation, the run's configuration still the artifact's id. `pnpm check:state` holds the
+  card's order and words (`offeredConfigurations`) and the line for the run it made (`ranWhat`).

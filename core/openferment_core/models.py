@@ -4471,6 +4471,10 @@ THING_ID = r"^[A-Za-z0-9][A-Za-z0-9._-]{0,79}$"
 # route, the tools and the thing's own list.
 CONFIGURATION_MAX = 80
 ConfigurationName = Annotated[str, Field(min_length=1, max_length=CONFIGURATION_MAX)]
+# The longest words a thing may give one of its configurations
+# (`EngineThing.configurationTitles`): an output's or a diagnostic's longest name.
+CONFIGURATION_TITLE_MAX = MAX_DIAGNOSTIC_NAME
+ConfigurationTitle = Annotated[str, Field(min_length=1, max_length=CONFIGURATION_TITLE_MAX)]
 # What a thing's default may rest on (`EngineParameter.origin`): a package's
 # own value or a stated convention, and for a thing the project holds, a
 # record, an artifact or a person's typed value. A model's estimate reaches a
@@ -4492,7 +4496,8 @@ class EnginePrecision(BaseModel):
 
 
 class EngineThing(BaseModel):
-    """One thing an engine can run, with the configurations it runs in."""
+    """One thing an engine can run, with the configurations it runs in and,
+    where the engine gives them, the words a person reads for each."""
 
     id: str = Field(pattern=THING_ID)
     title: str
@@ -4501,12 +4506,35 @@ class EngineThing(BaseModel):
     # CONFIGURATION_MAX characters.
     configurations: list[ConfigurationName] = Field(default_factory=list)
     defaultConfiguration: str | None = None
+    # Words a person reads for a configuration, by its name (the kinetics
+    # engine's: the kind of artifact the configuration names and when the
+    # project kept it). {} when the engine gives none, and a configuration
+    # with no title is read by its name. A run, its basis, its id and its
+    # replay name a configuration by its name alone.
+    configurationTitles: dict[str, ConfigurationTitle] = Field(default_factory=dict, description=(
+        "Words a person reads for a configuration, by its name: each key one of `configurations`, each title 1 to "
+        f"{CONFIGURATION_TITLE_MAX} characters. A configuration with no title is read by its name; `{{}}` when the "
+        "engine gives none."))
     precision: EnginePrecision
 
     @model_validator(mode="after")
     def _default_is_one_of_them(self) -> "EngineThing":
         if self.defaultConfiguration is not None and self.defaultConfiguration not in self.configurations:
             raise ValueError(f"{self.id}'s default configuration {self.defaultConfiguration!r} is not one of its own")
+        return self
+
+    @model_validator(mode="after")
+    def _each_title_names_one_of_them(self) -> "EngineThing":
+        stray = [c for c in self.configurationTitles if c not in self.configurations]
+        if stray:
+            held = ", ".join(map(repr, self.configurations))
+            raise ValueError(f"{self.id}'s configurationTitles name {', '.join(map(repr, stray))}, and "
+                             + (f"each title names one of its configurations: {held}" if held else
+                                "it takes no configuration to title"))
+        blank = [c for c, words in self.configurationTitles.items() if not words.strip()]
+        if blank:
+            raise ValueError(f"{self.id}'s title for {', '.join(map(repr, blank))} is blank: a title is words a "
+                             "person reads")
         return self
 
 

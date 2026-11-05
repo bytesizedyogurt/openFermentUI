@@ -27,8 +27,11 @@
 // did not build here are named with the package's words. With another engine
 // registered (GET /api/engines; docs/api/engines.md), the card offers its
 // things too, each run on the engine's own defaults
-// (POST /api/engines/{name}/run); an engine that cannot be used is named with
-// its error.
+// (POST /api/engines/{name}/run), and names each configuration by the
+// engine's title for it beside its name where the engine gives one (the
+// kinetics engine's: the kind of artifact and when the project kept it), on
+// the chooser and on the line for the run it made; an engine that cannot be
+// used is named with its error.
 //
 // Nothing here is typed as a number: a scenario's values are set on a run's
 // page, each a person's assumption or a deposition's reading, or by Postdoc,
@@ -50,11 +53,11 @@ import {
   listScenarios,
   listEngines,
   listStudyRunbooks,
+  offeredConfigurations,
   runEngine,
   runPlant,
   runScenario,
   type EngineInfo,
-  type EngineThing,
 } from '@/lib/studies';
 import { runnable, type LibraryPlant } from '@/lib/library';
 import { NEW_TRAIN, builderCopyPath, builderPath, ranWhat } from '@/lib/pureos';
@@ -77,11 +80,14 @@ const where = (plant: string, configuration: string | null) => plant + (configur
 /** A configuration as a person reads it: the plant's own when it names none. */
 const configurationWords = (c: string | null) => c ?? 'its own';
 
-/** What a run answered, a link to its page and to its SFF file, or the engine's words. */
-function Ran({ ran }: { ran: RunReport }) {
+/**
+ * What a run answered, a link to its page and to its SFF file, or the engine's words; its configuration read by the
+ * engine's title for it beside its name where the card holds the thing's titles.
+ */
+function Ran({ ran, titles }: { ran: RunReport; titles?: Record<string, string> }) {
   return (
     <p className="text-body mt-2" data-testid="run-plant-ran" data-run={ran.run.id} data-status={ran.run.status} data-engine={ran.run.engine}>
-      {ran.run.status === 'done' ? 'Ran' : 'Refused'} {ranWhat(ran.run)}
+      {ran.run.status === 'done' ? 'Ran' : 'Refused'} {ranWhat(ran.run, titles)}
       {ran.run.engine !== 'biosteam' && <> on {ran.run.engine}</>}
       {ran.run.refused && <>: {ran.run.refused}</>}.{' '}
       <a className="font-num underline underline-offset-2 hover:text-accent" href={href(`/proforma/runs/${ran.run.id}`)}>
@@ -257,26 +263,25 @@ const MAKES_THINGS: Record<string, { to: string; words: string }> = {
   train: { to: builderPath(NEW_TRAIN), words: 'pureOS → Builder saves one' },
 };
 
-/** Another engine's things (docs/api/engines.md), each run on the engine's own defaults in a configuration it names. */
+/**
+ * Another engine's things (docs/api/engines.md), each run on the engine's own defaults in a configuration it names,
+ * each configuration read by the engine's title for it beside its name where the engine gives one
+ * (`offeredConfigurations`).
+ */
 function EngineThings({ engine, onRan }: { engine: EngineInfo; onRan: () => void }) {
   const reviewer = useStore((s) => s.reviewer).trim();
   const things = engine.things ?? [];
   const [thingId, setThingId] = useState(things[0]?.id ?? '');
   const thing = things.find((t) => t.id === thingId) ?? null;
-  const configurationsOf = (t: EngineThing | null): (string | null)[] => {
-    if (!t || !(t.configurations ?? []).length) return [null];
-    const own = t.defaultConfiguration ?? null;
-    return [own, ...(t.configurations ?? []).filter((c) => c !== own)].filter((c): c is string => c !== null);
-  };
-  const [configuration, setConfiguration] = useState<string | null>(configurationsOf(thing)[0] ?? null);
+  const [configuration, setConfiguration] = useState<string | null>(offeredConfigurations(thing)[0]?.configuration ?? null);
   const [busy, setBusy] = useState(false);
   const [problem, setProblem] = useState<string | null>(null);
   const [ran, setRan] = useState<RunReport | null>(null);
-  const configurations = configurationsOf(thing);
+  const offered = offeredConfigurations(thing);
   const setsValues = thing ? SETS_VALUES[engine.name]?.[thing.kind ?? ''] : undefined;
   const choose = (id: string) => {
     setThingId(id);
-    setConfiguration(configurationsOf(things.find((t) => t.id === id) ?? null)[0] ?? null);
+    setConfiguration(offeredConfigurations(things.find((t) => t.id === id) ?? null)[0]?.configuration ?? null);
     setRan(null);
     setProblem(null);
   };
@@ -336,12 +341,12 @@ function EngineThings({ engine, onRan }: { engine: EngineInfo; onRan: () => void
               aria-label="Configuration"
               value={configuration ?? ''}
               onChange={(e) => setConfiguration(e.target.value === '' ? null : e.target.value)}
-              disabled={configurations.length <= 1}
+              disabled={offered.length <= 1}
               data-testid="run-engine-configuration"
             >
-              {configurations.map((c) => (
-                <option key={c ?? ''} value={c ?? ''}>
-                  {configurationWords(c)}
+              {offered.map((o) => (
+                <option key={o.configuration ?? ''} value={o.configuration ?? ''}>
+                  {o.words}
                 </option>
               ))}
             </select>
@@ -368,7 +373,7 @@ function EngineThings({ engine, onRan }: { engine: EngineInfo; onRan: () => void
           , each your assumption; that run is one of the {engine.name} engine&rsquo;s, listed with the project&rsquo;s runs.
         </p>
       )}
-      {ran && <Ran ran={ran} />}
+      {ran && <Ran ran={ran} titles={thing?.configurationTitles} />}
       {problem && <Refusal words={problem} />}
     </>
   );

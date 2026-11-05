@@ -7,7 +7,11 @@
  * answers and refuses is running and says why, and a candidate it brings
  * enters the store as a record when the ontology names its field
  * (src/lib/review.ts, `recordOf`); the configurations a plant
- * is offered in (src/lib/library.ts), and the refusals an SFF import answers
+ * is offered in (src/lib/library.ts), and those a thing of another engine is
+ * offered in on Studies' run card, each by the engine's title for it beside
+ * its name (src/lib/studies.ts, `offeredConfigurations`), as the card's line
+ * for the run it made names it (src/lib/pureos.ts, `ranWhat`; alpha 2.2
+ * E.18); the refusals an SFF import answers
  * in the service's words (src/lib/http.ts), a refusal of a request's own
  * fields among them; and the unit each person's change is sent in
  * (src/lib/params.ts, `inputsOf`), a panel that shows part of its scope
@@ -48,7 +52,8 @@ import {
 import type { Override, ParameterSpec } from '../src/lib/params';
 import type { LiveConversation, RunbookDraft } from '../src/lib/postdoc';
 import type { FlowsheetInfo, ProformaScenarioInfo, Scenario, ScenarioInput } from '../src/lib/proforma';
-import type { Artifact, BasisSource, Deposition, EngineRun, Prediction } from '../src/lib/studies';
+import type { Artifact, BasisSource, Deposition, EngineRun, EngineThing, Prediction } from '../src/lib/studies';
+import { offeredConfigurations } from '../src/lib/studies';
 import { loadOverlay } from '../src/lib/intake';
 import { recordOf, type Candidate } from '../src/lib/review';
 import { ONTOLOGY } from '../src/data/ontology';
@@ -56,7 +61,7 @@ import { bodyWords, edited, type CatalogueEntry } from '../src/lib/catalogues';
 import { ServiceDown, ServiceRefused, call, detailWords } from '../src/lib/http';
 import { runnable, type LibraryPlant } from '../src/lib/library';
 import { inputsOf } from '../src/lib/params';
-import { trainInputs, unitScope, type TrainSpec } from '../src/lib/pureos';
+import { ranWhat, trainInputs, unitScope, type TrainSpec } from '../src/lib/pureos';
 import {
   ceilingQuery,
   inputCounts,
@@ -264,6 +269,51 @@ const aCandidate = (id: string, field: string): Candidate => ({
   const own = runnable(plant([{ configuration: null, ok: true }]));
   check('a plant that takes no configuration runs in its own', JSON.stringify(own.configurations) === '[null]', JSON.stringify(own));
   check('a plant that never built is offered in none', runnable(plant([{ ok: false, error: 'no' }])).configurations.length === 0);
+}
+
+// ── the configurations a thing of another engine is offered in (alpha 2.2 E.18; src/lib/studies.ts) ──
+
+{
+  const aThing = (configurations: string[], defaultConfiguration: string | null, configurationTitles: Record<string, string> = {}): EngineThing => ({
+    id: 'a-thing',
+    title: 'A placeholder thing',
+    kind: 'placeholder',
+    configurations,
+    defaultConfiguration,
+    configurationTitles,
+    precision: { rtol: 0, atol: 0 },
+  });
+  const shown = (t: EngineThing | null) => JSON.stringify(offeredConfigurations(t).map((o) => [o.configuration, o.words]));
+  const titled = aThing(['one way', 'another way', 'a third way'], 'another way', { 'a third way': 'A placeholder way, in words' });
+  check(
+    'a thing of another engine is offered in its default first, then the rest in the engine’s order',
+    JSON.stringify(offeredConfigurations(titled).map((o) => o.configuration)) === '["another way","one way","a third way"]',
+    shown(titled),
+  );
+  check(
+    'a configuration the engine titles reads its title beside its name, and one it titles none reads its name',
+    shown(titled) === '[["another way","another way"],["one way","one way"],["a third way","A placeholder way, in words · a third way"]]',
+    shown(titled),
+  );
+  const newestFirst = aThing(['a newer placeholder', 'an older placeholder'], null, {
+    'a newer placeholder': 'A placeholder kind, kept at a placeholder time',
+    'an older placeholder': 'Another placeholder kind, kept at a placeholder time',
+  });
+  check(
+    'a thing with no default is offered in the engine’s order (the kinetics engine’s, newest first)',
+    shown(newestFirst) ===
+      '[["a newer placeholder","A placeholder kind, kept at a placeholder time · a newer placeholder"],["an older placeholder","Another placeholder kind, kept at a placeholder time · an older placeholder"]]',
+    shown(newestFirst),
+  );
+  check('a thing that takes no configuration runs in its own', shown(aThing([], null)) === '[[null,"its own"]]', shown(aThing([], null)));
+  const ran = { engine: 'a-placeholder-engine', plant: 'a-thing', configuration: 'a third way', inputs: [] };
+  check(
+    'the card’s line for a run it made names the configuration as the chooser does, and by its name where it holds no title',
+    ranWhat(ran, titled.configurationTitles) === 'a-thing (A placeholder way, in words · a third way)' &&
+      ranWhat({ ...ran, configuration: 'one way' }, titled.configurationTitles) === 'a-thing (one way)' &&
+      ranWhat(ran) === 'a-thing (a third way)',
+    ranWhat(ran, titled.configurationTitles),
+  );
 }
 
 async function callAgainst(answer: { status: number; body?: unknown }, healthy = true): Promise<unknown> {

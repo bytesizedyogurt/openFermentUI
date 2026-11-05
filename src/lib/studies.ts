@@ -118,6 +118,37 @@ export type SFFLibraryEntry = components['schemas']['SFFLibraryEntry'];
 /** An engine registered here, with its things, its worker and its last conformance verdict (GET /api/engines). */
 export type EngineInfo = components['schemas']['EngineInfo'];
 export type EngineThing = components['schemas']['EngineThing'];
+
+/**
+ * A configuration as a person reads it on Studies' run card: the engine's title for it beside its name
+ * (`EngineThing.configurationTitles`; the kinetics engine's names the kind of artifact the configuration names and when
+ * the project kept it), or its name where the engine gives none.
+ */
+export const titledConfiguration = (configuration: string, titles?: Record<string, string> | null): string =>
+  titles?.[configuration] ? `${titles[configuration]} · ${configuration}` : configuration;
+
+/**
+ * A configuration a thing of another engine is offered in on Studies' run card: its name, null for a thing that takes
+ * none and runs in its own, and the words the card shows for it.
+ */
+export interface OfferedConfiguration {
+  configuration: string | null;
+  words: string;
+}
+
+/**
+ * The configurations a thing of another engine is offered in on Studies' run card: its default first, then the rest in
+ * the engine's order (the kinetics engine's, newest first), each read by the engine's title for it beside its name
+ * (`titledConfiguration`); a thing that takes no configuration is offered in its own.
+ */
+export function offeredConfigurations(thing: EngineThing | null): OfferedConfiguration[] {
+  const named = thing?.configurations ?? [];
+  if (!thing || named.length === 0) return [{ configuration: null, words: 'its own' }];
+  const own = thing.defaultConfiguration;
+  const ordered = own !== null && named.includes(own) ? [own, ...named.filter((c) => c !== own)] : named;
+  return ordered.map((c) => ({ configuration: c, words: titledConfiguration(c, thing.configurationTitles) }));
+}
+
 /**
  * A reading a run may take as a measurement (GET /api/depositions/readings): a confirmed entry of one of the
  * project's depositions that stands for its measure, with its runbook, its measure, its depositor and its time; asked

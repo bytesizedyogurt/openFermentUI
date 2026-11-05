@@ -16,7 +16,9 @@ and wraps fermOS as it computes:
                 `vessel` are listed while the project holds one of their
                 configurations, read afresh from the current project on
                 every ask by the artifact store's tool column
-                (artifacts.of_tools); each replays identically (precision
+                (artifacts.of_tools), each configuration titled with the
+                kind of artifact it names and when the project kept it
+                (`configuration_title`); each replays identically (precision
                 rtol 0, atol 0).
     parameters  each parameter of the thing's own scope (fermos:family,
                 fermos:forecast, fermos:vessel) as an EngineParameter: a
@@ -69,6 +71,7 @@ from __future__ import annotations
 
 import importlib.metadata
 import json
+import re
 from datetime import datetime, timezone
 from pathlib import Path
 from typing import Any, Mapping, Sequence
@@ -100,6 +103,10 @@ SFF_WORDS = {
 }
 FORECAST_TITLE = "A band for the next run, drawn from a kept kinetic fit"
 VESSEL_TITLE = "The vessel a kept batch simulation or fit needs, designed on BioSTEAM"
+# What a kept artifact is as a configuration, by its tool; a simulation names its family.
+KEPT_KINDS = {fermos.KINETIC: "a kinetic fit", fermos.FORECAST: "a forecast"}
+# The date, the hour and the minute an ISO time begins with.
+KEPT_AT = re.compile(r"\d{4}-\d{2}-\d{2}T\d{2}:\d{2}")
 # The refusals a run of each thing says in words, beside the vessel's (`_refusals`).
 REFUSALS = (fermos.SimulationRefused, fermos.FitRefused, params.ParamRefused, params.ScopeUnknown,
             artifacts.ArtifactNotFound, artifacts.ArtifactDamaged)
@@ -143,20 +150,38 @@ def _logistic(a: Artifact) -> bool:
     return (o.get("model") or fermos.LOGISTIC) == fermos.LOGISTIC and bool(o.get("params")) and not o.get("reason")
 
 
-def _kept() -> tuple[list[str], list[str]]:
+def kept_at(at: str) -> str:
+    """When an artifact was kept, as the screens write a time the service
+    wrote (src/lib/proforma.ts `stamp`): its date and minute and `UTC`, or
+    nothing for a time that names no ISO date and minute."""
+    return f"{at[:10]} {at[11:16]} UTC" if KEPT_AT.match(at or "") else ""
+
+
+def configuration_title(a: Artifact) -> str:
+    """What a kept artifact is as a configuration of `forecast` or `vessel`,
+    in the words a person reads: its kind (a simulation's names its family),
+    and when the project kept it."""
+    kind = (f"a {(a.output or {}).get('family') or 'kinetics'} simulation" if a.tool == fermos.SIMULATION
+            else KEPT_KINDS.get(a.tool, a.tool))
+    at = kept_at(a.createdAt)
+    return f"{kind}, kept {at}" if at else kind
+
+
+def _kept() -> tuple[dict[str, str], dict[str, str]]:
     """The project's kept artifacts the forecast and the vessel take as their
-    configuration, newest first: the kinetic fits a forecast draws from, and
-    the batch_v1 simulations, those fits and the forecasts a vessel is
-    designed for. Nothing while no project is named."""
+    configuration, newest first, each id with its title
+    (`configuration_title`): the kinetic fits a forecast draws from, and the
+    batch_v1 simulations, those fits and the forecasts a vessel is designed
+    for. Nothing while no project is named."""
     if projects.current_or_none() is None:
-        return [], []
-    fits: list[str] = []
-    designable: list[str] = []
+        return {}, {}
+    fits: dict[str, str] = {}
+    designable: dict[str, str] = {}
     for a in artifacts.of_tools(fermos.KINETIC, fermos.FORECAST, fermos.SIMULATION):
         if _forecastable(a):
-            fits.append(a.id)
+            fits[a.id] = configuration_title(a)
         if _designable(a):
-            designable.append(a.id)
+            designable[a.id] = configuration_title(a)
     return fits, designable
 
 
@@ -225,15 +250,16 @@ class KineticsEngine:
 
     def things(self) -> list[EngineThing]:
         """Every family that simulates, then the forecast and the vessel
-        while the project holds what each takes."""
+        while the project holds what each takes, each configuration titled
+        with the kind of artifact it names and when the project kept it."""
         out = [EngineThing(id=fam.id, title=fam.title, kind=FAMILY_KIND, precision=EXACT) for fam in _families()]
         fits, designable = _kept()
         if fits:
-            out.append(EngineThing(id=FORECAST, title=FORECAST_TITLE, kind=FORECAST, configurations=fits,
-                                   precision=EXACT))
+            out.append(EngineThing(id=FORECAST, title=FORECAST_TITLE, kind=FORECAST, configurations=list(fits),
+                                   configurationTitles=fits, precision=EXACT))
         if designable:
-            out.append(EngineThing(id=VESSEL, title=VESSEL_TITLE, kind=VESSEL, configurations=designable,
-                                   precision=EXACT))
+            out.append(EngineThing(id=VESSEL, title=VESSEL_TITLE, kind=VESSEL, configurations=list(designable),
+                                   configurationTitles=designable, precision=EXACT))
         return out
 
     def _thing(self, thing: str, configuration: str | None) -> tuple[str, str | None]:

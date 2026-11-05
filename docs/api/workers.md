@@ -62,16 +62,18 @@ and returns the result object. The shapes of `EngineThing` and `EngineParameter`
 Every op that names a thing refuses one it does not run, by raising `Refused`. An answer outside
 the shapes below (a result key missing, outputs that are no list of names, values and units, a
 number that is NaN or infinite, two outputs of one name, an output's name blank or longer than
-200 characters, diagnostics outside the outputs' shape or more than 50 of them, a flowsheet that
-is no JSON object) breaks the contract: the service raises `EngineBroken`, keeps no runs row and answers 503 in
+200 characters, diagnostics outside the outputs' shape or more than 50 of them, a thing whose
+default or titled configuration is none of its configurations, a flowsheet that is no JSON
+object) breaks the contract: the service raises `EngineBroken`, keeps no runs row and answers 503 in
 words. A break in `run` keeps nothing; a break in `sff_export` comes after the run's artifact is
 kept, and the next ask answers the computation from it and asks `sff_export` again.
 
 ### `things`
 
 `{}` → `{"things": [EngineThing, …]}`: what the engine runs, each with its configurations, the
-configuration a run takes when it names none, and the precision a replay is held to. The service
-asks it once per process and keeps the answer.
+configuration a run takes when it names none, the words a person reads for each configuration
+where the worker gives them (`configurationTitles`, by configuration name, optional), and the
+precision a replay is held to. The service asks it once per process and keeps the answer.
 
 ### `parameters`
 

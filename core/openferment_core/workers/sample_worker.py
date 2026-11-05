@@ -2,7 +2,8 @@
 
 The worker of `engine/sample.py`'s engine, which no entry point registers. It
 computes nothing: its things and parameters are placeholders in placeholder
-units, a run answers the values it was given and their count, and an SFF
+units, one configuration titled in placeholder words and the other read by
+its name, a run answers the values it was given and their count, and an SFF
 export is refused in words, as the contract has an engine with no plant say
 so. One thing refuses every run, so a receipt is exercised; `environment`
 answers the names of the variables the worker was started with, so the tests
@@ -16,11 +17,14 @@ from importlib.metadata import version
 from . import serve
 
 PRECISION = {"rtol": 0.0, "atol": 0.0}
+# The words the sample gives one of its configurations; the other is read by its name.
+ONE_WAY_TITLE = "The placeholder thing's first way, in placeholder words"
 THINGS = [
     {"id": "placeholder", "title": "A placeholder thing", "kind": "placeholder", "configurations": [],
      "precision": PRECISION},
     {"id": "placeholder-configured", "title": "A placeholder thing in two configurations", "kind": "placeholder",
-     "configurations": ["one way", "another way"], "defaultConfiguration": "one way", "precision": PRECISION},
+     "configurations": ["one way", "another way"], "defaultConfiguration": "one way",
+     "configurationTitles": {"one way": ONE_WAY_TITLE}, "precision": PRECISION},
     {"id": "refuses", "title": "A thing whose every run the worker refuses", "kind": "placeholder",
      "configurations": [], "precision": PRECISION},
 ]
