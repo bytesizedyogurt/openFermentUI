@@ -3228,8 +3228,9 @@ export const useStore = create<OFState>()((set, get) => ({
     // reset the way it survives a reload.
     const overlay = get().overlay;
     const serviceUp = get().serviceUp;
-    // The project's strains and products are its catalogues' on the service, and survive a reset the same way.
-    const { strains, products } = get();
+    // The project's strains, products, skills and lessons are its catalogues' on the service (alpha 2.2 E.9, E.12),
+    // and its protocols are the service's too (ADR-017): each survives a reset the same way.
+    const { strains, products, skills, lessons, protocols } = get();
     // The open project's rows are the service's, and survive a reset the way
     // the overlay does: they are loaded again, and nothing is taken back on
     // the service. What this browser still owed it goes with the browser's data.
@@ -3237,6 +3238,9 @@ export const useStore = create<OFState>()((set, get) => ({
       ...initialState(),
       strains,
       products,
+      skills,
+      lessons,
+      protocols,
       toasts: [],
       serviceUp,
       durableReview: null,

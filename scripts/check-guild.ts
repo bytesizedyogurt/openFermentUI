@@ -18,7 +18,8 @@
  *   3. the store: writes made with the service down are kept and marked
  *      pending, the store holds no invented team of its own, and
  *      `syncGuild` posts people, then entries, then withdrawals, and drops
- *      what the service refuses;
+ *      what the service refuses; a reset of this browser's data keeps the
+ *      project's skills and protocols, which the service keeps;
  *   4. a run (OF-BLD-013 §2): completing a step writes a run alone, a
  *      supervised run or a deviation, once per step, for whoever is the
  *      operator at the time.
@@ -277,6 +278,11 @@ async function main() {
   useStore.setState({ serviceUp: false });
   s().clearBrowserData();
   check('a reset clears what was only ever in this browser', s().guildPending.length === 0 && s().guild.people.length === 0);
+  check(
+    "a reset keeps the project's skills and protocols, which the service keeps",
+    s().skills.length === SKILLS.length && s().protocols.length === TEST_PROTOCOLS.length,
+    [s().skills.length, s().protocols.length],
+  );
 
   // ── 4. a run writes to the ledger (OF-BLD-013 §2) ───────────────────
   useStore.setState({

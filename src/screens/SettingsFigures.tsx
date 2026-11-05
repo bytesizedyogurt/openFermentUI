@@ -6,8 +6,7 @@
 // latest of each is drawn here beside the records it is held against; with
 // none kept, or no service, the legend stands alone.
 import { useEffect, useMemo, useState } from 'react';
-import type { Artifact } from '@/data/types';
-import type { ExtractionRecord } from '@/lib/review';
+import type { Artifact } from '@/lib/studies';
 import { useStore } from '@/store';
 import { href } from '@/router';
 import { listArtifacts } from '@/lib/artifacts';
@@ -53,7 +52,7 @@ export function FiguresSection() {
       product,
       substrate,
       words,
-      on: yieldsOnSugar(records as ExtractionRecord[], substrate, product).on,
+      on: yieldsOnSugar(records, substrate, product).on,
       ceilings: [{ value: ceiling.output.gPerG as number, model: `${model} ceiling`, provenance: ceiling.provenance }],
     };
   }, [ceiling, records]);

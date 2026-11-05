@@ -43,8 +43,8 @@ import {
 import { DataTable, type Column } from '@/components/DataTable';
 import { FiguresSection } from './SettingsFigures';
 import { QuantityField, Quantity, type QuantityValue } from '@/components/QuantityField';
-import { ONTOLOGY, ONTOLOGY_BY_ID, fieldName } from '@/data/ontology';
-import type { FieldId, GateMode, GuildPolicy, ParameterDef } from '@/data/types';
+import { ONTOLOGY, ONTOLOGY_BY_ID, fieldName, type FieldId, type ParameterDef } from '@/data/ontology';
+import type { GateMode, GuildPolicy } from '@/lib/guild';
 import { convert, fmt, toSI } from '@/engine/units';
 import { DISCLOSURE, exportCSV } from '@/lib/csv';
 
@@ -808,18 +808,17 @@ function CorpusSection() {
           unaffected.
         </p>
         <p className="text-body mt-2">
-          This also clears the durable store in this browser, so{' '}
-          <span className="font-num">{depositions.length}</span> deposition
-          {depositions.length === 1 ? '' : 's'}, every review decision, every runbook lock, every
-          lesson finished here, and any Guild entry the service has not yet stored are discarded —
-          including the ones that would otherwise survive a refresh. A reset that left them behind
-          would restore itself on the next reload.
+          This also clears the durable store in this browser: every deposition, review decision,
+          runbook lock, Postdoc conversation and Guild entry the service has not yet stored is
+          discarded, including the ones that would otherwise survive a refresh. A reset that left them
+          behind would restore itself on the next reload.
         </p>
         <div className="text-caption text-ink-soft mt-2">
-          Currently in session: <span className="font-num">{records.length}</span> records,{' '}
-          <span className="font-num">{protocols.length}</span> protocols,{' '}
-          <span className="font-num">{scenarios.length}</span> scenarios,{' '}
-          <span className="font-num">{depositions.length}</span> depositions.
+          Currently in session: <span className="font-num">{records.length}</span> record
+          {records.length === 1 ? '' : 's'}, <span className="font-num">{protocols.length}</span> protocol
+          {protocols.length === 1 ? '' : 's'}, <span className="font-num">{scenarios.length}</span> scenario
+          {scenarios.length === 1 ? '' : 's'}, <span className="font-num">{depositions.length}</span> deposition
+          {depositions.length === 1 ? '' : 's'}.
         </div>
         <div className="flex items-center justify-end gap-2 mt-4">
           <Button onClick={() => setConfirm(false)}>Cancel</Button>
@@ -952,10 +951,9 @@ function ExportSection() {
                 </Button>
               </div>
               <p id="api-key-note" className="text-body text-ink-soft mt-2 max-w-3xl">
-                These controls are deliberately dead and shown disabled rather than hidden. There is
-                no server, no account and no key issuance in this build: nothing here would
-                authenticate against anything. In the product this panel would mint scoped tokens
-                for the extraction and retrieval endpoints and list their last use.
+                These controls stay disabled: the service has no sign-in and issues no key, so
+                nothing here authenticates against anything. Once accounts exist, this panel would
+                mint scoped tokens for the extraction and retrieval endpoints and list their last use.
               </p>
             </div>
           </div>
