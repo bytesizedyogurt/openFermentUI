@@ -382,7 +382,12 @@ class ModelRefused(RuntimeError):
 class Result:
     """What one call produced. `data` is the parsed JSON, or None when the
     response stopped at max_tokens or held no parseable JSON; `text` is the
-    response's words as written, for a call that asked for prose."""
+    response's words as written, for a call that asked for prose. `tried`
+    names the models asked, in order, and `refused` those of them the
+    safety classifier declined before one answered, by the ids they were
+    asked by; a model tried and passed over for another reason (a status
+    such as 529, a model this key cannot reach) stands in `tried` alone,
+    and the log line names why."""
 
     data: dict[str, Any] | None
     model: str
@@ -391,6 +396,7 @@ class Result:
     fell_back: bool = False
     tried: list[str] = field(default_factory=list)
     text: str = ""
+    refused: list[str] = field(default_factory=list)
 
     @property
     def truncated(self) -> bool:
@@ -672,6 +678,8 @@ def call(
     tried: list[str] = []
     refusal: str | None = None
     refused_by: list[str] = []
+    # The models that declined, by the ids they were asked by (Result.refused).
+    declined: list[str] = []
     for i, named in enumerate(models):
         last = i == len(models) - 1
         provider, model = spec(named)
@@ -700,7 +708,7 @@ def call(
                     data = None
             spent = add(spent, Usage(models=[named]))
             return Result(data=data, model=named, usage=spent, stop_reason="end_turn", fell_back=i > 0, tried=tried,
-                          text=text)
+                          text=text, refused=declined)
         tried.append(model)
         held = _reserve(model, request, max_tokens, spent, role)
         cost = 0.0
@@ -742,6 +750,7 @@ def call(
                 details = _get(response, "stop_details")
                 refusal = _get(details, "category") or refusal
                 refused_by.append(str(_get(response, "model") or model))
+                declined.append(model)
                 if last or refusal in NO_FALLBACK_REFUSALS:
                     raise ModelRefused(refusal, refused_by, spent)
                 log.warning("%s%s declined (%s); trying %s", label, model, refusal or "no category", models[i + 1])
@@ -755,6 +764,7 @@ def call(
                 fell_back=i > 0,
                 tried=tried,
                 text=_text_of(response),
+                refused=declined,
             )
         finally:
             spend.settle(held, role, cost)

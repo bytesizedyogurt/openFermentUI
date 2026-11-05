@@ -17,10 +17,11 @@ its history from the service), and keeps a row of `eval_runs` scored by code:
 Beside the scores a run keeps how the answer went (alpha 2.2 F.2a): the seconds
 from the question to the loop's first step (the code's module sweep), to its
 first step of another kind (the model's first: a tool it called, a restart or
-the answer) and to the answer, timed through the answer path's `on_step`; why
-the loop stopped; its restarts (a model declined or was unavailable, and the
-next model of the route was asked); and the validator's reasons for each thing
-it dropped.
+the answer; a tool's step lands when the tool returns, so the first tool's own
+time is in it) and to the answer, timed through the answer path's `on_step`;
+why the loop stopped; its restarts (a model declined or was unavailable, and
+the next model of the route was asked); and the validator's reasons for each
+thing it dropped.
 
 OFFLINE the loop answers with a stand-in (`StandIn`): each default question's own
 script of tool calls and a plan written from what the tools returned, the
@@ -42,7 +43,11 @@ suite, under a `tag` that names the route table it ran on, so runs on different
 models sit side by side (`summary`). A run may ask some of a suite's questions
 alone (`only`), under its tag: a follow-up among them is asked in the
 conversation of the newest run of the question it follows under that tag, so a
-table stopped part way is finished where it stopped.
+table stopped part way is finished where it stopped. That conversation holds
+what a full asking of the suite has the follow-up read before it; a follow-up
+whose conversation there holds anything else (its own earlier asking among
+them) is refused in words that name the questions to ask with it, so they are
+asked together in a new conversation.
 
 THE JUDGE (alpha 2.1 stage C). Beside the code's scores, a model on the `judge`
 route reads each answer as Postdoc gave it: the question, what a good answer
@@ -56,20 +61,24 @@ things from 0 to 1 and names the faults it finds:
     coverage     how much of what a good answer covers this one covers
 
 A judgement is the judge model's, kept with that model's id beside the code's
-scores and never in their place; a run may be judged again on another judge
-route (`judge`), and each judgement is kept. A judgement names the models its
-route tried, in order, and the route as it stood, so one Sonnet gave after Opus
-declined says so. A judge none of whose route's models answers (no key, the
-account's usage limit, the day's cap) stops the pass in words
-(`JudgeUnavailable`), and the run it was judging gains no judgement.
+scores; a run may be judged again on another judge route (`judge`), and each
+judgement is kept. A judgement names the models its route tried, in order, those
+of them the safety classifier declined, and the route as it stood, so one Sonnet
+gave after Opus declined says so. A judge none of whose route's models answers
+(no key, the account's usage limit, the day's cap) stops the pass in words
+(`JudgeUnavailable`) that name what the judge route spent on the call it stopped
+at, and the run it was judging gains no judgement. Where no model of the plan
+route answered the question either, a run's words say to ask it again with the
+rest, in a new conversation.
 
 THE SUMMARY (`summary`) sets each tag's newest runs side by side, each run
 counted once for each judge model, by that model's newest judgement of it: the
-code's scores, each judge's scores and cost, each judge route's fallbacks and
-declines, how far the two judges' scores of the same answers lie apart, the
-declines and restarts, the claims kept and dropped with the drop reasons by
-kind, the tool calls, the median seconds, the stops and the cost. `rows` gives
-one row for each tag's newest run of each question.
+code's scores, each judge's scores, refusals and cost, each judge route's
+fallbacks and declines, how far the two judges' scores of the same answers lie
+apart, the declines and the restarts counted by kind, the claims kept and
+dropped with the drop reasons by kind, the tool calls, the median seconds, the
+stops and the cost. `rows` gives one row for each tag's newest run of each
+question.
 """
 from __future__ import annotations
 
@@ -133,8 +142,9 @@ class Judgement(BaseModel):
     judged and what judging cost. A judge that declined leaves no score:
     `declined` says why, in words, and a mean leaves it out. `tried` names
     the models the judge route asked, in order, so a judgement Sonnet gave
-    after Opus declined names both, and `route` is the judge route as it
-    stood when the answer was judged."""
+    after Opus declined names both; `refused` names those of them the
+    safety classifier declined; and `route` is the judge route as it stood
+    when the answer was judged."""
 
     model: str
     answers: float | None = None
@@ -151,6 +161,11 @@ class Judgement(BaseModel):
     tried: list[str] = Field(default_factory=list)
     # The judge route's chain when the answer was judged (llm.chain("judge")).
     route: list[str] = Field(default_factory=list)
+    # The models of `tried` the safety classifier declined (llm.Result.refused,
+    # or each model a refusal names); a model passed over for another reason
+    # (a status such as 529, a model the key cannot reach) stands in `tried`
+    # alone. Empty on a judgement kept before the F.2a review.
+    refused: list[str] = Field(default_factory=list)
 
 
 class EvalRun(BaseModel):
@@ -178,8 +193,9 @@ class EvalRun(BaseModel):
     judged: list[Judgement] = Field(default_factory=list)
     # From the question asked to the loop's first step (the code's module
     # sweep), and to its first step of another kind: the model's first, a
-    # tool it called, a restart or the answer. Timed through the answer
-    # path's on_step; None on a run kept before alpha 2.2 F.2a.
+    # tool it called, a restart or the answer. A tool's step lands when the
+    # tool returns, so the first tool's own time is in the second. Timed
+    # through the answer path's on_step; None on a run kept before alpha 2.2 F.2a.
     firstStepSeconds: float | None = None
     firstModelSeconds: float | None = None
     # Why the loop stopped (AnswerPlan.stopped); None on a run kept before F.2a.
@@ -256,7 +272,7 @@ def as_seeded(q: EvalQuestion) -> EvalQuestion:
 # holds the ethanol sources (docs/corpus/ethanol-sources.txt) and their
 # extraction, and the two the alpha 2.2 prompt's §5 adds for the base's seams:
 # the engine reads (13) and a measurement origin (14), in the prompt's words.
-# Words only: what a good answer does, never what it finds. Question 4 asks of
+# Words only: what a good answer does. Question 4 asks of
 # "that plant", the one question 3 asks of, so it is asked in question 3's
 # conversation, as the owner's screen asked it in alpha 2.1 stage B.
 ETHANOL_QUESTIONS = (
@@ -648,9 +664,10 @@ def judge(q: EvalQuestion, plan: AnswerPlan, *, record: Callable[[str], dict[str
           paper: Callable[[str], dict[str, Any] | None], call: Callable[..., llm.Result] | None = None) -> Judgement:
     """One answer judged by the first model on the `judge` route that will:
     its scores, its faults and its verdict, labelled with that model, with
-    the models the route tried and the route itself. The caller hands it the
-    project's records and documents to read cited ids by (`evidence_pool`,
-    which this package does not import). A route whose every model declines
+    the models the route tried, those of them that declined, and the route
+    itself. The caller hands it the project's records and documents to read
+    cited ids by (`evidence_pool`, which this package does not import). A
+    route whose every model declines
     is a judgement with no score that says so. A route none of whose models
     answers (no key, the account's usage limit, the day's cap) raises
     llm.ModelUnavailable as the call raised it, and the caller keeps no
@@ -661,16 +678,18 @@ def judge(q: EvalQuestion, plan: AnswerPlan, *, record: Callable[[str], dict[str
                                  schema=JUDGE_SCHEMA, max_tokens=JUDGE_TOKENS, family="judge", label=f"judge {q.id}: ")
     except llm.ModelRefused as e:
         return Judgement(model=", ".join(e.models) or "judge", declined=str(e), costUsd=e.usage.costUsd, at=_now(),
-                         tried=list(e.models), route=route)
+                         tried=list(e.models), refused=list(e.models), route=route)
     data = got.data or {}
     if not data:
         why = "it ran out of room" if got.truncated else "it was not a judgement"
         return Judgement(model=got.model, declined=f"The judge's answer did not arrive whole ({why}).",
-                         costUsd=got.usage.costUsd, at=_now(), tried=list(got.tried), route=route)
+                         costUsd=got.usage.costUsd, at=_now(), tried=list(got.tried), refused=list(got.refused),
+                         route=route)
     return Judgement(model=got.model, answers=_unit(data.get("answers")), grounded=_unit(data.get("grounded")),
                      labelled=_unit(data.get("labelled")), coverage=_unit(data.get("coverage")),
                      errors=[str(e)[:400] for e in data.get("errors") or []][:20], note=str(data.get("note") or "")[:800],
-                     costUsd=got.usage.costUsd, at=_now(), tried=list(got.tried), route=route)
+                     costUsd=got.usage.costUsd, at=_now(), tried=list(got.tried), refused=list(got.refused),
+                     route=route)
 
 
 class Refused(ValueError):
@@ -683,11 +702,40 @@ class JudgeUnavailable(RuntimeError):
     answered (no key, the account's usage limit, the day's cap), in words
     that say where it stopped and how to go on. The run it was judging keeps
     no judgement from it. `done` holds the runs kept or judged before the
-    stop, in order: a run's own answer, kept unjudged, comes last among them."""
+    stop, in order: a run's own answer, kept unjudged, comes last among them.
+    `spent` is what the judge route spent on the call it stopped at (a
+    refusal billed before the next model met the stop), in USD; the day's
+    spend table holds it."""
 
-    def __init__(self, words: str, done: list[EvalRun]):
+    def __init__(self, words: str, done: list[EvalRun], spent: float = 0.0):
         super().__init__(words)
         self.done = done
+        self.spent = spent
+
+
+def _spent(e: llm.ModelUnavailable) -> str:
+    """What the judge route spent on the call it stopped at, in words, or
+    nothing when it spent nothing."""
+    cost = e.usage.costUsd
+    return f" The judge route spent ${cost:.4f} on it first; the day's spend table holds that amount." if cost else ""
+
+
+# The first words of the final step postdoc_agent.ask gives a plan no model
+# of the plan route answered, and the words every refusal begins with
+# (llm.ModelRefused). Such a plan with a refusal's words is a decline the
+# table gave; one with other words came for want of a model (the key, the
+# account's usage limit, the day's cap, the network).
+NO_ANSWER = "No answer: "
+REFUSAL = re.compile(r"^declined by the safety classifier\b")
+
+
+def unanswered(plan: AnswerPlan) -> bool:
+    """Whether a question went unanswered for want of a model: the plan
+    holds no claim, the loop's final step says no answer came, and its
+    decline is one `REFUSAL` leaves unmatched."""
+    final = next((s for s in reversed(plan.trace) if s.kind == "final"), None)
+    return (not plan.claims and final is not None and final.summary.startswith(NO_ANSWER)
+            and not REFUSAL.match(plan.declined or ""))
 
 
 def _count(n: int, noun: str) -> str:
@@ -745,34 +793,95 @@ def _picked(suite: str, only: list[str] | None) -> list[EvalQuestion]:
     return [q for q in held if q.id in only]
 
 
+def _ahead(q: EvalQuestion, held: list[EvalQuestion]) -> list[str]:
+    """The questions a full asking of a suite (`held`, in order) asks in a
+    follow-up's conversation before it, in order: the question it follows
+    and each other question that follows that one ahead of it. Empty for a
+    question that follows none."""
+    if not q.follows:
+        return []
+    at = [x.id for x in held].index(q.id)
+    return [x.id for x in held[:at] if q.follows in (x.id, x.follows)]
+
+
+def _said(ids: list[str]) -> str:
+    """Question ids in words, or that there are none."""
+    return _named(tuple(ids)) if ids else "no answered question"
+
+
+# A question a conversation holds that is none of the suite's, in words.
+OTHER_QUESTION = "a question of no suite here"
+
+
 def _chosen(suite: str, only: list[str] | None, tag: str) -> tuple[list[EvalQuestion], dict[str, str]]:
     """The questions a run asks (`_picked`), and for each follow-up whose
     question `only` leaves out, the conversation of that question's newest
-    run under `tag`, which it is asked in. Raises Refused, in words, for a
-    follow-up whose question has no such run."""
+    run under `tag`, which it is asked in. That conversation holds what a
+    full asking of the suite has the follow-up read before it (`_ahead`),
+    less the questions this run asks there first, so its answer reads what
+    the table's own asking read. Raises Refused, in words, for a follow-up
+    whose question has no such run, whose question no model of the plan
+    route answered there (`unanswered`), or whose conversation there holds
+    anything else (its own earlier asking among them), naming the questions
+    to add so that they are asked together in a new conversation."""
+    from . import conversations
+
     picked = _picked(suite, only)
     if only is None:
         return picked, {}
+    held = questions(suite)
+    id_of = {x.question.strip(): x.id for x in held}
     latest = {r.questionId: r for r in newest(suite, tag)}
     opened: dict[str, str] = {}
     for q in picked:
-        if q.follows and q.follows not in only:
-            before = latest.get(q.follows)
-            if before is None or not before.conversationId:
-                raise Refused(f"{q.id} follows {q.follows}, and the tag {tag!r} holds no run of {q.follows} whose "
-                              f"conversation it could be asked in: name {q.follows} too, so the two are asked together")
-            opened[q.id] = before.conversationId
+        if not q.follows or q.follows in only:
+            continue
+        ahead = _ahead(q, held)
+        add = _named(tuple(x for x in ahead if x not in only) or (q.follows,))
+        before = latest.get(q.follows)
+        try:
+            turns = conversations.get(before.conversationId).turns if before and before.conversationId else None
+        except conversations.ConversationNotFound:
+            turns = None
+        if before is None or turns is None:
+            raise Refused(f"{q.id} follows {q.follows}, and the tag {tag!r} holds no run of {q.follows} whose "
+                          f"conversation it could be asked in: name {add} too, so they are asked together")
+        turn = next((x for x in turns if x.id == before.turnId), None)
+        if turn is not None and turn.plan is not None and unanswered(turn.plan):
+            raise Refused(f"{q.id} follows {q.follows}, and no model of the plan route answered {q.follows} in its "
+                          f"newest run under the tag {tag!r}: name {add} too, so they are asked again together in a new "
+                          "conversation")
+        holds = [id_of.get(p.question.strip(), OTHER_QUESTION) for p in conversations.history(before.conversationId)]
+        if holds + [x.id for x in picked if x.id in ahead] != ahead:
+            raise Refused(f"{q.id} follows {q.follows}, and a full asking of the suite asks it in one conversation "
+                          f"after {_said(ahead)}; the conversation of {q.follows}'s newest run under the tag {tag!r} "
+                          f"holds {_said(holds)}: name {add} too, so they are asked again together in a new "
+                          "conversation")
+        opened[q.id] = before.conversationId
     return picked, opened
 
 
-def _run_stopped(kept: EvalRun, e: Exception, before: int, rest: list[str], *, suite: str, tag: str,
-                 live: bool) -> str:
-    """Where a run stopped for want of a judge, and the commands that go on from there."""
+def _run_stopped(kept: EvalRun, e: llm.ModelUnavailable, before: int, rest: list[str], *, suite: str, tag: str,
+                 live: bool, again: list[str] | None = None) -> str:
+    """Where a run stopped for want of a judge, and the commands that go on
+    from there: the answer judged and the rest asked. Where no model of the
+    plan route answered the question either, `again` names the questions to
+    ask again, in order: the questions a full asking asks in its
+    conversation before it, the question itself and the rest, so each
+    follow-up among them reads a conversation of this asking alone."""
     under = f" under the tag {tag!r}" if tag else ""
     asking = f"pnpm eval run{' --live' if live else ''} --suite {suite} --tag {shlex.quote(tag)} --judge"
-    words = (f"The run{under} stopped at {kept.questionId}: no model on the judge route answered ({e}). Its answer "
-             f"is kept with no judgement; the run kept {_count(before, 'answer')} before it. To go on, judge it with "
-             f"pnpm eval judge --suite {suite} --tag {shlex.quote(tag)} --only {kept.questionId}")
+    words = f"The run{under} stopped at {kept.questionId}: no model on the judge route answered ({e}).{_spent(e)}"
+    if again is not None:
+        ahead = again[:again.index(kept.questionId)]
+        go = "ask it again" + (" with the rest" if rest else "")
+        if ahead:
+            go += f"{',' if rest else ''} with {_said(ahead)} ahead of it in a new conversation, as a full asking has it"
+        return (f"{words} No model of the plan route answered {kept.questionId} either: its run keeps the decline in "
+                f"words and no judgement, and the run kept {_count(before, 'answer')} before it. To go on, {go}: "
+                f"{asking} --only {','.join(again)}.")
+    words += (f" Its answer is kept with no judgement; the run kept {_count(before, 'answer')} before it. To go on, "
+              f"judge it with pnpm eval judge --suite {suite} --tag {shlex.quote(tag)} --only {kept.questionId}")
     if rest:
         words += f", and ask the rest with {asking} --only {','.join(rest)}"
     return words + "."
@@ -789,13 +898,16 @@ def run(answer: Callable[..., AnswerPlan], *, live: bool = False, by: str = BY, 
     under `tag`; a question that follows another asked in its conversation.
     `only` names the questions to ask, the rest left as they stand: a
     follow-up whose question it leaves out is asked in the conversation of
-    that question's newest run under `tag`. With `judged`, each answer is
-    judged as it is kept (a live run only: offline there is no judge model);
-    a judge none of whose route's models answers stops the run in words
-    (JudgeUnavailable), the answer it was to judge kept unjudged. Offline, a
-    question with no stand-in script is passed over. The runs, and offline
-    the stand-ins each question was asked of. Raises Refused, in words and
-    before anything is asked, for questions the suite cannot ask as named."""
+    that question's newest run under `tag` (`_chosen`). With `judged`, each
+    answer is judged as it is kept (a live run only: offline there is no
+    judge model); a judge none of whose route's models answers stops the run
+    in words (JudgeUnavailable), the answer it was to judge kept unjudged,
+    and the words say to judge it and ask the rest; where no model of the
+    plan route answered the question either (`unanswered`), they say to ask
+    it again with the rest. Offline, a question with no stand-in script is
+    passed over. The runs, and offline the stand-ins each question was asked
+    of. Raises Refused, in words and before anything is asked, for questions
+    the suite cannot ask as named."""
     if judged and not live and judge_with is None:
         raise Refused("an answer is judged by a model on the judge route, so an offline run is not judged")
     chosen, opened = _chosen(suite, only, tag)
@@ -836,8 +948,12 @@ def run(answer: Callable[..., AnswerPlan], *, live: bool = False, by: str = BY, 
                     db.run(_keep(projects.current(), kept))
                     out.append(kept)
                     rest = [x.id for x in chosen[i + 1:] if live or x.id in SCRIPTS]
-                    raise JudgeUnavailable(_run_stopped(kept, e, len(out) - 1, rest, suite=suite, tag=tag, live=live),
-                                           out) from e
+                    again = None
+                    if unanswered(plan):
+                        ahead = [x for x in _ahead(q, questions(suite)) if live or x in SCRIPTS]
+                        again = [*ahead, q.id, *rest]
+                    raise JudgeUnavailable(_run_stopped(kept, e, len(out) - 1, rest, suite=suite, tag=tag, live=live,
+                                                        again=again), out, e.usage.costUsd) from e
             db.run(_keep(projects.current(), kept))
             out.append(kept)
     return out, standins
@@ -854,7 +970,7 @@ def newest(suite: str = DEFAULT, tag: str | None = None) -> list[EvalRun]:
     return sorted(latest.values(), key=lambda r: (r.tag, order[r.questionId]))
 
 
-def _pass_stopped(at: EvalRun, e: Exception, judged: int, left: list[EvalRun], suite: str) -> str:
+def _pass_stopped(at: EvalRun, e: llm.ModelUnavailable, judged: int, left: list[EvalRun], suite: str) -> str:
     """Where a judge pass stopped, and the commands that judge what it left."""
     tags: dict[str, list[str]] = {}
     for r in left:
@@ -862,8 +978,8 @@ def _pass_stopped(at: EvalRun, e: Exception, judged: int, left: list[EvalRun], s
     go_on = "; ".join(f"pnpm eval judge --suite {suite} --tag {shlex.quote(tag)} --only {','.join(ids)}"
                       for tag, ids in tags.items())
     return (f"The judge pass stopped at {at.questionId} of the tag {at.tag!r}: no model on the judge route answered "
-            f"({e}). That run keeps the judgements it held; the pass judged {_count(judged, 'run')} before it, each "
-            f"kept with its new judgement. To judge what is left: {go_on}.")
+            f"({e}).{_spent(e)} That run keeps the judgements it held; the pass judged {_count(judged, 'run')} before "
+            f"it, each kept with its new judgement. To judge what is left: {go_on}.")
 
 
 def judge_kept(suite: str = DEFAULT, tag: str | None = None,
@@ -891,7 +1007,7 @@ def judge_kept(suite: str = DEFAULT, tag: str | None = None,
         try:
             got = (judge_with or judge)(held[r.questionId], turn.plan)
         except llm.ModelUnavailable as e:
-            raise JudgeUnavailable(_pass_stopped(r, e, len(done), todo[k:], suite), done) from e
+            raise JudgeUnavailable(_pass_stopped(r, e, len(done), todo[k:], suite), done, e.usage.costUsd) from e
         r.judged.append(got)
         db.run(_keep(projects.current(), r))
         done.append(r)
@@ -923,6 +1039,26 @@ OTHER_DROP = "other"
 def drop_kind(reason: str) -> str:
     """The kind of thing one of the validator's reasons dropped (DROP_KINDS)."""
     return next((kind for kind, words in DROP_KINDS if words.search(reason)), OTHER_DROP)
+
+
+# The kinds of restart the loop writes (postdoc_agent.ask: "<model> declined;
+# asked again on <next>" after a refusal, "<model> was unavailable; asked
+# again on <next>" after any other failure), each with the words that say it,
+# so a table's restarts are counted by kind; a restart holding neither is `other`.
+RESTART_KINDS: tuple[tuple[str, re.Pattern[str]], ...] = (
+    ("declined", re.compile(r" declined; asked again on ")),
+    ("unavailable", re.compile(r" was unavailable; asked again on ")),
+)
+OTHER_RESTART = "other"
+
+
+def restart_kind(words: str) -> str:
+    """The kind of one of the loop's restart steps, by its words (RESTART_KINDS)."""
+    return next((kind for kind, said in RESTART_KINDS if said.search(words)), OTHER_RESTART)
+
+
+# How much of a judge's verdict a row gives (a judgement keeps up to 800 characters).
+NOTE_CHARS = 200
 
 
 def _mean(xs: list[float], places: int = 3) -> float | None:
@@ -984,16 +1120,18 @@ def _by_judge(r: EvalRun) -> dict[str, Judgement]:
 def _why_unscored(j: Judgement, model: str) -> str:
     """Why a judge model's newest judgement of a run holds no score of its own, in words."""
     if j.model != model and j.model in _took_part(j):
-        return f"{j.model} gave the judgement, after {model}" + (f": {j.declined}" if j.declined else "")
+        how = "declined" if model in j.refused else "gave no answer (the command's log names why)"
+        return f"{j.model} gave the judgement after {model} {how}" + (f": {j.declined}" if j.declined else "")
     return j.declined or "no score"
 
 
 def _judges(found: list[EvalRun]) -> dict[str, dict[str, Any]]:
     """Each judge model's mean scores over the answers it scored, each run
     counted once by the model's newest judgement of it; the answers it
-    scored, those it gave no score (it declined, its route passed the answer
-    on to a later model, or its answer did not arrive whole), and what the
-    judgements charged to it cost, every one kept."""
+    scored; those it gave no score, for any reason (it declined, its route
+    passed the answer on to a later model, or its answer did not arrive
+    whole); those of them the safety classifier declined on it (`refused`);
+    and what the judgements charged to it cost, every one kept."""
     of = [(r, _by_judge(r)) for r in found]
     out: dict[str, dict[str, Any]] = {}
     for m in sorted({m for _, by in of for m in by}):
@@ -1002,6 +1140,7 @@ def _judges(found: list[EvalRun]) -> dict[str, dict[str, Any]]:
         out[m] = {**{n: _mean([v for j in scored if (v := getattr(j, n)) is not None]) for n in JUDGED},
                   "answersJudged": len(scored),
                   "declined": [r.questionId for r, j in mine if not _scored(j, m)],
+                  "refused": [r.questionId for r, j in mine if m in j.refused],
                   "costUsd": round(sum(j.costUsd for r in found for j in r.judged if _charged(j) == m), 4)}
     return out
 
@@ -1048,6 +1187,7 @@ def _tag(found: list[EvalRun]) -> dict[str, Any]:
     costs = [r.costUsd for r in found]
     judging = sum(j.costUsd for r in found for j in r.judged)
     kinds = [drop_kind(x) for r in found for x in r.dropReasons]
+    restarted = [restart_kind(x) for r in found for x in r.restarts]
     return {
         "questions": len(found),
         "models": sorted({m for r in found for m in r.models}),
@@ -1057,6 +1197,8 @@ def _tag(found: list[EvalRun]) -> dict[str, Any]:
         "judgesDisagree": _disagree(found),
         "declined": [r.questionId for r in found if r.declined],
         "restarts": {r.questionId: list(r.restarts) for r in found if r.restarts},
+        "restartCount": {**{kind: restarted.count(kind) for kind, _ in RESTART_KINDS},
+                         **({OTHER_RESTART: n} if (n := restarted.count(OTHER_RESTART)) else {})},
         "claims": {"kept": sum(r.claims for r in found), "dropped": sum(r.rejected for r in found),
                    "droppedForNumbers": sum(r.droppedForNumbers for r in found),
                    "dropReasons": {k: n for k in (*(kind for kind, _ in DROP_KINDS), OTHER_DROP)
@@ -1075,11 +1217,12 @@ def _tag(found: list[EvalRun]) -> dict[str, Any]:
 def summary(suite: str = DEFAULT) -> dict[str, Any]:
     """Each tag's newest runs of a suite side by side, each run counted once
     for each judge model by that model's newest judgement of it: the code's
-    mean scores, each judge's, each judge route's fallbacks and declines,
-    the judges' disagreement, the declined plans and the restarts, the claims
-    kept and dropped with the drop reasons by kind, the tool calls, the
-    median seconds, the stops and the cost; and the judges' disagreement
-    pooled over every tag's answers."""
+    mean scores, each judge's with its refusals, each judge route's fallbacks
+    and declines, the judges' disagreement, the declined plans and the
+    restarts with their count by kind, the claims kept and dropped with the
+    drop reasons by kind, the tool calls, the median seconds, the stops and
+    the cost of the newest runs and their judgements; and the judges'
+    disagreement pooled over every tag's answers."""
     found = newest(suite)
     by_tag: dict[str, list[EvalRun]] = {}
     for r in found:
@@ -1094,8 +1237,8 @@ def rows(suite: str = DEFAULT) -> list[dict[str, Any]]:
     calls, claims kept and dropped, stop, restarts, decline, seconds to the
     first step, to the model's first step and to the answer, and cost; and
     for each judge model, its four scores by its newest judgement of the run
-    (each None, with the words why, where it gave none) and what the
-    judgements of the run charged to it cost."""
+    (each None, with the words why, where it gave none), its verdict cut to
+    NOTE_CHARS, and what the judgements of the run charged to it cost."""
     out = []
     for r in newest(suite):
         judges: dict[str, dict[str, Any]] = {}
@@ -1103,6 +1246,7 @@ def rows(suite: str = DEFAULT) -> list[dict[str, Any]]:
             mine = _scored(j, m)
             judges[m] = {**{n: getattr(j, n) if mine else None for n in JUDGED},
                          "declined": None if mine else _why_unscored(j, m),
+                         "note": j.note[:NOTE_CHARS] if mine else "",
                          "costUsd": round(sum(x.costUsd for x in r.judged if _charged(x) == m), 4)}
         out.append({
             "tag": r.tag, "questionId": r.questionId, "models": list(r.models), "scores": r.scores.model_dump(),

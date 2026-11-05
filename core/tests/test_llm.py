@@ -186,6 +186,7 @@ def test_a_refusal_on_opus_is_answered_by_sonnet_and_both_are_paid_for():
     assert client.asked == [OPUS, SONNET]
     assert result.model == SONNET and result.fell_back and result.data["candidates"][0]["value"] == 7
     assert result.usage.models == [OPUS, SONNET]
+    assert (result.tried, result.refused) == ([OPUS, SONNET], [OPUS]), "the model that declined, named apart"
     assert result.usage.costUsd == pytest.approx(2000 / 1e6 * 4 + 2000 / 1e6 * 2 + 800 / 1e6 * 10)
 
 
@@ -248,6 +249,7 @@ def test_opus_unavailable_falls_back_to_sonnet(error):
     client = FakeClient({OPUS: error(), SONNET: answer(SONNET)})
     result = run(client)
     assert client.asked == [OPUS, SONNET] and result.model == SONNET and result.fell_back
+    assert (result.tried, result.refused) == ([OPUS, SONNET], []), "passed over, and no refusal"
 
 
 def test_both_unavailable_is_unavailable():
@@ -306,7 +308,7 @@ def test_the_fallback_can_name_several_models_tried_in_order(monkeypatch):
     })
     result = run(client)
     assert client.asked == [OPUS, SONNET, third] and result.model == third
-    assert result.usage.models == [OPUS, SONNET, third]
+    assert result.usage.models == [OPUS, SONNET, third] and result.refused == [OPUS, SONNET]
 
 
 def test_no_key_is_unavailable(monkeypatch):
@@ -820,9 +822,13 @@ def test_a_local_model_answers_a_single_call_through_the_kits_adapter_at_no_char
         return '{"candidates": []}'
 
     monkeypatch.setattr(llm, "_local_generate", generate)
-    got = llm.call(system="s", user="u", schema=SCHEMA, max_tokens=100, family="explain")
+    # The route's Anthropic model, behind the local one, is never asked: its client is a stand-in, so the test
+    # holds alone, with no key in the environment, as CI runs it.
+    unasked = FakeClient({OPUS: answer(OPUS)})
+    got = llm.call(system="s", user="u", schema=SCHEMA, max_tokens=100, client_factory=lambda: unasked, family="explain")
     assert (got.model, got.data, got.usage.costUsd, got.tried) == (LOCAL_MODEL, {"candidates": []}, 0.0, [LOCAL_MODEL])
     assert asked == [("qwen3-32b", {"system": "s", "user": "u", "max_tokens": 100, "json_mode": True})]
+    assert unasked.asked == []
 
     def down(model, **kw):
         raise ConnectionError("connection refused")

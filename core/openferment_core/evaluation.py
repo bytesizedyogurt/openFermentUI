@@ -15,7 +15,11 @@ was asked on, so runs on different models sit side by side; `--judge` has the
 as it now stands read the kept ones again (a second judge). `--only` names
 question ids, comma-separated: `run` asks those alone under its tag, a
 follow-up among them in the conversation of the newest run there of the
-question it follows, and `judge` reads their newest runs alone. `--rows` adds
+question it follows, and `judge` reads their newest runs alone. That
+conversation holds what a full asking of the suite has the follow-up read
+before it; a run whose follow-up would find more there (its own earlier
+asking among them) or less is refused in words that name the questions to
+ask with it. `--rows` adds
 one row for each tag's newest run of each question to the summary.
 
 It acts in the project OPENFERMENT_PROJECT names, on the database
@@ -29,9 +33,10 @@ model is called; `--live` asks the routing table's models.
 A run or a judge pass that finds no model on the judge route answering (no
 key, the account's usage limit, the day's cap) stops there with exit 1: its
 JSON names what it kept or judged before, `stopped` says where and why with
-the commands that go on, and the run it was judging gains no judgement. A
-command asked of questions the suite cannot ask as named exits 2 in words,
-having asked nothing.
+the commands that go on, `spentAtStopUsd` what the judge route spent on the
+call it stopped at (0 on a command that ran to its end), and the run it was
+judging gains no judgement. A command asked of questions the suite cannot ask
+as named exits 2 in words, having asked nothing.
 """
 from __future__ import annotations
 
@@ -119,10 +124,11 @@ def main(argv: list[str] | None = None) -> int:
             print(e, file=sys.stderr)
             return 2
         except evaluate.JudgeUnavailable as e:
-            print(json.dumps({"judged": _judged(e.done), "stopped": str(e)}, ensure_ascii=False))
+            print(json.dumps({"judged": _judged(e.done), "stopped": str(e), "spentAtStopUsd": e.spent},
+                             ensure_ascii=False))
             print(e, file=sys.stderr)
             return 1
-        print(json.dumps({"judged": _judged(done), "stopped": None}, ensure_ascii=False))
+        print(json.dumps({"judged": _judged(done), "stopped": None, "spentAtStopUsd": 0.0}, ensure_ascii=False))
         return 0
     from .api import _answer
 
@@ -138,7 +144,8 @@ def main(argv: list[str] | None = None) -> int:
         print(e, file=sys.stderr)
         return 2
     except evaluate.JudgeUnavailable as e:
-        print(json.dumps({**evaluate.report(e.done), "stopped": str(e)}, ensure_ascii=False))
+        print(json.dumps({**evaluate.report(e.done), "stopped": str(e), "spentAtStopUsd": e.spent},
+                         ensure_ascii=False))
         print(e, file=sys.stderr)
         return 1
     out = evaluate.report(found)
@@ -147,6 +154,7 @@ def main(argv: list[str] | None = None) -> int:
     out["followUps"] = {qid: bool(s.seen) and held[held[qid].follows].question in json.dumps(s.seen[0])
                         for qid, s in standins.items() if held[qid].follows in held}
     out["stopped"] = None
+    out["spentAtStopUsd"] = 0.0
     print(json.dumps(out, ensure_ascii=False))
     return 0
 

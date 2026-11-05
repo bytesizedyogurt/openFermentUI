@@ -2806,8 +2806,8 @@ The live work (the prompt's §6.7 and §7), on the routes of its §4 as `core/.e
   loop's stop, its restart steps and the validator's reasons (`EvalRun.firstStepSeconds`, `firstModelSeconds`,
   `stopped`, `restarts`, `dropReasons`, each empty on a row kept before); a judgement keeps the models its
   route tried and the route itself (`Judgement.tried`, `route`). `pnpm eval judge` reads `core/.env` as
-  `pnpm eval run` does, importing the service module first (its loader, `override=False`): written to call the
-  judge route, it had read no key and kept a decline naming the missing key for every run. A judge none of
+  `pnpm eval run` does, importing the service module first (its loader, `override=False`); it had read no key,
+  no routes and the default cap, so each judgement it kept was a decline naming the missing key. A judge none of
   whose route's models answers stops `run --judge` and `judge` in words with exit 1, keeping no judgement for
   the run it was judging and naming the commands that go on. `pnpm eval summary` counts each run once for each
   judge model by its newest judgement and gives each tag's code scores, each judge's scores, answers judged,
@@ -2823,3 +2823,22 @@ The live work (the prompt's §6.7 and §7), on the routes of its §4 as `core/.e
   database address empty, on Python 3.13 and on 3.12, 73 passed each way; `gen:api`, `gen:tools` and
   `gen:components --check`, each file as it was; `pnpm test:core` 2960 passed, 1 skipped, 175 deselected
   (5 min 55 s); `pnpm prove --steps 6`, offline, steps 1, 2 and 6, 16 of 16 checks in 101 s, no model call.
+- F.2a review. The review's nine findings, each confirmed and fixed (ADR-008, Implementation 14, the review's note;
+  `docs/api/postdoc.md`). A judged run that stops at a question no model of the plan route answered either (the
+  account's limit most often lands on a plan call first: no claim, a final step `No answer: …`, a decline no
+  refusal, `evaluate.unanswered`) says to ask that question again with the rest, beside the questions a full asking
+  asks in its conversation before it when it follows one, and names no judge command for it. `--only` asks a
+  follow-up in its question's conversation when that conversation holds what a full asking has it read before it,
+  and refuses in words, naming the questions to add, a follow-up that would read its own earlier asking, miss a
+  question asked ahead of it, or follow an unanswered one. `llm.Result.refused` and `Judgement.refused` name the
+  models the safety classifier declined, so each judge's `refused` stands apart from its route's other pass-overs
+  (a 529, a model the key cannot reach), which `declined` counts beside them; a stop names what the judge route spent
+  on the call it stopped at (`spentAtStopUsd`, in its words and its JSON); the summary counts the restarts by kind
+  (`restartCount`); each row gives each judge's verdict cut to 200 characters; the docs say a tool's own time is in
+  `firstModelSeconds` and that the cost totals cover the newest runs. F.2a's ADR and log lines say what the judge
+  pass had read in plain words. `test_llm.py`'s local-model test gets a stand-in client, so it holds alone with no
+  key (it had read a key another test leaves in the environment). Tests: `test_evaluate.py` (5 new, 9 changed),
+  `test_llm.py` (3 changed, 1 made to hold alone). Checks: `test_evaluate.py`, `test_llm.py` and `test_writes.py`
+  with the database address empty, on Python 3.13 and on 3.12, 157 passed each way; `gen:api`, `gen:tools` and
+  `gen:components --check`, each file as it was; `pnpm test:core` 2966 passed, 1 skipped, 175 deselected (5 min
+  40 s); `pnpm prove --steps 6`, offline, steps 1, 2 and 6, 16 of 16 checks in 64 s, no model call.

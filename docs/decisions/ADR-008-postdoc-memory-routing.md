@@ -270,15 +270,14 @@ two judge models; F.2a lands the evaluation code that comparison reads before th
 seeded (`postdoc/evaluate.py`, `openferment_core/evaluation.py`, `docs/api/postdoc.md`):
 
 - **The judge pass reads core/.env as a run does.** `pnpm eval judge` copied the database address
-  and the project from `core/.env` and imported nothing more, so it read no key and no routes and
-  held the default cap of 25 USD: written to call the judge route, it never could, and each
-  judgement it kept was a decline naming a missing key. Its branch now imports the service module first, as the run
-  branch does, whose import loads `core/.env` through the same loader with `override=False`
-  (`api.py`): the same file, the same names, read the same way, and no new place a key is read
-  from. A judge none of whose route's models answers (no key, the account's usage limit, the day's
-  cap) now stops `run --judge` and `judge` in words with exit 1 and keeps no judgement for the run
-  it was judging (`evaluate.JudgeUnavailable`); a judge that declines is still kept as a judgement
-  with no score.
+  and the project from `core/.env` and imported nothing more, so it read no key, no routes and the
+  default cap of 25 USD, and each judgement it kept was a decline naming a missing key. Its branch
+  now imports the service module first, as the run branch does, whose import loads `core/.env`
+  through the same loader with `override=False` (`api.py`): the same file, the same names, read
+  the same way, and no new place a key is read from. A judge none of whose route's models answers
+  (no key, the account's usage limit, the day's cap) now stops `run --judge` and `judge` in words
+  with exit 1 and keeps no judgement for the run it was judging (`evaluate.JudgeUnavailable`); a
+  judge that declines is kept as a judgement with no score.
 - **A model's write carries the plan route's effort.** A write's audit row named the single effort
   setting (`llm.effort()`), so a write asked on a route table at `high` was labelled with
   `core/.env`'s `max`. It now names the effort of the route Postdoc's loop answers on,
@@ -296,6 +295,20 @@ seeded (`postdoc/evaluate.py`, `openferment_core/evaluation.py`, `docs/api/postd
   run there, so a table stopped part way is finished where it stopped. Question 4 follows question
   3, as the owner's screen asked it in alpha 2.1.
 - `JUDGE_TOKENS` and the loop's bounds stay as they are: the comparison measures them first.
+- **The review (F.2a review).** The account's limit most often lands on one of an answer's plan
+  calls before its judge call, so a stop's answer is itself unanswered: a plan with no claim whose
+  final step reads `No answer: …`, its decline no refusal (`evaluate.unanswered`). The stop's words
+  then say to ask that question again with the rest, beside the questions a full asking asks in
+  its conversation before it when it is a follow-up, and name no judge command for it. `--only`
+  asks a follow-up in its question's conversation when that conversation holds what a full asking
+  has it read before it; a follow-up that would find its own earlier asking there, miss a question
+  asked ahead of it, or follow a question no model answered is refused in words that name the
+  questions to ask with it. `llm.Result.refused` names the models the safety classifier declined
+  before one answered, by the ids they were asked by, and a judgement keeps them, so each judge's
+  refusals (`judges.<model>.refused`) stand apart from its route's pass-overs for a status such as
+  529, which `declined` counts beside them. A stop names what the judge route spent on the call it
+  stopped at (`spentAtStopUsd`); the restarts are counted by kind (`restartCount`); and each row
+  gives each judge's verdict cut to 200 characters.
 
 ## Evidence
 
