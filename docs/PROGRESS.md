@@ -26,7 +26,18 @@ session continues from this file and `git log` alone.
      OPENFERMENT_MODEL -u OPENFERMENT_FALLBACK_MODEL -u OPENFERMENT_INDEX_MODEL -u
      OPENFERMENT_EFFORT <command>`).
 3. First tests to run: `pnpm test:core`, then `pnpm test:sim`.
-4. **Next step: stage F, the live work, once `pnpm ready --probe` says ok** (the prompt's §6.7; the probe runs first).
+4. **Stage F, the live work, is under way** (the prompt's §6.7 and §7; the Log). F.0 and F.1 are done: `pnpm ready
+   --probe` answered at 08:26 UTC on 5 November, and the Ethanol project stands rebuilt in this container's fresh
+   `openferment_dev` from Home and `docs/corpus/ethanol-sources.txt` through Intake, its 22 documents held and extracted
+   on the `extract` route, 457 candidates waiting for the owner's review (5.38 USD; the section of 5 November in
+   `docs/reports/live-questions-2026-11.md`). Next is F.2, the model comparison on four route tables with two judges,
+   which sets the routing defaults; then F.3, the fourteen questions on the Postdoc screen on the final routes; F.4,
+   `pnpm prove --live`; and the paid retrieval lanes. The service and every live command run with
+   `OPENFERMENT_DATA_DIR` on a copy of the fetched caches (Yeast9's and iMM904's files and the toolkit's reference
+   files), which live outside `core/data/` in this container. Alpha 2.1's Ethanol project is kept whole in
+   `openferment_dev_alpha21`, the name F.1 gave alpha 2.1's development database, and read there with SELECT alone. A
+   fresh container makes the project again on Home from the sources file through Intake (four minutes of collecting),
+   then extracts (fourteen minutes).
    Stage E is done (E.0a to E.16, then its gate; the Log): every screen, component and `src/lib` module reads the
    generated `src/api/types.gen.ts`, `src/data/types.ts` is deleted, and `check:plan` keeps the provenance ranking
    alone; the catalogues screen stands at `/catalogues`, and Primer's lessons, Guild's skills and the protocols are the
@@ -40,11 +51,8 @@ session continues from this file and `git log` alone.
    strangers finished in their first round with no core file changed: the mirror engine
    (`examples/engines/openferment-engine-mirror/`) and the record-reader agent
    (`examples/agents/record-reader/`), each round in `docs/reports/handoff-2026-11.md`. Stage C is
-   done: every run one shape. `pnpm ready --probe` found the account answering at 23:50 UTC on 2
-   November, so stage F, the live work, follows E. Alpha 2.1's Ethanol project is in this
-   container's `openferment_dev`; a fresh container makes it again on Home from
-   `docs/corpus/ethanol-sources.txt` through Intake (about twenty minutes), then extracts.
-5. Files in flight: none; the E.gate commit holds the review's fixes and the gate's record.
+   done: every run one shape.
+5. Files in flight: none; the F.1 commit holds the report's stage F section and this file's record of F.0 and F.1.
 
 ## Current stage
 
@@ -274,6 +282,7 @@ DOI or PMID. Each now reads the project's rows.
 | 2026-11-05 06:50 | E.16: `pnpm test:core`, twice, the second on the final tree; the changed tests with the database address empty and on Python 3.12; `gen:api`, `gen:tools` and `gen:components` with each `--check`; `check:tools`, `typecheck`, `check:plan`, `check:state`, `check:figures`, `check:secrets`, `test_guidance.py`; `build`, its bundle set beside E.15's; `smoke` with no key; `pnpm prove --steps 3 --keep`, offline, its service kept for the stage D record-reader and a filtered read of the audit | 2940 passed, 1 skipped, 175 deselected, twice; 113 passed each way; each generated file as the code writes it; every check green, `check:state` 62 checks; the bundle byte for byte E.15's; 13 of 13 screens; 16 of 16 checks, the record-reader exiting 0 | 5 min 13 s (`test:core`); 39 s (the proof) | E.16 |
 | 2026-11-05 07:04 | CI on `dc02f20` (E.16), run 41982676788: `pnpm verify`, then `pnpm prove` | every stage green; every proof check holds | 13 min 9 s (verify); 3 min 25 s (the proof) | `dc02f20` |
 | 2026-11-05 08:49 | The stage E gate (E.gate): the changed tests with the tests of the code they cover, with the database address empty, on Python 3.13 and on 3.12; `pnpm test:sim`; `pnpm test:core`; `gen:api`, `gen:tools` and `gen:components`; `typecheck`, `check:plan`, `check:state`, `check:figures`, `check:guild`, `test:reconcile`, `check:secrets`; `build`; `pnpm smoke` with no key; `pnpm prove --steps 9` and `pnpm prove`, offline; `pnpm verify`, all sixteen stages | 579 passed each way; 142 passed; 2946 passed, 1 skipped, 175 deselected; the document, the types and `docs/TOOLS.md` regenerated, `COMPONENTS.md` as it was; every check green, `check:state` 66 checks, `check:guild` 146; 20 of 20 screens, Postdoc's saying it runs with no key; 52 of 52 and 93 of 93 checks, the catalogue screen and the five new walk steps in the walk, no call in the proof's spend table; every stage green (`test:core` 2946 passed, `test:sim` 142, `test:lit` 10, `smoke` 20 of 20) | 5 min 29 s (sim); 5 min 25 s (core); 218 s (the proof); 13 min 7 s (verify) | `dc02f20` and E.gate |
+| 2026-11-05 09:55 | F.1: `pnpm test:core` on the final tree, the report's stage F section and this file's record of F.0 and F.1 in it | 2946 passed, 1 skipped, 175 deselected | 5 min 20 s | F.1 |
 | 2026-10-30 06:47 | `test:core` with 2.2; `check:tools`; `pnpm smoke` (own database, project made through the API) | 1920 passed, 2 skipped, 128 deselected; passed; 11 of 11 rail entries open in the project | 4 min 26 s | 2.2 |
 
 ## Spend (alpha 2.1)
@@ -298,6 +307,7 @@ prompt's §4).
 | B | 0 | 0 | none: the contract, the registry and the conformance checks make no model call |
 | C | 0 | 0 | none: every step of stage C and its gate ran offline with no key; each proof's spend table held no call |
 | D | 0 | 0 | none: the pre-read, the fixes, both strangers' rounds and every proof ran offline with no key; the record-reader's run against the kept proof made no model call |
+| F | 32 | 5.377954 | so far, F.0 and F.1. F.0: `pnpm ready --probe`, one call on the index route (`claude-haiku-5-5`), 0.000004, its row now in `openferment_dev_alpha21`. F.1: the extraction of the 22 documents on the `extract` route, 31 calls and 5.377950 in `openferment_dev`: 22 answers (13 by `claude-opus-5-5`, 9 by `claude-sonnet-5-5` after Opus declined in `bio`) and the nine declines (1.216816). The day over every database read 5.377954 against the 150 USD cap |
 
 ## Decisions
 
@@ -2743,3 +2753,50 @@ holds the numbers, the tables and the judgements).
     walk steps among them; `pnpm prove`, offline, steps 1 to 10, 93 of 93 checks in 218 s, the catalogue screen
     in the walk and no call in the proof's spend table; and `pnpm verify`, all sixteen stages in 13 min 7 s (`test:core`
     2946 passed, 1 skipped, 175 deselected; `test:sim` 142 passed; `test:lit` 10 passed; `smoke` 20 of 20 screens with no key).
+
+### Alpha 2.2 — Stage F — 2026-11-05
+
+The live work (the prompt's §6.7 and §7), on the routes of its §4 as `core/.env` holds them;
+`docs/reports/live-questions-2026-11.md` holds the numbers in its section of 5 November.
+
+- F.0. `pnpm ready --probe` answered at 08:26 UTC on 5 November on the index route (`claude-haiku-5-5` at effort
+  low, the route's one model), 0.000004 USD, so the account answers and stage F runs. Its row is in the spend table
+  the rename of F.1 carried to `openferment_dev_alpha21`.
+- F.1. The Ethanol project rebuilt from nothing, on the screens.
+  - Before it: the tree clean at `3b40de6`, equal to `origin/claude/alpha-2-2-base`; 0 sessions on
+    `openferment_dev`; `pnpm build` (20 s).
+  - The rename. At 08:52 UTC alpha 2.1's development database was renamed `openferment_dev_alpha21` in one guarded
+    chain through the maintenance database (0 sessions on it, the new name free, `ALTER DATABASE openferment_dev
+    RENAME TO openferment_dev_alpha21`, both names read back), and `pnpm db:reset openferment_dev` made a fresh
+    `openferment_dev` at the heads (`openferment` 0010, `sci_rag` 0006) with 0 projects. Why: the rename keeps
+    alpha 2.1's project whole and readable with SELECT for the reports' earlier numbers (1 project, 22 document links
+    and 22 extraction rows at migration 0009, with F.0's probe row), and the fresh database is the one a fresh
+    container starts from, as the prompt's §0 and §6.7 describe the rebuild. There the kit ingests every document
+    anew, so the rebuild measures the parsing, chunking and embedding a fresh container makes; the project keeps the
+    id `ethanol` that the drivers, the evaluation commands and the reports name; the database stands at the tree's
+    heads; and the fourteen questions are seeded as the code holds them now. It reverses with `python -m
+    openferment_core.migrations drop openferment_dev`, then `ALTER DATABASE openferment_dev_alpha21 RENAME TO
+    openferment_dev`. It is a cloud container's development database; the rename moved it whole, and its rows stay
+    as they were.
+  - The service on 127.0.0.1:8800 alone, from that tree, with `OPENFERMENT_DATA_DIR` on a copy of the fetched
+    caches: health ok with the key, and the routes and caps of §4 (150 USD a day, 8 USD an ask).
+  - The rebuild, each step in Chromium on the screens with "Claude Code (build session)" typed in Settings as the
+    person's name: "Ethanol" made on Home at 08:58 UTC (id `ethanol`); the 22 identifiers of
+    `docs/corpus/ethanol-sources.txt` collected one at a time on Intake's Identifier form (08:58 to 09:02 UTC), each
+    `ingested` on its first try, 814 passages in 180 s of collecting, the board reading "22 held" with 0 refused;
+    Extract on every held document on the `extract` route, Opus then Sonnet at effort high (09:02 to 09:16 UTC), one
+    extraction call each: 457 candidates kept and 54 refused, all 54 by the unit rule, partial 0, Opus declining nine
+    papers in `bio` and Sonnet answering each; and three warm-up runs from Studies' run card on the package's own
+    values (`cornstover`, and `cellulosic_ethanol_v0` in dilute acid and in hot water, each with IB), each done and
+    `computed` with its SFF file, each run's id the one `openferment_dev_alpha21` holds for the same plant and
+    configuration.
+  - Cost and time: 5.3780 USD over 31 model requests, 22 answers and the nine declines (1.2168 USD of it the
+    declines); 803 s of extraction, 24 s a document at the median and 151 s at the most. The day over every database
+    read 5.377954 USD against the 150 USD cap, and the account answered every call.
+  - For the owner: all 457 candidates wait for review; the project holds 0 decisions, 0 records and 0 depositions,
+    and its audit table one row, the project made on Home.
+  - One screen fault joins the stage's list: the extraction's toast names its document by the kit's 32-hex id, as
+    the job's title and the activity line do, and the unbroken id widens the toast past its fixed 340 px, so its Open
+    Witness button sits outside it at 1440 px (`src/store.ts` 1462, 1470 and 1482; `src/components/ui.tsx` 364-386).
+    The drivers recorded 0 console errors, 0 page errors, 0 failed requests and 0 API answers of 400 or above.
+  - Checks: `pnpm test:core` on the final tree, 2946 passed, 1 skipped, 175 deselected (5 min 20 s).
