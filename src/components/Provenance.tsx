@@ -2,8 +2,8 @@
 // one `provenance` value so they can never disagree (OF-DES-001 §7.4).
 import type { ReactNode } from 'react';
 import { Award, ShieldCheck, CircleDashed, UserPen, FlaskConical, Ban, BookMarked, Microscope, TrendingUp, Calculator } from 'lucide-react';
-import type { Provenance } from '@/data/types';
 import type { ExtractionRecord } from '@/lib/review';
+import type { Provenance } from '@/lib/studies';
 import { aggregateExclusion } from '@/store';
 import { Explain, cx } from './ui';
 

@@ -2,8 +2,7 @@
 // stage-level progress here, completion toast that deep-links to the result.
 // Jobs never modally block the interface.
 import { CheckCircle2, Loader2, XCircle, Trash2 } from 'lucide-react';
-import type { Job } from '@/data/types';
-import { useStore } from '@/store';
+import { useStore, type Job } from '@/store';
 import { navigate } from '@/router';
 import { ComponentTag, type ComponentName } from './ComponentTag';
 import { cx, EmptyState } from './ui';

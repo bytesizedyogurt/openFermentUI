@@ -7,8 +7,8 @@
 // marks are the service's.
 import { useEffect, useMemo, useState } from 'react';
 import { Box, Cpu, MessageSquare } from 'lucide-react';
-import type { Provenance } from '@/data/types';
 import { watchEvents, type ServiceEvent } from '@/lib/events';
+import type { Provenance } from '@/lib/studies';
 import { href } from '@/router';
 import { ProvenanceBadge } from './Provenance';
 import { Card, cx } from './ui';

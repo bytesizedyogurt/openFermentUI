@@ -1,7 +1,7 @@
 // The record fields (alpha 2.0): what an extracted record may hold, in four
 // families. `core/openferment_core/schema/fields.yaml` is the source; this
-// file mirrors it until stage 7 serves the fields from the API, and
-// core/tests/test_schema.py holds the two equal through the fixture
+// file mirrors it and declares the types the mirror is written in (alpha 2.2
+// E.4), and core/tests/test_schema.py holds the two equal through the fixture
 // `pnpm export:unit-fixtures` writes. A field carries no range and no example
 // value: a definition states what a number means and never what one is
 // (ADR-010).

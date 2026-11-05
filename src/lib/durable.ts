@@ -37,7 +37,6 @@
 // unavailable would be worse.
 import type { components } from '@/api/types.gen';
 import type { Guild, GuildWithdrawal } from '@/lib/guild';
-import type { InputAssumption } from '@/data/types';
 import type { Deposition, MeasuredEvidence, Provenance, Runbook } from './studies';
 import type { RecordStatus, ReviewDecision } from './review';
 import type { Override } from './params';
@@ -173,6 +172,22 @@ export interface DurableSnapshot {
  * place's params; when it was saved, ISO, UTC; and the reviewer name it was saved under.
  */
 export type TrainMade = components['schemas']['TrainMade'];
+
+/**
+ * A value a named person typed for one input of a Proforma scenario, with its range (OF-BLD-014 §8.4): the browser's
+ * own shape, as a snapshot written before the parameter panel keeps it (`proformaAssumptions`, read once into the
+ * scenario's overrides, each a person's assumption), and as the store reads a `proforma:` scope's numeric overrides
+ * (`assumptionsFromOverrides`).
+ */
+export interface InputAssumption {
+  key: string;
+  value: number;
+  low: number;
+  high: number;
+  by: string;
+  at: string;
+  note: string | null;
+}
 
 export const EMPTY_SNAPSHOT: DurableSnapshot = {
   version: 1,

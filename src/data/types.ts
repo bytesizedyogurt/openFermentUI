@@ -1,5 +1,8 @@
 // openFerment — the client's entity types (OF-DES-001 §15), hand-kept beside
 // the generated src/api/types.gen.ts and held to the service by check:plan.
+// Since alpha 2.2 E.14 no file imports it: every reader names the generated
+// types, and the client's own types where their owners declare them, and
+// check:plan reads the pairs here by text until E.15 deletes the file.
 
 /**
  * Provenance classes (OF-DES-001 §7.4, revised by OF-COR-001 §20).
@@ -575,13 +578,9 @@ export interface LearnModule {
   outline?: string[];
 }
 
-export interface ActivityEvent {
-  at: string;
-  icon: string;
-  text: string;
-  href?: string;
-  provenance: Provenance;
-}
+// A line of the page's activity is the store's own (src/store.ts, alpha 2.2
+// E.14); named here until this file goes (E.15).
+export type { ActivityEvent } from '@/store';
 
 // A job the tray shows is the store's own (src/store.ts, alpha 2.2 E.4); named
 // here until this file goes (E.15).
@@ -2378,7 +2377,12 @@ export interface ScenarioInput {
   flags: string[];
 }
 
-/** A value a named person typed for one input, with its range. */
+/**
+ * A value a named person typed for one input, with its range. The browser's
+ * own is declared in src/lib/durable.ts beside the snapshot that keeps it
+ * (alpha 2.2 E.14); this twin of models.py's stands for check:plan's pair
+ * until this file goes (E.15).
+ */
 export interface InputAssumption {
   key: string;
   value: number;

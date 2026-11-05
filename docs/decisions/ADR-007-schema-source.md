@@ -303,3 +303,15 @@ Never; this is how the drift stops recurring.
   Learning. `core/tests/fixtures/competence-unrated.json` holds the two equal on such a skill, and
   `competence.json` is byte for byte what it was. The ledger the service answers always keeps a policy
   (`Guild.policy`); a ledger a check builds for itself may leave it to the default (`Ledger`).
+
+### Alpha 2.2, E.14 (2026-11-05): the last readers, and the browser's own types with their owners
+
+- Provenance, TraceCards and check:figures read the provenance class from `lib/studies.ts`, QuantityField a record's
+  field from `data/ontology.ts`, JobsTray a job from the store, and the store a project from `lib/project.ts`, which
+  names the generated `Project`. No file imports `src/data/types.ts`; check:plan reads its pairs there by text until
+  E.15 deletes it.
+- The browser's own types finish moving to their owners: a line of the page's recent activity (`ActivityEvent`) to
+  the store, and a Proforma assumption as a snapshot written before the parameter panel keeps it (`InputAssumption`)
+  to `lib/durable.ts`, with the seven fields the browser wrote; the store reads each as a person's assumption.
+  `src/data/types.ts` re-exports `ActivityEvent` until E.15 and keeps its own `InputAssumption`, check:plan's twin of
+  the model the service binds a scenario's values with, its origin and reading among its fields; no route serves it.

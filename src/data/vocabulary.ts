@@ -9,9 +9,10 @@
 
 /**
  * Where a unit operation sits in a downstream train, fermenter to vial. The
- * order of `UNIT_OP_STAGE_ORDER` below is the display order; a product's own
- * `unitOperationIds` array is the authority on its actual train, because two
- * products can use the same operation at different points.
+ * order of `UNIT_OP_STAGE_ORDER` below is the display order; a train's own
+ * units, in the order the train holds them (a pureOS train's `units`), are
+ * the authority on its actual order, because two trains can use the same
+ * operation at different points.
  */
 export type UnitOperationStage =
   | 'harvest'
@@ -101,9 +102,9 @@ function containsWord(haystack: string, needle: string): boolean {
 }
 
 /**
- * Downstream unit operations. A product's `unitOperationIds` array is ordered
- * fermenter to vial and is the authority on its train; `stage` here only says
- * what kind of job the operation does.
+ * Downstream unit operations. A train holds its units in order, fermenter to
+ * vial, and that order is the authority on the train; `stage` here says what
+ * kind of job the operation does.
  */
 export const UNIT_OPERATIONS: UnitOperation[] = [
   {

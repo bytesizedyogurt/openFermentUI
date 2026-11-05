@@ -6,7 +6,6 @@
 // (src/lib/durable.ts), and localStorage holds the last-open project alone.
 import { useMemo } from 'react';
 import { create } from 'zustand';
-import type { Project, InputAssumption, ActivityEvent } from '@/data/types';
 import {
   CataloguesDown,
   listLessons,
@@ -53,13 +52,14 @@ import {
   loadDurable,
   saveDurable,
   type DurableSnapshot,
+  type InputAssumption,
   type TrainMade,
 } from '@/lib/durable';
 import { DecisionRefused, IntakeDown, extractPaper, loadOverlay, postDecision } from '@/lib/intake';
 import { blocks, recordOf, writeRefusal, type ReviewAction } from '@/lib/review';
 import { isFieldId } from '@/data/ontology';
 import { call } from '@/lib/http';
-import { openProjectId, projectSettled, setOpenProjectId } from '@/lib/project';
+import { openProjectId, projectSettled, setOpenProjectId, type Project } from '@/lib/project';
 import {
   EMPTY_STATE,
   applyEntries,
@@ -97,6 +97,18 @@ export interface Toast {
   kind: 'info' | 'success' | 'warn' | 'error';
   href?: string;
   hrefLabel?: string;
+}
+
+/**
+ * A line of this page's recent activity, as Home lists it, newest first (`logActivity`): when it happened, the icon
+ * it draws with, its words, the page it links to, and the provenance its tick shows.
+ */
+export interface ActivityEvent {
+  at: string;
+  icon: string;
+  text: string;
+  href?: string;
+  provenance: Provenance;
 }
 
 export interface JobStage {

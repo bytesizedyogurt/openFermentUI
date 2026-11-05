@@ -3,8 +3,7 @@
 // carries no range (alpha 2.0, ADR-010), so a value is held to its unit and
 // to the quote it stands in, which review checks.
 import { useEffect, useState } from 'react';
-import type { FieldId } from '@/data/types';
-import { ONTOLOGY_BY_ID } from '@/data/ontology';
+import { ONTOLOGY_BY_ID, type FieldId } from '@/data/ontology';
 import { parseQuantity, toSI, sameFamily, fmt, explainRefusal } from '@/engine/units';
 import { ComponentTag } from './ComponentTag';
 import { cx } from './ui';
