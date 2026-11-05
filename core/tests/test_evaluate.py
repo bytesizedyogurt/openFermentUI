@@ -86,6 +86,9 @@ def test_the_owners_twelve_and_the_bases_two_are_a_suite_of_their_own():
     assert made == [f"eq-eth-{n:02d}" for n in range(1, 15)] and evaluate.seed(suite=evaluate.ETHANOL) == []
     held = {q.id: q for q in evaluate.questions(evaluate.ETHANOL)}
     assert (held["eq-eth-07"].follows, held["eq-eth-08"].follows) == ("eq-eth-06", "eq-eth-05")
+    assert held["eq-eth-04"].follows == "eq-eth-03", "that plant, the one question 3 asks of, in its conversation"
+    assert {q.id: q.follows for q in held.values() if q.follows} == {
+        "eq-eth-04": "eq-eth-03", "eq-eth-07": "eq-eth-06", "eq-eth-08": "eq-eth-05", "eq-eth-14": "eq-eth-05"}
     assert all(q.expects and q.suite == evaluate.ETHANOL for q in held.values())
     assert evaluate.questions(evaluate.DEFAULT) == [], "a suite is seeded on its own"
     assert held["eq-eth-05"].estimate is True and held["eq-eth-07"].estimate is False and held["eq-eth-01"].estimate is None
@@ -240,6 +243,7 @@ def test_a_judge_that_declines_leaves_no_score_and_says_why(worker):
     q = evaluate.EvalQuestion(id="q", question="q")
     got = evaluate.judge(q, _cited_plan(), call=refuses, record=lambda _: None, paper=lambda _: None)
     assert (got.model, got.answers, got.costUsd) == ("claude-opus-5-5", None, 0.002) and "bio" in got.declined
+    assert got.tried == ["claude-opus-5-5"], "the models the refusal names"
     evaluate.seed()
 
     def half(q, plan):
@@ -247,8 +251,8 @@ def test_a_judge_that_declines_leaves_no_score_and_says_why(worker):
 
     found, _ = evaluate.run(api._answer, tag="t", judged=True,
                             judge_with=lambda q, plan: got if q.id == "eq-dearer" else half(q, plan))
-    judged = evaluate.summary(evaluate.DEFAULT)["t"]["judges"]["claude-opus-5-5"]
-    assert (judged["answers"], judged["answers judged"], judged["declined"]) == (0.5, 1, ["eq-dearer"])
+    judged = evaluate.summary(evaluate.DEFAULT)["tags"]["t"]["judges"]["claude-opus-5-5"]
+    assert (judged["answers"], judged["answersJudged"], judged["declined"]) == (0.5, 1, ["eq-dearer"])
 
 
 def test_a_run_is_tagged_timed_judged_and_judged_again(worker):
@@ -268,6 +272,351 @@ def test_a_run_is_tagged_timed_judged_and_judged_again(worker):
                for r in found)
     again = evaluate.judge_kept(evaluate.DEFAULT, "stand-in table", judge_with=second)
     assert [[j.model for j in r.judged] for r in again] == [["judge-one", "judge-two"]] * 2
-    s = evaluate.summary(evaluate.DEFAULT)["stand-in table"]
-    assert s["questions"] == 2 and s["code"]["tools"] == 1.0 and s["droppedForNumbers"] == 1
+    s = evaluate.summary(evaluate.DEFAULT)["tags"]["stand-in table"]
+    assert s["questions"] == 2 and s["code"]["tools"] == 1.0 and s["claims"]["droppedForNumbers"] == 1
     assert s["judges"]["judge-one"]["coverage"] == 0.5 and s["judges"]["judge-two"]["answers"] == 0.5
+
+
+# ── alpha 2.2 F.2a: what the model comparison reads ─────────────────────
+
+OPUS, SONNET = "claude-opus-5-5", "claude-sonnet-5-5"
+
+
+def test_a_run_keeps_its_first_steps_its_stop_its_restarts_and_its_drop_reasons(worker):
+    evaluate.seed()
+    found, _ = evaluate.run(api._answer)
+    price, dearer = found
+    for r in found:
+        assert 0 <= r.firstStepSeconds <= r.firstModelSeconds <= r.seconds, r.questionId
+        assert (r.stopped, r.restarts) == ("done", []), r.questionId
+    (turn,) = [t for t in conversations.get(price.conversationId).turns if t.id == price.turnId]
+    assert [s.kind for s in turn.plan.trace][:2] == ["coverage", "tool"], "the code's sweep first, the model's call next"
+    assert price.dropReasons == []
+    (reason,) = dearer.dropReasons
+    assert "contains a number" in reason and evaluate.drop_kind(reason) == "a number in a claim's words"
+    kept = {r.id: r for r in evaluate.runs()}[dearer.id]
+    assert (kept.dropReasons, kept.firstModelSeconds, kept.stopped) == (dearer.dropReasons, dearer.firstModelSeconds,
+                                                                      "done"), "kept as the run made it"
+
+
+def test_a_run_keeps_the_restarts_and_the_stop_its_answer_gave():
+    """The answer path hands the run each step as it completes; a restart
+    step's words and the plan's stop are kept on the run."""
+    from openferment_core.models import Usage
+
+    evaluate.seed()
+    restart = "model-a declined; asked again on model-b"
+
+    def answer(request, *, converse=None, on_step=None):
+        steps = [TraceStep(n=1, kind="coverage", summary="swept", ms=0, ok=True),
+                 TraceStep(n=2, kind="restart", summary=restart, ms=0, ok=False),
+                 TraceStep(n=3, kind="final", summary="Answered", ms=0, ok=True)]
+        for s in steps:
+            on_step(s)
+        return AnswerPlan(question=request.question, trace=steps, stopped="calls", conversationId=request.conversationId,
+                          turnId=request.turnId, usage=Usage(models=["model-b"], costUsd=0.01),
+                          rejectionReasons=["a gap dropped: it holds a number"])
+
+    found, _ = evaluate.run(answer, live=True, tag="restarted")
+    assert [(r.restarts, r.stopped, r.models) for r in found] == [([restart], "calls", ["model-b"])] * 2
+    assert all(r.firstStepSeconds <= r.firstModelSeconds <= r.seconds for r in found)
+    assert all(evaluate.drop_kind(x) == "a number in a gap or the decline" for r in found for x in r.dropReasons)
+
+
+def test_the_drop_kinds_read_the_validators_own_words():
+    """Each kind of drop counted by the words the validator writes, read
+    from the validator itself so a change to its words is seen here."""
+    from openferment_core import postdoc_agent
+    from openferment_core.models import Passage
+    from openferment_core.validate import SeenSet, validate_plan
+
+    class NoRecords:
+        def record(self, record_id):
+            return None
+
+    seen = SeenSet()
+    seen.passages["P1:s1:0"] = Passage(id="P1:s1:0", paperId="P1", sectionId="s1", heading="h", kind="prose",
+                                       text="One sentence stands here.", start=0, end=25)
+    seen.runs["a9"] = "fermos/vessel/a9"
+
+    def claim(cid, text="It says a thing.", **kw):
+        return {"id": cid, "text": text, "recordIds": [], "paperIds": [], "support": "direct", "passages": [],
+                "evidenceIds": [], "moduleRefs": [], "values": [], **kw}
+
+    out = validate_plan([
+        claim("c1", "The run gives 2 of them."),
+        claim("c2", recordIds=["r-none"]),
+        claim("c3", evidenceIds=["a1:price"]),
+        claim("c4", evidenceIds=["a9"]),
+        claim("c5", passages=[{"passageId": "P1:s1:0", "quote": ""}]),
+        claim("c6", values=[{"label": "a value", "evidenceId": "", "recordId": "", "estimate": None}]),
+        claim("c7"),
+        claim("c8", ""),
+        "not a claim at all",
+    ], seen, NoRecords())
+    reasons = list(out.reasons)
+    postdoc_agent.held_to_rule_one(["a gap of 3 parts"], "declined for 2 reasons", reasons)
+    assert [evaluate.drop_kind(r) for r in reasons] == [
+        "a number in a claim's words", "a citation no tool returned", "a citation no tool returned",
+        "a row cited as evidence", "a quote", "a typed value", "a claim citing nothing", "an empty claim",
+        "an empty claim", "a number in a gap or the decline", "a number in a gap or the decline"], reasons
+    assert evaluate.drop_kind("words of no rule") == evaluate.OTHER_DROP
+
+
+def _keep(question_id, tag="t", **fields):
+    """A run kept with known values (placeholders) through the store a run is kept in."""
+    import uuid
+
+    from openferment_core import db, projects
+
+    run = evaluate.EvalRun(**{
+        "id": f"er-{uuid.uuid4().hex[:12]}", "questionId": question_id, "question": "q", "mode": "live",
+        "models": ["model-a"], "scores": evaluate.EvalScores(tools=1.0, citations=1.0, estimates=1.0, bareNumbers=1.0),
+        "droppedForNumbers": 0, "claims": 0, "rejected": 0, "toolsCalled": [], "costUsd": 0.0,
+        "at": "2026-11-05T00:00:00Z", "by": evaluate.BY, "suite": evaluate.ETHANOL, "tag": tag, **fields})
+    db.run(evaluate._keep(projects.current(), run))
+    return run
+
+
+def _judged(model, score=None, *, tried=None, route=None, declined=None, cost=0.0):
+    return evaluate.Judgement(model=model, answers=score, grounded=score, labelled=score, coverage=score,
+                              declined=declined, costUsd=cost, tried=tried if tried is not None else [model],
+                              route=route if route is not None else [model])
+
+
+def test_summary_sets_medians_tool_calls_dropped_claims_and_cost_per_question():
+    evaluate.seed(suite=evaluate.ETHANOL)
+    _keep("eq-eth-01", costUsd=5.0, seconds=99.0, toolsCalled=["a"] * 20)  # superseded by the newer run below
+    _keep("eq-eth-01", seconds=10.0, firstStepSeconds=0.2, firstModelSeconds=1.0, toolsCalled=["a"] * 3, claims=2,
+          rejected=1, droppedForNumbers=1, dropReasons=["c3: claim text contains a number ('2') — values come from "
+                                                        "the record"], stopped="done", costUsd=0.1)
+    _keep("eq-eth-02", seconds=30.0, firstStepSeconds=0.4, firstModelSeconds=3.0, toolsCalled=["a"] * 5, claims=4,
+          rejected=2, dropReasons=["c1: cites what no tool returned in this run: P9:s1:0",
+                                   "a gap dropped: it holds a number"], stopped="calls",
+          restarts=["model-a declined; asked again on model-b"], costUsd=0.2,
+          judged=[_judged("judge-a", 0.5, cost=0.05)])
+    _keep("eq-eth-03", seconds=20.0, firstStepSeconds=0.3, firstModelSeconds=2.0, toolsCalled=["a"] * 10,
+          stopped="time", costUsd=0.6, declined="Postdoc wrote no claim it could support.")
+    _keep("eq-eth-01", tag="other", costUsd=1.0)
+    out = evaluate.summary(evaluate.ETHANOL)
+    assert (out["suite"], sorted(out["tags"])) == (evaluate.ETHANOL, ["other", "t"])
+    s = out["tags"]["t"]
+    assert s["questions"] == 3 and s["toolCalls"] == {"mean": 6.0, "median": 5}
+    assert s["seconds"] == {"firstStep": 0.3, "firstModelStep": 2.0, "answer": 20.0}
+    assert s["claims"] == {"kept": 6, "dropped": 3, "droppedForNumbers": 1, "dropReasons": {
+        "a number in a claim's words": 1, "a number in a gap or the decline": 1, "a citation no tool returned": 1}}
+    assert s["stops"] == {"done": 1, "rounds": 0, "calls": 1, "cost": 0, "time": 1}
+    assert s["declined"] == ["eq-eth-03"] and s["restarts"] == {"eq-eth-02": ["model-a declined; asked again on model-b"]}
+    assert s["cost"] == {"perQuestion": {"mean": 0.3, "median": 0.2}, "answersUsd": 0.9, "judgesUsd": 0.05,
+                         "totalUsd": 0.95}
+    assert out["tags"]["other"]["cost"]["answersUsd"] == 1.0 and out["tags"]["other"]["seconds"]["answer"] is None
+
+
+def _two_judges():
+    """Two tags judged by two judge models: on `t` Opus once and Sonnet twice
+    on one answer; on `u` Opus declining one answer and passing another on to
+    Sonnet on the Opus-then-Sonnet route."""
+    evaluate.seed(suite=evaluate.ETHANOL)
+    _keep("eq-eth-01", judged=[_judged(OPUS, 0.8, cost=0.05), _judged(SONNET, 0.6, cost=0.02),
+                               _judged(SONNET, 0.7, cost=0.03)], toolsCalled=["engine_run"], claims=3, costUsd=0.4)
+    _keep("eq-eth-01", tag="u", judged=[
+        _judged(OPUS, declined="declined by the safety classifier (bio) on claude-opus-5-5", cost=0.002),
+        _judged(SONNET, 0.5, cost=0.03)])
+    _keep("eq-eth-02", tag="u", judged=[_judged(SONNET, 0.9, tried=[OPUS, SONNET], route=[OPUS, SONNET], cost=0.04)])
+
+
+def test_summary_counts_a_judge_once_a_run_and_says_how_far_the_judges_disagree():
+    _two_judges()
+    out = evaluate.summary(evaluate.ETHANOL)
+    t, u = out["tags"]["t"], out["tags"]["u"]
+    assert (t["judges"][OPUS]["answers"], t["judges"][SONNET]["answers"]) == (0.8, 0.7), "Sonnet's newest judgement"
+    assert t["judges"][SONNET]["answersJudged"] == 1 and t["judges"][SONNET]["costUsd"] == 0.05, "both judgements paid"
+    (pair,) = t["judgesDisagree"]
+    assert pair == {"judges": [OPUS, SONNET], "answers": 0.1, "grounded": 0.1, "labelled": 0.1, "coverage": 0.1,
+                    "pairs": 1, "unpaired": 0}
+    assert u["judges"][OPUS] == {"answers": None, "grounded": None, "labelled": None, "coverage": None,
+                                 "answersJudged": 0, "declined": ["eq-eth-01", "eq-eth-02"], "costUsd": 0.002}
+    assert (u["judges"][SONNET]["answers"], u["judges"][SONNET]["answersJudged"]) == (0.7, 2)
+    assert u["judgeRoutes"] == {OPUS: {"judgements": 1, "fellBack": 0, "declined": 1},
+                                SONNET: {"judgements": 1, "fellBack": 0, "declined": 0},
+                                f"{OPUS} then {SONNET}": {"judgements": 1, "fellBack": 1, "declined": 0}}
+    assert [(p["pairs"], p["unpaired"], p["answers"]) for p in u["judgesDisagree"]] == [(0, 2, None)]
+    (pooled,) = out["judgesDisagree"]
+    assert (pooled["judges"], pooled["pairs"], pooled["unpaired"], pooled["answers"]) == ([OPUS, SONNET], 1, 2, 0.1)
+    assert t["cost"]["judgesUsd"] == 0.1 and u["cost"]["judgesUsd"] == 0.072
+
+
+def test_a_judgement_names_its_route_and_the_models_it_tried(monkeypatch):
+    from openferment_core import llm
+    from openferment_core.models import Usage
+
+    monkeypatch.setenv(llm.ROUTES_SETTING, json.dumps({"judge": {"models": [OPUS, SONNET], "effort": "max"}}))
+    q = evaluate.EvalQuestion(id="q", question="q", expects="e")
+    scores = {"answers": 0.9, "grounded": 0.8, "labelled": 1.0, "coverage": 0.7, "errors": [], "note": "Sound."}
+
+    def after_opus(**kw):
+        return llm.Result(data=scores, model=SONNET, usage=Usage(costUsd=0.04, models=[OPUS, SONNET]),
+                          stop_reason="end_turn", fell_back=True, tried=[OPUS, SONNET])
+
+    got = evaluate.judge(q, _cited_plan(), call=after_opus, record=lambda _: None, paper=lambda _: None)
+    assert (got.model, got.tried, got.route, got.answers, got.declined) == (SONNET, [OPUS, SONNET], [OPUS, SONNET], 0.9,
+                                                                           None)
+    served = got.model_copy(update={"model": f"{SONNET}-served"})
+    assert evaluate._took_part(served) == [OPUS, f"{SONNET}-served"], "the last model tried, by the id it was served as"
+    assert evaluate._fell_back(served) and evaluate._charged(served) == f"{SONNET}-served"
+
+    def both_decline(**kw):
+        raise llm.ModelRefused("bio", [OPUS, SONNET], Usage(costUsd=0.003))
+
+    none = evaluate.judge(q, _cited_plan(), call=both_decline, record=lambda _: None, paper=lambda _: None)
+    assert (none.tried, none.route, none.answers, none.costUsd) == ([OPUS, SONNET], [OPUS, SONNET], None, 0.003)
+    assert "bio" in none.declined
+
+    def unavailable(**kw):
+        raise llm.ModelUnavailable("ANTHROPIC_API_KEY is not set. Put it in core/.env (gitignored) and restart the service.")
+
+    with pytest.raises(llm.ModelUnavailable, match="ANTHROPIC_API_KEY is not set"):
+        evaluate.judge(q, _cited_plan(), call=unavailable, record=lambda _: None, paper=lambda _: None)
+
+
+def test_rows_give_each_newest_run_with_each_judges_scores():
+    _two_judges()
+    rows = {(r["tag"], r["questionId"]): r for r in evaluate.rows(evaluate.ETHANOL)}
+    assert list(rows) == [("t", "eq-eth-01"), ("u", "eq-eth-01"), ("u", "eq-eth-02")]
+    first = rows[("t", "eq-eth-01")]
+    assert (first["models"], first["toolCalls"], first["claims"], first["dropped"], first["costUsd"]) == (
+        ["model-a"], 1, 3, 0, 0.4)
+    assert set(first) >= {"stopped", "restarts", "seconds", "firstStepSeconds", "firstModelSeconds", "scores", "declined"}
+    assert first["judges"] == {
+        OPUS: {"answers": 0.8, "grounded": 0.8, "labelled": 0.8, "coverage": 0.8, "declined": None, "costUsd": 0.05},
+        SONNET: {"answers": 0.7, "grounded": 0.7, "labelled": 0.7, "coverage": 0.7, "declined": None, "costUsd": 0.05}}
+    passed = rows[("u", "eq-eth-02")]["judges"]
+    assert passed[OPUS] == {"answers": None, "grounded": None, "labelled": None, "coverage": None,
+                            "declined": f"{SONNET} gave the judgement, after {OPUS}", "costUsd": 0.0}
+    assert (passed[SONNET]["answers"], passed[SONNET]["costUsd"]) == (0.9, 0.04)
+    assert "bio" in rows[("u", "eq-eth-01")]["judges"][OPUS]["declined"]
+
+
+def test_only_asks_the_questions_named_and_a_follow_up_in_its_questions_conversation(worker):
+    evaluate.seed()
+    (price, _dearer), _ = evaluate.run(api._answer, tag="t")
+    again, standins = evaluate.run(api._answer, tag="t", only=["eq-dearer"])
+    (dearer,) = again
+    assert dearer.questionId == "eq-dearer" and dearer.conversationId == price.conversationId
+    assert "What selling price does the library's sugarcane plant solve" in str(standins["eq-dearer"].seen[0])
+    assert [r.id for r in evaluate.newest(evaluate.DEFAULT, "t")] == [price.id, dearer.id]
+    with pytest.raises(evaluate.Refused, match="the tag 'other' holds no run of eq-price"):
+        evaluate.run(api._answer, tag="other", only=["eq-dearer"])
+    with pytest.raises(evaluate.Refused, match="holds no question nonesuch; it holds eq-price, eq-dearer"):
+        evaluate.run(api._answer, tag="t", only=["nonesuch"])
+    with pytest.raises(evaluate.Refused, match="no question is named"):
+        evaluate.run(api._answer, tag="t", only=[])
+    assert len(evaluate.runs()) == 3, "a refusal asks nothing"
+    both, _ = evaluate.run(api._answer, tag="other", only=["eq-price", "eq-dearer"])
+    assert both[1].conversationId == both[0].conversationId != price.conversationId
+
+
+def _unavailable(**kw):
+    from openferment_core import llm
+
+    raise llm.ModelUnavailable("ANTHROPIC_API_KEY is not set. Put it in core/.env (gitignored) and restart the service.")
+
+
+def _judging(q, plan):
+    return evaluate.judge(q, plan, record=lambda _: None, paper=lambda _: None, call=_unavailable)
+
+
+def test_a_judge_pass_stops_in_words_when_no_judge_model_answers(worker):
+    evaluate.seed()
+    evaluate.run(api._answer, tag="t")
+
+    def first_alone(q, plan):
+        if q.id == "eq-dearer":
+            return _judging(q, plan)
+        return evaluate.Judgement(model="judge-one", answers=1.0, grounded=1.0, labelled=1.0, coverage=1.0)
+
+    with pytest.raises(evaluate.JudgeUnavailable) as stop:
+        evaluate.judge_kept(evaluate.DEFAULT, "t", judge_with=first_alone)
+    words = str(stop.value)
+    assert "stopped at eq-dearer" in words and "ANTHROPIC_API_KEY is not set" in words
+    assert "judged 1 run before it" in words and "pnpm eval judge --suite default --tag t --only eq-dearer" in words
+    assert [r.questionId for r in stop.value.done] == ["eq-price"]
+    held = {r.questionId: r for r in evaluate.newest(evaluate.DEFAULT, "t")}
+    assert ([j.model for j in held["eq-price"].judged], held["eq-dearer"].judged) == (["judge-one"], []), \
+        "the run it stopped at keeps no judgement, and none names the missing key"
+    with pytest.raises(evaluate.Refused, match="no question nonesuch"):
+        evaluate.judge_kept(evaluate.DEFAULT, "t", judge_with=first_alone, only=["nonesuch"])
+    assert [r.questionId for r in evaluate.judge_kept(evaluate.DEFAULT, "t", judge_with=first_alone,
+                                                      only=["eq-price"])] == ["eq-price"]
+
+
+def test_a_judged_run_stops_at_the_answer_no_judge_could_read(worker):
+    evaluate.seed()
+    with pytest.raises(evaluate.JudgeUnavailable) as stop:
+        evaluate.run(api._answer, tag="u", judged=True, judge_with=_judging)
+    (kept,) = stop.value.done
+    assert (kept.questionId, kept.judged) == ("eq-price", [])
+    assert [(r.questionId, r.judged) for r in evaluate.runs()] == [("eq-price", [])], "the answer kept, unjudged"
+    words = str(stop.value)
+    assert "stopped at eq-price" in words and "ANTHROPIC_API_KEY is not set" in words
+    assert "pnpm eval judge --suite default --tag u --only eq-price" in words
+    assert "pnpm eval run --suite default --tag u --judge --only eq-dearer" in words
+
+
+def test_the_command_asks_only_the_questions_named_and_adds_the_rows(worker, capsys):
+    from openferment_core import evaluation
+
+    evaluate.seed()
+    assert evaluation.main(["run", "--tag", "t"]) == 0
+    first = json.loads(capsys.readouterr().out)
+    assert [r["questionId"] for r in first["runs"]] == ["eq-price", "eq-dearer"] and first["stopped"] is None
+    assert evaluation.main(["run", "--tag", "t", "--only", "eq-dearer"]) == 0
+    again = json.loads(capsys.readouterr().out)
+    assert [r["questionId"] for r in again["runs"]] == ["eq-dearer"] and again["followUps"] == {"eq-dearer": True}
+    assert again["runs"][0]["conversationId"] == first["runs"][0]["conversationId"]
+    assert evaluation.main(["run", "--only", "nonesuch"]) == 2
+    assert "holds no question nonesuch" in capsys.readouterr().err
+    assert evaluation.main(["summary", "--rows"]) == 0
+    out = json.loads(capsys.readouterr().out)
+    assert set(out) == {"suite", "tags", "judgesDisagree", "rows"}
+    assert [(r["tag"], r["questionId"]) for r in out["rows"]] == [("t", "eq-price"), ("t", "eq-dearer")]
+    assert out["tags"]["t"]["questions"] == 2
+
+
+def test_the_judge_command_stops_in_words_and_exits_one(worker, capsys, monkeypatch):
+    from openferment_core import evaluation
+
+    evaluate.seed()
+    evaluate.run(api._answer, tag="t")
+    monkeypatch.setattr(evaluation, "_judge_with", lambda: _judging)
+    assert evaluation.main(["judge", "--tag", "t"]) == 1
+    seen = capsys.readouterr()
+    out = json.loads(seen.out)
+    assert out["judged"] == [] and "ANTHROPIC_API_KEY is not set" in out["stopped"] and "stopped at eq-price" in seen.err
+    assert all(r.judged == [] for r in evaluate.runs())
+
+
+def test_the_judge_command_reads_core_env_as_the_run_command_does():
+    """The judge branch imports the service module before it judges, whose
+    import loads core/.env (api.py, override=False), as the run branch's
+    import does: the key, the routes and the budgets a judge's call reads.
+    In a process of its own, so the import is seen happening."""
+    import os
+    import subprocess
+    import sys
+
+    script = (
+        "import sys\n"
+        "from openferment_core import evaluation\n"
+        "from openferment_core.postdoc import evaluate\n"
+        "before = 'openferment_core.api' in sys.modules\n"
+        "seen = []\n"
+        "evaluation._judge_with = lambda: seen.append('openferment_core.api' in sys.modules)\n"
+        "evaluate.judge_kept = lambda *a, **k: []\n"
+        "code = evaluation.main(['judge'])\n"
+        "print(before, seen, code)\n"
+    )
+    done = subprocess.run([sys.executable, "-c", script], capture_output=True, text=True, timeout=300,
+                          env=dict(os.environ))
+    assert done.returncode == 0, done.stderr[-2000:]
+    assert done.stdout.split()[-3:] == ["False", "[True]", "0"], done.stdout

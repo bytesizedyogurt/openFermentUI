@@ -263,6 +263,40 @@ is written from:
   at every start, and the page's top points at the recipe, at the MCP server's section and at what
   a module read answers.
 
+## Implementation 14 (alpha 2.2 F.2a: the evaluation the model comparison reads)
+
+Stage F compares four route tables for `plan` and `explain` on the fourteen, each answer judged by
+two judge models; F.2a lands the evaluation code that comparison reads before the ethanol suite is
+seeded (`postdoc/evaluate.py`, `openferment_core/evaluation.py`, `docs/api/postdoc.md`):
+
+- **The judge pass reads core/.env as a run does.** `pnpm eval judge` copied the database address
+  and the project from `core/.env` and imported nothing more, so it read no key and no routes and
+  held the default cap of 25 USD: written to call the judge route, it never could, and each
+  judgement it kept was a decline naming a missing key. Its branch now imports the service module first, as the run
+  branch does, whose import loads `core/.env` through the same loader with `override=False`
+  (`api.py`): the same file, the same names, read the same way, and no new place a key is read
+  from. A judge none of whose route's models answers (no key, the account's usage limit, the day's
+  cap) now stops `run --judge` and `judge` in words with exit 1 and keeps no judgement for the run
+  it was judging (`evaluate.JudgeUnavailable`); a judge that declines is still kept as a judgement
+  with no score.
+- **A model's write carries the plan route's effort.** A write's audit row named the single effort
+  setting (`llm.effort()`), so a write asked on a route table at `high` was labelled with
+  `core/.env`'s `max`. It now names the effort of the route Postdoc's loop answers on,
+  `llm.routes()["plan"].effort` (`tools/writes._plan_effort`), so a table's writes carry the
+  table's effort; the single setting stands where the table names no effort for the route, as
+  `routes()` builds it, and where the table cannot be read.
+- **What a run and a judgement keep.** A run keeps the seconds to the loop's first step (the code's
+  module sweep), to its first step of another kind (the model's first) and to the answer, timed
+  through the answer path's `on_step`, with the loop's stop, its restart steps and the validator's
+  reasons. A judgement keeps the models its route tried and the route itself, so one Sonnet gave
+  after Opus declined says so. The summary counts each run once for each judge model, by that
+  model's newest judgement of it, and says how far the two judges' scores of the same answers lie
+  apart, per tag and pooled; `rows` gives each tag's newest run of each question; `run --only`
+  asks some questions alone under a tag, a follow-up in the conversation of its question's newest
+  run there, so a table stopped part way is finished where it stopped. Question 4 follows question
+  3, as the owner's screen asked it in alpha 2.1.
+- `JUDGE_TOKENS` and the loop's bounds stay as they are: the comparison measures them first.
+
 ## Evidence
 
 - `postdoc_agent.py`, `llm.py`, `spend.py`, `tools/__init__.py` at `alpha-1.0`.

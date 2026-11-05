@@ -16,7 +16,8 @@ depositions on their pages), and that
 refusal is a result Postdoc reports in `gaps`. `check:tools` greps this file for a store write and fails on one.
 
 THE MARK. Every write that goes through carries `agent: model`, the model
-id, the effort and the ask id into the audit log (`audit.py`), with the note
+id, the effort the plan route answers at and the ask id into the audit log
+(`audit.py`; alpha 2.2 F.2a), with the note
 its call carried, and what it made lands in the open lane: an artifact with
 its basis, a candidate `unverified`, a fetched paper. A person or a run
 promotes it. The call's answer names the row by its id (`auditIds`,
@@ -199,12 +200,23 @@ class ModuleWriteInput(BaseModel):
     note: str = Field(description="Why, in your own words; kept on the audit line and the proposal.")
 
 
+def _plan_effort() -> str:
+    """The effort the plan route's models answer at, the route Postdoc's loop
+    answers on (`llm.routes`): a route table's own, so a write made on a table
+    carries the table's effort, and core/.env's single effort setting where
+    the table names none for the route or cannot be read."""
+    try:
+        return llm.routes()["plan"].effort
+    except llm.RoutesInvalid:
+        return llm.effort()
+
+
 def _who(ctx: ToolContext | None = None) -> tuple[str, str]:
     """The model a write is marked with when no person calls: the one
     answering the run when a loop owns it (§7.R finding 7), else the chain's
-    first name."""
+    first name; and the plan route's effort."""
     model = getattr(ctx, "model", "") or llm.chain("answer")[0]
-    return model, llm.effort()
+    return model, _plan_effort()
 
 
 def _actor(ctx: ToolContext) -> tuple[str, str]:
@@ -218,10 +230,11 @@ def _actor(ctx: ToolContext) -> tuple[str, str]:
 
 
 def _effort(ctx: ToolContext, agent: str) -> str | None:
-    """The effort the service's own model ran at, for a write of Postdoc's;
-    a person's write carries none, and so does an outside assistant's
-    (`ToolContext.via`), since no model of the service ran for it."""
-    return llm.effort() if agent == "model" and not getattr(ctx, "via", "") else None
+    """The effort the service's own model ran at, for a write of Postdoc's:
+    the plan route's (`_plan_effort`); a person's write carries none, and so
+    does an outside assistant's (`ToolContext.via`), since no model of the
+    service ran for it."""
+    return _plan_effort() if agent == "model" and not getattr(ctx, "via", "") else None
 
 
 def _detail(ctx: ToolContext, agent: str, detail: dict[str, Any]) -> dict[str, Any]:

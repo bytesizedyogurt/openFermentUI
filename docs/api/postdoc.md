@@ -86,12 +86,34 @@ adds for the base's seams, each with what a good answer does in words (`expects`
 | `eq-eth-13` Which engines are registered here, what does each take and give, and which of this project's runs came from each? | The engine reads (`engine_plants`, whose `engines` names every engine registered here with the ids of the project's runs it made; `engine_parameters`; then `engine_report`, which names a run's engine and tool, or a module read) set out as one table with a row for each engine registered here when the suite is seeded (the registry's names, `evaluate.engines_here`: the core's three, `biosteam`, `kinetics` and `train`, which `ENGINES_EXPECTED` holds, and any engine installed beside them), each run cited by its evidence id or module row; no estimate |
 | `eq-eth-14` Take the ethanol yield measured in this project's most recent deposition, set it as the glucose-only scenario's yield, run it, and say what changed and what the value rests on. | Asked in question 5's conversation: the reading read with `runbooks_read` (kind `reading`), set as the scenario's value with the origin `{"kind": "measurement", "ref": "<the reading's id>"}`, run with `engine_run`, set beside the glucose-only run with `study_compare` and the comparison cited; the run's provenance `measured`, or `assumed` with the reason; where no deposition holds such a reading, said in words |
 
+A question that follows another is asked in that one's conversation: question 4 ("that plant")
+follows question 3, question 7 question 6, and questions 8 and 14 question 5, so a seed keeps each
+follow as the code holds it.
+
 `pnpm eval seed --suite ethanol` keeps the fourteen; `pnpm eval run --live --suite
 ethanol --tag <name> [--judge]` asks them on the routing table the environment sets and keeps each
-run under the tag, with the seconds it took. `--judge` has the first model on the `judge` route
-read each answer as it is kept: the question, what a good answer does, every claim with what it
-cites (the evidence's values, each record's quote, each passage's words), the gaps and the tools
-called, and score it from 0 to 1:
+run under the tag. Beside the code's scores, a run keeps how its answer went (alpha 2.2 F.2a):
+
+| Field | What it is |
+|---|---|
+| `seconds` | From the question asked to the answer kept, to the millisecond |
+| `firstStepSeconds` | To the loop's first step, the code's module sweep (kind `coverage`), timed through the answer path's `on_step` |
+| `firstModelSeconds` | To the loop's first step of another kind: the model's first, a tool it called, a restart or the answer |
+| `stopped` | Why the loop stopped (`AnswerPlan.stopped`): `done`, `rounds`, `calls`, `cost` or `time` |
+| `restarts` | Each restart step's words: a model declined or was unavailable, and the question was asked again on the next model of the route |
+| `dropReasons` | The validator's reason for each thing it dropped (`AnswerPlan.rejectionReasons`), a gap or a decline dropped for a number among them |
+
+A run kept before F.2a reads with the five fields after `seconds` empty (`null`, or an empty list).
+
+`--only <id,id>` asks the questions it names alone, under the run's tag, the rest left as they
+stand: a follow-up among them whose question it leaves out is asked in the conversation of that
+question's newest run under the tag, so a table stopped part way is finished where it stopped. A
+name the suite lacks, or a follow-up whose question has no run under the tag, is refused in words
+with exit 2 before anything is asked.
+
+`--judge` has the first model on the `judge` route read each answer as it is kept: the question,
+what a good answer does, every claim with what it cites (the evidence's values, each record's
+quote, each passage's words), the gaps and the tools called, and score it from 0 to 1:
 
 | Judge's score | What it is |
 |---|---|
@@ -101,9 +123,46 @@ called, and score it from 0 to 1:
 | `coverage` | How much of what a good answer covers this one covers |
 
 A judgement keeps the judge model's id, its faults in words and its cost, beside the code's scores
-and never in their place. `pnpm eval judge --suite ethanol --tag <name>` has the judge route as it
-now stands read the newest kept answers again and adds its judgement, so a second judge reads the
-same answers; `pnpm eval summary --suite ethanol` sets each tag's newest runs side by side.
+and never in their place, with `tried`, the models the route asked in order (the last of them gave
+the judgement, named in `model` by the id the API served; a refusal names each model that
+declined), and `route`, the judge route's chain when the answer was judged. A judgement Sonnet gave
+after Opus declined on the Opus-then-Sonnet route reads `model` Sonnet and `tried` Opus then
+Sonnet. `pnpm eval judge --suite ethanol --tag <name> [--only <id,id>]` has the judge route as it
+now stands read the newest kept answers again (those of the questions named, with `--only`) and
+adds its judgement, so a second judge reads the same answers. It reads `core/.env` as `run` does,
+through the service module's own loader (`api.py`; a setting the environment holds stands over the file's), so
+the key, the routes and the budgets a judge's call reads are there.
+
+A judge none of whose route's models answers (no key, the account's usage limit, the day's cap)
+stops `run --judge` and `judge` in words with exit 1: the JSON names what was kept or judged before
+the stop, and `stopped` says where and why, with the commands that go on (`--only` with the
+questions left). The answer the run was to judge is kept unjudged, and the run the pass was judging
+gains no judgement, so a judge pass never keeps a decline that names a missing key. A judge that
+declines is kept as a judgement with no score, as before.
+
+`pnpm eval summary --suite ethanol [--rows]` sets each tag's newest runs side by side, `{suite,
+tags, judgesDisagree}`, each run counted once for each judge model, by that model's newest
+judgement of it. Under `tags`, each tag:
+
+| Key | What it holds |
+|---|---|
+| `questions`, `models` | The questions with a run under the tag, and every model that answered them |
+| `code` | The mean of each of the code's four scores |
+| `judges` | For each judge model: its mean of each judge score over the answers it scored, `answersJudged`, `declined` (the questions whose newest judgement it took part in holds no score of its own: it declined, its route passed the answer on to a later model, or its answer did not arrive whole) and `costUsd`, what the judgements charged to it cost, every one kept (a judgement is charged to the model that gave it, or to the first its route tried when each model declined) |
+| `judgeRoutes` | For each judge route, named by its models in order (`<a> then <b>`): its newest judgement of each run counted, `judgements`, `fellBack` (given by a later model of the route after the first passed the answer on) and `declined` (with no score). A judgement kept before F.2a names no route and is left out |
+| `judgesDisagree` | For each two judge models, `judges`, the mean absolute difference between their newest judgements of each answer both scored, score by score, over `pairs` answers; `unpaired` counts the answers either took part in that lack a score from one of them, which the means leave out |
+| `declined`, `restarts` | The questions whose plan declined; each question's restart steps, by question |
+| `claims` | `kept`, `dropped`, `droppedForNumbers`, and `dropReasons`, the validator's reasons counted by kind (a number in a claim's words, a number in a gap or the decline, a typed value, a quote, a row cited as evidence, a citation no tool returned, a claim citing nothing, an empty claim, other) |
+| `toolCalls` | The mean and the median of the tool calls an answer made |
+| `seconds` | The medians of `firstStep`, `firstModelStep` and `answer` |
+| `stops` | The runs by why their loop stopped, each of the five reasons named |
+| `cost` | `perQuestion`, the mean and the median of an answer's cost; `answersUsd`; `judgesUsd`, every judgement the runs hold; `totalUsd`, the two together |
+
+The top level's `judgesDisagree` pools every tag's answers. `--rows` adds `rows`: one row for each
+tag's newest run of each question, with its models, the code's scores, tool calls, claims kept and
+dropped, stop, restarts, decline, seconds to the first step, to the model's first step and to the
+answer, cost, and for each judge model its four scores by its newest judgement of the run (each
+`null` where it gave none, `declined` saying why) and the cost of its judgements of the run.
 
 ## A key the request names
 

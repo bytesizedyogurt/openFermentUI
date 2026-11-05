@@ -321,7 +321,7 @@ prompt's §4).
 | [005](decisions/ADR-005-projects.md) | Projects replace programs | accepted |
 | [006](decisions/ADR-006-quantities-and-estimates.md) | Typed quantities with origins replace Rule 1 | accepted, stages 4 and 6 (alpha 2.2 E.15: the browser's quantity types are generated, a note added at E.gate) |
 | [007](decisions/ADR-007-schema-source.md) | Types generated from OpenAPI | accepted, stage 7 (alpha 2.2 E.0a: a schema the service only writes lists every property as required; E.0b: the rows a project keeps of its pages read as their models and served as kept; E.1: each lib names the generated schemas it answers, and its screens and components read them there; E.3: Postdoc's lib, and the one seam where a draft becomes the store's runbook until E.11; E.4: the review family in lib/review.ts, a record's field held to the ontology as it enters the store; E.6: fermOS's lib, and thermosteam's POST answering its artifact beside what it holds; E.7: pureOS's lib, and a train's units read as a request may leave them; E.8: the catalogues' lib born on the generated types, and an entry a keep sends read as a request may leave it; E.9: geneOS's lib, and a strain and a product read as the project's catalogue entries; E.11: the runbook family and the bench's record in lib/studies.ts, a runbook read as a row served as kept may leave it, and the draft's seam gone; E.12: Guild's, the checks' and Practice's libs and a new lib/protocols.ts, a skill and a lesson read as the project's catalogue entries, a protocol read as served whole, and a skill kept with no policy rated by nobody on both sides; E.14: the last readers, and the browser's own types with their owners, so no file imports src/data/types.ts; E.15: src/data/types.ts deleted and check:plan's pairs retired with it, every reader held to the service by `gen:api --check` and `typecheck`; E.gate: a decision's refusal rule generated as the eight rules, each hand copy of a generated request or union derived from its schema, a Proforma run's view built from its typed answer, and an artifact's output read per tool, a recorded departure) |
-| [008](decisions/ADR-008-postdoc-memory-routing.md) | Postdoc memory on the server; model routes | accepted, stage 6 (alpha 2.2 E.16: the agent builder's interface points, Implementation 13: one rule for a BioRepo record, a write's answer naming its audit rows, the audit read by what a write was and served with its null fields left out) |
+| [008](decisions/ADR-008-postdoc-memory-routing.md) | Postdoc memory on the server; model routes | accepted, stage 6 (alpha 2.2 E.16: the agent builder's interface points, Implementation 13: one rule for a BioRepo record, a write's answer naming its audit rows, the audit read by what a write was and served with its null fields left out; F.2a, Implementation 14: the judge pass reads core/.env as a run does and stops in words where no judge answers, and a model's write carries the plan route's effort) |
 | [009](decisions/ADR-009-ui.md) | The UI is kept and wired | accepted, stage 7 (alpha 2.2 E.15: the hand-kept types and check:plan's pairs retired, a note added at E.gate) |
 | [010](decisions/ADR-010-deletions.md) | Deletions | accepted, stage 1 (alpha 2.2 E.10: the enumeration funnel deleted, both its pieces standing at `alpha-1.0`) |
 | [011](decisions/ADR-011-guards.md) | Guards and verify stages | accepted, stages 1 and 8 (Implementation 8: sixteen stages; alpha 2.2 E.15: `check:plan` keeps the provenance ranking alone, its pairs retired with `src/data/types.ts`, and verify keeps its sixteen stages) |
@@ -2800,3 +2800,26 @@ The live work (the prompt's §6.7 and §7), on the routes of its §4 as `core/.e
     Witness button sits outside it at 1440 px (`src/store.ts` 1462, 1470 and 1482; `src/components/ui.tsx` 364-386).
     The drivers recorded 0 console errors, 0 page errors, 0 failed requests and 0 API answers of 400 or above.
   - Checks: `pnpm test:core` on the final tree, 2946 passed, 1 skipped, 175 deselected (5 min 20 s).
+- F.2a. The evaluation the model comparison reads, landed before the ethanol suite is seeded (ADR-008,
+  Implementation 14; `docs/api/postdoc.md`, the evaluation set). A run keeps the seconds to the loop's first
+  step, to the model's first step and to the answer, timed through the answer path's `on_step`, with the
+  loop's stop, its restart steps and the validator's reasons (`EvalRun.firstStepSeconds`, `firstModelSeconds`,
+  `stopped`, `restarts`, `dropReasons`, each empty on a row kept before); a judgement keeps the models its
+  route tried and the route itself (`Judgement.tried`, `route`). `pnpm eval judge` reads `core/.env` as
+  `pnpm eval run` does, importing the service module first (its loader, `override=False`): written to call the
+  judge route, it had read no key and kept a decline naming the missing key for every run. A judge none of
+  whose route's models answers stops `run --judge` and `judge` in words with exit 1, keeping no judgement for
+  the run it was judging and naming the commands that go on. `pnpm eval summary` counts each run once for each
+  judge model by its newest judgement and gives each tag's code scores, each judge's scores, answers judged,
+  declines and cost, each judge route's fallbacks and declines, how far the two judges' scores of the same
+  answers lie apart (per tag and pooled, an answer one judge left unscored counted beside the pairs), the
+  declined plans and the restarts, the claims kept and dropped with the drop reasons by kind, the tool calls,
+  the median seconds, the stops and the cost per question and in all; `--rows` adds each tag's newest run of
+  each question; `--only` asks or judges the questions it names under a tag, a follow-up in the conversation
+  of its question's newest run there. Question 4 follows question 3, as the owner's screen asked it. A model's
+  write carries the plan route's effort on its audit row (`tools/writes._plan_effort`), `core/.env`'s single
+  setting where the table names none or cannot be read. `JUDGE_TOKENS` and the loop's bounds stay as they are.
+  Tests: `test_evaluate.py` (13 new, 3 changed), `test_writes.py` (1 new). Checks: the two files with the
+  database address empty, on Python 3.13 and on 3.12, 73 passed each way; `gen:api`, `gen:tools` and
+  `gen:components --check`, each file as it was; `pnpm test:core` 2960 passed, 1 skipped, 175 deselected
+  (5 min 55 s); `pnpm prove --steps 6`, offline, steps 1, 2 and 6, 16 of 16 checks in 101 s, no model call.

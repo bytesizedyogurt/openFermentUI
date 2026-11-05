@@ -117,6 +117,21 @@ def test_a_gated_action_writes_nothing_and_comes_back_proposed(pool, store, modu
     assert not (store / "guild.json").exists() and not (store / "checks.json").exists()
 
 
+def test_a_models_write_carries_the_effort_of_the_plan_route(pool, store, monkeypatch):  # noqa: F811
+    """alpha 2.2 F.2a: a write of Postdoc's names the effort the plan route
+    answers at, so the writes asked on a route table carry the table's
+    effort; core/.env's single setting stands where the table cannot be read."""
+    monkeypatch.setenv("OPENFERMENT_ROUTES", json.dumps({"plan": {"effort": "high"}, "judge": {"effort": "max"}}))
+    write("runbooks", ctx(pool), "lock", target="rb-1")
+    [line] = audit.read()
+    assert (line.agent, line.who, line.effort) == ("model", "claude-haiku-5-5", "high"), "the plan route's effort"
+    monkeypatch.setenv("OPENFERMENT_ROUTES", "{not json")
+    c = ctx(pool, ask="ask-two")
+    c.model = "claude-haiku-5-5"
+    write("runbooks", c, "lock", target="rb-2")
+    assert audit.read()[-1].effort == "medium", "core/.env's single setting"
+
+
 def test_a_proposal_shows_on_home_read(pool, store):  # noqa: F811
     c = ctx(pool)
     write("home", c, "note", note="keep the fructose ceiling as the only bound")
