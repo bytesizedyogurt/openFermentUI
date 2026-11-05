@@ -149,7 +149,7 @@ class Usage(BaseModel):
 # question names, so Postdoc never calls a thing absent that a screen shows.
 
 # The one state every module row reads as (OF-BLD-015 §7.2). It is computed
-# in `module_stores.py` from the module's own word (a clearance state, a
+# in `module_stores.py` from the module's own word (a record's provenance, a
 # runbook's status and lock, a check's state), never chosen by a model.
 ModuleState = Literal["open", "fenced", "approved", "locked", "proposed", "retired"]
 ModuleName = Literal["runbooks", "geneos", "fermos", "pureos", "proforma", "biorepo", "guild", "primer", "intake",
@@ -195,13 +195,33 @@ class ModuleRow(BaseModel):
     label: str
     # Computed from `status` by module_stores, never by a model.
     state: ModuleState
-    # The module's own word: a clearance state, a runbook status, an ingest state.
+    # The module's own word: a record's provenance, a runbook status, an ingest state.
     status: str
     # The row's provenance mark when the module keeps one; null for a row
     # that carries none (a lesson, a unit operation).
     provenance: Provenance | None = None
-    # A few named fields the module shows, kept short.
-    detail: dict[str, Any] = Field(default_factory=dict)
+    detail: dict[str, Any] = Field(default_factory=dict, description=(
+        "A few named fields of the row, each text cut at 300 characters and each list at its first ten. Each kind's "
+        "fields are its own, named kind by kind in docs/TOOLS.md (Module reads; module_stores.DETAIL)."))
+
+
+class ModuleRead(BaseModel):
+    """What a module's read tool (`<module>_read`, OF-BLD-015 §7.2) answers as
+    its summary, beside the rows themselves on the result's `rows`."""
+
+    module: str = Field(description="The module, by the name the rail gives it (BioRepo, fermOS).")
+    count: int = Field(description="How many of the module's rows the read matches, every one.")
+    returned: int = Field(description="How many of those `rows` holds, the read's limit at most, in the order the "
+                                      "read ranks them.")
+    states: dict[str, int] = Field(description="Every match counted by its state (open, fenced, approved, locked, "
+                                               "proposed, retired); a state no match holds is left out.")
+    rows: list[dict[str, Any]] = Field(description="The rows returned, each a ModuleRow with its module left out.")
+    note: str | None = Field(default=None, description=(
+        "Present when rows were left out so that the result stays readable: a sentence saying so, and how to read the "
+        "rest."))
+    partial: str | None = Field(default=None, description=(
+        "Present when the read leaves part of the module out, in every read of that module: a sentence naming what "
+        "the read leaves out and where that waits (module_stores.PARTIAL). BioRepo's read holds one."))
 
 
 class AuditEntry(BaseModel):
@@ -222,15 +242,31 @@ class AuditEntry(BaseModel):
     action: str
     # The state the write left behind, or `proposed`, `done`, `dismissed`.
     state: str
-    target: str | None = None
+    target: str | None = Field(default=None, description=(
+        "What the write was on, by its id (a catalogue entry's as `<kind>/<id>`); left out for a write that names "
+        "none."))
     askId: str | None = Field(default=None, description=(
-        "The ask of Postdoc's the write was part of; empty for a write from outside an ask."))
+        "The ask of Postdoc's the write was part of; left out for a write from outside an ask."))
     effort: str | None = Field(default=None, description=(
-        "The effort the service's model ran at, for a write of Postdoc's; empty for a person's write and for an "
+        "The effort the service's model ran at, for a write of Postdoc's; left out for a person's write and for an "
         "outside assistant's, since no model of the service ran for it."))
     detail: dict[str, Any] = Field(default_factory=dict, description=(
-        "What the write was, by the action's own names (the tool, the kind, a note), and, for a write of the "
-        "model's lane, the door it came in by (`via`: postdoc, mcp or http)."))
+        "What the write was, in the action's own names: the tool and the kind of what it kept, the ids it made, and "
+        "the note its call carried, where the call takes one (a module write, a catalogue entry, a study scenario, "
+        "an engine run, a flowsheet import); a gated write's row names its proposal (`proposalId`) and gate, and the "
+        "proposal keeps the call's note. For a write of the model's lane, the door it came in by (`via`: postdoc, "
+        "mcp or http)."))
+
+
+class AuditRow(AuditEntry):
+    """One row of the project's audit log as `GET /api/audit` serves it: the
+    entry its write left, under the row's own id, its null fields left out as
+    an answer over MCP leaves them out."""
+
+    id: str = Field(description=(
+        "The row's id, a string of digits, the id the answer of the write that made it names (a tool's `auditIds`)."))
+    # Every row the log serves holds its detail, `{}` for a write that names nothing more.
+    detail: dict[str, Any] = Field(description=AuditEntry.model_fields["detail"].description)
 
 
 ProposalState = Literal["proposed", "done", "dismissed"]
@@ -1592,6 +1628,9 @@ class ToolResult(BaseModel):
     # the MCP server: a model reads `summary` alone (OF-BLD-019 §6.1:
     # `stream_table`'s whole stream table). Nothing here is citable.
     data: dict[str, Any] | None = None
+    auditIds: list[str] = Field(default_factory=list, description=(
+        "The audit rows the call wrote, oldest first, each by the id `GET /api/audit` serves it under: the row of "
+        "each thing a write kept, and of the proposal a gated write made. A read writes none."))
 
 
 # ── geneOS (OF-BLD-014 §6.3) ───────────────────────────────────────────

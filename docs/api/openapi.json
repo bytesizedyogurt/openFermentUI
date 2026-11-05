@@ -284,107 +284,6 @@
         "title": "AskRequest",
         "type": "object"
       },
-      "AuditEntry": {
-        "description": "One row of the audit table (OF-BLD-015 §7.3): a write a model, an MCP\nclient or a named person made, a proposal a person carried out or\ndismissed, or a request that named its own key. `agent` is `model` for a\nmodel's or an assistant's write and `person` for a person's; `who` names\nit, an MCP client by its `<name>/<version>`. A row of the model's lane\nnames the door its write came in by in `detail.via`: `postdoc` (Postdoc's\nloop), `mcp` (the MCP server in its own process) or `http` (the tool\ndoor's X-OpenFerment-Assistant header).",
-        "properties": {
-          "action": {
-            "title": "Action",
-            "type": "string"
-          },
-          "agent": {
-            "enum": [
-              "model",
-              "person"
-            ],
-            "title": "Agent",
-            "type": "string"
-          },
-          "askId": {
-            "anyOf": [
-              {
-                "type": "string"
-              },
-              {
-                "type": "null"
-              }
-            ],
-            "description": "The ask of Postdoc's the write was part of; empty for a write from outside an ask.",
-            "title": "Askid"
-          },
-          "at": {
-            "description": "When the row was written, ISO 8601 in UTC (`+00:00`).",
-            "title": "At",
-            "type": "string"
-          },
-          "detail": {
-            "additionalProperties": true,
-            "description": "What the write was, by the action's own names (the tool, the kind, a note), and, for a write of the model's lane, the door it came in by (`via`: postdoc, mcp or http).",
-            "title": "Detail",
-            "type": "object"
-          },
-          "effort": {
-            "anyOf": [
-              {
-                "type": "string"
-              },
-              {
-                "type": "null"
-              }
-            ],
-            "description": "The effort the service's model ran at, for a write of Postdoc's; empty for a person's write and for an outside assistant's, since no model of the service ran for it.",
-            "title": "Effort"
-          },
-          "module": {
-            "enum": [
-              "runbooks",
-              "geneos",
-              "fermos",
-              "pureos",
-              "proforma",
-              "biorepo",
-              "guild",
-              "primer",
-              "intake",
-              "home"
-            ],
-            "title": "Module",
-            "type": "string"
-          },
-          "state": {
-            "title": "State",
-            "type": "string"
-          },
-          "target": {
-            "anyOf": [
-              {
-                "type": "string"
-              },
-              {
-                "type": "null"
-              }
-            ],
-            "title": "Target"
-          },
-          "who": {
-            "title": "Who",
-            "type": "string"
-          }
-        },
-        "required": [
-          "at",
-          "agent",
-          "who",
-          "module",
-          "action",
-          "state",
-          "target",
-          "askId",
-          "effort",
-          "detail"
-        ],
-        "title": "AuditEntry",
-        "type": "object"
-      },
       "AuditEvent": {
         "description": "One entry in a record's audit trail. Mirrors the browser's AuditEvent.",
         "properties": {
@@ -427,6 +326,111 @@
           "to"
         ],
         "title": "AuditEvent",
+        "type": "object"
+      },
+      "AuditRow": {
+        "description": "One row of the project's audit log as `GET /api/audit` serves it: the\nentry its write left, under the row's own id, its null fields left out as\nan answer over MCP leaves them out.",
+        "properties": {
+          "action": {
+            "title": "Action",
+            "type": "string"
+          },
+          "agent": {
+            "enum": [
+              "model",
+              "person"
+            ],
+            "title": "Agent",
+            "type": "string"
+          },
+          "askId": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "The ask of Postdoc's the write was part of; left out for a write from outside an ask.",
+            "title": "Askid"
+          },
+          "at": {
+            "description": "When the row was written, ISO 8601 in UTC (`+00:00`).",
+            "title": "At",
+            "type": "string"
+          },
+          "detail": {
+            "additionalProperties": true,
+            "description": "What the write was, in the action's own names: the tool and the kind of what it kept, the ids it made, and the note its call carried, where the call takes one (a module write, a catalogue entry, a study scenario, an engine run, a flowsheet import); a gated write's row names its proposal (`proposalId`) and gate, and the proposal keeps the call's note. For a write of the model's lane, the door it came in by (`via`: postdoc, mcp or http).",
+            "title": "Detail",
+            "type": "object"
+          },
+          "effort": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "The effort the service's model ran at, for a write of Postdoc's; left out for a person's write and for an outside assistant's, since no model of the service ran for it.",
+            "title": "Effort"
+          },
+          "id": {
+            "description": "The row's id, a string of digits, the id the answer of the write that made it names (a tool's `auditIds`).",
+            "title": "Id",
+            "type": "string"
+          },
+          "module": {
+            "enum": [
+              "runbooks",
+              "geneos",
+              "fermos",
+              "pureos",
+              "proforma",
+              "biorepo",
+              "guild",
+              "primer",
+              "intake",
+              "home"
+            ],
+            "title": "Module",
+            "type": "string"
+          },
+          "state": {
+            "title": "State",
+            "type": "string"
+          },
+          "target": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "What the write was on, by its id (a catalogue entry's as `<kind>/<id>`); left out for a write that names none.",
+            "title": "Target"
+          },
+          "who": {
+            "title": "Who",
+            "type": "string"
+          }
+        },
+        "required": [
+          "at",
+          "agent",
+          "who",
+          "module",
+          "action",
+          "state",
+          "detail",
+          "id"
+        ],
+        "title": "AuditRow",
         "type": "object"
       },
       "Band": {
@@ -7540,6 +7544,7 @@
         "properties": {
           "detail": {
             "additionalProperties": true,
+            "description": "A few named fields of the row, each text cut at 300 characters and each list at its first ten. Each kind's fields are its own, named kind by kind in docs/TOOLS.md (Module reads; module_stores.DETAIL).",
             "title": "Detail",
             "type": "object"
           },
@@ -14964,6 +14969,14 @@
       "ToolResult": {
         "description": "What a tool returns to whoever called it: Postdoc's loop, the HTTP\nendpoint or the MCP server (E.6).",
         "properties": {
+          "auditIds": {
+            "description": "The audit rows the call wrote, oldest first, each by the id `GET /api/audit` serves it under: the row of each thing a write kept, and of the proposal a gated write made. A read writes none.",
+            "items": {
+              "type": "string"
+            },
+            "title": "Auditids",
+            "type": "array"
+          },
           "data": {
             "anyOf": [
               {
@@ -15043,7 +15056,8 @@
           "usage",
           "draft",
           "rows",
-          "data"
+          "data",
+          "auditIds"
         ],
         "title": "ToolResult",
         "type": "object"
@@ -18207,7 +18221,7 @@
     },
     "/api/audit": {
       "get": {
-        "description": "The project's newest `limit` rows of its audit log, newest last:\n`limit` is held to 1 to 500 (200 by default), a larger one read as 500.\n`at` is ISO 8601 in UTC (`2026-11-04T09:00:00.123456+00:00`), as a\ncatalogue entry's `at` is; `agent` is `model` for a model's or an\nassistant's write and `person` for a named person's, and `who` names it\n(an MCP client by its `<name>/<version>`). A row of the model's lane\nnames the door its write came in by in `detail.via`: `postdoc` for\nPostdoc's loop, with the `effort` its model ran at and, from an ask, its\n`askId`; `mcp` for the MCP server in its own process and `http` for the\ntool door's assistant header, with no effort and no ask.",
+        "description": "The project's newest `limit` rows of its audit log, newest last:\n`limit` is held to 1 to 500 (200 by default), a larger one read as 500.\n`action`, `target` and `who` narrow the rows to those that name each one\ngiven exactly as the row names it, the newest `limit` of them served, so\na write of any age is found by what it was:\n`?action=catalogue_write&target=skill/<id>&who=<name>/<version>` reads\nthe rows of one catalogue entry an assistant kept. Each row carries its `id`, the\nid the answer of the write that made it names in `auditIds`, and leaves\nits null fields out, as an answer over MCP leaves them out: a row with no\ntarget, ask or effort holds no such key. `at` is ISO 8601 in UTC\n(`2026-11-04T09:00:00.123456+00:00`), as a catalogue entry's `at` is;\n`agent` is `model` for a model's or an assistant's write and `person` for\na named person's, and `who` names it (an MCP client by its\n`<name>/<version>`). A row of the model's lane names the door its write\ncame in by in `detail.via`: `postdoc` for Postdoc's loop, with the\n`effort` its model ran at and, from an ask, its `askId`; `mcp` for the\nMCP server in its own process and `http` for the tool door's assistant\nheader, with no effort and no ask.",
         "operationId": "audit_read_api_audit_get",
         "parameters": [
           {
@@ -18218,6 +18232,42 @@
               "default": 200,
               "title": "Limit",
               "type": "integer"
+            }
+          },
+          {
+            "description": "Only the rows of this action (`catalogue_write`).",
+            "in": "query",
+            "name": "action",
+            "required": false,
+            "schema": {
+              "default": "",
+              "description": "Only the rows of this action (`catalogue_write`).",
+              "title": "Action",
+              "type": "string"
+            }
+          },
+          {
+            "description": "Only the rows on this target, as a row names it (`skill/<id>` for a catalogue entry).",
+            "in": "query",
+            "name": "target",
+            "required": false,
+            "schema": {
+              "default": "",
+              "description": "Only the rows on this target, as a row names it (`skill/<id>` for a catalogue entry).",
+              "title": "Target",
+              "type": "string"
+            }
+          },
+          {
+            "description": "Only the rows this caller made, as a row names it (an assistant's `<name>/<version>`, a person's name).",
+            "in": "query",
+            "name": "who",
+            "required": false,
+            "schema": {
+              "default": "",
+              "description": "Only the rows this caller made, as a row names it (an assistant's `<name>/<version>`, a person's name).",
+              "title": "Who",
+              "type": "string"
             }
           },
           {
@@ -18245,7 +18295,7 @@
               "application/json": {
                 "schema": {
                   "items": {
-                    "$ref": "#/components/schemas/AuditEntry"
+                    "$ref": "#/components/schemas/AuditRow"
                   },
                   "title": "Response Audit Read Api Audit Get",
                   "type": "array"

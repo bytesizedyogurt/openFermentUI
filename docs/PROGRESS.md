@@ -30,12 +30,12 @@ session continues from this file and `git log` alone.
    (E.0a to E.15, the Log): every screen, component and `src/lib` module reads the generated
    `src/api/types.gen.ts`, `src/data/types.ts` is deleted, and `check:plan` keeps the provenance
    ranking alone; the catalogues screen stands at `/catalogues`, and Primer's lessons, Guild's
-   skills and the protocols are the project's own; the research funnel is deleted. Three Known
-   debts name stage E and wait, each for a commit of its own: a Proforma panel row that chooses a
-   deposition reading and sends the reading's own value and unit; Studies' run card naming a
-   kinetics configuration by its kind and when it was kept; and the agent builder's interface
-   points, each with the code it describes. Then the stage E gate: `pnpm verify`, `pnpm smoke`
-   with no key, and `pnpm prove` with the catalogue screen in the walk. Stage D is done: D.0 sealed
+   skills and the protocols are the project's own; the research funnel is deleted; and the agent
+   builder's interface points are paid, each in the code the pages are written from (E.16). Two
+   Known debts name stage E and wait, each for a commit of its own: a Proforma panel row that chooses
+   a deposition reading and sends the reading's own value and unit; and Studies' run card naming a
+   kinetics configuration by its kind and when it was kept. Then the stage E gate: `pnpm verify`,
+   `pnpm smoke` with no key, and `pnpm prove` with the catalogue screen in the walk. Stage D is done: D.0 sealed
    the handoff pages before the core's commit was recorded (`CORE=6f85338`, D.1), and both
    strangers finished in their first round with no core file changed: the mirror engine
    (`examples/engines/openferment-engine-mirror/`) and the record-reader agent
@@ -44,8 +44,7 @@ session continues from this file and `git log` alone.
    November, so stage F, the live work, follows E. Alpha 2.1's Ethanol project is in this
    container's `openferment_dev`; a fresh container makes it again on Home from
    `docs/corpus/ethanol-sources.txt` through Intake (about twenty minutes), then extracts.
-5. Files in flight: none; E.15's commit holds the deletion, check:plan's ranking and the words that named the
-   hand-kept file.
+5. Files in flight: none; E.16's commit holds the agent builder's interface points, each with its test.
 
 ## Current stage
 
@@ -261,6 +260,7 @@ DOI or PMID. Each now reads the project's rows.
 | 2026-11-05 04:51 | E.13: `pnpm test:core`, twice, the second on the final tree; `typecheck`, `check:plan`, `check:state`, `check:figures`, `check:guild` (its new check also run on the store before the fix), `check:secrets`; `gen:api --check`, `gen:tools --check` and `gen:components --check`; `build`, its bundle with the names moved set beside the one the tree before the commit builds; `smoke` with no key; `pnpm prove --steps 2 --keep`, offline, each time on a fresh database, its service kept for a scratch check of Settings and the clear | 2928 passed, 1 skipped, 175 deselected; every check green, `check:state` 62 checks, `check:guild` 141 (the new check failing on the store before the fix); byte for byte; the document, TOOLS.md and COMPONENTS.md as they were; 13 of 13 screens; 7 of 7 checks each, no call in the proof's spend table; 22 of 24 before the fix, 24 of 24 after it, and 25 of 25 on the final tree, no 5xx | 4 min 56 s (`test:core`); 32 s (the proof) | E.13 |
 | 2026-11-05 05:10 | E.14: `pnpm test:core`, twice, the second on the final tree; `typecheck`, `check:plan`, `check:state`, `check:figures`, `check:guild`, `test:reconcile`, `check:secrets`; `gen:api --check`, `gen:tools --check` and `gen:components --check`; `build`, its bundle set beside the one the tree before the commit builds; `smoke` with no key | 2928 passed, 1 skipped, 175 deselected; every check green, `check:state` 62 checks, `check:guild` 141, the reconciliation's 10; the document, TOOLS.md and COMPONENTS.md as they were; byte for byte; 13 of 13 screens | 4 min 47 s (`test:core`) | E.14 |
 | 2026-11-05 05:55 | E.15: `pnpm verify`, all sixteen stages; `pnpm build && pnpm prove`, offline, steps 1 to 10; `pnpm test:core` again on the final tree; the changed tests with the database address empty and on Python 3.12; `gen:api`, `gen:tools` and `gen:components` with each `--check`; `typecheck`, `check:plan` (each of its checks also made to fail on a scratch copy of the two files it reads), `check:state`, `check:figures`, `check:guild`, `test:reconcile`, `check:secrets`; `build`, its bundle set beside the one the tree before the commit builds; `smoke` with no key; `grep -rn "data/types" src scripts` | every stage green: `test:core` 2928 passed, 1 skipped, 175 deselected, `test:sim` 142 passed, `test:lit` 10 passed, `smoke` 13 of 13 screens; 89 of 89 checks, the catalogue screen in the walk, no call in the proof's spend table; the same counts; 13 passed each way; the document and `src/api/types.gen.ts` with their descriptions regenerated, TOOLS.md as it was, COMPONENTS.md with `src/data/`'s nine files; every check green, `check:plan` 9 classes in one order, `check:state` 62 checks, `check:guild` 141, the reconciliation's 10; byte for byte; 13 of 13 screens; nothing found | 11 min 39 s (verify); 4 min 51 s (`test:core`); 5 min 13 s (`test:sim`); 199 s (the proof) | E.15 |
+| 2026-11-05 06:50 | E.16: `pnpm test:core`, twice, the second on the final tree; the changed tests with the database address empty and on Python 3.12; `gen:api`, `gen:tools` and `gen:components` with each `--check`; `check:tools`, `typecheck`, `check:plan`, `check:state`, `check:figures`, `check:secrets`, `test_guidance.py`; `build`, its bundle set beside E.15's; `smoke` with no key; `pnpm prove --steps 3 --keep`, offline, its service kept for the stage D record-reader and a filtered read of the audit | 2940 passed, 1 skipped, 175 deselected, twice; 113 passed each way; each generated file as the code writes it; every check green, `check:state` 62 checks; the bundle byte for byte E.15's; 13 of 13 screens; 16 of 16 checks, the record-reader exiting 0 | 5 min 13 s (`test:core`); 39 s (the proof) | E.16 |
 | 2026-10-30 06:47 | `test:core` with 2.2; `check:tools`; `pnpm smoke` (own database, project made through the API) | 1920 passed, 2 skipped, 128 deselected; passed; 11 of 11 rail entries open in the project | 4 min 26 s | 2.2 |
 
 ## Spend (alpha 2.1)
@@ -298,7 +298,7 @@ prompt's §4).
 | [005](decisions/ADR-005-projects.md) | Projects replace programs | accepted |
 | [006](decisions/ADR-006-quantities-and-estimates.md) | Typed quantities with origins replace Rule 1 | accepted, stages 4 and 6 |
 | [007](decisions/ADR-007-schema-source.md) | Types generated from OpenAPI | accepted, stage 7 (alpha 2.2 E.0a: a schema the service only writes lists every property as required; E.0b: the rows a project keeps of its pages read as their models and served as kept; E.1: each lib names the generated schemas it answers, and its screens and components read them there; E.3: Postdoc's lib, and the one seam where a draft becomes the store's runbook until E.11; E.4: the review family in lib/review.ts, a record's field held to the ontology as it enters the store; E.6: fermOS's lib, and thermosteam's POST answering its artifact beside what it holds; E.7: pureOS's lib, and a train's units read as a request may leave them; E.8: the catalogues' lib born on the generated types, and an entry a keep sends read as a request may leave it; E.9: geneOS's lib, and a strain and a product read as the project's catalogue entries; E.11: the runbook family and the bench's record in lib/studies.ts, a runbook read as a row served as kept may leave it, and the draft's seam gone; E.12: Guild's, the checks' and Practice's libs and a new lib/protocols.ts, a skill and a lesson read as the project's catalogue entries, a protocol read as served whole, and a skill kept with no policy rated by nobody on both sides; E.14: the last readers, and the browser's own types with their owners, so no file imports src/data/types.ts; E.15: src/data/types.ts deleted and check:plan's pairs retired with it, every reader held to the service by `gen:api --check` and `typecheck`) |
-| [008](decisions/ADR-008-postdoc-memory-routing.md) | Postdoc memory on the server; model routes | accepted, stage 6 |
+| [008](decisions/ADR-008-postdoc-memory-routing.md) | Postdoc memory on the server; model routes | accepted, stage 6 (alpha 2.2 E.16: the agent builder's interface points, Implementation 13: one rule for a BioRepo record, a write's answer naming its audit rows, the audit read by what a write was and served with its null fields left out) |
 | [009](decisions/ADR-009-ui.md) | The UI is kept and wired | accepted, stage 7 |
 | [010](decisions/ADR-010-deletions.md) | Deletions | accepted, stage 1 (alpha 2.2 E.10: the enumeration funnel deleted, both its pieces standing at `alpha-1.0`) |
 | [011](decisions/ADR-011-guards.md) | Guards and verify stages | accepted, stages 1 and 8 (Implementation 8: sixteen stages; alpha 2.2 E.15: `check:plan` keeps the provenance ranking alone, its pairs retired with `src/data/types.ts`, and verify keeps its sixteen stages) |
@@ -430,7 +430,7 @@ prompt's §4).
 
 | Debt | Paid at |
 |---|---|
-| The agent builder's interface points (`docs/reports/handoff-2026-11.md`, round 1): "record" reads two ways (`biorepo_read` kind `record` lists none where `search_records` returns the project's record, an approved candidate); no audit id links a write to its row; `GET /api/audit` takes `limit` alone; `docs/TOOLS.md`'s client recipe keeps `VIRTUAL_ENV`, which uv warns of; a module read's `partial` and a ModuleRow's `detail` undescribed, AuditEntry's promised note, the HTTP audit's explicit nulls, the recipe at the page's end with no pointer. `docs/TOOLS.md` is written from the code, so each waits for the core to move | stage E, the first with the code it describes |
+| Paid: the agent builder's interface points (`docs/reports/handoff-2026-11.md`, round 1), each in the code `docs/TOOLS.md` and `docs/api/openapi.json` are written from (ADR-008's Implementation 13): a BioRepo record is one rule, `module_stores.RECORD`, that `biorepo_read` lists its kinds `record` and `candidate` by and `search_records` names each hit's kind by, so a candidate a reviewer verified is a record; a write's answer names the audit rows it left (`ToolResult.auditIds`), a gated write's proposal among them; `GET /api/audit` takes `action`, `target` and `who` beside `limit`, so a write of any age is found by what it was, and serves each row as an `AuditRow` under its `id`, its null fields left out as an answer over MCP leaves them out; `AuditEntry`'s `detail` says what a row holds, and `catalogue_write` and `study_scenario` keep their call's note there as the other writes do; a module read's summary is a `ModuleRead`, its `partial` a sentence, and `module_stores.DETAIL` names each kind's `detail` field by field; the client recipe hands the server no `VIRTUAL_ENV`, and the page's top points at it. `core/tests/test_agent_interface.py` holds each, a row of every kind among them | alpha 2.2, E.16 |
 | Paid: the per-request key override and the local-model route (owner question 10 and §3 of the alpha 2.1 prompt): `X-OpenFerment-Key` serves a request's calls and is kept nowhere; `OPENFERMENT_LOCAL_BASE_URL` serves a local model in single calls | alpha 2.1, D.4 |
 | `core/tests/standins.py` (27 test files use it) keeps stand-in records on real strain ids, a closed-form ethanol evaluator and `STANDIN_THEORETICAL`, the theoretical yield on glucose; `test_proforma.py` keeps the package's regression values to test the parser (the benchmark price this build once measured left the tree with the retired shelf entries, alpha 2.2 C.6). A4's `rg` clause finds them (a departure above) | stage 4 (fixtures read from the library plants); still open: after alpha 2.0 |
 | Postdoc's scripted stand-in model and the test pool still speak of PHB, casein and xylose hydrolysate (`test_tools.py`, `test_postdoc_agent.py` and the tests that import their fixtures); §5.3 wants them to speak only of library plants and the kit's demo corpus. The words are test material, and no value of them reaches the service | after alpha 2.0, with the stand-ins above |
@@ -2634,3 +2634,33 @@ holds the numbers, the tables and the judgements).
   `check:state`, 62 checks; `check:figures`; `check:guild`, 141 checks; `test:reconcile`, 10 checks;
   `check:secrets`; `gen:api`, `gen:tools` and `gen:components` with each `--check`; `build`; `pnpm smoke` with no
   key, 13 of 13 screens; and `grep -rn "data/types" src scripts` finds nothing.
+- E.16. The agent builder's interface points are paid, each in the code `docs/TOOLS.md` and `docs/api/openapi.json`
+  are written from (`docs/reports/handoff-2026-11.md`, round 1; ADR-008's Implementation 13). A BioRepo record is one
+  rule, `module_stores.RECORD`, which `biorepo_read` and `search_records` both quote: a record is an extraction a
+  reviewer verified against its document's own words (verified, or gold), and a candidate one no reviewer has verified
+  yet (unverified). `biorepo_read` lists the two as its kinds `record` and `candidate` (`record_kind`, from the row's
+  state), so a candidate a reviewer accepted is kind `record` now; `search_records` names each hit's `kind` by the same
+  rule; and the row `biorepo_write`'s candidate action answers with is the row the read lists (`record_row`). A
+  write's answer names its audit rows: `tools.run` opens `audit.written()` around the tool, `audit.add` adds each new
+  row's id to it, the rows a store's own transaction writes on the database's thread among them, and
+  `ToolResult.auditIds` names each, a gated write's proposal included, at the HTTP door and over MCP alike. An audit
+  row's id is its place in the table, served as a string of digits on `AuditRow`; `GET /api/audit` takes `action`,
+  `target` and `who` beside `limit`, each matched as a row names it, so a write of any age is found by what it was,
+  and leaves a row's null fields out as an answer over MCP does (`response_model_exclude_none`; `AuditRow` joins
+  `api.AS_KEPT`, and the route `SERVED_AS_KEPT`). `AuditEntry.detail` says what a row holds, and `catalogue_write`
+  and `study_scenario` keep their call's note there as the other writes do. A module read's summary is a
+  `ModuleRead`, its `partial` a sentence, and `module_stores.DETAIL` names each kind's `detail` field by field;
+  `docs/TOOLS.md` renders both at the end of Module reads, its client recipe hands the server a client's environment
+  with `VIRTUAL_ENV` taken out, and its top points at the recipe. `docs/api/engines.md` says an engine run's answer
+  names its row, and the handoff report says the five points are paid. `core/tests/test_agent_interface.py` holds each
+  point in twelve tests, a row of every kind among them, and `test_mcp_service.py`, `test_mcp.py`, `test_openapi.py`,
+  `test_route_models.py` and `test_projects.py` read the new answers. Against `pnpm prove --steps 3 --keep`'s service,
+  the stage D record-reader (`examples/agents/record-reader/`, as its builder left it) lists the project's one record
+  as kind `record` and exits 0, and `GET /api/audit` narrowed by its write's action, target and name serves that
+  write's row alone, under its id, with no null field. Every client change is to the generated types, so `pnpm build`
+  wrote byte for byte the bundle E.15's tree builds. Checks: `pnpm test:core` 2940 passed, 1 skipped, 175 deselected
+  (5 min 13 s), and again on the final tree with the same counts; the changed tests with the database address empty
+  and on Python 3.12, 113 passed each way; `gen:api`, `gen:tools` and `gen:components` with each `--check`;
+  `check:tools`; `typecheck`; `check:plan`; `check:state`, 62 checks; `check:figures`; `check:secrets`;
+  `test_guidance.py`; `build`; `pnpm smoke` with no key, 13 of 13 screens; `pnpm prove --steps 3 --keep`, offline,
+  16 of 16 checks.

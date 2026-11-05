@@ -128,7 +128,8 @@ agent `model`, module `guild`, action `catalogue_write`, detail via `http`.
 
 `docs/TOOLS.md` is written from the code (`tools/reference.py` and the tools' descriptions), so
 these five wait for the core to move again: they are Known debts in `docs/PROGRESS.md`, paid in
-stage E, the first of them with the code it describes.
+stage E, the first of them with the code it describes. Alpha 2.2 E.16 paid all five, each in the
+code the pages are written from (ADR-008's Implementation 13).
 
 ## The gate
 

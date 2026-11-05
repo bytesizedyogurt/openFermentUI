@@ -69,14 +69,22 @@ export interface paths {
          * Audit Read
          * @description The project's newest `limit` rows of its audit log, newest last:
          *     `limit` is held to 1 to 500 (200 by default), a larger one read as 500.
-         *     `at` is ISO 8601 in UTC (`2026-11-04T09:00:00.123456+00:00`), as a
-         *     catalogue entry's `at` is; `agent` is `model` for a model's or an
-         *     assistant's write and `person` for a named person's, and `who` names it
-         *     (an MCP client by its `<name>/<version>`). A row of the model's lane
-         *     names the door its write came in by in `detail.via`: `postdoc` for
-         *     Postdoc's loop, with the `effort` its model ran at and, from an ask, its
-         *     `askId`; `mcp` for the MCP server in its own process and `http` for the
-         *     tool door's assistant header, with no effort and no ask.
+         *     `action`, `target` and `who` narrow the rows to those that name each one
+         *     given exactly as the row names it, the newest `limit` of them served, so
+         *     a write of any age is found by what it was:
+         *     `?action=catalogue_write&target=skill/<id>&who=<name>/<version>` reads
+         *     the rows of one catalogue entry an assistant kept. Each row carries its `id`, the
+         *     id the answer of the write that made it names in `auditIds`, and leaves
+         *     its null fields out, as an answer over MCP leaves them out: a row with no
+         *     target, ask or effort holds no such key. `at` is ISO 8601 in UTC
+         *     (`2026-11-04T09:00:00.123456+00:00`), as a catalogue entry's `at` is;
+         *     `agent` is `model` for a model's or an assistant's write and `person` for
+         *     a named person's, and `who` names it (an MCP client by its
+         *     `<name>/<version>`). A row of the model's lane names the door its write
+         *     came in by in `detail.via`: `postdoc` for Postdoc's loop, with the
+         *     `effort` its model ran at and, from an ask, its `askId`; `mcp` for the
+         *     MCP server in its own process and `http` for the tool door's assistant
+         *     header, with no effort and no ask.
          */
         get: operations["audit_read_api_audit_get"];
         put?: never;
@@ -2941,59 +2949,6 @@ export interface components {
             turnId?: string | null;
         };
         /**
-         * AuditEntry
-         * @description One row of the audit table (OF-BLD-015 §7.3): a write a model, an MCP
-         *     client or a named person made, a proposal a person carried out or
-         *     dismissed, or a request that named its own key. `agent` is `model` for a
-         *     model's or an assistant's write and `person` for a person's; `who` names
-         *     it, an MCP client by its `<name>/<version>`. A row of the model's lane
-         *     names the door its write came in by in `detail.via`: `postdoc` (Postdoc's
-         *     loop), `mcp` (the MCP server in its own process) or `http` (the tool
-         *     door's X-OpenFerment-Assistant header).
-         */
-        AuditEntry: {
-            /** Action */
-            action: string;
-            /**
-             * Agent
-             * @enum {string}
-             */
-            agent: "model" | "person";
-            /**
-             * Askid
-             * @description The ask of Postdoc's the write was part of; empty for a write from outside an ask.
-             */
-            askId: string | null;
-            /**
-             * At
-             * @description When the row was written, ISO 8601 in UTC (`+00:00`).
-             */
-            at: string;
-            /**
-             * Detail
-             * @description What the write was, by the action's own names (the tool, the kind, a note), and, for a write of the model's lane, the door it came in by (`via`: postdoc, mcp or http).
-             */
-            detail: {
-                [key: string]: unknown;
-            };
-            /**
-             * Effort
-             * @description The effort the service's model ran at, for a write of Postdoc's; empty for a person's write and for an outside assistant's, since no model of the service ran for it.
-             */
-            effort: string | null;
-            /**
-             * Module
-             * @enum {string}
-             */
-            module: "runbooks" | "geneos" | "fermos" | "pureos" | "proforma" | "biorepo" | "guild" | "primer" | "intake" | "home";
-            /** State */
-            state: string;
-            /** Target */
-            target: string | null;
-            /** Who */
-            who: string;
-        };
-        /**
          * AuditEvent
          * @description One entry in a record's audit trail. Mirrors the browser's AuditEvent.
          */
@@ -3006,6 +2961,62 @@ export interface components {
             from: unknown | null;
             /** To */
             to: unknown | null;
+            /** Who */
+            who: string;
+        };
+        /**
+         * AuditRow
+         * @description One row of the project's audit log as `GET /api/audit` serves it: the
+         *     entry its write left, under the row's own id, its null fields left out as
+         *     an answer over MCP leaves them out.
+         */
+        AuditRow: {
+            /** Action */
+            action: string;
+            /**
+             * Agent
+             * @enum {string}
+             */
+            agent: "model" | "person";
+            /**
+             * Askid
+             * @description The ask of Postdoc's the write was part of; left out for a write from outside an ask.
+             */
+            askId?: string | null;
+            /**
+             * At
+             * @description When the row was written, ISO 8601 in UTC (`+00:00`).
+             */
+            at: string;
+            /**
+             * Detail
+             * @description What the write was, in the action's own names: the tool and the kind of what it kept, the ids it made, and the note its call carried, where the call takes one (a module write, a catalogue entry, a study scenario, an engine run, a flowsheet import); a gated write's row names its proposal (`proposalId`) and gate, and the proposal keeps the call's note. For a write of the model's lane, the door it came in by (`via`: postdoc, mcp or http).
+             */
+            detail: {
+                [key: string]: unknown;
+            };
+            /**
+             * Effort
+             * @description The effort the service's model ran at, for a write of Postdoc's; left out for a person's write and for an outside assistant's, since no model of the service ran for it.
+             */
+            effort?: string | null;
+            /**
+             * Id
+             * @description The row's id, a string of digits, the id the answer of the write that made it names (a tool's `auditIds`).
+             */
+            id: string;
+            /**
+             * Module
+             * @enum {string}
+             */
+            module: "runbooks" | "geneos" | "fermos" | "pureos" | "proforma" | "biorepo" | "guild" | "primer" | "intake" | "home";
+            /** State */
+            state: string;
+            /**
+             * Target
+             * @description What the write was on, by its id (a catalogue entry's as `<kind>/<id>`); left out for a write that names none.
+             */
+            target?: string | null;
             /** Who */
             who: string;
         };
@@ -5696,7 +5707,10 @@ export interface components {
          *     module holds, where it stands, and how it is marked.
          */
         ModuleRow: {
-            /** Detail */
+            /**
+             * Detail
+             * @description A few named fields of the row, each text cut at 300 characters and each list at its first ten. Each kind's fields are its own, named kind by kind in docs/TOOLS.md (Module reads; module_stores.DETAIL).
+             */
             detail: {
                 [key: string]: unknown;
             };
@@ -8391,6 +8405,11 @@ export interface components {
          *     endpoint or the MCP server (E.6).
          */
         ToolResult: {
+            /**
+             * Auditids
+             * @description The audit rows the call wrote, oldest first, each by the id `GET /api/audit` serves it under: the row of each thing a write kept, and of the proposal a gated write made. A read writes none.
+             */
+            auditIds: string[];
             /** Data */
             data: {
                 [key: string]: unknown;
@@ -9512,6 +9531,12 @@ export interface operations {
         parameters: {
             query?: {
                 limit?: number;
+                /** @description Only the rows of this action (`catalogue_write`). */
+                action?: string;
+                /** @description Only the rows on this target, as a row names it (`skill/<id>` for a catalogue entry). */
+                target?: string;
+                /** @description Only the rows this caller made, as a row names it (an assistant's `<name>/<version>`, a person's name). */
+                who?: string;
                 /** @description The project the request acts in, where a header cannot be sent (an EventSource); the X-OpenFerment-Project header in its place. */
                 project?: string;
             };
@@ -9530,7 +9555,7 @@ export interface operations {
                     [name: string]: unknown;
                 };
                 content: {
-                    "application/json": components["schemas"]["AuditEntry"][];
+                    "application/json": components["schemas"]["AuditRow"][];
                 };
             };
             /** @description The project the request names is one the database does not hold, in words. */

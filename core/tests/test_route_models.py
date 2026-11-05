@@ -26,10 +26,12 @@ from test_library import StandInWorker
 STREAMS = {("POST", "/api/ask/stream"), ("GET", "/api/events"), ("POST", "/api/literature/answer")}
 FILES = {("GET", "/api/flowsheets/{record_id}/file"), ("GET", "/api/studies/export")}
 # The routes that serve their rows as kept (`response_model_exclude_unset`):
-# the four that serve a runbook, and the project's state (E.0b).
+# the four that serve a runbook, and the project's state (E.0b); and the
+# audit log, its rows' null fields left out (`response_model_exclude_none`,
+# E.16).
 SERVED_AS_KEPT = {("GET", "/api/studies/runbooks"), ("POST", "/api/studies/runbooks"),
                   ("GET", "/api/studies/runbooks/{runbook_id}"), ("POST", "/api/studies/runbooks/{runbook_id}/lock"),
-                  ("GET", "/api/state")}
+                  ("GET", "/api/state"), ("GET", "/api/audit")}
 # What a route served as kept serves whole, by the schema each family starts
 # from: the project's state reads each Live conversation from the whole of
 # what Postdoc keeps, every field set (project_state.state), and

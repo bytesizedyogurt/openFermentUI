@@ -1,11 +1,13 @@
 """`docs/TOOLS.md`, written from the registry (execution prompt §7.3 item 7, A5).
 
 `render()` is the whole file: what every tool takes and says, as a model and an
-outside assistant read it, its family, whether it writes, and its scope; the
-gate table from `gates.GATES`; and the MCP server: its own two names, read
-from its listing, how it starts, the two ways it reaches a project, and what a
-client of it reads. `pnpm gen:tools` writes it (scripts/gen-tools.py); `pnpm
-check:tools` fails when the file on disk differs from it. Nothing in the file
+outside assistant read it, its family, whether it writes, and its scope; what
+a module read answers (`models.ModuleRead`) and what each kind's rows hold
+(`module_stores.DETAIL`); the gate table from `gates.GATES`; and the MCP
+server: its own two names, read from its listing, how it starts, the two ways
+it reaches a project, and what a client of it reads. `pnpm gen:tools` writes
+it (scripts/gen-tools.py); `pnpm check:tools` fails when the file on disk
+differs from it. Nothing in the file
 is written by hand: a change to a tool is a change to its registration, and
 the file follows.
 """
@@ -48,6 +50,11 @@ One registry, three callers: Postdoc's loop, the HTTP endpoints (`GET /api/tools
 /api/tools/{{name}}`) and the MCP server (`openferment`) run every tool through `tools.run`
 (`core/openferment_core/tools/__init__.py`), so a rule the registry holds, it holds for each of them.
 
+**For a client.** [The MCP server](#the-mcp-server), at the end of this page, says how to start it
+and the two ways it reaches a project, and [A client](#a-client) is the recipe: the SDK's names, the
+environment to hand the server, the shape of every answer, and where a write's audit row is read.
+What a module read answers, and what each kind of row holds, closes [Module reads](#module-reads).
+
 - **Inputs** carry ids, words and quantities (ADR-006). A number stands only inside a quantity, an
   object of `value` and `unit` (and `low` and `high` for a range), where a tool asks for one; a
   number anywhere else, outside the count fields `k` and `limit`, refuses the call. A number is a
@@ -61,7 +68,9 @@ One registry, three callers: Postdoc's loop, the HTTP endpoints (`GET /api/tools
   beside it what a claim may cite: records (`recordIds`), passages, evidence and module rows
   (`rows`; `moduleRefs` are the module rows a claim of Postdoc's plan cites, each by its `ref`). The
   whole of a large output travels in `data`, which no model reads, and a refusal is `error`, in
-  words.
+  words. `auditIds` names each audit row the call wrote, oldest first, by the id `GET /api/audit`
+  serves it under: a write names the row of what it kept, a gated write the row of its proposal,
+  and a read names none.
 - **Scope**: every tool acts in one project (ADR-005): the request's, the question's, or the one the
   MCP server was started in.
 - **Writes**: a tool marked *writes* keeps something new in the project, audited as its caller's,
@@ -71,7 +80,9 @@ One registry, three callers: Postdoc's loop, the HTTP endpoints (`GET /api/tools
   call runs in the model's lane under that name, as over MCP. A call that names nobody, or names
   both, is a 422 in words, with nothing run. A write of the model's lane names the door it came in by
   on its audit row (`detail.via`: `postdoc` for Postdoc's loop, `mcp` for the MCP server in its own
-  process, `http` for the header), and only Postdoc's carries an `effort`. The person named is the write's author: its audit row
+  process, `http` for the header), and only Postdoc's carries an `effort`. A write's row keeps the
+  note its call carried as `detail.note` (a gated write's proposal keeps it), and the call's answer
+  names the row in `auditIds`. The person named is the write's author: its audit row
   (agent `person`), a proposal it makes (which waits for a person to carry it out, as every
   proposal does) and what it keeps; pureOS's kept trains hold a model's work alone, and a person's
   call to keep one is refused in the store's words.
@@ -137,6 +148,26 @@ def _tool(name: str) -> list[str]:
     return out + [""]
 
 
+def _module_reads() -> list[str]:
+    """What a module read answers (ModuleRead) and what each kind's rows hold
+    in `detail` (module_stores.DETAIL), after the read tools."""
+    from .. import module_stores
+    from ..models import ModuleRead
+
+    out = ["### What a module read answers", "",
+           "Each `<module>_read` answers its rows twice: as the result's `rows`, each a `ModuleRow` "
+           "(`docs/api/openapi.json`), and inside its `summary`, a `ModuleRead`:", "",
+           *_fields(ModuleRead.model_json_schema(), top=False), "",
+           "### What each kind's `detail` holds", "",
+           "A module row's `detail` holds the few named fields of its kind below, each text cut at 300 characters "
+           "and each list at its first ten.", "",
+           "| Module | Kind | `detail` |", "|---|---|---|"]
+    for module in module_stores.MODULES:
+        for kind in module_stores.KINDS[module]:
+            out.append(f"| `{module}` | `{kind}` | {_cell(module_stores.DETAIL[module][kind])} |")
+    return out + [""]
+
+
 def _gates() -> list[str]:
     rows = ["## The gates (OF-BLD-015 §7.4)", "",
             "A write tool whose module and action a gate names writes nothing: the call becomes a proposal with "
@@ -193,9 +224,11 @@ def _mcp() -> list[str]:
             "- In its own process it reads `OPENFERMENT_DATABASE_URL` and `OPENFERMENT_PROJECT` from its "
             "environment, else from `core/.env`, and `ask_postdoc` runs on the key its environment holds "
             "(`ANTHROPIC_API_KEY`); through a service, `ask_postdoc` runs on the service's own key. uv reads the "
-            "proxy variables. A Python client passes its own environment "
-            "(`StdioServerParameters(command=\"uv\", args=[...], cwd=<root>, env=dict(os.environ))`), since the SDK "
-            "otherwise hands the server `HOME`, `PATH` and four names more.",
+            "proxy variables. A Python client hands the server its own environment with `VIRTUAL_ENV` taken out "
+            "(`env = dict(os.environ); env.pop(\"VIRTUAL_ENV\", None)`, then `StdioServerParameters(command=\"uv\", "
+            "args=[...], cwd=<root>, env=env)`): the SDK alone hands the server `HOME`, `PATH` and four names more, "
+            "and a client run by `uv run <script>` holds its own environment's `VIRTUAL_ENV`, which the server's "
+            "`uv run --project core` warns of at every start and leaves unused.",
             "- In a fresh checkout the first start syncs core's environment with every extra from PyPI, which takes "
             "minutes; `uv sync --project core --all-extras` from the repository's root beforehand leaves a start of "
             "a few seconds. Once the environment is built the server answers `initialize` in a few seconds (about "
@@ -229,8 +262,13 @@ def _mcp() -> list[str]:
             "and `<name>/<version>, at the HTTP endpoint` through a service. A client that declares no name, or "
             f"only the SDK's own (`mcp` 0.1.0), is marked `{mcp_server.AUTHOR}`.",
             "- No tool reads the audit: a client reads it at the service's `GET /api/audit` with the project header, "
-            "newest row last, `who` the client's `<name>/<version>`, `at` ISO 8601 in UTC as a catalogue entry's "
-            "`at` is.",
+            "the newest `limit` rows (200 unless asked, at most 500), newest last, narrowed by `action`, `target` "
+            "and `who`, each matched exactly as a row names it "
+            "(`?action=catalogue_write&target=skill/<id>&who=<name>/<version>`), so a write of any age is found by "
+            "what it was. Each row carries its `id`, the id the write's answer named in `auditIds`; `who` is the "
+            "client's `<name>/<version>` and `at` ISO 8601 in UTC, as a catalogue entry's `at` is. A row leaves its "
+            "null fields out, as an answer over MCP does, so a client reads `target`, `askId` and `effort` with a "
+            "default.",
             "- An example client in this repository writes placeholder words alone: an entry named as a "
             "placeholder (`A placeholder skill`) with a note saying it is one. Its files and its writes name no "
             "real strain, species or product, since the repository ships software alone.",
@@ -261,5 +299,7 @@ def render() -> str:
             lines += [f"## {fam}", ""]
             for n in names:
                 lines += _tool(n)
+            if fam == "Module reads":
+                lines += _module_reads()
     lines += _gates() + _mcp()
     return "\n".join(lines).rstrip() + "\n"

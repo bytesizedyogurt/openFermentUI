@@ -117,6 +117,7 @@ def test_a_gated_write_through_the_server_is_a_proposal_not_a_write(store, monke
     assert not (store / "guild.json").exists() and len(proposals.open_ones()) == 1
     [line] = audit.read()
     assert line.agent == "model" and line.askId is None  # no ask owns a call from outside the app
+    assert out["auditIds"] == [line.id], "the answer over MCP names the row its proposal left"
     refused = _text(asyncio.run(server.call_tool("pureos_write", {"action": "add", "target": "", "fields": {}, "note": ""})))
     assert "no write function" in refused["error"]
 

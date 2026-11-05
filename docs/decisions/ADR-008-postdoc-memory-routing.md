@@ -223,6 +223,46 @@ setting; another provider's model still waits for the owner.
 - `docs/TOOLS.md` says how the server starts, both ways it reaches a project, and what a client
   reads: the SDK's names, the shape of an answer over MCP, and where the audit row is read.
 
+## Implementation 13 (alpha 2.2 E.16: the agent builder's interface points)
+
+The agent builder of stage D (`docs/reports/handoff-2026-11.md`, round 1) finished with no core
+edit and named five points the interface left a client to guess. Each is paid in the code the page
+is written from:
+
+- **What a BioRepo record is.** One rule, `module_stores.RECORD`, which both readers' descriptions
+  quote: a record is an extraction a reviewer verified against its document's own words
+  (provenance verified, or gold), and a candidate is one no reviewer has verified yet
+  (unverified); one a reviewer rejected leaves every read. `biorepo_read` lists the two as its
+  kinds `record` and `candidate` (`module_stores.record_kind`, from the row's state), and
+  `search_records` names each hit's kind by the same rule. A candidate a reviewer accepted, which
+  `biorepo_read` listed as kind `candidate` in the approved state, is now kind `record`; a
+  fixture's curated row was a record already and stays one. The row `biorepo_write`'s candidate
+  action answers with is the row the read lists (`module_stores.record_row`).
+- **A write's answer names its audit row.** An audit row's id is its place in the table (`seq`),
+  served as a string of digits. `tools.run` opens `audit.written()` around the tool, and
+  `audit.add` adds each new row's id to it, so the result's `auditIds` names every row the call
+  wrote, oldest first: a kept entry's, a run's, a refused run's receipt, and a gated write's
+  proposal, whose row its own transaction writes on the database's thread (a coroutine sent there
+  runs in a copy of its sender's context, so the list reaches it). Over MCP the answer carries the
+  field as every other.
+- **The audit read by what a write was.** `GET /api/audit` takes `action`, `target` and `who`
+  beside `limit`, each matched exactly as a row names it, and serves the newest `limit` of the
+  matching rows, so a write older than the newest 500 rows is found by what it was. Each row is an
+  `AuditRow`, the entry under its `id`.
+- **The HTTP audit leaves null fields out**, as the MCP server writes every model it answers
+  (`response_model_exclude_none`): a row with no target, ask or effort holds no such key.
+  `AuditRow` joins `api.AS_KEPT`, so the document lists the fields a row may leave out as
+  optional, and `test_route_models.py` serves the route as kept.
+- **What a row holds.** `AuditEntry.detail` says what it holds, and every write whose call takes a
+  note keeps it there (`catalogue_write` and `study_scenario` join the writes that did). A module
+  read's summary is a `ModuleRead`, its `partial` a sentence, and `module_stores.DETAIL` names
+  each kind's `detail` field by field; `docs/TOOLS.md` renders both under Module reads, and
+  `test_agent_interface.py` builds a row of every kind and holds its fields to its kind's words.
+- **The client recipe** hands the server its client's environment with `VIRTUAL_ENV` taken out,
+  which a client run by `uv run <script>` holds and the server's `uv run --project core` warns of
+  at every start, and the page's top points at the recipe, at the MCP server's section and at what
+  a module read answers.
+
 ## Evidence
 
 - `postdoc_agent.py`, `llm.py`, `spend.py`, `tools/__init__.py` at `alpha-1.0`.

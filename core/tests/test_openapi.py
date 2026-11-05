@@ -70,8 +70,13 @@ def test_the_catalogue_reads_the_event_streams_and_the_tool_door_say_what_they_t
     assert [p["in"] for p in door["parameters"] if p["name"] == tools.ASSISTANT_HEADER] == ["header"]
     audit = doc["paths"]["/api/audit"]["get"]["description"]
     assert "1 to 500" in audit and "+00:00" in audit and "detail.via" in audit
-    row = doc["components"]["schemas"]["AuditEntry"]["properties"]
-    assert all(row[k].get("description") for k in ("at", "askId", "effort", "detail")), "each field said in words"
+    row = doc["components"]["schemas"]["AuditRow"]
+    assert all(row["properties"][k].get("description") for k in ("id", "at", "target", "askId", "effort", "detail")), \
+        "each field said in words"
+    # A served row always holds its id; a field it may leave out is no required one.
+    assert "id" in row["required"] and {"target", "askId", "effort"}.isdisjoint(row["required"])
+    asked = {p["name"] for p in doc["paths"]["/api/audit"]["get"]["parameters"] if p["in"] == "query"}
+    assert {"limit", "action", "target", "who"} <= asked
 
 
 def test_the_committed_document_is_the_services():

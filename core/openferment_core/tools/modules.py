@@ -15,7 +15,9 @@ where a row stands, the one `state` computed from it in `module_stores.py`,
 and the row's provenance mark. The rows go back on `ToolResult.rows`, which
 is what lets a claim cite them (`SeenSet`).
 
-A read that leaves part of a module out says so in `partial`. Nothing here
+A read that leaves part of a module out says so in `partial`, a sentence.
+The summary is a `ModuleRead` (models.py), and each kind's `detail` holds the
+fields `module_stores.DETAIL` names; docs/TOOLS.md lists both. Nothing here
 writes.
 """
 from __future__ import annotations
@@ -28,7 +30,7 @@ from typing import Literal
 from pydantic import BaseModel, ConfigDict, Field, field_validator
 
 from .. import module_stores
-from ..models import ToolResult
+from ..models import ModuleRead, ToolResult
 from . import MAX_SUMMARY_CHARS, Tool, ToolContext, register
 
 MAX_ROWS = 20
@@ -64,7 +66,8 @@ WHAT = {
                 "the corn stover and dry-grind corn reference plants among them, and the runs kept from the retired "
                 "reference entries (a reference run, the benchmark), listed as kept (stream_table reads a run's "
                 "streams; engine_report reads a library run's numbers as evidence ids)",
-    "biorepo": "the records, the extractor's candidates, the computed artifacts and the Witness runs that score the extractor",
+    "biorepo": f"the records and the extractor's candidates, by one rule ({module_stores.RECORD}; search_records names "
+               "each hit's kind by it), the computed artifacts and the Witness runs that score the extractor",
     "guild": "the people on the ledger (name, role, whether active) and the competence checks on skills; no level is stored "
              "and none is read",
     "primer": "the lessons, by module, and the skills each counts toward",
@@ -98,22 +101,14 @@ class ModuleReadInput(BaseModel):
 
 
 def _summary(module: str, inp: ModuleReadInput, matched: list[Any], rows: list[dict[str, Any]], cut: bool) -> dict[str, Any]:
+    """The read's summary, a ModuleRead, its null fields left out."""
     states: dict[str, int] = {}
     for r in matched:
         states[r.state] = states.get(r.state, 0) + 1
-    out: dict[str, Any] = {
-        "module": module_stores.LABEL[module],
-        "count": len(matched),
-        "returned": len(rows),
-        "states": states,
-        "rows": rows,
-    }
-    if cut:
-        out["note"] = "fewer rows than asked, so that the result stays readable; ask by id or with words for the rest"
-    partial = module_stores.PARTIAL.get(module)
-    if partial:
-        out["partial"] = partial
-    return out
+    note = "fewer rows than asked, so that the result stays readable; ask by id or with words for the rest"
+    return ModuleRead(module=module_stores.LABEL[module], count=len(matched), returned=len(rows), states=states,
+                      rows=rows, note=note if cut else None, partial=module_stores.PARTIAL.get(module),
+                      ).model_dump(mode="json", exclude_none=True)
 
 
 def _runner(module: str):
@@ -153,8 +148,8 @@ def _description(module: str) -> str:
         "ref (cite it in moduleRefs), label, state (open, fenced, approved, locked, proposed, retired; computed by the "
         "service), the module's own status word and its provenance. The summary holds module, rows, count (every "
         "match), returned (the rows shown) and states (the count of every match by state), a note when rows were "
-        "left out so that the result stays readable, and partial when the module is read in part; narrow by ids, "
-        "state or words to read the rest."
+        "left out so that the result stays readable, and partial, a sentence naming what the read leaves out, when "
+        "the module is read in part; narrow by ids, state or words to read the rest."
         + (f" Read in part: {partial}." if partial else "")
     )
 

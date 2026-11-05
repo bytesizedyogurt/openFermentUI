@@ -1,13 +1,16 @@
-"""`search_records`: the records Postdoc may cite, found by words (OF-BLD-014 §3.4).
+"""`search_records`: the records and candidates Postdoc may cite, found by words (OF-BLD-014 §3.4).
 
 It searches `ctx.pool`: the project's candidates as reviewers' decisions
-leave them (evidence_pool.py)."""
+leave them (evidence_pool.py). Each hit names its kind, record or candidate,
+by the rule biorepo_read lists them by (module_stores.RECORD, alpha 2.2
+E.16)."""
 from __future__ import annotations
 
 from pydantic import BaseModel, ConfigDict, Field, field_validator
 
 from ..evidence_pool import MAX_LIMIT
 from ..models import ToolResult
+from ..module_stores import RECORD, record_kind
 from ..postdoc.plan import evidence_payload
 from . import Tool, ToolContext, register
 
@@ -37,6 +40,7 @@ def _run(inp: SearchRecordsInput, ctx: ToolContext) -> ToolResult:
     payload = evidence_payload(hits, pool)
     for item, hit in zip(payload, hits):
         item["carbonSource"] = hit.get("carbonSource")
+        item["kind"] = record_kind(hit.get("provenance"), hit.get("status"))
     return ToolResult(
         summary={
             "query": inp.query,
@@ -53,13 +57,12 @@ TOOL = register(
     Tool(
         name="search_records",
         description=(
-            "Search the records Postdoc may cite: the candidates extracted from the project's documents that nobody "
-            "rejected, gold or verified where a reviewer promoted one and unverified otherwise. Returns at most ten, "
-            "best match first, each "
-            "with its record id, paper, what was measured, its value and unit as the paper wrote them, the quoted "
-            "sentence, the strain, the carbon source when the paper states one, and its provenance. Filter by an "
-            "ontology field id and by a strain id, or pass null for no filter. Returns none when nothing "
-            "matches."
+            "Search by words the extractions from the project's documents that Postdoc may cite, its records and its "
+            f"candidates: {RECORD}. biorepo_read lists them by the same rule, as its kinds record and "
+            "candidate. Returns at most ten, best match first, each with its kind (record or candidate), its record "
+            "id, paper, what was measured, its value and unit as the paper wrote them, the quoted sentence, the "
+            "strain, the carbon source when the paper states one, and its provenance. Filter by an ontology field "
+            "id and by a strain id, or pass null for no filter. Returns none when nothing matches."
         ),
         input_model=SearchRecordsInput,
         run=_run,

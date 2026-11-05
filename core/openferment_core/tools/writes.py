@@ -16,9 +16,11 @@ depositions on their pages), and that
 refusal is a result Postdoc reports in `gaps`. `check:tools` greps this file for a store write and fails on one.
 
 THE MARK. Every write that goes through carries `agent: model`, the model
-id, the effort and the ask id into the audit log (`audit.py`), and what it
-made lands in the open lane: an artifact with its basis, a candidate
-`unverified`, a fetched paper. A person or a run promotes it.
+id, the effort and the ask id into the audit log (`audit.py`), with the note
+its call carried, and what it made lands in the open lane: an artifact with
+its basis, a candidate `unverified`, a fetched paper. A person or a run
+promotes it. The call's answer names the row by its id (`auditIds`,
+`tools.run`).
 
 THE GATES. An action in `gates.GATES` writes nothing: it becomes a proposal
 with `state: proposed`, and Home shows it with one button (§7.4). The spend
@@ -559,7 +561,8 @@ def keep_catalogue(tool: str, inp: Any, ctx: ToolContext) -> ToolResult:
         kept = catalogues.keep_fields(kind, fields, by=who, source=source, agent=agent, via=door)
     except catalogues.CatalogueRefused as e:
         return ToolResult(error=f"{tool} refused: {e}")
-    _audit_as(ctx, CATALOGUE_MODULES[kind], tool, "open", f"{kind}/{kept.id}", {"tool": tool, "kind": kind})
+    _audit_as(ctx, CATALOGUE_MODULES[kind], tool, "open", f"{kind}/{kept.id}",
+              {"tool": tool, "kind": kind, "note": inp.note})
     entry = kept.model_dump(mode="json", exclude_none=True, exclude={"sequence"})
     return ToolResult(summary={"state": "open", **entry, "meaning": CATALOGUE_KEPT})
 
@@ -584,7 +587,8 @@ def make_scenario(tool: str, inp: Any, ctx: ToolContext) -> ToolResult:
     except scenarios.ScenarioRefused as e:
         return ToolResult(error=f"{tool} refused: {e}")
     _audit_as(ctx, "proforma", "study_scenario", "open", made.id, {"tool": tool, "plant": made.plant,
-                                                                   "keys": [v.key for v in made.values]})
+                                                                   "keys": [v.key for v in made.values],
+                                                                   "note": inp.note})
     return ToolResult(summary={
         "state": "open", "scenarioId": made.id, "title": made.title, "plant": made.plant,
         "configuration": made.configuration, "runIds": made.runIds,
@@ -1094,6 +1098,7 @@ def _pureos(action: str, inp: ModuleWriteInput, ctx: ToolContext) -> ToolResult:
 
 def _biorepo_candidate(inp: ModuleWriteInput, ctx: ToolContext) -> ToolResult:
     from .. import extract
+    from ..evidence_pool import candidate_record
 
     need = _need(inp, "paperId", "sectionId", "field", "value", "unit", "quote")
     if need:
@@ -1122,8 +1127,8 @@ def _biorepo_candidate(inp: ModuleWriteInput, ctx: ToolContext) -> ToolResult:
         return ToolResult(error=f"biorepo_write refused: {e}")
     if made is None:
         return ToolResult(error=f"biorepo_write refused on rule {rule}: {detail}")
-    row = module_stores.Row("biorepo", "candidate", made.id, made.field, "proposed", "unverified", provenance="unverified",
-                            detail={"paperId": made.paperId, "field": made.field, "by": who})
+    # The row biorepo_read lists the candidate as, read by the same rule.
+    row = module_stores.record_row(candidate_record(made, {}))
     _audit(ctx, "biorepo", "candidate", "proposed", made.id, {"paperId": made.paperId, "field": made.field, "note": inp.note})
     return ToolResult(
         summary={"state": "proposed", "ref": row.ref, "candidateId": made.id, "field": made.field, "provenance": "unverified",

@@ -575,8 +575,9 @@ computation from that artifact and asks `sff_export` for the file again.
   running in the model's lane under that name; a call that names nobody, or names both, is a 422
   in words. A run through `engine_run` keeps one audit row (`GET
   /api/audit`): module `proforma`, action `engine_run`, state `open` (`refused` for a receipt),
-  target the run's id, `agent` and `who` the caller, and for a caller of the model's lane the door
-  it came in by in `detail.via` (`postdoc`, `mcp` or `http`); a run through `POST
+  target the run's id, `agent` and `who` the caller, the call's note as `detail.note`, and for a
+  caller of the model's lane the door it came in by in `detail.via` (`postdoc`, `mcp` or `http`);
+  the tool's answer names the row by its id in `auditIds`. A run through `POST
   /api/engines/{name}/run` keeps none, and its row's `by` names who asked.
 - **`pnpm ready`** prints one row per engine: its version, its worker and its conformance verdict.
 

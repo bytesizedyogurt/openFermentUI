@@ -161,7 +161,7 @@ One tool registry, three callers (OF-BLD-014 §3.4, E.6).
 | `passages.py` | `search_passages`: the papers' own words, found for a question. |
 | `proforma.py` | Proforma's tools: `selling_price` (OF-BLD-014 §8.5), `run_flowsheet` and `stream_table` (OF-BLD-019 §6.1). |
 | `pureos.py` | pureOS's tools: `pureos_build` and `pureos_propose`. |
-| `records.py` | `search_records`: the records Postdoc may cite, found by words (OF-BLD-014 §3.4). |
+| `records.py` | `search_records`: the records and candidates Postdoc may cite, found by words (OF-BLD-014 §3.4). |
 | `reference.py` | `docs/TOOLS.md`, written from the registry (execution prompt §7.3 item 7, A5). |
 | `runbook.py` | `draft_runbook`: Postdoc drafts a runbook, and the service writes every number (OF-BLD-014 §9.2). |
 | `studies.py` | The project's studies, for Postdoc (alpha 2.0 stage 6; execution prompt §4.6, §9.1 step 6; ADR-006). |

@@ -57,6 +57,11 @@ its audit rows name that door and record no effort, since no model of the
 service ran, and a catalogue entry it keeps is replaced only by an outside
 assistant of the same name (catalogues.py).
 
+A WRITE'S ANSWER NAMES ITS AUDIT ROWS (alpha 2.2 E.16). `run` collects the id
+of every audit row the call's writes leave, a gated write's proposal among
+them (`audit.written`), and hands them back on the result's `auditIds`, oldest
+first, so a caller reads its write's row at `GET /api/audit` by that id.
+
 TOOL OUTPUT DISCIPLINE. A tool summarises in code before a model reads
 anything. `summary` is at most `MAX_SUMMARY_CHARS` as JSON; a tool that
 returns more is a defect in the tool, and the result says so in place of the
@@ -537,17 +542,19 @@ def run(name: str, raw: Any, ctx: ToolContext | None = None) -> ToolResult:
         problems = "; ".join(f"{'.'.join(str(p) for p in err['loc']) or 'input'}: {err['msg']}" for err in e.errors())
         return ToolResult(error=f"{name} refused its input: {problems}")
     try:
-        from .. import projects
+        from .. import audit, projects
 
-        with projects.using(ctx.project) if ctx.project else contextlib.nullcontext():
+        acting = projects.using(ctx.project) if ctx.project else contextlib.nullcontext()
+        with audit.written() as audited, acting:
             result = tool.run(parsed, ctx)
     except Exception as e:  # a defect or an outage, said in words to the caller
         return ToolResult(error=f"{name} failed: {type(e).__name__}: {e}")
     size = len(json.dumps(result.summary, ensure_ascii=False, default=str))
     if size > MAX_SUMMARY_CHARS:
         # Nothing the model never read may become citable (§5.R): the ids go
-        # with the summary. What the tool spent stays.
-        return result.model_copy(
+        # with the summary. What the tool spent stays, and so do the audit
+        # rows its writes left.
+        result = result.model_copy(
             update={
                 "summary": {},
                 "recordIds": [],
@@ -558,7 +565,8 @@ def run(name: str, raw: Any, ctx: ToolContext | None = None) -> ToolResult:
                 "error": f"{name} returned a summary of {size} characters, over the {MAX_SUMMARY_CHARS} a model may read.",
             }
         )
-    return result
+    # The answer names each audit row the call's writes left (alpha 2.2 E.16).
+    return result.model_copy(update={"auditIds": list(audited)}) if audited else result
 
 
 def infos() -> list[ToolInfo]:

@@ -334,10 +334,11 @@ def test_the_tool_door_runs_a_named_assistant_in_the_models_lane():
     (line,) = [a for a in audit.read() if a.target == f"skill/{ENTRY['id']}"]
     assert (line.agent, line.who, line.module, line.action, line.state, line.effort, line.askId) == (
         "model", "example-test/0.1", "guild", "catalogue_write", "open", None, None)
-    assert line.detail == {"tool": "catalogue_write", "kind": "skill", "via": "http"}
+    assert line.detail == {"tool": "catalogue_write", "kind": "skill", "note": ENTRY["note"], "via": "http"}
+    assert kept.json()["auditIds"] == [line.id], "the write's answer names its audit row"
     rows = client.get("/api/audit").json()
-    assert [(r["agent"], r["who"], r["detail"]["via"]) for r in rows if r["target"] == f"skill/{ENTRY['id']}"] == [
-        ("model", "example-test/0.1", "http")]
+    assert [(r["id"], r["agent"], r["who"], r["detail"]["via"]) for r in rows
+            if r.get("target") == f"skill/{ENTRY['id']}"] == [(line.id, "model", "example-test/0.1", "http")]
 
 
 def test_an_assistant_at_the_door_leaves_postdocs_entries_as_they_are():
@@ -474,10 +475,13 @@ def test_the_server_started_with_service_writes_through_it_and_the_audit_names_t
     assert "error" not in _text(records) and _text(records)["summary"]["count"] == 0
     assert "HTTP Request" not in said.read_text(encoding="utf-8"), "a forwarded request writes no line of its own"
     named = {projects.HEADER: PROJECT}
-    rows = httpx.get(f"{service}/api/audit", headers=named, trust_env=False).json()
-    (row,) = [r for r in rows if r["target"] == f"skill/{ENTRY['id']}"]
-    assert (row["agent"], row["who"], row["action"], row["module"], row["effort"], row["detail"]["via"]) == (
-        "model", "example-test/0.1", "catalogue_write", "guild", None, "http")
+    asked = {"action": "catalogue_write", "target": f"skill/{ENTRY['id']}", "who": "example-test/0.1"}
+    rows = httpx.get(f"{service}/api/audit", headers=named, params=asked, trust_env=False).json()
+    (row,) = rows
+    assert [row["id"]] == kept["auditIds"], "the write's answer over MCP names the row the service serves"
+    assert (row["agent"], row["who"], row["action"], row["module"], row["detail"]["via"]) == (
+        "model", "example-test/0.1", "catalogue_write", "guild", "http")
+    assert "effort" not in row and "askId" not in row, "the HTTP audit leaves its null fields out, as MCP does"
     entry = httpx.get(f"{service}/api/catalogues/skill/{ENTRY['id']}", headers=named, trust_env=False).json()
     assert (entry["by"], entry["agent"], entry["via"], entry["source"]) == (
         "example-test/0.1", "model", "http", "example-test/0.1, at the HTTP endpoint")

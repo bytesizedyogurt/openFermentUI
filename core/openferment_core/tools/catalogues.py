@@ -122,7 +122,8 @@ WRITE_TOOL = register(Tool(
         "you are kept under), agent (model), via (the door: postdoc, mcp or http), source and at, beside state "
         "(open) and meaning (the service's word on the keep). Its audit row names the module that reads the kind "
         "(geneos for a strain, pureos a product, guild a skill, primer a lesson), action catalogue_write, state "
-        "open, target <kind>/<id>, the caller as agent and who, and the door as detail.via."
+        "open, target <kind>/<id>, the caller as agent and who, your note as detail.note and the door as "
+        "detail.via; the result's auditIds names that row by its id."
     ),
     input_model=CatalogueWriteInput, run=_write, strict=False, writes=True,
 ))

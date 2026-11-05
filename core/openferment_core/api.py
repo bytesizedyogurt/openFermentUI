@@ -71,7 +71,7 @@ from .models import (
     UnitSpecs,
     UnitType,
     VesselSummary,
-    AuditEntry,
+    AuditRow,
     Proposal,
     ProposalAction,
     AnswerPlan,
@@ -222,13 +222,15 @@ NO_SUCH_PROJECT = "The project the request names is one the database does not ho
 # E.0b): a runbook and what it holds, served with
 # `response_model_exclude_unset` for its lock's digest (runbook_lock.py reads
 # an absent field and a null one apart), and a draft of one, which a page
-# keeps as a runbook; and the rows a project keeps of its pages, which
-# `GET /api/state` serves as the page sent them (project_state.py). Each
-# keeps Pydantic's required list.
+# keeps as a runbook; the rows a project keeps of its pages, which
+# `GET /api/state` serves as the page sent them (project_state.py); and a row
+# of the audit log, which `GET /api/audit` serves with its null fields left
+# out, as an answer over MCP leaves them out (E.16). Each keeps Pydantic's
+# required list.
 AS_KEPT = frozenset({"Runbook", "RunbookStage", "Prediction", "Measure", "Range", "RunbookDraft",
                      "Deposition", "DepositionEntry", "DepositionObservation", "Reconciliation",
                      "ReconciliationDelta", "MeasuredEvidence", "MeasuredConditions", "ProformaScenario",
-                     "TrainMade", "Override"})
+                     "TrainMade", "Override", "AuditRow"})
 SCHEMA_REF = "#/components/schemas/"
 
 
@@ -2861,21 +2863,36 @@ def state_remove(kind: str, item_id: str, by: str = "") -> StateTakenBack:
     return StateTakenBack(kind=kind, id=item_id, removed=True)
 
 
-@app.get("/api/audit", response_model=list[AuditEntry])
-def audit_read(limit: int = 200) -> list[AuditEntry]:
+@app.get("/api/audit", response_model=list[AuditRow], response_model_exclude_none=True)
+def audit_read(limit: int = 200,
+               action: str = Query(default="", description="Only the rows of this action (`catalogue_write`)."),
+               target: str = Query(default="", description="Only the rows on this target, as a row names it "
+                                                           "(`skill/<id>` for a catalogue entry)."),
+               who: str = Query(default="", description="Only the rows this caller made, as a row names it (an "
+                                                        "assistant's `<name>/<version>`, a person's name).")
+               ) -> list[AuditRow]:
     """The project's newest `limit` rows of its audit log, newest last:
     `limit` is held to 1 to 500 (200 by default), a larger one read as 500.
-    `at` is ISO 8601 in UTC (`2026-11-04T09:00:00.123456+00:00`), as a
-    catalogue entry's `at` is; `agent` is `model` for a model's or an
-    assistant's write and `person` for a named person's, and `who` names it
-    (an MCP client by its `<name>/<version>`). A row of the model's lane
-    names the door its write came in by in `detail.via`: `postdoc` for
-    Postdoc's loop, with the `effort` its model ran at and, from an ask, its
-    `askId`; `mcp` for the MCP server in its own process and `http` for the
-    tool door's assistant header, with no effort and no ask."""
+    `action`, `target` and `who` narrow the rows to those that name each one
+    given exactly as the row names it, the newest `limit` of them served, so
+    a write of any age is found by what it was:
+    `?action=catalogue_write&target=skill/<id>&who=<name>/<version>` reads
+    the rows of one catalogue entry an assistant kept. Each row carries its `id`, the
+    id the answer of the write that made it names in `auditIds`, and leaves
+    its null fields out, as an answer over MCP leaves them out: a row with no
+    target, ask or effort holds no such key. `at` is ISO 8601 in UTC
+    (`2026-11-04T09:00:00.123456+00:00`), as a catalogue entry's `at` is;
+    `agent` is `model` for a model's or an assistant's write and `person` for
+    a named person's, and `who` names it (an MCP client by its
+    `<name>/<version>`). A row of the model's lane names the door its write
+    came in by in `detail.via`: `postdoc` for Postdoc's loop, with the
+    `effort` its model ran at and, from an ask, its `askId`; `mcp` for the
+    MCP server in its own process and `http` for the tool door's assistant
+    header, with no effort and no ask."""
     from . import audit
 
-    return audit.read(max(1, min(limit, audit.MAX_READ)))
+    return audit.read(max(1, min(limit, audit.MAX_READ)), action=action or None, target=target or None,
+                      who=who or None)
 
 
 def _header_text(raw: str) -> str:
