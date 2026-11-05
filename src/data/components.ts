@@ -152,8 +152,7 @@ export const COMPONENTS: ComponentDef[] = [
   {
     // OF-BLD-011 §2 — the first of the three stages. The strain catalogue and
     // its pages moved here from fermOS, because choosing a chassis is a
-    // genetic design decision; genus enumeration came with them, being a
-    // sequence-space search.
+    // genetic design decision.
     name: 'geneOS',
     owner: 'geneOS',
     layer: 'Computing',
@@ -161,7 +160,6 @@ export const COMPONENTS: ComponentDef[] = [
       'src/screens/GeneOS.tsx',
       'src/screens/Organisms.tsx',
       'src/screens/StrainPage.tsx',
-      'src/engine/geneos/enumeration.ts',
       // OF-BLD-014 §6.2–§6.4 — flux balance analysis on a shelf of published models.
       'src/screens/GeneOSModel.tsx',
       'core/openferment_core/geneos.py',

@@ -158,11 +158,10 @@ export default function Runbooks() {
         <span className="inline-flex items-center gap-1.5">
           <span className="font-num text-ink">${spend.toFixed(2)}</span> modeled compute spend
           <Explain label="What the cost figure means">
-            An estimate of the compute a runbook consumes — retrieval, prediction, enumeration —
-            not a quotation and not a process cost. It is here because enumeration compute is the
-            one input a person authorises before it is spent, which is why{' '}
-            <span className="font-medium">awaiting budget</span> is a state on this board rather
-            than a footnote.
+            A modeled estimate of the compute each runbook consumes, retrieval and prediction among
+            it. A person authorises a runbook&rsquo;s compute before it is spent, which is why the
+            board groups the runbooks <span className="font-medium">awaiting budget</span> in a
+            column of their own.
           </Explain>
         </span>
       </div>

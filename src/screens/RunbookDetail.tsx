@@ -10,7 +10,7 @@
 // says exactly why and what would make the conversion possible, rather than
 // throwing. A stage that halts on a number with no source is the same shape of
 // event: not an error, a guardrail, with two honest ways forward.
-import { useMemo, useState } from 'react';
+import { useState } from 'react';
 import {
   ArrowRight,
   CircleDollarSign,
@@ -28,7 +28,6 @@ import type { Runbook } from '@/data/types';
 import { useStore } from '@/store';
 import { href, navigate } from '@/router';
 import { RUNBOOK_STATUS_LABEL, RUNBOOK_STATUS_NOTE } from '@/data/labels';
-import { enumerationFunnel, funnelSummary, funnelWidest } from '@/engine/geneos/enumeration';
 import { lockIntact } from '@/engine/lock';
 import { ledgerRows } from '@/engine/ledger';
 import { IntervalLedger } from '@/components/figures';
@@ -43,7 +42,6 @@ import {
   Callout,
   Card,
   EmptyState,
-  Explain,
   LinkButton,
   Modal,
   PageHeader,
@@ -52,11 +50,10 @@ import {
 } from '@/components/ui';
 
 /**
- * A stage `value` is free text on purpose — stages produce titres, CAPEX
- * figures, candidate counts and clearance verdicts, and forcing one shape
- * would lose most of them. This spots the ones written as vocabulary ids so an
- * unresolved term can be labelled rather than printed as though it were a
- * finding.
+ * A stage `value` is free text on purpose: a stage may answer with a titre, a
+ * cost figure or a count, and free text holds each of them. This spots a value
+ * written as a vocabulary id, so the page marks it as a term no vocabulary of
+ * this build carries.
  */
 function looksLikeVocabularyId(value: string): boolean {
   return /^[a-z]+(-[a-z]+)+$/.test(value);
@@ -117,8 +114,8 @@ function StatePanel({ runbook }: { runbook: Runbook }) {
             : `Running this costs about $${runbook.estCostUsd} of compute.`}
         </h2>
         <p className="text-body text-ink-soft mt-1.5 max-w-3xl">
-          Enumeration is the one input somebody authorises before it is spent, so the board has a
-          state for it rather than a footnote. Nothing runs until you say yes.
+          A person authorises a runbook&rsquo;s compute before it is spent, and the board groups
+          the runbooks waiting on that in a column of their own. Nothing runs until you say yes.
         </p>
         <div className="flex flex-wrap gap-2 mt-3">
           <Button variant="primary" onClick={() => authorise(runbook.id)}>
@@ -193,9 +190,9 @@ function StatePanel({ runbook }: { runbook: Runbook }) {
           A research runbook that finds something becomes an industrial one in a single action.
         </h2>
         <p className="text-body text-ink-soft mt-1.5 max-w-3xl">
-          Promotion carries the finding across rather than restarting the work: the clearance
-          reading becomes the industrial runbook&rsquo;s first stage, already done, and the host
-          and molecule come with it.
+          Promotion carries the finding across: what this runbook&rsquo;s finished stages found
+          becomes the industrial runbook&rsquo;s first stage, already done, and its host, its
+          product, its predictions and its measures come with it.
         </p>
         <div className="flex flex-wrap gap-2 mt-3">
           <Button
@@ -401,78 +398,6 @@ function PredictionPanel({ runbook }: { runbook: Runbook }) {
           action={locked ? `frozen ${runbook.lockedAt?.slice(0, 10)}` : 'predictions still editable'}
         />
       </div>
-    </Card>
-  );
-}
-
-// ── the enumeration funnel (research runbooks only) ────────────────────
-
-function EnumerationFunnel({ runbook }: { runbook: Runbook }) {
-  const funnel = useMemo(() => enumerationFunnel(runbook), [runbook]);
-  const widest = funnelWidest(funnel);
-  const summary = funnelSummary(funnel);
-
-  return (
-    <Card className="p-4">
-      <div className="flex items-baseline justify-between gap-3 mb-2">
-        <div className="text-caption uppercase tracking-wide text-ink-soft">
-          Enumeration funnel
-        </div>
-        <Explain label="How the funnel is derived">
-          Read back out of the stages rather than authored beside them, so the two cannot
-          disagree. A number counts as a population only when the stage&rsquo;s own words say what
-          it counts &mdash; a strain designation and a buffer percentage both contain digits and
-          neither is a candidate. Stages that have produced no count are listed, not interpolated.
-        </Explain>
-      </div>
-
-      {funnel.steps.length === 0 ? (
-        <EmptyState
-          title="Nothing quantified yet"
-          body="No stage has reported a candidate count. The funnel appears as soon as one does — it is derived from the stages, so there is nothing to draw until they say something."
-        />
-      ) : (
-        <ol className="space-y-2">
-          {funnel.steps.map((s, i) => (
-            <li key={`${s.stage.name}-${i}`}>
-              <div className="flex items-baseline justify-between gap-3">
-                <span className="text-body truncate">{s.stage.name}</span>
-                <span className="font-num text-body shrink-0">
-                  {s.count.toLocaleString()}{' '}
-                  <span className="text-ink-soft text-caption">{s.unit}</span>
-                </span>
-              </div>
-              <div className="mt-1 h-2 w-full rounded-full bg-ink-soft/12 overflow-hidden">
-                <div
-                  className="h-full rounded-full bg-accent"
-                  style={{ width: `${widest > 0 ? Math.max(1.5, (s.count / widest) * 100) : 0}%` }}
-                />
-              </div>
-            </li>
-          ))}
-        </ol>
-      )}
-
-      {summary && <p className="text-caption text-ink-soft mt-2">{summary}</p>}
-
-      {funnel.unquantified.length > 0 && (
-        <div className="mt-3 pt-3 border-t border-line">
-          <div className="text-caption uppercase tracking-wide text-ink-soft mb-1.5">
-            Not quantified
-          </div>
-          <ul className="space-y-1">
-            {funnel.unquantified.map((s, i) => (
-              <li key={`${s.name}-${i}`} className="flex items-start gap-2 text-caption">
-                <StageIcon status={s.status} size={13} />
-                <span className="text-ink-soft">
-                  <span className="text-ink">{s.name}</span> — {stageMeta(s.status).label}
-                  {s.status === 'blocked' && ' · the run stopped here'}
-                </span>
-              </li>
-            ))}
-          </ul>
-        </div>
-      )}
     </Card>
   );
 }
@@ -786,84 +711,81 @@ export default function RunbookDetail({ runbookId }: { runbookId: string }) {
           />
         </div>
 
-        <div
-          className={cx(
-            'grid grid-cols-1 gap-4',
-            runbook.kind === 'research' ? 'lg:grid-cols-[minmax(0,1.3fr)_minmax(0,1fr)]' : '',
+        <Card className="p-4">
+          {runbook.stages.length === 0 && (
+            <p className="text-body text-ink-soft" data-testid="runbook-no-stages">
+              This runbook holds no stages: a runbook made from a study or drafted by Postdoc
+              starts with its predictions and the measures that test them, below.
+            </p>
           )}
-        >
-          <Card className="p-4">
-            <ol className="space-y-3">
-              {runbook.stages.map((s, i) => {
-                const meta = stageMeta(s.status);
-                return (
-                  <li key={`${s.name}-${i}`} className="flex items-start gap-2.5">
-                    <span className="mt-[3px]">
-                      <StageIcon status={s.status} />
-                    </span>
-                    <div className="min-w-0 flex-1">
-                      <div className="flex items-baseline justify-between gap-3">
-                        <span
-                          className={cx(
-                            'font-medium leading-snug',
-                            s.status === 'pending' && 'text-ink-soft',
-                          )}
-                        >
-                          {s.name}
-                        </span>
-                        <span className={cx('text-caption shrink-0', meta.color)}>{meta.label}</span>
-                      </div>
-                      {s.detail && (
-                        <div className="text-body text-ink-soft mt-0.5 leading-snug">{s.detail}</div>
-                      )}
-                      {s.value && (
-                        <div className="mt-1">
-                          {looksLikeVocabularyId(s.value) ? (
-                            // A hyphenated lowercase token that resolves to
-                            // nothing is a term this build does not carry, not
-                            // a finding. Showing it as one would dress an
-                            // unresolved reference up as an answer, so it is
-                            // labelled instead.
-                            <span
-                              className="chip text-ink-soft font-num text-[11px] py-0"
-                              title="This stage recorded a term that is in no vocabulary this build carries. It is shown as written."
-                            >
-                              {s.value} · not in the vocabulary
-                            </span>
-                          ) : (
-                            <span className="font-num text-body text-accent">{s.value}</span>
-                          )}
-                        </div>
-                      )}
+          <ol className="space-y-3">
+            {runbook.stages.map((s, i) => {
+              const meta = stageMeta(s.status);
+              return (
+                <li key={`${s.name}-${i}`} className="flex items-start gap-2.5">
+                  <span className="mt-[3px]">
+                    <StageIcon status={s.status} />
+                  </span>
+                  <div className="min-w-0 flex-1">
+                    <div className="flex items-baseline justify-between gap-3">
+                      <span
+                        className={cx(
+                          'font-medium leading-snug',
+                          s.status === 'pending' && 'text-ink-soft',
+                        )}
+                      >
+                        {s.name}
+                      </span>
+                      <span className={cx('text-caption shrink-0', meta.color)}>{meta.label}</span>
                     </div>
-                  </li>
-                );
-              })}
-            </ol>
+                    {s.detail && (
+                      <div className="text-body text-ink-soft mt-0.5 leading-snug">{s.detail}</div>
+                    )}
+                    {s.value && (
+                      <div className="mt-1">
+                        {looksLikeVocabularyId(s.value) ? (
+                          // A hyphenated lowercase token that resolves to
+                          // nothing is a term this build does not carry, not
+                          // a finding. Showing it as one would dress an
+                          // unresolved reference up as an answer, so it is
+                          // labelled instead.
+                          <span
+                            className="chip text-ink-soft font-num text-[11px] py-0"
+                            title="This stage recorded a term that is in no vocabulary this build carries. It is shown as written."
+                          >
+                            {s.value} · not in the vocabulary
+                          </span>
+                        ) : (
+                          <span className="font-num text-body text-accent">{s.value}</span>
+                        )}
+                      </div>
+                    )}
+                  </div>
+                </li>
+              );
+            })}
+          </ol>
 
-            {runbook.outputs.length > 0 && (
-              <div className="mt-4 pt-3 border-t border-line">
-                <div className="text-caption uppercase tracking-wide text-ink-soft mb-1.5">
-                  Outputs
-                </div>
-                <div className="flex flex-wrap gap-1.5">
-                  {runbook.outputs.map((o) => (
-                    <span key={o} className="chip text-accent border-accent/40">
-                      <FileCheck2 size={12} aria-hidden />
-                      {o}
-                    </span>
-                  ))}
-                </div>
-                <p className="text-caption text-ink-soft mt-2">
-                  Artifacts, not files. This build names what a finished runbook hands over; it
-                  does not generate the documents themselves.
-                </p>
+          {runbook.outputs.length > 0 && (
+            <div className="mt-4 pt-3 border-t border-line">
+              <div className="text-caption uppercase tracking-wide text-ink-soft mb-1.5">
+                Outputs
               </div>
-            )}
-          </Card>
-
-          {runbook.kind === 'research' && <EnumerationFunnel runbook={runbook} />}
-        </div>
+              <div className="flex flex-wrap gap-1.5">
+                {runbook.outputs.map((o) => (
+                  <span key={o} className="chip text-accent border-accent/40">
+                    <FileCheck2 size={12} aria-hidden />
+                    {o}
+                  </span>
+                ))}
+              </div>
+              <p className="text-caption text-ink-soft mt-2">
+                Artifacts, not files. This build names what a finished runbook hands over; it
+                does not generate the documents themselves.
+              </p>
+            </div>
+          )}
+        </Card>
       </section>
 
       {/* ── predictions ─────────────────────────────────────────────────── */}

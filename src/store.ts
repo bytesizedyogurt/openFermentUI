@@ -1652,7 +1652,7 @@ export const useStore = create<OFState>()((set, get) => ({
       provenance: 'user',
     });
     get().toast({
-      text: 'Promoted to an industrial runbook — the clearance finding came across with it',
+      text: 'Promoted to an industrial runbook — the research findings came across with it',
       kind: 'success',
       href: `#/runbooks/${id}`,
       hrefLabel: 'Open',

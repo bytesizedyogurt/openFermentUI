@@ -27,3 +27,18 @@ A deleted piece proves needed: restore it from `alpha-1.0` with a decision recor
 ## Evidence
 
 - Commit list on `claude/alpha-2-foundation` (`alpha2: 1.x — …`), each naming what and why.
+
+## Implementation notes
+
+### Alpha 2.2, E.10 (2026-11-05): the enumeration funnel
+
+- `src/engine/geneos/enumeration.ts` and RunbookDetail's research funnel (`EnumerationFunnel`) leave
+  the tree, as the alpha 2.2 prompt's §3 authorizes. The funnel read candidate counts out of a
+  research runbook's stage words, a genus enumeration of Dominion's era, and every research runbook
+  this build makes (a study's, or a draft Postdoc wrote) starts with no stage, so it had no count to
+  draw. The words of that era on the runbook pages go with it: a stage's clearance verdict, the
+  clearance reading and the molecule a promotion carried, and enumeration as the compute a person
+  authorises.
+- Both stand unchanged at `alpha-1.0`: the module at `src/engine/geneos/enumeration.ts`, and
+  `EnumerationFunnel` in `src/screens/RunbookDetail.tsx`. A funnel that proves needed returns from
+  there with a decision record, under the revisit condition above.
