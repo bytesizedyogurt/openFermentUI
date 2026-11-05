@@ -23,9 +23,12 @@
  * plant's page reads in its default configuration (`referenceRunOf`) and the
  * runs kept from the retired reference entries it lists (`keptRunsOf`), and a
  * run's grid read where it holds a dimension at one value
- * (src/engine/interp.ts). Run by `pnpm check:state`, offline: the service is
- * a stand-in for `fetch`. A fixture of a shape the service's models define is
- * a whole value of its generated type (src/api/types.gen.ts).
+ * (src/engine/interp.ts); and the runbooks a page makes (src/store.ts): a
+ * draft's predictions and measures kept as the service wrote them, the lock
+ * taken over them, and a runbook adopted, revised or promoted on the page
+ * among the rows the page sends. Run by `pnpm check:state`, offline: the
+ * service is a stand-in for `fetch`. A fixture of a shape the service's
+ * models define is a whole value of its generated type (src/api/types.gen.ts).
  */
 import {
   EMPTY_STATE,
@@ -37,11 +40,10 @@ import {
   type OutboxEntry,
   type ProjectState,
 } from '../src/lib/projectState';
-import type { Deposition } from '../src/data/types';
 import type { Override, ParameterSpec } from '../src/lib/params';
-import type { LiveConversation } from '../src/lib/postdoc';
+import type { LiveConversation, RunbookDraft } from '../src/lib/postdoc';
 import type { FlowsheetInfo, ProformaScenarioInfo, Scenario, ScenarioInput } from '../src/lib/proforma';
-import type { Artifact, BasisSource, EngineRun } from '../src/lib/studies';
+import type { Artifact, BasisSource, Deposition, EngineRun, Prediction } from '../src/lib/studies';
 import { loadOverlay } from '../src/lib/intake';
 import { recordOf, type Candidate } from '../src/lib/review';
 import { ONTOLOGY } from '../src/data/ontology';
@@ -52,6 +54,8 @@ import { trainInputs, unitScope, type TrainSpec } from '../src/lib/pureos';
 import { ceilingQuery, inputCounts, isReading, keptRunsOf, referenceRunOf, retiredEntryOf, runBody, runSpecs } from '../src/lib/proforma';
 import { interpolate } from '../src/engine/interp';
 import { awaitingReadBack, correctedBy, correctionOf } from '../src/engine/readings';
+import { lockIntact, runbookLockHash } from '../src/engine/lock';
+import { projectStateOf, useStore } from '../src/store';
 
 let fails = 0;
 const check = (label: string, ok: boolean, extra = '') => {
@@ -81,8 +85,12 @@ const aFlowsheet = (inputs: FlowsheetInfo['inputs']): FlowsheetInfo => ({
   leavesOut: [], priceBasis: null, priceOutput: null, program: null, brothStream: null, builtFrom: [],
 });
 const aConversation = (id: string): LiveConversation => ({ id, title: 'A placeholder conversation', startedAt: AT, turns: [] });
+const aDeposition = (id: string, more: Partial<Deposition> = {}): Deposition => ({
+  id, runbookId: 'rb-1', protocolId: null, operatorId: null, startedAt: AT, closedAt: null, state: 'running', entries: [],
+  observations: [], reconciliation: null, ...more,
+});
 
-const dep = { id: 'dep-1', runbookId: 'rb-1' } as unknown as Deposition;
+const dep = aDeposition('dep-1');
 const scenario = aScenario('sc-1');
 const talk = aConversation('lc-1');
 const before: ProjectState = { ...EMPTY_STATE, depositions: [dep], scenarios: [scenario], conversations: [talk], fits: { 'sc-1': { mu: 'a'.repeat(16) } } };
@@ -90,7 +98,7 @@ const before: ProjectState = { ...EMPTY_STATE, depositions: [dep], scenarios: [s
 // ── changes ────────────────────────────────────────────────────────────
 
 check('nothing changed is nothing to send', changes(before, { ...before }, 'p', 'Ada').length === 0);
-const moved = { ...dep, entries: [] } as unknown as Deposition;
+const moved: Deposition = { ...dep, state: 'closed', closedAt: AT };
 const pinned: Scenario = { ...scenario, pinned: true };
 const after: ProjectState = { ...before, depositions: [moved], scenarios: [pinned], fits: {} };
 const sent = changes(before, after, 'p', 'Ada');
@@ -127,6 +135,12 @@ check('a later write of a row replaces the one still unsent, and goes last', JSO
 check('the same row in another project is another write', enqueue([e('sc-1', 1, 'a')], [e('sc-1', 2, 'b')]).length === 2);
 const laid = applyEntries(before, [{ ...e('sc-1', null) }, { ...e('sc-9', pinned) }]);
 check('an owed write is laid over the loaded rows, a take-back removes', laid.scenarios.length === 1 && laid.scenarios[0] === pinned);
+const answered = { ...before, depositedBy: { 'dep-1': 'Ada' }, refused: [{ kind: 'runbooks', id: 'rb-old', why: 'a placeholder reason' }] };
+const answeredLaid = applyEntries(answered, [e('sc-9', pinned)]);
+check(
+  'what the service answers beside the rows, who deposited each deposition and the rows it cannot read, stays as it answered',
+  answeredLaid.depositedBy === answered.depositedBy && answeredLaid.refused === answered.refused && EMPTY_STATE.refused.length === 0,
+);
 
 // ── the flush ──────────────────────────────────────────────────────────
 
@@ -325,7 +339,7 @@ async function callAgainst(answer: { status: number; body?: unknown }, healthy =
   // "came in at 3", fixed to 2 at the bench: the correction appended, the 3 kept with its words.
   const first = entry('de-1', 3);
   const fixed = correctionOf(first, 'de-2', 2, '2026-11-03T11:30:00Z');
-  const bench = { id: 'dep-1', entries: [first, fixed], observations: [], sampleTimes: {} } as unknown as Deposition;
+  const bench = aDeposition('dep-1', { entries: [first, fixed], sampleTimes: {} });
   check(
     'a correction keeps the time its reading was taken, says when it was typed, and stands confirmed',
     fixed.at === first.at && fixed.correctedAt === '2026-11-03T11:30:00Z' && fixed.confirmed && fixed.value === 2,
@@ -337,18 +351,18 @@ async function callAgainst(answer: { status: number; body?: unknown }, healthy =
     JSON.stringify(awaitingReadBack(bench)),
   );
   // Then "came in at 5" and "came in at 7": the 7 alone waits, the number the person said last.
-  const later = { ...bench, entries: [first, fixed, entry('de-3', 5), entry('de-4', 7)] } as unknown as Deposition;
+  const later: Deposition = { ...bench, entries: [first, fixed, entry('de-3', 5), entry('de-4', 7)] };
   check(
     'of several numbers on one measure, the read-back box holds the newest alone',
     JSON.stringify(awaitingReadBack(later).map((e) => e.id)) === '["de-4"]',
     JSON.stringify(awaitingReadBack(later).map((e) => e.id)),
   );
   // A series: each reading at its own hour stands, and a later one at the same hour corrects it.
-  const series = {
+  const series: Deposition = {
     ...bench,
     entries: [entry('de-5', 1), entry('de-6', 2), entry('de-7', 1.5)],
     sampleTimes: { 'de-5': 1, 'de-6': 2, 'de-7': 1 },
-  } as unknown as Deposition;
+  };
   check(
     'a reading in a series is its own, corrected by a later one at its hour alone',
     correctedBy(series, series.entries[0]) === 'de-7' && correctedBy(series, series.entries[1]) === null,
@@ -474,6 +488,66 @@ async function callAgainst(answer: { status: number; body?: unknown }, healthy =
     keptRunsOf('corn', kept).map((a) => a.id).join() === 'proforma.reference-corn_drygrind' &&
       keptRunsOf('cornstover', kept).map((a) => a.id).join() === 'proforma_benchmark-,proforma.reference-cornstover_benchmark',
   );
+}
+
+// ── the runbooks a page makes (alpha 2.2 E.11; src/store.ts) ───────────
+// A runbook is the generated Runbook, served as kept: a draft's prediction may
+// hold its kind, interval, artifact and records as null or leave them out, and
+// a measure may leave its prediction out. lock.ts and runbook_lock.py read the
+// two apart, so the page keeps each as the service wrote it. Every runbook the
+// page makes is one of the project's rows: adopted from a draft, opened to
+// revise a locked one, or promoted from a research one.
+
+{
+  const S = () => useStore.getState();
+  const aPrediction = (id: string, more: Partial<Prediction> = {}): Prediction => ({
+    id, label: `A placeholder claim ${id}`, value: 1, unit: 'placeholder-unit', confidence: 'medium', basis: 'a placeholder basis', ...more,
+  });
+  const draft: RunbookDraft = {
+    title: 'A placeholder draft',
+    productId: '',
+    strainId: '',
+    predictions: [aPrediction('p1', { kind: null, interval: null, artifactId: null, recordIds: null }), aPrediction('p2')],
+    measures: [
+      { id: 'm1', label: 'A placeholder measure', unit: 'placeholder-unit', timepoint: 'harvest', predictionId: 'p1' },
+      { id: 'm2', label: 'A placeholder context', unit: 'placeholder-unit', timepoint: 'harvest' },
+    ],
+  };
+  const drafted = S().adoptRunbookDraft(draft);
+  const adopted = S().runbooks.find((r) => r.id === drafted);
+  check(
+    'a draft’s predictions and measures enter the runbook as the service wrote them, each null and each field left out kept',
+    JSON.stringify(adopted?.predictions) === JSON.stringify(draft.predictions) &&
+      JSON.stringify(adopted?.measurementSchema) === JSON.stringify(draft.measures) &&
+      adopted?.predictions?.[0].kind === null && !('kind' in (adopted?.predictions?.[1] ?? {})) &&
+      !('predictionId' in (adopted?.measurementSchema?.[1] ?? {})),
+    JSON.stringify(adopted?.predictions),
+  );
+  S().lockRunbook(drafted);
+  const locked = S().runbooks.find((r) => r.id === drafted);
+  check(
+    'its lock is taken over the values as they arrived, and reads as intact',
+    locked?.lockHash === runbookLockHash(draft.predictions, draft.measures) && locked !== undefined && lockIntact(locked) &&
+      locked.lockHash !== runbookLockHash([aPrediction('p1'), aPrediction('p2')], draft.measures),
+    String(locked?.lockHash),
+  );
+  const revised = S().supersedeRunbook(drafted);
+  useStore.setState((x) => ({ runbooks: x.runbooks.map((r) => (r.id === drafted ? { ...r, status: 'complete' as const } : r)) }));
+  const promoted = S().promoteRunbook(drafted);
+  const sent = new Set(projectStateOf(S()).runbooks.map((r) => r.id));
+  check(
+    'a runbook adopted, revised or promoted on the page is among the rows the page sends, each under an id that holds across reloads',
+    revised !== null && promoted !== null && sent.has(drafted) && sent.has(revised) && sent.has(promoted) &&
+      [revised, promoted].every((id) => /^rb-[0-9a-z]+-\d+$/.test(id ?? '')),
+    JSON.stringify([...sent]),
+  );
+  const revision = S().runbooks.find((r) => r.id === revised);
+  check(
+    'the revision keeps the locked runbook’s values as they were and is open to change; the original keeps its lock',
+    JSON.stringify(revision?.predictions) === JSON.stringify(draft.predictions) && revision?.lockedAt === null &&
+      S().runbooks.find((r) => r.id === drafted)?.lockHash === locked?.lockHash,
+  );
+  useStore.setState({ runbooks: [], adoptedRunbookIds: [] });
 }
 
 // ── a run's grid with a dimension of one value (src/engine/interp.ts) ──

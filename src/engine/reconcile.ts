@@ -10,7 +10,7 @@
 // the verdict. That split matters most for 'inconclusive': whether a run's
 // deviations were large enough to void the comparison is a call about what
 // actually happened in the room, and a threshold cannot make it.
-import type { Deposition, Prediction, Runbook } from '@/data/types';
+import type { Deposition, Prediction, Runbook } from '@/lib/studies';
 
 export interface Delta {
   predictionId: string;
@@ -87,8 +87,9 @@ export const CONFIRM_BAND_PCT = 10;
  */
 export function computeDeltas(deposition: Deposition, runbook: Runbook): Delta[] {
   const out: Delta[] = [];
-  for (const prediction of runbook.predictions) {
-    const measures = runbook.measurementSchema.filter((m) => m.predictionId === prediction.id);
+  const schema = runbook.measurementSchema ?? [];
+  for (const prediction of runbook.predictions ?? []) {
+    const measures = schema.filter((m) => m.predictionId === prediction.id);
     if (measures.length === 0) continue;
     const ids = new Set(measures.map((m) => m.id));
     const entries = deposition.entries.filter((e) => ids.has(e.measureId));
@@ -113,7 +114,7 @@ export function computeDeltas(deposition: Deposition, runbook: Runbook): Delta[]
 /** Predictions the run simply never got to. */
 export function unmeasured(deposition: Deposition, runbook: Runbook): Prediction[] {
   const measured = new Set(computeDeltas(deposition, runbook).map((d) => d.predictionId));
-  return runbook.predictions.filter((p) => !measured.has(p.id));
+  return (runbook.predictions ?? []).filter((p) => !measured.has(p.id));
 }
 
 export interface OutcomeSuggestion {

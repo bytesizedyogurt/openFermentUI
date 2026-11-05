@@ -16,8 +16,9 @@ import { Card, EmptyState, LinkButton, PageHeader, cx } from '@/components/ui';
 import { OwnerTabs } from '@/components/OwnerTabs';
 import { RUNBOOK_TABS } from '@/data/tabs';
 import { ComponentTag } from '@/components/ComponentTag';
+import type { Deposition } from '@/lib/studies';
 
-const STATE_TONE: Record<string, string> = {
+const STATE_TONE: Record<Deposition['state'], string> = {
   staged: 'text-ink-soft',
   running: 'text-accent',
   closed: 'text-ink-soft',
@@ -71,7 +72,7 @@ export default function Depositions() {
                     >
                       {d.id}
                     </a>
-                    <span className={cx('chip text-[11px] py-0', STATE_TONE[d.state] ?? 'text-ink-soft')}>
+                    <span className={cx('chip text-[11px] py-0', STATE_TONE[d.state])}>
                       {d.state}
                     </span>
                     <span className="ml-auto font-num text-caption text-ink-soft shrink-0">

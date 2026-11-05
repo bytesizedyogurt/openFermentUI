@@ -9,7 +9,7 @@
 // read as text. Nothing here fits anything: fermOS reads these series
 // (§7.2).
 import { useState } from 'react';
-import type { Deposition, Runbook, SeriesRole } from '@/data/types';
+import { measuresOf, type Deposition, type Runbook, type SeriesRole } from '@/lib/studies';
 import { useStore } from '@/store';
 import { seriesOf } from '@/engine/series';
 import { Button } from './ui';
@@ -26,7 +26,7 @@ export function TimeSeriesPanel({ deposition, runbook }: { deposition: Depositio
   const times = deposition.sampleTimes ?? {};
   const open = deposition.state === 'running';
   const series = seriesOf(deposition, runbook);
-  const measures = runbook.measurementSchema.filter((m) => deposition.entries.some((e) => e.measureId === m.id));
+  const measures = measuresOf(runbook).filter((m) => deposition.entries.some((e) => e.measureId === m.id));
 
   return (
     <div className="space-y-4" data-testid="time-series">

@@ -73,7 +73,45 @@ export type StudyComparison = S['StudyComparison'];
 export type ComparisonReport = S['ComparisonReport'];
 /** A runbook predicting a run's outputs, as studies make it and as the service keeps it. */
 export type RunbookCreate = S['RunbookCreate'];
+/**
+ * A runbook as the project keeps it, a person's or a study's, served as kept (studies/runbooks.py, project_state.py):
+ * a field its row never set stays out of the answer. A reader reads its stages, predictions, measures and outputs
+ * through `stagesOf`, `predictionsOf`, `measuresOf` and `outputsOf`, and its note and its progress as a row may leave
+ * them out, which the document names as present for their defaults.
+ */
 export type Runbook = S['Runbook'];
+export type RunbookStatus = Runbook['status'];
+/** One stage of a runbook and where it stands. */
+export type RunbookStage = S['RunbookStage'];
+export type RunbookStageStatus = RunbookStage['status'];
+/**
+ * A claim a runbook makes before anything runs, and a value the bench records against it. A prediction's kind,
+ * interval, artifact and records, and a measure's prediction, stand absent or null as the service or the page wrote
+ * them: the lock's digest reads the two apart (src/engine/lock.ts, runbook_lock.py), so a reader passes each on as it
+ * arrived.
+ */
+export type Prediction = S['Prediction'];
+export type Measure = S['Measure'];
+/**
+ * The bench's record of a run against a runbook (project_state.py): its readings and observations as they were
+ * taken, its state, its reconciliation, and a reading's hours into the run and a measure's series role where a
+ * person set them. A row keeps every field the page sent.
+ */
+export type Deposition = S['Deposition'];
+export type DepositionEntry = S['DepositionEntry'];
+/** What a measure's series is, as a person named it. */
+export type SeriesRole = NonNullable<Deposition['seriesRoles']>[string];
+/** A measured value a reconciliation released, with what it was true under and the run's deviations. */
+export type MeasuredEvidence = S['MeasuredEvidence'];
+
+/** A runbook's stages; a row that set none has none. */
+export const stagesOf = (r: Pick<Runbook, 'stages'>): RunbookStage[] => r.stages ?? [];
+/** A runbook's predictions; a row that set none has none. */
+export const predictionsOf = (r: Pick<Runbook, 'predictions'>): Prediction[] => r.predictions ?? [];
+/** A runbook's measures, the bench's schema; a row that set none has none. */
+export const measuresOf = (r: Pick<Runbook, 'measurementSchema'>): Measure[] => r.measurementSchema ?? [];
+/** What a complete runbook hands over; a row that set none hands over none. */
+export const outputsOf = (r: Pick<Runbook, 'outputs'>): string[] => r.outputs ?? [];
 
 /** One of the toolkit's reference SFF files at the pinned commit. */
 export type SFFLibraryEntry = components['schemas']['SFFLibraryEntry'];

@@ -7,15 +7,14 @@
 // refusal comes back as the rule and the reason, and nothing here repeats
 // them.
 import type {
-  Deposition,
   Practice,
   PracticeDeposition,
   PracticeDraftRequest,
   PracticeScenario,
   PracticeSession,
   PracticeTurnRequest,
-  Runbook,
 } from '@/data/types';
+import type { Deposition, Runbook } from './studies';
 import { IntakeDown } from './intake';
 import { apiFetch } from './project';
 

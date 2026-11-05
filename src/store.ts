@@ -10,13 +10,9 @@ import type {
   Project,
   InputAssumption,
   ActivityEvent,
-  Deposition,
   Deviation,
-  MeasuredEvidence,
   LearnModule,
   Protocol,
-  Runbook,
-  SeriesRole,
   RunState,
   TimerState,
   Guild,
@@ -40,7 +36,17 @@ import type { LiveConversation, LiveTurn, RunbookDraft, TraceStep } from '@/lib/
 import type { Scenario } from '@/lib/proforma';
 import type { KeptTrain, TrainFromRun, TrainProposal, TrainRun, TrainSpec } from '@/lib/pureos';
 import type { ExtractionRecord, Overlay, OverlayPaper, Paper, RecordStatus, ReviewDecision, RunOutput } from '@/lib/review';
-import type { Provenance } from '@/lib/studies';
+import {
+  measuresOf,
+  outputsOf,
+  predictionsOf,
+  stagesOf,
+  type Deposition,
+  type MeasuredEvidence,
+  type Provenance,
+  type Runbook,
+  type SeriesRole,
+} from '@/lib/studies';
 import { toSI } from '@/engine/units';
 import { runbookLockHash } from '@/engine/lock';
 import { computeDeltas } from '@/engine/reconcile';
@@ -71,6 +77,7 @@ import {
   flush,
   loadProjectState,
   type OutboxEntry,
+  type ProjectRows,
   type ProjectState,
 } from '@/lib/projectState';
 import {
@@ -335,7 +342,11 @@ export interface OFState {
   reviewStats: { accepted: number; rejected: number; edited: number; skipped: number; gold: number; startedAt: number };
   undoStack: UndoFrame[];
   learnProgress: Record<string, boolean>;
-  /** Runbooks adopted from a Postdoc draft, by id (OF-BLD-014 §9.2). Durable. */
+  /**
+   * The runbooks the project keeps and those this page made, by id: each is one of the project's rows, sent when it
+   * changes (lib/projectState.ts). A runbook adopted from a Postdoc draft (OF-BLD-014 §9.2), promoted from a research
+   * runbook or opened to revise a locked one joins it as it is made.
+   */
   adoptedRunbookIds: string[];
   /** A research runbook, unlocked, from a draft; returns its id. */
   adoptRunbookDraft: (draft: RunbookDraft) => string;
@@ -602,11 +613,11 @@ export interface OFState {
    * base the next change is compared with (lib/projectState.ts). Null until
    * the project's rows have loaded, and nothing is sent before then.
    */
-  stateSeen: ProjectState | null;
+  stateSeen: ProjectRows | null;
   /** Project rows the service has not yet acknowledged, oldest first. */
   stateOutbox: OutboxEntry[];
   /** Rows this browser kept itself before alpha 2.0, until a project is open to carry them to. */
-  stateLegacy: ProjectState | null;
+  stateLegacy: ProjectRows | null;
   /** Why the open project's rows could not be loaded, in words; null when they were. */
   stateProblem: string | null;
   /** Load the open project's rows, lay the unsent ones over them, and send what is owed. */
@@ -789,10 +800,12 @@ export interface OFState {
 function freezeLocked(runbooks: Runbook[]): Runbook[] {
   for (const r of runbooks) {
     if (!r.lockedAt) continue;
-    r.predictions.forEach((p) => Object.freeze(p));
-    r.measurementSchema.forEach((m) => Object.freeze(m));
-    Object.freeze(r.predictions);
-    Object.freeze(r.measurementSchema);
+    // A row that set no predictions or no measures froze empty lists of them, and holds none to freeze.
+    for (const list of [r.predictions, r.measurementSchema]) {
+      if (!list) continue;
+      list.forEach((x) => Object.freeze(x));
+      Object.freeze(list);
+    }
   }
   return runbooks;
 }
@@ -950,7 +963,7 @@ export const useStore = create<OFState>()((set, get) => ({
     }
     // A row the service keeps that does not read as its kind stays out of what
     // the page holds, and the page names it with the service's words.
-    const unread = held.refused ?? [];
+    const unread = held.refused;
     for (const r of unread)
       get().logActivity({
         at: stamp(),
@@ -1013,7 +1026,7 @@ export const useStore = create<OFState>()((set, get) => ({
       );
       return {
         depositions: state.depositions,
-        depositedBy: state.depositedBy ?? {},
+        depositedBy: state.depositedBy,
         measuredEvidence: state.measuredEvidence,
         runbooks: freezeLocked(runbooks),
         adoptedRunbookIds: [...adopted],
@@ -1563,11 +1576,12 @@ export const useStore = create<OFState>()((set, get) => ({
     const product = source.productId
       ? s.products.find((p) => p.id === source.productId)
       : undefined;
-    const id = nextId('rb');
+    // The promoted runbook is one of the project's rows, so its id holds across reloads.
+    const id = timeId('rb');
 
     // The research runbook's own findings become the industrial one's first
     // stage. Promotion carries the answer across; it does not restart the work.
-    const carried = source.stages
+    const carried = stagesOf(source)
       .filter((st) => st.status === 'done' && (st.value || st.detail))
       .map((st) => st.value ?? st.detail)
       .filter(Boolean)
@@ -1607,7 +1621,7 @@ export const useStore = create<OFState>()((set, get) => ({
       note: `Promoted from ${source.id}. A research runbook that finds something becomes an industrial one in a single action, and the finding travels with it rather than being retyped.`,
       eta: null,
       outputs: [],
-      productId: source.productId,
+      productId: source.productId ?? null,
       progressPct: 0,
       estCostUsd: null,
       strainId: source.strainId ?? null,
@@ -1617,9 +1631,9 @@ export const useStore = create<OFState>()((set, get) => ({
       // against a number somebody made up at promotion time. When the process
       // stages do produce predictions, that is a new version — this one is
       // locked, and locked means superseded, not edited.
-      predictions: source.predictions.map((p) => ({ ...p, id: `${id}-${p.id}` })),
+      predictions: predictionsOf(source).map((p) => ({ ...p, id: `${id}-${p.id}` })),
       measurementSchema: [
-        ...source.measurementSchema.map((m) => ({
+        ...measuresOf(source).map((m) => ({
           ...m,
           id: `${id}-${m.id}`,
           predictionId: m.predictionId ? `${id}-${m.predictionId}` : null,
@@ -1643,7 +1657,7 @@ export const useStore = create<OFState>()((set, get) => ({
       lockHash: null,
     };
 
-    set((st) => ({ runbooks: [runbook, ...st.runbooks] }));
+    set((st) => ({ runbooks: [runbook, ...st.runbooks], adoptedRunbookIds: [...st.adoptedRunbookIds, id] }));
     get().logActivity({
       at: stamp(),
       icon: 'runbook',
@@ -1665,7 +1679,7 @@ export const useStore = create<OFState>()((set, get) => ({
       runbooks: s.runbooks.map((r) => {
         if (r.id !== runbookId || r.status !== 'blocked_unverified') return r;
         let unblocked = false;
-        const stages = r.stages.map((st) => {
+        const stages = stagesOf(r).map((st) => {
           if (st.status === 'blocked') {
             unblocked = true;
             return {
@@ -1715,8 +1729,8 @@ export const useStore = create<OFState>()((set, get) => ({
           ? {
               ...r,
               status: 'running' as const,
-              stages: r.stages.map((st, i) =>
-                st.status === 'queued' && i === r.stages.findIndex((x) => x.status === 'queued')
+              stages: stagesOf(r).map((st, i, stages) =>
+                st.status === 'queued' && i === stages.findIndex((x) => x.status === 'queued')
                   ? { ...st, status: 'running' as const }
                   : st,
               ),
@@ -1735,7 +1749,7 @@ export const useStore = create<OFState>()((set, get) => ({
       provenance: 'user',
     });
     get().toast({
-      text: `Authorised. Estimated spend ${r.estCostUsd === null ? 'unpriced' : `$${r.estCostUsd}`}.`,
+      text: `Authorised. Estimated spend ${r.estCostUsd == null ? 'unpriced' : `$${r.estCostUsd}`}.`,
       kind: 'info',
     });
   },
@@ -1748,12 +1762,12 @@ export const useStore = create<OFState>()((set, get) => ({
               ...r,
               status: 'complete' as const,
               progressPct: 100,
-              stages: r.stages.map((st) =>
+              stages: stagesOf(r).map((st) =>
                 st.status === 'review'
                   ? { ...st, status: 'done' as const, detail: `Ruled on by a person — ${verdict}` }
                   : st,
               ),
-              outputs: [...r.outputs, 'Boundary map', 'Reviewer decision'],
+              outputs: [...outputsOf(r), 'Boundary map', 'Reviewer decision'],
             }
           : r,
       ),
@@ -1776,7 +1790,8 @@ export const useStore = create<OFState>()((set, get) => ({
       get().toast({ text: 'Already locked — supersede it to change anything.', kind: 'warn' });
       return;
     }
-    if (r.predictions.length === 0) {
+    const predictions = predictionsOf(r);
+    if (predictions.length === 0) {
       get().toast({
         text: 'Nothing to lock. A runbook with no predictions has made no claim.',
         kind: 'warn',
@@ -1784,7 +1799,7 @@ export const useStore = create<OFState>()((set, get) => ({
       return;
     }
     const lockedAt = new Date().toISOString();
-    const lockHash = runbookLockHash(r.predictions, r.measurementSchema);
+    const lockHash = runbookLockHash(predictions, measuresOf(r));
     set((s) => ({
       runbooks: freezeLocked(
         s.runbooks.map((x) => (x.id === runbookId ? { ...x, lockedAt, lockHash } : x)),
@@ -1793,12 +1808,12 @@ export const useStore = create<OFState>()((set, get) => ({
     get().logActivity({
       at: stamp(),
       icon: 'runbook',
-      text: `Predictions frozen on ${r.title} — ${r.predictions.length} claim${r.predictions.length === 1 ? '' : 's'}`,
+      text: `Predictions frozen on ${r.title} — ${predictions.length} claim${predictions.length === 1 ? '' : 's'}`,
       href: `#/runbooks/${runbookId}`,
       provenance: 'user',
     });
     get().toast({
-      text: `Locked. ${r.predictions.length} prediction${r.predictions.length === 1 ? '' : 's'} frozen against hash ${lockHash.slice(0, 8)}.`,
+      text: `Locked. ${predictions.length} prediction${predictions.length === 1 ? '' : 's'} frozen against hash ${lockHash.slice(0, 8)}.`,
       kind: 'success',
     });
   },
@@ -1821,7 +1836,7 @@ export const useStore = create<OFState>()((set, get) => ({
         x.id === runbookId
           ? {
               ...x,
-              predictions: x.predictions.map((p) => (p.id === predictionId ? { ...p, value } : p)),
+              predictions: predictionsOf(x).map((p) => (p.id === predictionId ? { ...p, value } : p)),
             }
           : x,
       ),
@@ -1838,13 +1853,8 @@ export const useStore = create<OFState>()((set, get) => ({
     // The draft's predictions and measures enter the runbook as the service
     // wrote them, every field present or left out and every null as it
     // arrived, since lock.ts and runbook_lock.py read a field left out and a
-    // null apart. The draft reads the generated types and the store's
-    // runbooks the hand-kept ones until alpha 2.2 E.11 moves them; this
-    // assertion is the one seam between the two.
-    const assay = structuredClone({ predictions: draft.predictions, measurementSchema: draft.measures }) as Pick<
-      Runbook,
-      'predictions' | 'measurementSchema'
-    >;
+    // null apart. The draft and the runbook are the service's generated types.
+    const assay = structuredClone({ predictions: draft.predictions, measurementSchema: draft.measures });
     const runbook: Runbook = {
       id,
       kind: 'research',
@@ -1871,7 +1881,8 @@ export const useStore = create<OFState>()((set, get) => ({
     const s = get();
     const source = s.runbooks.find((x) => x.id === runbookId);
     if (!source) return null;
-    const id = nextId('rb');
+    // The revision is one of the project's rows, so its id holds across reloads.
+    const id = timeId('rb');
     const revision: Runbook = {
       ...structuredClone({ ...source, predictions: source.predictions, measurementSchema: source.measurementSchema }),
       id,
@@ -1884,7 +1895,7 @@ export const useStore = create<OFState>()((set, get) => ({
       lockedAt: null,
       lockHash: null,
     };
-    set((st) => ({ runbooks: [revision, ...st.runbooks] }));
+    set((st) => ({ runbooks: [revision, ...st.runbooks], adoptedRunbookIds: [...st.adoptedRunbookIds, id] }));
     get().logActivity({
       at: stamp(),
       icon: 'runbook',
@@ -2305,7 +2316,7 @@ export const useStore = create<OFState>()((set, get) => ({
       id: timeId('me'),
       depositionId,
       runbookId: runbook.id,
-      productId: runbook.productId,
+      productId: runbook.productId ?? null,
       predictionId: delta.predictionId,
       label: delta.label,
       value: delta.observed,
@@ -2314,7 +2325,7 @@ export const useStore = create<OFState>()((set, get) => ({
       conditions: {
         protocolId: d.protocolId,
         scale: run?.scale ?? 1,
-        strainId: runbook.strainId,
+        strainId: runbook.strainId ?? null,
       },
       deviations,
       confirmed: delta.confirmed,
@@ -3404,8 +3415,8 @@ export function snapshotOf(s: OFState): DurableSnapshot {
 }
 
 /** The open project's rows as the page holds them (lib/projectState.ts). */
-export function projectStateOf(s: OFState): ProjectState {
-  const runbookLocks: ProjectState['runbookLocks'] = {};
+export function projectStateOf(s: OFState): ProjectRows {
+  const runbookLocks: ProjectRows['runbookLocks'] = {};
   for (const r of s.runbooks) if (r.lockedAt && r.lockHash) runbookLocks[r.id] = lockOf(r.id, r.lockedAt, r.lockHash);
   return {
     depositions: s.depositions,
@@ -3431,8 +3442,8 @@ function lockOf(id: string, lockedAt: string, lockHash: string): { lockedAt: str
 }
 
 /** The rows a snapshot from before alpha 2.0 kept in this browser, or null when it kept none. */
-function legacyStateOf(snap: DurableSnapshot): ProjectState | null {
-  const state: ProjectState = {
+function legacyStateOf(snap: DurableSnapshot): ProjectRows | null {
+  const state: ProjectRows = {
     depositions: snap.depositions ?? [],
     measuredEvidence: snap.measuredEvidence ?? [],
     runbooks: snap.adoptedRunbooks ?? [],

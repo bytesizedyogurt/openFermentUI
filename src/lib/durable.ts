@@ -34,8 +34,8 @@
 // persistence is bad; refusing to open the screen because persistence is
 // unavailable would be worse.
 import type { components } from '@/api/types.gen';
-import type { Deposition, Guild, GuildWithdrawal, InputAssumption, MeasuredEvidence, Runbook } from '@/data/types';
-import type { Provenance } from './studies';
+import type { Guild, GuildWithdrawal, InputAssumption } from '@/data/types';
+import type { Deposition, MeasuredEvidence, Provenance, Runbook } from './studies';
 import type { RecordStatus, ReviewDecision } from './review';
 import type { Override } from './params';
 import type { LiveConversation } from './postdoc';

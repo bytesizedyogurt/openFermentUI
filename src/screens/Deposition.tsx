@@ -41,6 +41,7 @@ import {
 import { useStore } from '@/store';
 import { href, navigate } from '@/router';
 import type { Step } from '@/data/types';
+import { measuresOf, predictionsOf } from '@/lib/studies';
 import { renderStepText, batchLabel, scaleMaterials } from '@/engine/scale';
 import { fmt } from '@/engine/units';
 import { exportText } from '@/lib/csv';
@@ -333,11 +334,11 @@ export default function Deposition({ protocolId, runId }: { protocolId: string; 
             <div className="text-caption uppercase tracking-wide text-ink-soft mb-2">
               What will be recorded
             </div>
-            {runbook && runbook.measurementSchema.length > 0 ? (
+            {runbook && measuresOf(runbook).length > 0 ? (
               <>
                 <ul className="space-y-2">
-                  {runbook.measurementSchema.map((m) => {
-                    const p = runbook.predictions.find((x) => x.id === m.predictionId);
+                  {measuresOf(runbook).map((m) => {
+                    const p = predictionsOf(runbook).find((x) => x.id === m.predictionId);
                     return (
                       <li key={m.id} className="flex flex-wrap items-baseline gap-x-2">
                         <span className="text-reading text-ink">{m.label}</span>
@@ -1110,7 +1111,7 @@ export function DepositionBench({ depositionId }: { depositionId: string }) {
     );
   }
 
-  const schema = runbook.measurementSchema;
+  const schema = measuresOf(runbook);
   // The latest entry on each measure, which a correction is appended after (§4.4).
   const standing = (measureId: string) => [...deposition.entries].reverse().find((e) => e.measureId === measureId) ?? null;
   const unconfirmed = awaitingReadBack(deposition).length;

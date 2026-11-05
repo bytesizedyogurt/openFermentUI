@@ -253,3 +253,26 @@ Never; this is how the drift stops recurring.
 - A strain is named in a chooser or a label by `strainWords` (its species, then its name), and a
   scenario links to a strain by any name its entry keeps (`strainNames` and `namesStrain`, which
   moved from StrainPage into `lib/geneos.ts`).
+
+### Alpha 2.2, E.11 (2026-11-05): the runbook family and the bench's record, read as a row served as kept
+
+- `lib/studies.ts`, which named `Runbook` since E.1, names the rest of the runbook family (`RunbookStatus`,
+  `RunbookStage`, `RunbookStageStatus`, `Prediction`, `Measure`) and the bench's record (`Deposition`,
+  `DepositionEntry`, `SeriesRole`, `MeasuredEvidence`). `lib/projectState.ts`'s `ProjectState` is the generated
+  answer of `GET /api/state` with its `RefusedRow`, where a hand mirror stood, and `ProjectRows` the kinds of rows a
+  page compares and sends. Runbooks, RunbookDetail, RunbookLedger, Depositions, DepositionDetail and the bench
+  (Deposition, its own `Step` on the hand-kept types until E.12), RunbookBits, DepositionPanel, TimeSeriesPanel,
+  ProcessTrain (its `UnitOperation` from `data/vocabulary.ts`), the figure IntervalLedger, the engine modules a
+  runbook and a deposition pass through (ledger, lock, readings, reconcile, series, capture), `lib/fermos.ts`,
+  `lib/practice.ts`, `lib/durable.ts`, `data/labels.ts`, the store, check:state, check-reconcile-kinds and
+  export-lock-fixtures read them there.
+- A runbook is served as kept (`api.AS_KEPT`, E.0a), so a row leaves out every field it never set. A reader takes a
+  runbook's stages, predictions, measures and outputs through `stagesOf`, `predictionsOf`, `measuresOf` and
+  `outputsOf` (the engine modules through `?? []`, which keeps `lib/studies.ts` out of their imports); a runbook with
+  no lock time is unlocked and one with no price unpriced (`== null`), and a measure that names no prediction is
+  context nobody predicted. The document names a runbook's note and its progress as present for their defaults, and
+  their readers read each as a row may leave it out: the note card says the runbook keeps no note, and the progress
+  stands at none.
+- The seam of E.3 goes: `store.adoptRunbookDraft` copies a draft's predictions and measures as the service wrote
+  them, with no type assertion, and every reader passes a prediction's kind, interval, artifact and records on as
+  they arrived; the lock digests the browser writes hold byte for byte (`core/tests/fixtures/lock-digests.json`).

@@ -12,14 +12,15 @@
  * characters beyond the Basic Multilingual Plane.
  */
 import { writeFileSync } from 'node:fs';
-import type { Measure, Prediction } from '../src/data/types';
+import type { Measure, Prediction } from '../src/lib/studies';
 import { runbookLockHash } from '../src/engine/lock';
 
 const point = (id: string, value: number, extra: Partial<Prediction> = {}): Prediction => ({
   id, label: `Final titre ${id}`, value, unit: 'g L⁻¹', confidence: 'medium', basis: 'a named person’s value', ...extra,
 });
+// A measure's prediction is left out, null or named: the generated Measure takes all three as the service keeps them.
 const measure = (id: string, predictionId: string | null | undefined): Measure =>
-  ({ id, label: `Titre ${id}`, unit: 'g L⁻¹', timepoint: 'harvest', ...(predictionId === undefined ? {} : { predictionId }) }) as Measure;
+  ({ id, label: `Titre ${id}`, unit: 'g L⁻¹', timepoint: 'harvest', ...(predictionId === undefined ? {} : { predictionId }) });
 
 const cases: { name: string; predictions: Prediction[]; schema: Measure[] }[] = [
   { name: 'one point, its measure', predictions: [point('p1', 3)], schema: [measure('m1', 'p1')] },

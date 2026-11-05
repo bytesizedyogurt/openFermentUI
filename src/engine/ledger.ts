@@ -7,7 +7,7 @@
 // recorded inconclusive: an inconclusive run is counted as a run, never as a
 // test of anything. The latest such run decides held or missed, through
 // `holds` in reconcile.ts, the one place that decides it for every kind.
-import type { Deposition, Prediction, Runbook } from '@/data/types';
+import type { Deposition, Prediction, Runbook } from '@/lib/studies';
 import { holds } from './reconcile';
 
 /** The tested count below which a hit rate is not shown (the screen says so). */
@@ -40,7 +40,7 @@ export function ledgerRows(runbooks: Runbook[], depositions: Deposition[]): Ledg
     const runs = depositions
       .filter((d) => d.runbookId === rb.id && d.reconciliation && d.reconciliation.outcome !== 'inconclusive')
       .sort((a, b) => (a.reconciliation!.at < b.reconciliation!.at ? -1 : 1));
-    for (const p of rb.predictions) {
+    for (const p of rb.predictions ?? []) {
       let observed: LedgerRow['observed'] = null;
       for (const d of runs) {
         const delta = d.reconciliation!.deltas.find((x) => x.predictionId === p.id);

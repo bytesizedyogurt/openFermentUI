@@ -13,7 +13,7 @@
 // for it — by definition.
 import { useMemo, useState } from 'react';
 import { AlertTriangle, Check, CornerDownLeft, Eye, Ruler } from 'lucide-react';
-import type { Deposition, Measure } from '@/data/types';
+import type { Deposition, Measure } from '@/lib/studies';
 import { useStore } from '@/store';
 import { matchToSchema, readBackText, type CaptureMatch } from '@/engine/capture';
 import { awaitingReadBack, correctedBy } from '@/engine/readings';

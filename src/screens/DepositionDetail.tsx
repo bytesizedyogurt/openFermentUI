@@ -9,7 +9,7 @@
 // are what can be reconciled and the observations are what nobody predicted.
 import { useEffect, useMemo, useState } from 'react';
 import { ArrowRight, ClipboardList, Eye, FlaskConical, GitBranch, Ruler, Scale as ScaleIcon } from 'lucide-react';
-import type { Deposition } from '@/data/types';
+import { predictionsOf, type Deposition } from '@/lib/studies';
 import { useStore } from '@/store';
 import { href, useRoute } from '@/router';
 import { awaitingReadBack, correctedBy } from '@/engine/readings';
@@ -98,8 +98,8 @@ function ReconciliationPanel({ deposition }: { deposition: Deposition }) {
           <IntervalLedger
             title="What was predicted, and what did this run measure?"
             rows={deltas.map((d) => {
-              const p = runbook.predictions.find((x) => x.id === d.predictionId)!;
-              return { key: d.predictionId, label: d.label, prediction: p, lockedAt: runbook.lockedAt, observed: { value: d.observed, unit: d.unit }, held: d.held };
+              const p = predictionsOf(runbook).find((x) => x.id === d.predictionId)!;
+              return { key: d.predictionId, label: d.label, prediction: p, lockedAt: runbook.lockedAt ?? null, observed: { value: d.observed, unit: d.unit }, held: d.held };
             })}
             csvName={`reconciliation-${deposition.id}`}
           />

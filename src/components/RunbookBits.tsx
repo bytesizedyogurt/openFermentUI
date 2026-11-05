@@ -16,7 +16,7 @@ import {
   Loader2,
   Wallet,
 } from 'lucide-react';
-import type { RunbookStageStatus, RunbookStatus } from '@/data/types';
+import type { RunbookStageStatus, RunbookStatus } from '@/lib/studies';
 import { cx } from './ui';
 
 const STATUS_META: Record<

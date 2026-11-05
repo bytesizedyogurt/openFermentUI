@@ -7,7 +7,7 @@
 // bench's correction carries the time across (store `amendEntry`). The bench
 // reads back the entries that stand, and the record says which entry corrects
 // which, so the two pages and a run's lookup read one rule.
-import type { Deposition, DepositionEntry } from '@/data/types';
+import type { Deposition, DepositionEntry } from '@/lib/studies';
 
 /** The id of the entry that corrects `entry` in `deposition`, or null when `entry` stands for its measure. */
 export function correctedBy(deposition: Deposition, entry: DepositionEntry): string | null {

@@ -24,7 +24,7 @@ import {
   Link2,
   Wallet,
 } from 'lucide-react';
-import type { Runbook } from '@/data/types';
+import { measuresOf, outputsOf, predictionsOf, stagesOf, type Runbook } from '@/lib/studies';
 import { useStore } from '@/store';
 import { href, navigate } from '@/router';
 import { RUNBOOK_STATUS_LABEL, RUNBOOK_STATUS_NOTE } from '@/data/labels';
@@ -67,8 +67,9 @@ function StatePanel({ runbook }: { runbook: Runbook }) {
   const resolveReview = useStore((s) => s.resolveRunbookReview);
   const promote = useStore((s) => s.promoteRunbook);
 
-  const blockedStage = runbook.stages.find((s) => s.status === 'blocked');
-  const reviewStage = runbook.stages.find((s) => s.status === 'review');
+  const stages = stagesOf(runbook);
+  const blockedStage = stages.find((s) => s.status === 'blocked');
+  const reviewStage = stages.find((s) => s.status === 'review');
 
   if (runbook.status === 'blocked_unverified') {
     return (
@@ -109,7 +110,7 @@ function StatePanel({ runbook }: { runbook: Runbook }) {
           Priced, not authorised
         </div>
         <h2 className="font-serif text-section-title font-semibold leading-snug">
-          {runbook.estCostUsd === null
+          {runbook.estCostUsd == null
             ? 'This run has not been priced.'
             : `Running this costs about $${runbook.estCostUsd} of compute.`}
         </h2>
@@ -120,7 +121,7 @@ function StatePanel({ runbook }: { runbook: Runbook }) {
         <div className="flex flex-wrap gap-2 mt-3">
           <Button variant="primary" onClick={() => authorise(runbook.id)}>
             <Wallet size={14} /> Authorise
-            {runbook.estCostUsd === null ? '' : ` $${runbook.estCostUsd}`}
+            {runbook.estCostUsd == null ? '' : ` $${runbook.estCostUsd}`}
           </Button>
         </div>
       </Card>
@@ -169,7 +170,7 @@ function StatePanel({ runbook }: { runbook: Runbook }) {
         </div>
         <h2 className="font-serif text-section-title font-semibold leading-snug">
           A prior run already answered this, for{' '}
-          {runbook.estCostUsd === null ? 'nothing' : `$${runbook.estCostUsd.toFixed(2)}`}.
+          {runbook.estCostUsd == null ? 'nothing' : `$${runbook.estCostUsd.toFixed(2)}`}.
         </h2>
         <p className="text-body text-ink-soft mt-1.5 max-w-3xl">
           {runbook.note} Caching artifacts rather than answers is what makes the second question
@@ -214,7 +215,7 @@ function StatePanel({ runbook }: { runbook: Runbook }) {
       <Card className="p-4">
         <div className="text-caption uppercase tracking-wide text-ink-soft mb-1">Scoped only</div>
         <h2 className="font-serif text-section-title font-semibold leading-snug">
-          {runbook.stages[0]?.detail ?? 'Nothing has been run yet.'}
+          {stages[0]?.detail ?? 'Nothing has been run yet.'}
         </h2>
         <p className="text-body text-ink-soft mt-1.5 max-w-3xl">{runbook.note}</p>
       </Card>
@@ -237,10 +238,12 @@ function PredictionPanel({ runbook }: { runbook: Runbook }) {
   const revise = useStore((st) => st.reviseRunbookPrediction);
   const supersede = useStore((st) => st.supersedeRunbook);
   const intact = lockIntact(runbook);
-  const locked = runbook.lockedAt !== null;
-  const measuresFor = (predictionId: string) =>
-    runbook.measurementSchema.filter((m) => m.predictionId === predictionId);
-  const unpredicted = runbook.measurementSchema.filter((m) => m.predictionId === null);
+  // A row served as kept leaves out a field it never set: a runbook with no lock time is unlocked, and a measure
+  // that names no prediction is context nobody predicted.
+  const locked = runbook.lockedAt != null;
+  const predictions = predictionsOf(runbook);
+  const measuresFor = (predictionId: string) => measuresOf(runbook).filter((m) => m.predictionId === predictionId);
+  const unpredicted = measuresOf(runbook).filter((m) => m.predictionId == null);
 
   return (
     <Card className="p-4">
@@ -270,14 +273,14 @@ function PredictionPanel({ runbook }: { runbook: Runbook }) {
         )}
       </div>
 
-      {runbook.predictions.length === 0 ? (
+      {predictions.length === 0 ? (
         <EmptyState
           title="Nothing predicted yet"
           body="This runbook is scoped but has not committed to a number. Until it does there is nothing for a bench result to confirm or refute."
         />
       ) : (
         <ul className="space-y-3">
-          {runbook.predictions.map((p) => {
+          {predictions.map((p) => {
             const tests = measuresFor(p.id);
             return (
               <li key={p.id}>
@@ -379,12 +382,12 @@ function PredictionPanel({ runbook }: { runbook: Runbook }) {
             <Button
               variant="primary"
               onClick={() => lock(runbook.id)}
-              disabled={runbook.predictions.length === 0}
+              disabled={predictions.length === 0}
             >
               <Lock size={14} /> Lock predictions
             </Button>
             <span className="text-caption text-ink-soft">
-              {runbook.predictions.length === 0
+              {predictions.length === 0
                 ? 'Nothing to freeze yet.'
                 : 'Editable until frozen. After that the runbook is superseded, never rewritten.'}
             </span>
@@ -422,7 +425,9 @@ function StartDeposition({ runbook }: { runbook: Runbook }) {
   const [scale, setScale] = useState(1);
 
   const mine = depositions.filter((d) => d.runbookId === runbook.id);
-  const blocked = runbook.lockedAt === null;
+  // A runbook with no lock time is unlocked, and a deposition waits for its predictions to freeze.
+  const blocked = runbook.lockedAt == null;
+  const measures = measuresOf(runbook);
 
   return (
     <Card className="p-4">
@@ -485,7 +490,7 @@ function StartDeposition({ runbook }: { runbook: Runbook }) {
         >
           <div className="font-medium">The readings alone</div>
           <div className="text-caption text-ink-soft">
-            Each of this runbook&rsquo;s {runbook.measurementSchema.length} measure{runbook.measurementSchema.length === 1 ? '' : 's'} recorded at the
+            Each of this runbook&rsquo;s {measures.length} measure{measures.length === 1 ? '' : 's'} recorded at the
             bench, with no protocol&rsquo;s steps around them
           </div>
         </button>
@@ -551,11 +556,11 @@ function RunbookLedgerFigure({ runbook }: { runbook: Runbook }) {
     <div className="mb-4">
       <IntervalLedger
         title={`What does ${runbook.title} predict, and what was measured?`}
-        rows={runbook.predictions.map((p) => ({
+        rows={predictionsOf(runbook).map((p) => ({
           key: p.id,
           label: p.label,
           prediction: p,
-          lockedAt: runbook.lockedAt,
+          lockedAt: runbook.lockedAt ?? null,
           observed: tested.get(p.id)?.observed ?? null,
           held: tested.get(p.id)?.held ?? null,
         }))}
@@ -596,7 +601,11 @@ export default function RunbookDetail({ runbookId }: { runbookId: string }) {
     );
   }
 
-  const done = runbook.stages.filter((s) => s.status === 'done').length;
+  const stages = stagesOf(runbook);
+  const outputs = outputsOf(runbook);
+  const done = stages.filter((s) => s.status === 'done').length;
+  // A row served as kept may leave out its progress, which then stands at none.
+  const progress = runbook.progressPct ?? 0;
 
   return (
     <>
@@ -640,10 +649,10 @@ export default function RunbookDetail({ runbookId }: { runbookId: string }) {
           <div className="min-w-[180px] flex-1">
             <div className="flex items-baseline justify-between gap-3 mb-1">
               <span className="text-caption uppercase tracking-wide text-ink-soft">Progress</span>
-              <span className="font-num text-body">{runbook.progressPct}%</span>
+              <span className="font-num text-body">{progress}%</span>
             </div>
             <Bar
-              value={runbook.progressPct}
+              value={progress}
               max={100}
               className={
                 runbook.status === 'blocked_unverified'
@@ -655,7 +664,7 @@ export default function RunbookDetail({ runbookId }: { runbookId: string }) {
             />
             <div className="text-caption text-ink-soft mt-1">
               <span className="font-num">{done}</span> of{' '}
-              <span className="font-num">{runbook.stages.length}</span> stages resolved
+              <span className="font-num">{stages.length}</span> stages resolved
             </div>
           </div>
           <div>
@@ -669,7 +678,7 @@ export default function RunbookDetail({ runbookId }: { runbookId: string }) {
               <CircleDollarSign size={12} aria-hidden /> Compute
             </div>
             <div className="font-num text-section-title">
-              {runbook.estCostUsd === null
+              {runbook.estCostUsd == null
                 ? 'unpriced'
                 : `$${runbook.estCostUsd < 1 ? runbook.estCostUsd.toFixed(2) : runbook.estCostUsd}`}
             </div>
@@ -687,7 +696,7 @@ export default function RunbookDetail({ runbookId }: { runbookId: string }) {
           <div className="text-caption uppercase tracking-wide text-ink-soft mb-1">
             Why this runbook is here
           </div>
-          <p className="font-serif text-reading">{runbook.note}</p>
+          <p className="font-serif text-reading">{runbook.note || 'This runbook keeps no note of why it is here.'}</p>
         </Tick>
       </Card>
 
@@ -695,9 +704,9 @@ export default function RunbookDetail({ runbookId }: { runbookId: string }) {
       <section className="mb-6" aria-labelledby="band-stages">
         <SectionTitle
           right={
-            runbook.outputs.length > 0 ? (
+            outputs.length > 0 ? (
               <span className="font-num text-caption text-ink-soft">
-                {runbook.outputs.length} outputs
+                {outputs.length} outputs
               </span>
             ) : undefined
           }
@@ -707,19 +716,19 @@ export default function RunbookDetail({ runbookId }: { runbookId: string }) {
         <div className="mb-2">
           <ComponentTag
             component="Runbook"
-            action={`${runbook.kind} claim · ${runbook.stages.length} stages`}
+            action={`${runbook.kind} claim · ${stages.length} stages`}
           />
         </div>
 
         <Card className="p-4">
-          {runbook.stages.length === 0 && (
+          {stages.length === 0 && (
             <p className="text-body text-ink-soft" data-testid="runbook-no-stages">
               This runbook holds no stages: a runbook made from a study or drafted by Postdoc
               starts with its predictions and the measures that test them, below.
             </p>
           )}
           <ol className="space-y-3">
-            {runbook.stages.map((s, i) => {
+            {stages.map((s, i) => {
               const meta = stageMeta(s.status);
               return (
                 <li key={`${s.name}-${i}`} className="flex items-start gap-2.5">
@@ -766,13 +775,13 @@ export default function RunbookDetail({ runbookId }: { runbookId: string }) {
             })}
           </ol>
 
-          {runbook.outputs.length > 0 && (
+          {outputs.length > 0 && (
             <div className="mt-4 pt-3 border-t border-line">
               <div className="text-caption uppercase tracking-wide text-ink-soft mb-1.5">
                 Outputs
               </div>
               <div className="flex flex-wrap gap-1.5">
-                {runbook.outputs.map((o) => (
+                {outputs.map((o) => (
                   <span key={o} className="chip text-accent border-accent/40">
                     <FileCheck2 size={12} aria-hidden />
                     {o}
@@ -798,7 +807,7 @@ export default function RunbookDetail({ runbookId }: { runbookId: string }) {
           run, and the measurements that will test them — frozen together, so the platform cannot
           quietly move a prediction toward a result it has already seen.
         </p>
-        {runbook.predictions.length > 0 && <RunbookLedgerFigure runbook={runbook} />}
+        {predictionsOf(runbook).length > 0 && <RunbookLedgerFigure runbook={runbook} />}
         <Dossier runbook={runbook} />
         <div className="grid grid-cols-1 lg:grid-cols-[minmax(0,1.4fr)_minmax(0,1fr)] gap-4">
           <PredictionPanel runbook={runbook} />

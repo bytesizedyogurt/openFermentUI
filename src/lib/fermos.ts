@@ -18,9 +18,10 @@
 // Every shape the service answers or takes here is generated from its models
 // into src/api/types.gen.ts (ADR-007) and named below: a fit and its series,
 // a forecast, a family, a binding, a simulation, a harvest and a vessel. A
-// deposition and the runbook it was taken on are the store's own shapes.
+// deposition and the runbook it was taken on are the project's rows, as
+// lib/studies.ts names them.
 import type { components } from '@/api/types.gen';
-import type { Deposition, Runbook } from '@/data/types';
+import type { Deposition, Runbook } from './studies';
 import { seriesOf } from '@/engine/series';
 import type { TimeCourseProps, TrajectorySeries } from '@/components/figures';
 import { ServiceDown, ServiceRefused, call } from './http';

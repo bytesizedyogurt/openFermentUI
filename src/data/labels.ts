@@ -2,7 +2,7 @@
 // alpha 2.0 kept these when it deleted the seed files they lived in
 // (src/data/products.ts and runbooks.ts at tag alpha-1.0; ADR-010).
 import type { ProductCategory, ProductLocation, SkillCriticality } from '@/lib/catalogues';
-import type { RunbookStatus } from './types';
+import type { RunbookStatus } from '@/lib/studies';
 
 /**
  * A product's class as the products catalogue keeps it: the classes pureOS's proposer reads (the generated

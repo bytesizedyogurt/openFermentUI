@@ -22,8 +22,7 @@
 // drawn.
 import { Fragment, useState } from 'react';
 import { ArrowRight, FlaskConical, Package } from 'lucide-react';
-import { UNIT_OPERATIONS_BY_ID } from '@/data/vocabulary';
-import type { UnitOperation } from '@/data/types';
+import { UNIT_OPERATIONS_BY_ID, type UnitOperation } from '@/data/vocabulary';
 import { useStore } from '@/store';
 import { Callout, EmptyState, Sheet, cx } from './ui';
 
@@ -87,13 +86,11 @@ function OpNode({
 export function ProcessTrain({
   unitOperationIds,
   strainId,
-  processCode,
   emptyBody,
 }: {
   /** Ordered fermenter to vial. This array is the train — stage order is not. */
   unitOperationIds: string[];
   strainId?: string | null;
-  processCode?: string;
   emptyBody?: string;
 }) {
   const [open, setOpen] = useState<UnitOperation | null>(null);
@@ -139,7 +136,6 @@ export function ProcessTrain({
         <span className="font-num">
           {ops.length} unit operation{ops.length === 1 ? '' : 's'}
         </span>
-        {processCode && <span>process family {processCode}</span>}
         <span>click a step for its definition</span>
       </div>
 

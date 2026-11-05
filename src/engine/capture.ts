@@ -11,7 +11,7 @@
 // Observation. A false negative costs a person one reclassification later; a
 // false positive silently writes a number into a slot it does not belong in
 // and the reconciliation is quietly wrong.
-import type { Measure } from '@/data/types';
+import type { Measure } from '@/lib/studies';
 
 export interface CaptureMatch {
   measureId: string;
