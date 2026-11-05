@@ -51,7 +51,8 @@ function RunbookCard({ r }: { r: Runbook }) {
 
       {product && (
         <div className="text-caption text-ink-soft mt-1 truncate">
-          {product.name} · {PRODUCT_CATEGORY_LABEL[product.category]}
+          {product.name}
+          {product.category && ` · ${PRODUCT_CATEGORY_LABEL[product.category]}`}
         </div>
       )}
 

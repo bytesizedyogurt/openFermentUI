@@ -11,6 +11,10 @@
 // that names nobody. With the service down a call says so (ServiceDown); a refusal comes back in the service's
 // words (ServiceRefused). Nothing here takes an entry out.
 //
+// The store reads the project's strains and products through `listStrains` and `listProducts` (alpha 2.2 E.9):
+// geneOS's hosts and their pages, the strain choosers of fermOS and pureOS, the runbooks and the protocols name a
+// strain as its entry does, and a product likewise.
+//
 // Every shape here is the service's own, generated from its models into src/api/types.gen.ts (ADR-007). The keep's
 // body is the entry as the catalogue answers one (`CatalogueKeep.entry`), so the generated entry names every field
 // with a default as one a reader may find absent.
@@ -33,6 +37,10 @@ export type ProductCategory = NonNullable<CatalogueEntry['category']>;
 export type ProductLocation = NonNullable<CatalogueEntry['location']>;
 /** A skill's criticality: a critical skill is one where a mistake hurts a person or loses a batch. */
 export type SkillCriticality = NonNullable<CatalogueEntry['criticality']>;
+/** A strain the project works with, as its strain catalogue keeps it: its name, species, chemical set and other names. */
+export type Strain = CatalogueEntry & { kind: 'strain' };
+/** A product the project works with, as its product catalogue keeps it: its name, class, location and sequence. */
+export type Product = CatalogueEntry & { kind: 'product' };
 
 export { ServiceDown as CataloguesDown, ServiceRefused as CataloguesRefused };
 
@@ -44,6 +52,17 @@ const id = (s: string) => encodeURIComponent(s);
 /** The open project's entries of one catalogue, by id. */
 export const listCatalogue = (kind: CatalogueKind, signal?: AbortSignal) =>
   call<CatalogueEntry[]>(`/api/catalogues/${kind}`, { signal });
+
+/** The open project's strains, as its strain catalogue keeps them. */
+export const listStrains = (signal?: AbortSignal) =>
+  listCatalogue('strain', signal).then((entries) => entries.filter((e): e is Strain => e.kind === 'strain'));
+
+/** The open project's products, as its product catalogue keeps them. */
+export const listProducts = (signal?: AbortSignal) =>
+  listCatalogue('product', signal).then((entries) => entries.filter((e): e is Product => e.kind === 'product'));
+
+/** A strain in words, as a chooser or a label names it: its species, where its entry keeps one, then its name. */
+export const strainWords = (s: Pick<CatalogueEntry, 'name' | 'species'>): string => [s.species, s.name].filter(Boolean).join(' ');
 
 /** One entry of the open project's catalogue of `kind`. */
 export const catalogueEntry = (kind: CatalogueKind, entryId: string, signal?: AbortSignal) =>

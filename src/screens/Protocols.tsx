@@ -24,8 +24,8 @@ import type {
   Protocol,
   ProtocolCategory,
   ProtocolVersion,
-  Strain,
 } from '@/data/types';
+import { strainWords, type Strain } from '@/lib/catalogues';
 import type { ExtractionRecord } from '@/lib/review';
 import { useStore, provenanceOf } from '@/store';
 import { href, navigate } from '@/router';
@@ -199,10 +199,11 @@ export function fmtMinutes(min: number): string {
   return m === 0 ? `${h} h` : `${h} h ${m} min`;
 }
 
+/** A strain a protocol lists, named as its entry in the project's strain catalogue names it. */
 export function strainLabel(id: string, strains: Strain[]): { label: string; title: string } {
   const s = strains.find((x) => x.id === id);
-  if (!s) return { label: id, title: `${id} — not among the strains in this session` };
-  return { label: s.designation, title: `${s.binomial} ${s.designation} · BSL-${s.bsl}` };
+  if (!s) return { label: id, title: `${id} — not among the project's strains` };
+  return { label: s.name, title: strainWords(s) };
 }
 
 // ── Row model ──────────────────────────────────────────────────────────

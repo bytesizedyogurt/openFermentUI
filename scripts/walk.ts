@@ -6,7 +6,9 @@
  * report and its SFF graph → a scenario begun from the run → the plants Studies
  * offers to run → the project's SFF flowsheets → the catalogues screen, where
  * the person keeps a placeholder strain, edits it, takes in a file naming it
- * again and reads it back as their own (alpha 2.2 E.8) → a conversation with
+ * again and reads it back as their own (alpha 2.2 E.8) → geneOS's Hosts, where
+ * that strain has its card, and its page with the other names its entry keeps
+ * (alpha 2.2 E.9) → a conversation with
  * its labelled estimate → a runbook → a reading deposited at the bench on that
  * locked runbook, the readings alone, in the unit a scenario parameter of the
  * project is denominated in, the placeholder value the person types and reads
@@ -278,6 +280,22 @@ async function main(): Promise<void> {
     if (held.by !== PERSON || held.agent !== 'person' || held.via != null || held.name !== STRAIN_NAME || aliases !== STRAIN_ALIASES.join(', ') || held.source !== `the file ${STRAIN_FILE}`)
       throw new Error(`the service keeps ${STRAIN} as "${held.name}" (${aliases}) by ${held.by} in the ${held.agent} lane from ${held.source}`);
     return `placeholder strain ${STRAIN} kept on the catalogues screen in ${PERSON}'s name, edited to the other names ${aliases}, taken in again from ${STRAIN_FILE} through the screen, and read back from the service as ${PERSON}'s keep from that file`;
+  });
+
+  // alpha 2.2 E.9: geneOS's hosts are the project's strain catalogue, which the store reads, so the strain the person
+  // kept has its card on Hosts and its own page, named as its entry names it.
+  await step('Hosts', async () => {
+    await at(page, '/geneos/hosts');
+    const card = page.locator(`[data-testid="strain-card"][data-strain="${STRAIN}"]`);
+    await card.waitFor();
+    await card.getByText(STRAIN_NAME, { exact: true }).waitFor();
+    await card.getByRole('link', { name: /Open/ }).click();
+    const held = page.locator(`[data-testid="strain-page"][data-strain="${STRAIN}"]`);
+    await held.waitFor();
+    await held.getByText(STRAIN_NAME, { exact: true }).first().waitFor();
+    const aliases = (await held.getByTestId('strain-aliases').innerText()).trim();
+    if (aliases !== STRAIN_ALIASES.join(', ')) throw new Error(`the strain's page names its other names as "${aliases}"`);
+    return `geneOS → Hosts shows ${STRAIN}'s card from the project's strain catalogue, and its page names it with its other names ${aliases}`;
   });
 
   await step('Conversation', async () => {

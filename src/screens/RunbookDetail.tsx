@@ -703,7 +703,8 @@ export default function RunbookDetail({ runbookId }: { runbookId: string }) {
         {strain && (
           <a href={href(`/geneos/hosts/${strain.id}`)} className="chip text-ink-soft hover:border-accent/45">
             <FlaskConical size={12} aria-hidden />
-            <span className="italic">{strain.binomial}</span>
+            {strain.species && <span className="italic">{strain.species}</span>}
+            <span>{strain.name}</span>
           </a>
         )}
         <span className="chip text-ink-soft font-num">{runbook.id}</span>
@@ -889,13 +890,13 @@ export default function RunbookDetail({ runbookId }: { runbookId: string }) {
           <span id="band-train">Process train</span>
         </SectionTitle>
         <Card className="p-4">
+          {/* A product's catalogue entry keeps its class, its location and its sequence; pureOS builds and proposes trains. */}
           <ProcessTrain
-            unitOperationIds={product?.unitOperationIds ?? []}
-            strainId={runbook.strainId ?? product?.defaultStrainId ?? null}
-            processCode={product?.processCode}
+            unitOperationIds={[]}
+            strainId={runbook.strainId ?? null}
             emptyBody={
               product
-                ? 'This product declares no unit operations, so there is no train to draw yet.'
+                ? `${product.name}'s catalogue entry keeps its class, where the cells leave it and its sequence. A train of unit operations is built in pureOS, unit by unit, or proposed there for a product and a host.`
                 : 'This runbook names no product, so it has no process train to draw.'
             }
           />

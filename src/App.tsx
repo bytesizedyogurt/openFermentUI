@@ -351,6 +351,7 @@ export default function App() {
   const hydrateOverlay = useStore((s) => s.hydrateOverlay);
   const loadProjects = useStore((s) => s.loadProjects);
   const hydrateProjectState = useStore((s) => s.hydrateProjectState);
+  const hydrateCatalogues = useStore((s) => s.hydrateCatalogues);
   const route = useRoute();
   const [gPressed, setGPressed] = useState(false);
   const lastFrame = useRef(performance.now());
@@ -368,12 +369,14 @@ export default function App() {
   useEffect(() => {
     // alpha 2.0 (ADR-005) — the projects first, so every later call to the
     // service names the open one; then the service's overlay, applied when
-    // the service answers and silent when it does not; then, with what this
-    // browser still owes the service read, the open project's rows.
+    // the service answers and silent when it does not, and the project's
+    // strains and products from its catalogues (alpha 2.2 E.9); then, with
+    // what this browser still owes the service read, the open project's rows.
     const projects = loadProjects();
     void projects.then(() => hydrateOverlay());
+    void projects.then(() => hydrateCatalogues());
     void Promise.all([hydrateDurable(), projects]).then(() => hydrateProjectState());
-  }, [hydrateDurable, hydrateOverlay, loadProjects, hydrateProjectState]);
+  }, [hydrateDurable, hydrateOverlay, loadProjects, hydrateProjectState, hydrateCatalogues]);
 
   // Theme / density / motion applied at the document root.
   useEffect(() => {

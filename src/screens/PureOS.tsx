@@ -23,9 +23,9 @@
 // is an economics question; asking whether centrifugation or filtration is the
 // right step for a cell-wall-deficient alga is a process question. Each entry
 // names the BioSTEAM classes that perform it, so a unit in a run's train links
-// to its step (`?op=` highlights it below). Every operation listed is one a
-// molecule in the catalogue declares or a train BioSTEAM ships runs; none is
-// invented.
+// to its step (`?op=` highlights it below). Every operation listed is a name
+// the vocabulary keeps (src/data/vocabulary.ts) with the BioSTEAM classes that
+// perform it; none is invented.
 //
 // PUREOS BUILDS A TRAIN (OF-BLD-020 §5.3, D9). **New train** opens the
 // Builder (/pureos/build/new, PureOSBuilder.tsx), where a person puts units
@@ -363,19 +363,10 @@ export default function PureOS() {
   useEffect(() => {
     if (focus) document.getElementById(`op-${focus}`)?.scrollIntoView({ block: 'center' });
   }, [focus]);
-  // The products on file, as the store holds them.
+  // The products on file, as the project's product catalogue keeps them (alpha 2.2 E.9): the proposer proposes a
+  // train for a product kept with its class.
   const products = useStore((s) => s.products);
-  // Usage is counted from the catalogue rather than declared, so an operation
-  // no molecule uses shows as zero instead of being quietly dropped.
-  const usage = useMemo(() => {
-    const counts = new Map<string, number>();
-    for (const product of products) {
-      for (const id of product.unitOperationIds ?? []) {
-        counts.set(id, (counts.get(id) ?? 0) + 1);
-      }
-    }
-    return counts;
-  }, [products]);
+  const classed = products.filter((p) => p.category != null).length;
 
   const byStage = useMemo(() => {
     const groups = new Map<UnitOperationStage, typeof UNIT_OPERATIONS>();
@@ -391,8 +382,6 @@ export default function PureOS() {
       ops: groups.get(stage)!,
     }));
   }, []);
-
-  const unused = UNIT_OPERATIONS.filter((op) => !usage.has(op.id)).length;
 
   // The service's train runs, read once for both lists that show them.
   const [runs, setRuns] = useState<TrainSummary[] | null>(null);
@@ -446,17 +435,12 @@ export default function PureOS() {
         </p>
       </Callout>
 
-      <div className="grid grid-cols-2 md:grid-cols-3 gap-3 my-5">
+      <div className="grid grid-cols-2 gap-3 my-5">
         <Stat label="Unit operations" value={String(UNIT_OPERATIONS.length)} sub={`across ${byStage.length} stages`} />
         <Stat
-          label="Molecules with a train"
-          value={String(products.filter((p) => (p.unitOperationIds ?? []).length > 0).length)}
-          sub={`of ${products.length} in the catalogue`}
-        />
-        <Stat
-          label="Operations unused"
-          value={String(unused)}
-          sub={unused === 0 ? 'every one is on a train' : 'in the vocabulary, on no train'}
+          label="Products on file"
+          value={String(products.length)}
+          sub={`${classed} with the class the proposer reads`}
         />
       </div>
 
@@ -496,52 +480,36 @@ export default function PureOS() {
             </SectionTitle>
             <Card className="px-4 py-1">
               <ul>
-                {ops.map((op) => {
-                  const used = usage.get(op.id) ?? 0;
-                  return (
-                    <li
-                      key={op.id}
-                      id={`op-${op.id}`}
-                      data-testid="pureos-operation"
-                      data-focused={focus === op.id ? 'true' : undefined}
-                      className={cx(
-                        'py-2.5 border-b border-line/70 last:border-0',
-                        focus === op.id && 'rounded-input ring-2 ring-accent/60 px-2 -mx-2',
+                {ops.map((op) => (
+                  <li
+                    key={op.id}
+                    id={`op-${op.id}`}
+                    data-testid="pureos-operation"
+                    data-focused={focus === op.id ? 'true' : undefined}
+                    className={cx(
+                      'py-2.5 border-b border-line/70 last:border-0',
+                      focus === op.id && 'rounded-input ring-2 ring-accent/60 px-2 -mx-2',
+                    )}
+                  >
+                    <div className="flex flex-wrap items-baseline gap-x-2 gap-y-0.5">
+                      <span className="font-num text-body text-ink">{op.label}</span>
+                      {op.resin && (
+                        <span className="text-caption text-ink-soft">{op.resin}</span>
                       )}
-                    >
-                      <div className="flex flex-wrap items-baseline gap-x-2 gap-y-0.5">
-                        <span className="font-num text-body text-ink">{op.label}</span>
-                        {op.resin && (
-                          <span className="text-caption text-ink-soft">{op.resin}</span>
-                        )}
-                        {op.scale && (
-                          <span className="chip text-[11px] py-0 text-ink-soft">{op.scale}</span>
-                        )}
-                        <span
-                          className={cx(
-                            'ml-auto font-num text-caption shrink-0',
-                            used > 0 ? 'text-ink-soft' : 'text-ink-soft/55',
-                          )}
-                          title={
-                            used > 0
-                              ? `${used} molecule${used === 1 ? '' : 's'} in the catalogue declare this step`
-                              : 'no molecule in the catalogue declares this step'
-                          }
-                        >
-                          {used > 0 ? `on ${used}` : 'on none'}
-                        </span>
+                      {op.scale && (
+                        <span className="chip text-[11px] py-0 text-ink-soft">{op.scale}</span>
+                      )}
+                    </div>
+                    {op.note && (
+                      <div className="text-body text-ink-soft mt-0.5">{op.note}</div>
+                    )}
+                    {op.biosteamClasses && op.biosteamClasses.length > 0 && (
+                      <div className="text-caption text-ink-soft mt-0.5">
+                        BioSTEAM: <span className="font-num">{op.biosteamClasses.join(', ')}</span>
                       </div>
-                      {op.note && (
-                        <div className="text-body text-ink-soft mt-0.5">{op.note}</div>
-                      )}
-                      {op.biosteamClasses && op.biosteamClasses.length > 0 && (
-                        <div className="text-caption text-ink-soft mt-0.5">
-                          BioSTEAM: <span className="font-num">{op.biosteamClasses.join(', ')}</span>
-                        </div>
-                      )}
-                    </li>
-                  );
-                })}
+                    )}
+                  </li>
+                ))}
               </ul>
             </Card>
           </section>

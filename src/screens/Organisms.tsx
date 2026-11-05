@@ -4,16 +4,20 @@
 // actually stands behind each strain: each card counts its papers, verified
 // records, protocols and scenarios, and says plainly when a class is empty.
 //
-// The catalogue is the store's strains. No store holds a strain catalogue yet
-// (alpha 2.0, ADR-010), so the page says so.
+// The catalogue is the project's strain catalogue, which the store reads
+// through lib/catalogues.ts (alpha 2.2 E.9): each card names a strain as its
+// entry does, its species, its name, the other names papers give it and its
+// note, and a strain is kept on the Catalogues screen.
 import { useMemo, useState } from 'react';
 import { ArrowRight, ClipboardList, FlaskConical, LineChart, BookOpen, ShieldCheck } from 'lucide-react';
-import type { Strain } from '@/data/types';
+import type { Strain } from '@/lib/catalogues';
+import { namesStrain, strainNames } from '@/lib/geneos';
 import type { ExtractionRecord } from '@/lib/review';
 import { useStore } from '@/store';
 import { ProvDot, ProvenanceLegend, Tick, type ProvKind } from '@/components/Provenance';
 import {
   Bar,
+  Callout,
   Card,
   EmptyState,
   Explain,
@@ -21,7 +25,6 @@ import {
   PageHeader,
   cx,
 } from '@/components/ui';
-import { namesStrain } from './StrainPage';
 
 // ── coverage model ─────────────────────────────────────────────────────
 
@@ -39,7 +42,10 @@ interface Coverage {
   prov: ProvKind;
 }
 
-/** A record counts for a strain when its organism tag names it. */
+/**
+ * A record counts for a strain when its organism tag names it: anchoring resolves the wording a paper uses to a
+ * strain's id by the name and the other names its entry keeps (validate.strain_id on the service).
+ */
 function recordsFor(records: ExtractionRecord[], strainId: string): ExtractionRecord[] {
   return records.filter((r) => r.organism === strainId);
 }
@@ -82,16 +88,21 @@ function CoverageCount({
 function StrainCard({ c, maxes }: { c: Coverage; maxes: Record<string, number> }) {
   const s = c.strain;
   const complete = c.classes === 4 && c.verified > 0;
+  const aliases = s.aliases ?? [];
 
   return (
-    <Card className="p-4 flex flex-col gap-3">
+    <Card className="p-4 flex flex-col gap-3" data-testid="strain-card" data-strain={s.id}>
       <div>
         <div className="flex items-start justify-between gap-3">
           <div className="min-w-0">
-            <h2 className="font-serif text-section-title font-semibold italic leading-snug">
-              {s.binomial}
-            </h2>
-            <div className="font-num text-body mt-0.5">{s.designation}</div>
+            {s.species ? (
+              <>
+                <h2 className="font-serif text-section-title font-semibold italic leading-snug">{s.species}</h2>
+                <div className="font-num text-body mt-0.5">{s.name}</div>
+              </>
+            ) : (
+              <h2 className="font-serif text-section-title font-semibold leading-snug">{s.name}</h2>
+            )}
           </div>
           <span
             className={cx(
@@ -108,15 +119,17 @@ function StrainCard({ c, maxes }: { c: Coverage; maxes: Record<string, number> }
           </span>
         </div>
 
-        <div className="mt-2 flex flex-wrap gap-1.5">
-          {s.badges.map((b) => (
-            <span key={b} className="chip text-ink-soft">
-              {b}
-            </span>
-          ))}
-        </div>
+        {aliases.length > 0 && (
+          <div className="mt-2 flex flex-wrap gap-1.5" aria-label="Other names">
+            {aliases.map((a) => (
+              <span key={a} className="chip text-ink-soft" title="Another name papers give this strain">
+                {a}
+              </span>
+            ))}
+          </div>
+        )}
 
-        <p className="mt-2 text-body text-ink-soft line-clamp-3">{s.description}</p>
+        {s.note && <p className="mt-2 text-body text-ink-soft line-clamp-3">{s.note}</p>}
       </div>
 
       <Tick
@@ -156,7 +169,7 @@ function StrainCard({ c, maxes }: { c: Coverage; maxes: Record<string, number> }
             label={COUNT_LABEL.scenarios}
             n={c.scenarios}
             max={maxes.scenarios}
-            title="Scenarios with an assumption or dimension sourced from a record for this strain"
+            title="Scenarios whose name, description or product names this strain"
           />
         </div>
 
@@ -213,7 +226,11 @@ function StrainCard({ c, maxes }: { c: Coverage; maxes: Record<string, number> }
           Open <ArrowRight size={14} />
         </LinkButton>
         <span className="font-num text-caption text-ink-soft">{s.id}</span>
-        <span className="font-num text-caption text-ink-soft ml-auto">BSL-{s.bsl}</span>
+        {s.program && (
+          <span className="text-caption text-ink-soft ml-auto" title="The chemical set its trains use, as pureOS names it">
+            chemical set <span className="font-num">{s.program}</span>
+          </span>
+        )}
       </div>
     </Card>
   );
@@ -225,6 +242,8 @@ type SortKey = 'coverage' | 'name';
 
 export default function Organisms({ embedded = false }: { embedded?: boolean } = {}) {
   const strains = useStore((s) => s.strains);
+  const read = useStore((s) => s.cataloguesRead);
+  const problem = useStore((s) => s.cataloguesProblem);
   const papers = useStore((s) => s.papers);
   const records = useStore((s) => s.records);
   const protocols = useStore((s) => s.protocols);
@@ -242,7 +261,7 @@ export default function Organisms({ embedded = false }: { embedded?: boolean } =
       // The papers the strain's records were read from.
       const paperCount = new Set(recs.map((r) => r.paperId)).size;
       const protocolCount = protocols.filter((p) => p.organisms.includes(strain.id)).length;
-      const scenarioCount = scenarios.filter((sc) => namesStrain(sc, [strain.designation, strain.binomial])).length;
+      const scenarioCount = scenarios.filter((sc) => namesStrain(sc, strainNames(strain))).length;
       const prov: ProvKind = gold > 0 ? 'gold' : verified > 0 ? 'verified' : 'unverified';
       return {
         strain,
@@ -274,8 +293,8 @@ export default function Organisms({ embedded = false }: { embedded?: boolean } =
     if (sort === 'name') {
       list.sort(
         (a, b) =>
-          a.strain.binomial.localeCompare(b.strain.binomial) ||
-          a.strain.designation.localeCompare(b.strain.designation),
+          (a.strain.species ?? '').localeCompare(b.strain.species ?? '') ||
+          a.strain.name.localeCompare(b.strain.name),
       );
     } else {
       list.sort(
@@ -283,7 +302,7 @@ export default function Organisms({ embedded = false }: { embedded?: boolean } =
           b.classes - a.classes ||
           b.verified - a.verified ||
           b.records - a.records ||
-          a.strain.designation.localeCompare(b.strain.designation),
+          a.strain.name.localeCompare(b.strain.name),
       );
     }
     return list;
@@ -305,13 +324,27 @@ export default function Organisms({ embedded = false }: { embedded?: boolean } =
     return (
       <>
         {!embedded && <PageHeader eyebrow="geneOS · Hosts" title="Organisms" subtitle={subtitle} />}
-        <Card>
-          <EmptyState
-            icon={<FlaskConical size={22} />}
-            title="No strain is on file yet"
-            body="No store holds a strain catalogue yet. When one does, each strain gets a card here, counting the papers, records, protocols and scenarios that stand behind it."
-          />
-        </Card>
+        {problem && (
+          <div className="mb-4">
+            <Callout kind="warn" title="The project's strains could not be read">
+              <span data-testid="hosts-problem">{problem}</span>
+            </Callout>
+          </div>
+        )}
+        {!read && !problem ? (
+          <p className="text-body text-ink-soft" data-testid="hosts-reading">
+            Reading the project&rsquo;s strain catalogue…
+          </p>
+        ) : (
+          <Card>
+            <EmptyState
+              icon={<FlaskConical size={22} />}
+              title="No strain is on file yet"
+              body="The project's strain catalogue holds no strain yet. Each strain kept there gets a card here, counting the papers, records, protocols and scenarios that stand behind it."
+              action={<LinkButton to="/catalogues">Keep a strain on the Catalogues screen</LinkButton>}
+            />
+          </Card>
+        )}
       </>
     );
   }
@@ -345,7 +378,7 @@ export default function Organisms({ embedded = false }: { embedded?: boolean } =
                 title={
                   key === 'coverage'
                     ? 'Best-covered strains first — asset classes, then verified records'
-                    : 'Alphabetical by binomial'
+                    : 'Alphabetical by species, then by name'
                 }
                 className={cx(
                   'px-2.5 py-[5px] text-[12px]',
@@ -384,11 +417,20 @@ export default function Organisms({ embedded = false }: { embedded?: boolean } =
             Four counts, each derived live from the session store: papers holding a record for the
             strain; extraction records for it that a reviewer has verified; protocols listing it;
             and scenarios that name it in their name, description or product.
-            A record counts for the organism its tag names. Bars are drawn relative to the best-covered
+            A record counts for the strain its organism tag names, which the service resolves from the
+            paper&rsquo;s wording by the names the strain&rsquo;s entry keeps. Bars are drawn relative to the best-covered
             strain in this corpus, so they compare strains to each other and to nothing else.
           </Explain>
         </span>
       </div>
+
+      {problem && (
+        <div className="mb-4">
+          <Callout kind="warn" title="The project's strains could not be read again">
+            {problem} The cards below are the strains as last read.
+          </Callout>
+        </div>
+      )}
 
       <div className="mb-4">
         <ProvenanceLegend />
@@ -411,8 +453,8 @@ export default function Organisms({ embedded = false }: { embedded?: boolean } =
         <div className="flex items-start gap-2">
           <LineChart size={13} className="mt-[2px] shrink-0" />
           <span>
-            A scenario counts for a strain only when one of its assumptions cites a record for that
-            strain.
+            A scenario counts for a strain when its name, description or product names the strain by
+            one of the names its entry keeps.
           </span>
         </div>
       </div>

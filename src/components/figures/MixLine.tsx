@@ -1,7 +1,7 @@
 // The ceiling across mixtures of two sugars at equal total carbon
 // (OF-BLD-014 §6.3, §6.4): a computed line, so dotted, with its basis. It
 // answers how a hydrolysate's sugar ratio bounds the yield.
-import type { ComputedBasis } from '@/data/types';
+import type { ComputedBasis } from '@/lib/studies';
 import { fmt } from '@/engine/units';
 import { FigureFrame, lineStroke, type FigureTable } from './FigureFrame';
 

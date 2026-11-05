@@ -50,6 +50,7 @@ import { SourceChip, shown } from '@/components/ParameterRow';
 import { TimeCourse } from '@/components/figures';
 import { CARBON_SOURCES } from '@/data/vocabulary';
 import { PRODUCT_WORDS, productWords } from '@/lib/geneos';
+import { strainWords } from '@/lib/catalogues';
 import { paramScope, type ParameterSpec, type ParameterValue, type ParamScope } from '@/lib/params';
 import { FIT_TOOL_WORDS, fermosFits, proformaShelf } from '@/lib/proforma';
 import { exportCSV } from '@/lib/csv';
@@ -502,7 +503,7 @@ export default function FermOSSimulate() {
 
   const strainLabel = (id: string) => {
     const s = strains.find((x) => x.id === id);
-    return s ? `${s.binomial} ${s.designation}`.trim() : id;
+    return s ? strainWords(s) : id;
   };
 
   return (

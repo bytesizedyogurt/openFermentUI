@@ -6,30 +6,33 @@
 // review queue changes the median and turns its dot green without a reload.
 //
 // Everything the page lists about the strain (papers, records, media,
-// protocols, scenarios, products, runbooks) is what the store holds for it.
+// protocols, scenarios) is what the store holds for it. The strain is its
+// entry in the project's strain catalogue (lib/catalogues.ts, alpha 2.2 E.9):
+// its name, species, chemical set, the other names papers give it, its note
+// and who kept it, edited on the Catalogues screen.
 import { HostCeilingCard } from './GeneOSModel';
 import React, { useCallback, useMemo, useRef, useState } from 'react';
 import {
   AlertTriangle,
   ArrowRight,
   BookOpen,
-  Boxes,
   ClipboardCheck,
   ClipboardList,
   Download,
   FlaskConical,
   LineChart,
   Microscope,
-  NotebookPen,
   Play,
   ScatterChart,
   Table2,
   X,
 } from 'lucide-react';
-import type { FieldId, ParameterDef, Product, Protocol } from '@/data/types';
+import type { Protocol } from '@/data/types';
+import { keptIn } from '@/lib/catalogues';
+import { namesStrain, strainNames } from '@/lib/geneos';
 import type { ExtractionRecord } from '@/lib/review';
-import type { Scenario } from '@/lib/proforma';
-import { ONTOLOGY, ONTOLOGY_BY_ID, fieldName } from '@/data/ontology';
+import { stamp as keptAt, type Scenario } from '@/lib/proforma';
+import { ONTOLOGY, ONTOLOGY_BY_ID, fieldName, type FieldId, type ParameterDef } from '@/data/ontology';
 import {
   useStore,
   provenanceOf,
@@ -39,7 +42,6 @@ import {
 } from '@/store';
 import { href, navigate } from '@/router';
 import { convert, fmt, asNumber } from '@/engine/units';
-import { PRODUCT_CATEGORY_LABEL } from '@/data/labels';
 import { CitationChip } from '@/components/Chip';
 import { DataTable, type Column, type FacetDef } from '@/components/DataTable';
 import { ProvDot, ProvenanceLegend, Tick, type ProvKind } from '@/components/Provenance';
@@ -63,16 +65,6 @@ interface SPoint {
   prov: ProvKind;
   /** Value converted into the field's canonical unit, or null if incommensurable. */
   canonical: number | null;
-}
-
-/**
- * Whether a scenario names a strain: one of `names` (its designation, its binomial), longer than two letters, in the
- * scenario's name, description or product. The service binds a scenario's inputs to records each time it runs, and the
- * scenario's row holds its name, its description and its product, so a strain links to a scenario by name.
- */
-export function namesStrain(sc: Pick<Scenario, 'name' | 'description' | 'product'>, names: string[]): boolean {
-  const text = `${sc.name} ${sc.description} ${sc.product}`.toLowerCase();
-  return names.some((n) => n.length > 2 && text.includes(n.toLowerCase()));
 }
 
 const STATUS_FACET_LABEL: Record<string, string> = {
@@ -548,8 +540,8 @@ export default function StrainPage({ strainId }: { strainId: string }) {
   const records = useStore((s) => s.records);
   const protocols = useStore((s) => s.protocols);
   const scenarios = useStore((s) => s.scenarios);
-  const products = useStore((s) => s.products);
-  const runbooks = useStore((s) => s.runbooks);
+  const cataloguesRead = useStore((s) => s.cataloguesRead);
+  const cataloguesProblem = useStore((s) => s.cataloguesProblem);
   const runs = useStore((s) => s.runs);
   const activeRunId = useStore((s) => s.activeRunId);
   const density = useStore((s) => s.ui.density);
@@ -664,34 +656,9 @@ export default function StrainPage({ strainId }: { strainId: string }) {
     p.versions.find((v) => v.version === p.currentVersion) ?? p.versions[p.versions.length - 1];
 
   const linkedScenarios = useMemo<Scenario[]>(() => {
-    const names = strain ? [strain.designation, strain.binomial] : [strainId];
+    const names = strain ? strainNames(strain) : [strainId];
     return scenarios.filter((sc) => namesStrain(sc, names));
   }, [scenarios, strain, strainId]);
-
-  // ── products made in this host (OF-BLD-005 §6) ───────────────────────
-  //
-  // A different kind of link from the ones above. Papers, protocols and
-  // scenarios say what the corpus KNOWS about this organism; products say what
-  // it could be pointed at, and the section says which it is holding.
-  const hostProducts = useMemo(
-    () => products.filter((p) => p.defaultStrainId === strainId),
-    [products, strainId],
-  );
-
-  const hostProductGroups = useMemo(() => {
-    const by = new Map<Product['category'], Product[]>();
-    for (const p of hostProducts) {
-      const arr = by.get(p.category);
-      if (arr) arr.push(p);
-      else by.set(p.category, [p]);
-    }
-    return [...by.entries()].sort((a, b) => b[1].length - a[1].length || a[0].localeCompare(b[0]));
-  }, [hostProducts]);
-
-  const hostRunbooks = useMemo(
-    () => runbooks.filter((r) => r.strainId === strainId),
-    [runbooks, strainId],
-  );
 
   // ── media ────────────────────────────────────────────────────────────
 
@@ -762,7 +729,7 @@ export default function StrainPage({ strainId }: { strainId: string }) {
       `openferment-${strainId}-parameter-summary.csv`,
       [
         'Strain ID',
-        'Strain designation',
+        'Strain name',
         'Field ID',
         'Field',
         'Canonical unit',
@@ -779,7 +746,7 @@ export default function StrainPage({ strainId }: { strainId: string }) {
       ],
       groups.map((g) => [
         strainId,
-        strain?.designation ?? '',
+        strain?.name ?? '',
         g.def.id,
         g.def.name,
         g.def.canonicalUnit,
@@ -923,25 +890,75 @@ export default function StrainPage({ strainId }: { strainId: string }) {
 
   // ── states ───────────────────────────────────────────────────────────
 
+  if (!strain && !cataloguesRead && !cataloguesProblem) {
+    return (
+      <>
+        <PageHeader eyebrow="geneOS · Hosts" title={strainId} subtitle="Reading the project's strain catalogue…" />
+      </>
+    );
+  }
+
   if (!strain) {
     return (
       <>
         <PageHeader
           eyebrow="geneOS · Hosts"
           title="Strain not found"
-          subtitle="No strain catalogue holds a strain with this id."
+          subtitle={
+            cataloguesProblem
+              ? `The project's strain catalogue could not be read: ${cataloguesProblem}`
+              : "The project's strain catalogue holds no strain with this id."
+          }
         />
         <Card>
           <EmptyState
             icon={<Microscope size={22} />}
             title={`No strain with the id “${strainId}”`}
-            body="The organism index lists every strain this corpus covers. Open it to pick one."
-            action={<LinkButton to="/geneos/hosts">Back to hosts</LinkButton>}
+            body="Hosts lists every strain the project's strain catalogue keeps, and a strain is kept on the Catalogues screen."
+            action={
+              <div className="flex gap-2">
+                <LinkButton to="/geneos/hosts">Back to hosts</LinkButton>
+                <LinkButton to="/catalogues">Open the Catalogues screen</LinkButton>
+              </div>
+            }
           />
         </Card>
       </>
     );
   }
+
+  const aliases = strain.aliases ?? [];
+  // A person's keep is written by hand; a model's write says whose it is in words.
+  const byHand = strain.agent !== 'model';
+  const entryWords = (
+    <>
+      <div className="text-caption uppercase tracking-wide text-ink-soft mb-1">Description</div>
+      {strain.note ? (
+        <p className="font-serif text-reading">{strain.note}</p>
+      ) : (
+        <p className="text-body text-ink-soft">The strain&rsquo;s entry keeps no description.</p>
+      )}
+      <dl className="mt-2 grid grid-cols-[max-content_1fr] gap-x-3 gap-y-0.5 text-caption">
+        <dt className="text-ink-soft">Other names</dt>
+        <dd data-testid="strain-aliases">{aliases.length > 0 ? aliases.join(', ') : 'none kept'}</dd>
+        {strain.program && (
+          <>
+            <dt className="text-ink-soft">Chemical set</dt>
+            <dd className="font-num">{strain.program}</dd>
+          </>
+        )}
+        <dt className="text-ink-soft">Kept</dt>
+        <dd>
+          {strain.by || '—'}, {keptIn(strain)}
+          {strain.at ? `, ${keptAt(strain.at)}` : ''}
+          {strain.source ? `, from ${strain.source}` : ''}
+        </dd>
+      </dl>
+      <a className="mt-2 inline-block text-caption text-accent hover:underline" href={href('/catalogues')}>
+        Edit it on the Catalogues screen
+      </a>
+    </>
+  );
 
   const bandControls = (
     <div className="flex flex-wrap items-center gap-2">
@@ -998,28 +1015,18 @@ export default function StrainPage({ strainId }: { strainId: string }) {
   );
 
   return (
-    <>
+    <div data-testid="strain-page" data-strain={strainId}>
       <PageHeader
-        eyebrow={`geneOS · Hosts · BSL-${strain.bsl}`}
+        eyebrow="geneOS · Hosts"
         title={
           <span>
-            <span className="italic">{strain.binomial}</span>{' '}
-            <span className="font-num not-italic">{strain.designation}</span>
+            {strain.species && (
+              <>
+                <span className="italic">{strain.species}</span>{' '}
+              </>
+            )}
+            <span className="font-num not-italic">{strain.name}</span>
           </span>
-        }
-        subtitle={
-          <nav aria-label="Taxonomy" className="flex flex-wrap items-center gap-x-1 gap-y-0.5">
-            {strain.taxonomy.map((t, i) => (
-              <span key={t} className="inline-flex items-center gap-1">
-                {i > 0 && (
-                  <span className="text-ink-soft/60" aria-hidden>
-                    ›
-                  </span>
-                )}
-                <span className={cx(i === strain.taxonomy.length - 1 && 'italic text-ink')}>{t}</span>
-              </span>
-            ))}
-          </nav>
         }
         actions={
           <>
@@ -1034,21 +1041,17 @@ export default function StrainPage({ strainId }: { strainId: string }) {
       />
 
       <div className="flex flex-wrap items-center gap-2 mb-3">
-        {strain.badges.map((b) => (
-          <span key={b} className="chip text-ink-soft">
-            {b}
-          </span>
-        ))}
         <span className="chip text-ink-soft font-num">{strainId}</span>
       </div>
 
-      <Card className="p-4 mb-5">
-        <Tick p="curated" title="Description — written by hand, not extracted">
-          <div className="text-caption uppercase tracking-wide text-ink-soft mb-1">
-            Description
-          </div>
-          <p className="font-serif text-reading">{strain.description}</p>
-        </Tick>
+      <Card className="p-4 mb-5" data-testid="strain-entry">
+        {byHand ? (
+          <Tick p="curated" title="The strain's entry, written by hand on the Catalogues screen">
+            {entryWords}
+          </Tick>
+        ) : (
+          <div title={`The strain's entry: ${keptIn(strain)}`}>{entryWords}</div>
+        )}
       </Card>
 
       <div className="flex flex-wrap items-center gap-x-5 gap-y-1.5 mb-4 text-caption text-ink-soft">
@@ -1094,7 +1097,7 @@ export default function StrainPage({ strainId }: { strainId: string }) {
             <EmptyState
               icon={<FlaskConical size={22} />}
               title="No extraction records for this strain"
-              body={`No record in this project carries an organism tag naming ${strain.designation}. The extraction table is the place to check what the corpus does cover.`}
+              body={`No record in this project carries an organism tag naming ${strain.name}. The extraction table is the place to check what the corpus does cover.`}
               action={
                 <div className="flex gap-2">
                   <LinkButton to="/intake">Open Intake</LinkButton>
@@ -1157,7 +1160,8 @@ export default function StrainPage({ strainId }: { strainId: string }) {
         </SectionTitle>
         <p className="text-caption text-ink-soft mb-2 max-w-3xl">
           Medium composition as the corpus records it, and the media protocols in this workspace that
-          list <span className="italic">{strain.binomial}</span> {strain.designation}.
+          list {strain.species && <span className="italic">{strain.species} </span>}
+          {strain.name}.
         </p>
 
         <div className="grid grid-cols-1 xl:grid-cols-[1fr_360px] gap-4">
@@ -1175,7 +1179,7 @@ export default function StrainPage({ strainId }: { strainId: string }) {
               <div className="overflow-x-auto">
                 <table className="w-full border-collapse text-body">
                   <caption className="sr-only">
-                    Medium components recorded for {strain.designation}, median concentration in
+                    Medium components recorded for {strain.name}, median concentration in
                     grams per litre
                   </caption>
                   <thead>
@@ -1426,115 +1430,6 @@ export default function StrainPage({ strainId }: { strainId: string }) {
         </div>
       </section>
 
-      {/* ── BAND 3.5 — products made in this host (OF-BLD-005 §6) ─────── */}
-      <section className="mb-6" aria-labelledby="band-products">
-        <SectionTitle>
-          <span id="band-products">Products made in this host</span>
-        </SectionTitle>
-        <p className="text-caption text-ink-soft mb-2 max-w-3xl">
-          A different kind of link from the ones above. Papers, protocols and scenarios describe
-          what the corpus <em>knows</em> about this organism; these describe what it could be
-          pointed at. Every one is modeled — a plausible assignment of molecule to chassis, not a
-          record of anything having been made.{' '}
-          <Explain label="Why these are not evidence">
-            A product names this strain as its default host because the pairing is conventional in
-            industry, not because a paper in this corpus reports it. That is a useful map and a bad
-            citation. The organism&rsquo;s parameter summary above is the part backed by
-            literature; this section is the part backed by a catalogue.
-          </Explain>
-        </p>
-
-        {hostProducts.length === 0 ? (
-          <Card>
-            <EmptyState
-              icon={<Boxes size={22} aria-hidden />}
-              title="No product on file defaults to this host"
-              body={`No product on file names ${strain.designation} as its chassis. Products arrive with the documents that report them, through Intake; this says what the catalogue holds today, and nothing about the organism.`}
-            />
-          </Card>
-        ) : (
-          <>
-            <div className="flex flex-wrap items-center gap-x-5 gap-y-1.5 mb-3 text-caption text-ink-soft">
-              <span>
-                <span className="font-num text-ink">{hostProducts.length}</span>{' '}
-                {hostProducts.length === 1 ? 'molecule' : 'molecules'}
-              </span>
-              <span>
-                <span className="font-num text-ink">{hostProductGroups.length}</span>{' '}
-                {hostProductGroups.length === 1 ? 'category' : 'categories'}
-              </span>
-              <span>
-                <span className="font-num text-ink">
-                  {new Set(hostProducts.map((p) => p.processCode)).size}
-                </span>{' '}
-                process families
-              </span>
-              {hostRunbooks.length > 0 && (
-                <span>
-                  <span className="font-num text-accent">{hostRunbooks.length}</span>{' '}
-                  {hostRunbooks.length === 1 ? 'runbook uses' : 'runbooks use'} this host
-                </span>
-              )}
-            </div>
-
-            <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
-              {hostProductGroups.map(([category, items]) => (
-                <Card key={category} className="p-4">
-                  <div className="flex items-baseline justify-between gap-3 mb-2">
-                    <div className="text-caption uppercase tracking-wide text-ink-soft">
-                      {PRODUCT_CATEGORY_LABEL[category]}
-                    </div>
-                    <span className="font-num text-caption text-ink-soft">{items.length}</span>
-                  </div>
-                  <ul className="space-y-1.5 max-h-[260px] overflow-y-auto pr-1">
-                    {items.map((p) => (
-                      <li key={p.id} className="text-body truncate" title={p.note ?? p.name}>
-                        {p.name}
-                      </li>
-                    ))}
-                  </ul>
-                </Card>
-              ))}
-            </div>
-          </>
-        )}
-      </section>
-
-      {/* ── BAND 4 — notes ─────────────────────────────────────────────── */}
-      <section className="mb-4" aria-labelledby="band-notes">
-        <SectionTitle>
-          <span id="band-notes">Notes</span>
-        </SectionTitle>
-        <p className="text-caption text-ink-soft mb-2 max-w-3xl">
-          Free text written by hand. Not extracted, not scored — hand-authored bench
-          judgement, carried with the gold tick because a person put their name on it.
-        </p>
-        <Card className="p-4">
-          {strain.notes.length === 0 ? (
-            <EmptyState
-              icon={<NotebookPen size={22} />}
-              title="No notes for this strain"
-              body="No note is kept for this strain. The parameter summary above is the whole of what the platform knows about it."
-            />
-          ) : (
-            <ul className="space-y-4">
-              {[...strain.notes]
-                .sort((a, b) => b.at.localeCompare(a.at))
-                .map((n) => (
-                  <li key={`${n.at}-${n.who}`}>
-                    <Tick p="curated" title="A note written by hand">
-                      <div className="text-caption text-ink-soft">
-                        <span className="font-num">{n.at}</span> · {n.who}
-                      </div>
-                      <p className="font-serif text-reading mt-1">{n.text}</p>
-                    </Tick>
-                  </li>
-                ))}
-            </ul>
-          )}
-        </Card>
-      </section>
-
       {points.length > 0 && (
         <Callout kind="info" title="What this page is claiming">
           Every number above is a summary of{' '}
@@ -1571,6 +1466,6 @@ export default function StrainPage({ strainId }: { strainId: string }) {
           </Callout>
         </div>
       )}
-    </>
+    </div>
   );
 }

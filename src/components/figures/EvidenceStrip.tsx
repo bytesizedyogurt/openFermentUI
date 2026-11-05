@@ -6,7 +6,7 @@
 // aggregated is a tick on the axis. Computed limits are rule lines. A record
 // whose unit does not convert to the axis unit is not drawn, and the count of
 // those is stated.
-import type { ComputedBasis, Provenance } from '@/data/types';
+import type { ComputedBasis, Provenance } from '@/lib/studies';
 import type { ExtractionRecord } from '@/lib/review';
 import { aggregateExclusion, provenanceOf } from '@/store';
 import { asNumber, convert, fmt } from '@/engine/units';

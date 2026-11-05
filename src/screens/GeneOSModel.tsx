@@ -24,8 +24,6 @@
 // and clamps nothing.
 import { useEffect, useMemo, useState } from 'react';
 import { Calculator } from 'lucide-react';
-import type { GeneosModelInfo, GeneosResult } from '@/data/types';
-import type { ExtractionRecord } from '@/lib/review';
 import type { CeilingCheck, FlowsheetInfo, Scenario } from '@/lib/proforma';
 import { proformaScope, useStore } from '@/store';
 import { href, navigate, useRoute } from '@/router';
@@ -43,6 +41,8 @@ import {
   geneosMix,
   geneosModels,
   type FrontierPointOut,
+  type GeneosModelInfo,
+  type GeneosResult,
   type MixPointOut,
 } from '@/lib/geneos';
 import { ceilingCheck, proformaShelf } from '@/lib/proforma';
@@ -200,7 +200,7 @@ export default function GeneOSModel() {
 
   // Only the yields of this product measured on this sugar are held against its ceilings.
   const { on: yields, elsewhere } = useMemo(
-    () => yieldsOnSugar(records as ExtractionRecord[], substrate, product),
+    () => yieldsOnSugar(records, substrate, product),
     [records, substrate, product],
   );
   const known = yieldFieldKnown(product);

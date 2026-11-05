@@ -14,12 +14,10 @@ import type {
   Deviation,
   MeasuredEvidence,
   LearnModule,
-  Product,
   Protocol,
   Runbook,
   SeriesRole,
   RunState,
-  Strain,
   TimerState,
   Guild,
   GuildEvidence,
@@ -35,6 +33,7 @@ import type {
   Checks,
   Skill,
 } from '@/data/types';
+import { CataloguesDown, listProducts, listStrains, type Product, type Strain } from '@/lib/catalogues';
 import type { FermosFitResponse } from '@/lib/fermos';
 import type { Override } from '@/lib/params';
 import type { LiveConversation, LiveTurn, RunbookDraft, TraceStep } from '@/lib/postdoc';
@@ -280,8 +279,12 @@ export interface OFState {
   papers: Paper[];
   records: ExtractionRecord[];
   runOutputs: RunOutput[];
+  /**
+   * The open project's strains, as its strain catalogue keeps them (lib/catalogues.ts, alpha 2.2 E.9): geneOS's
+   * hosts, the strains a record, a protocol, a runbook or a simulation names, and pureOS's hosts.
+   */
   strains: Strain[];
-  /** The molecule catalogue (OF-BLD-005). Session-mutable like the rest. */
+  /** The open project's products, as its product catalogue keeps them (alpha 2.2 E.9). */
   products: Product[];
   /**
    * Synthesised runbooks. Kept separate from `jobs` on purpose: a Job is a
@@ -608,6 +611,18 @@ export interface OFState {
   stateProblem: string | null;
   /** Load the open project's rows, lay the unsent ones over them, and send what is owed. */
   hydrateProjectState: () => Promise<void>;
+  /**
+   * Whether the store holds the open project's strains and products, read from its catalogues this session; with no
+   * project open it holds none, and that is settled too.
+   */
+  cataloguesRead: boolean;
+  /** Why the open project's strains and products could not be read, in words; null when they were. */
+  cataloguesProblem: string | null;
+  /**
+   * Read the open project's strains and products from its catalogues (alpha 2.2 E.9), as the page opens and after
+   * the catalogues screen keeps an entry or takes in a file. What was read last stays when a read fails.
+   */
+  hydrateCatalogues: () => Promise<void>;
   /** Put a project's rows in the page. */
   applyProjectState: (state: ProjectState) => void;
   /** Send the outbox; what the service does not answer stays for the next try. */
@@ -884,6 +899,8 @@ export const useStore = create<OFState>()((set, get) => ({
   stateOutbox: [],
   stateLegacy: null,
   stateProblem: null,
+  cataloguesRead: false,
+  cataloguesProblem: null,
 
   loadProjects: async () => {
     let listed: Project[];
@@ -962,6 +979,26 @@ export const useStore = create<OFState>()((set, get) => ({
         provenance: 'user',
       });
     void get().flushProjectState();
+  },
+
+  hydrateCatalogues: async () => {
+    // The catalogues belong to one project: with none open the store holds none.
+    if (!get().projectId) {
+      set({ strains: [], products: [], cataloguesRead: true, cataloguesProblem: null });
+      return;
+    }
+    // Reads overlap when the catalogues screen keeps two entries quickly; the newest read's answer is the one kept.
+    const read = ++catalogueReads;
+    try {
+      const [strains, products] = await Promise.all([listStrains(), listProducts()]);
+      if (read === catalogueReads) set({ strains, products, cataloguesRead: true, cataloguesProblem: null });
+    } catch (e) {
+      if (read === catalogueReads)
+        set({
+          cataloguesProblem:
+            e instanceof CataloguesDown ? `${e.message} ${e.remedy}` : e instanceof Error ? e.message : String(e),
+        });
+    }
   },
 
   applyProjectState: (state) =>
@@ -1552,7 +1589,8 @@ export const useStore = create<OFState>()((set, get) => ({
         {
           name: 'Host & construct selection',
           status: 'pending',
-          detail: product ? `Starting from ${product.defaultStrainId}` : null,
+          // The host the research runbook names; a product's entry names none.
+          detail: source.strainId ? `Starting from ${source.strainId}` : null,
           value: null,
         },
         { name: 'Process train', status: 'queued', detail: null, value: null },
@@ -1572,7 +1610,7 @@ export const useStore = create<OFState>()((set, get) => ({
       productId: source.productId,
       progressPct: 0,
       estCostUsd: null,
-      strainId: source.strainId ?? product?.defaultStrainId ?? null,
+      strainId: source.strainId ?? null,
       // Promotion carries the research finding across verbatim. It does NOT
       // invent process predictions: the titre and recovery models have not run,
       // so those are measured with `predictionId: null` rather than predicted
@@ -3097,11 +3135,15 @@ export const useStore = create<OFState>()((set, get) => ({
     // reset the way it survives a reload.
     const overlay = get().overlay;
     const serviceUp = get().serviceUp;
+    // The project's strains and products are its catalogues' on the service, and survive a reset the same way.
+    const { strains, products } = get();
     // The open project's rows are the service's, and survive a reset the way
     // the overlay does: they are loaded again, and nothing is taken back on
     // the service. What this browser still owed it goes with the browser's data.
     set({
       ...initialState(),
+      strains,
+      products,
       toasts: [],
       serviceUp,
       durableReview: null,
@@ -3419,6 +3461,8 @@ function owedLedger(ledger: Guild, owed: Guild | undefined): Guild {
 
 let stateFlushing = false;
 let stateRetry: ReturnType<typeof setTimeout> | null = null;
+/** How many reads of the project's catalogues this page has asked for; only the newest one's answer is kept. */
+let catalogueReads = 0;
 /** How long a project row the service did not answer waits before it is sent again. */
 const STATE_RETRY_MS = 15_000;
 

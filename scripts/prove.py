@@ -68,7 +68,8 @@ packages stay installed while the kept service runs, each said with the command 
        SFF flowsheets, the catalogues screen keeping a placeholder strain in the proof's person's
        name (added, edited, taken in again from a file through the screen, and read back as the
        person's; the service then holds it as the strain catalogue's one entry, the person's keep
-       from that file), the conversation of step 6 with its estimate marked, the runbook of step 5;
+       from that file), geneOS's Hosts showing that strain's card and its page with the other names
+       its entry keeps, the conversation of step 6 with its estimate marked, the runbook of step 5;
        then a reading deposited at the bench on that locked runbook, the readings alone, by the
        proof's person, in the unit of the scenario parameter step 5 sets, the placeholder the
        person types; a scenario made from step 5's flowsheet run through NewScenarioDialog with
@@ -175,7 +176,7 @@ TITLES = {
        "its history",
     7: "a reference SFF file imported; it draws",
     8: "the service restarted: everything reloads; an artifact replays within its tolerance",
-    9: "the UI walk: Home, the project, ingest, search, a run report and its SFF graph, a scenario begun from it, the plants Studies offers, the SFF flowsheets, a placeholder strain kept on the catalogues screen, a conversation, a runbook; a reading at the bench, a scenario on it, its run measured; each example engine's first thing run from the Runs screen",
+    9: "the UI walk: Home, the project, ingest, search, a run report and its SFF graph, a scenario begun from it, the plants Studies offers, the SFF flowsheets, a placeholder strain kept on the catalogues screen and shown among geneOS's hosts, a conversation, a runbook; a reading at the bench, a scenario on it, its run measured; each example engine's first thing run from the Runs screen",
     10: "the engines: each registered one listed, the core's three among them, the eight conformance checks made on "
         "it, its verdict kept, the proof's project as it was; a train made on step 4's run for the train engine's",
 }

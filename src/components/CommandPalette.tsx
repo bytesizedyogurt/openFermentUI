@@ -22,6 +22,7 @@ import {
 import { useStore } from '@/store';
 import { navigate } from '@/router';
 import { RUNBOOK_STATUS_LABEL } from '@/data/labels';
+import { strainWords } from '@/lib/catalogues';
 import { RAIL, SUB_VIEWS } from '@/data/nav';
 import { cx } from './ui';
 
@@ -128,8 +129,10 @@ export function CommandPalette() {
       nav.push({
         id: `s-${s.id}`,
         group: 'Navigate',
-        label: `${s.binomial} ${s.designation}`,
+        label: strainWords(s),
         hint: 'strain',
+        // A strain is found by the other names papers give it too.
+        aliases: s.aliases,
         icon: FlaskConical,
         run: () => navigate(`/geneos/hosts/${s.id}`),
       });

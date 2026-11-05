@@ -231,3 +231,25 @@ Never; this is how the drift stops recurring.
   each field with a default as one a reader may find absent. The service writes every field of an
   entry it answers; the screen reads a list field through `?? []` and a word through `?? ''`, and a
   keep sends `by` and `at` empty for the service to write.
+
+### Alpha 2.2, E.9 (2026-11-05): geneOS's lib, and a strain and a product as catalogue entries
+
+- `lib/geneos.ts` names the generated schemas of geneOS's answers: a model on the shelf
+  (`GeneosModelInfo`) and a ceiling, a frontier or a sugar mix (`GeneosResult`); it reads a field's
+  types (`FieldId`, `ParameterDef`) from `data/ontology.ts`. GeneOSModel, Organisms and the figures
+  Frontier, MixLine, CeilingGap and EvidenceStrip read every name there or in `lib/studies.ts`
+  (`ComputedBasis`, `Provenance`), and EvidenceCard, whose geneOS helpers took the hand-kept types
+  through the lib, finishes.
+- A strain and a product are the project's catalogue entries: `lib/catalogues.ts` names `Strain`
+  and `Product` as the generated `CatalogueEntry` of their kind, and the store fills its `strains`
+  and `products` from the two catalogues (`listStrains`, `listProducts`) as the page opens and again
+  after the catalogues screen keeps an entry or takes in a file; `cataloguesRead` and
+  `cataloguesProblem` say where the read stands, and a reset of the browser's data keeps them, the
+  service's as the overlay is. A strain's binomial reads the entry's `species`, its designation its
+  `name` and its description its `note`. The alpha 1.0 fields no entry keeps leave with their reads,
+  each of which read an empty list until now: a strain's taxonomy, badges, biosafety level and
+  notes; a product's default host, unit operations, process code, routes, regulatory ids, tags,
+  value band and its two provenance labels. StrainPage keeps the hand-kept `Protocol` until E.12.
+- A strain is named in a chooser or a label by `strainWords` (its species, then its name), and a
+  scenario links to a strain by any name its entry keeps (`strainNames` and `namesStrain`, which
+  moved from StrainPage into `lib/geneos.ts`).

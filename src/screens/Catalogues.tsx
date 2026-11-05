@@ -12,9 +12,11 @@
 // Who reads what is kept, on the service: pureOS proposes a train for a product made in a strain kept here, by the
 // product's class and where the cells leave it; Postdoc reads the strains among geneOS's hosts and finds a strain a
 // question names by any of its names; ProtParam computes from a product's sequence; Guild rates people on each skill
-// by its policy, and nobody on a skill kept with none; a lesson passed counts toward the skills it names. The store's
-// own lists of strains, products, skills and lessons stay empty until the store reads these catalogues (alpha 2.2
-// E.9 and E.12). Every shape is the service's own (src/lib/catalogues.ts).
+// by its policy, and nobody on a skill kept with none; a lesson passed counts toward the skills it names. The store
+// reads the strains and the products (alpha 2.2 E.9) as the page opens and again after each keep and each file taken
+// in here, so geneOS's hosts, the strain choosers and the runbooks name what this screen keeps; its own lists of
+// skills and lessons stay empty until it reads those catalogues too (E.12). Every shape is the service's own
+// (src/lib/catalogues.ts).
 import { useEffect, useMemo, useRef, useState, type ReactNode } from 'react';
 import { BookMarked, Pencil, Plus, Upload } from 'lucide-react';
 import { href } from '@/router';
@@ -506,6 +508,12 @@ export default function Catalogues({ view }: { view?: string }) {
   const [editing, setEditing] = useState<CatalogueEntry | null>(null);
   const [kept, setKept] = useState<CatalogueEntry | null>(null);
   const [version, setVersion] = useState(0);
+  const hydrateCatalogues = useStore((s) => s.hydrateCatalogues);
+  // After a keep or a file, this tab reads its catalogue again, and the store its strains and products.
+  const reread = () => {
+    setVersion((v) => v + 1);
+    void hydrateCatalogues();
+  };
   useEffect(() => {
     setEditing(null);
     setKept(null);
@@ -624,12 +632,12 @@ export default function Catalogues({ view }: { view?: string }) {
             onKept={(entry) => {
               setKept(entry);
               setEditing(null);
-              setVersion((v) => v + 1);
+              reread();
             }}
             onDone={() => setEditing(null)}
           />
         )}
-        <TakeInFile key={kind} kind={kind} onTaken={() => setVersion((v) => v + 1)} />
+        <TakeInFile key={kind} kind={kind} onTaken={reread} />
       </div>
     </div>
   );
