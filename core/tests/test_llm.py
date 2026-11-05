@@ -7,6 +7,7 @@ the way the real one does, with a context manager whose final message has a
 """
 from __future__ import annotations
 
+import asyncio
 import json
 from types import SimpleNamespace
 
@@ -910,3 +911,166 @@ def test_postdocs_loop_passes_a_local_model_over_in_words(monkeypatch):
     with pytest.raises(llm.ModelUnavailable, match="answers a single call"):
         llm.converse(system="s", messages=[{"role": "user", "content": "q"}], tools=[], schema=None, max_tokens=10,
                      model=LOCAL_MODEL, tool_choice="auto")
+
+
+# ── a run's own count, and the kit's calls (alpha 2.2 F.5) ──────────────
+
+
+def test_a_tally_counts_each_call_with_the_model_that_answered():
+    """Each call made in a tally is counted with its route's family and
+    effort, the ceiling it asked, the model that answered, the models asked
+    and the one that declined, its tokens and USD and how it stopped; a call
+    made outside every tally is kept nowhere."""
+    run(FakeClient({OPUS: answer(OPUS)}))
+    fell = FakeClient({OPUS: answer(OPUS, stop="refusal", category="bio", tin=2000, tout=0),
+                       SONNET: answer(SONNET, tin=2000, tout=800)})
+    with llm.tally() as spent:
+        run(FakeClient({OPUS: answer(OPUS, tin=1000, tout=500)}))
+        llm.call(system="s", user="u", schema=None, max_tokens=300, client_factory=lambda: fell, family="judge")
+        run(FakeClient({OPUS: answer(OPUS, '{"candidates": [{"val', stop="max_tokens", tout=4000)}))
+    assert [(s.family, s.effort, s.max_tokens, s.outcome, s.model, s.tried, s.refused) for s in spent] == [
+        ("explain", "high", 4000, "answered", OPUS, (OPUS,), ()),
+        ("judge", "max", 300, "answered", SONNET, (OPUS, SONNET), (OPUS,)),
+        ("explain", "high", 4000, "answered", OPUS, (OPUS,), ()),
+    ]
+    first, second, cut = spent
+    assert (first.usage.inputTokens, first.usage.outputTokens, first.usage.models) == (1000, 500, [OPUS])
+    assert first.usage.costUsd == llm.cost_usd(OPUS, 1000, 500) and not first.fell_back
+    assert second.fell_back and second.usage.models == [OPUS, SONNET]
+    assert second.usage.costUsd == pytest.approx(llm.cost_usd(OPUS, 2000, 0) + llm.cost_usd(SONNET, 2000, 800)), \
+        "the refusal billed before the answer is counted with it"
+    assert [s.stop_reason for s in spent] == ["end_turn", "end_turn", "max_tokens"]
+    assert [s.truncated for s in spent] == [False, False, True] and cut.usage.outputTokens == 4000
+    assert all(s.failure is None for s in spent)
+    with llm.tally() as later:
+        pass
+    assert later == [], "no call made before it is carried in"
+
+
+def test_a_refused_and_an_unavailable_call_are_counted_in_words(monkeypatch):
+    """A call every model declines, one whose last model is down after a
+    billed refusal, and one with no key: each is counted with what it spent,
+    the models asked, and the failure in the words its caller was given."""
+    declined = FakeClient({OPUS: answer(OPUS, stop="refusal", category="bio", tin=3000, tout=0),
+                           SONNET: answer(SONNET, stop="refusal", category="bio", tin=3000, tout=0)})
+    down = FakeClient({OPUS: answer(OPUS, stop="refusal", category="bio", tin=3000, tout=0),
+                       SONNET: status_error(anthropic.APIStatusError, 529)})
+    monkeypatch.delenv("ANTHROPIC_API_KEY", raising=False)
+    with llm.tally() as spent:
+        with pytest.raises(llm.ModelRefused) as no:
+            run(declined)
+        with pytest.raises(llm.ModelUnavailable) as gone:
+            run(down)
+        with pytest.raises(llm.ModelUnavailable) as keyless:
+            llm.call(system="s", user="u", schema=None, max_tokens=10, family="index")
+    assert [s.outcome for s in spent] == ["refused", "unavailable", "unavailable"]
+    assert all(s.model is None and s.stop_reason is None and not s.fell_back for s in spent)
+    refused, outage, unkeyed = spent
+    assert refused.failure == str(no.value) and "declined by the safety classifier (bio)" in refused.failure
+    assert (refused.tried, refused.refused, refused.usage) == ((OPUS, SONNET), (OPUS, SONNET), no.value.usage)
+    assert refused.usage.costUsd == pytest.approx(llm.cost_usd(OPUS, 3000, 0) + llm.cost_usd(SONNET, 3000, 0))
+    assert outage.failure == str(gone.value) and "answered 529" in outage.failure
+    assert (outage.tried, outage.refused) == ((OPUS, SONNET), (OPUS,))
+    assert outage.usage.costUsd == pytest.approx(llm.cost_usd(OPUS, 3000, 0)), "what was spent before the outage"
+    assert (unkeyed.family, unkeyed.tried, unkeyed.usage) == ("index", (), Usage())
+    assert unkeyed.failure == str(keyless.value) and "ANTHROPIC_API_KEY is not set" in unkeyed.failure
+
+
+def test_a_call_the_daily_cap_refuses_is_counted_with_no_model_asked(monkeypatch):
+    from openferment_core import spend
+
+    monkeypatch.setenv("OPENFERMENT_DAILY_BUDGET_USD", "1.00")
+    monkeypatch.setattr(llm, "worst_case_usd", lambda *a, **k: 0.10)
+    spend.charge("answer", 0.95)
+    client = FakeClient({OPUS: answer(OPUS)})
+    with llm.tally() as spent, pytest.raises(llm.BudgetExhausted) as e:
+        run(client)
+    assert client.asked == []
+    assert [(s.outcome, s.tried, s.usage, s.failure) for s in spent] == [("unavailable", (), Usage(), str(e.value))]
+    assert "daily cap" in spent[0].failure
+
+
+def test_a_tally_inside_another_counts_its_calls_in_both():
+    client = FakeClient({OPUS: answer(OPUS)})
+    with llm.tally() as outer:
+        run(client)
+        with llm.tally() as inner:
+            run(client)
+        run(client)
+    assert (len(outer), len(inner)) == (3, 1) and inner[0] is outer[1]
+
+
+def test_a_tally_counts_the_calls_made_in_a_copy_of_its_context():
+    """The kit's calls arrive on a thread `asyncio.to_thread` starts, from
+    coroutines `db.run` hands to the database loop: each runs in a copy of
+    its caller's context, which carries the tally. A thread
+    `threading.Thread` starts begins with an empty context (Python 3.12 and
+    3.13), and no tally counts its call."""
+    import threading
+
+    from openferment_core import db
+
+    client = FakeClient({OPUS: answer(OPUS)})
+
+    async def on_the_database_loop():
+        assert db.on_database_thread()
+        await asyncio.to_thread(run, client)
+
+    with llm.tally() as spent:
+        db.run(on_the_database_loop())
+        plain = threading.Thread(target=run, args=(client,))
+        plain.start()
+        plain.join()
+    assert len(client.requests) == 2 and [s.model for s in spent] == [OPUS]
+
+
+def test_a_kit_call_has_room_for_its_thinking(monkeypatch):
+    """The kit sizes its calls for a model that writes its answer at once (a
+    judgement in 1,024 tokens, a drafted set in 4,096, HyDE's passage in 512),
+    and output tokens include thinking: a kit call asks the larger of the
+    kit's ceiling and the room its route's effort sets (`KIT_ROOM`)."""
+    assert llm.KIT_ROOM == {"low": 0, "medium": 4096, "high": 8192, "xhigh": 12000, "max": 16000}
+    assert set(llm.KIT_ROOM) == set(llm.EFFORTS)
+    monkeypatch.setenv(llm.ROUTES_SETTING, json.dumps({
+        "judge": {"models": [OPUS, SONNET], "effort": "max"},
+        "extract": {"models": [OPUS, SONNET], "effort": "high"},
+        "explain": {"models": [OPUS, SONNET], "effort": "medium"},
+        "index": {"models": [HAIKU], "effort": "low"},
+    }))
+    client = FakeClient({OPUS: answer(OPUS, "{}"), HAIKU: answer(HAIKU, "{}")})
+    monkeypatch.setattr(llm, "_default_client", lambda: client)
+
+    async def the_kit_asks():
+        await llm.kit_client("judge").generate_json("p", max_tokens=1024)
+        await llm.kit_client("draft").generate("p", max_tokens=4096, json_mode=True)
+        await llm.kit_client("extraction").generate("p", max_tokens=512)
+        await llm.kit_client("extraction").generate_json("p", max_tokens=8192)
+        await llm.kit_client("answer").generate("p", max_tokens=2048)
+
+    with llm.tally() as spent:
+        asyncio.run(the_kit_asks())
+    assert [(r["model"], r["output_config"]["effort"], r["max_tokens"]) for r in client.requests] == [
+        (OPUS, "max", 16000), (OPUS, "high", 8192), (HAIKU, "low", 512), (HAIKU, "low", 8192), (OPUS, "medium", 4096),
+    ], "the room at max, high and medium; at low, and above the room, the kit's own ceiling"
+    assert [(s.family, s.max_tokens) for s in spent] == [
+        ("judge", 16000), ("extract", 8192), ("index", 512), ("index", 8192), ("explain", 4096)]
+
+
+def test_the_draft_role_reads_the_extract_route(monkeypatch):
+    """The kit's drafter of seed questions runs on the kit's answer role;
+    openFerment names it `draft` and routes it on `extract`, as a document
+    read into candidates is routed, charged to that route's spend role."""
+    from openferment_core import spend
+
+    assert llm.KIT_ROLES == {"answer": "explain", "extraction": "index", "judge": "judge", "draft": "extract"}
+    monkeypatch.setenv(llm.ROUTES_SETTING, json.dumps({"extract": {"models": [SONNET], "effort": "high"}}))
+    client = FakeClient({SONNET: answer(SONNET, '{"questions": []}')})
+    monkeypatch.setattr(llm, "_default_client", lambda: client)
+    drafter = llm.kit_client("draft")
+    assert drafter.model == SONNET and drafter.describe() == SONNET
+    with llm.tally() as spent:
+        said = asyncio.run(drafter.generate("p", system="sys", max_tokens=4096, json_mode=True))
+    assert said == '{"questions": []}' and client.asked == [SONNET]
+    assert client.requests[0]["output_config"]["effort"] == "high" and client.requests[0]["system"] == "sys"
+    assert [(s.family, s.effort, s.model, s.outcome) for s in spent] == [("extract", "high", SONNET, "answered")]
+    assert spend.state()["byRole"]["answer"] == llm.cost_usd(SONNET, 1000, 500)

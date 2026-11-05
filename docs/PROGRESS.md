@@ -3098,3 +3098,20 @@ The live work (the prompt's §6.7 and §7), on the routes of its §4 as `core/.e
   on 3.12, 203 passed each way; `gen:api` regenerated for the health docstrings, then `gen:api`, `gen:tools` and
   `gen:components`, each with `--check`, each file as the service writes it; `pnpm typecheck` and
   `pnpm check:secrets`; `pnpm test:core` 2972 passed, 1 skipped, 175 deselected (4 min 54 s).
+- F.5.1. The model layer the retrieval lanes stand on (the F.5 plan's §3 item 1; the orchestrator's decisions 2 and
+  8). `llm.tally()` opens a run's own count: within it every `llm.call` adds one `llm.Spent`, an answer, a refusal
+  and an outage alike, holding the family and effort it ran at, the ceiling it asked, its outcome (`answered`,
+  `refused` or `unavailable`), the model that answered, the models asked and those the safety classifier declined,
+  its tokens and USD, how the answer stopped, and a failure in the words its caller was given. Tallies nest, and a
+  context copied from a tally's carries it: a thread `asyncio.to_thread` starts, and a coroutine `db.run` hands to
+  the database loop (measured on Python 3.12.3 and 3.13.17, where a thread `threading.Thread` starts begins with an
+  empty context); outside every tally nothing is kept. `call`'s body moves to `_call`, and a model counts as asked
+  once its reservation holds, so a call the daily cap refuses names no model. `KIT_ROLES` gains `draft`, the role
+  openFerment names for the kit's drafter of seed questions, on the `extract` route; each kit call asks the larger
+  of the kit's ceiling and the room for thinking its route's effort sets (`KIT_ROOM`: low 0, medium 4,096, high
+  8,192, xhigh 12,000, max 16,000), the live Search answer's call among them. ADR-008's note on the room, the role
+  and the tally comes with the plan's records (its §3 item 15). Tests: `test_llm.py` (7 new). Checks: `test_llm.py`
+  and the thirteen files that reach `llm.call`, the kit or the package map, with the database address empty, on
+  Python 3.13 and on 3.12, 333 passed each way; `gen:api`, `gen:tools` and `gen:components --check`, each file as
+  it was; `pnpm test:core` 2973 passed, 1 skipped, 175 deselected (6 min 8 s); `pnpm test:lit` not owed
+  (literature/ unchanged, and its tests hand the kit its own `MockLLM`).

@@ -30,11 +30,20 @@ provider routes the same way; the service serves Anthropic's models itself,
 and a route naming another provider waits, said in words, for the owner's
 decision on how its key is read (execution prompt §11.1). The day's spend is
 charged under two roles, `answer` and `index` (`SPEND_ROLES`); `role=` names
-a family as it did before (`answer` reads `plan`'s route).
+a family as it did before (`answer` reads `plan`'s route). Sci RAG Kit's
+calls read the routes by its roles (`KIT_ROLES`), each with the room for its
+thinking that its route's effort sets (`KIT_ROOM`).
 
 ONE DAILY CAP. Every response is charged to `spend.py` under its role, and a
 call whose worst case could take the UTC day past `OPENFERMENT_DAILY_BUDGET_USD`
 is refused before it is sent (`BudgetExhausted`).
+
+A RUN'S OWN COUNT (alpha 2.2 F.5). Within `tally()`, every `call` adds one
+`Spent` to the list the tally yields, an answer, a refusal and an outage
+alike: its family and effort, the model that answered, the models asked and
+those that declined, its tokens and USD, how the answer stopped, and a
+refusal or an outage in words. A command that reports what one run spent
+opens a tally around the run; outside every tally nothing is kept.
 
 TOOL TURNS. `converse` runs one turn of a conversation the caller owns, each
 tool strict unless the registry marks it loose (the module tools, OF-BLD-015
@@ -696,6 +705,68 @@ def _default_client() -> Any:
     return make_client(api_key=key)
 
 
+# ── a run's own count (alpha 2.2 F.5) ──────────────────────────────────
+
+
+@dataclass(frozen=True)
+class Spent:
+    """One `call` as a tally counts it. `family` and `effort` are its route as
+    it stood when the call was made, and `max_tokens` the ceiling the call
+    asked. `outcome` is `answered`, `refused` (every model asked declined) or
+    `unavailable` (no model answered: the key, the network, the daily cap, or
+    every model passed over), and `failure` says why in the words the caller
+    was given, for the last two. `model` is the model that answered, None when
+    none did; `tried` names the models asked, in order, and `refused` those of
+    them the safety classifier declined, by the ids they were asked by.
+    `usage` is what the call spent, a billed refusal before the answer or the
+    outage included; `stop_reason` is how the answer stopped, and `fell_back`
+    whether a model after the route's first gave it."""
+
+    family: str
+    effort: str
+    max_tokens: int
+    outcome: str
+    tried: tuple[str, ...]
+    refused: tuple[str, ...]
+    usage: Usage
+    model: str | None = None
+    stop_reason: str | None = None
+    fell_back: bool = False
+    failure: str | None = None
+
+    @property
+    def truncated(self) -> bool:
+        return self.stop_reason == "max_tokens"
+
+
+#: The tallies open in this context, the outermost first (`tally`).
+_TALLIES: contextvars.ContextVar[tuple[list[Spent], ...]] = contextvars.ContextVar("openferment_tallies", default=())
+
+
+@contextlib.contextmanager
+def tally() -> Iterator[list[Spent]]:
+    """Count the calls made within it: every `call` adds its `Spent` to the
+    list this yields, in the order the calls end. Tallies nest, and a call is
+    counted in every tally open around it. A context copied from this one
+    carries it: a thread `asyncio.to_thread` starts (the kit's calls arrive
+    so), a task begun within it, a coroutine `db.run` hands to the database
+    loop. A thread `threading.Thread` starts begins with an empty context on
+    Python 3.12 and 3.13, and its calls reach a tally only when it runs them
+    in a copy (`contextvars.copy_context().run`). Outside every tally nothing
+    is kept; the day's spend is charged to `spend.py` either way."""
+    spent: list[Spent] = []
+    token = _TALLIES.set((*_TALLIES.get(), spent))
+    try:
+        yield spent
+    finally:
+        _TALLIES.reset(token)
+
+
+def _keep(spent: Spent) -> None:
+    for kept in _TALLIES.get():
+        kept.append(spent)
+
+
 def call(
     *,
     system: str,
@@ -711,9 +782,48 @@ def call(
     `schema` is None), by the first model in the family's route that will
     (`role` names one as before: `answer` is `explain` here, an answer in one
     call). Raises ModelRefused or ModelUnavailable (BudgetExhausted among
-    them) otherwise."""
+    them) otherwise. Every tally open around the call counts it, an answer, a
+    refusal and an outage alike (`tally`)."""
     family = family_of(family or ("explain" if role == "answer" else role))
     route = routes()[family]
+    tried: list[str] = []
+    declined: list[str] = []
+
+    def counted(outcome: str, usage: Usage, **how: Any) -> Spent:
+        return Spent(family=family, effort=route.effort, max_tokens=max_tokens, outcome=outcome, tried=tuple(tried),
+                     refused=tuple(declined), usage=usage, **how)
+
+    try:
+        result = _call(system=system, user=user, schema=schema, max_tokens=max_tokens, client_factory=client_factory,
+                       label=label, family=family, route=route, tried=tried, declined=declined)
+    except ModelRefused as e:
+        _keep(counted("refused", e.usage, failure=str(e)))
+        raise
+    except ModelUnavailable as e:
+        _keep(counted("unavailable", e.usage, failure=str(e)))
+        raise
+    _keep(counted("answered", result.usage, model=result.model, stop_reason=result.stop_reason,
+                  fell_back=result.fell_back))
+    return result
+
+
+def _call(
+    *,
+    system: str,
+    user: str,
+    schema: dict[str, Any] | None,
+    max_tokens: int,
+    client_factory: Callable[[], Any] | None,
+    label: str,
+    family: str,
+    route: Route,
+    tried: list[str],
+    declined: list[str],
+) -> Result:
+    """`call`'s work: the route's models asked in turn. `tried` gains each
+    model as it is asked and `declined` each one that declines, by the id it
+    was asked by (`Result.tried` and `Result.refused`), so a call that raises
+    still says which were."""
     role = SPEND_ROLES[family]
     client = (client_factory or _default_client)()
     output: dict[str, Any] = {"effort": route.effort}
@@ -728,11 +838,8 @@ def call(
         request["system"] = system
     models = list(route.models)
     spent = Usage()
-    tried: list[str] = []
     refusal: str | None = None
     refused_by: list[str] = []
-    # The models that declined, by the ids they were asked by (Result.refused).
-    declined: list[str] = []
     for i, named in enumerate(models):
         last = i == len(models) - 1
         provider, model = spec(named)
@@ -762,8 +869,8 @@ def call(
             spent = add(spent, Usage(models=[named]))
             return Result(data=data, model=named, usage=spent, stop_reason="end_turn", fell_back=i > 0, tried=tried,
                           text=text, refused=declined)
-        tried.append(model)
         held = _reserve(model, request, max_tokens, spent, role)
+        tried.append(model)
         cost = 0.0
         try:
             try:
@@ -984,17 +1091,33 @@ def _converse_once(request: dict[str, Any], ask: Callable[[dict[str, Any]], Any]
 
 
 #: The kit's roles, as our families: its answers with citations explain, its
-#: high-volume extraction (a document's graph, HyDE's passage) is an index
-#: chore, and its judge judges.
-KIT_ROLES = {"answer": "explain", "extraction": "index", "judge": "judge"}
+#: high-volume extraction (a document's graph, HyDE's passage, a question's
+#: entity names) is an index chore, and its judge judges. `draft` is a role
+#: openFerment names for the kit's drafter of seed questions, which the kit
+#: runs on its answer role; it reads the extract route, as a document read
+#: into candidates does (alpha 2.2 F.5).
+KIT_ROLES = {"answer": "explain", "extraction": "index", "judge": "judge", "draft": "extract"}
+
+#: The room a kit call has for thinking, in output tokens, by its route's
+#: effort. The kit sizes each call for a model that writes its answer at
+#: once (a judgement in 1,024 tokens, a drafted set of questions in 4,096,
+#: HyDE's passage in 512), and a model's output tokens include its thinking,
+#: so at a high effort the thinking may spend the ceiling before the answer
+#: is written. A kit call asks the larger of the kit's ceiling and this room;
+#: at effort low the kit's ceiling stands. openFerment's own judge asks
+#: 32,000 at every effort (`postdoc.evaluate.JUDGE_TOKENS`).
+KIT_ROOM = {"low": 0, "medium": 4096, "high": 8192, "xhigh": 12000, "max": 16000}
 
 
 def kit_client(kit_role: str = "answer") -> Any:
-    """The model client Sci RAG Kit generates with, for one of its roles:
-    answers with citations, HyDE's hypothetical passage, a document's graph.
-    Every call goes through `call` here, so the kit's calls are capped by the
-    day's spend, read the key in this one place, and fall back along the
-    role's chain like any other. Built on demand: the kit is the `lit` extra."""
+    """The model client Sci RAG Kit generates with, for one of its roles
+    (`KIT_ROLES`): answers with citations, HyDE's hypothetical passage, a
+    question's entity names, a document's graph, a judgement, a drafted set
+    of questions. Every call goes through `call` here, so the kit's calls are
+    capped by the day's spend, read the key in this one place, fall back
+    along the role's route like any other, and are counted by each tally open
+    around them; each asks at least the room its route's effort sets for
+    thinking (`KIT_ROOM`). Built on demand: the kit is the `lit` extra."""
     import asyncio
 
     from sci_rag.llm.client import LLMClient
@@ -1006,8 +1129,9 @@ def kit_client(kit_role: str = "answer") -> Any:
 
         async def generate(self, prompt: str, *, system: str | None = None, temperature: float = 0.2,
                            max_tokens: int = 2048, json_mode: bool = False) -> str:
+            room = KIT_ROOM[routes()[family].effort]
             result = await asyncio.to_thread(
-                call, system=system or "", user=prompt, schema=None, max_tokens=max_tokens,
+                call, system=system or "", user=prompt, schema=None, max_tokens=max(max_tokens, room),
                 family=family, label="sci-rag-kit: ",
             )
             return result.text
