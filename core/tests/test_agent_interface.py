@@ -209,7 +209,7 @@ def test_the_tools_page_points_a_client_at_its_recipe_and_the_recipe_hands_the_s
     page = reference.render()
     assert (ROOT / "docs" / "TOOLS.md").read_text(encoding="utf-8") == page, "pnpm gen:tools writes the page"
     top = page.split("## The registry", 1)[0]
-    anchors = {"the-mcp-server", "a-client", "module-reads"}
+    anchors = {"the-mcp-server", "a-client", "module-reads", "the-sci-rag-server"}
     assert all(f"(#{a})" in top for a in anchors)
     headings = {line.lstrip("#").strip().lower().replace(" ", "-") for line in page.splitlines() if line.startswith("#")}
     assert anchors <= headings, "each link names a heading of the page"

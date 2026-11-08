@@ -178,6 +178,14 @@ refusal with no project and, with one, the connection's failure, each in words
   has read says which command builds its graph (`graph.NO_GRAPH`).
 - **Communities and entity resolution stay off.** The kit reads no community under a scope, and
   resolution merges rows every project reads.
+- **The graph tools are back on the `sci-rag` server (F.5.3).** `literature_mcp.build` removes the
+  kit's `search_entities` and `get_entity_relationships`, which query the store whole, and adds
+  openFerment's own under the same names and argument schemas, each calling the service's scoped
+  read through `InWords` (the project asked for first, every failure in words) and each
+  description naming the domain's types; a graph tool asked of a project no build has read is
+  refused in `NO_GRAPH`'s words. `docs/TOOLS.md` lists the server's tools from its own listing
+  (`tools/reference.py`, over `literature_mcp.Unopened`, a service that opens nothing).
+  Implementation 8's debt is paid.
 
 ## Revisit condition
 

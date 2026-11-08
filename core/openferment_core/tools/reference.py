@@ -3,9 +3,12 @@
 `render()` is the whole file: what every tool takes and says, as a model and an
 outside assistant read it, its family, whether it writes, and its scope; what
 a module read answers (`models.ModuleRead`) and what each kind's rows hold
-(`module_stores.DETAIL`); the gate table from `gates.GATES`; and the MCP
-server: its own two names, read from its listing, how it starts, the two ways
-it reaches a project, and what a client of it reads. `pnpm gen:tools` writes
+(`module_stores.DETAIL`); the gate table from `gates.GATES`; the MCP server:
+its own two names, read from its listing, how it starts, the two ways it
+reaches a project, and what a client of it reads; and the `sci-rag` server's
+tools, read from its listing over a service that opens nothing
+(`literature_mcp.Unopened`), with how it starts and the scope its graph tools
+read in. `pnpm gen:tools` writes
 it (scripts/gen-tools.py); `pnpm check:tools` fails when the file on disk
 differs from it. Nothing in the file
 is written by hand: a change to a tool is a change to its registration, and
@@ -50,10 +53,12 @@ One registry, three callers: Postdoc's loop, the HTTP endpoints (`GET /api/tools
 /api/tools/{{name}}`) and the MCP server (`openferment`) run every tool through `tools.run`
 (`core/openferment_core/tools/__init__.py`), so a rule the registry holds, it holds for each of them.
 
-**For a client.** [The MCP server](#the-mcp-server), at the end of this page, says how to start it
+**For a client.** [The MCP server](#the-mcp-server), near the end of this page, says how to start it
 and the two ways it reaches a project, and [A client](#a-client) is the recipe: the SDK's names, the
 environment to hand the server, the shape of every answer, and where a write's audit row is read.
 What a module read answers, and what each kind of row holds, closes [Module reads](#module-reads).
+[The sci-rag server](#the-sci-rag-server), last, lists Sci RAG Kit's own tools over the project's
+literature.
 
 - **Inputs** carry ids, words and quantities (ADR-006). A number stands only inside a quantity, an
   object of `value` and `unit` (and `low` and `high` for a range), where a tool asks for one; a
@@ -279,6 +284,37 @@ def _mcp() -> list[str]:
     return out
 
 
+def _sci_rag() -> list[str]:
+    from .. import literature_mcp
+
+    listed = sorted(asyncio.run(literature_mcp.build(literature_mcp.Unopened()).list_tools()), key=lambda t: t.name)
+    module = "python -m openferment_core.literature_mcp"
+    graph_tools = " and ".join(f"`{n}`" for n in literature_mcp.SCOPED)
+    out = ["## The sci-rag server", "",
+           "`sci-rag` (`core/openferment_core/literature_mcp.py`, started by `.mcp.json` beside `openferment`) is "
+           "Sci RAG Kit's own MCP server over the project's literature (ADR-002). Each of its tools is the kit's, "
+           "served by `kit.ProjectService`, so every read stays inside the one project the server acts in. The "
+           f"kit's two concept graph tools, {graph_tools}, keep their names and arguments and read the project's "
+           "graph alone (`core/openferment_core/literature/graph.py`; ADR-002, Implementation F): an entity where "
+           "a passage of a document the project holds names it, an edge where its passage is the project's and "
+           "both its ends are entities of the project, a description or a quote where the project's own "
+           "documents carry it.", "",
+           f"- Start it from the repository's root: `uv run --project core --all-extras {module} --project <id>`, "
+           "or with `OPENFERMENT_PROJECT` in its environment. It reads `OPENFERMENT_DATABASE_URL` and "
+           "`OPENFERMENT_PROJECT` from its environment, else from `core/.env`.",
+           "- With no project, every call is refused in words naming the two ways to name one; a document the "
+           "project does not hold and a database that does not answer are said in words as well. A graph tool "
+           "asked of a project whose passages no build has read is refused in words naming the command that "
+           "builds the project's graph.",
+           "- `answer_question`, and `search_corpus` with `deep`, call a model through `core/openferment_core/llm.py` "
+           "(the kit's roles on the routes `explain` and `index`), on the key the server's environment holds; "
+           "every other call reads the store alone.",
+           ""]
+    for tool in listed:
+        out += [f"### `{tool.name}`", "", _cell(tool.description or ""), "", *_fields(tool.input_schema, top=True), ""]
+    return out
+
+
 def render() -> str:
     from .. import mcp_server
 
@@ -302,5 +338,5 @@ def render() -> str:
                 lines += _tool(n)
             if fam == "Module reads":
                 lines += _module_reads()
-    lines += _gates() + _mcp()
+    lines += _gates() + _mcp() + _sci_rag()
     return "\n".join(lines).rstrip() + "\n"

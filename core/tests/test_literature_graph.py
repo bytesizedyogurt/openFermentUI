@@ -27,7 +27,7 @@ from sci_rag.ingest.manifest import CorpusEntry
 from sci_rag.llm.client import LLMClient
 from sqlalchemy import insert, select
 
-from openferment_core import db, projects
+from openferment_core import db, literature_mcp, projects
 from openferment_core.db import models as t
 from openferment_core.literature import graph, kit
 
@@ -437,6 +437,23 @@ def test_neither_project_reads_the_others_entities_edges_or_descriptions(graphs)
             return await kit.service("free").search_entities("")
 
     assert asyncio.run(free(HERE)) == _entities(HERE), "the MCP server's service reads as the service in process does"
+
+
+def test_the_sci_rag_servers_graph_tools_read_each_projects_graph_alone(graphs):
+    n = graphs
+    server = literature_mcp.build(kit.service("free"))
+
+    async def ask(project_id: str, tool: str, arguments: dict) -> dict:
+        with projects.using(project_id):
+            return json.loads((await server.call_tool(tool, arguments)).content[0].text)
+
+    for project_id in (HERE, THERE):
+        assert asyncio.run(ask(project_id, "search_entities", {"name_contains": ""})) == _entities(project_id)
+        assert asyncio.run(ask(project_id, "get_entity_relationships", {"entity_name": n.shared})) == _edges(
+            project_id, n.shared)
+    assert asyncio.run(ask(HERE, "get_entity_relationships", {"entity_name": n.there}))["found"] is False
+    assert asyncio.run(ask(THERE, "search_entities", {"name_contains": n.here}))["entities"] == []
+    assert asyncio.run(ask(HERE, "search_entities", {"name_contains": n.alias}))["entities"] == []
 
 
 def test_an_edges_quote_is_shown_where_its_words_stand_in_its_passage(tmp_path):
