@@ -432,16 +432,6 @@ def runs() -> list[ExtractRun]:
     return [_run(g, reviewed_records())]
 
 
-def new_candidates() -> list[Candidate]:
-    """The candidates no reference covers (§6.2): the undecided ones from the
-    candidates, and every one a reviewer has decided, from the decisions, so
-    an accepted record is still a record where the extraction is gone."""
-    g = _gather()
-    decided = {c.id for c in biorepo.records()}
-    fresh = new_records(g.candidates, reviewed_records(), papers=g.papers) if g.papers else []
-    return [c for c in fresh if c.id not in decided] + biorepo.records()
-
-
 def overlay_bundle() -> tuple[list[ExtractRun], list[Candidate], dict[str, ReviewDecision]]:
     """Runs, candidates and decisions for the overlay, from ONE read of the
     candidates and the decisions — the store asks on every page load and after

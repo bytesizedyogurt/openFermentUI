@@ -119,6 +119,10 @@ openFerment's own replay check (re-run within tolerance) is the verification tha
 - The address is a person's to name: the route is the one door that fetches by address, and the
   registry's `flowsheet_import` takes a reference file's id alone, so no model, over the loop or
   MCP, has the service fetch an address.
+- alpha 2.2 H.0: `library()` lists the reference files as the manifest names them and which this
+  machine holds (`GET /api/flowsheets/library`, the `flowsheet_library` tool), and `import_library`
+  keeps one in the project (`POST /api/flowsheets/library/{file_id}`, `flowsheet_import`).
+  `library_flowsheets()`, named above as the way the files load, had no caller and is deleted.
 
 ## Revisit condition
 

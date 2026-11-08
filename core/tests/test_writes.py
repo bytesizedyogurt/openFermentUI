@@ -25,7 +25,7 @@ class _Store(type(Path())):
 
 @pytest.fixture()
 def store(tmp_path, monkeypatch, pool, held_documents):  # noqa: F811
-    """Every file store the writes reach, under tmp_path; the audit log is
+    """The data directory the writes reach, under tmp_path; the audit log is
     the test's rolled-back database; the documents the project holds in
     `store.held`."""
     monkeypatch.setattr(intake, "DATA_DIR", tmp_path)

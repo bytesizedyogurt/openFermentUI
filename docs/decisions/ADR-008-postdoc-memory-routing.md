@@ -488,6 +488,14 @@ its numbers.
   `chunks_left` each time (`literature/graph.py`). `OPENFERMENT_ROUTES` naming a second index
   model reads it; Sonnet answered each of F.1's declines.
 
+## Implementation 19 (alpha 2.2 H.0: the one-call path's record)
+
+- 6.1's `postdoc/single.py`, the one-call path, left at 8.5 (`484b5b2`), and the claim filter it
+  validated by, `validate.validate_claims`, left at alpha 2.2 H.0. `postdoc/` holds
+  `conversations.py`, `evaluate.py` and `plan.py`; every answer comes from the loop, its claims held
+  by `validate.validate_plan`. `explain` is a route family of `llm.ROUTES`, the role a call names,
+  with no module of its own.
+
 ## Evidence
 
 - `postdoc_agent.py`, `llm.py`, `spend.py`, `tools/__init__.py` at `alpha-1.0`.

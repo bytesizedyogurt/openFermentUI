@@ -29,7 +29,6 @@ from __future__ import annotations
 
 import uuid
 from datetime import datetime, timezone
-from typing import Any
 
 from sqlalchemy.ext.asyncio import AsyncSession
 
@@ -289,8 +288,3 @@ def listed(state: str | None = None) -> list[Proposal]:
     """Every proposal, or those in one state, as `shown`: what
     GET /api/proposals serves."""
     return [shown(p) for p in db.run(_read(projects.current(), state))]
-
-
-def as_rows(limit: int = 20) -> list[dict[str, Any]]:
-    """Open proposals as `home_read` lists them."""
-    return [shown(p).model_dump(mode="json") for p in open_ones()[:limit]]

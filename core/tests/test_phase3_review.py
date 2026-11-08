@@ -67,7 +67,8 @@ def test_unknown_spend_refuses_and_leaves_the_day_as_it_was(monkeypatch):
     down = make_engine("postgresql://nobody:nothing@127.0.0.1:9/none")
     previous_binding, previous_engine = db.bind(None), db.use_engine(down)
     try:
-        assert spend.would_pass(5)[0] is True
+        with pytest.raises(spend.SpendUnknown):
+            spend.reserve("answer", 5)
         with pytest.raises(spend.SpendUnknown):
             spend.charge("answer", 0.1)
     finally:

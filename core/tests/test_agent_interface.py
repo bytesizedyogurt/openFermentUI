@@ -263,14 +263,12 @@ def _every_kind() -> module_stores.Sources:
                "productId": None, "strainId": None, "predictions": [],
                "measurementSchema": [{"id": "m-a", "label": "A placeholder measure", "unit": "placeholder-unit",
                                       "timepoint": "harvest", "predictionId": None}]}
+    protocol = {"id": "pr-a", "title": "A placeholder protocol", "category": "a-placeholder", "organisms": [],
+                "purpose": "", "currentVersion": "1", "versions": ["1"]}
+    scenario = {"id": "sc-a", "name": "A placeholder scenario", "kind": "biosteam", "product": "",
+                "modelId": "a-placeholder-model"}
     projection = {
-        "runbooks": {"runbooks": [runbook],
-                     "protocols": [{"id": "pr-a", "title": "A placeholder protocol", "category": "a-placeholder",
-                                    "organisms": [], "purpose": "", "currentVersion": "1", "versions": ["1"]}]},
-        "geneos": {"hosts": [{"id": "h-a", "name": "Placeholdera testii", "badges": [], "bsl": 1}],
-                   "pathways": [{"id": "pw-a", "label": "A placeholder pathway", "products": ["a-placeholder"]}]},
-        "proforma": {"scenarios": [{"id": "sc-a", "name": "A placeholder scenario", "kind": "biosteam",
-                                    "product": "", "modelId": "a-placeholder-model"}]},
+        "geneos": {"hosts": [{"id": "h-a", "name": "Placeholdera testii", "badges": [], "bsl": 1}]},
         "primer": {"lessons": [{"id": "l-a", "title": "A placeholder lesson", "moduleTitle": "A placeholder module",
                                 "blurb": "", "skills": []},
                                {"id": "l-b", "title": "Another placeholder lesson", "skills": []}]},
@@ -322,6 +320,9 @@ def _every_kind() -> module_stores.Sources:
                                          falsePositives=[], models=[MODEL])],
         proposals=lambda: [proposal],
         kept_trains=lambda: [kept],
+        scenarios=lambda: [scenario],
+        runbooks=lambda: [runbook],
+        protocols=lambda: [protocol],
         depositions=lambda: [(deposition, "Ada Moreno")],
         measured=lambda: [measured],
     )

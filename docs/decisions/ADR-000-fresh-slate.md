@@ -68,7 +68,7 @@ The new `CLAUDE.md` (stage 8) carries only R, P and C lines, each labelled.
 | Hosting | `scripts/host/` install, deploy, nightly; launchd jobs never root | C | Kept, wording generalized, PostgreSQL steps added |
 | Hosting | Bind `127.0.0.1`; widening is the owner's decision | R | Execution prompt §11.1; kept |
 | Hosting | `guard.py` host and origin checks on every changing request | R | Execution prompt §11.1 (never weaken); kept |
-| Hosting | Every kept file written through `atomic.write_text` | X | Stores move to PostgreSQL; `atomic.py` stays for export files |
+| Hosting | Every kept file written through `atomic.write_text` | X | Stores move to PostgreSQL; `atomic.py` stays for the one file the service keeps on disk, a genome-scale model it fetched (`atomic.write_bytes`) |
 | Hosting | `biorepo.json` merge driver | X | No JSON store remains (ADR-001) |
 | Guild | A level is computed, never stored | C | Kept |
 | Guild | Rules live in `guild.py`; the browser asks | C | Kept over PostgreSQL |

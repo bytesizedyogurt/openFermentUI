@@ -82,7 +82,7 @@ HOSTS = [{"id": CENPK, "name": "Saccharomyces cerevisiae CEN.PK113-7D"},
 def catalogue(monkeypatch):
     empty = json.dumps(module_stores.EMPTY_PROJECTION)
     monkeypatch.setattr(module_stores, "_projection",
-                        lambda: {**json.loads(empty), "geneos": {"hosts": [dict(h) for h in HOSTS], "pathways": []}})
+                        lambda: {**json.loads(empty), "geneos": {"hosts": [dict(h) for h in HOSTS]}})
     return HOSTS
 
 

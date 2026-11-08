@@ -114,11 +114,12 @@ _ETHANOL = FlowsheetInfo(
 
 # OF-BLD-020 §6.1 (D11): a vessel and a train, priced. A scenario on it is made
 # with New scenario, naming the kept vessel design and train run it is built
-# from (`builtFrom`). Its program is
-# its train's; a train runs only on a program with a chemical set
-# (pureos/train_spec.PROGRAM_CHEMICALS, the yeast program's alone tonight), so
-# the entry is the yeast program's and a train of another program is refused
-# in words (test_custom_train holds the two equal).
+# from (`builtFrom`). Its chemical set is its train's; a train runs only on a
+# chemical set pureOS holds (pureos/train_spec.PROGRAM_CHEMICALS, the yeast set
+# alone tonight), so the entry carries the yeast set's key and a train on
+# another set is refused in words (test_custom_train holds the two equal). The
+# description and the price basis below keep the word "program": a composite
+# run's basis hashes both (docs/PROGRESS.md, Known debts, the `program` key).
 COMPOSITE = "custom_train_v1"
 COMPOSITE_BUILT_FROM = ["fermos.vessel", "pureos.train_run"]
 COMPOSITE_PRICE_BASIS = ("USD per kg of the product the train traces (ethanol, for the yeast program), contained in "

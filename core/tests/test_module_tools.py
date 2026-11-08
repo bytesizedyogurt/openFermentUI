@@ -1,8 +1,8 @@
 """One read tool per module (OF-BLD-015 §7.2), through `tools.run`.
 
-The module rows come from a small projection written here: fictional
-runbooks, a host and a lesson, handed in as a catalogue no store holds yet
-would be. The service's stores are stand-ins, so nothing here reads a key,
+The module rows come from small stand-ins written here: fictional runbooks
+through the runbooks door, and a host and a lesson through the projection,
+as the project's catalogues hand them. The service's stores are stand-ins, so nothing here reads a key,
 the network or this machine's data; the last test reads the project's own
 rows (project_state.py).
 """
@@ -21,19 +21,14 @@ STATES = {"open", "fenced", "approved", "locked", "proposed", "retired"}
 
 
 # Fictional rows, chosen to be found by whole words and heads and by nothing else.
+RUNBOOKS = [{"id": "rb-zeta", "title": "Zetase — pilot process", "kind": "research", "status": "needs_review",
+             "lockedAt": None, "productId": None, "strainId": None, "predictions": []},
+            {"id": "rb-omega", "title": "Omegase — bench trial", "kind": "research", "status": "ready",
+             "lockedAt": "2026-10-01T00:00:00Z", "productId": None, "strainId": None, "predictions": []}]
 PROJECTION = {
-    "runbooks": {
-        "runbooks": [{"id": "rb-zeta", "title": "Zetase — pilot process", "kind": "research", "status": "needs_review",
-                      "lockedAt": None, "productId": None, "strainId": None, "predictions": []},
-                     {"id": "rb-omega", "title": "Omegase — bench trial", "kind": "research", "status": "ready",
-                      "lockedAt": "2026-10-01T00:00:00Z", "productId": None, "strainId": None, "predictions": []}],
-        "protocols": [],
-    },
     "geneos": {"hosts": [{"id": "h-zeta", "name": "Zetamyces testii Z1", "badges": [], "bsl": 1},
                          {"id": "s-cerevisiae-cenpk113-7d", "name": "Saccharomyces cerevisiae CEN.PK113-7D",
-                          "badges": [], "bsl": 1}],
-               "pathways": []},
-    "proforma": {"scenarios": []},
+                          "badges": [], "bsl": 1}]},
     "primer": {"lessons": [{"id": "l-ster", "title": "Sterilising and releasing a vessel",
                             "moduleTitle": "Why extraction comes first", "blurb": "", "skills": []}]},
 }
@@ -45,6 +40,7 @@ def ctx_for(pool_, **over):  # noqa: F811
     def make():
         src = module_stores.fixture_sources(lambda: pool_)
         src.projection = lambda: json.loads(json.dumps(PROJECTION))
+        src.runbooks = lambda: json.loads(json.dumps(RUNBOOKS))
         for k, v in over.items():
             setattr(src, k, v)
         return module_stores.Stores(src)

@@ -340,7 +340,7 @@ def test_a_decided_candidate_outlives_its_extraction(monkeypatch):
     # No run — the extraction is gone — but the record is still a record,
     # kept with its decision, and a later decision about it still resolves.
     assert witness.runs() == []
-    assert [c.id for c in witness.new_candidates()] == ["cl1-T5-276fbb61"]
+    assert [c.id for c in biorepo.records()] == ["cl1-T5-276fbb61"]
     again = biorepo.write(decision("cl1-T5-276fbb61", "rejected", rejectReason="on reflection, a placeholder"))
     assert again.status == "rejected" and len(biorepo.read().records) == 1
 

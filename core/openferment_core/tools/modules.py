@@ -47,7 +47,7 @@ WHAT = {
                 "{\"kind\": \"measurement\", \"ref\": \"<its id>\"}}), and the measured evidence a "
                 "reconciliation released (kind measured-evidence: the prediction it tests, its value, unit and "
                 "conditions)",
-    "geneos": "the hosts, the pathways, the genome-scale models on the shelf and the ceilings computed on them",
+    "geneos": "the hosts, the genome-scale models on the shelf and the ceilings computed on them",
     "fermos": "the growth fits and forecasts computed from deposited runs (kind artifact), the kept simulations "
               "of a model family (kind simulation: its family, strain, product and sugar, and what bound each "
               "parameter, in words; its numbers stay in the artifact, cited by the row's ref or the evidence id "

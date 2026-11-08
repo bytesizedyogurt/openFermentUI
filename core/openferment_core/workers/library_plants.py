@@ -141,14 +141,6 @@ def package_test_tables() -> dict[str, Any]:
     return out
 
 
-def package_test_name(plant: str, configuration: str | None) -> str:
-    """The test the package's code generator writes for a plant and
-    configuration (`generate_code`: `test_<module><_configuration>`, a `*`
-    spelled `_agile`)."""
-    tag = f"_{configuration}".replace("*", "_agile") if configuration else ""
-    return f"test_{plant}{tag}"
-
-
 # ── discovery ──────────────────────────────────────────────────────────
 
 
@@ -517,7 +509,6 @@ TEA_SETTINGS = (
 # and offered as BioSTEAM states it.
 DESIGN_UNITS = {"T": "K", "P": "Pa", "tau": "hr", "tau_0": "hr", "V": "m3", "V_max": "m3", "kW_per_m3": "kW/m3",
                 "dT_hx_loop": "K", "T_condenser": "K", "Q": "kJ/hr", "power": "kW"}
-SHARE_NAMES = ("V_wf", "efficiency", "split", "conversion", "moisture_content", "x_", "y_", "_frac", "fraction")
 
 
 @dataclass
@@ -675,10 +666,6 @@ def parameters(p: Plant) -> list[Param]:
     keys = {q.key for q in own}
     return [*own, *(q for q in [*_stream_params(p), *_tea_params(p), *_utility_params(p), *_unit_params(p)]
                     if q.key not in keys)]
-
-
-def is_share(name: str) -> bool:
-    return any(s in name for s in SHARE_NAMES)
 
 
 def param_json(param: Param) -> dict[str, Any]:

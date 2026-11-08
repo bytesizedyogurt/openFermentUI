@@ -8,12 +8,11 @@ not being asked to be careful with quantities — it has no slot to put one in.
     model emits   "Ethanol yield on glucose in cenpk113-7d under anaerobic conditions"  + [its record id]
     UI renders    Ethanol yield on glucose in cenpk113-7d under anaerobic conditions — <the record's value and unit> (verified)
 
-A claim is rejected when any of these hold:
-
-    1. the text contains a number, in digits or in words
-    2. a cited record id does not resolve against the evidence pool
-    3. a cited paper id does not resolve
-    4. there are no record ids and the claim does not admit to being unsupported
+A claim of the agent's plan is rejected when any of `validate_plan`'s six
+rules holds: among them, its text contains a number, in digits or in words; a
+cited record id does not resolve against the evidence pool; it cites what no
+tool returned in the run; and it cites nothing while its support is not
+`unsupported`. Its papers come from what it cites.
 
 REJECTED CLAIMS ARE DROPPED AND COUNTED, NEVER REPAIRED. Stripping the number
 out of a bad claim would produce a sentence the model never wrote, attached to
@@ -220,85 +219,6 @@ class ValidationResult:
     claims: list[Claim] = field(default_factory=list)
     rejected: int = 0
     reasons: list[str] = field(default_factory=list)
-
-
-def validate_claims(
-    raw_claims: list[dict[str, Any]],
-    records_by_id: dict[str, Any],
-    papers_by_id: dict[str, Any],
-) -> ValidationResult:
-    """Filter model claims down to the ones that can be trusted and rendered.
-
-    Provenance is COMPUTED here, from the cited records, and whatever the model
-    put in that field is discarded. A model grading its own evidence grades it
-    generously; and the weakest-citation rule means a claim resting on one gold
-    record and one industry estimate is an industry estimate.
-    """
-    out = ValidationResult()
-
-    for index, raw in enumerate(raw_claims):
-        claim_id = str(raw.get("id") or f"c{index + 1}")
-        text = str(raw.get("text") or "").strip()
-        record_ids = [str(r) for r in (raw.get("recordIds") or [])]
-        paper_ids = [str(p) for p in (raw.get("paperIds") or [])]
-        support = raw.get("support") or "direct"
-        if support not in ("direct", "inferred", "unsupported"):
-            support = "direct"
-
-        def reject(why: str) -> None:
-            out.rejected += 1
-            out.reasons.append(f"{claim_id}: {why}")
-
-        if not text:
-            reject("empty claim text")
-            continue
-
-        # 1. Rule 1 itself.
-        if found := find_number(text):
-            reject(f"claim text contains a number ({found!r}) — values come from the record")
-            continue
-
-        # 2 & 3. Citations must resolve. A claim citing a record that does not
-        # exist is not a slightly-wrong claim; it is a claim with nothing under
-        # it, and the UI has no value to render beside it.
-        ghost_records = [r for r in record_ids if r not in records_by_id]
-        if ghost_records:
-            reject(f"cites records that do not exist: {', '.join(ghost_records)}")
-            continue
-
-        ghost_papers = [p for p in paper_ids if p not in papers_by_id]
-        if ghost_papers:
-            reject(f"cites papers that do not exist: {', '.join(ghost_papers)}")
-            continue
-
-        # 4. No citation and no admission. 'unsupported' is a legitimate claim
-        # — "nobody has measured this in this host" is a useful answer — but it
-        # has to be declared, not arrived at by omission.
-        if not record_ids and support != "unsupported":
-            reject(f"no recordIds, so its support must be 'unsupported'; it says '{support}'")
-            continue
-
-        # Papers are derived from the cited records rather than trusted from the
-        # model, so a claim can never point at a paper its evidence does not
-        # come from. Anything the model additionally named and that resolves is
-        # kept, in case it cited a paper with no extracted record.
-        derived = {records_by_id[r]["paperId"] for r in record_ids}
-        papers = sorted(derived | set(paper_ids))
-
-        out.claims.append(
-            Claim(
-                id=claim_id,
-                text=text,
-                recordIds=record_ids,
-                paperIds=papers,
-                support=support,
-                provenance=weakest_provenance(
-                    [records_by_id[r]["provenance"] for r in record_ids]
-                ),
-            )
-        )
-
-    return out
 
 
 # ── the agent's plan (OF-BLD-014 §5.1) ─────────────────────────────────

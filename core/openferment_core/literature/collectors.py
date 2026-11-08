@@ -85,7 +85,7 @@ _CORE = Path(__file__).parent.parent.parent
 
 def _env_path(name: str, default: Path) -> Path:
     """An override from the environment. A relative one is taken from the
-    repository root — the `pnpm intake:*` aliases run from core/, and a path
+    repository root — the `pnpm intake:extract` command runs from core/, and a path
     typed at the root must not quietly land in core/core/."""
     raw = os.environ.get(name, "").strip()
     if not raw:

@@ -618,12 +618,6 @@ def library_flowsheet(file_id: str, *, get: Callable[[str], bytes] = download) -
                    library_id=f.id)
 
 
-def library_flowsheets(ids: list[str] | None = None, *, get: Callable[[str], bytes] = download) -> list[SFFFlowsheet]:
-    """The reference flowsheets loaded as records with origin `library`: every
-    one the manifest names, or those asked for."""
-    return [library_flowsheet(i, get=get) for i in (ids or [f.id for f in manifest().flowsheets])]
-
-
 def export(plant: dict[str, Any], *, project_id: str, run_artifact_id: str, by: str,
            title: str | None = None, call: Callable[[str, dict[str, Any]], Any] | None = None) -> SFFFlowsheet:
     """A run's base case written as an SFF file by the toolkit in the worker,

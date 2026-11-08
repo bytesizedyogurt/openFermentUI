@@ -17,8 +17,7 @@ Where each module's rows come from:
   scenario;
 - the project's protocols (protocols.py), each with its versions;
 - the module projection: geneOS's hosts and Primer's lessons from the
-  project's catalogues (catalogues.py), and geneOS's pathways, which no
-  store holds, so their list is empty; a test hands its own projection in;
+  project's catalogues (catalogues.py); a test hands its own projection in;
 - pureOS's unit operations, from `schema/vocabulary.yaml`;
 - the service's own stores (records and candidates through the evidence
   pool, artifacts, Guild's ledger and checks, Intake's fetch state, the
@@ -247,24 +246,20 @@ def _kept_trains() -> list[Any]:
     return list(kept.read().trains)
 
 
-# What a module reads beside its rows (the hosts and pathways, the lessons),
-# each list empty until `_projection` fills it from the project's
-# catalogues; a test hands its own in through `Sources.projection`, or in
-# place of `_projection`, and may hand runbooks, protocols and scenarios this
-# way beside the project's own (`Sources.runbooks`, `Sources.protocols`,
-# `Sources.scenarios`).
+# What a module reads from the project's catalogues (geneOS's hosts,
+# Primer's lessons), each list empty until `_projection` fills it; a test
+# hands its own in through `Sources.projection`, or in place of
+# `_projection`. Runbooks, protocols and scenarios come through their own
+# doors (`Sources.runbooks`, `Sources.protocols`, `Sources.scenarios`).
 EMPTY_PROJECTION: dict[str, Any] = {
-    "runbooks": {"runbooks": [], "protocols": []},
-    "geneos": {"hosts": [], "pathways": []},
-    "proforma": {"scenarios": []},
+    "geneos": {"hosts": []},
     "primer": {"lessons": []},
 }
 
 
 def _projection() -> dict[str, Any]:
     """The projection, a copy of its own for each caller: geneOS's hosts and
-    Primer's lessons from the open project's catalogues (catalogues.py), the
-    rest empty."""
+    Primer's lessons from the open project's catalogues (catalogues.py)."""
     from . import catalogues
 
     out = copy.deepcopy(EMPTY_PROJECTION)
@@ -589,8 +584,7 @@ class Stores:
         return tuple(sorted({by_strain[s] for s in strain_ids if s and s in by_strain}))
 
     def _runbooks(self) -> Iterable[Row]:
-        p = self._get("projection")["runbooks"]
-        for r in [*self._get("runbooks"), *p["runbooks"]]:
+        for r in self._get("runbooks"):
             # Named by its title, the title's head ("Ethanol" of "Ethanol —
             # pilot run") and the product it makes, so a question about a
             # product finds the runbooks that touch it. A prediction is read
@@ -602,7 +596,7 @@ class Stores:
                       words=" ".join([r["kind"], r.get("productId") or "", r.get("strainId") or ""] + predictions),
                       detail={"kind": r["kind"], "productId": r.get("productId"), "strainId": r.get("strainId"),
                               "lockedAt": r.get("lockedAt"), "predictions": predictions})
-        for x in [*self._get("protocols"), *p["protocols"]]:
+        for x in self._get("protocols"):
             organisms = list(x.get("organisms", []))
             yield Row("runbooks", "protocol", x["id"], x["title"], "approved", f"version {x['currentVersion']} current",
                       words=" ".join([x["category"], x.get("purpose") or ""] + organisms),
@@ -624,8 +618,7 @@ class Stores:
         if "_depositions" not in self._cache:
             from .measurements import held_readings
 
-            p = self._get("projection")["runbooks"]
-            books = [*self._get("runbooks"), *p["runbooks"]]
+            books = self._get("runbooks")
             out = []
             for d, maker in self._get("depositions"):
                 if isinstance(d, dict) and d.get("id"):
@@ -636,9 +629,8 @@ class Stores:
         return self._cache["_depositions"]
 
     def _runbook_titles(self) -> dict[str, str]:
-        """Each runbook's title by its id: the project's and any a test handed in."""
-        p = self._get("projection")["runbooks"]
-        return {str(r["id"]): str(r.get("title") or r["id"]) for r in [*self._get("runbooks"), *p["runbooks"]]
+        """Each runbook's title by its id."""
+        return {str(r["id"]): str(r.get("title") or r["id"]) for r in self._get("runbooks")
                 if isinstance(r, dict) and r.get("id")}
 
     def _geneos(self) -> Iterable[Row]:
@@ -651,9 +643,6 @@ class Stores:
                       names=tuple(aliases.get(h["id"], ())), words=" ".join(h.get("badges") or []),
                       detail={"bsl": h.get("bsl"), "badges": h.get("badges") or []},
                       species=self._species_of([h["id"]]))
-        for x in p["pathways"]:
-            yield Row("geneos", "pathway", x["id"], x["label"], "open", "in the catalogue",
-                      words=" ".join(x.get("products") or []), detail={"products": x.get("products") or []})
         for m in self._get("shelf"):
             ok = m.unavailable is None
             yield Row("geneos", "model", m.id, m.name, "open" if ok else "fenced", "on the shelf" if ok else "not fetched",
@@ -817,8 +806,8 @@ class Stores:
                                   "unitOfMass": tr.tableUnits.get("massFlow")})
 
     def _scenario_rows(self) -> list[dict[str, Any]]:
-        """The project's scenarios, and any a test handed in the projection."""
-        return [*self._get("scenarios"), *self._get("projection")["proforma"]["scenarios"]]
+        """The project's scenarios."""
+        return self._get("scenarios")
 
     def _proforma(self) -> Iterable[Row]:
         for s in self._scenario_rows():
@@ -900,7 +889,7 @@ class Stores:
 
 KINDS = {
     "runbooks": ("runbook", "protocol", "deposition", "reading", "measured-evidence"),
-    "geneos": ("host", "pathway", "model", "artifact"),
+    "geneos": ("host", "model", "artifact"),
     "fermos": ("artifact", "simulation", "vessel", "deposition"),
     "pureos": ("unit-operation", "train", "train-unit", "train-run"),
     "proforma": ("scenario", "artifact"),
@@ -943,7 +932,6 @@ DETAIL: dict[str, dict[str, str]] = {
     },
     "geneos": {
         "host": "`bsl` (its biosafety level) and `badges`",
-        "pathway": "`products` (what it makes)",
         "model": "`host` (the strain the model describes, by id) and `unavailable` (why it cannot be loaded here; null "
                  "when it can)",
         "artifact": _ARTIFACT,
