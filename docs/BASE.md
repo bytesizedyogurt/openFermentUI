@@ -16,10 +16,10 @@ the base runs on.
 | The store | PostgreSQL with pgvector, the one database: every row carries its project, who made it and when | `docs/decisions/ADR-001-postgresql.md` |
 | Projects | Everything a person keeps belongs to one project, named on every request by `X-OpenFerment-Project` | `docs/decisions/ADR-005-projects.md` |
 | Records | Values read from documents, each anchored to the verbatim quote it stands in; a reviewer's decisions; the candidates waiting; the catalogues of strains, products, skills and lessons; the depositions made at the bench. Provenance is computed by code from inputs and origins, and no person or model sets it | `docs/api/intake.md`, `docs/decisions/ADR-006-quantities-and-estimates.md` |
-| Runs | One `runs` row per computation, of one shape whatever engine made it, each input a typed quantity with its origin, replayable within the precision the run states | `docs/api/runs.md`, `docs/api/engines.md` |
+| Runs | One `runs` row per computation, of one shape whatever engine made it, each input a typed quantity with its origin (a reading deposited at the bench among them, as a `measurement`, which a run resting on readings and the package's defaults reads as `measured`), replayable within the precision the run states | `docs/api/runs.md`, `docs/api/engines.md` |
 | Flowsheets | SFF files: every run of a plant writes a validated, scored file, and files import as records | `docs/api/sff.md` |
 | Studies | Scenarios, comparisons, runbooks with locked predictions, and an export package that opens without the service | `docs/api/studies.md` |
-| The screens | A React application, one address per project, reading the types generated from the service's OpenAPI document | `docs/api/openapi.json` |
+| The screens | A React application, one address per project, reading the types generated from the service's OpenAPI document; a project's catalogues have a screen at `/catalogues`, a tab a kind | `docs/api/openapi.json` |
 | The ways in | The REST API, the server-sent event stream, one tool registry, and the `openferment` MCP server over that registry | `docs/TOOLS.md`, `docs/api/postdoc.md` |
 
 The base works with no model key configured. Every screen of the base opens and works without
@@ -49,8 +49,9 @@ A module adds capability through a contract and edits nothing in the base:
   registered (step 10).
 - **An agent**: a program that acts in a project through the REST API or the MCP server, under
   a name of its own, every write audited under that name (`docs/TOOLS.md`).
-- **The literature layer**: Sci RAG Kit, used as a library, with its REST under `/rag` and an
-  MCP server of its own (`docs/decisions/ADR-002-sci-rag-kit.md`).
+- **The literature layer**: Sci RAG Kit, used as a library, with its REST under `/rag` and the
+  `sci-rag` MCP server: the kit's tools and two graph tools of openFerment's, each reading the
+  project's concept graph alone (`docs/decisions/ADR-002-sci-rag-kit.md`).
 - **Postdoc**: the first agent, which stays in the repository with its screen; nothing in the
   base depends on it.
 - **Content**: Guild's protocols, kept as a project's protocols (`docs/api/studies.md`), and
@@ -117,7 +118,7 @@ permissive licence families `core/licences.toml` lists (`pnpm check:licences`).
 
 ```
 pnpm install --frozen-lockfile
-cd core && uv sync --all-extras && cd ..
+cd core && uv sync --frozen --all-extras && cd ..
 pnpm db:migrate          # PostgreSQL named by OPENFERMENT_DATABASE_URL in core/.env
 pnpm verify              # every gate, offline, with no key
 pnpm build && pnpm prove # the proof on a database of its own, with no key and no network

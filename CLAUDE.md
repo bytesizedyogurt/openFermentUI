@@ -12,20 +12,21 @@
 - R: Versions, ports, tolerances, unit-conversion factors, file hashes and the library's own regression values read at run time count as software (§1 item 7).
 - R: Out of scope for alpha 2.0: accounts and multi-user access (a membership stub only), kinetic response models, optimization, bench execution, a public licence, engines beyond BioSTEAM, specialist or fine-tuned agents, a visual redesign (§1).
 - R: Keep Guild, Primer, Deposition and the kinetics families as they are, beyond the store and type changes that reach them (§11.5).
+- R: A project's catalogues (strains with their aliases, products, Guild's skills, Primer's lessons) have a screen at `/catalogues` in the project's address, a tab a kind, and geneOS, Guild's protocol steps and Primer read the project's catalogue (alpha 2.2 prompt §1 item 4, §6.5).
 
 ## Run and test
 
 - C: Install: `pnpm install --frozen-lockfile`, then `cd core && uv sync --frozen --all-extras`; this container runs Python 3.13.17 and CI runs 3.12.
 - C: Database: PostgreSQL 16 or later with pgvector. `pnpm db:up` starts `compose.yaml`'s `pgvector/pgvector:pg17`, or `OPENFERMENT_DATABASE_URL` in `core/.env` names a local server (`core/.env.example` has the development address); then `pnpm db:migrate` migrates both schemas, `openferment` and the kit's `sci_rag` (ADR-001).
 - C: The tests make databases of their own on the server `OPENFERMENT_TEST_DATABASE_URL` names (default: the compose role on 127.0.0.1:5432) and drop them after; `pnpm db:reset openferment_dev` remakes the development database, and the command refuses the production database `openferment`.
-- C: `pnpm verify` is the gate: sixteen stages in ADR-011's order, `check:secrets` first, about twenty minutes here; CI runs it with a pgvector service, then `pnpm prove`.
+- C: `pnpm verify` is the gate: sixteen stages in ADR-011's order, `check:secrets` first, twelve to seventeen minutes here; CI runs it with a pgvector service, then `pnpm prove`.
 - C: `pnpm test:core`: offline, no key, no network, about five to six minutes; it leaves out the markers `sim`, `lit`, `slow` and `live`.
 - C: `pnpm test:sim` (marker `sim`) starts the real BioSTEAM worker: a cold BioSTEAM import takes about 31 s and a reference plant builds in about 17 s; the suite takes about five minutes.
 - C: `pnpm test:lit` (marker `lit`) runs Sci RAG Kit with FastEmbed's model over the kit's demo corpus; the model file comes from Hugging Face once and stays cached in `~/.cache/fastembed` (`FASTEMBED_CACHE_PATH` moves it, and CI keeps it in the workspace's `.cache/fastembed`).
 - C: `pnpm test:slow` (marker `slow`) and `pnpm test:live` (marker `live`: a real network call, most needing the key and spending) run by hand, outside verify.
 - C: `pnpm prove` runs the proof (`scripts/prove.py`, steps 1 to 10) on a database of its own, with no key and the network refused; run `pnpm build` first, since step 9 walks the built app in Chromium; `--steps 3,8` proves the steps named with what they stand on.
-- C: `pnpm ready` (or `pnpm ready --offline`) says in rows whether the service can run: the database, both schemas, pgvector, the embedder, the model routes and the key; `pnpm ready --probe` adds one minimal call on the `index` route, the one row that sees the account's own usage limit, and it spends.
-- C: `pnpm eval seed` and `pnpm eval run [--live]` keep and score Postdoc's evaluation set in the project `OPENFERMENT_PROJECT` names; `--suite ethanol` is the owner's twelve and the base's two, fourteen in all, `--tag` names a route table, `--judge` and `pnpm eval judge` add the `judge` route's scores, and `pnpm eval summary` sets the tags side by side (`docs/api/postdoc.md`).
+- C: `pnpm ready` (or `pnpm ready --offline`) says in rows whether the service can run: the database, both schemas, pgvector, the embedder, the workers, each registered engine, the model routes and the key; `pnpm ready --probe` adds one minimal call on the `index` route, the one row that sees the account's own usage limit, and it spends.
+- C: `pnpm eval seed` and `pnpm eval run [--live]` keep and score Postdoc's evaluation set in the project `OPENFERMENT_PROJECT` names; `--suite ethanol` is the owner's twelve and the base's two, fourteen in all, `--tag` names a route table, `--only` names questions, `--judge` and `pnpm eval judge` add the `judge` route's scores, and `pnpm eval summary` sets the tags side by side (`docs/api/postdoc.md`).
 - C: `pnpm gen:api`, `pnpm gen:tools` and `pnpm gen:components` write `docs/api/openapi.json` with `src/api/types.gen.ts`, `docs/TOOLS.md` and `COMPONENTS.md`; verify fails on drift, so regenerate a generated file and leave it unedited by hand.
 - C: `pnpm smoke` opens every rail entry against the real service and needs a build; `pnpm dev` serves the client on Vite.
 - R: `pnpm test:core` green before every commit; push after every step; never force-push; never commit `core/.env` or a database dump (§11.2).
@@ -66,9 +67,9 @@
 - C: SFF is the flowsheet record: every engine run writes a validated, scored file, files import as records, and a flowsheet module is an SFF recipe (ADR-003).
 - C: BioSTEAM runs through one adapter (`engine/library.py`) for library plants and openFerment's flowsheets alike, each plant built fresh (ADR-004).
 - C: Projects replace programs: everything a person keeps belongs to one project (ADR-005).
-- C: Typed quantities with origins (`library-default`, `record`, `artifact`, `person-assumption`, `model-estimate`, `measurement`: a confirmed bench reading the service looks up) replace Rule 1; an estimate reaches a scenario and never a record (ADR-006).
+- C: Typed quantities with origins (`library-default`, `record`, `artifact`, `person-assumption`, `model-estimate`, `measurement`: a confirmed bench reading the service looks up, `convention`: a software setting with its note) replace Rule 1; an estimate reaches a scenario and never a record (ADR-006).
 - C: The client's types are generated from the service's OpenAPI document into `src/api/types.gen.ts` (ADR-007).
-- C: Postdoc's conversations, turns and tool calls live on the server, and models are routed by family (`plan`, `explain`, `extract`, `index`, `judge`) in one table (ADR-008).
+- C: Postdoc's conversations, turns and tool calls live on the server, and models are routed by family in one table, `llm.ROUTES`, its defaults set by alpha 2.2's comparison: `plan`, `explain` and `extract` on Opus then Sonnet at high, `index` on Haiku at low, `judge` on Opus then Sonnet at max; a plan turn's room follows its route's effort, 32,000 tokens at high and below, 64,000 at xhigh, 128,000 at max (ADR-008, Implementations 16 and 17).
 - C: The UI is the existing React application, kept and wired to the server, with each project at its own address `/p/:project` (ADR-009).
 - C: Deleted: programs, the TypeScript seed and its projection, the demo infrastructure, the bespoke retrieval stack, the file stores and Dominion (ADR-010).
 - C: The guards and verify's sixteen stages (ADR-011).
@@ -121,7 +122,7 @@
 - C: ADR-002: the kit drops async SQLAlchemy or changes its ingestion contract, a second literature engine is needed, or the upstream pull request lands.
 - C: ADR-003: the toolkit ships an importer or packaging, or the schema reaches 1.0. ADR-004: a second engine, or NSKinetics once a kinetic model exists.
 - C: ADR-005: accounts and multi-user access. ADR-009: a design pass after alpha 2.0. ADR-012: the owner adopts terms.
-- C: ADR-006: a task needs a formal decision rule or uncertainty method, justified and evaluated for that task. ADR-008: the evaluation that lets the simple system compete.
+- C: ADR-006: a task needs a formal decision rule or uncertainty method, justified and evaluated for that task. ADR-008: the evaluation that lets the simple system compete; the routing defaults, the second judge's reading and the plan's larger room measured once the account answers (Implementations 16 and 17).
 - C: ADR-010: a deleted piece proves needed, restored from `alpha-1.0` with a decision record. ADR-011: a guard proves necessary again and returns with a negative test.
 - C: ADR-013: biosteam, thermosteam or biorefineries changes version, or the package's test values change upstream. ADR-014: the owner asks for the queue to go, or accounts give pending writes a home on the service.
 - C: ADR-015: a second scientific engine beyond the three in the tree, or the SFF toolkit ships an importer (ADR-003).

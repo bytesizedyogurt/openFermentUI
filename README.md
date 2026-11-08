@@ -10,6 +10,12 @@ The repository holds software alone. The science arrives at run time through the
 own doors: documents through Intake, plants and their numbers through the library, values
 through people and models, each value carrying where it came from.
 
+**Alpha 2.2** seals the base. Engines register behind one written contract and its eight checks,
+and every run of every engine is one row of one shape. A reading deposited at the bench enters a
+scenario as a `measurement`, and a run resting on readings and the package's defaults reads `measured`.
+The screens read the types the service generates, and a project's catalogues have a screen of their own.
+Two builders who read the contract pages alone added an engine and an agent with no edit to the base: [`docs/BASE.md`](docs/BASE.md).
+
 ## What it is made of
 
 | Part | What it does |
@@ -52,6 +58,7 @@ pnpm build && pnpm prove      # the end-to-end proof, offline, on a database of 
 
 ## Read further
 
+- [`docs/BASE.md`](docs/BASE.md): the base, what a module is, the two handoff tests and the pinned versions.
 - [`docs/PROGRESS.md`](docs/PROGRESS.md): where things stand, how to resume, the debts and the blockers.
 - [`CLAUDE.md`](CLAUDE.md): the working guidance, every line labelled.
 - [`docs/decisions/`](docs/decisions/): the decision records, ADR-000 to ADR-018.
