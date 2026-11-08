@@ -941,8 +941,8 @@ function BiosteamScenario({ scenario }: { scenario: Scenario }) {
           {flowsheet && <p className="text-caption text-ink-soft mb-2">{flowsheet.description}</p>}
           <p className="text-caption text-ink-soft mb-3">
             Records of an input&rsquo;s field pass the same gate statistics pass. Three or more give their median and range, sampled
-            triangular; two a pair, sampled uniform; one is held fixed. Every other input is a named person&rsquo;s assumption, or a
-            convention the run states.
+            triangular; two a pair, sampled uniform; one is held fixed. Every other input is a named person&rsquo;s assumption, a reading
+            deposited at the bench that a person chose for it on its row, or a convention the run states.
           </p>
           {bindProblem && (
             <Callout kind="warn">

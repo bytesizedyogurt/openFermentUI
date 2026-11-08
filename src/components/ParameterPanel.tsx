@@ -53,6 +53,7 @@ import {
   type ParamResolveResult,
   type ParamScope,
 } from '@/lib/params';
+import { NOT_RUNNING } from '@/lib/http';
 import { ParameterRow, type ChosenReading, type ParameterChange } from './ParameterRow';
 
 export interface ParameterPanelProps {
@@ -137,7 +138,7 @@ export function ParameterPanel({ scope, data, request, onChange, onResolved, onR
   const setOverride = useStore((s) => s.setOverride);
   const clearOverride = useStore((s) => s.clearOverride);
   const [resolved, setResolved] = useState<{ asked: string; result: ParamResolveResult } | null>(null);
-  const [problem, setProblem] = useState<{ down: boolean; words: string } | null>(null);
+  const [problem, setProblem] = useState<{ down: boolean; away: boolean; words: string } | null>(null);
   const resolvedRef = useRef(onResolved);
   resolvedRef.current = onResolved;
   const refusedRef = useRef(onRefused);
@@ -169,7 +170,7 @@ export function ParameterPanel({ scope, data, request, onChange, onResolved, onR
           resolvedRef.current?.(null);
           const down = e instanceof ParamsDown;
           const words = down ? `${e.message} ${e.remedy ?? ''}`.trim() : e instanceof Error ? e.message : String(e);
-          setProblem({ down, words });
+          setProblem({ down, away: down && e.message === NOT_RUNNING, words });
           if (!down) refusedRef.current?.(words);
         });
     }, RESOLVE_AFTER_MS);
@@ -198,11 +199,24 @@ export function ParameterPanel({ scope, data, request, onChange, onResolved, onR
     onChange?.(useStore.getState().parameterOverrides[scope] ?? []);
   };
   // A reading chosen for a row: its own value and unit, its depositor and the time it was taken, as the service listed
-  // it, kept in the reviewer's name with the project's rows; the service looks it up again and sets it in the
-  // parameter's unit each time it is sent.
+  // it, kept in the reviewer's name with the project's rows (`chosenBy`, the row's maker on the service, and its
+  // audit row); the service looks it up again and sets it in the parameter's unit each time it is sent.
   const read = (spec: ParameterSpec, r: ChosenReading, note: string | null) => {
     if (!reviewer) return;
-    setOverride({ scope, key: spec.key, value: r.value, unit: r.unit, low: null, high: null, by: r.by, at: r.at, note, origin: 'measurement', ref: r.ref });
+    setOverride({
+      scope,
+      key: spec.key,
+      value: r.value,
+      unit: r.unit,
+      low: null,
+      high: null,
+      by: r.by,
+      at: r.at,
+      note,
+      origin: 'measurement',
+      ref: r.ref,
+      chosenBy: reviewer,
+    });
     onChange?.(useStore.getState().parameterOverrides[scope] ?? []);
   };
 
@@ -210,9 +224,11 @@ export function ParameterPanel({ scope, data, request, onChange, onResolved, onR
     <div data-testid="parameter-panel" data-scope={scope} data-resolved={fresh ? 'true' : 'false'}>
       {problem && (
         <p className="text-caption text-signal-warn mb-2" role="status" data-testid="param-problem" data-down={problem.down ? 'true' : 'false'}>
-          {problem.down
-            ? `The service could not check these values: ${problem.words} Your changes are kept in the project and go with the run.`
-            : `The service refused these values: ${problem.words}`}
+          {problem.away
+            ? `The service could not check these values: ${problem.words} Your changes wait in this browser until the service answers, and go to the project then, with the run.`
+            : problem.down
+              ? `The service could not check these values: ${problem.words} Your changes are kept in the project and go with the run.`
+              : `The service refused these values: ${problem.words}`}
         </p>
       )}
       {groupOrder(data.specs, groups).map((g) => (

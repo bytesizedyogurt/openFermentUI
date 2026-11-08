@@ -842,6 +842,18 @@ def test_a_worker_whose_titles_name_a_configuration_it_lists_none_of_is_broken(m
     assert runs.listed("sample") == []
 
 
+def test_a_worker_that_answers_null_titles_titles_none(monkeypatch):
+    """A worker may answer null for a thing that titles none, as it answers a
+    thing's defaultConfiguration: the thing is listed, its configurations
+    read by their names (alpha 2.2 E.debts)."""
+    engine = contract.WorkerEngine(name="sample", worker=SAMPLE.worker, distributions=("openferment-core",))
+    plain = {"id": "placeholder-configured", "title": "A placeholder thing", "configurations": ["one way"],
+             "defaultConfiguration": None, "configurationTitles": None, "precision": {"rtol": 0, "atol": 0}}
+    monkeypatch.setattr(engine, "call", lambda op, args, *, timeout_s=None: {"things": [plain]})
+    (thing,) = engine.things()
+    assert (thing.id, thing.configurations, thing.configurationTitles) == ("placeholder-configured", ["one way"], {})
+
+
 def test_a_worker_that_fails_writing_the_file_says_the_job_failed_and_keeps_no_row(engines, monkeypatch):
     def crashed(*a, **k):
         raise WorkerCrashed("the sample worker ended while answering 'sff_export'")

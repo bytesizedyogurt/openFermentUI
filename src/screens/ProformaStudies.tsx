@@ -381,10 +381,13 @@ function EngineThings({ engine, onRan }: { engine: EngineInfo; onRan: () => void
 
 /**
  * A refusal in the engine's words: its first sentence, and the rest (each parameter that waits, each bound) folded
- * under it when there is more.
+ * under it when there is more. A leading `<thing> refused:` is part of that sentence, so the summary carries the first
+ * clause of the engine's words after it.
  */
 function Refusal({ words }: { words: string }) {
-  const cut = words.search(/[.:;](\s|$)/);
+  const lead = /^\S+ refused:\s*/.exec(words)?.[0].length ?? 0;
+  const at = words.slice(lead).search(/[.:;](\s|$)/);
+  const cut = at >= 0 ? lead + at : -1;
   const head = cut > 0 ? words.slice(0, cut + 1) : words;
   const rest = cut > 0 ? words.slice(cut + 1).trim() : '';
   return (
@@ -417,18 +420,12 @@ function ScenarioThings({ engine }: { engine: EngineInfo | null }) {
   );
 }
 
-/** Run a thing of any engine registered here (GET /api/engines); BioSTEAM's plants first. */
-function RunAPlant({ onRan }: { onRan: () => void }) {
-  const [engines, setEngines] = useState<EngineInfo[] | null>(null);
+/**
+ * Run a thing of any engine registered here (GET /api/engines, which the page lists again after each run made here, so
+ * a configuration a run kept is offered with its title); BioSTEAM's plants first.
+ */
+function RunAPlant({ engines, onRan }: { engines: EngineInfo[] | null; onRan: () => void }) {
   const [engine, setEngine] = useState('biosteam');
-  useEffect(() => {
-    const ctrl = new AbortController();
-    // With no engine list (a service that cannot read it), BioSTEAM's plants are still offered.
-    listEngines(ctrl.signal)
-      .then(setEngines)
-      .catch(() => !ctrl.signal.aborted && setEngines([]));
-    return () => ctrl.abort();
-  }, []);
   const usable = (engines ?? []).filter((e) => !e.error);
   const unusable = (engines ?? []).filter((e) => e.error);
   const other = usable.find((e) => e.name === engine && e.name !== 'biosteam') ?? null;
@@ -470,7 +467,7 @@ function RunAPlant({ onRan }: { onRan: () => void }) {
 const holdsNoPrice = (r: EngineRun) =>
   r.tool === 'proforma.run' && r.status === 'done' && !(Array.isArray(r.outputs?.values) && r.outputs.values.length > 0);
 
-function Runs({ runs, scenarios }: { runs: EngineRun[]; scenarios: StudyScenario[] }) {
+function Runs({ runs, scenarios, engines }: { runs: EngineRun[]; scenarios: StudyScenario[]; engines: EngineInfo[] | null }) {
   const reviewer = useStore((s) => s.reviewer).trim();
   const [chosen, setChosen] = useState<string[]>([]);
   const [title, setTitle] = useState('');
@@ -481,8 +478,11 @@ function Runs({ runs, scenarios }: { runs: EngineRun[]; scenarios: StudyScenario
   const proformaScenarios = useStore((s) => s.scenarios);
   const titles = new Map<string, string>([...proformaScenarios.map((s) => [s.id, s.name] as const), ...scenarios.map((s) => [s.id, s.title] as const)]);
   // The engines the project's runs name (docs/api/engines.md); the filter shows one engine's runs.
-  const engines = [...new Set(runs.map((r) => r.engine))].sort();
+  const named = [...new Set(runs.map((r) => r.engine))].sort();
   const shown = engine ? runs.filter((r) => r.engine === engine) : runs;
+  // A run's configuration by the engine's title for it, as the run card names it (alpha 2.2 E.18), where the engine gives one.
+  const titlesOf = (r: EngineRun) =>
+    engines?.find((e) => e.name === r.engine)?.things?.find((t) => t.id === r.plant)?.configurationTitles ?? null;
   // A run kept done that holds no price (a Proforma run whose samples all failed) has nothing to compare.
   const comparable = (r: EngineRun) => r.status === 'done' && !holdsNoPrice(r);
   const done = shown.filter(comparable);
@@ -524,7 +524,7 @@ function Runs({ runs, scenarios }: { runs: EngineRun[]; scenarios: StudyScenario
               Engine
               <select className="input text-caption" value={engine} onChange={(e) => setEngine(e.target.value)} data-testid="studies-runs-engine">
                 <option value="">every engine</option>
-                {engines.map((name) => (
+                {named.map((name) => (
                   <option key={name} value={name}>
                     {name}
                   </option>
@@ -563,7 +563,7 @@ function Runs({ runs, scenarios }: { runs: EngineRun[]; scenarios: StudyScenario
                       </a>
                     </td>
                     <td className="py-1 pr-2 font-num">{r.engine}</td>
-                    <td className="py-1 pr-2">{ranWhat(r)}</td>
+                    <td className="py-1 pr-2">{ranWhat(r, titlesOf(r))}</td>
                     <td className="py-1 pr-2" data-testid="studies-run-status">
                       {r.status !== 'done' ? `refused: ${r.refused ?? ''}` : holdsNoPrice(r) ? 'done, and it holds no price: its page says why' : 'done'}
                     </td>
@@ -684,6 +684,16 @@ export default function ProformaStudies() {
   const [exportProblem, setExportProblem] = useState<string | null>(null);
   // Bumped when a run is made here, so the lists read the service again.
   const [version, setVersion] = useState(0);
+  // The engines registered here, listed again with the lists: a run made here may give a thing a configuration.
+  const [engines, setEngines] = useState<EngineInfo[] | null>(null);
+  useEffect(() => {
+    const ctrl = new AbortController();
+    // With no engine list (a service that cannot read it), BioSTEAM's plants are still offered.
+    listEngines(ctrl.signal)
+      .then(setEngines)
+      .catch(() => !ctrl.signal.aborted && setEngines((was) => was ?? []));
+    return () => ctrl.abort();
+  }, [version]);
 
   useEffect(() => {
     const ctrl = new AbortController();
@@ -725,7 +735,7 @@ export default function ProformaStudies() {
         }
       />
       <div className="mb-4">
-        <RunAPlant onRan={() => setVersion((v) => v + 1)} />
+        <RunAPlant engines={engines} onRan={() => setVersion((v) => v + 1)} />
       </div>
       {exportProblem && (
         <div className="mb-4">
@@ -741,7 +751,7 @@ export default function ProformaStudies() {
       )}
       {held && (
         <div className="space-y-4">
-          <Runs runs={held.runs} scenarios={held.scenarios} />
+          <Runs runs={held.runs} scenarios={held.scenarios} engines={engines} />
           <Scenarios scenarios={held.scenarios} />
           <Card className="p-4" data-testid="studies-comparisons">
             <h2 className="font-serif text-section-title font-semibold mb-1">Comparisons</h2>
@@ -756,7 +766,7 @@ export default function ProformaStudies() {
                     </a>
                     <ProvenanceBadge p={c.provenance} compact />
                     <span className="text-caption text-ink-soft">
-                      {c.runIds.length} runs · {c.by || 'this browser'}, {stamp(c.at)}
+                      {c.runIds.length} runs · {c.by || 'nobody named'}, {stamp(c.at)}
                     </span>
                   </li>
                 ))}

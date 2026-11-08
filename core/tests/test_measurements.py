@@ -110,7 +110,7 @@ def test_a_reading_that_stands_is_set_in_its_parameters_unit_with_its_depositor_
     # the person's own note after it.
     other = looked_up(measured("de-4", 2.5, "kg/h", note="a placeholder note"), "kg/hr").quantity
     assert (other.value, other.unit) == (units.convert(2.5, "kg/h", "kg/hr"), "kg/hr")
-    assert other.origin.note == "2.5 kg/h as deposited, 2.5 kg/hr in the parameter's unit (units.convert); a placeholder note"
+    assert other.origin.note == "2.5 kg/h as deposited, 2.5 kg/hr in the parameter's unit; a placeholder note"
     # A value naming the reading's own depositor and time, the time in another spelling of the same moment, is
     # the same reading, kept with the entry's own spelling.
     named = looked_up(measured("de-3", 3.0, "kg/hr", by=DEPOSITOR, at="2026-11-03T09:10:00+00:00"), "kg/hr")
@@ -249,7 +249,7 @@ def test_the_readings_a_person_chooses_from_are_those_the_lookup_takes_each_with
     assert [r["ref"] for r in flows] == ["dep-1/de-3", "dep-1/de-4"]
     in_h = {r["ref"]: r for r in flows}["dep-1/de-4"]
     assert (in_h["value"], in_h["unit"], in_h["inUnit"]) == (2.5, "kg/h", units.convert(2.5, "kg/h", "kg/hr"))
-    assert in_h["note"] == "2.5 kg/h as deposited, 2.5 kg/hr in the parameter's unit (units.convert)"
+    assert in_h["note"] == "2.5 kg/h as deposited, 2.5 kg/hr in the parameter's unit"
     for r in flows:
         got = looked_up(measured(r["entryId"], r["value"], r["unit"]), "kg/hr").quantity
         assert (got.value, got.origin.ref, got.origin.by, got.origin.at) == (r["inUnit"], r["ref"], r["by"], r["at"])
@@ -562,8 +562,7 @@ def test_a_reading_kept_on_the_panel_goes_in_its_own_unit_and_runs_set_in_its_pa
     assert sent["glucose_price"].unit == panel.unit_of["glucose_price"]
     r = proforma.run(req.model_copy(update={"samples": 8}), pool=panel.pool)
     set_to = units.convert(panel.in_mg, "mg/L", panel.unit_of["titre"])
-    said = (f"{panel.in_mg:.12g} mg/L as deposited, {set_to:.12g} {panel.unit_of['titre']} in the parameter's unit "
-            "(units.convert)")
+    said = f"{panel.in_mg:.12g} mg/L as deposited, {set_to:.12g} {panel.unit_of['titre']} in the parameter's unit"
     titre = {i.key: i for i in r.inputs}["titre"]
     assert (titre.binding, titre.value, titre.low, titre.high, titre.sampling) == (
         "assumption", set_to, set_to, set_to, "fixed")
@@ -573,6 +572,55 @@ def test_a_reading_kept_on_the_panel_goes_in_its_own_unit_and_runs_set_in_its_pa
     assert (got.value, got.unit, got.origin.kind, got.origin.ref, got.origin.by) == (
         set_to, panel.unit_of["titre"], "measurement", "dep-1/de-2", DEPOSITOR)
     assert r.provenance == "assumed" == row.provenance, "beside the person's prices"
+
+
+def _makers(scope: str) -> dict[str, str]:
+    """Who made each of a scope's override rows, by its key, as the table keeps them."""
+    from sqlalchemy import select
+
+    from openferment_core import db, projects
+    from openferment_core.db import models as t
+
+    async def read() -> dict[str, str]:
+        async with db.session() as s:
+            q = select(t.overrides.c.key, t.overrides.c.created_by).where(
+                t.overrides.c.project_id == projects.current(), t.overrides.c.scope == scope)
+            return {r.key: r.created_by for r in (await s.execute(q)).all()}
+
+    return db.run(read())
+
+
+def test_the_person_who_chose_a_reading_makes_its_row_and_each_choice_is_audited(panel):
+    from openferment_core import audit
+
+    # The scope holds a person's values first; the reading is chosen beside them at a later keep, in the name of
+    # another person than its depositor (alpha 2.2 E.debts).
+    typed = [{"scope": HELD_SCOPE, "key": k, "value": v, "low": None, "high": None, "by": CHOOSER, "at": "2026-11-04",
+              "note": "a STAND-IN for a test", "origin": "person-assumption"}
+             for k, v in (("plant_scale", 100000.0), ("glucose_price", 0.4))]
+    project_state.put("overrides", HELD_SCOPE, typed, by=CHOOSER)
+    read = {"scope": HELD_SCOPE, "key": "titre", "value": panel.in_mg, "low": None, "high": None, "by": DEPOSITOR,
+            "at": TAKEN, "note": None, "origin": "measurement", "ref": f"{DEPOSITION}/de-2", "unit": "mg/L",
+            "chosenBy": CHOOSER}
+    project_state.put("overrides", HELD_SCOPE, [read, *typed], by=CHOOSER)
+    assert _makers(HELD_SCOPE) == {"titre": CHOOSER, "plant_scale": CHOOSER, "glucose_price": CHOOSER}
+    (kept,) = [o for o in project_state.overrides_of(HELD_SCOPE) if o["key"] == "titre"]
+    assert (kept["by"], kept["chosenBy"]) == (DEPOSITOR, CHOOSER), "the depositor stays the reading's"
+    chosen = lambda: [(a.who, a.target, a.detail) for a in audit.read(action="choose_reading")]  # noqa: E731
+    assert chosen() == [(CHOOSER, HELD_SCOPE, {"key": "titre", "ref": "dep-1/de-2", "chosenBy": CHOOSER})]
+    # Kept again with its note typed and a person's value moved: no reading is chosen anew.
+    moved = [{**typed[0], "value": 120000.0}, typed[1]]
+    project_state.put("overrides", HELD_SCOPE, [{**read, "note": "a STAND-IN reason"}, *moved], by=CHOOSER)
+    assert len(chosen()) == 1
+    # Another reading, chosen by another person: its row is theirs, and so is the audit row.
+    other = "Lin Okafor"
+    again = {**read, "value": TITRE, "unit": "g/L", "ref": f"{DEPOSITION}/de-1", "chosenBy": other}
+    project_state.put("overrides", HELD_SCOPE, [again, *moved], by=other)
+    assert _makers(HELD_SCOPE)["titre"] == other
+    assert chosen()[1:] == [(other, HELD_SCOPE, {"key": "titre", "ref": "dep-1/de-1", "chosenBy": other})]
+    # The run still names the depositor as the reading's maker.
+    (titre,) = [i.quantity for i in project_state.run_request(HELD, by=other).inputs if i.name == "titre"]
+    assert (titre.origin.kind, titre.origin.ref, titre.origin.by) == ("measurement", "dep-1/de-1", DEPOSITOR)
 
 
 def test_a_reading_kept_in_its_parameters_unit_is_refused_in_the_lookups_words(panel):
@@ -633,8 +681,14 @@ def test_an_override_keeps_a_unit_of_its_own_for_a_reading_alone():
         Override.model_validate(row)
     with pytest.raises(ValidationError, match="and a model's estimate is in its parameter's unit"):
         Override.model_validate({**row, "origin": "model-estimate"})
-    held = Override.model_validate({**row, "origin": "measurement", "ref": "dep-1/de-1"})
-    assert held.unit == "placeholder-unit"
+    held = Override.model_validate({**row, "origin": "measurement", "ref": "dep-1/de-1", "chosenBy": CHOOSER})
+    assert (held.unit, held.chosenBy) == ("placeholder-unit", CHOOSER)
+    # Who chose it is a reading's alone: a person's value names its person in `by`.
+    plain = {k: v for k, v in row.items() if k != "unit"}
+    with pytest.raises(ValidationError, match="names who chose it \\(chosenBy\\) for a deposition's reading alone"):
+        Override.model_validate({**plain, "chosenBy": CHOOSER})
+    with pytest.raises(ValidationError, match="names who chose it on one line"):
+        Override.model_validate({**row, "origin": "measurement", "ref": "dep-1/de-1", "chosenBy": " "})
     # A resolver's Override, the one converter's, keeps its value in the parameter's unit and names none.
     assert Override.model_validate({k: v for k, v in row.items() if k != "unit"}).unit is None
 

@@ -209,8 +209,7 @@ def _held_to_rules(value: EngineInput, unit: str, deposition: dict[str, Any], en
         if not math.isfinite(set_to):
             raise MeasurementRefused(f"{name}: reading {ref} is {_shown(float(own))} {own_unit}, which in {unit} is no "
                                      "finite number")
-        said = (f"{_shown(float(own))} {own_unit} as deposited, {_shown(set_to)} {unit} in the parameter's unit "
-                "(units.convert)")
+        said = f"{_shown(float(own))} {own_unit} as deposited, {_shown(set_to)} {unit} in the parameter's unit"
     note = "; ".join(x for x in (said, (origin.note or "").strip()) if x) or None
     return EngineInput(name=name, quantity=Quantity(value=set_to, unit=unit, origin=Origin(
         kind="measurement", ref=ref, by=maker, at=str(taken).strip(), note=note)))

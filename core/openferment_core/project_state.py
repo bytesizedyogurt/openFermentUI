@@ -85,6 +85,12 @@ MAX_BYTES = 2_000_000
 # set in Settings (src/store.ts `decidedBy`). A reading kept under it names
 # nobody, and no run takes it as a measurement (measurements.py).
 UNNAMED = "this browser"
+# The scopes whose overrides may keep a deposition's reading in its own value
+# and unit (`Override.unit`): a Proforma scenario's, whose parameter panel
+# offers readings (alpha 2.2 E.17). Every other scope keeps each value in its
+# parameter's unit, as pureOS's Builder lays a train's overrides into the
+# train it saves (src/lib/pureos.ts `trainSpecOf`).
+OWN_UNIT_SCOPE = "proforma:"
 
 # The stages a deposition moves through at the bench, in order (src/store.ts).
 DEPOSITION_STATES = ("staged", "running", "closed")
@@ -229,6 +235,11 @@ def _checked(kind: str, item_id: str, value: Any) -> Any:
             raise StateRefused(f"the overrides of {item_id} are a list, each naming this scope and its key")
         for o in value:
             _reads_as(kind, o, f"the override of {o['key']} in {item_id}")
+            if o.get("unit") is not None and not item_id.startswith(OWN_UNIT_SCOPE):
+                raise StateRefused(f"the override of {o['key']} in {item_id} keeps a reading in its own unit "
+                                   f"({o['unit']}), which a Proforma scenario's scope alone keeps "
+                                   f"({OWN_UNIT_SCOPE}<scenario id>): this scope keeps each value in its parameter's "
+                                   "unit, as a saved train keeps it; nothing was kept")
         return value
     if kind == LOCKS:
         if not isinstance(value, dict) or not all(isinstance(value.get(k), str) and value[k] for k in ("lockedAt", "lockHash")):
@@ -471,8 +482,10 @@ async def _scope_overrides(project_id: str, scope: str) -> list[dict[str, Any]]:
 
 def overrides_of(scope: str) -> list[dict[str, Any]]:
     """The overrides the current project keeps for one scope
-    (`proforma:<scenario id>`), each a person's assumption or a model's
-    estimate as the parameter panel wrote it."""
+    (`proforma:<scenario id>`), each as the parameter panel wrote it: a
+    person's assumption or a model's estimate in its parameter's unit, or a
+    deposition's reading a person chose there, in the reading's own value and
+    unit and naming who chose it (`Override.unit`, `Override.chosenBy`)."""
     return db.run(_scope_overrides(projects.current(), scope))
 
 
@@ -532,6 +545,31 @@ async def _stored(s: AsyncSession, project_id: str, deposition_id: str) -> dict[
     return body if isinstance(body, dict) else None
 
 
+def _override_maker(o: dict[str, Any], by: str) -> str:
+    """Who an override row was made by: a deposition's reading by the person
+    who chose it for the parameter (`chosenBy`; the write's person where the
+    row names none), `by` staying its depositor; a person's value or a
+    model's estimate by the person or the model it names."""
+    if o.get("origin") == "measurement":
+        return str(o.get("chosenBy") or by)
+    return str(o.get("by") or by)
+
+
+def _readings_chosen(before: list[dict[str, Any]], after: list[dict[str, Any]]) -> list[dict[str, Any]]:
+    """The rows of a scope's overrides that set a parameter to a deposition's
+    reading the scope's rows before did not: a reading on a key that held
+    none, another reading, or the same reading chosen by another person. A
+    keep that moves a person's value beside a reading chooses nothing."""
+    held = {o.get("key"): o for o in before}
+
+    def same(o: dict[str, Any]) -> bool:
+        was = held.get(o.get("key"))
+        return (was is not None and was.get("origin") == "measurement"
+                and (was.get("ref"), was.get("chosenBy")) == (o.get("ref"), o.get("chosenBy")))
+
+    return [o for o in after if o.get("origin") == "measurement" and not same(o)]
+
+
 async def _put(project_id: str, kind: str, item_id: str, value: Any, by: str) -> None:
     async with db.session() as s:
         # A runbook and its lock are written one at a time, so a row cannot
@@ -552,6 +590,7 @@ async def _put(project_id: str, kind: str, item_id: str, value: Any, by: str) ->
                 if why:
                     raise StateRefused(why)
                 closed = before.get("state") == "closed"
+        chosen: list[dict[str, Any]] = []
         if kind == LOCKS:
             if existed:
                 raise StateRefused(f"{item_id} is locked already; a lock is kept as it was made")
@@ -560,21 +599,30 @@ async def _put(project_id: str, kind: str, item_id: str, value: Any, by: str) ->
                 locked_at=datetime.fromisoformat(value["lockedAt"].replace("Z", "+00:00")), created_by=by,
             ))
         elif kind == OVERRIDES:
+            before = (await _overrides(s, project_id, item_id)).get(item_id, []) if existed else []
+            chosen = _readings_chosen(before, value)
             await s.execute(delete(t.overrides).where(t.overrides.c.project_id == project_id, t.overrides.c.scope == item_id))
             for o in value:
                 await s.execute(insert(t.overrides).values(project_id=project_id, scope=item_id, key=o["key"], body=o,
-                                                           created_by=str(o.get("by") or by)))
+                                                           created_by=_override_maker(o, by)))
         else:
             k = KINDS[kind]
             body = {"id": item_id, "byInput": value} if kind == "fits" else value
             await rows.put(s, k.table, project_id, item_id, body, by=by, **k.columns(value))
+        module = item_id.split(":", 1)[0] if kind == OVERRIDES and item_id.split(":", 1)[0] in ("proforma", "fermos", "pureos") \
+            else (KINDS[kind].module if kind in KINDS else "runbooks")
         if not existed or kind == LOCKS:
-            module = item_id.split(":", 1)[0] if kind == OVERRIDES and item_id.split(":", 1)[0] in ("proforma", "fermos", "pureos") \
-                else (KINDS[kind].module if kind in KINDS else "runbooks")
             await audit.add(project_id, agent="person", who=by, module=module,
                             action="lock" if kind == LOCKS else f"keep_{kind}", state="locked" if kind == LOCKS else "kept",
                             target=item_id)
-        elif closed:
+        # A parameter set to a deposition's reading, at the scope's first keep
+        # or any later one: who chose which reading for which parameter
+        # (alpha 2.2 E.debts; ADR-006's note of E.17).
+        for o in chosen:
+            await audit.add(project_id, agent="person", who=by, module=module, action="choose_reading", state="kept",
+                            target=item_id, detail={"key": o["key"], "ref": o.get("ref"),
+                                                    "chosenBy": _override_maker(o, by)})
+        if closed:
             # A closed deposition changes little (a series' role, an
             # observation structured, its reconciliation), and each change
             # is audited.

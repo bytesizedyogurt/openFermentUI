@@ -534,10 +534,17 @@ async function main(): Promise<void> {
     const detail = (await row.getByTestId('param-detail').innerText()).replace(/\s+/g, ' ').trim();
     if (!detail.includes('as deposited')) throw new Error(`the row says "${detail}" of the reading`);
     const kept = await overrideHeld(page, scope, PANEL_PARAMETER);
-    if (kept.origin !== 'measurement' || kept.ref !== ref || kept.value !== Number(READING) || kept.unit !== READING_UNIT || kept.by !== PERSON)
+    if (
+      kept.origin !== 'measurement' ||
+      kept.ref !== ref ||
+      kept.value !== Number(READING) ||
+      kept.unit !== READING_UNIT ||
+      kept.by !== PERSON ||
+      kept.chosenBy !== PERSON
+    )
       throw new Error(`the project keeps ${PANEL_PARAMETER} of ${scope} as ${JSON.stringify(kept)}`);
     console.log(`  panel scenario ${made}`);
-    return `scenario ${made} made on ${PANEL_FLOWSHEET}; on its panel ${PANEL_PARAMETER} set to reading ${ref} (${offered}), the service saying "${detail}", and the project's row kept as ${kept.value} ${kept.unit}, the reading's own, deposited by ${kept.by}`;
+    return `scenario ${made} made on ${PANEL_FLOWSHEET}; on its panel ${PANEL_PARAMETER} set to reading ${ref} (${offered}), the service saying "${detail}", and the project's row kept as ${kept.value} ${kept.unit}, the reading's own, deposited by ${kept.by} and chosen by ${kept.chosenBy}`;
   });
 
   // alpha 2.2 D0.8: each engine the walk is given, its first thing run on its own defaults from the Runs screen.

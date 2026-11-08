@@ -274,8 +274,8 @@ task (development plan §8).
   (`project_state.run_request`, which `selling_price`, `run_flowsheet` and `proforma_write` read)
   send a reading in its own value and unit, and every other row in its parameter's unit. The lookup
   holds the reading to its rules at each door and sets it in the parameter's unit, the conversion
-  stated in the value's note ("<value> <unit> as deposited, <value> <unit> in the parameter's unit
-  (units.convert)"), so the run's basis names both. The resolvers keep taking an Override in the
+  stated in the value's note ("<value> <unit> as deposited, <value> <unit> in the parameter's
+  unit"), so the run's basis names both. The resolvers keep taking an Override in the
   parameter's unit: `basis.override_of` returns one whose `unit` is empty.
 - A run's basis names the input, its low and its high each as a `deposition` source naming the
   reading, the value held fixed; the run is `measured` resting on readings, records and the
@@ -286,3 +286,23 @@ task (development plan §8).
   (`core/tests/test_engine_pins.py`), and a row with no unit reads as it did.
 - The chooser stands on a Proforma scenario's panel alone. fermOS's panels and pureOS's Builder
   render their rows with it off, and a saved train's `TrainParam` holds no reading (Known debts).
+
+### Alpha 2.2 E.debts (2026-11-08): who chose a reading, and where a reading's own unit stands
+
+- The person who chose a reading is kept on its row: `Override.chosenBy`, a reading's alone (a
+  person's value or a model's estimate naming one is refused in words), which the panel fills with
+  the reviewer's name and `project_state` writes as the row's maker, `by` staying the depositor.
+  This pays the review's finding on E.17's note above: E.17 kept the depositor as the row's maker
+  and audited a scope's first keep alone. Each keep that sets a parameter to a reading its scope
+  did not hold, or the same reading chosen by another person, writes a `choose_reading` audit row
+  naming the key, the reading and the chooser, and the row's Readings on the panel say who chose
+  it. `chosenBy` enters no run's basis: the basis names the depositor, as before, and no artifact
+  id moves with it.
+- The state door keeps a reading in its own unit on a Proforma scenario's scope alone
+  (`project_state.OWN_UNIT_SCOPE`) and refuses one on every other scope in words, so a saved train
+  never reads a reading's own number in its parameter's unit.
+- A reading's value note says the conversion in words alone: "<value> <unit> as deposited, <value>
+  <unit> in the parameter's unit", the converter's name left out. The note stands in the run's
+  basis, so a run on a reading deposited in another unit than its parameter's takes a new id; a
+  reading in its parameter's own unit states no conversion, and every pin holds
+  (`core/tests/test_engine_pins.py`).

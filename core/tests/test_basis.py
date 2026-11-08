@@ -128,11 +128,11 @@ def _sent(o: Override) -> EngineInput:
 @pytest.mark.parametrize("origin", sorted(EVERY_FIELD))
 def test_an_override_sent_as_its_input_comes_back_the_same_override_field_for_field(origin):
     o = EVERY_FIELD[origin]
-    # Every field a person's or a model's value fills; `ref` names a measurement's reading alone, and `unit` the
-    # reading's own unit as a page keeps it (alpha 2.2 E.17).
-    assert all(getattr(o, f) is not None for f in Override.model_fields if f not in ("ref", "unit")), \
+    # Every field a person's or a model's value fills; `ref` names a measurement's reading alone, `unit` the
+    # reading's own unit as a page keeps it (alpha 2.2 E.17) and `chosenBy` who chose it there (E.debts).
+    assert all(getattr(o, f) is not None for f in Override.model_fields if f not in ("ref", "unit", "chosenBy")), \
         "every field is set"
-    assert o.ref is None and o.unit is None
+    assert o.ref is None and o.unit is None and o.chosenBy is None
     back = override_of(SCOPE, _sent(o), UNIT)
     for field in Override.model_fields:
         assert getattr(back, field) == getattr(o, field), field

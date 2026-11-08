@@ -95,9 +95,10 @@ _ETHANOL = FlowsheetInfo(
                        note="the batch time is the titre divided by it"),
         FlowsheetInput(key="plant_scale", name="ethanol fermented in a year", dimension="massFlow", unit="t yr-1",
                        kind="economic",
-                       note="a named person's assumption; with the yield it sets the glucose fed, so the plant's size"),
+                       note="with the yield it sets the glucose fed, so the plant's size"),
         FlowsheetInput(key="glucose_price", name="price of glucose", dimension="costUSD", unit="USD kg-1",
-                       kind="economic", note="a named person's assumption; the glucose alone is priced, not its water"),
+                       kind="economic",
+                       note="the price of the glucose alone; the water that dilutes it carries none"),
         FlowsheetInput(key="ethanol_purity", name="ethanol purity", dimension="fraction", unit="",
                        kind="convention",
                        note="fuel grade: the ethanol the package's molecular sieves give, with no denaturant "
@@ -165,10 +166,11 @@ _CUSTOM_TRAIN = FlowsheetInfo(
         FlowsheetInput(key="plant_scale", name="ethanol fermented in a year", dimension="massFlow", unit="t yr-1",
                        kind="economic",
                        note="the vessel's scale: the plant scale its design names (the vessel design is its source); "
-                            "a design of one vessel's batch volume names none, and then it is a named person's "
-                            "assumption. With the yield it sets the glucose fed, so the plant's size"),
+                            "a design of one vessel's batch volume names none, and then a person sets it. With the "
+                            "yield it sets the glucose fed, so the plant's size"),
         FlowsheetInput(key="glucose_price", name="price of glucose", dimension="costUSD", unit="USD kg-1",
-                       kind="economic", note="a named person's assumption; the glucose alone is priced, not its water"),
+                       kind="economic",
+                       note="the price of the glucose alone; the water that dilutes it carries none"),
     ],
     outputs=["pricePerKgProduct", "productKgPerH", "costLines", "readBack"],
     priceOutput="pricePerKgProduct",

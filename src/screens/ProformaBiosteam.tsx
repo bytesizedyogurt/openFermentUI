@@ -578,13 +578,13 @@ const READ_BACK_GROUPS: { origin: ReadBackRow['origin']; title: string; reads: s
     origin: 'person',
     title: 'What a named person set',
     reads:
-      'Each a named person\u2019s assumption, as the run\u2019s basis names it (a Finance value typed in this scenario\u2019s panel, or a vessel setting typed in fermOS \u2192 Vessel), read back after the base case ran.',
+      'Each a named person\u2019s assumption, or a reading deposited at the bench that a person chose, as the run\u2019s basis names it (a Finance value typed or chosen in this scenario\u2019s panel, or a vessel setting typed in fermOS \u2192 Vessel), read back after the base case ran; a reading is named by its depositor.',
   },
   {
     origin: 'case',
     title: 'What this case gave',
     reads:
-      'Set by this case\u2019s bound records and named assumptions, through BioSTEAM\u2019s units, and read back after the base case ran; the reference model supplied none of these.',
+      'Set by this case\u2019s bound records, named assumptions and chosen readings, through BioSTEAM\u2019s units, and read back after the base case ran; the reference model supplied none of these.',
   },
   {
     origin: 'read',
@@ -612,7 +612,7 @@ export function ReadBack({ view, flowsheet }: { view: RunView; flowsheet: Flowsh
                     <td className="py-0.5 pr-2">
                       {r.label}
                       {r.label !== r.key && <span className="font-num text-ink-soft"> ({r.key})</span>}
-                      {r.by && <span className="text-ink-soft"> · by {r.by}</span>}
+                      {r.by && <span className="text-ink-soft"> · {r.reading ? 'a reading deposited by' : 'by'} {r.by}</span>}
                     </td>
                     <td className="py-0.5 px-1.5 text-right font-num">{typeof r.value === 'number' ? fmt(r.value, 4) : r.value}</td>
                     <td className="py-0.5 pl-1.5 font-num text-ink-soft">{r.unit}</td>

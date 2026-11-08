@@ -28,7 +28,7 @@
 // opens), and the keyboard reaches every control, here and in the records
 // Proforma renders into a row.
 import { useEffect, useId, useRef, useState, type ReactNode } from 'react';
-import type { Override, ParameterSpec, ParameterValue } from '@/lib/params';
+import { readingLeftTheList, type Override, type ParameterSpec, type ParameterValue } from '@/lib/params';
 import { StudiesDown, depositionReadings, type DepositionReading } from '@/lib/studies';
 import { href } from '@/router';
 import { fmt } from '@/engine/units';
@@ -36,10 +36,16 @@ import { CitationChip } from './Chip';
 import { ReadingChoice, depositionPath, minute, readingOf } from './ReadingOrigin';
 import { Button, cx } from './ui';
 
-/** A reading's basis note as the panel says it: the time it was taken to the minute, and what follows it. */
+/**
+ * A reading's words as the panel says them, the time it was taken to the minute and what follows it: a basis note
+ * (`measured on <time>…`) or the service's detail of a value set to a reading (params.py, `reading <ref>, deposited by
+ * <person> and taken at <time>…`).
+ */
 function measuredWords(note: string): string {
   const m = /^measured on (\S+?)(?:: (.*))?$/s.exec(note);
-  return m ? `measured ${minute(m[1])}${m[2] ? `: ${m[2]}` : ''}` : note;
+  if (m) return `measured ${minute(m[1])}${m[2] ? `: ${m[2]}` : ''}`;
+  const r = /^(reading \S+, deposited by .+?) and taken at (\S+?)(?:: (.*))?$/s.exec(note);
+  return r ? `${r[1]}, taken ${minute(r[2])}${r[3] ? `: ${r[3]}` : ''}` : note;
 }
 
 /** What a person typed for a row: the panel keeps it as an Override under the reviewer name, at now. */
@@ -467,7 +473,8 @@ function Readings({
   }, [open, spec.unit]);
   const note = reading ? (reading.note ?? '') : draft;
   const unit = spec.unit || 'no unit';
-  const held = reading && listed?.readings ? listed.readings.some((r) => r.ref === reading.ref) : true;
+  // Said gone only when the service answered with a listing that lacks it; a listing it could not give says nothing of it.
+  const gone = readingLeftTheList(reading, listed);
   const chosen = (r: ChosenReading): ChosenReading => ({ ref: r.ref, value: r.value, unit: r.unit, by: r.by, at: r.at });
   return (
     <details
@@ -506,7 +513,12 @@ function Readings({
             />
           ))
         )}
-        {reading && !held && (
+        {reading?.chosenBy && (
+          <p className="text-ink-soft" data-testid="param-reading-chosen">
+            {reading.chosenBy} chose reading <span className="font-num">{reading.ref}</span> for {spec.label}, deposited by {reading.by}.
+          </p>
+        )}
+        {reading && gone && (
           <p className="text-signal-warn" data-testid="param-reading-gone" data-ref={reading.ref ?? ''}>
             This value is set to reading <span className="font-num">{reading.ref}</span>, which has left the readings the service lists in{' '}
             {unit}; the service&rsquo;s words above say why. Choose another reading here, type your own value, or reset it to its source.

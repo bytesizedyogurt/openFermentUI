@@ -201,6 +201,10 @@ def test_a_waiting_parameter_names_the_field_that_would_bind_it():
     assert "a record of ethanol_productivity or volumetric_productivity through the aggregate gate" in v.detail
     assert "a fit a person chooses" in v.detail and "a named person's assumption" in v.detail
     assert v.detail.endswith("14 records name no carbon source")
+    # A panel that offers no reading (fermOS's, pureOS's) keeps its words, held in a kinetics run's outputs.
+    assert "a model's estimate" not in v.detail and "reading" not in v.detail
+    (offered,) = params.resolve([s], {}, [], readings=True)
+    assert "a named person's assumption, a model's estimate or a reading deposited at the bench" in offered.detail
     assert params.basis_inputs([s], [v]) == [], "a waiting value adds nothing to a basis"
 
 
@@ -306,6 +310,9 @@ def test_the_provider_binds_what_bind_inputs_binds(standin):
             else:
                 assert inp.binding == "waiting" and v.origin == "waiting" and v.value is None
         assert got.waiting == [k for k, i in bound.items() if i.binding == "waiting"] == ["plant_scale", "glucose_price"]
+        # A Proforma panel offers a reading on the row, and the words of a value that waits name it (alpha 2.2 E.debts).
+        assert values["glucose_price"].detail == ("waits for a source: a named person's assumption, a model's estimate or "
+                                                   "a reading deposited at the bench")
         assert values["feed_glucose_conc"].detail.startswith("3 records of medium_component_conc, 20 to 100 g L-1, median 60")
     assert params.scope(SCOPE).title.endswith(f"({shelf.info(ETHANOL).title})")
     narrowed = params.scope(SCOPE, ParamResolveRequest(host="nobody"))

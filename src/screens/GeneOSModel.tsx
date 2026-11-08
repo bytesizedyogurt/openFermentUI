@@ -169,7 +169,8 @@ export default function GeneOSModel() {
             host: null,
             fits: proformaFits[s.id] ?? {},
             overrides: (parameterOverrides[proformaScope(s.id)] ?? []).filter((o) => o.key === 'yield'),
-            // The yield is sent in its input's unit, as the shelf states it for the scenario's flowsheet.
+            // A person's yield is sent in its input's unit, as the shelf states it for the scenario's flowsheet; a
+            // reading set as the yield goes in its own value and unit, which the ceiling door sets in the input's.
             specs: (flowsheets ?? []).find((f) => f.id === (s.flowsheetId ?? s.modelId))?.inputs ?? [],
           },
         })),

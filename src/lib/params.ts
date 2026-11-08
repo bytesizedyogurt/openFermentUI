@@ -154,3 +154,19 @@ export const resolveParams = (scope: string, overrides: Override[], specs: Param
     body: JSON.stringify(resolveRequest(overrides, specs, ask)),
     signal,
   });
+
+/**
+ * The readings a panel row's unit takes as the service listed them: `readings` null while it is asked, and `problem`
+ * the service's words when it could not answer (alpha 2.2 E.17, ParameterRow's Readings).
+ */
+export type ReadingsListed = { readings: { ref: string }[] | null; problem: string | null };
+
+/**
+ * Whether the reading a row is set to has left the readings the service lists for its unit: true only when the
+ * service answered with a listing that names it nowhere. A listing still asked for, or one the service could not
+ * give, says nothing of the reading, and the row then shows the service's words alone (alpha 2.2 E.debts).
+ */
+export function readingLeftTheList(reading: Pick<Override, 'origin' | 'ref'> | null, listed: ReadingsListed | null): boolean {
+  if (!reading || reading.origin !== 'measurement' || !listed || listed.problem !== null || listed.readings === null) return false;
+  return !listed.readings.some((r) => r.ref === reading.ref);
+}

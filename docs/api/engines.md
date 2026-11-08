@@ -231,7 +231,7 @@ object, which runs in the service's process.
 - `configurations`: the configurations it runs in, each name 1 to 80 characters, or `[]` when it
   takes none. `defaultConfiguration` is one of them, or null.
 - `configurationTitles`, optional: the words a person reads for a configuration, by its name,
-  each title 1 to 200 characters; left out, it reads `{}`. Studies' run card shows a
+  each title 1 to 200 characters; left out or null, it reads `{}`. Studies' run card shows a
   configuration by its title beside its name, on its chooser and on the line for the run it
   made, and by its name where the engine gives none. A title is words alone: a run, its basis,
   its id and its replay name the configuration by its name, so a title the engine changes moves

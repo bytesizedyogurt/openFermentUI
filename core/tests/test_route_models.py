@@ -209,7 +209,7 @@ def test_the_rows_a_project_keeps_are_served_as_kept_and_keep_their_optional_fie
     assert "additionalProperties" not in schemas["Override"]
     assert {"correctedAt"}.isdisjoint(schemas["DepositionEntry"]["required"])
     assert {"sampleTimes", "seriesRoles"}.isdisjoint(schemas["Deposition"]["required"])
-    assert {"origin", "ref", "unit", "low", "high", "note"}.isdisjoint(schemas["Override"]["required"])
+    assert {"origin", "ref", "unit", "chosenBy", "low", "high", "note"}.isdisjoint(schemas["Override"]["required"])
     assert {"flowsheetId", "lastRunId", "createdAt", "vessel", "trainRun"}.isdisjoint(
         schemas["ProformaScenario"]["required"])
     state = schemas["ProjectState"]

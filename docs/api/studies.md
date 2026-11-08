@@ -86,12 +86,15 @@ which opens at the reading, marked. A Proforma scenario's parameter panel offers
 2.2 E.17): each numeric row whose rule takes a person's value lists, on asking, the readings in
 its parameter's unit or one that converts into it (`GET /api/depositions/readings?unit=`), and a
 chosen one is kept as the scope's override in the reading's own value and unit (`Override.unit`,
-origin `measurement`, `ref` the reading, `by` its depositor and `at` the time it was taken), sent
+origin `measurement`, `ref` the reading, `by` its depositor, `at` the time it was taken and
+`chosenBy` the person who chose it, the row's maker, each choice audited as `choose_reading`), sent
 so by the panel's resolve, the run, the ceiling check and a tool's run of the kept scenario
 (`project_state.run_request`, `proforma.inputs_of`), and set in the parameter's unit by the
 lookup at each door, the conversion stated in the value's note. A typed value or the row's slider
-replaces it with the person's own. A deposition records readings at the bench against a locked
-runbook's measures alone, with no protocol's steps (RunbookDetail, *The readings alone*,
+replaces it with the person's own. The state door keeps a reading in its own unit on a Proforma
+scenario's scope alone, and refuses one on any other scope in words. A deposition records
+readings at the bench against a locked runbook's measures alone, with no protocol's steps
+(RunbookDetail, *The readings alone*,
 `/runbooks/depositions/<id>/bench`), once the person has set their name in Settings.
 
 A reading's ref keeps naming one entry: each deposition, entry, observation and measured evidence

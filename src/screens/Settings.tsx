@@ -803,8 +803,8 @@ function CorpusSection() {
 
       <Modal open={confirm} onClose={() => setConfirm(false)} title="Clear this browser’s data">
         <p className="text-body">
-          Returns this browser to the state it starts in, with no records, protocols or scenarios of its
-          own; what the service keeps is laid back on at once. Exports you&rsquo;ve downloaded are
+          Returns this browser to the state it starts in, holding none of the project&rsquo;s rows; what
+          the service keeps is laid back on at once. Exports you&rsquo;ve downloaded are
           unaffected.
         </p>
         <p className="text-body mt-2">

@@ -230,7 +230,8 @@ def test_every_other_run_is_refused_in_words(standin, client, held):
         ({"scenarioId": MADE_HERE, "flowsheet": "nowhere"}, "there is no flowsheet nowhere"),
         ({"scenarioId": HELD, "flowsheet": shelf.COMPOSITE}, f"{HELD} runs ethanol_glucose_v0, not {shelf.COMPOSITE}"),
         ({"scenarioId": " ", "flowsheet": ETHANOL}, "names the scenario it belongs to"),
-        ({"scenarioId": HELD}, "wait for a source, a record or a named person's assumption: plant_scale, glucose_price"),
+        ({"scenarioId": HELD}, "wait for a source, a record, a named person's assumption or a reading deposited at "
+                               "the bench: plant_scale, glucose_price"),
         ({"scenarioId": MADE_HERE, "flowsheet": ETHANOL}, "plant_scale, glucose_price"),
     ]
     for body, words in cases:

@@ -108,6 +108,14 @@ def test_a_projects_rows_are_its_own():
         ("runbookLocks", "rb-1", {"lockedAt": "yesterday", "lockHash": "abc"}, "is not a time"),
         ("runbookLocks", "rb-1", {"lockHash": "abc"}, "names when it was made"),
         ("overrides", "proforma:sc-1", [{"scope": "proforma:sc-2", "key": "price"}], "naming this scope"),
+        # A reading in its own unit stands on a Proforma scenario's scope alone: a saved train keeps each value in
+        # its parameter's unit (src/lib/pureos.ts `trainSpecOf`), and fermOS's panels offer no reading.
+        *[("overrides", scope, [{"scope": scope, "key": "a_placeholder_key", "value": 2.0, "by": "Ada Moreno",
+                                 "at": AT, "origin": "measurement", "ref": "dep-1/de-1", "unit": "placeholder-unit"}],
+           "which a Proforma scenario's scope alone keeps")
+          for scope in ("pureos:unit:tr-1:u-1", "fermos:family:monod")],
+        ("overrides", "proforma:sc-1", [{"scope": "proforma:sc-1", "key": "price", "value": 0.4, "by": "Ada Moreno",
+                                         "at": AT, "chosenBy": "Ada Moreno"}], "names who chose it"),
         ("depositions", "dep-1", {"id": "dep-1", "blob": "x" * 2_000_001}, "over 2 MB"),
         ("conversations", "lc-1", {"id": "lc-1", "turns": "every word"}, "is a Live conversation"),
     ],

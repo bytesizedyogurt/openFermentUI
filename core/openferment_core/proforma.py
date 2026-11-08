@@ -924,7 +924,8 @@ def computed(req, pool=None):
     fitted = apply_fits(inputs, fits_beside(req.fits, typed), flowsheet)
     waiting = [i.key for i in inputs if i.binding == "waiting"]
     if waiting:
-        raise ScenarioRefused("these inputs wait for a source, a record or a named person's assumption: " + ", ".join(waiting))
+        raise ScenarioRefused("these inputs wait for a source, a record, a named person's assumption or a reading "
+                              "deposited at the bench: " + ", ".join(waiting))
     art = keep_run(flowsheet, basis_inputs(inputs, flowsheet, req.samples, scenario_id=req.scenarioId, fitted=fitted,
                                            parts=parts, finance=finance) + values_read(sets),
                    by=req.by, seed=req.seed, records_by_id=pool.records_by_id, scenario_id=req.scenarioId,
@@ -990,7 +991,8 @@ def run_flowsheet(flowsheet: str, assumptions: list, *, samples: int = SAMPLES, 
         inputs.append(inp)
     waiting = [i.key for i in inputs if i.binding == "waiting"]
     if waiting:
-        raise ScenarioRefused("these inputs wait for a source, a record or a named person's assumption: " + ", ".join(waiting))
+        raise ScenarioRefused("these inputs wait for a source, a record, a named person's assumption or a reading "
+                              "deposited at the bench: " + ", ".join(waiting))
     return artifacts.compute(RUN, basis_inputs(inputs, flowsheet, samples, scenario_id=scenario_id),
                              records_by_id={}, seed=seed)
 

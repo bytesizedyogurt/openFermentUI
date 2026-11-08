@@ -119,7 +119,7 @@ export default function ProformaComparison({ comparisonId }: { comparisonId: str
             <span className="flex flex-wrap items-center gap-2">
               <ProvenanceBadge p={c.provenance} />
               <span>
-                {c.runIds.length} runs set side by side for {c.by || 'this browser'}, {stamp(c.at)}. Each change is reckoned from the first run.
+                {c.runIds.length} runs set side by side for {c.by || 'nobody named'}, {stamp(c.at)}. Each change is reckoned from the first run.
               </span>
             </span>
           )

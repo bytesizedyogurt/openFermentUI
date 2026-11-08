@@ -1056,8 +1056,10 @@ export interface ReadBackRow {
    * 'person': a named person's assumption, as the run's basis names it (OF-BLD-020 §6.R); 'read': not known here.
    */
   origin: 'setting' | 'case' | 'person' | 'read';
-  /** Who set a 'person' row, as the run's basis names them. */
+  /** Who set a 'person' row, as the run's basis names them: a reading's depositor where a person chose a reading. */
   by?: string | null;
+  /** A 'person' row set to a reading deposited at the bench (its basis source a deposition). */
+  reading?: boolean;
 }
 
 /**
@@ -1113,7 +1115,7 @@ export function readBackRows(readBack: Record<string, unknown>, flowsheet: Flows
       // OF-BLD-020 §6.R (main-11/23): a value a named person set is theirs, read from the run's own basis.
       const credit = composite ? named.get(finance ? key : COMPOSITE_CREDIT[key] ?? '') : undefined;
       const by = credit?.source.by ?? null;
-      if (by) return { key, label, unit, value, origin: 'person' as const, by };
+      if (by) return { key, label, unit, value, origin: 'person' as const, by, ...(credit?.source.kind === 'deposition' ? { reading: true } : {}) };
       const origin: ReadBackRow['origin'] = finance ? 'setting' : known?.case.includes(key) ? 'case' : known?.setting.includes(key) ? 'setting' : 'read';
       return { key, label, unit, value, origin };
     });

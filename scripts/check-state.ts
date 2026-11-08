@@ -66,7 +66,7 @@ import { ONTOLOGY } from '../src/data/ontology';
 import { bodyWords, edited, type CatalogueEntry } from '../src/lib/catalogues';
 import { ServiceDown, ServiceRefused, call, detailWords } from '../src/lib/http';
 import { runnable, type LibraryPlant } from '../src/lib/library';
-import { inputsOf } from '../src/lib/params';
+import { inputsOf, readingLeftTheList } from '../src/lib/params';
 import { ranWhat, trainInputs, unitScope, type TrainSpec } from '../src/lib/pureos';
 import {
   ceilingQuery,
@@ -75,6 +75,7 @@ import {
   keptRunsOf,
   laidOn,
   modellerQuestions,
+  readBackRows,
   referenceRunOf,
   retiredEntryOf,
   runBody,
@@ -577,6 +578,29 @@ async function callAgainst(answer: { status: number; body?: unknown }, healthy =
   );
 }
 
+// ── a reading a panel row is set to, against the listing the service gave (alpha 2.2 E.debts; src/lib/params.ts) ──
+
+{
+  const set = anOverride('proforma:sc-1', 'yield', 0.5, { unit: 'placeholder-share-b', origin: 'measurement', ref: 'dep-1/de-1' });
+  check('a reading the service’s listing names stands on the row', !readingLeftTheList(set, { readings: [{ ref: 'dep-1/de-1' }], problem: null }));
+  check('a reading a listing that answered names nowhere has left it', readingLeftTheList(set, { readings: [{ ref: 'dep-1/de-2' }], problem: null }));
+  check(
+    'a listing the service could not give, or one still asked for, says nothing of the reading',
+    !readingLeftTheList(set, { readings: [], problem: 'The service is not running.' }) && !readingLeftTheList(set, { readings: null, problem: null }),
+  );
+  // A composite's Finance value set to a reading is credited to its depositor as a reading, a person's as theirs.
+  const composite = { ...aFlowsheet([]), id: 'custom_train_v1' };
+  const rows = readBackRows({ 'finance.a': 1, 'finance.b': 2 }, composite, [
+    { name: 'finance.a', value: 1, unit: '', source: { kind: 'deposition', id: 'dep-1/de-1', by: 'Grace', note: null } },
+    { name: 'finance.b', value: 2, unit: '', source: { kind: 'assumption', id: null, by: 'Ada', note: null } },
+  ]);
+  check(
+    'a run’s read-back credits a reading a person chose to its depositor as a reading, and a person’s value to them',
+    JSON.stringify(rows.map((r) => [r.key, r.origin, r.by, r.reading ?? false])) === '[["finance.a","person","Grace",true],["finance.b","person","Ada",false]]',
+    JSON.stringify(rows),
+  );
+}
+
 // ── a scenario card's counts, the reference runs a page reads (src/lib/proforma.ts) ──
 
 {
@@ -826,6 +850,37 @@ async function callAgainst(answer: { status: number; body?: unknown }, healthy =
   /** What a session holds of them: what it loaded. */
   const LOADED = /\bloaded\b/i;
 
+  /**
+   * A browser shown where a person's name stands: a row's maker drawn as `x || 'this browser'` (or `??`) on a screen.
+   * The service's own word for a row kept with no reviewer name set (project_state.UNNAMED, src/store.ts `decidedBy`)
+   * is a value it reads, and a screen names such a row's maker as nobody named.
+   */
+  const browserNamed = (path: string): number[] => {
+    const file = ts.createSourceFile(path, readFileSync(path, 'utf8'), ts.ScriptTarget.Latest, true, path.endsWith('.tsx') ? ts.ScriptKind.TSX : ts.ScriptKind.TS);
+    const lines: number[] = [];
+    const shown = (node: ts.Node): boolean => {
+      for (let at = node.parent; at && !ts.isSourceFile(at); at = at.parent) {
+        if (ts.isJsxExpression(at) || ts.isTemplateSpan(at)) return true;
+        if (ts.isFunctionLike(at)) return false;
+      }
+      return false;
+    };
+    const visit = (node: ts.Node) => {
+      const p = node.parent;
+      if (
+        (ts.isStringLiteral(node) || ts.isNoSubstitutionTemplateLiteral(node)) &&
+        /^this browser$/i.test(node.text.trim()) &&
+        p && ts.isBinaryExpression(p) && p.right === node &&
+        (p.operatorToken.kind === ts.SyntaxKind.BarBarToken || p.operatorToken.kind === ts.SyntaxKind.QuestionQuestionToken) &&
+        shown(node)
+      )
+        lines.push(file.getLineAndCharacterOfPosition(node.getStart(file)).line + 1);
+      ts.forEachChild(node, visit);
+    };
+    visit(file);
+    return lines;
+  };
+
   const misplaced: string[] = [];
   let read = 0;
   for (const path of sourcesUnder(SRC)) {
@@ -836,6 +891,7 @@ async function callAgainst(answer: { status: number; body?: unknown }, healthy =
       else if (KEPT_IN_THIS_BROWSER.test(text) && !WAITS_OR_PREFERS.test(text)) misplaced.push(`${where} keeps in this browser what the service keeps: “${text}”`);
       else if (KEPT_IN_THIS_SESSION.test(text) && !LOADED.test(text)) misplaced.push(`${where} keeps in this session what the service keeps: “${text}”`);
     }
+    for (const line of browserNamed(path)) misplaced.push(`${relative(join(SRC, '..'), path)}:${line} names this browser where a person’s name stands`);
   }
   check(
     'the words on every screen put a project’s rows with the service, and in this browser its preferences and the writes that wait for the service',

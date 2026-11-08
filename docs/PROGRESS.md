@@ -2789,7 +2789,7 @@ holds the numbers, the tables and the judgements).
     own unit; the row the panel's path kept before refused in the lookup's words; a unit kept for a reading alone), a
     reading's row served as kept and a unit on a person's value refused in `test_project_state.py`, the optional `unit`
     in `test_route_models.py`, and `test_basis.py`'s round trip of a person's and a model's Override, `ref` and `unit`
-    left empty and every other field filled; `check:state` gains ten checks (`inputsOf`, `runBody`, `ceilingQuery`, `laidOn`,
+    left empty and every other field filled; `check:state` gains nine checks (`inputsOf`, `runBody`, `ceilingQuery`, `laidOn`,
     `modellerQuestions`, `assumptionOfOverride`). `docs/api/studies.md`, `docs/api/runs.md` and the Known debts row on
     the stored panel overrides follow, and the gate's Departures row on the two stage E debts says where and when
     they land.
@@ -2797,7 +2797,7 @@ holds the numbers, the tables and the judgements).
     on Python 3.13 and on 3.12, 285 passed each way; `pnpm test:sim` 142 passed (5 min 45 s); `pnpm test:core` 2952
     passed, 1 skipped, 175 deselected (5 min 24 s); `gen:api`, `gen:tools` and `gen:components`, the document and
     `src/api/types.gen.ts` regenerated (`Override.unit`) and `docs/TOOLS.md` and `COMPONENTS.md` as they were;
-    `typecheck`; `check:plan`; `check:state`, 76 checks; `check:figures`; `check:guild`; `check:tools`;
+    `typecheck`; `check:plan`; `check:state`, 75 checks; `check:figures`; `check:guild`; `check:tools`;
     `test:reconcile`; `check:secrets`; `build`; `pnpm smoke` with no key, 20 of 20 screens; and `pnpm prove --steps
     9`, offline, 55 of 55 checks in 109 s, the panel's reading in the walk and no call in the proof's spend table.
 - E.18. Studies' run card names each kinetics configuration by its kind and when it was kept (the Known debts row is
@@ -2831,7 +2831,7 @@ holds the numbers, the tables and the judgements).
     `test_engine_diagnostics.py`), with the database address empty, on Python 3.13 and on 3.12, 176 passed each way;
     `pnpm test:sim` 142 passed (5 min 37 s); `pnpm test:core` 2955 passed, 1 skipped, 175 deselected (5 min 35 s);
     `gen:api`, `gen:tools` and `gen:components`, the document and `src/api/types.gen.ts` regenerated (`EngineThing`
-    alone) and `docs/TOOLS.md` and `COMPONENTS.md` as they were; `typecheck`; `check:plan`; `check:state`, 81 checks;
+    alone) and `docs/TOOLS.md` and `COMPONENTS.md` as they were; `typecheck`; `check:plan`; `check:state`, 80 checks;
     `check:figures`; `check:guild`; `check:tools`; `test:reconcile`; `check:secrets`; `build`; `pnpm smoke` with no
     key, 20 of 20 screens; and `pnpm prove`, offline, steps 1 to 10, 96 of 96 checks in 217 s and no call in the
     proof's spend table. On the proof's kept service, a scratch check outside the tree kept a stand-in fit and its
@@ -2864,13 +2864,49 @@ holds the numbers, the tables and the judgements).
     Run before the words changed, it named eighteen of the nineteen sentences above (Home's title names no keeping);
     it reads 19,166 sentences now and names none. A second check reads Postdoc's empty list, and `pnpm smoke` reads it
     on the screen of the empty project it opens.
-  - Checks: `typecheck`; `check:plan`; `check:state`, two checks more, 83 in all, which fails on the words before this
+  - Checks: `typecheck`; `check:plan`; `check:state`, two checks more, 82 in all, which fails on the words before this
     commit, naming the eighteen; `check:figures`; `check:guild`; `check:tools`; `test:reconcile`; `check:secrets`;
     `build`; `pnpm smoke` with no key, 20 of 20 screens, Postdoc's list saying the service keeps each conversation;
     `gen:api`, `gen:tools` and `gen:components` with `--check`, each file as the code writes it; `test_guidance.py`
     and `test_no_seed.py`, which read the docs and the decision record this commit changes, with the database address
     empty, on Python 3.13 and on 3.12, 53 passed each way; and `pnpm test:core` 2955 passed, 1 skipped, 175 deselected
     (5 min 49 s). No Python changed, and neither the walk nor `prove.py`, so `test:sim` and `pnpm prove` did not run.
+- E.debts. The review of E.17, E.18 and E.19: fifteen findings, three of them should-fix, each confirmed against the
+  code and each fixed (ADR-006's note of E.debts). Built in a worktree beside stage F's live work, with no model call.
+  - Who chose a reading: an override keeps it in `chosenBy`, a reading's alone (a person's value or a model's estimate
+    naming one is refused in words), which the panel fills with the reviewer and `project_state` writes as the row's
+    maker, `by` staying the depositor; each keep that sets a parameter to a reading its scope did not hold, or the
+    same reading chosen by another person, writes a `choose_reading` audit row, and the row's Readings say who chose
+    it. The state door keeps a reading in its own unit on a Proforma scenario's scope alone, and refuses one on a
+    pureOS or fermOS scope in words.
+  - The row's words when the readings list cannot load: `params.readingLeftTheList` says a reading has left the list
+    only when the service answered with a listing that lacks it, and `check:state` holds three cases.
+  - The Proforma scenario page's words on a person's assumptions: the inputs card, the shelf notes of `plant_scale` and
+    `glucose_price`, the read-back's groups (a composite's Finance value set to a reading is credited to its depositor
+    as a reading, held by `check:state`), the words of a Proforma panel's value that waits for a source and the
+    refusals of a run with one name a reading deposited at the bench beside a person's assumption. The panels of
+    fermOS and pureOS offer no reading and keep their words (`params.READINGS_OFFERED`): a kinetics run keeps them in
+    its outputs, and the fed-batch pin's output hash moved when they changed, so they stand as they were.
+  - The minors: a worker's `configurationTitles: null` reads as `{}` (a test), and `docs/api/workers.md` lists a blank
+    title and one past 200 characters among the breaks; the panel's detail line says when a reading was taken to the
+    minute, and a reading's value note leaves the converter's name out, so a run on a reading in another unit than its
+    parameter's takes a new id and every pin holds; the run card lists the engines again after a run made there, the
+    runs table names a configuration by its title, and a refusal's summary carries the first clause after
+    `<thing> refused:`; a comparison with no maker is set side by side for nobody named, the reset's words say this
+    browser then holds none of the project's rows, the panel says a change waits in this browser while the service
+    is not running, and `check:state` names a browser drawn where a person's name stands; Guild's empty queue tells
+    a project with no extraction that it holds none yet; two comments; and the three log lines above count
+    `check:state` as their trees run it, 75, 80 and 82.
+  - Checks: the touched tests (`test_basis.py`, `test_engines.py`, `test_measurements.py`, `test_proforma_ethanol.py`,
+    `test_project_state.py`, `test_route_models.py`, `test_params.py`, `test_tools.py`, `test_proforma_runs.py`,
+    `test_proforma_shelf.py`, `test_proforma_overrides.py`, `test_engine_pins.py`) with `test_guidance.py` and
+    `test_no_seed.py`, the database address empty, on Python 3.13 and on 3.12, 488 passed each way; `gen:api`,
+    `gen:tools` and `gen:components` with `--check`, the document and `src/api/types.gen.ts` regenerated
+    (`Override.chosenBy`); `typecheck`; `check:state`, four checks more, 86 in all, whose new rule names
+    `ProformaComparison.tsx` on the words before this commit; `check:figures`; `build`; `pnpm smoke` with no key, 20
+    of 20 screens; `pnpm prove --steps 9`, offline, 55 of 55 checks in 89 s, the walk's reading chosen and kept in the
+    reviewer's name, and no call in the proof's spend table; `pnpm test:sim` 142 passed (4 min 35 s); and
+    `pnpm test:core` 2960 passed, 1 skipped, 175 deselected (4 min 30 s).
 
 ### Alpha 2.2 — Stage F — 2026-11-05
 

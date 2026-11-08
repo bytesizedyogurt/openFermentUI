@@ -2967,7 +2967,9 @@ class Override(BaseModel):
     stays empty. A reading a page keeps (a Proforma scenario's parameter
     panel) names its own unit: its value and `unit` are the reading's as
     deposited, which the door it is sent to sets in the parameter's unit
-    (measurements.py), the conversion stated in the value's note."""
+    (measurements.py), the conversion stated in the value's note. It names
+    the person who chose it for the parameter in `chosenBy`, the row's maker
+    (project_state.py), `by` staying its depositor."""
 
     scope: str
     key: str
@@ -2984,6 +2986,11 @@ class Override(BaseModel):
     # reading so; None for a value in its parameter's own unit, as a person's
     # assumption, a model's estimate and every Override a resolver takes are.
     unit: str | None = None
+    # Who set the parameter to a deposition's reading, when a page keeps one
+    # (a Proforma scenario's panel, the reviewer who chose it): the row's
+    # maker. None for a person's or a model's value, whose `by` names who set
+    # it, and for every Override a resolver takes.
+    chosenBy: str | None = None
 
     @field_validator("value", "low", "high", mode="before")
     @classmethod
@@ -3002,6 +3009,13 @@ class Override(BaseModel):
             said = "a model's estimate" if self.origin == "model-estimate" else "a person's assumption"
             raise ValueError(f"the override of {self.key} keeps a unit of its own for a deposition's reading alone, "
                              f"and {said} is in its parameter's unit")
+        if self.chosenBy is not None and self.origin != "measurement":
+            said = "a model's estimate names its model" if self.origin == "model-estimate" else \
+                "a person's assumption names its person"
+            raise ValueError(f"the override of {self.key} names who chose it (chosenBy) for a deposition's reading "
+                             f"alone, and {said} in by")
+        if self.chosenBy is not None and (not self.chosenBy.strip() or not self.chosenBy.isprintable()):
+            raise ValueError(f"the measurement of {self.key} names who chose it on one line (chosenBy)")
         return self
 
 
@@ -4508,14 +4522,21 @@ class EngineThing(BaseModel):
     defaultConfiguration: str | None = None
     # Words a person reads for a configuration, by its name (the kinetics
     # engine's: the kind of artifact the configuration names and when the
-    # project kept it). {} when the engine gives none, and a configuration
-    # with no title is read by its name. A run, its basis, its id and its
-    # replay name a configuration by its name alone.
+    # project kept it). {} when the engine gives none, left out or null, and a
+    # configuration with no title is read by its name. A run, its basis, its
+    # id and its replay name a configuration by its name alone.
     configurationTitles: dict[str, ConfigurationTitle] = Field(default_factory=dict, description=(
         "Words a person reads for a configuration, by its name: each key one of `configurations`, each title 1 to "
         f"{CONFIGURATION_TITLE_MAX} characters. A configuration with no title is read by its name; `{{}}` when the "
         "engine gives none."))
     precision: EnginePrecision
+
+    @field_validator("configurationTitles", mode="before")
+    @classmethod
+    def _null_titles_none(cls, v: Any) -> Any:
+        # A worker may answer null for "none", as it answers a thing's
+        # defaultConfiguration: it reads as a thing that titles none.
+        return {} if v is None else v
 
     @model_validator(mode="after")
     def _default_is_one_of_them(self) -> "EngineThing":

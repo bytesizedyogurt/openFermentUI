@@ -134,6 +134,11 @@ _FORMS: tuple[tuple[str, re.Pattern[str]], ...] = (
 )
 SCOPE_WORDS = ("fermos:family:<family id>, fermos:vessel:<simulation artifact id>, "
                "fermos:forecast:<kinetic fit artifact id>, pureos:unit:<train id>:<unit id> or proforma:<scenario id>")
+# The scope kinds whose panel offers a deposition's reading on a row (alpha
+# 2.2 E.17; ADR-006's note): their waiting values name a reading among what
+# would bind them (`_waiting_words`).
+READINGS_OFFERED = ("proforma",)
+
 KIND_WORDS = {
     "fermos-family": "fermOS's model families",
     "fermos-vessel": "fermOS's vessel designs",
@@ -255,7 +260,7 @@ def scope(name: str, req: ParamResolveRequest | None = None) -> ParamScope:
     service binds them now, with no override (the service keeps none)."""
     req = (req or ParamResolveRequest()).model_copy(update={"inputs": []})
     kind, got = _provided(name, req)
-    values = _not_read(got, resolve(got.specs, got.sources, []))
+    values = _not_read(got, resolve(got.specs, got.sources, [], readings=kind in READINGS_OFFERED))
     return ParamScope(scope=name, kind=kind, title=got.title, specs=got.specs, values=values,
                       waiting=[v.key for v in values if v.origin == "waiting"], notes=got.notes)
 
@@ -268,9 +273,9 @@ def resolve_scope(name: str, req: ParamResolveRequest) -> ParamResolveResult:
     in words. A provider that binds on the values set converts them at its
     own door, with its own units, as a run of the scope does. Runs nothing
     and keeps nothing."""
-    _, got = _provided(name, req)
+    kind, got = _provided(name, req)
     overrides = overrides_of(name, req.inputs, units_of(got.specs))
-    values = _not_read(got, resolve(got.specs, got.sources, overrides))
+    values = _not_read(got, resolve(got.specs, got.sources, overrides, readings=kind in READINGS_OFFERED))
     why = got.refuses(values) if got.refuses is not None else None
     if why:
         raise ParamRefused(why)
@@ -343,7 +348,14 @@ def bounds_check(spec: ParameterSpec, value: Any, low: float | None = None, high
             "it is kept as given and the basis records it")
 
 
-def _waiting_words(spec: ParameterSpec) -> str:
+def _waiting_words(spec: ParameterSpec, *, readings: bool = False) -> str:
+    """What would bind a value that waits, in words. `readings` for a panel
+    that offers a deposition's reading on the row (a Proforma scenario's,
+    alpha 2.2 E.17): its rule's entry for a value set for the run names a
+    model's estimate and a reading beside a person's assumption, as
+    ParameterRow's `ruleWords` names them. Every other panel's words stand
+    as they were, held in the outputs a kinetics run keeps
+    (`core/tests/test_engine_pins.py`)."""
     parts = []
     fields = [e.split(":", 1)[1] for e in spec.sourceRule if e.startswith("record:")]
     if "fit" in spec.sourceRule:
@@ -355,7 +367,8 @@ def _waiting_words(spec: ParameterSpec) -> str:
     if "simulation" in spec.sourceRule:
         parts.append("a kept simulation")
     if "assumption" in spec.sourceRule:
-        parts.append("a named person's assumption")
+        parts.append("a named person's assumption, a model's estimate or a reading deposited at the bench" if readings
+                     else "a named person's assumption")
     if "convention" in spec.sourceRule:
         parts.append("a stated convention")
     if "library-default" in spec.sourceRule:
@@ -463,7 +476,7 @@ def _from_override(spec: ParameterSpec, o: Override) -> ParameterValue:
         detail=detail + (f": {o.note}" if o.note else ""))
 
 
-def _first(spec: ParameterSpec, cands: Mapping[str, ParameterValue | None]) -> ParameterValue:
+def _first(spec: ParameterSpec, cands: Mapping[str, ParameterValue | None], *, readings: bool = False) -> ParameterValue:
     for entry in spec.sourceRule:
         found = cands.get(entry)
         if found is None and entry == "convention" and spec.convention is not None:
@@ -475,7 +488,7 @@ def _first(spec: ParameterSpec, cands: Mapping[str, ParameterValue | None]) -> P
         return found.model_copy(update={"key": spec.key, "origin": origin, "overriddenBy": None,
                                         "identified": found.identified if origin == "fit" else None})
     why = cands.get("waiting")
-    detail = _waiting_words(spec) + (f". {why.detail}" if why is not None and why.detail else "")
+    detail = _waiting_words(spec, readings=readings) + (f". {why.detail}" if why is not None and why.detail else "")
     return ParameterValue(key=spec.key, value=None, source=None, origin="waiting", detail=detail)
 
 
@@ -503,20 +516,21 @@ def checked(specs: list[ParameterSpec], overrides: Iterable[Override] | None, by
 
 
 def resolve(specs: list[ParameterSpec], sources: Mapping[str, Mapping[str, ParameterValue | None]],
-            overrides: Iterable[Override] | None, by: str | None = None) -> list[ParameterValue]:
+            overrides: Iterable[Override] | None, by: str | None = None, *, readings: bool = False) -> list[ParameterValue]:
     """Each spec's value. An Override for its key wins over every source and
     becomes an `assumption` by the person it names (or by `by`, when it names
     nobody; with neither it is refused), where the spec's rule takes a named
     person's value (`checked`). Otherwise the first entry of the spec's
     `sourceRule` with a candidate in `sources` wins, its origin the entry's;
     "convention" falls back on the spec's stated convention, with its note as
-    the reason. With none, the value waits and says what would bind it.
+    the reason. With none, the value waits and says what would bind it
+    (`readings` for a panel that offers a reading, `_waiting_words`).
     Every value outside the bounds is kept and flagged."""
     given = checked(specs, overrides, by)
     out = []
     for spec in specs:
         cands = sources.get(spec.key) or {}
-        v = _from_override(spec, given[spec.key]) if spec.key in given else _first(spec, cands)
+        v = _from_override(spec, given[spec.key]) if spec.key in given else _first(spec, cands, readings=readings)
         lib = cands.get("library-default")
         if lib is not None:
             v.libraryDefault = lib.value

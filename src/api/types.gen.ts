@@ -5883,13 +5883,17 @@ export interface components {
          *     stays empty. A reading a page keeps (a Proforma scenario's parameter
          *     panel) names its own unit: its value and `unit` are the reading's as
          *     deposited, which the door it is sent to sets in the parameter's unit
-         *     (measurements.py), the conversion stated in the value's note.
+         *     (measurements.py), the conversion stated in the value's note. It names
+         *     the person who chose it for the parameter in `chosenBy`, the row's maker
+         *     (project_state.py), `by` staying its depositor.
          */
         Override: {
             /** At */
             at: string;
             /** By */
             by: string;
+            /** Chosenby */
+            chosenBy?: string | null;
             /** High */
             high?: number | null;
             /** Key */

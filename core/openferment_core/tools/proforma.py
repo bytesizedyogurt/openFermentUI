@@ -210,9 +210,11 @@ def _no_run(sid: str, row: dict, ctx: ToolContext) -> str:
         return f"{NAME} refused: no run of {sid} is on file here, and its inputs could not be bound: {e}"
     waiting = [f"{i.key} ({i.label})" for i in bound.inputs if i.binding == "waiting"]
     if waiting:
-        why = f"these inputs wait for a source, a record or a named person's assumption: {', '.join(waiting)}"
-        how = (f"A run is made in Proforma, on the page of {name}: a named person's assumption is kept there for each "
-               "input that waits, and the person runs it")
+        why = (f"these inputs wait for a source, a record, a named person's assumption or a reading deposited at the "
+               f"bench: {', '.join(waiting)}")
+        how = (f"A run is made in Proforma, on the page of {name}: a named person's assumption, or a reading "
+               "deposited at the bench that a person chooses, is kept there for each input that waits, and the "
+               "person runs it")
     else:
         why = "every input has a source as the service binds it, and nobody has run it"
         how = f"A person runs it in Proforma, on the page of {name}, or run_flowsheet runs it as the service binds it"

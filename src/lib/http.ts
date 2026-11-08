@@ -9,6 +9,9 @@
 import { START_COMMAND, postdocHealth } from './postdoc';
 import { apiFetch } from './project';
 
+/** What a ServiceDown says when nothing answered: the service is not running, and a write waits in this browser's outbox. */
+export const NOT_RUNNING = 'The service is not running.';
+
 export class ServiceDown extends Error {
   constructor(
     message: string,
@@ -62,7 +65,7 @@ export async function call<T>(path: string, init?: RequestInit): Promise<T> {
   try {
     response = await apiFetch(path, init);
   } catch {
-    throw new ServiceDown('The service is not running.');
+    throw new ServiceDown(NOT_RUNNING);
   }
   if (response.ok) return (await response.json()) as T;
   // 413 is an upload past the size an import takes, 502 a source the service
@@ -82,7 +85,7 @@ export async function call<T>(path: string, init?: RequestInit): Promise<T> {
   try {
     await postdocHealth(init?.signal ?? undefined);
   } catch {
-    throw new ServiceDown('The service is not running.');
+    throw new ServiceDown(NOT_RUNNING);
   }
   throw new ServiceDown(`The service answered ${response.status}.`, 'The service is running, so check its log — it will name what went wrong.');
 }

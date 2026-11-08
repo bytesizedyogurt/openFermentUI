@@ -553,7 +553,11 @@ export default function Guild() {
           <EmptyState
             icon={<ClipboardCheck size={22} />}
             title="Nothing waiting for review"
-            body="Every extraction the project holds has been decided. Queue a new batch from the Extract table — filter it first and only those rows enter the queue."
+            body={
+              records.length === 0
+                ? 'The project holds no extraction yet: bring a document in through Intake and run the extractor on it, and each value it reads can be queued here from the Extract table.'
+                : 'Every extraction the project holds has been decided. Queue a new batch from the Extract table — filter it first and only those rows enter the queue.'
+            }
             action={
               <div className="flex gap-2">
                 <LinkButton to="/intake" variant="primary">
