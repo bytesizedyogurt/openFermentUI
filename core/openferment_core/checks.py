@@ -1,5 +1,4 @@
-"""Checks — proposed by fixed rules, scheduled and run by an assessor
-(OF-BLD-013 §5.2).
+"""Checks — proposed by fixed rules, scheduled and run by an assessor.
 
 `rank_pairs` and `propose` mirror src/engine/checks.ts, which is the
 reference; the competence fixture holds the two together
@@ -14,7 +13,10 @@ is a read-check-write in one transaction under the project's checks lock
 
   person     the person is not active on the ledger, or is an auditor; an
              open check on someone no longer active can only be dismissed
-  skill      a skill named is not one Guild holds, or a check names none
+  skill      a skill named is not one Guild holds, a check names none, or a
+             check is asked for by name on a skill whose catalogue entry
+             holds no policy (competence.unrated); the ranking leaves such
+             a skill out
   authority  the one acting may not do this: proposing and dismissing take an
              assessor or the lead; scheduling and running take an assessor on
              every skill in the check, and never the person checked; asking
@@ -34,8 +36,7 @@ Running a check writes one witnessed entry per skill through Guild
 assessor's own words as its raw: passed when every criterion of that skill
 was met. The entries are asked against one ledger and written in the same
 transaction that closes the check, so a run lands whole or not at all; an
-entry naming a check as its source is taken from nowhere else (OF-BLD-013
-§5.5).
+entry naming a check as its source is taken from nowhere else.
 
 The nightly job is a second process; the lock is the database's, so it holds
 across processes as well as threads. The nightly commands act in the project
@@ -57,7 +58,7 @@ from typing import Any
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from . import db, guild, llm, projects
-from .competence import Competence, days_between
+from .competence import Competence, days_between, unrated
 from .db import models as t
 from .db import rows
 from .models import (
@@ -177,7 +178,8 @@ def rank_pairs(ledger: Guild, skills: dict[str, dict[str, Any]], today: str, cov
         if not person.active or person.role == "auditor":
             continue
         for skill_id, skill in skills.items():
-            if f"{person.id}|{skill_id}" in cover:
+            # A skill kept with no policy is left out of every level, and of the ranking with them.
+            if f"{person.id}|{skill_id}" in cover or unrated(skill):
                 continue
             st = comp.status(person.id, skill_id)
             if st.level not in (2, 3):
@@ -278,12 +280,16 @@ def propose(by: str | None, *, today: str | None = None, limit: int = PROPOSALS_
     if by is not None and not (_lead(ledger, by) or _assessor_anywhere(ledger, by)):
         raise CheckRefused("authority", "the ranking is run by an assessor or the lead")
     day = today or date.today().isoformat()
-    made = db.run(_propose(projects.current(), ledger, by, day, limit))
+    made = db.run(_propose(projects.current(), ledger, guild.skills(), by, day, limit))
     log.info("checks: %d proposed%s", len(made), f" by {by}" if by else " by the nightly ranking")
     return made
 
 
-async def _propose(project_id: str, ledger: Guild, by: str | None, day: str, limit: int) -> list[Check]:
+async def _propose(project_id: str, ledger: Guild, known: dict[str, dict[str, Any]], by: str | None, day: str,
+                   limit: int) -> list[Check]:
+    """The ranking's checks kept, against the skills its caller read before
+    the transaction began: this runs on the database's own thread, where a
+    store's read through `db.run` is refused."""
     async with db.session() as s:
         checks = await _locked(s, project_id)
         made = [
@@ -296,7 +302,7 @@ async def _propose(project_id: str, ledger: Guild, by: str | None, day: str, lim
                 proposedAt=_now(),
                 proposedBy=by,
             )
-            for p in propose_from(ledger, guild.skills(), day, covered(checks), limit)
+            for p in propose_from(ledger, known, day, covered(checks), limit)
         ]
         for c in made:
             await _keep(s, project_id, c)
@@ -312,6 +318,9 @@ def request(asked: CheckRequest) -> Check:
         raise CheckRefused("person", f"{asked.personId!r} is not an active person who can hold skills")
     if not asked.skillIds or any(s not in known for s in asked.skillIds):
         raise CheckRefused("skill", "a check names the skills it is for, from the skills Guild holds")
+    no_policy = [why for s in asked.skillIds if (why := unrated(known[s]))]
+    if no_policy:
+        raise CheckRefused("skill", f"{no_policy[0]}: a check of it waits until its catalogue entry holds its policy")
     if asked.by != asked.personId and not any(_assessor(ledger, asked.by, s) for s in asked.skillIds):
         raise CheckRefused("authority", "a check is asked for by the person, or by an assessor on one of its skills")
     return db.run(_request(projects.current(), ledger, asked))
@@ -462,7 +471,7 @@ async def _record(
         ]
         # Asked against one ledger and written in this transaction with the
         # check's close: the run lands whole or not at all.
-        stored = await guild.write_check_entries_in(s, project_id, entries, c)
+        stored = await guild.write_check_entries_in(s, project_id, entries, c, known)
         done = c.model_copy(
             update={
                 "state": "done",

@@ -5,7 +5,71 @@
 // reviewer presses the key. `biorepo.write` on the service is the authority
 // (§2.3); these exist so the screen says the same thing the service would, one
 // keystroke earlier.
-import type { DecisionCheck, ExtractionRecord, Paper, ReviewDecision } from '@/data/types';
+//
+// The review family is named here, each a generated schema of the service's
+// answers (ADR-007): a candidate, a reviewer's decision on it, the service's
+// verdict on a decision before it is sent, an extractor run as witness.py
+// scores it, and the overlay that carries them with the documents the project
+// holds. The record and the paper are the store's own shapes of them.
+import type { components } from '@/api/types.gen';
+import { isFieldId, type FieldId } from '@/data/ontology';
+
+type S = components['schemas'];
+
+/** An extraction the anchoring rules kept (OF-BLD-012 §2.4), before a reviewer has looked at it. */
+export type Candidate = S['Candidate'];
+/** What a reviewer decided about one record (§7.1), as the service keeps it and the Durable tier holds it. */
+export type ReviewDecision = S['ReviewDecision'];
+/** POST /api/biorepo/check: whether the service would keep a decision, and the rule it would refuse it under. */
+export type DecisionCheck = S['DecisionCheck'];
+export type RecordStatus = Candidate['status'];
+/** The extractor run a candidate came from: 'claude-1', the run that runs (§6). */
+export type ExtractorRun = Candidate['extractorRun'];
+/**
+ * One line of a record's audit trail, as the page writes it: who did what and
+ * when, with the value before and after when a value changed.
+ */
+type AuditLine = Omit<S['AuditEvent'], 'from' | 'to'> & Partial<Pick<S['AuditEvent'], 'from' | 'to'>>;
+/** One extractor run as witness.py scores it against the values reviewers typed (§6.2). */
+export type RunOutput = S['ExtractRun'];
+/** GET /api/biorepo/overlay: the documents the project holds, its decisions, its candidates and its runs. */
+export type Overlay = S['Overlay'];
+/** One document the project holds, as the overlay carries it (ADR-002). */
+export type OverlayPaper = S['OverlayPaper'];
+
+/**
+ * A document the project holds, as the store keeps it: the overlay's entry
+ * under its id, its title the kit's citation or, when the kit holds none, the
+ * id itself.
+ */
+export type Paper = OverlayPaper & { id: string; title: string };
+
+/**
+ * A record: a candidate with the review layer over it (§7.3). The decision's
+ * gold, correction and reviewer; the audit trail; what it was published as,
+ * stamped once as it enters the store (OF-BLD-012.1 F7); and whether the
+ * extractor's current run still reads it (F3). Its field is one the ontology
+ * names, checked as it enters the store (`recordOf`).
+ */
+export type ExtractionRecord = Omit<Candidate, 'field'> & {
+  field: FieldId;
+  gold?: ReviewDecision['gold'];
+  corrected?: ReviewDecision['corrected'];
+  reviewer?: ReviewDecision['reviewer'];
+  audit: AuditLine[];
+  original?: { value: number | string; unit: string; quote: string; sectionId: string };
+  absentFromRun?: boolean;
+};
+
+/**
+ * A candidate as a record entering the store, with no decision yet and an
+ * empty audit trail; null when its field is one the ontology does not name,
+ * since every reader of a record indexes the ontology by its field.
+ */
+export function recordOf(c: Candidate): ExtractionRecord | null {
+  const { field } = c;
+  return isFieldId(field) ? { ...c, field, audit: [] } : null;
+}
 
 // ── §2.4 rule 2's normalisation, the browser's copy ─────────────────────
 //
@@ -27,7 +91,7 @@ const DASHES = /[−‐‑‒–—―⁻]/g;
 const SUP_ANY = new RegExp(`[${SUP}]`, 'g');
 
 /** Rule 2's normalisation of a quote or a section, character for character with the service. */
-export function normalizeText(text: string): string {
+function normalizeText(text: string): string {
   let out = text.replace(/­/g, '');
   out = out.replace(POWER, (_m, d: string, minus: string, digits: string) => `${d}^${minus ? '-' : ''}${foldSup(digits)}`);
   out = out.replace(UNIT_EXP, (_m, digits: string) => `-${foldSup(digits)}`);
@@ -139,16 +203,17 @@ export function locateQuote(text: string, quote: string): { start: number; end: 
   return { start, end: last + 1 };
 }
 
-export function paperFetched(paper: Paper | undefined): paper is Paper {
+function paperFetched(paper: Paper | undefined): paper is Paper {
   return !!paper && paper.textSource === 'full-text' && paper.sections.length > 0;
 }
 
 /**
  * Whether the project holds the paper, the service's rule for a decision
  * (`biorepo._held`): a decision stands on a document a reader can look up.
+ * Every paper the store keeps is one the overlay names as held (ADR-002).
  */
 export function paperHeld(paper: Paper | undefined): boolean {
-  return !!paper?.held;
+  return paper !== undefined;
 }
 
 export type ReviewAction = 'accept' | 'reject' | 'gold';
@@ -160,8 +225,8 @@ export type ReviewAction = 'accept' | 'reject' | 'gold';
  * keeps the decision, the service is simply never asked — where the other
  * two mean the action cannot be taken at all until something changes.
  */
-/** The rules `biorepo.write` refuses under (§2.3). The service names one; the fallback below can only see three of them. */
-export type RefusalRule = 'record' | 'reviewer' | 'fulltext' | 'quote' | 'paper' | 'unit' | 'status';
+/** The rules `biorepo.write` refuses under (§2.3; models.DecisionRule). The service names one; the fallback below can only see three of them. */
+type RefusalRule = NonNullable<DecisionCheck['rule']>;
 
 export interface Refusal {
   rule: RefusalRule;
@@ -233,7 +298,9 @@ export function writeRefusal(
  */
 export function refusalOf(check: DecisionCheck, fallback: Refusal | null): Refusal | null {
   if (check.ok) return null;
-  const rule = (check.rule ?? 'fulltext') as RefusalRule;
+  // A refusal names its rule (the check routes answer `biorepo.write`'s); one that names none takes the fallback's, else
+  // stops the action as a refusal of the record would.
+  const rule: RefusalRule = check.rule ?? fallback?.rule ?? 'record';
   return {
     rule,
     why:

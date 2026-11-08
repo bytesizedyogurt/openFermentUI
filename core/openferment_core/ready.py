@@ -1,25 +1,31 @@
-"""Is this machine ready for the live loop? (OF-BLD-012 §B.9)
+"""Is this machine ready for the live loop?
 
     pnpm ready                 every check
     pnpm ready --no-network    only what needs no network
     pnpm ready --offline       what an offline run needs: no network, and no key,
                                because it makes no model call (scripts/prove.py)
+    pnpm ready --probe         every check, and one minimal model call on the
+                               index route, which spends a few tokens
 
 One line per check: ✓ ready, ! works with a gap worth knowing, ✗ the live
 loop fails here, · skipped. Each ✗ and ! says what to do. Exits 1 when any
 check is ✗, so install.sh and deploy.sh can show it.
 
-It spends nothing. The model check asks Anthropic's Models API whether the key
-may use each model in the chain (llm.py: Opus, then Sonnet), which is free and
-is also how a retired model shows up before a real call fails; the Europe PMC
-check is one search. The key itself is never printed, in whole or in part.
+Without --probe it spends nothing. The model check asks Anthropic's Models API
+whether the key may use each model in the chain (llm.py: Opus, then Sonnet),
+which is free and is also how a retired model shows up before a real call
+fails; the Europe PMC check is one search. An account past its own usage limit
+still answers the Models API, so only a real call sees that limit: the probe
+row makes one, on the index route, and says what it cost. The key itself is
+never printed, in whole or in part.
 
 The last line is the lane (OF-BLD-014 A.4), what this machine can run:
 `full` with a key the Models API accepted and Europe PMC answering,
-`model-only` with that key alone, `none` otherwise. The `huggingface` row is a
+`model-only` with that key alone, `none` otherwise, and `none` when the probe
+ran and no model answered it. The `huggingface` row is a
 warning at most, and it never changes the exit code: FastEmbed's model file
 comes from there once (the `embedder` row). Nor does the
-`graphviz` row (OF-BLD-019 D8): without `dot`, Proforma lists a flowsheet's
+`graphviz` row: without `dot`, Proforma lists a flowsheet's
 units where its diagram would be.
 """
 from __future__ import annotations
@@ -44,11 +50,17 @@ CORE = Path(__file__).parent.parent
 REPO = CORE.parent
 MARKS = {"ok": "✓", "warn": "!", "fail": "✗", "skip": "·"}
 PLACEHOLDER_KEY = "sk-ant-..."
+# How the live host starts its PostgreSQL, from power-on and as its owner
+# (docs/runbooks/live-host-install.md, step 0).
+LIVE_START = 'sudo brew services start --sudo-service-user="$(id -un)" postgresql@17'
 # A PMCID the Europe PMC check asks about: one search says whether it answers.
 PROBE_PMCID = "PMC8471596"
 # Where FastEmbed fetches its model file from, once (ADR-002).
 HUGGINGFACE = "https://huggingface.co"
 LANES = ("full", "model-only", "none")
+# The probe's one call (--probe): the fewest tokens a model answers in words.
+MODEL_PROBE_ASK = "Answer with the one word: ok"
+MODEL_PROBE_TOKENS = 16
 # Where api.py mounts the build from, worked out the same way and kept equal to
 # it by test_ready; importing api for it would start the app and log as it.
 DIST_DIR = intake._env_path("OPENFERMENT_DIST_DIR", REPO / "dist")
@@ -67,8 +79,10 @@ class Check:
 def check_key() -> Check:
     key = (os.environ.get("ANTHROPIC_API_KEY") or "").strip()
     if not key or key == PLACEHOLDER_KEY:
-        return Check("key", "fail", "core/.env holds no key. Postdoc and extraction need one: set a "
-                     "spend cap in the Anthropic console, copy core/.env.example to core/.env, add the key")
+        return Check("key", "fail", "core/.env holds no key. Postdoc and extraction need one: set a spend cap in "
+                     "the Anthropic console, write the key on core/.env's ANTHROPIC_API_KEY= line (core/.env.example "
+                     "holds it; when core/.env is absent, copy the example, leaving out its OPENFERMENT_DATABASE_URL "
+                     "line on the live host, docs/runbooks/live-host-install.md step 1), and restart the service")
     if not key.startswith("sk-ant-"):
         return Check("key", "warn", "core/.env holds a key that does not start the way Anthropic keys do")
     return Check("key", "ok", "core/.env holds a key")
@@ -107,7 +121,8 @@ def check_data() -> Check:
     try:
         at, head = migrate.revision(url), migrate.head()
     except Exception as e:  # the server's own words are the row's answer
-        return Check("data", "fail", f"{where} did not answer ({type(e).__name__}: {e}). Start PostgreSQL: pnpm db:up")
+        return Check("data", "fail", f"{where} did not answer ({type(e).__name__}: {e}). Start PostgreSQL: pnpm "
+                                     f"db:up for the development database, or on the live host {LIVE_START}")
     if at != head:
         return Check("data", "fail", f"{where} is at revision {at or 'none'} of {head}. Run: pnpm db:migrate")
     n_projects, n_decisions = _held()
@@ -277,8 +292,90 @@ def check_models() -> Check:
     return Check("models", worst, "; ".join(said))
 
 
+# What a row adds for the core's own kinetics engine (docs/api/engines.md,
+# The core's `kinetics`): its things wait for values no default gives, so
+# its conformance run reads a file of them, which this builder writes; and it
+# computes in the service's process, its vessel design in the Proforma worker.
+CONFORM_INPUTS = {"kinetics": "openferment_core.fermos_engine.write_placeholder_inputs(<file>, by=<your name>)"}
+CALLS_WORKER = {"kinetics": "a vessel design runs in the Proforma worker"}
+
+
+def things_are(name: str) -> str | None:
+    """What an engine's things are, in words, for an engine every one of
+    whose things is a project's own (it declares `things_are`: the train
+    engine's are a project's trains); None for any other."""
+    from .engine import registry
+
+    found = registry.found().get(name)
+    said = getattr(found.engine, "things_are", None) if found is not None else None
+    return str(said) if said else None
+
+
+def conform_command(name: str) -> str:
+    """The command that checks an engine here, in words: with `--inputs
+    <file>` and the builder that writes the file, for an engine whose things
+    wait for values (CONFORM_INPUTS); with `--project <id>` for an engine
+    whose things are a project's own (`things_are`), naming a project of this
+    database that holds one of them. The checks read that project and run on
+    a copy of it in a database of their own (engine/conform.py `in_project`),
+    so the command runs on any database, the production one among them."""
+    command = f"python -m openferment_core.engine.conform {name}"
+    if name in CONFORM_INPUTS:
+        return f"{command} --inputs <file>, the file {CONFORM_INPUTS[name]} writes"
+    held = things_are(name)
+    if held:
+        return (f"{command} --project <id>, naming a project of this database that holds one of its things ({held}); "
+                "the checks run on a copy of it")
+    return command
+
+
+def check_engines() -> list[Check]:
+    """One row per engine registered here (docs/api/engines.md): its version,
+    its worker, and its last conformance verdict at that version, with the
+    command that checks it again (`conform_command`), or, for an engine whose
+    things are a project's own and that names nothing they rest on, the words
+    saying why no command checks it (`conform.unrested`). An engine that
+    fails to load is a warning: the service runs on without it."""
+    from .engine import conform, contract, registry
+
+    rows: list[Check] = []
+    for name in registry.names():
+        f = registry.found()[name]
+        if f.engine is None:
+            rows.append(Check(f"engine {name}", "warn", f"{f.error}; the service runs on without it"))
+            continue
+        e = f.engine
+        try:
+            version = contract.version_string(e)
+        except Exception as ex:  # a version that cannot be read is said, and the row stands
+            rows.append(Check(f"engine {name}", "warn", f"its version could not be read: {type(ex).__name__}: {ex}"))
+            continue
+        worker = (f"worker {e.worker} ({registry.status_of(e)})" if e.worker else
+                  "no worker: it computes in the service's process" + (f"; {CALLS_WORKER[name]}"
+                                                                       if name in CALLS_WORKER else ""))
+        verdict = conform.latest(name)
+        again = conform_command(name)
+        unchecked = conform.unrested(e)
+        if unchecked:
+            mark, said = "warn", unchecked
+        elif verdict is None:
+            mark, said = "warn", f"never checked here: {again}"
+        elif verdict.version != version:
+            mark, said = "warn", f"checked at {verdict.version}; check it again: {again}"
+        elif not verdict.ok:
+            failed = ", ".join(str(c.number) for c in verdict.checks if not c.ok)
+            mark, said = "warn", f"checks {failed} failed at {verdict.at}; to see why, run {again}"
+        else:
+            mark, said = "ok", f"every conformance check held at {verdict.at}"
+        rows.append(Check(f"engine {name}", mark, f"{version}; {worker}; {said}"))
+    if not rows:
+        rows.append(Check("engines", "fail", "no engine is registered: install the service again (cd core && uv sync "
+                                              "--all-extras), whose pyproject.toml registers biosteam"))
+    return rows
+
+
 def check_graphviz() -> Check:
-    """Whether Graphviz's `dot` is on the path (OF-BLD-019 D8). Optional, so
+    """Whether Graphviz's `dot` is on the path. Optional, so
     a warning at most: without it Proforma lists a flowsheet's units in run
     order where the diagram would be, and nothing else changes."""
     import shutil
@@ -313,11 +410,12 @@ def check_spend() -> Check:
 
 
 def check_model(have_key: bool, client_factory: Callable[[], object] | None = None) -> Check:
-    """Both models in the chain, through the free Models API: the primary every
-    call starts on and the fallback it moves to (llm.py)."""
+    """The plan route's models, through the free Models API: the first a
+    Postdoc answer starts on and those it moves to (llm.py), and the effort
+    the route runs at."""
     if llm.effort() not in llm.EFFORTS:
         return Check("model", "fail", f"OPENFERMENT_EFFORT={llm.effort()} is not one of "
-                     f"{', '.join(llm.EFFORTS)}, so every call would be refused")
+                     f"{', '.join(llm.EFFORTS)}, so every call on plan, explain and extract would be refused")
     try:
         table = llm.routes()
     except llm.RoutesInvalid as e:
@@ -361,7 +459,8 @@ def check_model(have_key: bool, client_factory: Callable[[], object] | None = No
     if waiting:
         return Check("model", "warn", f"the key is accepted; {' then '.join(offered)}; the routes name "
                      f"{', '.join(waiting)}, which wait: {_why_it_waits(waiting[0])}")
-    return Check("model", "ok", f"the key is accepted; {' then '.join(offered)}, effort {llm.effort()}")
+    return Check("model", "ok", f"the key is accepted; {' then '.join(offered)} on the plan route, "
+                 f"effort {table['plan'].effort}")
 
 
 def _why_it_waits(named: str) -> str:
@@ -386,7 +485,7 @@ def _said(e: Exception) -> str:
 
 
 def check_roles(have_key: bool, client_factory: Callable[[], object] | None = None) -> Check:
-    """Each role's models (OF-BLD-014 §3.3, E.7), whether the Models API lists
+    """Each role's models, whether the Models API lists
     them for this key, and today's spend against the daily cap."""
     try:
         cap = spend.daily_budget()
@@ -415,14 +514,47 @@ def check_roles(have_key: bool, client_factory: Callable[[], object] | None = No
             return Check("roles", "skip", f"{named}; {today}; the model row says why the models could not be asked")
     unlisted = [m for m in listed if not listed[m]]
     if unlisted:
-        index_first = chains["index"][0]
-        why = (
-            f"{index_first} is not listed for this key, so index work runs on the answer chain"
-            if index_first in unlisted
-            else f"{', '.join(unlisted)} not listed for this key"
-        )
+        index_first, *index_rest = chains["index"]
+        later = [m for m in index_rest if m not in unlisted]
+        if index_first not in unlisted:
+            why = f"{', '.join(unlisted)} not listed for this key"
+        elif later:
+            why = f"{index_first} is not listed for this key, so index work runs on {' then '.join(later)}"
+        else:
+            why = (f"{index_first} is not listed for this key, and the index route names no other model it lists, "
+                   "so every index call fails; name one in OPENFERMENT_INDEX_MODEL or OPENFERMENT_ROUTES")
         return Check("roles", "warn", f"{named}; {why}; {today}")
     return Check("roles", "ok", f"{named}; every model listed for this key; {today}")
+
+
+def _regains(said: str) -> str:
+    """The date the API names for the account's access to return (`llm.regains`)."""
+    return llm.regains(said)
+
+
+def check_probe(have_key: bool, client_factory: Callable[[], object] | None = None) -> Check:
+    """One minimal call on the index route (`pnpm ready --probe`): the one row
+    that sees the Anthropic account's own usage limit, which the free Models
+    API the model row asks does not show. The call is charged to today's spend
+    like any other, and the row says what it cost."""
+    if not have_key:
+        return Check("probe", "skip", "needs the key")
+    if intake.fixtures_only():
+        return Check("probe", "skip", "OPENFERMENT_FIXTURES is set")
+    try:
+        result = llm.call(system="", user=MODEL_PROBE_ASK, schema=None, max_tokens=MODEL_PROBE_TOKENS,
+                          client_factory=client_factory, label="ready probe: ", family="index")
+    except llm.UsageLimitReached as e:
+        return Check("probe", "fail", f"the Anthropic account's usage limit is reached{getattr(e, 'until', '') or _regains(str(e))}, so no model "
+                     "answers; the account's owner raises it in the Anthropic console (Settings, Limits), a limit "
+                     "separate from openFerment's daily cap")
+    except llm.ModelUnavailable as e:  # the daily cap among them
+        return Check("probe", "fail", f"no model on the index route answered: {e}")
+    except llm.ModelRefused as e:
+        return Check("probe", "fail", f"the index route's models refused the probe: {e}")
+    u = result.usage
+    return Check("probe", "ok", f"{result.model} answered on the index route: {u.inputTokens} tokens in, "
+                 f"{u.outputTokens} out, ${u.costUsd:.6f} charged to today's spend")
 
 
 def check_europe_pmc() -> Check:
@@ -501,7 +633,8 @@ def check_service(port: int, have_key: bool, host: str = "127.0.0.1") -> Check:
 # ── the report ─────────────────────────────────────────────────────────
 
 
-def run(no_network: bool = False, port: int | None = None, workers: bool = True, offline: bool = False) -> list[Check]:
+def run(no_network: bool = False, port: int | None = None, workers: bool = True, offline: bool = False,
+        probe: bool = False) -> list[Check]:
     load_dotenv(CORE / ".env", override=False)
     host, found_port = service_address()
     port = port or found_port
@@ -518,10 +651,22 @@ def run(no_network: bool = False, port: int | None = None, workers: bool = True,
             checks.append(row())
         except Exception as e:  # any failure is the row's answer, in words
             checks.append(Check(name, "warn", f"could not be checked: {type(e).__name__}: {e}"))
+    try:
+        checks += check_engines()
+    except Exception as e:  # the registry itself could not be read: said, and the rest still run
+        checks.append(Check("engines", "warn", f"could not be checked: {type(e).__name__}: {e}"))
     if no_network:
         checks += [Check(n, "skip", "--no-network") for n in ("model", "roles", "europepmc", "huggingface")]
     else:
         checks += [check_model(have_key), check_roles(have_key), check_europe_pmc(), check_huggingface()]
+    if probe:
+        if no_network:
+            checks.append(Check("probe", "skip", "--probe needs the network"))
+        else:
+            try:
+                checks.append(check_probe(have_key))
+            except Exception as e:  # a route table or a cap the call could not read: the row says so
+                checks.append(Check("probe", "fail", f"the probe could not be made: {type(e).__name__}: {e}"))
     checks.append(check_service(port, have_key, host))
     return checks
 
@@ -534,6 +679,8 @@ def lane(checks: list[Check]) -> str:
     its check passed."""
     marks = {c.name: c.mark for c in checks}
     if marks.get("key") not in ("ok", "warn") or marks.get("model") not in ("ok", "warn"):
+        return "none"
+    if marks.get("probe") == "fail":
         return "none"
     return "full" if marks.get("europepmc") == "ok" else "model-only"
 
@@ -553,10 +700,11 @@ def report(checks: list[Check]) -> str:
 
 
 def main(argv: list[str]) -> int:
-    if any(a not in ("--no-network", "--no-workers", "--offline") for a in argv):
-        print("usage: python -m openferment_core.ready [--no-network] [--no-workers] [--offline]")
+    if any(a not in ("--no-network", "--no-workers", "--offline", "--probe") for a in argv):
+        print("usage: python -m openferment_core.ready [--no-network] [--no-workers] [--offline] [--probe]")
         return 2
-    checks = run(no_network="--no-network" in argv, workers="--no-workers" not in argv, offline="--offline" in argv)
+    checks = run(no_network="--no-network" in argv, workers="--no-workers" not in argv, offline="--offline" in argv,
+                 probe="--probe" in argv)
     print(report(checks))
     return 1 if any(c.mark == "fail" for c in checks) else 0
 

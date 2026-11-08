@@ -20,7 +20,10 @@ import httpx
 from openferment_core.db import migrate
 
 CORE = Path(__file__).parent.parent
-TRAIN = {"train": {"id": "tr-restart", "units": []}, "savedAt": "2026-10-30T07:00:00Z", "by": "Ada Moreno"}
+# A train as the Builder saves one (src/store.ts `saveTrain`), placeholders throughout.
+TRAIN = {"train": {"id": "tr-restart", "name": "A placeholder train", "program": "placeholder",
+                   "product": "a-placeholder-product", "inlet": {"kind": "typed"}, "units": []},
+         "savedAt": "2026-10-30T07:00:00Z", "by": "Ada Moreno"}
 LEAD = {"id": "p-ada", "name": "Ada Moreno", "role": "lead", "joinedAt": "2026-10-01", "addedAt": "2026-10-01T00:00:00Z"}
 READS = ("/api/projects", "/api/state", "/api/guild", "/api/audit", "/api/proposals")
 

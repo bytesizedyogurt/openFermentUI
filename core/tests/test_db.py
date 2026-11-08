@@ -3,6 +3,7 @@ the sessions, the advisory lock, the migrations and the database commands."""
 from __future__ import annotations
 
 import asyncio
+import json
 import threading
 
 import pytest
@@ -53,9 +54,9 @@ def test_the_session_database_is_at_the_newest_revision_of_both_schemas(test_dat
     from openferment_core import migrations
 
     test_database.open()
-    assert migrate.head() == "0007"
+    assert migrate.head() == "0010"
     assert migrations.kit_head() == "0006"
-    assert migrations.at_head(test_database.url) == {"openferment": ("0007", "0007"), "sci_rag": ("0006", "0006")}
+    assert migrations.at_head(test_database.url) == {"openferment": ("0010", "0010"), "sci_rag": ("0006", "0006")}
 
 
 def test_rollback_1_a_row_a_test_writes_is_there_for_the_rest_of_that_test():
@@ -254,6 +255,61 @@ def test_migration_0005_keeps_each_turn_of_a_conversation_kept_whole_as_a_row_an
         migrate.drop(name, test_database.server)
 
 
+def test_migration_0008_names_every_run_kept_before_it_a_biosteam_run_and_back(test_database):
+    """A database at 0007 holding a run kept before engines were registered, and one whose
+    body names its engine (a row kept at 0008, then downgraded). At 0008 the first's
+    `engine` column reads `biosteam` and the second's the engine its body names, each body
+    as it was stored, and the column's filter finds each; at 0007 again the column is gone
+    and each row is whole; at 0008 once more each column reads its body's engine again."""
+    import sqlalchemy as sa
+    from alembic import command
+
+    test_database.open()
+    name = f"{test_database.name}_0008"
+    url = migrate.create(name, test_database.server)
+    engine = make_engine(url)
+    body = {"id": "r-1", "plant": "a-plant", "status": "done", "tool": "library.run", "toolVersion": "v",
+            "inputs": [], "by": "Ada Moreno", "at": "2026-11-02T08:00:00Z"}
+    named = {**body, "id": "r-2", "engine": "an-engine", "plant": "a-thing", "tool": "engine.an-engine"}
+
+    async def seed() -> None:
+        async with engine.begin() as c:
+            await c.execute(insert(t.projects).values(id="p", name="p", created_by="test"))
+            for row in (body, named):
+                await c.execute(sa.text("insert into openferment.runs (project_id, id, body, created_by, status) "
+                                        "values ('p', :id, cast(:body as json), 'Ada Moreno', 'done')"),
+                                {"id": row["id"], "body": json.dumps(row)})
+
+    async def held() -> tuple[set[str], dict[str, dict], dict[str, str]]:
+        async with engine.connect() as c:
+            columns = set((await c.execute(sa.text(
+                "select column_name from information_schema.columns "
+                "where table_schema = 'openferment' and table_name = 'runs'"))).scalars())
+            # Named columns: a statement whose result keeps one shape across the change.
+            found = {r["id"]: r["body"] for r in (await c.execute(sa.text("select id, body from openferment.runs"))).mappings()}
+            engines = {}
+            if "engine" in columns:
+                engines = {r.id: r.engine for r in (await c.execute(sa.text(
+                    "select id, engine from openferment.runs where project_id = 'p'"))).all()}
+            return columns, found, engines
+
+    try:
+        migrate.upgrade(url, "0007")
+        db.run(seed())
+        migrate.upgrade(url, "0008")
+        columns, found, engines = db.run(held())
+        assert "engine" in columns and found == {"r-1": body, "r-2": named}
+        assert engines == {"r-1": "biosteam", "r-2": "an-engine"}
+        command.downgrade(migrate.config(url), "0007")
+        columns, found, _ = db.run(held())
+        assert "engine" not in columns and found == {"r-1": body, "r-2": named}
+        migrate.upgrade(url, "0008")
+        assert db.run(held())[2] == {"r-1": "biosteam", "r-2": "an-engine"}
+    finally:
+        db.run(engine.dispose())
+        migrate.drop(name, test_database.server)
+
+
 class _Answer(Exception):
     """A PostgreSQL refusal as asyncpg's errors carry it: its code."""
 
@@ -308,6 +364,25 @@ def test_the_command_names_the_setting_when_no_address_is_set(capsys, monkeypatc
     monkeypatch.delenv(db.URL_SETTING, raising=False)
     assert db_command(["migrate"]) == 2
     assert db.URL_SETTING in capsys.readouterr().err
+
+
+def test_the_command_says_so_in_words_when_the_server_does_not_answer(capsys, monkeypatch):
+    monkeypatch.setattr("openferment_core.migrations.load_dotenv", lambda *a, **k: None)
+    monkeypatch.setenv(db.URL_SETTING, "postgresql://nobody:nothing@127.0.0.1:9/none")
+    assert db_command(["migrate"]) == 2
+    said = capsys.readouterr().err
+    assert said.startswith("refused: the database none on 127.0.0.1:9 could not be reached: ") and "Traceback" not in said
+    assert "nothing" not in said, "the password stays out of the words"
+
+
+def test_the_command_names_the_way_to_make_a_database_the_server_does_not_hold(capsys, monkeypatch, test_database):
+    monkeypatch.setattr("openferment_core.migrations.load_dotenv", lambda *a, **k: None)
+    absent = test_database.server.set(database=f"{test_database.name}_absent")
+    monkeypatch.setenv(db.URL_SETTING, absent.render_as_string(hide_password=False))
+    assert db_command(["migrate"]) == 2
+    said = capsys.readouterr().err
+    assert said.startswith("refused: the server at ") and f"holds no database {test_database.name}_absent (" in said
+    assert "pnpm db:reset <name> makes a database of that name there and migrates it" in said
 
 
 def test_a_plain_postgresql_address_is_given_the_asyncpg_dialect():

@@ -1,6 +1,6 @@
 // Scenario comparison (OF-DES-001 §8.13; OF-BLD-019 §3.3, D1, D6).
 //
-// Pinned BioSTEAM scenarios (kind 'biosteam', held or made here) side by
+// Pinned BioSTEAM scenarios (kind 'biosteam', each the project's) side by
 // side from each one's NEWEST RUN ARTIFACT (its `lastRunId`, read at GET
 // /api/biorepo/artifacts/{id}): the price with its basis and provenance, the
 // TEA's cost lines closing on the run's own base-case price, and the inputs as
@@ -15,7 +15,8 @@ import { useEffect, useState } from 'react';
 import { Download, GitCompare, Pin } from 'lucide-react';
 import { useStore } from '@/store';
 import { href, navigate } from '@/router';
-import type { Artifact, FlowsheetInfo, Scenario } from '@/data/types';
+import type { FlowsheetInfo, Scenario } from '@/lib/proforma';
+import { listComparisons, type Artifact, type StudyComparison } from '@/lib/studies';
 import { fmt } from '@/engine/units';
 import { exportCSV } from '@/lib/csv';
 import { PageHeader, Card, Button, EmptyState, Callout, cx } from '@/components/ui';
@@ -37,6 +38,37 @@ import {
   type RunView,
 } from '@/lib/proforma';
 
+/** The project's kept comparisons (GET /api/studies/comparisons), each opening its page; nothing while none is kept. */
+function KeptComparisons() {
+  const [kept, setKept] = useState<StudyComparison[] | null>(null);
+  useEffect(() => {
+    const ctrl = new AbortController();
+    listComparisons(ctrl.signal).then(setKept, () => !ctrl.signal.aborted && setKept([]));
+    return () => ctrl.abort();
+  }, []);
+  if (!kept || kept.length === 0) return null;
+  return (
+    <Card className="p-4 mb-5" data-testid="kept-comparisons">
+      <h2 className="font-serif text-section-title font-semibold mb-1">The project&rsquo;s comparisons</h2>
+      <p className="text-caption text-ink-soft mb-2">
+        Runs set side by side and kept with the project, from Studies or Postdoc; each opens its page.
+      </p>
+      <ul className="space-y-1 text-body">
+        {kept.map((c) => (
+          <li key={c.id} className="flex flex-wrap items-baseline gap-x-2">
+            <a className="underline underline-offset-2 hover:text-accent" href={href(`/proforma/comparisons/${c.id}`)}>
+              {c.title || c.id}
+            </a>
+            <span className="text-caption text-ink-soft">
+              <span className="font-num">{c.runIds.length}</span> runs · {c.by || 'nobody named'} · <span className="font-num">{stamp(c.at)}</span>
+            </span>
+          </li>
+        ))}
+      </ul>
+    </Card>
+  );
+}
+
 export default function Compare() {
   const scenarios = useStore((s) => s.scenarios);
   const pinned = scenarios.filter((s) => s.pinned && s.kind === 'biosteam');
@@ -44,11 +76,12 @@ export default function Compare() {
   if (pinned.length === 0) {
     return (
       <div>
-        <PageHeader title="Compare scenarios" subtitle="Pin scenarios to line them up side by side." />
+        <PageHeader eyebrow="BioRepo" title="Compare" subtitle="The project's kept comparisons, and the scenarios pinned to line up side by side." />
         <OwnerTabs tabs={BIOREPO_TABS} />
+        <KeptComparisons />
         <EmptyState
-          title="Nothing pinned yet"
-          body="Open a scenario and use Pin to add it here: BioSTEAM scenarios are set side by side from their newest runs, two or more at once."
+          title="No scenario pinned yet"
+          body="Open a Proforma scenario and use Pin to add it here: BioSTEAM scenarios are set side by side from their newest runs, two or more at once."
           icon={<GitCompare size={28} />}
           action={<Button onClick={() => navigate('/proforma')}>Browse scenarios</Button>}
         />
@@ -59,10 +92,12 @@ export default function Compare() {
   return (
     <div>
       <PageHeader
-        title="Compare scenarios"
+        eyebrow="BioRepo"
+        title="Compare"
         subtitle={`${pinned.length} pinned scenario${pinned.length === 1 ? '' : 's'}. BioSTEAM scenarios are read from their newest runs, side by side; nothing is recomputed here.`}
       />
       <OwnerTabs tabs={BIOREPO_TABS} />
+      <KeptComparisons />
       <BiosteamCompare scenarios={pinned} />
     </div>
   );
@@ -85,7 +120,7 @@ interface Column {
 }
 
 /** An input's source in words, with its range, as the run's basis states it. */
-export function inputWords(i: RunInput): string {
+function inputWords(i: RunInput): string {
   const u = i.unit ? ` ${i.unit}` : '';
   const range = (lo: number | null, hi: number | null) => (lo == null || hi == null ? '' : lo === hi ? `${fmt(lo, 4)}${u}` : `${fmt(lo, 4)}–${fmt(hi, 4)}${u}`);
   switch (i.kind) {

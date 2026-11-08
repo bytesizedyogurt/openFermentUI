@@ -11,10 +11,17 @@ import { useEffect, useRef, useState } from 'react';
 import { MessageSquarePlus, PanelLeft, RefreshCw, Send, Sparkles, Square } from 'lucide-react';
 import { useStore, timeId, reviewerName } from '@/store';
 import { navigate, useRoute } from '@/router';
-import type { LiveConversation, LiveTurn } from '@/data/types';
 import { Button, Card, cx, EmptyState, Callout } from '@/components/ui';
 import { AnswerPlanView, PostdocDownNotice } from '@/components/AnswerPlanView';
-import { askPostdocStream, fetchConversation, postdocHealth, PostdocDown, type PostdocHealth } from '@/lib/postdoc';
+import {
+  askPostdocStream,
+  fetchConversation,
+  postdocHealth,
+  PostdocDown,
+  type Health,
+  type LiveConversation,
+  type LiveTurn,
+} from '@/lib/postdoc';
 import { PlanTrace } from '@/components/PlanTrace';
 import { stamp } from '@/lib/proforma';
 
@@ -52,7 +59,7 @@ function LiveTurnView({
   onAskAgain,
 }: {
   turn: LiveTurn;
-  health: PostdocHealth | null;
+  health: Health | null;
   latest: boolean;
   onAskAgain: (q: string) => void;
 }) {
@@ -73,8 +80,10 @@ function LiveTurnView({
               <>
                 Working on{' '}
                 <span className="font-num normal-case">
-                  {/* After a restart the second model in the chain answers (§5.R). */}
-                  {(steps.some((s) => s.kind === 'restart') ? health?.fallbackModel : health?.model) ?? 'the model'}
+                  {/* After a restart the second model in the chain answers (§5.R), the first fallbackModel names. */}
+                  {(steps.some((s) => s.kind === 'restart')
+                    ? health?.fallbackModel.split(',')[0].trim() || health?.model
+                    : health?.model) ?? 'the model'}
                 </span>
               </>
             ) : (
@@ -124,7 +133,7 @@ function LivePanel({
   onAsk,
 }: {
   conversation: LiveConversation | null;
-  health: PostdocHealth | null;
+  health: Health | null;
   onAsk: (q: string) => void;
 }) {
   const turns = conversation?.turns ?? [];
@@ -133,18 +142,24 @@ function LivePanel({
       {/* The service is up but cannot answer. A different problem from being
           down, and a different fix — restarting it would not help. */}
       {health && health.ok && !health.hasKey && (
+        <div data-testid="postdoc-no-key">
         <Callout kind="warn" title="Postdoc is running without an API key">
-          {/* The variable is deliberately NOT named here. check:secrets forbids
-              src/ from naming it at all — src/ is the browser bundle, and the
-              rule is absence rather than care. Pointing at the template is a
-              better instruction anyway: it names the exact file operation. */}
+          {/* check:secrets keeps src/ from naming the key's variable: src/ is
+              the browser bundle. The template's own line for the key names it,
+              so the instruction points at that line. On the live host core/.env
+              already holds the database line the install wrote, so the key goes
+              on its line there; a machine with no core/.env copies the template, and
+              the live host's copy leaves out the template's database line. */}
           <p className="text-ink">
-            Copy <span className="font-num">core/.env.example</span> to{' '}
-            <span className="font-num">core/.env</span>, fill in the key it names, and restart
-            the service. That file is gitignored, and the key never reaches the browser — which
-            is the whole reason the service exists.
+            Write the key on its line in <span className="font-num">core/.env</span>, the line{' '}
+            <span className="font-num">core/.env.example</span> holds for it (when{' '}
+            <span className="font-num">core/.env</span> is absent, copy the example, leaving out its
+            database line on the live host), and restart the service. That
+            file is gitignored, and the key never reaches the browser, which is why the service
+            holds it.
           </p>
         </Callout>
+        </div>
       )}
 
       {turns.map((t, i) => (
@@ -193,7 +208,7 @@ export default function Postdoc({ sessionId, initialQuery }: { sessionId?: strin
 
   // The live turns are in the store (`liveConversations`), so this component
   // holds only what it is showing and whether the service answers.
-  const [health, setHealth] = useState<PostdocHealth | null>(null);
+  const [health, setHealth] = useState<Health | null>(null);
   const [healthChecked, setHealthChecked] = useState(false);
   // An answer streamed since the page loaded: the service is there, whatever
   // the health probe last said.
@@ -294,7 +309,7 @@ export default function Postdoc({ sessionId, initialQuery }: { sessionId?: strin
     const current = fresh ? null : conversation;
     const convId = current?.id ?? store.startLiveConversation(text.slice(0, 60));
     const turnId = timeId('lt');
-    const by = reviewerName() ?? undefined;
+    const by = reviewerName();
     store.addLiveTurn(convId, {
       id: turnId,
       question: text,
@@ -304,6 +319,7 @@ export default function Postdoc({ sessionId, initialQuery }: { sessionId?: strin
       error: null,
       status: 'running',
       by,
+      artifactIds: [],
     });
     setActiveId(convId);
     if (route.path !== `/postdoc/${convId}` || route.query.has('q')) navigate(`/postdoc/${convId}`, { replace: true });
@@ -377,9 +393,9 @@ export default function Postdoc({ sessionId, initialQuery }: { sessionId?: strin
           </Button>
           <div className="flex-1 overflow-y-auto space-y-1" data-testid="live-conversations">
             {liveConversations.length === 0 && (
-              <p className="text-caption text-ink-soft px-2.5 py-2">
-                No conversation yet: a person asks the first question. Conversations asked here are kept in
-                this browser, across reloads.
+              <p className="text-caption text-ink-soft px-2.5 py-2" data-testid="live-conversations-none">
+                No conversation yet: a person asks the first question. The service keeps each conversation with the
+                project, so it is listed here after a reload and on every page that opens the project.
               </p>
             )}
             {liveConversations.map((c) => (
@@ -394,7 +410,9 @@ export default function Postdoc({ sessionId, initialQuery }: { sessionId?: strin
                   c.id === conversation?.id ? 'bg-accent-wash' : 'hover:bg-ink-soft/[0.06]',
                 )}
               >
-                <div className="text-body truncate">{c.title}</div>
+                <div className="text-body truncate" title={c.title}>
+                  {c.title}
+                </div>
                 <div className="text-caption text-ink-soft">
                   <span className="font-num">{shownAt(c.startedAt)}</span> · <span className="font-num">{c.turns.length}</span>{' '}
                   {c.turns.length === 1 ? 'question' : 'questions'}

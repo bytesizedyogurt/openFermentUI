@@ -10,9 +10,41 @@
 // screen needs to grey out a button it already knows the service would
 // refuse. It is not a second copy of the rules, and it never decides what is
 // stored. While the service is up, the sign-off sheet asks /api/guild/check.
-import type { DecisionCheck, Guild, GuildEvidence, GuildPerson, GuildPolicy, GuildWithdrawal } from '@/data/types';
+//
+// Every shape here is the service's own, generated from its models into
+// src/api/types.gen.ts (ADR-007): the ledger, a person, an entry, a
+// withdrawal and the lead's policy. The skills a level is computed on are the
+// project's skill catalogue (lib/catalogues.ts, `Skill`).
+import type { components } from '@/api/types.gen';
+import { DEFAULT_POLICY } from '@/engine/competence';
 import { IntakeDown } from './intake';
 import { apiFetch } from './project';
+import { detailWords } from './http';
+
+type S = components['schemas'];
+
+/** `GET /api/guild`: a project's ledger, the people on it and everything recorded about them, with the lead's policy. */
+export type Guild = S['Guild'];
+/** A person on the ledger; the browser chooses the id, so a person added offline keeps theirs. */
+export type GuildPerson = S['GuildPerson'];
+/** What a person may do on the ledger: a member holds skills, the lead designates assessors, an auditor reads. */
+export type GuildRole = GuildPerson['role'];
+/** One thing a person did that bears on one skill. Append-only. */
+/** `POST /api/guild/check`: whether the service would keep an entry, and the rule of Guild's it would refuse it under. */
+export type EvidenceCheck = S['EvidenceCheck'];
+export type GuildEvidence = S['GuildEvidence'];
+/** What an entry rests on: a sign-off, the lead, a run at the bench, a lesson, a practice session or a check. */
+export type EvidenceSource = S['EvidenceSource'];
+/** `POST /api/guild/withdraw`: an entry taken back, by whom, when and why; the entry stays on the ledger, marked. */
+export type GuildWithdrawal = S['GuildWithdrawal'];
+/**
+ * The lead's choices for the team (OF-BLD-013 §5.1). In advise mode the
+ * run-mode gate warns and records a deviation; in enforce mode it holds the
+ * step until a cosigner is recorded, or someone qualified takes over.
+ */
+export type GuildPolicy = S['GuildPolicy'];
+/** Whether the gate holds a step or only warns. */
+export type GateMode = GuildPolicy['routineGate'];
 
 /** The service stored nothing and said which rule held. Not an outage. */
 export class GuildRefused extends Error {
@@ -25,7 +57,8 @@ export class GuildRefused extends Error {
   }
 }
 
-export const EMPTY_GUILD: Guild = { version: 1, people: [], evidence: [] };
+/** A ledger with nobody on it, under the default policy, as the service answers one. */
+export const EMPTY_GUILD: Guild = { version: 1, people: [], evidence: [], policy: DEFAULT_POLICY };
 
 async function call<T>(path: string, body?: unknown, signal?: AbortSignal): Promise<T> {
   let response: Response;
@@ -43,7 +76,7 @@ async function call<T>(path: string, body?: unknown, signal?: AbortSignal): Prom
   if (response.status === 422) {
     let detail = '';
     try {
-      detail = String(((await response.json()) as { detail?: string }).detail ?? '');
+      detail = detailWords(((await response.json()) as { detail?: unknown }).detail);
     } catch {
       /* the status is the message */
     }
@@ -67,7 +100,7 @@ export const postPerson = (p: GuildPerson, signal?: AbortSignal) => call<GuildPe
 export const postEvidence = (e: GuildEvidence, signal?: AbortSignal) => call<GuildEvidence>('/api/guild/evidence', e, signal);
 export const postWithdrawal = (w: GuildWithdrawal, signal?: AbortSignal) =>
   call<GuildEvidence>('/api/guild/withdraw', w, signal);
-export const checkEvidence = (e: GuildEvidence, signal?: AbortSignal) => call<DecisionCheck>('/api/guild/check', e, signal);
+export const checkEvidence = (e: GuildEvidence, signal?: AbortSignal) => call<EvidenceCheck>('/api/guild/check', e, signal);
 export const postPolicy = (p: GuildPolicy) => call<GuildPolicy>('/api/guild/policy', p);
 
 // ── ids ────────────────────────────────────────────────────────────────

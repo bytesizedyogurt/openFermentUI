@@ -4,8 +4,63 @@
 // Names, stages, spellings and the BioSTEAM classes each step maps to. No
 // value, range or claim about any organism or product lives here. alpha 2.0
 // (ADR-010) kept these two lists from the old facet vocabulary and deleted
-// the rest with the seeded catalogue.
-import type { CarbonSource, UnitOperation, UnitOperationStage } from './types';
+// the rest with the seeded catalogue. The types of both lists are declared
+// here with them (alpha 2.2 E.7).
+
+/**
+ * Where a unit operation sits in a downstream train, fermenter to vial. The
+ * order of `UNIT_OP_STAGE_ORDER` below is the display order; a train's own
+ * units, in the order the train holds them (a pureOS train's `units`), are
+ * the authority on its actual order, because two trains can use the same
+ * operation at different points.
+ */
+export type UnitOperationStage =
+  | 'harvest'
+  | 'clarification'
+  | 'cell disruption'
+  | 'recovery'
+  | 'capture'
+  | 'capture/polish'
+  | 'polish'
+  | 'concentration'
+  | 'desalting'
+  | 'isolation'
+  | 'purification'
+  | 'drying'
+  | 'formulation'
+  | 'finishing'
+  // OF-BLD-020 §5.1: a pump, a tank, a heat exchanger, a mixer or a splitter
+  // serves a train without being a step of it.
+  | 'utility';
+
+export interface UnitOperation {
+  id: string;
+  label: string;
+  stage: UnitOperationStage;
+  /** Scale band where the operation is used at all, when it is not universal. */
+  scale?: string;
+  /** Chemistry detail, e.g. the resin family for a chromatography step. */
+  resin?: string;
+  note?: string;
+  /**
+   * The BioSTEAM unit classes this step is (OF-BLD-019 §4.1), so a unit in a
+   * train a flowsheet ran links to the step it performs. Names only, as
+   * BioSTEAM spells its classes; a step BioSTEAM has no class for names none.
+   */
+  biosteamClasses?: string[];
+}
+
+/**
+ * A carbon source a value can be measured on (OF-BLD-014 §2.1): a name and
+ * the spellings a paper uses for it, lower-case. Words alone, with no number
+ * and no concentration: what is resolved is the paper's wording.
+ * `carbonSourceId` below matches against `spellings`.
+ */
+interface CarbonSource {
+  id: string;
+  label: string;
+  spellings: string[];
+}
 
 /**
  * The id a paper's wording names, by the whole-word rule (OF-BLD-014 §2.1).
@@ -14,8 +69,8 @@ import type { CarbonSource, UnitOperation, UnitOperationStage } from './types';
  * An exact alias wins. Otherwise every alias that stands inside the wording as
  * a whole word — no letter or digit touching either end — is a hit, and when
  * all the hits name ONE id that id is the answer. No hit is null, and so is
- * hits naming two different ids: "E. coli expressing bovine β-casein" names
- * two organisms, and choosing one would merge measurements this table exists
+ * hits naming two different ids: "a host expressing a protein of another
+ * organism" names two organisms, and choosing one would merge measurements this table exists
  * to keep apart.
  *
  * `carbonSourceId` in vocabulary.ts applies the same rule, and
@@ -47,9 +102,9 @@ function containsWord(haystack: string, needle: string): boolean {
 }
 
 /**
- * Downstream unit operations. A product's `unitOperationIds` array is ordered
- * fermenter to vial and is the authority on its train; `stage` here only says
- * what kind of job the operation does.
+ * Downstream unit operations. A train holds its units in order, fermenter to
+ * vial, and that order is the authority on the train; `stage` here says what
+ * kind of job the operation does.
  */
 export const UNIT_OPERATIONS: UnitOperation[] = [
   {
@@ -100,13 +155,13 @@ export const UNIT_OPERATIONS: UnitOperation[] = [
     id: 'nanofiltration',
     label: 'Nanofiltration',
     stage: 'concentration',
-    note: 'oligosaccharide retention',
+    note: 'a tight membrane: water and small ions pass, larger solutes stay',
   },
   {
     id: 'electrodialysis',
     label: 'Electrodialysis',
     stage: 'desalting',
-    note: 'HMO salt removal',
+    note: 'ions leave the stream through charged membranes under an electric field',
   },
   {
     id: 'iex',
@@ -134,7 +189,7 @@ export const UNIT_OPERATIONS: UnitOperation[] = [
     id: 'sec',
     label: 'Size exclusion chromatography',
     stage: 'polish',
-    note: 'low throughput, high resolution',
+    note: 'separates by molecular size through a porous bed',
   },
   {
     id: 'mixed-mode',
@@ -145,13 +200,13 @@ export const UNIT_OPERATIONS: UnitOperation[] = [
     id: 'heat-step',
     label: 'Thermal clarification',
     stage: 'capture',
-    note: 'thermostable enzymes only — huge cost saver for Taq-class products',
+    note: 'the stream is heated so host proteins denature and settle out, and a heat-stable product stays in solution',
   },
   {
     id: 'refolding',
     label: 'Inclusion body solubilisation + refolding',
     stage: 'recovery',
-    note: 'E. coli intracellular route',
+    note: 'insoluble aggregates dissolve in a denaturant, and the protein folds again as the denaturant leaves',
   },
   {
     id: 'protease-cleavage',
@@ -173,8 +228,8 @@ export const UNIT_OPERATIONS: UnitOperation[] = [
   {
     id: 'lle',
     label: 'Liquid-liquid extraction',
-    stage: 'recovery',
-    note: 'terpene recovery',
+    stage: 'capture',
+    note: 'the product moves from the broth into an immiscible solvent',
     biosteamClasses: [
       'LLEUnit',
       'LLESettler',
@@ -189,7 +244,7 @@ export const UNIT_OPERATIONS: UnitOperation[] = [
     id: 'distillation',
     label: 'Distillation / rectification',
     stage: 'purification',
-    note: 'terpene finishing; the beer column and rectifier of an ethanol plant',
+    note: 'separates by volatility; the beer column and rectifier of an ethanol plant',
     biosteamClasses: ['Distillation', 'BinaryDistillation', 'MESHDistillation', 'AdiabaticMultiStageVLEColumn'],
   },
   {
@@ -197,7 +252,7 @@ export const UNIT_OPERATIONS: UnitOperation[] = [
     // train BioSTEAM ships; vocabulary, so it carries no number.
     id: 'molecular-sieve',
     label: 'Molecular sieve dehydration',
-    stage: 'purification',
+    stage: 'polish',
     note: 'adsorbs the water distillation cannot take past the ethanol-water azeotrope',
     biosteamClasses: ['MolecularSieve'],
   },
@@ -205,20 +260,20 @@ export const UNIT_OPERATIONS: UnitOperation[] = [
     id: 'spray-dry',
     label: 'Spray drying',
     stage: 'drying',
-    note: 'ambient-stable powder',
+    note: 'the liquid, atomised into hot gas, dries to a powder',
     biosteamClasses: ['SprayDryer'],
   },
   {
     id: 'lyophilisation',
     label: 'Lyophilisation',
     stage: 'drying',
-    note: 'highest stability, highest cost',
+    note: 'water sublimes from the frozen product under vacuum',
   },
   {
     id: 'granulation',
     label: 'Granulation',
     stage: 'formulation',
-    note: 'dust-free industrial enzyme',
+    note: 'a powder bound into granules',
   },
   {
     id: 'sterile-filtration',
@@ -229,13 +284,13 @@ export const UNIT_OPERATIONS: UnitOperation[] = [
     id: 'endotoxin-removal',
     label: 'Endotoxin clearance',
     stage: 'polish',
-    note: 'mandatory for E. coli-derived research/clinical proteins',
+    note: 'lipopolysaccharide removed from the product stream',
   },
   {
     id: 'nuclease-clearance',
     label: 'Nuclease/residual-DNA clearance',
     stage: 'polish',
-    note: 'defining step for molecular-biology enzyme grade',
+    note: 'nucleic acid digested or bound and removed from the product stream',
   },
   // OF-BLD-020 §5.1 — the steps pureOS's unit catalogue builds a train from
   // (core/openferment_core/pureos/catalogue.py), each a catalogue id. The
@@ -287,7 +342,7 @@ export const UNIT_OPERATIONS: UnitOperation[] = [
   {
     id: 'lle-multistage',
     label: 'Counter-current extraction',
-    stage: 'recovery',
+    stage: 'capture',
     note: 'mixer-settlers in series, the solvent against the broth',
     biosteamClasses: ['MultiStageMixerSettlers'],
   },

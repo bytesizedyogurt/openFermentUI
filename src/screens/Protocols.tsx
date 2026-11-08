@@ -20,13 +20,9 @@ import {
   Timer,
   X,
 } from 'lucide-react';
-import type {
-  ExtractionRecord,
-  Protocol,
-  ProtocolCategory,
-  ProtocolVersion,
-  Strain,
-} from '@/data/types';
+import type { Protocol, ProtocolCategory, ProtocolVersion } from '@/lib/protocols';
+import { strainWords, type Strain } from '@/lib/catalogues';
+import type { ExtractionRecord } from '@/lib/review';
 import { useStore, provenanceOf } from '@/store';
 import { href, navigate } from '@/router';
 import { DataTable, type Column } from '@/components/DataTable';
@@ -57,7 +53,7 @@ export const CATEGORY_META: Record<
   sop: { label: 'SOP', Icon: ClipboardList, blurb: 'Standing operating procedure' },
 };
 
-export const CATEGORY_ORDER: ProtocolCategory[] = [
+const CATEGORY_ORDER: ProtocolCategory[] = [
   'media',
   'culture',
   'fermentation',
@@ -68,7 +64,7 @@ export const CATEGORY_ORDER: ProtocolCategory[] = [
 
 // ── Derived capabilities ───────────────────────────────────────────────
 
-export interface Capabilities {
+interface Capabilities {
   scalable: boolean;
   timed: boolean;
   calculator: boolean;
@@ -102,10 +98,10 @@ const CALC_TEXT_RE = /\{\{stock:|\b(?:calculat|dilut|inocul)|\b(?:adjust|make up
  *                calculation is happening, and it disappears once rendered.
  */
 export function capabilitiesOf(version: ProtocolVersion): Capabilities {
-  const scalableCount = version.materials.filter((m) => m.scaling !== 'fixed').length;
-  const timedCount = version.steps.filter((s) => s.timerSec !== undefined).length;
-  const stockCount = version.materials.filter((m) => !!m.stock).length;
-  const calcStepCount = version.steps.filter((s) => CALC_TEXT_RE.test(s.text)).length;
+  const scalableCount = (version.materials ?? []).filter((m) => m.scaling !== 'fixed').length;
+  const timedCount = (version.steps ?? []).filter((s) => s.timerSec != null).length;
+  const stockCount = (version.materials ?? []).filter((m) => !!m.stock).length;
+  const calcStepCount = (version.steps ?? []).filter((s) => CALC_TEXT_RE.test(s.text)).length;
   return {
     scalable: scalableCount > 0,
     timed: timedCount > 0,
@@ -117,7 +113,7 @@ export function capabilitiesOf(version: ProtocolVersion): Capabilities {
   };
 }
 
-export type CapabilityKey = 'scalable' | 'timed' | 'calculator';
+type CapabilityKey = 'scalable' | 'timed' | 'calculator';
 
 export const CAPABILITY_META: Record<
   CapabilityKey,
@@ -179,12 +175,12 @@ export function provenanceFromRefs(
 export function protocolProvenance(version: ProtocolVersion, records: ExtractionRecord[]): ProvKind {
   const recordIds = new Set<string>();
   const paperIds = new Set<string>();
-  for (const m of version.materials) if (m.sourceRecordId) recordIds.add(m.sourceRecordId);
-  for (const r of version.references) {
+  for (const m of (version.materials ?? [])) if (m.sourceRecordId) recordIds.add(m.sourceRecordId);
+  for (const r of (version.references ?? [])) {
     if (r.recordId) recordIds.add(r.recordId);
     if (r.paperId) paperIds.add(r.paperId);
   }
-  for (const s of version.steps)
+  for (const s of (version.steps ?? []))
     for (const ref of s.refs ?? []) (ref.startsWith('r-') ? recordIds : paperIds).add(ref);
   return provenanceFromRefs(recordIds, paperIds, records);
 }
@@ -199,10 +195,11 @@ export function fmtMinutes(min: number): string {
   return m === 0 ? `${h} h` : `${h} h ${m} min`;
 }
 
+/** A strain a protocol lists, named as its entry in the project's strain catalogue names it. */
 export function strainLabel(id: string, strains: Strain[]): { label: string; title: string } {
   const s = strains.find((x) => x.id === id);
-  if (!s) return { label: id, title: `${id} — not among the strains in this session` };
-  return { label: s.designation, title: `${s.binomial} ${s.designation} · BSL-${s.bsl}` };
+  if (!s) return { label: id, title: `${id} — not among the project's strains` };
+  return { label: s.name, title: strainWords(s) };
 }
 
 // ── Row model ──────────────────────────────────────────────────────────
@@ -357,7 +354,7 @@ function ProtocolCard({ row, strains }: { row: ProtoRow; strains: Strain[] }) {
         <p className="text-body text-ink-soft line-clamp-2">{protocol.purpose}</p>
 
         <div className="flex flex-wrap items-center gap-1">
-          {protocol.organisms.length === 0 && (
+          {(protocol.organisms ?? []).length === 0 && (
             <span className="text-caption text-ink-soft">Organism-independent</span>
           )}
           {row.organisms.map((o) => {
@@ -379,7 +376,7 @@ function ProtocolCard({ row, strains }: { row: ProtoRow; strains: Strain[] }) {
         </div>
 
         <div className="text-caption text-ink-soft font-num">
-          {version.steps.length} steps · {fmtMinutes(version.estMinutes.active)} active ·{' '}
+          {(version.steps ?? []).length} steps · {fmtMinutes(version.estMinutes.active)} active ·{' '}
           {fmtMinutes(version.estMinutes.total)} total
         </div>
 
@@ -405,16 +402,180 @@ function ProtocolCard({ row, strains }: { row: ProtoRow; strains: Strain[] }) {
   );
 }
 
+// ── Begin a protocol (ADR-017) ─────────────────────────────────────────
+
+/** A protocol's id, as the service holds one: a letter or a digit first, then letters, digits, '.', '_' or '-'. */
+const PROTOCOL_ID = /^[A-Za-z0-9][A-Za-z0-9._-]{0,79}$/;
+
+/**
+ * A protocol begun on this page: its own fields and a first version, version 1.0, with its base batch, the minutes a
+ * run takes and its steps, one a line. The service keeps it in the reviewer's name, once under its id; its materials,
+ * equipment, safety notes and each step's skills are written in the editor next, which keeps them as version 1.1.
+ */
+function BeginProtocol({ onClose }: { onClose: () => void }) {
+  const reviewer = useStore((s) => s.reviewer).trim();
+  const beginProtocol = useStore((s) => s.beginProtocol);
+  const [f, setF] = useState({
+    id: '',
+    title: '',
+    category: 'sop' as ProtocolCategory,
+    bsl: 1 as 1 | 2,
+    purpose: '',
+    organisms: '',
+    batchValue: '',
+    batchUnit: '',
+    batchLabel: '',
+    active: '',
+    total: '',
+    steps: '',
+  });
+  const [busy, setBusy] = useState(false);
+  const [problem, setProblem] = useState<string | null>(null);
+  const set = <K extends keyof typeof f>(k: K, v: (typeof f)[K]) => setF((was) => ({ ...was, [k]: v }));
+  const lines = (t: string) =>
+    t
+      .split('\n')
+      .map((x) => x.trim())
+      .filter(Boolean);
+  const steps = lines(f.steps);
+  const batch = Number(f.batchValue);
+  const missing = [
+    !PROTOCOL_ID.test(f.id.trim()) && 'an id: a letter or a digit first, then letters, digits, ".", "_" or "-"',
+    !f.title.trim() && 'a title',
+    !(f.batchValue.trim() && Number.isFinite(batch) && batch > 0) && 'a base batch above zero',
+    !f.batchUnit.trim() && "the base batch's unit",
+    !(f.active.trim() && Number(f.active) >= 0 && f.total.trim() && Number(f.total) >= 0) && 'the minutes a run takes, hands on and in all',
+    steps.length === 0 && 'a first step',
+  ].filter((x): x is string => Boolean(x));
+  const begin = () => {
+    setBusy(true);
+    setProblem(null);
+    const protocol: Protocol = {
+      id: f.id.trim(),
+      title: f.title.trim(),
+      category: f.category,
+      bsl: f.bsl,
+      purpose: f.purpose.trim(),
+      organisms: lines(f.organisms),
+      currentVersion: '1.0',
+      provenanceNote: '',
+      versions: [
+        {
+          version: '1.0',
+          changelog: 'The first version.',
+          baseBatch: { value: batch, unit: f.batchUnit.trim(), label: f.batchLabel.trim() },
+          materials: [],
+          equipment: [],
+          safety: [],
+          steps: steps.map((text, i) => ({ id: `s${i + 1}`, text })),
+          estMinutes: { active: Number(f.active), total: Number(f.total) },
+          references: [],
+          // The service writes who kept the version, and when.
+          by: '',
+          at: '',
+        },
+      ],
+    };
+    void beginProtocol(protocol).then((why) => {
+      setBusy(false);
+      if (why) setProblem(why);
+      else navigate(`/runbooks/protocols/${protocol.id}/edit`);
+    });
+  };
+  const box = (k: 'id' | 'title' | 'batchValue' | 'batchUnit' | 'batchLabel' | 'active' | 'total', label: string, hint?: string) => (
+    <label className="block text-caption text-ink-soft">
+      {label}
+      <input className="input text-body block mt-0.5 w-full" value={f[k]} onChange={(e) => set(k, e.target.value)} aria-label={label} data-testid={`begin-protocol-${k}`} />
+      {hint && <span className="block mt-0.5 text-ink-soft/80">{hint}</span>}
+    </label>
+  );
+  return (
+    <Card className="p-4 mb-4" data-testid="begin-protocol">
+      <h2 className="font-serif text-section-title font-semibold mb-1">Begin a protocol</h2>
+      <p className="text-caption text-ink-soft mb-3">
+        The service keeps it once under its id, in your name, with version 1.0. Its materials, equipment, safety notes and the skills each
+        step needs are written in the editor next, which keeps them as version 1.1.
+      </p>
+      <div className="grid gap-3 sm:grid-cols-2">
+        {box('id', 'Id', 'A letter or a digit first, then letters, digits, ".", "_" or "-".')}
+        {box('title', 'Title')}
+        <label className="block text-caption text-ink-soft">
+          Category
+          <select className="input text-body block mt-0.5 w-full" value={f.category} onChange={(e) => set('category', e.target.value as ProtocolCategory)} aria-label="Category">
+            {(Object.keys(CATEGORY_META) as ProtocolCategory[]).map((c) => (
+              <option key={c} value={c}>
+                {CATEGORY_META[c].label}
+              </option>
+            ))}
+          </select>
+        </label>
+        <label className="block text-caption text-ink-soft">
+          Biosafety level
+          <select className="input text-body block mt-0.5 w-full" value={f.bsl} onChange={(e) => set('bsl', e.target.value === '2' ? 2 : 1)} aria-label="Biosafety level">
+            <option value={1}>BSL-1</option>
+            <option value={2}>BSL-2</option>
+          </select>
+        </label>
+        {box('batchValue', 'Base batch', 'The batch its amounts are written for.')}
+        {box('batchUnit', "The base batch's unit")}
+        {box('batchLabel', 'What the batch is called')}
+        <div className="grid grid-cols-2 gap-2">
+          {box('active', 'Minutes hands on')}
+          {box('total', 'Minutes in all')}
+        </div>
+        <label className="block text-caption text-ink-soft sm:col-span-2">
+          Purpose
+          <textarea className="input font-sans text-body block mt-0.5 w-full min-h-[56px]" value={f.purpose} onChange={(e) => set('purpose', e.target.value)} aria-label="Purpose" />
+        </label>
+        <label className="block text-caption text-ink-soft sm:col-span-2">
+          The organisms it is written for, one a line
+          <textarea className="input font-sans text-body block mt-0.5 w-full min-h-[44px]" value={f.organisms} onChange={(e) => set('organisms', e.target.value)} aria-label="Organisms" />
+        </label>
+        <label className="block text-caption text-ink-soft sm:col-span-2">
+          Its steps, one a line
+          <textarea className="input font-sans text-body block mt-0.5 w-full min-h-[88px]" value={f.steps} onChange={(e) => set('steps', e.target.value)} aria-label="Steps" data-testid="begin-protocol-steps" />
+        </label>
+      </div>
+      {missing.length > 0 && <p className="text-caption text-ink-soft mt-2">To begin it, write {missing.join('; ')}.</p>}
+      <div className="flex flex-wrap items-center gap-2 mt-3">
+        <Button variant="primary" disabled={busy || missing.length > 0 || !reviewer} onClick={begin} data-testid="begin-protocol-keep">
+          {busy ? 'Keeping…' : 'Begin it'}
+        </Button>
+        <Button onClick={onClose} disabled={busy}>
+          Close
+        </Button>
+        {!reviewer && (
+          <span className="text-caption text-ink-soft">
+            A protocol is kept in a person&rsquo;s name: set yours in{' '}
+            <a className="underline underline-offset-2 hover:text-accent" href={href('/settings/corpus')}>
+              Settings
+            </a>{' '}
+            first.
+          </span>
+        )}
+      </div>
+      {problem && (
+        <p className="text-caption text-signal-warn mt-2" data-testid="begin-protocol-problem">
+          {problem}
+        </p>
+      )}
+    </Card>
+  );
+}
+
 // ── Screen ─────────────────────────────────────────────────────────────
 
 export default function Protocols() {
   const protocols = useStore((s) => s.protocols);
+  const protocolsRead = useStore((s) => s.protocolsRead);
+  const protocolsProblem = useStore((s) => s.protocolsProblem);
   const records = useStore((s) => s.records);
   const strains = useStore((s) => s.strains);
   const runs = useStore((s) => s.runs);
   const density = useStore((s) => s.ui.density);
 
   const [view, setView] = useState<'cards' | 'table'>('cards');
+  const [beginning, setBeginning] = useState(false);
   const [query, setQuery] = useState('');
   const [selection, setSelection] = useState<Record<FacetKey, string[]>>(EMPTY_SELECTION);
 
@@ -427,7 +588,7 @@ export default function Protocols() {
         protocol.versions.find((v) => v.version === protocol.currentVersion) ?? protocol.versions[0];
       return {
         protocol,
-        organisms: protocol.organisms,
+        organisms: protocol.organisms ?? [],
         version,
         caps: capabilitiesOf(version),
         prov: protocolProvenance(version, records),
@@ -435,6 +596,7 @@ export default function Protocols() {
       };
     });
   }, [protocols, records, runs]);
+  const versionCount = allRows.reduce((n, r) => n + r.protocol.versions.length, 0);
 
   const matchesQuery = useMemo(() => {
     const q = query.trim().toLowerCase();
@@ -627,8 +789,8 @@ export default function Protocols() {
       width: '64px',
       numeric: true,
       priority: 2,
-      render: (r) => <span className="font-num">{r.version.steps.length}</span>,
-      value: (r) => r.version.steps.length,
+      render: (r) => <span className="font-num">{(r.version.steps ?? []).length}</span>,
+      value: (r) => (r.version.steps ?? []).length,
     },
     {
       key: 'active',
@@ -675,16 +837,21 @@ export default function Protocols() {
   const header = (
     <>
     <PageHeader
+      eyebrow="Runbooks"
       title="Protocols"
       subtitle={
         <>
           Executable bench procedures whose quantities are bound to materials, so a batch-size change
-          rewrites every number. <span className="font-num">{allRows.length}</span> protocols across{' '}
-          <span className="font-num">{allRows.reduce((n, r) => n + r.protocol.versions.length, 0)}</span>{' '}
-          versions. Capability icons are computed from content, never declared.
+          rewrites every number. <span className="font-num">{allRows.length}</span> protocol{allRows.length === 1 ? '' : 's'} across{' '}
+          <span className="font-num">{versionCount}</span> version{versionCount === 1 ? '' : 's'}. Each capability icon is computed from
+          the protocol&rsquo;s content.
         </>
       }
       actions={
+        <>
+        <Button size="sm" onClick={() => setBeginning(true)} disabled={!protocolsRead} data-testid="begin-protocol-open">
+          Begin a protocol
+        </Button>
         <div className="flex items-center gap-1 rounded-btn border border-line p-0.5" role="group" aria-label="View">
           <button
             className={cx(
@@ -709,9 +876,11 @@ export default function Protocols() {
             <Table2 size={13} /> Table
           </button>
         </div>
+        </>
       }
     />
     <OwnerTabs tabs={RUNBOOK_TABS} />
+    {beginning && <BeginProtocol onClose={() => setBeginning(false)} />}
     </>
   );
 
@@ -721,9 +890,22 @@ export default function Protocols() {
         {header}
         <Card>
           <EmptyState
-            title="No protocols yet"
-            body="No protocol ships with the app. The lab’s protocols appear here once they are on the service, each with its steps, materials and the records its quantities cite."
+            title={protocolsProblem ? 'The protocols could not be read' : protocolsRead ? 'No protocols yet' : 'Reading the project\u2019s protocols'}
+            body={
+              protocolsProblem
+                ? protocolsProblem
+                : protocolsRead
+                  ? 'A protocol enters the project in a person\u2019s name, begun here, and appears with its steps, materials and the records its quantities cite.'
+                  : 'The protocols are read from the service as the page opens.'
+            }
             icon={<ClipboardList size={22} />}
+            action={
+              protocolsRead && !beginning ? (
+                <Button onClick={() => setBeginning(true)} data-testid="begin-protocol-empty">
+                  Begin a protocol
+                </Button>
+              ) : undefined
+            }
           />
         </Card>
       </>

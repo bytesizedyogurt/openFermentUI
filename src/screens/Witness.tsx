@@ -13,7 +13,8 @@ import {
   Send,
   ArrowUpDown,
 } from 'lucide-react';
-import type { Candidate, ExtractionRecord, ExtractorRun, FieldId, ReviewDecision, RunOutput } from '@/data/types';
+import type { Candidate, ExtractionRecord, ExtractorRun, ReviewDecision, RunOutput } from '@/lib/review';
+import type { Quantity } from '@/lib/studies';
 import { fieldName } from '@/data/ontology';
 import { useStore } from '@/store';
 import { computeRunMetrics, type FieldMetrics, type RunMetrics } from '@/engine/metrics';
@@ -185,11 +186,12 @@ function MetricValue({ value, defined }: { value: number | null; defined: boolea
 interface MismatchRow {
   key: string;
   outcome: 'value_mismatch' | 'unit_error' | 'span_error' | 'miss' | 'spurious';
-  field: FieldId;
+  /** A record's field, or the field the service wrote on a false positive (named by `fieldName`). */
+  field: string;
   paperId: string;
   recordId?: string;
-  gold?: { value: number | string; unit: string };
-  extracted?: { value: number; unit: string };
+  gold?: Quantity;
+  extracted?: Quantity;
   note?: string;
 }
 
@@ -290,7 +292,7 @@ export default function Witness() {
         paperId: rec.paperId,
         recordId: rec.id,
         gold: rec.gold,
-        extracted: res.extracted,
+        extracted: res.extracted ?? undefined,
       });
     }
     for (const fp of run.falsePositives) {
@@ -568,7 +570,7 @@ export default function Witness() {
         <div className="mb-4">
           <Callout
             kind="warn"
-            title="No gold annotations in this session"
+            title="No gold annotations yet"
           >
             Precision and recall are undefined without a gold set. Flag records for gold in the
             review queue and this screen fills in.
@@ -696,7 +698,11 @@ export default function Witness() {
         {sortedFields.length === 0 ? (
           <EmptyState
             title="No fields scored"
-            body="This run produced no results that map onto a gold record in the current session."
+            body={
+              metrics.goldSize === 0
+                ? 'Nothing is scored until a record is flagged for the gold set; the service keeps the gold set with the project.'
+                : 'This run produced no result that maps onto a record of the gold set.'
+            }
           />
         ) : (
           <table className="w-full border-collapse" style={{ fontSize: 'var(--table-fs)' }}>
@@ -826,8 +832,12 @@ export default function Witness() {
       <Card className="overflow-x-auto">
         {mismatches.length === 0 ? (
           <EmptyState
-            title="No mismatches in this run"
-            body="Every scored gold record matched and the run produced no spurious extractions. With a gold set this small that is a statement about the gold set, not about the extractor."
+            title={metrics.goldSize === 0 ? 'Nothing scored yet' : 'No mismatches in this run'}
+            body={
+              metrics.goldSize === 0
+                ? 'Nothing is scored until a record is flagged for the gold set; every candidate waits unscored until then.'
+                : 'Every scored gold record matched and the run produced no spurious extractions. With a gold set this small, that speaks of the gold set more than of the extractor.'
+            }
           />
         ) : visibleMismatches.length === 0 ? (
           <EmptyState
@@ -1032,10 +1042,12 @@ function ComparisonBody({
   onFile: () => void;
 }) {
   const goldSI = row.gold && typeof row.gold.value === 'number' ? toSI(row.gold.value, row.gold.unit) : null;
-  const extractedSI = row.extracted ? toSI(row.extracted.value, row.extracted.unit) : null;
+  // A categorical value carries a string, which converts to nothing and compares to nothing.
+  const extracted = row.extracted && typeof row.extracted.value === 'number' ? { value: row.extracted.value, unit: row.extracted.unit } : null;
+  const extractedSI = extracted ? toSI(extracted.value, extracted.unit) : null;
   const gap =
-    row.gold && row.extracted && typeof row.gold.value === 'number'
-      ? relativeGap({ value: row.gold.value, unit: row.gold.unit }, row.extracted)
+    row.gold && extracted && typeof row.gold.value === 'number'
+      ? relativeGap({ value: row.gold.value, unit: row.gold.unit }, extracted)
       : null;
   const showExtractedSpan = row.outcome === 'value_mismatch' || row.outcome === 'unit_error';
 

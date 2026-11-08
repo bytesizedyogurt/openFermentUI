@@ -1,45 +1,71 @@
 // The browser's side of Proforma's simulator (OF-BLD-014 §8.2).
 //
-// The simulator's status and the benchmark it reproduced. The service runs
-// BioSTEAM and keeps the benchmark as an artifact; with it down this says so,
-// and nothing stands in for a result (E.2). Shares lib/http.ts's call.
-import type {
-  Artifact,
-  BasisInput,
-  CeilingCheck,
-  ComputedBasis,
-  CostLine,
-  FermosFitInfo,
-  FlowsheetInfo,
-  HistogramBin,
-  Override,
-  InputSensitivity,
-  PackageRegression,
-  ProformaGrid,
-  ProformaRunRequest,
-  ProformaRunResult,
-  ProformaScenarioInfo,
-  ProformaTables,
-  Provenance,
-  RegressionCheck,
-  ResultGrid,
-  Scenario,
-  ScenarioInput,
-  StreamRow,
-  TeaBreakdown,
-  TrainSummary,
-  UnitRow,
-  UtilityDuties,
-  VesselSummary,
-} from '@/data/types';
-import { useStore } from '@/store';
+// The simulator's status, the shelf's scenario flowsheets and their runs, and
+// the reference runs, which the library shelf's plants give (alpha 2.2 D8).
+// The service runs BioSTEAM and keeps every run as an artifact; with it down
+// this says so, and nothing stands in for a result (E.2). Shares lib/http.ts's
+// call. The shapes the service answers are generated from its models into
+// src/api/types.gen.ts (ADR-007); the sliders' grid (`ResultGrid`) is kept here.
+import type { components } from '@/api/types.gen';
+import { overrideEnds, useStore } from '@/store';
 import { ServiceDown, ServiceRefused, call } from './http';
+import { fmt } from '@/engine/units';
+import { inputsOf, type Override, type ParameterSpec } from './params';
+import type { Artifact, BasisInput, BasisSource, ComputedBasis, EngineRun, Provenance } from './studies';
 
-export { ServiceDown as ProformaDown, ServiceRefused as ProformaRefused };
+export { ServiceDown as ProformaDown };
 
-export interface SimulatorStatus {
-  status: 'cold' | 'starting' | 'ready' | 'failed';
-  error: string | null;
+type S = components['schemas'];
+
+/** `GET /api/proforma/status`: the simulator worker's state, with its error when it failed to start. */
+export type SimulatorStatus = S['SimulatorStatus'];
+/** A scenario made in Proforma, kept whole in the project's rows (`GET /api/state`, `scenarios`). */
+export type Scenario = S['ProformaScenario'];
+/** A flowsheet on the shelf, with the inputs it declares and what it leaves out (`GET /api/proforma/shelf`). */
+export type FlowsheetInfo = S['FlowsheetInfo'];
+/** A scenario bound by the service, each input with its source (`GET /api/proforma/scenarios`, `/bind`). */
+export type ProformaScenarioInfo = S['ProformaScenarioInfo'];
+export type ScenarioInput = S['ScenarioInput'];
+/** `POST /api/proforma/run`: what a run is asked with, and what it answers. */
+export type ProformaRunRequest = S['ProformaRunRequest'];
+export type ProformaRunResult = S['ProformaRunResult'];
+export type HistogramBin = S['HistogramBin'];
+export type InputSensitivity = S['InputSensitivity'];
+export type ProformaGrid = S['ProformaGrid'];
+/** A run's flowsheet and its tables, as a `proforma.run` artifact keeps them. */
+export type ProformaTables = S['ProformaTables'];
+export type StreamRow = S['StreamRow'];
+export type UnitRow = S['UnitRow'];
+export type UtilityDuties = S['UtilityDuties'];
+export type TeaBreakdown = S['TeaBreakdown'];
+/** A plant's package test (ADR-013), and one value of it held beside a run. */
+export type PackageRegression = S['PackageRegression'];
+export type RegressionCheck = S['RegressionCheck'];
+/** A scenario's yield beside the geneOS ceilings of its organism (`GET /api/proforma/ceiling-check`). */
+export type CeilingCheck = S['CeilingCheck'];
+export type CeilingRow = S['CeilingRow'];
+/** A fermOS fit, forecast or simulation with what it can feed a flowsheet (`GET /api/fermos/fits`). */
+export type FermosFitInfo = S['FermosFitInfo'];
+/** A kept vessel design and a kept train run, as a scenario built from both names them. */
+export type VesselSummary = S['VesselSummary'];
+export type TrainSummary = S['TrainSummary'];
+
+/** The cost lines a run's grid holds, one slider reading each. */
+export type CostLine = 'capex' | 'media' | 'utilities' | 'labor' | 'downstream' | 'other';
+
+interface SensitivityRow {
+  assumption: string;
+  lowPct: number;
+  hiPct: number;
+}
+
+/** A sweep's prices over its grid, in the arrays the sliders interpolate (`asResultGrid`). */
+export interface ResultGrid {
+  modelId: string;
+  dims: { key: string; values: number[] }[];
+  msp: Float64Array;
+  costLines: Record<CostLine, Float64Array>;
+  sensitivity: SensitivityRow[];
 }
 
 /** The worker's status in words, for the status line beside every Run (OF-BLD-019 §3.1). */
@@ -60,26 +86,19 @@ export const proformaStatus = (signal?: AbortSignal) => call<SimulatorStatus>('/
  */
 export const proformaShelf = (signal?: AbortSignal) => call<FlowsheetInfo[]>('/api/proforma/shelf', { signal });
 
-// ── Reference runs (OF-BLD-019 §2.2, D3) ────────────────────────────────
+// ── Reference runs (alpha 2.2 D8; OF-BLD-019 §2.2) ──────────────────────
 
 /**
- * A reference biorefinery's newest stored run, or none, and the worker's
- * status: `ProformaReference` as GET and POST /api/proforma/reference/{id}
- * answer it, with the shelf's entry and the package test's values, which a
- * service that predates that endpoint does not send.
+ * The plants of the library shelf Proforma's reference runs read: the corn
+ * stover plant (the NREL 2011 design, the benchmark the shelf's retired entry
+ * ran) and the dry-grind corn plant, each run whole on its package's own
+ * values through the library's door (`GET /api/library`, `POST
+ * /api/library/{plant}/run`) and held to its package's own test.
  */
-export interface ReferenceResponse {
-  flowsheet?: FlowsheetInfo | null;
-  artifact: Artifact | null;
-  /** The package's own regression test, as the service read it from the installed file. */
-  regression?: PackageRegression | null;
-  simulator: SimulatorStatus;
-  /** What the service said when it answered that it holds no run, in its words. */
-  note?: string | null;
-}
+export const REFERENCE_PLANTS: readonly string[] = ['cornstover', 'corn'];
 
-/** Where a reference biorefinery's page lives (OF-BLD-019 §3.3; 'reference' is reserved under /proforma). */
-export const referencePath = (id: string) => `/proforma/reference/${encodeURIComponent(id)}`;
+/** Where a reference plant's page lives (OF-BLD-019 §3.3; 'reference' is reserved under /proforma). */
+export const referencePath = (plant: string) => `/proforma/reference/${encodeURIComponent(plant)}`;
 
 /**
  * Whether the service has no such endpoint, rather than no such run: FastAPI's
@@ -90,71 +109,73 @@ const noEndpoint = (e: unknown) =>
   (e instanceof ServiceRefused && (e.status === 405 || (e.status === 404 && e.message === 'Not Found'))) ||
   (e instanceof ServiceDown && /answered 40[45]\./.test(e.message));
 
+/** The values a plant's own package test asserts, read by the service from the installed file; null when it has none. */
+export const libraryRegression = (plant: string, signal?: AbortSignal) =>
+  call<PackageRegression | null>(`/api/library/${encodeURIComponent(plant)}/regression`, { signal });
+
+/** The origins of a value a run set for itself (the service's `basis.SET_ORIGINS`). */
+const SET_ORIGINS = new Set(['person-assumption', 'model-estimate', 'measurement']);
+
+/** Whether a kept engine run ran on its package's own values: it set no value of its own. */
+const onOwnValues = (run: EngineRun): boolean => run.inputs.every((i) => !SET_ORIGINS.has(i.quantity.origin?.kind ?? ''));
+
 /**
- * The newest stored run of a reference flowsheet, its shelf entry and its
- * package test's values, at `GET /api/proforma/reference/{id}` (OF-BLD-019
- * §2.2), the corn stover benchmark included (§3.3): one artifact per
- * reference run, `proforma.reference`, with its tables and its checks. A
- * service that predates that endpoint says so in the note; for the benchmark
- * it still answers at `/api/proforma/benchmark` (OF-BLD-014 §8.2), which
- * keeps its price and no table. A 404 in words is the service saying the id
- * is not a reference it holds.
+ * A library plant's reference run among the project's runs (newest first, as `GET /api/runs` lists them): its newest
+ * run that computed, on its package's own values, in the configuration a run of it takes when none is named
+ * (`configuration`, the plant's default as `runnable` orders it: the library door runs a plant that takes
+ * configurations in its default, and keeps the run under it). Null when the project keeps none.
  */
-export async function proformaReference(id: string, signal?: AbortSignal): Promise<ReferenceResponse> {
-  let ref: ReferenceResponse;
-  try {
-    ref = await call<ReferenceResponse>(`/api/proforma/reference/${encodeURIComponent(id)}`, { signal });
-  } catch (e) {
-    if (noEndpoint(e)) {
-      if (id === BENCHMARK_FLOWSHEET) {
-        const old = await proformaBenchmark(signal);
-        return { ...old, note: 'This service keeps the benchmark at its old address, with its price and no table: the reference endpoint is newer than it.' };
-      }
-      return { artifact: null, simulator: await proformaStatus(signal), note: `This service has no reference endpoint, so it cannot run ${id} yet.` };
-    }
-    // A 404 in words is the service saying the id is not a reference it
-    // holds (OF-BLD-019 §3.R, finding 14): the caller says so, and offers no
-    // run of something that is not there.
-    throw e;
-  }
-  // The corn stover benchmark kept before reference runs held their tables
-  // (OF-BLD-014 §8.2, `proforma_benchmark`) is still the service's run of
-  // that plant, and the one Postdoc's selling_price cites: with no reference
-  // run on file, it is shown, price only, said to be what it is (§3.R,
-  // findings 0, 15, 22).
-  if (id === BENCHMARK_FLOWSHEET && !ref.artifact) {
-    const old = await proformaBenchmark(signal).catch(() => null);
-    if (old?.artifact) return { ...ref, artifact: old.artifact, note: LEGACY_BENCHMARK_NOTE };
-  }
-  return ref;
+export function referenceRunOf(plant: string, runs: EngineRun[], configuration: string | null = null): EngineRun | null {
+  return (
+    runs.find(
+      (r) =>
+        r.tool === LIBRARY_RUN_TOOL &&
+        r.plant === plant &&
+        (r.configuration ?? null) === configuration &&
+        r.status === 'done' &&
+        !!r.artifactId &&
+        onOwnValues(r),
+    ) ?? null
+  );
 }
 
-/** The tool the benchmark was kept under before reference runs held their tables (proforma.BENCHMARK). */
-export const LEGACY_BENCHMARK_TOOL = 'proforma_benchmark';
+// ── Runs kept from the retired reference entries (alpha 2.2 D8) ─────────
 
-export const LEGACY_BENCHMARK_NOTE =
-  'This is the benchmark run kept before reference runs held their tables: its price and settings, with no table and no check against the package’s test. Run makes the full reference run, with its tables and its checks.';
+/**
+ * The library plant each of the shelf's retired reference entries built, by the entry's id (the service's
+ * `proforma.RETIRED_PLANTS`): a run a person kept from an entry before it retired stays theirs, and the plant's page
+ * lists it.
+ */
+export const RETIRED_PLANTS: Readonly<Record<string, string>> = { cornstover_benchmark: 'cornstover', corn_drygrind: 'corn' };
 
-/** Run a reference flowsheet whole, on its package's defaults: `POST /api/proforma/reference/{id}`. */
-export async function runProformaReference(id: string, signal?: AbortSignal): Promise<ReferenceResponse> {
-  try {
-    return await call<ReferenceResponse>(`/api/proforma/reference/${encodeURIComponent(id)}`, { method: 'POST', signal });
-  } catch (e) {
-    if (!noEndpoint(e)) throw e;
-    if (id === BENCHMARK_FLOWSHEET) return runProformaBenchmark(signal);
-    throw new ServiceRefused(404, `This service cannot run ${id} yet: it has no reference endpoint.`);
-  }
+/** The tools a run kept from a retired entry was kept under: a reference run, and the benchmark. */
+const KEPT_REFERENCE_TOOLS: readonly string[] = ['proforma.reference', 'proforma_benchmark'];
+
+/** The retired entry a kept run was made from: a reference run's flowsheet, the corn stover entry for the benchmark; null for any other artifact. */
+export function retiredEntryOf(a: Artifact): string | null {
+  if (a.tool === 'proforma_benchmark') return 'cornstover_benchmark';
+  if (a.tool !== 'proforma.reference') return null;
+  const named = (a.output as Record<string, unknown> | undefined)?.flowsheet ?? a.inputs.find((i) => i.name === 'flowsheet')?.value;
+  return typeof named === 'string' && named in RETIRED_PLANTS ? named : null;
 }
+
+/** The runs kept from the retired entries that built `plant`, in the order given (the service's, newest first). */
+export const keptRunsOf = (plant: string, kept: Artifact[]): Artifact[] =>
+  kept.filter((a) => {
+    const entry = retiredEntryOf(a);
+    return entry != null && RETIRED_PLANTS[entry] === plant;
+  });
+
+/** The runs the project kept from the retired entries (`GET /api/biorepo/artifacts?tool=`), newest first. */
+export const keptReferenceRuns = (signal?: AbortSignal) =>
+  call<Artifact[]>(`/api/biorepo/artifacts?${KEPT_REFERENCE_TOOLS.map((t) => `tool=${encodeURIComponent(t)}`).join('&')}`, { signal });
 
 /** One artifact the service keeps (`GET /api/biorepo/artifacts/{id}`). */
 export const proformaArtifact = (id: string, signal?: AbortSignal) =>
   call<Artifact>(`/api/biorepo/artifacts/${encodeURIComponent(id)}`, { signal });
 
 /** `GET /api/proforma/runs?scenarioId=`: a scenario's newest run on the service, or none. */
-export interface ScenarioRunsResponse {
-  scenarioId: string;
-  artifact: Artifact | null;
-}
+export type ScenarioRunsResponse = S['ScenarioRunsResponse'];
 
 /**
  * The newest run the service holds for a scenario (OF-BLD-019 §3.R,
@@ -183,6 +204,23 @@ export const newestRunId = (served: Artifact | null | undefined, kept: string | 
 /** A time the service wrote (ISO, in UTC), as a date and a minute that say they are UTC (§3.R, finding 4). */
 export const stamp = (iso: string) => `${iso.replace('T', ' ').slice(0, 16)} UTC`;
 
+/** Words with every ISO time in them written as `stamp` writes one: the day and the minute, UTC named where the time names it. */
+export const stampsIn = (words: string) =>
+  words.replace(/\b(\d{4}-\d{2}-\d{2})T(\d{2}:\d{2})(?::\d{2}(?:\.\d+)?)?(Z|[+-]00:00)?/g, (_m, day: string, hm: string, z?: string) =>
+    `${day} ${hm}${z ? ' UTC' : ''}`,
+  );
+
+/**
+ * A note as a page shows it, the build's own decision tags dropped: a leading `D8: `, and a parenthesis anywhere naming
+ * a decision (`(D9)`, `(D5 as built, 4)`), a build document (`(OF-BLD-020 §3.2 added the field)`, `(Appendix 2 §A)`)
+ * or a rule's constant (`(CARBON_RULE)`, `(kinetics.RUN_OUT_SHARE)`). A basis keeps the words whole, its id hashing
+ * them, and so does a CSV; the full words stay in a title.
+ */
+const LEADING_TAG = /^D\d+:\s+/;
+const TAG = /\s*\((?:D\d+\b[^()]*|OF-[A-Z]+-\d+[^()]*|Appendix \d+[^()]*|(?:[a-z_]+\.)?[A-Z][A-Z0-9]*_[A-Z0-9_]+)\)/g;
+export const plainNote = (note: string) =>
+  stampsIn(note.replace(LEADING_TAG, '').replace(TAG, '').replace(/\s+([.,;:])/g, '$1').trim());
+
 /** A price read from a run, with the words that say per what. */
 export interface PriceRead {
   value: number;
@@ -197,20 +235,67 @@ export interface PriceRead {
 const num = (v: unknown): number | null => (typeof v === 'number' && Number.isFinite(v) ? v : null);
 
 /**
- * A reference run's price: the output the shelf names as its price
- * (`priceOutput`, in `priceBasis`), else the price a run's tables were read
- * at. Null when the run holds neither. How the price was had (the corn
- * stover plant solves its; the corn plant's is the package's own, set, and
- * its TEA solves the IRR at it) is the shelf's `priceBasis` to say; `reads`
- * claims nothing beyond where the number was read (OF-BLD-019 §2.R).
+ * A library run's price (a `library.run` artifact): the product's price its TEA solves at the package's rate of return
+ * (`price.solvedPrice`, in the unit `price.units` names), else the product's price as the package sets it. Null when
+ * the run holds neither (a plant that carries no TEA). The words say which it is; nothing is computed here.
  */
-export function referencePrice(info: FlowsheetInfo | null, art: Artifact): PriceRead | null {
-  const o = art.output as Record<string, unknown>;
-  const named = info?.priceOutput ? num(o[info.priceOutput]) : null;
-  if (named != null) return { value: named, basis: info?.priceBasis ?? info?.priceOutput ?? '', low: null, high: null, reads: 'as the package\u2019s own run left it' };
-  const tea = o.tea as { productPrice?: unknown } | null | undefined;
-  const read = num(tea?.productPrice) ?? num(o.basePrice);
-  return read == null ? null : { value: read, basis: info?.priceBasis ?? 'USD per kg of product', low: null, high: null, reads: 'the price the run\u2019s TEA was read at' };
+export function libraryPrice(art: Artifact): PriceRead | null {
+  const price = rec<unknown>((art.output as Record<string, unknown>).price);
+  const units = rec<unknown>(price.units);
+  const product = typeof price.product === 'string' ? price.product : 'the product';
+  const solved = num(price.solvedPrice);
+  const unitOf = (key: string) => (typeof units[key] === 'string' ? (units[key] as string) : 'USD/kg');
+  if (solved != null)
+    return { value: solved, basis: `${unitOf('solvedPrice')} of ${product}`, low: null, high: null, reads: 'the price its TEA solves at the package\u2019s rate of return' };
+  const set = num(price.packagePrice);
+  return set == null ? null : { value: set, basis: `${unitOf('packagePrice')} of ${product}`, low: null, high: null, reads: 'the price as the package sets it' };
+}
+
+// ── Held to its package's own test (ADR-013) ────────────────────────────
+
+/** A value as a regression table prints it: thousands grouped, else five significant figures. */
+const sig = (v: number | null | undefined, n = 5): string => {
+  if (v == null || !Number.isFinite(v)) return '\u2014';
+  if (Math.abs(v) >= 1000) return Math.round(v).toLocaleString('en-US');
+  // A share far below a thousandth reads as a power of ten (2.40×10⁻⁹), as every other figure on the page writes one.
+  if (v !== 0 && Math.abs(v) < 1e-3) return fmt(v);
+  return String(Number(v.toPrecision(n)));
+};
+/** A share as a percentage, for the relative difference and the tolerance. */
+const pct = (v: number | null | undefined): string => (v == null || !Number.isFinite(v) ? '\u2014' : `${sig(v * 100, 2)} %`);
+
+/** One row of a package test held beside a run: the test's value, and what the run measured for its expression. */
+interface RegressionRow {
+  expression: string;
+  label: string;
+  unit: string;
+  package: number;
+  rtol: number;
+  measured: number | null;
+  relDiff: number | null;
+  within: boolean | null;
+}
+
+/** The rows: the run's checks when it ran, else the package's values with nothing beside them. */
+export function regressionRows(regression: PackageRegression | null, checks: RegressionCheck[], ran: boolean): RegressionRow[] {
+  if (ran && checks.length) return checks.map((c) => ({ ...c }));
+  return (regression?.values ?? []).map((v) => ({ ...v, measured: null, relDiff: null, within: null }));
+}
+
+/** The table a package test is shown and exported in: its headers, and each row as the cells print it. */
+export function regressionTable(rows: RegressionRow[]) {
+  const headers = ['Quantity', 'Expression', 'Unit', "Package's value", 'This run', 'Relative difference', 'Tolerance', 'Within'];
+  const body = rows.map((r) => [
+    r.label,
+    r.expression,
+    r.unit || '\u2014',
+    sig(r.package),
+    sig(r.measured),
+    r.relDiff == null ? (r.measured != null && r.package === 0 ? 'package value is zero' : '\u2014') : pct(r.relDiff),
+    pct(r.rtol),
+    r.within == null ? 'not run' : r.within ? 'within' : 'outside',
+  ]);
+  return { headers, rows: body };
 }
 
 /**
@@ -237,16 +322,46 @@ export function runPrice(art: Artifact, shelf: FlowsheetInfo[]): PriceRead | nul
  * the shelf says which inputs can bind to records, and no more (OF-BLD-019
  * §2.R: the card once said four bound where the service bound three).
  */
-export interface InputCounts {
+/**
+ * Whether a basis source is a deposition's reading a run set (the service's
+ * `basis.is_measurement`): a deposition naming one reading,
+ * `<deposition id>/<entry id>`, its note saying when it was taken. A
+ * deposition naming a whole series is the record a kinetic fit rests on.
+ */
+export function isReading(source: BasisSource | null | undefined): boolean {
+  return (
+    source?.kind === 'deposition' && /^[^/\s]{1,200}\/[^/\s]{1,200}$/.test(source.id ?? '') && /^measured on \S/.test(source.note ?? '')
+  );
+}
+
+/**
+ * What binds an input the service read from a kept artifact with no fit chosen for it, in words: the vessel design a
+ * custom_train_v1 scenario names (its source's note says so, composite.py), else a kept artifact.
+ */
+function keptBindingWords(source: BasisSource | null | undefined): string {
+  return /vessel design/.test(source?.note ?? '') ? 'the vessel design' : 'a kept artifact';
+}
+
+interface InputCounts {
   total: number;
   /** Bound to records by the service, or, with no binding to read, inputs that can bind to records. */
   records: number;
+  /** Set to a deposition's reading: a value the service binds as a named one, its source the reading. */
+  measured: number;
   /**
    * Inputs a person chose a fermOS fit for in this project (OF-BLD-019 §5.1),
    * counted from the choice: the index binds without the fits, so it says
    * "with a fermOS fit chosen", never that the service bound one (§5.R).
    */
   computed: number;
+  /**
+   * Inputs the service bound to a kept artifact with no fit chosen for them: a
+   * custom_train_v1 scenario's plant scale, read from the vessel design it
+   * names (`binding` 'artifact'), counted by what binds each (`keptBy`).
+   */
+  kept: number;
+  /** What binds each input counted in `kept`, in words and in the order met: "the vessel design", "a kept artifact". */
+  keptBy: string[];
   assumed: number;
   conventions: number;
   waiting: number;
@@ -259,29 +374,36 @@ export function inputCounts(
   info: ProformaScenarioInfo | null,
   shelf: FlowsheetInfo[],
   /** The scenario's overrides (OF-BLD-020 D3): each wins over the records and any fit for its input. */
-  typedValues: { key: string }[],
+  typedValues: { key: string; origin?: string }[],
   fits: Record<string, string> = {},
 ): InputCounts | null {
-  const typed = new Set(typedValues.map((a) => a.key));
+  const typed = new Set(typedValues.filter((a) => a.origin !== 'measurement').map((a) => a.key));
+  const read = new Set(typedValues.filter((a) => a.origin === 'measurement').map((a) => a.key));
   const flowsheet = shelf.find((f) => f.id === (scenario.flowsheetId ?? scenario.modelId));
   if (info) {
     // The binding holds no convention (a run states it in its basis), and the
     // scenario page lists it among the inputs, so the card counts it from the
     // shelf as the page does (OF-BLD-020 §2.R, finding 16).
     const conventions = flowsheet ? flowsheet.inputs.filter((i) => i.kind === 'convention').length : 0;
-    const c = { total: info.inputs.length + conventions, records: 0, computed: 0, assumed: 0, conventions, waiting: 0, bound: true };
+    const c: InputCounts = { total: info.inputs.length + conventions, records: 0, measured: 0, computed: 0, kept: 0, keptBy: [], assumed: 0, conventions, waiting: 0, bound: true };
     for (const i of info.inputs) {
-      if (typed.has(i.key) || i.binding === 'assumption') c.assumed++;
-      else if (i.binding === 'artifact' || fits[i.key]) c.computed++;
-      else if (i.binding === 'records') c.records++;
+      if (read.has(i.key) || (!typed.has(i.key) && isReading(i.source))) c.measured++;
+      else if (typed.has(i.key) || i.binding === 'assumption') c.assumed++;
+      else if (fits[i.key]) c.computed++;
+      else if (i.binding === 'artifact') {
+        c.kept++;
+        const by = keptBindingWords(i.source);
+        if (!c.keptBy.includes(by)) c.keptBy.push(by);
+      } else if (i.binding === 'records') c.records++;
       else c.waiting++;
     }
     return c;
   }
   if (!flowsheet) return null;
-  const c = { total: flowsheet.inputs.length, records: 0, computed: 0, assumed: 0, conventions: 0, waiting: 0, bound: false };
+  const c: InputCounts = { total: flowsheet.inputs.length, records: 0, measured: 0, computed: 0, kept: 0, keptBy: [], assumed: 0, conventions: 0, waiting: 0, bound: false };
   for (const i of flowsheet.inputs) {
     if (i.kind === 'convention') c.conventions++;
+    else if (read.has(i.key)) c.measured++;
     else if (typed.has(i.key)) c.assumed++;
     else if (fits[i.key]) c.computed++;
     else if (i.fields.length > 0) c.records++;
@@ -289,32 +411,6 @@ export function inputCounts(
   }
   return c;
 }
-
-export interface BenchmarkResponse {
-  artifact: Artifact | null;
-  simulator: SimulatorStatus;
-}
-
-/** What the benchmark's artifact holds, as `flowsheets/cornstover_benchmark.py` writes it. */
-export interface BenchmarkOutput {
-  package: string;
-  /** The benchmark kept before reference runs (OF-BLD-014 §8.2) names BioSTEAM's version here. */
-  biosteam?: string;
-  /** A reference run names its simulator and version here instead ('biosteam 2.54.0'; §3.R, findings 18, 29). */
-  simulator?: string;
-  mespUsdPerGal: number;
-  mespUsdPerKg: number;
-  settings: { rateOfReturn: number; operatingDays: number; incomeTax: number; startYear: number; endYear: number };
-  references: string[];
-}
-
-/** The shelf id of the corn stover benchmark (flowsheets/shelf.py). */
-export const BENCHMARK_FLOWSHEET = 'cornstover_benchmark';
-
-export const proformaBenchmark = (signal?: AbortSignal) => call<BenchmarkResponse>('/api/proforma/benchmark', { signal });
-
-export const runProformaBenchmark = (signal?: AbortSignal) =>
-  call<BenchmarkResponse>('/api/proforma/benchmark', { method: 'POST', signal });
 
 // ── The BioSTEAM scenario (§8.4), and the scenario run contract ─────────
 //
@@ -325,14 +421,14 @@ export const runProformaBenchmark = (signal?: AbortSignal) =>
 //       project keeps, bound (`ProformaScenarioInfo`, carrying its `flowsheet`);
 //   (c) GET  /api/proforma/bind?flowsheet=&host=  the same
 //       shape for a flowsheet, id and name empty: what a scenario (D6) shows
-//       as its inputs; a reference flowsheet, the toy or an unknown id is a
-//       refusal in words;
+//       as its inputs, the page's binding of every scenario of the project
+//       (alpha 2.2 D9); the toy or an unknown id is a refusal in words;
 //   (d) POST /api/proforma/run  a scenario by its id and its flowsheet, bound
 //       as (c) binds it, with the request's overrides. Inputs that still wait
 //       are a 422 listing them.
 
 /** What a binding is asked with: the host filter. */
-export interface BindAsk {
+interface BindAsk {
   host: string | null;
   /** The fermOS fits a person chose, by input key (OF-BLD-019 §5.1); sent to (c) alone. */
   fits?: Record<string, string>;
@@ -350,35 +446,47 @@ const bindQuery = (ask: BindAsk, extra: Record<string, string> = {}) => {
   return q.toString();
 };
 
-/** (b) The project's BioSTEAM scenarios, each bound by the service. */
+/**
+ * (b) The project's BioSTEAM scenarios, each bound by the service: every one the project's, a scenario on
+ * custom_train_v1 with its vessel design and train run, one whose binding is refused with the words (`refused`).
+ */
 export const proformaScenarios = (ask: BindAsk, signal?: AbortSignal) =>
   call<ProformaScenarioInfo[]>(`/api/proforma/scenarios?${bindQuery(ask)}`, { signal });
 
 /**
- * (c) A flowsheet's inputs, bound as the service binds a scenario made here.
- * A service that predates the endpoint says so in words, rather than as a
- * bare 404.
+ * (c) A flowsheet's inputs, bound as the service binds a scenario of it: the page's binding of every scenario, its
+ * flowsheet named, so a scenario this browser has not yet saved binds as a kept one does (ADR-014). A service that
+ * predates the endpoint says so in words.
  */
 export async function proformaBind(flowsheet: string, ask: BindAsk, signal?: AbortSignal): Promise<ProformaScenarioInfo> {
   try {
     return await call<ProformaScenarioInfo>(`/api/proforma/bind?${bindQuery(ask, { flowsheet })}`, { signal });
   } catch (e) {
     if (!noEndpoint(e)) throw e;
-    throw new ServiceRefused(404, 'This service has no bind endpoint, so it cannot bind the inputs of a scenario made here yet.');
+    throw new ServiceRefused(404, 'This service has no bind endpoint, so it cannot bind the inputs of a scenario yet.');
   }
 }
 
-/** What the page posts to run a scenario: `ProformaRunRequest`, and the flowsheet of a scenario made here. */
-export interface RunAsk {
+/** What the page posts to run a scenario: `ProformaRunRequest`, its flowsheet named. */
+interface RunAsk {
   scenarioId: string;
-  /** The scenario's flowsheet; the service holds a kept scenario to its own. */
+  /** The scenario's flowsheet; the service holds a kept scenario to its own, and binds one not yet saved by it. */
   flowsheet?: string | null;
   /**
    * A person's changes in the parameter panel (OF-BLD-020 D3): the scope
    * `proforma:<scenarioId>`'s overrides, each a named assumption that wins
-   * over the records and any fit for its input (`runOverrides`).
+   * over the records and any fit for its input (`runOverrides`), sent as typed
+   * inputs (`runBody`).
    */
   overrides: Override[];
+  /**
+   * The scope's parameters, each with the unit a change to it is sent in
+   * (`runSpecs`): the panel's specs when it has answered, else the
+   * flowsheet's inputs as the shelf states them.
+   */
+  specs: Pick<ParameterSpec, 'key' | 'unit'>[];
+  /** The person asking: the run's row is created by them. */
+  by: string;
   host: string | null;
   /** The fermOS fits a person chose, by input key (OF-BLD-019 §5.1). */
   fits?: Record<string, string>;
@@ -392,7 +500,7 @@ export interface RunAsk {
  * own, of the inputs its flowsheet takes; an override of an input the
  * flowsheet no longer takes stays with the project and is not sent.
  */
-export function runOverrides(scoped: Override[], keys: string[]): Override[] {
+function runOverrides(scoped: Override[], keys: string[]): Override[] {
   const takes = new Set(keys);
   return scoped.filter((o) => takes.has(o.key));
 }
@@ -412,17 +520,39 @@ export function scenarioRunOverrides(
   return ask.composite ? [...scoped] : runOverrides(scoped, [...ask.inputs, ...ask.finance]);
 }
 
-/** The body `runProformaScenario` posts, as the service reads it (`ProformaRunRequest`). */
-export function runBody(ask: RunAsk): ProformaRunRequest {
-  // `flowsheet` joins ProformaRunRequest in the service with OF-BLD-019 §2.3;
-  // a service that predates it ignores the field and refuses a scenario it
-  // does not hold, in words. It is sent only for a scenario made here, and
-  // `fits` only when a person chose one (§5.1). A person's values go as
-  // `overrides` (OF-BLD-020 §2.2); the older `assumptions` field, which the
-  // service still reads for one release, is no longer sent.
+/**
+ * The parameters a scenario's changes are sent in the units of: the panel's specs when it has answered (a
+ * composite's Finance group among them), else the scenario's inputs as the service bound them, and the
+ * flowsheet's inputs as the shelf states them for a key the binding lacks (`inputsOf` reads the last spec of a
+ * key, so the bound inputs come last). A change to a key none of them names goes with no unit, and the service
+ * refuses it in words; a composite's run waits for its panel, which names its Finance group's units.
+ */
+export function runSpecs(
+  panel: { specs: Pick<ParameterSpec, 'key' | 'unit'>[] } | null,
+  flowsheet: Pick<FlowsheetInfo, 'inputs'> | null,
+  bound: { inputs: { key: string; unit: string }[] } | null = null,
+): Pick<ParameterSpec, 'key' | 'unit'>[] {
+  return panel?.specs ?? [...(flowsheet?.inputs ?? []), ...(bound?.inputs ?? [])];
+}
+
+/**
+ * A request body as the service reads it, the fields `K` left to the defaults the service holds: the generated type
+ * writes a field with a default as one every body carries, and a body that leaves it out takes the service's own.
+ */
+type Body<T, K extends keyof T> = Omit<T, K> & Partial<Pick<T, K>>;
+
+/** The body `runProformaScenario` posts, as the service reads it (`ProformaRunRequest`); the service draws its own number of samples. */
+export function runBody(ask: RunAsk): Body<ProformaRunRequest, 'samples'> {
+  // `flowsheet` names the scenario's own (a kept scenario is held to it, one
+  // not yet saved binds by it, ADR-014), and `fits` goes only when a person
+  // chose one (OF-BLD-019 §2.3, §5.1). A person's values go as typed
+  // inputs (alpha 2.2 D2), each turned from its Override by params.ts's one
+  // function, in its parameter's unit; the service converts each back into
+  // that Override at its door and refuses any field the request does not name.
   return {
     scenarioId: ask.scenarioId,
-    overrides: ask.overrides,
+    inputs: inputsOf(ask.overrides, ask.specs),
+    by: ask.by,
     host: ask.host,
     seed: 0,
     ...(ask.flowsheet ? { flowsheet: ask.flowsheet } : {}),
@@ -481,7 +611,7 @@ export const sendFitPath = (scenarioId: string, artifactId: string) =>
 // number, and the binding and the run are untouched.
 
 /** What the check is asked with: the scenario as its page binds it. */
-export interface CeilingAsk {
+interface CeilingAsk {
   scenarioId: string;
   /** The scenario's flowsheet; the service holds a kept scenario to its own. */
   flowsheet?: string | null;
@@ -490,15 +620,23 @@ export interface CeilingAsk {
   fits?: Record<string, string>;
   /** The yield's override, when a person typed one (OF-BLD-020 D3); the rest do not bear on the check. */
   overrides?: Override[];
+  /** The parameters the yield's change is sent in the unit of (`runSpecs`); a key they lack goes with no unit. */
+  specs?: Pick<ParameterSpec, 'key' | 'unit'>[];
 }
 
-/** `GET /api/proforma/ceiling-check`: a service that predates it says so in words. */
-export async function ceilingCheck(ask: CeilingAsk, signal?: AbortSignal): Promise<CeilingCheck> {
+/** The query `ceilingCheck` sends: the yield's change as a typed input in its unit (alpha 2.2 D2), as a run sends it. */
+export function ceilingQuery(ask: CeilingAsk): URLSearchParams {
   const q = new URLSearchParams({ scenarioId: ask.scenarioId });
   if (ask.flowsheet) q.set('flowsheet', ask.flowsheet);
   if (ask.host) q.set('host', ask.host);
   if (ask.fits && Object.keys(ask.fits).length > 0) q.set('fits', JSON.stringify(ask.fits));
-  if (ask.overrides && ask.overrides.length > 0) q.set('overrides', JSON.stringify(ask.overrides));
+  if (ask.overrides && ask.overrides.length > 0) q.set('inputs', JSON.stringify(inputsOf(ask.overrides, ask.specs ?? [])));
+  return q;
+}
+
+/** `GET /api/proforma/ceiling-check`: a service that predates it says so in words. */
+export async function ceilingCheck(ask: CeilingAsk, signal?: AbortSignal): Promise<CeilingCheck> {
+  const q = ceilingQuery(ask);
   try {
     return await call<CeilingCheck>(`/api/proforma/ceiling-check?${q.toString()}`, { signal });
   } catch (e) {
@@ -595,37 +733,43 @@ export function runViewOfArtifact(art: Artifact): RunView | null {
   });
 }
 
-/** A run as `POST /api/proforma/run` answers it: the same output, its basis in its evidence. */
+/**
+ * A run as `POST /api/proforma/run` answers it: the same output as its artifact keeps, every field typed by the
+ * answer's model, and its basis in its evidence. A grid that sweeps no dimension reads as none, as an artifact's does.
+ */
 export function runViewOfResult(r: ProformaRunResult): RunView {
-  return viewOf(r as unknown as Record<string, unknown>, {
+  const basis = r.evidence.basis;
+  return {
     artifactId: r.artifactId,
-    createdAt: r.evidence?.basis?.at ?? null,
+    createdAt: basis.at ?? null,
     durationMs: null,
     provenance: r.provenance,
-    basis: r.evidence.basis,
-  });
-}
-
-/** The tool every reference biorefinery's run is kept under (proforma.REFERENCE). */
-export const REFERENCE_TOOL = 'proforma.reference';
-
-/**
- * A reference run in the shape a scenario run reads (OF-BLD-019 §3.3): the
- * same tables under the same keys, and one case, so no samples, no
- * sensitivity and no grid. Its base case is the run itself, and its price on
- * the TEA's own basis is the product price the worker read from the TEA,
- * which the cost breakdown closes on; nothing is computed here.
- */
-export function runViewOfReference(art: Artifact): RunView | null {
-  if (art.tool !== REFERENCE_TOOL) return null;
-  const view = viewOf(art.output, {
-    artifactId: art.id,
-    createdAt: art.createdAt,
-    durationMs: art.durationMs,
-    provenance: art.provenance,
-    basis: { tool: art.tool, toolVersion: art.toolVersion, inputs: art.inputs, artifactId: art.id, at: art.createdAt, seed: art.seed },
-  });
-  return { ...view, basePrice: num(view.tables.tea?.productPrice) };
+    basis,
+    scenarioId: r.scenarioId,
+    flowsheet: r.flowsheet ?? str(basis.inputs.find((i) => i.name === 'flowsheet')?.value),
+    basePrice: r.basePrice,
+    baseInfeasible: r.baseInfeasible,
+    quantiles: r.quantiles,
+    histogram: r.histogram,
+    sensitivity: r.sensitivity,
+    samples: r.samples,
+    feasible: r.feasible,
+    infeasible: r.infeasible,
+    grid: r.grid.dims.length > 0 ? r.grid : null,
+    readBack: r.readBack,
+    tables: {
+      flowsheet: r.flowsheet ?? str(basis.inputs.find((i) => i.name === 'flowsheet')?.value),
+      tablesSource: r.tablesSource,
+      tea: r.tea,
+      streams: r.streams,
+      units: r.units,
+      utilities: r.utilities,
+      diagram: r.diagram,
+      diagramNote: r.diagramNote,
+      unitOrder: r.unitOrder,
+      tableUnits: r.tableUnits,
+    },
+  };
 }
 
 /** The tool every engine run of a library plant or a flowsheet is kept under (engine/library.py LIBRARY_RUN). */
@@ -633,10 +777,9 @@ export const LIBRARY_RUN_TOOL = 'library.run';
 
 /**
  * An engine run in the shape a scenario run reads (execution prompt §7.4):
- * the same tables under the same keys, one case and no samples, as a
- * reference run reads. Its base price is the price the run's TEA solved
- * for (`price.solvedPrice`, USD/kg, BioSTEAM's), else the TEA's own product
- * price; nothing is computed here.
+ * the same tables under the same keys, one case and no samples. Its base
+ * price is the price the run's TEA solved for (`price.solvedPrice`, USD/kg,
+ * BioSTEAM's), else the TEA's own product price; nothing is computed here.
  */
 export function runViewOfRun(art: Artifact): RunView | null {
   if (art.tool !== LIBRARY_RUN_TOOL) return null;
@@ -650,11 +793,8 @@ export function runViewOfRun(art: Artifact): RunView | null {
   return { ...view, basePrice: num(rec<unknown>(art.output.price).solvedPrice) ?? num(view.tables.tea?.productPrice) };
 }
 
-/** One of a reference run's checks against its package's own test, as the service wrote it (`output.checks`). */
-export const referenceChecks = (art: Artifact | null): RegressionCheck[] => arr<RegressionCheck>(art?.output?.checks);
-
-/** A basis input a reference run names, by name ('compatibility', 'simulator'), or null. */
-export const basisInput = (art: Artifact | null, name: string): BasisInput | null => art?.inputs.find((i) => i.name === name) ?? null;
+/** A run's checks against its package's own test, as the service wrote them (`output.checks`). */
+export const packageChecks = (art: Artifact | null): RegressionCheck[] => arr<RegressionCheck>(art?.output?.checks);
 
 // ── The inputs a run was bound with, read from its basis (Compare) ──────
 
@@ -683,7 +823,7 @@ export interface RunInput {
  */
 const FIT_NAME = /^(\w+) (fit|vessel)(?: (low|high))?$/;
 /** What a composite run's basis carries of its parts (composite.PREFIXES): never an input of its own. */
-export const PART_PREFIXES = ['fermenter.', 'train.', 'finance.'];
+const PART_PREFIXES = ['fermenter.', 'train.', 'finance.'];
 
 /**
  * Each input the run's flowsheet takes, as the run's basis names it (D1):
@@ -819,7 +959,7 @@ export function asResultGrid(modelId: string, g: ProformaGrid): ResultGrid {
  * A flowsheet with no question of its own for an input asks where it should
  * come from.
  */
-export const QUESTIONS: Record<string, Record<string, string>> = {
+const QUESTIONS: Record<string, Record<string, string>> = {
   // OF-BLD-020 §6.1: a vessel and a train, priced. Its fermenter's inputs ask what the ethanol flowsheet's ask.
   custom_train_v1: {
     feed_glucose_conc:
@@ -842,6 +982,53 @@ export const QUESTIONS: Record<string, Record<string, string>> = {
 };
 
 /**
+ * A scenario's inputs as the service bound them, with the scope's overrides laid over every input they name, records
+ * and fits included (OF-BLD-020 D3), as the service lays them on a run (`proforma._assume`): a person's value as their
+ * assumption, its interval as the service reads it (`overrideEnds`); a model's estimate under its model; and a reading
+ * deposited at the bench that a person chose as a named value is bound (alpha 2.2 E.17): one value held fixed, its
+ * source the reading (`isReading`), its value the reading's own where its unit is the input's and none where the
+ * service sets it in the input's unit. The scenario page binds by it, and the panel shows the service's own answer.
+ */
+export function laidOn(inputs: ScenarioInput[], overrides: Override[]): ScenarioInput[] {
+  const by = new Map(overrides.filter((o) => typeof o.value === 'number').map((o) => [o.key, o]));
+  return inputs.map((i): ScenarioInput => {
+    const o = by.get(i.key);
+    if (!o || typeof o.value !== 'number') return i;
+    const said = o.note ? `: ${o.note}` : '';
+    if (o.origin === 'measurement') {
+      const value = o.unit == null || o.unit === i.unit ? o.value : null;
+      return {
+        ...i,
+        binding: 'assumption',
+        value,
+        low: value,
+        high: value,
+        sampling: 'fixed',
+        source: { kind: 'deposition', id: o.ref ?? null, by: o.by, note: `measured on ${o.at}${said}` },
+        records: [],
+        recordIds: [],
+      };
+    }
+    // One end typed, the other is the value; neither, held at the value (overrideEnds, as the service reads it).
+    const ends = overrideEnds(o);
+    const low = ends.low ?? o.value;
+    const high = ends.high ?? o.value;
+    const estimate = o.origin === 'model-estimate';
+    return {
+      ...i,
+      binding: 'assumption',
+      value: o.value,
+      low,
+      high,
+      sampling: low === high ? 'fixed' : 'uniform',
+      source: { kind: estimate ? 'model-estimate' : 'assumption', id: null, by: o.by, note: `${estimate ? 'estimated' : 'typed'} on ${o.at}${said}` },
+      records: [],
+      recordIds: [],
+    };
+  });
+}
+
+/**
  * The inputs that rest on an assumption, ordered by how strongly they move
  * the price in the latest run (|Spearman ρ|), each with its flowsheet's
  * question; the flowsheet's omissions follow. Inputs absent from a run keep
@@ -855,7 +1042,8 @@ export function modellerQuestions(
   const rho = new Map((run?.sensitivity ?? []).map((s) => [s.key, s.rho]));
   const own = (flowsheet ? QUESTIONS[flowsheet] : undefined) ?? {};
   return inputs
-    .filter((i) => i.binding === 'assumption' || i.binding === 'waiting')
+    // A reading a person deposited answers where its input comes from.
+    .filter((i) => (i.binding === 'assumption' && !isReading(i.source)) || i.binding === 'waiting')
     .map((i, n) => ({ key: i.key, label: i.label, rho: rho.get(i.key) ?? null, question: own[i.key] ?? `Where should ${i.label} come from?`, n }))
     // An input the run did not rank (held fixed, or no run yet) follows every ranked one.
     .sort((a, b) => (b.rho == null ? -1 : Math.abs(b.rho)) - (a.rho == null ? -1 : Math.abs(a.rho)) || a.n - b.n)
@@ -871,10 +1059,9 @@ export function modellerQuestions(
 // A run's `readBack` holds both what the inputs leave to the package or to
 // BioSTEAM (the finance model, a unit's defaults, the run's conventions) and
 // what the case gave from its inputs (the glucose fed is the plant's scale
-// over the bound yield; the batch time is titre over productivity). A
-// reference plant runs whole on its package's defaults, so everything it
-// reads back is the package's, named and in its unit as the shelf lists it.
-// A key this page does not know is shown as read back, crediting nobody.
+// over the bound yield; the batch time is titre over productivity). A key
+// this page does not know, every key of a library plant's run among them
+// (no shelf entry names one), is shown as read back, crediting nobody.
 
 export interface ReadBackRow {
   key: string;
@@ -886,8 +1073,10 @@ export interface ReadBackRow {
    * 'person': a named person's assumption, as the run's basis names it (OF-BLD-020 §6.R); 'read': not known here.
    */
   origin: 'setting' | 'case' | 'person' | 'read';
-  /** Who set a 'person' row, as the run's basis names them. */
+  /** Who set a 'person' row, as the run's basis names them: a reading's depositor where a person chose a reading. */
   by?: string | null;
+  /** A 'person' row set to a reading deposited at the bench (its basis source a deposition). */
+  reading?: boolean;
 }
 
 /**
@@ -943,8 +1132,8 @@ export function readBackRows(readBack: Record<string, unknown>, flowsheet: Flows
       // OF-BLD-020 §6.R (main-11/23): a value a named person set is theirs, read from the run's own basis.
       const credit = composite ? named.get(finance ? key : COMPOSITE_CREDIT[key] ?? '') : undefined;
       const by = credit?.source.by ?? null;
-      if (by) return { key, label, unit, value, origin: 'person' as const, by };
-      const origin: ReadBackRow['origin'] = flowsheet?.reference || finance ? 'setting' : known?.case.includes(key) ? 'case' : known?.setting.includes(key) ? 'setting' : 'read';
+      if (by) return { key, label, unit, value, origin: 'person' as const, by, ...(credit?.source.kind === 'deposition' ? { reading: true } : {}) };
+      const origin: ReadBackRow['origin'] = finance ? 'setting' : known?.case.includes(key) ? 'case' : known?.setting.includes(key) ? 'setting' : 'read';
       return { key, label, unit, value, origin };
     });
 }

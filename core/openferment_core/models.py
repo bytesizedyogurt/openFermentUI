@@ -1,9 +1,10 @@
-"""AnswerPlan (OF-BLD-007 §3).
+"""AnswerPlan.
 
-The only representation of an answer in the system. Defined here and mirrored
-exactly in `src/data/types.ts`; `pnpm check:plan` fails the build if the two
-drift, because a shape that exists twice and is enforced once is a shape that
-is about to disagree with itself.
+The only representation of an answer in the system, defined here with every
+other shape the service serves. The browser's types are generated from the
+OpenAPI document the service writes from these models (`docs/api/openapi.json`
+and `src/api/types.gen.ts`, `pnpm gen:api`; ADR-007), and verify fails the
+build when either file drifts from them (`gen:api --check`).
 
 THE PLAN IS NOT A TRANSCRIPT. The scripted path this replaces replayed prose a
 human wrote. A plan is a set of claims, each one a sentence with no number in
@@ -14,13 +15,17 @@ structurally incapable of originating a quantity (§5).
 from __future__ import annotations
 
 import math
-from typing import Any, Literal
+import re
+from typing import Annotated, Any, Literal
 
-from pydantic import BaseModel, ConfigDict, Field, field_validator, model_serializer, model_validator
+from pydantic import (BaseModel, ConfigDict, Field, FiniteFloat, ValidationInfo, field_validator, model_serializer,
+                      model_validator)
 
-# Mirrors the Provenance union in src/data/types.ts, weakest last. The order IS
-# the ranking: `weakest_provenance` walks this list, so adding a class in the
-# wrong place silently changes what a claim claims.
+# The provenance classes, strongest first and weakest last; the browser's union
+# is generated from this one (`src/api/types.gen.ts`). The order IS the ranking:
+# `weakest_provenance` walks PROVENANCE_ORDER below, which `check:plan` holds to
+# these classes, so adding a class in the wrong place silently changes what a
+# claim claims.
 Provenance = Literal[
     "measured",
     "gold",
@@ -110,7 +115,7 @@ StopReason = Literal["done", "rounds", "calls", "cost", "time"]
 
 
 class TraceStep(BaseModel):
-    """One step of Postdoc's loop, as the browser shows it (OF-BLD-014 §5.1)."""
+    """One step of Postdoc's loop, as the browser shows it."""
 
     n: int
     kind: TraceKind
@@ -144,7 +149,7 @@ class Usage(BaseModel):
 # question names, so Postdoc never calls a thing absent that a screen shows.
 
 # The one state every module row reads as (OF-BLD-015 §7.2). It is computed
-# in `module_stores.py` from the module's own word (a clearance state, a
+# in `module_stores.py` from the module's own word (a record's provenance, a
 # runbook's status and lock, a check's state), never chosen by a model.
 ModuleState = Literal["open", "fenced", "approved", "locked", "proposed", "retired"]
 ModuleName = Literal["runbooks", "geneos", "fermos", "pureos", "proforma", "biorepo", "guild", "primer", "intake",
@@ -179,7 +184,7 @@ class ModuleCoverage(BaseModel):
 
 
 class ModuleRow(BaseModel):
-    """One row a module's read tool returns (OF-BLD-015 §7.2): what the
+    """One row a module's read tool returns: what the
     module holds, where it stands, and how it is marked."""
 
     module: ModuleName
@@ -190,38 +195,85 @@ class ModuleRow(BaseModel):
     label: str
     # Computed from `status` by module_stores, never by a model.
     state: ModuleState
-    # The module's own word: a clearance state, a runbook status, an ingest state.
+    # The module's own word: a record's provenance, a runbook status, an ingest state.
     status: str
     # The row's provenance mark when the module keeps one; null for a row
     # that carries none (a lesson, a unit operation).
     provenance: Provenance | None = None
-    # A few named fields the module shows, kept short.
-    detail: dict[str, Any] = Field(default_factory=dict)
+    detail: dict[str, Any] = Field(default_factory=dict, description=(
+        "A few named fields of the row, each text cut at 300 characters and each list at its first ten. Each kind's "
+        "fields are its own, named kind by kind in docs/TOOLS.md (Module reads; module_stores.DETAIL)."))
+
+
+class ModuleRead(BaseModel):
+    """What a module's read tool (`<module>_read`) answers as
+    its summary, beside the rows themselves on the result's `rows`."""
+
+    module: str = Field(description="The module, by the name the rail gives it (BioRepo, fermOS).")
+    count: int = Field(description="How many of the module's rows the read matches, every one.")
+    returned: int = Field(description="How many of those `rows` holds, the read's limit at most, in the order the "
+                                      "read ranks them.")
+    states: dict[str, int] = Field(description="Every match counted by its state (open, fenced, approved, locked, "
+                                               "proposed, retired); a state no match holds is left out.")
+    rows: list[dict[str, Any]] = Field(description="The rows returned, each a ModuleRow with its module left out.")
+    note: str | None = Field(default=None, description=(
+        "Present when rows were left out so that the result stays readable: a sentence saying so, and how to read the "
+        "rest."))
+    partial: str | None = Field(default=None, description=(
+        "Present when the read leaves part of the module out, in every read of that module: a sentence naming what "
+        "the read leaves out and where that waits (module_stores.PARTIAL). BioRepo's read holds one."))
 
 
 class AuditEntry(BaseModel):
-    """One row of the audit table (OF-BLD-015 §7.3): a write a model
-    made, or a proposal a person carried out or dismissed."""
+    """One row of the audit table: a write a model, an MCP
+    client or a named person made, a proposal a person carried out or
+    dismissed, or a request that named its own key. `agent` is `model` for a
+    model's or an assistant's write and `person` for a person's; `who` names
+    it, an MCP client by its `<name>/<version>`. A row of the model's lane
+    names the door its write came in by in `detail.via`: `postdoc` (Postdoc's
+    loop), `mcp` (the MCP server in its own process) or `http` (the tool
+    door's X-OpenFerment-Assistant header)."""
 
-    at: str
+    at: str = Field(description="When the row was written, ISO 8601 in UTC (`+00:00`).")
     agent: Literal["model", "person"]
-    # The model id, or the person's name.
+    # The model id, an assistant's declared name, or the person's name.
     who: str
     module: ModuleName
     action: str
     # The state the write left behind, or `proposed`, `done`, `dismissed`.
     state: str
-    target: str | None = None
-    askId: str | None = None
-    effort: str | None = None
-    detail: dict[str, Any] = Field(default_factory=dict)
+    target: str | None = Field(default=None, description=(
+        "What the write was on, by its id (a catalogue entry's as `<kind>/<id>`); left out for a write that names "
+        "none."))
+    askId: str | None = Field(default=None, description=(
+        "The ask of Postdoc's the write was part of; left out for a write from outside an ask."))
+    effort: str | None = Field(default=None, description=(
+        "The effort the service's model ran at, for a write of Postdoc's; left out for a person's write and for an "
+        "outside assistant's, since no model of the service ran for it."))
+    detail: dict[str, Any] = Field(default_factory=dict, description=(
+        "What the write was, in the action's own names: the tool and the kind of what it kept, the ids it made, and "
+        "the note its call carried, where the call takes one (a module write, a catalogue entry, a study scenario, "
+        "an engine run, a flowsheet import); a gated write's row names its proposal (`proposalId`) and gate, and the "
+        "proposal keeps the call's note. For a write of the model's lane, the door it came in by (`via`: postdoc, "
+        "mcp or http)."))
+
+
+class AuditRow(AuditEntry):
+    """One row of the project's audit log as `GET /api/audit` serves it: the
+    entry its write left, under the row's own id, its null fields left out as
+    an answer over MCP leaves them out."""
+
+    id: str = Field(description=(
+        "The row's id, a string of digits, the id the answer of the write that made it names (a tool's `auditIds`)."))
+    # Every row the log serves holds its detail, `{}` for a write that names nothing more.
+    detail: dict[str, Any] = Field(description=AuditEntry.model_fields["detail"].description)
 
 
 ProposalState = Literal["proposed", "done", "dismissed"]
 
 
 class Proposal(BaseModel):
-    """What a model asked for at a gate (OF-BLD-015 §7.4), until a person
+    """What a model asked for at a gate, until a person
     carries it out or dismisses it on Home."""
 
     id: str
@@ -370,8 +422,8 @@ class TurnError(BaseModel):
 
 
 class LiveTurn(BaseModel):
-    """One turn of a Postdoc conversation (mirrors `LiveTurn` in
-    src/data/types.ts): the question, its loop's steps, the validated plan or
+    """One turn of a Postdoc conversation (the browser's `LiveTurn`,
+    src/lib/postdoc.ts): the question, its loop's steps, the validated plan or
     the failure in words, and its status. The service keeps it
     (postdoc/conversations.py) with who asked and the artifacts its tool calls
     produced; a turn the service was answering when it stopped reads
@@ -389,8 +441,8 @@ class LiveTurn(BaseModel):
 
 
 class LiveConversation(BaseModel):
-    """A Postdoc conversation, its turns oldest first (mirrors
-    `LiveConversation` in src/data/types.ts; GET /api/conversations/{id})."""
+    """A Postdoc conversation, its turns oldest first (the browser's
+    `LiveConversation`, src/lib/postdoc.ts; GET /api/conversations/{id})."""
 
     id: str
     title: str
@@ -418,15 +470,10 @@ class ToolCallRecord(BaseModel):
 
 
 # ── Intake (OF-BLD-012 §2.5, §5) ────────────────────────────────────────
-#
-# Mirrored in src/data/types.ts and named in scripts/check-plan.mjs PAIRS, like
-# everything else in this file. `FetchedSection` mirrors the browser's
-# `PaperSection` under a different name because that interface already exists
-# and this is the service's word for the same shape.
 
 
 class FetchedSection(BaseModel):
-    """One section of a paper's own text. Same shape as PaperSection."""
+    """One section of a paper's own text."""
 
     id: str
     heading: str
@@ -564,6 +611,24 @@ class SearchResponse(BaseModel):
     degradedStages: list[str] = Field(default_factory=list)
 
 
+class LiteratureStats(BaseModel):
+    """GET /api/literature/stats, in the kit's own names: the project's
+    documents, their chunks and their citations, counted by licence class,
+    source and embedding version, and the project's concept graph, the
+    entities its passages name and the relationships they hold
+    (literature/graph.py). Communities stay unbuilt, so they count 0."""
+
+    documents: int
+    chunks: int
+    citations: int
+    entities: int
+    relationships: int
+    communities: int
+    license_classes: dict[str, int]
+    sources: dict[str, int]
+    embedding_versions: dict[str, int]
+
+
 class LiteratureQuestion(BaseModel):
     """POST /api/literature/answer: a question for a cited answer over the
     project's documents."""
@@ -621,7 +686,7 @@ class Overlay(BaseModel):
     values reviewers typed by `witness.py` (§6.2); `records` from the
     project's decisions (§7).
 
-    `candidates` and `runs` are a LIST OR NULL (OF-BLD-012.1 F3). The service
+    `candidates` and `runs` are a LIST OR NULL. The service
     always sends the full list, so an empty list means the extractor produced
     nothing and the store drops what it had. `None` means "not supplied" and
     the store keeps what it had — nothing here sends it, and it exists so that
@@ -636,8 +701,9 @@ class Overlay(BaseModel):
 # ── Extraction and review (OF-BLD-012 §2.5, §6, §7) ──────────────────────
 
 RecordStatus = Literal["unverified", "verified", "rejected"]
-# Mirrors ExtractorRun in types.ts. 'claude-1' is the first run that runs for
-# real: Claude Opus 5.5, with Claude Sonnet 5.5 where Opus declined (llm.py).
+# The browser names it `ExtractorRun` too (src/lib/review.ts). 'claude-1' is the
+# first run that runs for real: Claude Opus 5.5, with Claude Sonnet 5.5 where
+# Opus declined (llm.py).
 ExtractorRun = Literal["claude-1"]
 Outcome = Literal["match", "value_mismatch", "unit_error", "span_error", "miss"]
 
@@ -663,32 +729,62 @@ class AuditEvent(BaseModel):
 # `assumed`, it is never averaged into evidence, and no record store takes it
 # (`basis.refuse_estimates`).
 
-OriginKind = Literal["record", "artifact", "person-assumption", "model-estimate", "library-default", "convention"]
-# The origins a value set for one run can have (an `Override`'s `origin`).
-OverrideOrigin = Literal["person-assumption", "model-estimate"]
+OriginKind = Literal["record", "artifact", "person-assumption", "model-estimate", "measurement", "library-default",
+                     "convention"]
+# The origins a value set for one run can have (an `Override`'s `origin`): a
+# named person's assumption, a model's estimate, and a reading a person
+# deposited at the bench (a measurement, ADR-006).
+OverrideOrigin = Literal["person-assumption", "model-estimate", "measurement"]
+# A deposition's reading as a measurement names it: `<deposition id>/<entry id>`.
+READING_REF = re.compile(r"^[^/\s]{1,200}/[^/\s]{1,200}$")
+# The validation context a request form sets (EngineInput, ScenarioValue, a
+# tool's quantity): a measurement there may leave its reading's time and its
+# depositor to the service, which fills both from the deposition before
+# anything runs (measurements.py).
+READING_TO_FILL = "reading-to-fill"
 
 
 class Origin(BaseModel):
     """Where a number came from (ADR-006)."""
 
     kind: OriginKind
-    # The record, the artifact or the library entry it was read from.
+    # The record, the artifact or the library entry it was read from; a
+    # measurement's reading, `<deposition id>/<entry id>`.
     ref: str | None = None
-    # The person who typed it, or the id of the model that estimated it.
+    # The person who typed it, the id of the model that estimated it, or the
+    # person who deposited the reading.
     by: str | None = None
-    # The day it was typed, or the moment it was estimated.
+    # The day it was typed, the moment it was estimated, or the time the
+    # reading was taken.
     at: str | None = None
     # What it rests on, in words.
     note: str | None = None
 
     @model_validator(mode="after")
-    def _names_its_source(self) -> "Origin":
+    def _names_its_source(self, info: ValidationInfo) -> "Origin":
         if self.kind in ("person-assumption", "model-estimate") and not (self.by or "").strip():
             who = "the person who typed it" if self.kind == "person-assumption" else "the model that estimated it"
             raise ValueError(f"a {self.kind} names {who} (by)")
         if self.kind in ("record", "artifact", "library-default") and not (self.ref or "").strip():
             raise ValueError(f"a {self.kind} origin names what it was read from (ref)")
+        if self.kind == "measurement":
+            if not READING_REF.fullmatch((self.ref or "").strip()):
+                raise ValueError("a measurement names the reading it is as <deposition id>/<entry id> (ref)")
+            if not (self.at or "").strip() and not (info.context or {}).get(READING_TO_FILL):
+                raise ValueError("a measurement names the time its reading was taken (at)")
         return self
+
+
+def _reading_may_wait(value: Any, handler: Any, info: ValidationInfo) -> Any:
+    """A request form's quantity (EngineInput, ScenarioValue, a tool's
+    quantity): one whose origin is a measurement is validated with the
+    context that lets its reading's time and its depositor wait for the
+    service, which fills both from the deposition (measurements.py); every
+    other quantity is validated as it stands."""
+    origin = value.get("origin") if isinstance(value, dict) else None
+    if isinstance(origin, dict) and origin.get("kind") == "measurement":
+        return Quantity.model_validate(value, context={**(info.context or {}), READING_TO_FILL: True})
+    return handler(value)
 
 
 class Quantity(BaseModel):
@@ -707,16 +803,113 @@ class Quantity(BaseModel):
     origin: Origin | None = None
 
     @model_serializer(mode="wrap")
-    def _as_before_when_bare(self, handler: Any) -> Any:
+    def _as_before_when_bare(self, handler: Any):
         # A quantity with no basis, range or origin is written as it was
         # before they existed, so a stored output's hash and a stored
-        # record's row read the same (ADR-006).
+        # record's row read the same (ADR-006). Left without a return
+        # annotation, its JSON schema is its fields', the shape it writes
+        # with the unset ones left out.
         out = handler(self)
         if isinstance(out, dict):
             for k in ("basis", "low", "high", "origin"):
                 if out.get(k) is None:
                     out.pop(k, None)
         return out
+
+
+class RunInput(BaseModel):
+    """One input of an engine run: its name, and its value as a quantity
+    with its origin (ADR-006)."""
+
+    name: str
+    quantity: Quantity
+
+
+def non_finite(q: Quantity) -> str | None:
+    """Which of a quantity's numbers is NaN or infinite, in words (`its value
+    is NaN`, `its high is infinite`); None when each is finite. A JSON
+    request can carry either (Python reads `NaN`, `Infinity` and a number
+    past a float's range), and every door that takes a run's values refuses
+    one before anything computes (alpha 2.2 D0.6)."""
+    for k in ("value", "low", "high"):
+        v = getattr(q, k)
+        if isinstance(v, float) and not math.isfinite(v):
+            return f"its {k} is {'NaN' if math.isnan(v) else 'infinite'}"
+    return None
+
+
+# The smallest integer a float cannot hold: the midpoint between a float's
+# largest value (2**1024 - 2**971) and 2**1024, which rounds up past the range.
+FLOAT_EDGE = 2**1024 - 2**970
+
+
+def float_holds(n: int) -> bool:
+    """Whether a JSON integer fits a float, as every number the service
+    keeps does: Python reads an integer literal of any length, and one past
+    a float's range is no number a run's output, a diagnostic or a quantity
+    can hold (`float(n)` raises OverflowError exactly when this is False)."""
+    return abs(n) < FLOAT_EDGE
+
+
+# What a quantity and its origin hold, and nothing beside: a request that
+# carries any other field, a number among them, is refused (docs/api/engines.md).
+QUANTITY_FIELDS = frozenset({"value", "unit", "basis", "low", "high", "origin"})
+ORIGIN_FIELDS = frozenset({"kind", "ref", "by", "at", "note"})
+
+
+class EngineInput(RunInput):
+    """A value a run sets: a parameter's key and a typed quantity in that
+    parameter's unit (the shape a run's inputs have), carrying the person or
+    the model that set it and the day it was set (`origin.at`), as an
+    Override and a scenario's value carry theirs; or a reading a person
+    deposited at the bench (a `measurement`, its `ref` the reading's
+    `<deposition id>/<entry id>`), its value and unit the reading's own,
+    which the service looks up in the project's depositions before anything
+    runs, filling the reading's time and its depositor where the request
+    leaves them out (measurements.py). It holds those fields alone, and a
+    value, low or high that is true or false is refused, as an Override
+    refuses one."""
+
+    model_config = ConfigDict(extra="forbid")
+
+    name: str = Field(min_length=1, max_length=200)
+
+    @field_validator("quantity", mode="wrap")
+    @classmethod
+    def _a_reading_may_wait_for_its_time(cls, value: Any, handler: Any, info: ValidationInfo) -> Any:
+        return _reading_may_wait(value, handler, info)
+
+    @model_validator(mode="before")
+    @classmethod
+    def _a_quantity_holds_its_own_fields(cls, data: Any) -> Any:
+        if not isinstance(data, dict) or not isinstance(data.get("quantity"), dict):
+            return data
+        name, q = data.get("name"), data["quantity"]
+        stray = sorted(set(q) - QUANTITY_FIELDS)
+        if isinstance(q.get("origin"), dict):
+            stray += [f"origin.{k}" for k in sorted(set(q["origin"]) - ORIGIN_FIELDS)]
+        if stray:
+            raise ValueError(f"{name}: a quantity holds {', '.join(sorted(QUANTITY_FIELDS))} and its origin "
+                             f"{', '.join(sorted(ORIGIN_FIELDS))}; {', '.join(stray)} is none of them")
+        for k in ("value", "low", "high"):
+            if isinstance(q.get(k), bool):
+                raise ValueError(f"{name}: a quantity's {k} is a number or words, never true or false")
+        return data
+
+    @model_validator(mode="after")
+    def _names_who_set_it(self) -> "EngineInput":
+        infinite = non_finite(self.quantity)
+        if infinite:
+            raise ValueError(f"{self.name}: {infinite}, and a number a run sets is finite; nothing runs on it")
+        origin = self.quantity.origin
+        if origin is None or origin.kind not in ("person-assumption", "model-estimate", "measurement"):
+            raise ValueError(f"{self.name}: a value a run sets is a person's assumption or a model's estimate, its "
+                             "origin naming who set it (person-assumption or model-estimate, with by), or a "
+                             "deposition's reading, its origin naming the reading (measurement, with ref)")
+        if origin.kind != "measurement" and not (origin.at or "").strip():
+            raise ValueError(f"{self.name}: a value a run sets says when it was set (quantity.origin.at), and the "
+                             "day enters the run's basis")
+        return self
 
 
 class ClaimValue(BaseModel):
@@ -790,14 +983,40 @@ class Candidate(BaseModel):
     valueBasis: ValueBasis | None = None
 
 
+# The rules `biorepo.write` refuses a decision under (OF-BLD-012.1 §2.3),
+# `biorepo.RULES` in this order: no such record, no reviewer named, no full
+# text to verify against, a quote that fails anchoring, a paper with no
+# identifier, a value that does not convert into its field's unit, a status
+# the decision cannot hold, and a model's estimate (ADR-006).
+DecisionRule = Literal["record", "reviewer", "fulltext", "quote", "paper", "unit", "status", "estimate"]
+
+
 class DecisionCheck(BaseModel):
-    """What `POST /api/biorepo/check` answers (OF-BLD-012.1 F1.5): whether
+    """What `POST /api/biorepo/check` answers: whether
     `biorepo.write` would store this decision, and the rule it would refuse
-    it under. The browser asks before the reviewer presses the key, so the
-    screen says what the service would say rather than a mirror of it."""
+    it under, with why (both null when it would store it). The browser asks
+    before the reviewer presses the key, so the screen says what the service
+    would say."""
 
     ok: bool
-    rule: str | None = None
+    rule: DecisionRule | None = None
+    why: str | None = None
+
+
+# The rules `guild.write_evidence` refuses an entry under, `guild.RULES` in
+# this order.
+GuildRule = Literal["name", "role", "added", "duplicate", "person", "skill", "source", "observer", "authority",
+                    "outcome", "note", "date", "evidence", "policy"]
+
+
+class EvidenceCheck(BaseModel):
+    """What `POST /api/guild/check` answers: whether `guild.write_evidence`
+    would keep this entry, and the rule it would refuse it under, with why
+    (both null when it would keep it). The sign-off sheet asks before anyone
+    signs, so it says what the service would say."""
+
+    ok: bool
+    rule: GuildRule | None = None
     why: str | None = None
 
 
@@ -926,8 +1145,8 @@ class ExtractResponse(BaseModel):
 # Who may verify, extended from records to the people running protocol steps.
 # The ledger is the project's rows of `guild_people` and `guild_evidence`,
 # written only by `guild.write_*`; a competence ledger is personnel data and
-# never enters the public repository. Mirrored in src/data/types.ts and held
-# to it by `check:plan`.
+# never enters the public repository. The browser names the ledger's types in
+# src/lib/guild.ts, each a generated twin of one here.
 
 GuildRole = Literal["member", "lead", "auditor"]
 
@@ -1009,7 +1228,7 @@ GateMode = Literal["advise", "enforce"]
 
 
 class GuildPolicy(BaseModel):
-    """The lead's choices for the team (OF-BLD-013 §5.1). In advise mode the
+    """The lead's choices for the team. In advise mode the
     run-mode gate warns and records a deviation; in enforce mode it holds the
     step until a cosigner is recorded, or someone qualified takes over. Set
     per criticality: a routine skill and a critical one can differ."""
@@ -1436,6 +1655,9 @@ class ToolResult(BaseModel):
     # the MCP server: a model reads `summary` alone (OF-BLD-019 §6.1:
     # `stream_table`'s whole stream table). Nothing here is citable.
     data: dict[str, Any] | None = None
+    auditIds: list[str] = Field(default_factory=list, description=(
+        "The audit rows the call wrote, oldest first, each by the id `GET /api/audit` serves it under: the row of "
+        "each thing a write kept, and of the proposal a gated write made. A read writes none."))
 
 
 # ── geneOS (OF-BLD-014 §6.3) ───────────────────────────────────────────
@@ -1458,7 +1680,7 @@ class GeneosModelInfo(BaseModel):
     feed: str
     notes: list[str] = Field(default_factory=list)
     # The product a view opens on, and every product the shelf names a route
-    # to in this model ("phb", "ethanol"); the worker decides what it makes.
+    # to in this model ("ethanol", or a placeholder id); the worker decides what it makes.
     product: str
     products: list[str] = Field(default_factory=list)
 
@@ -1560,8 +1782,7 @@ class SeriesFitQuality(BaseModel):
 
 class KineticFit(BaseModel):
     """Logistic growth, Luedeking–Piret production and the substrate balance
-    (`logistic_v0`), or a kinetics family fitted to the same series
-    (OF-BLD-020 §3.1)."""
+    (`logistic_v0`), or a kinetics family fitted to the same series."""
 
     params: list[FitParam] = Field(default_factory=list)
     quality: list[SeriesFitQuality] = Field(default_factory=list)
@@ -1598,17 +1819,23 @@ class StartValues(BaseModel):
 
 
 class ForecastRequest(BaseModel):
+    """POST /api/fermos/forecast: a band for the next run, drawn from a fit.
+    Its start values and length are the values of the forecast's scope
+    `fermos:forecast:<fit id>`, each keyed as the scope names it (x0, s0, p0
+    and t_end, fermos.FORECAST_KEYS) and typed as a quantity with its
+    origin, the person or the model that set it and the day it was set;
+    the ones left unset are the fitted run's own. It holds these fields and
+    no other: a field it does not name is refused."""
+
+    model_config = ConfigDict(extra="forbid")
+
     # A kept kinetic fit, or the fit itself inline for the sample run.
     fitArtifactId: str | None = None
     fit: KineticFit | None = None
-    start: StartValues = Field(default_factory=StartValues)
-    # Who changed a starting value; a changed one is that person's assumption.
-    changedBy: str | None = None
-    # Hours; unset is the fitted run's own length.
-    durationH: float | None = None
-    # Who set the length; a length a person set is that person's assumption
-    # (OF-BLD-020 §3.R). Unset: the one who changed a starting value, if any.
-    durationBy: str | None = None
+    # The start values and the length a person or a model sets (alpha 2.2 D2).
+    inputs: list[EngineInput] = Field(default_factory=list)
+    # The person or the model asking.
+    by: str = Field(default="", max_length=200)
     sample: bool = False
 
 
@@ -1708,6 +1935,11 @@ class ScenarioInput(BaseModel):
 
 
 class InputAssumption(BaseModel):
+    """A named value of a scenario's input, as the binding lays it on: a
+    person's assumption, a model's estimate (`by` the model's id), or a
+    deposition's reading (`by` its depositor, `ref` the reading), with the
+    range the run's samples draw over."""
+
     key: str
     value: float
     low: float
@@ -1715,6 +1947,9 @@ class InputAssumption(BaseModel):
     by: str
     at: str
     note: str | None = None
+    origin: OverrideOrigin = "person-assumption"
+    # The reading a measurement is, `<deposition id>/<entry id>`.
+    ref: str | None = None
 
 
 class ProformaScenarioInfo(BaseModel):
@@ -1728,22 +1963,33 @@ class ProformaScenarioInfo(BaseModel):
     waiting: list[str] = Field(default_factory=list)
     leavesOut: list[str] = Field(default_factory=list)
     priceBasis: str
+    # The words a kept scenario's binding was refused in (a part of a
+    # custom_train_v1 scenario that cannot stand, or a flowsheet the shelf no
+    # longer holds), its inputs then empty; None for a scenario that binds.
+    refused: str | None = None
 
 
 class ProformaRunRequest(BaseModel):
+    """POST /api/proforma/run. It holds these fields alone: a field it does
+    not name is refused."""
+
+    model_config = ConfigDict(extra="forbid")
+
     scenarioId: str
-    # The older field (OF-BLD-014 §8.4): a named person's values by input
-    # key. Accepted for one release as a shim (OF-BLD-020 §2.2): each is read
-    # as an Override of `proforma:<scenarioId>`, and the run's basis says
-    # which field it read.
-    assumptions: list[InputAssumption] = Field(default_factory=list)
-    # A person's changes in the parameter panel (OF-BLD-020 D3), each an
-    # Override of scope `proforma:<scenarioId>`: a named assumption that wins
-    # over the records and any fermOS fit for its input, and that the run's
-    # basis names with the person. The page sends the scenario's own, which
-    # the project keeps (project_state.py); `project_state.run_request`
-    # reads them for a run Postdoc makes.
-    overrides: list[Override] = Field(default_factory=list)
+    # The values a person or a model sets (alpha 2.2 D2): each an input's key
+    # of the scenario's flowsheet, or a key of the Finance group of a
+    # flowsheet built from a vessel and a train, with a typed quantity in that
+    # parameter's unit and its origin; its low and high are the range the
+    # run's samples draw over. Proforma converts each at its door into the
+    # Override of `proforma:<scenarioId>` its binding takes
+    # (proforma.overrides_of): a named assumption that wins over the records
+    # and any fermOS fit for its input, and that the run's basis names with
+    # the person. The page sends the scenario's own, which the project keeps
+    # (project_state.py); `project_state.run_request` reads them for a run
+    # Postdoc makes.
+    inputs: list[EngineInput] = Field(default_factory=list)
+    # The person or the model asking: the run's row is created by them.
+    by: str = Field(default="", max_length=200)
     host: str | None = None
     seed: int = 0
     # How many Latin hypercube samples the run draws (OF-BLD-019 D7). The
@@ -1753,8 +1999,8 @@ class ProformaRunRequest(BaseModel):
     # The shelf flowsheet the scenario runs (OF-BLD-019 §2.3, D6): a scenario
     # the project keeps runs its own and needs none (another is refused); a
     # scenario not yet saved runs this one, bound as
-    # GET /api/proforma/bind binds it. A reference biorefinery, the toy or an
-    # id the shelf does not hold is refused in words.
+    # GET /api/proforma/bind binds it. The toy or an id the shelf does not
+    # hold is refused in words.
     flowsheet: str | None = None
     # The fermOS fits a person chose, by input key: titre, yield and
     # productivity, each the id of a kept `kinetic_fit` or `growth_forecast`
@@ -1784,8 +2030,16 @@ class InputSensitivity(BaseModel):
     sourceKind: str
 
 
+class GridDim(BaseModel):
+    """One axis of a run's grid: the input it walks, by key, and the values
+    it takes, in the input's unit."""
+
+    key: str
+    values: list[float]
+
+
 class ProformaGrid(BaseModel):
-    dims: list[dict[str, Any]]
+    dims: list[GridDim]
     msp: list[float | None]
     costLines: dict[str, list[float | None]]
     infeasible: int
@@ -2008,8 +2262,6 @@ class FlowsheetInfo(BaseModel):
     source: str
     # The chemical-set key (`yeast`, train_spec.PROGRAM_CHEMICALS); None for a general flowsheet.
     program: str | None = None
-    # A published reference biorefinery, run whole on its package's defaults.
-    reference: bool = False
     inputs: list[FlowsheetInput] = Field(default_factory=list)
     # The names its evaluation (or its whole run) reports.
     outputs: list[str] = Field(default_factory=list)
@@ -2019,10 +2271,6 @@ class FlowsheetInfo(BaseModel):
     leavesOut: list[str] = Field(default_factory=list)
     # The inputs a run's grid walks, for the sliders; none, no grid.
     gridInputs: list[str] = Field(default_factory=list)
-    # A reference biorefinery's own regression test, cited as file::test
-    # ('biorefineries/tests/test_biorefineries.py::test_corn'); its values
-    # are read from the installed file (PackageRegression), never retyped.
-    packageTest: str | None = None
     # OF-BLD-020 §6.1 (D11): the kept artifacts a scenario on this flowsheet
     # names besides the flowsheet, by tool, in the order the flowsheet builds
     # on them (`custom_train_v1`: a `fermos.vessel` design and a
@@ -2035,14 +2283,13 @@ class FlowsheetInfo(BaseModel):
     brothStream: str | None = None
 
 
-# ── A reference biorefinery's run (OF-BLD-019 §2.2, D3) ──────────────────
+# ── A plant held to its package's own test (OF-BLD-019 §2.2; ADR-013) ──────
 #
-# A published biorefinery runs whole on its package's defaults and is kept
-# as one `proforma.reference` artifact: the package's outputs, the
-# quantities its own test asserts as this installation computed them, the
-# defaults read back, and every table a `proforma.run` artifact holds. The
-# test's values come from the installed test file, parsed, with the file
-# and test named.
+# A library plant run whole on its package's defaults (engine/library.py) is
+# set beside the values its package's own test asserts, as this installation
+# computed them. The test's values come from the installed test file,
+# parsed, with the file and test named; a `proforma.reference` artifact kept
+# from the shelf's retired reference entries holds the same (alpha 2.2 D8).
 
 
 class RegressionValue(BaseModel):
@@ -2058,8 +2305,8 @@ class RegressionValue(BaseModel):
 
 
 class PackageRegression(BaseModel):
-    """A reference biorefinery's regression values, read from the package's
-    installed test file: which package, which file, which test."""
+    """A plant's regression values, read from its package's installed test
+    file: which package, which file, which test."""
 
     package: str
     file: str
@@ -2081,17 +2328,6 @@ class RegressionCheck(BaseModel):
     # with its default absolute tolerance has it).
     relDiff: float | None = None
     within: bool
-
-
-class ProformaReference(BaseModel):
-    """GET and POST /api/proforma/reference/{id}: the shelf's entry, the
-    newest stored reference run (or None), the package test's values, and
-    where the simulator is."""
-
-    flowsheet: FlowsheetInfo
-    artifact: Artifact | None = None
-    regression: PackageRegression | None = None
-    simulator: dict[str, Any] = Field(default_factory=dict)
 
 
 class StreamRow(BaseModel):
@@ -2212,6 +2448,22 @@ class ProformaTables(BaseModel):
 
 # ProformaRunResult names the table models defined after it.
 ProformaRunResult.model_rebuild()
+
+
+class ScenarioRunsResponse(BaseModel):
+    """GET /api/proforma/runs: a scenario's newest run on this service, or
+    None when it has none."""
+
+    scenarioId: str
+    artifact: Artifact | None
+
+
+class SimulatorStatus(BaseModel):
+    """GET /api/proforma/status: where the Proforma worker is (cold,
+    starting, ready or failed), and the words of a start that failed."""
+
+    status: Literal["cold", "starting", "ready", "failed"]
+    error: str | None
 
 
 # ── pureOS reads the train (OF-BLD-019 §4.1, D1) ────────────────────────
@@ -2375,6 +2627,24 @@ class ThermoProps(BaseModel):
     notes: list[str] = Field(default_factory=list)
 
 
+class ThermoPropsStored(BaseModel):
+    """GET /api/thermo/props: the answer stored for the same question, its
+    artifact with what the artifact holds, or both None when nobody has
+    asked it here."""
+
+    artifact: Artifact | None
+    props: ThermoProps | None
+
+
+class ThermoPropsAnswer(BaseModel):
+    """POST /api/thermo/props: thermosteam's answer to the question, its
+    artifact beside what the artifact holds, read as `ThermoProps`, the same
+    pair a later GET reads back as `ThermoPropsStored`."""
+
+    artifact: Artifact
+    props: ThermoProps
+
+
 # ── a product's properties (OF-BLD-020 §7.1, D12) ───────────────────────
 #
 # What pureOS's proposer reads about a product: from its sequence, through
@@ -2458,11 +2728,20 @@ class Volatility(BaseModel):
     notes: list[str] = Field(default_factory=list)
 
 
+class StoredAnswer(BaseModel):
+    """GET /api/protparam and GET /api/thermo/volatility: the answer stored
+    for the same product, or None when it has not been asked here."""
+
+    artifact: Artifact | None
+
+
 # ── Runbook drafts (OF-BLD-014 §9.2) ────────────────────────────────────
 
 
 class Prediction(BaseModel):
-    """Mirrors `Prediction` in src/data/types.ts (§9.1)."""
+    """What a runbook predicts before the run: a labelled value in its unit,
+    with its confidence and its basis (§9.1; the browser's `Prediction`,
+    src/lib/studies.ts)."""
 
     id: str
     label: str
@@ -2477,7 +2756,9 @@ class Prediction(BaseModel):
 
 
 class Measure(BaseModel):
-    """Mirrors `Measure` in src/data/types.ts."""
+    """What the bench measures for a runbook: a labelled reading in its unit
+    at its timepoint, and the prediction it tests where it tests one (the
+    browser's `Measure`, src/lib/studies.ts)."""
 
     id: str
     label: str
@@ -2528,7 +2809,8 @@ RunbookStageStatus = Literal["done", "running", "queued", "pending", "review", "
 
 
 class RunbookStage(BaseModel):
-    """Mirrors `RunbookStage` in src/data/types.ts."""
+    """One stage of a runbook and where it stands (the browser's
+    `RunbookStage`, src/lib/studies.ts)."""
 
     name: str
     status: RunbookStageStatus
@@ -2537,10 +2819,10 @@ class RunbookStage(BaseModel):
 
 
 class Runbook(BaseModel):
-    """Mirrors `Runbook` in src/data/types.ts: a row of the project's
-    `runbooks`, a person's or a study's (studies/runbooks.py). It is read
-    and written with `exclude_unset`, so a row comes back as it was kept:
-    the lock's digest reads a prediction's absent field and a null one
+    """A row of the project's `runbooks`, a person's or a study's
+    (studies/runbooks.py; the browser's `Runbook`, src/lib/studies.ts). It is
+    read and written with `exclude_unset`, so a row comes back as it was
+    kept: the lock's digest reads a prediction's absent field and a null one
     differently (runbook_lock.py)."""
 
     id: str
@@ -2579,9 +2861,9 @@ class Runbook(BaseModel):
 # fed-batch's mu_set under a constant feed), which waits for nothing
 # (OF-BLD-020 §3.R, finding 16).
 # `assumption` is a person's value set by an Override, `model-estimate` a
-# model's (ADR-006).
-ParamOrigin = Literal["fit", "record", "artifact", "simulation", "assumption", "model-estimate", "convention",
-                      "library-default", "waiting", "not-read"]
+# model's (ADR-006), `measurement` a reading a person deposited at the bench.
+ParamOrigin = Literal["fit", "record", "artifact", "simulation", "assumption", "model-estimate", "measurement",
+                      "convention", "library-default", "waiting", "not-read"]
 # What a scope parameterises: a fermOS model family, a vessel designed for
 # a simulation, one unit of a pureOS train, a Proforma scenario, or a library
 # plant (an engine run's parameters, engine/runs.py `parameters_of`).
@@ -2630,7 +2912,7 @@ class ParameterSpec(BaseModel):
     @classmethod
     def _bounds_have_a_reason(cls, v: str) -> str:
         if not (v or "").strip():
-            raise ValueError("every parameter's bounds carry a written reason (OF-BLD-020 D4)")
+            raise ValueError("every parameter's bounds carry a written reason")
         return v
 
     @field_validator("sourceRule")
@@ -2675,8 +2957,19 @@ class ParameterValue(BaseModel):
 
 class Override(BaseModel):
     """A change to one parameter of one scope for a run (D3): a named
-    person's assumption, or a model's estimate (ADR-006), `by` naming the
-    person or the model."""
+    person's assumption, a model's estimate (ADR-006), `by` naming the
+    person or the model, or a deposition's reading (a measurement), `by` the
+    person who deposited it, `at` the time it was taken and `ref` the
+    reading, `<deposition id>/<entry id>`.
+
+    Its value is in its parameter's own unit, as a person's assumption, a
+    model's estimate and every Override a resolver takes are, and `unit`
+    stays empty. A reading a page keeps (a Proforma scenario's parameter
+    panel) names its own unit: its value and `unit` are the reading's as
+    deposited, which the door it is sent to sets in the parameter's unit
+    (measurements.py), the conversion stated in the value's note. It names
+    the person who chose it for the parameter in `chosenBy`, the row's maker
+    (project_state.py), `by` staying its depositor."""
 
     scope: str
     key: str
@@ -2687,6 +2980,17 @@ class Override(BaseModel):
     at: str
     note: str | None = None
     origin: OverrideOrigin = "person-assumption"
+    # The reading a measurement is; None for a person's or a model's value.
+    ref: str | None = None
+    # The unit a reading's own value is in, as deposited, when a page keeps a
+    # reading so; None for a value in its parameter's own unit, as a person's
+    # assumption, a model's estimate and every Override a resolver takes are.
+    unit: str | None = None
+    # Who set the parameter to a deposition's reading, when a page keeps one
+    # (a Proforma scenario's panel, the reviewer who chose it): the row's
+    # maker. None for a person's or a model's value, whose `by` names who set
+    # it, and for every Override a resolver takes.
+    chosenBy: str | None = None
 
     @field_validator("value", "low", "high", mode="before")
     @classmethod
@@ -2696,6 +3000,23 @@ class Override(BaseModel):
         if isinstance(v, bool):
             raise ValueError("an override's value, low and high are numbers or words, never true or false")
         return v
+
+    @model_validator(mode="after")
+    def _a_measurement_names_its_reading(self) -> "Override":
+        if self.origin == "measurement" and not READING_REF.fullmatch((self.ref or "").strip()):
+            raise ValueError(f"the measurement of {self.key} names its reading as <deposition id>/<entry id> (ref)")
+        if self.unit is not None and self.origin != "measurement":
+            said = "a model's estimate" if self.origin == "model-estimate" else "a person's assumption"
+            raise ValueError(f"the override of {self.key} keeps a unit of its own for a deposition's reading alone, "
+                             f"and {said} is in its parameter's unit")
+        if self.chosenBy is not None and self.origin != "measurement":
+            said = "a model's estimate names its model" if self.origin == "model-estimate" else \
+                "a person's assumption names its person"
+            raise ValueError(f"the override of {self.key} names who chose it (chosenBy) for a deposition's reading "
+                             f"alone, and {said} in by")
+        if self.chosenBy is not None and (not self.chosenBy.strip() or not self.chosenBy.isprintable()):
+            raise ValueError(f"the measurement of {self.key} names who chose it on one line (chosenBy)")
+        return self
 
 
 class ParamScope(BaseModel):
@@ -2712,9 +3033,15 @@ class ParamScope(BaseModel):
 
 
 class ParamResolveRequest(BaseModel):
-    """POST /api/params/{scope}/resolve. Runs nothing."""
+    """POST /api/params/{scope}/resolve. Runs nothing. It holds these
+    fields alone: a field it does not name is refused."""
 
-    overrides: list[Override] = Field(default_factory=list)
+    model_config = ConfigDict(extra="forbid")
+
+    # The values a person or a model sets, each a parameter's key and a typed
+    # quantity in its unit with its origin, laid on the scope the route names
+    # (alpha 2.2 D2).
+    inputs: list[EngineInput] = Field(default_factory=list)
     # The shelf flowsheet a Proforma scenario not yet saved runs, as
     # ProformaRunRequest.flowsheet names it; a scenario the project keeps
     # needs none.
@@ -2744,8 +3071,9 @@ class ParamResolveRequest(BaseModel):
     # pureOS's unit scope (§5.2): the whole train, as the project keeps it
     # (D9), so the unit's per-component keys expand over the train's
     # chemicals and its records bind from the evidence pool by field; the
-    # scope `pureos:unit:<train id>:inlet` is the train's inlet. Its units'
-    # typed values are not laid on here: a resolve's `overrides` are.
+    # scope `pureos:unit:<train id>:inlet` is the train's inlet. A resolve
+    # lays on its `inputs` alone, so a page sends a unit's typed values among
+    # them.
     train: TrainSpec | None = None
     # A Proforma scenario on `custom_train_v1` (OF-BLD-020 §6.1): the kept
     # vessel design and train run it is built from, as ProformaRunRequest
@@ -2779,7 +3107,10 @@ class ParamResolveResult(BaseModel):
 
 
 class VesselRequest(BaseModel):
-    """POST /api/fermos/vessel. Exactly one of `simulation` and `fit`."""
+    """POST /api/fermos/vessel. Exactly one of `simulation` and `fit`. It
+    holds these fields alone: a field it does not name is refused."""
+
+    model_config = ConfigDict(extra="forbid")
 
     # A `fermos.simulation` artifact id.
     simulation: str | None = None
@@ -2794,9 +3125,12 @@ class VesselRequest(BaseModel):
     # one its class runs for the design; a convention of this request, as
     # fermos_vessel names it (OF-BLD-020 §4.2, D13). None is the class's own.
     klaMethod: str | None = None
-    # A person's changes, each a named assumption (D3), scope
-    # `fermos:vessel:<simulation or fit id>`.
-    overrides: list[Override] = Field(default_factory=list)
+    # The values a person or a model sets, each a design parameter's key and
+    # a typed quantity in its unit with its origin, laid on the scope
+    # `fermos:vessel:<simulation or fit id>` (alpha 2.2 D2).
+    inputs: list[EngineInput] = Field(default_factory=list)
+    # The person or the model asking.
+    by: str = Field(default="", max_length=200)
 
 
 class VesselDesignRow(BaseModel):
@@ -2981,14 +3315,21 @@ class FamilyInfo(BaseModel):
 
 
 class SimulationRequest(BaseModel):
-    """POST /api/fermos/simulate."""
+    """POST /api/fermos/simulate. It holds these fields alone: a field it
+    does not name is refused."""
+
+    model_config = ConfigDict(extra="forbid")
 
     family: str
     strain: str | None = None
     product: str | None = None
     sugar: str | None = None
-    # A person's changes, each an Override of scope fermos:family:<family>.
-    overrides: list[Override] = Field(default_factory=list)
+    # The values a person or a model sets, each a parameter's key and a typed
+    # quantity in its unit with its origin, laid on the scope
+    # `fermos:family:<family>` (alpha 2.2 D2).
+    inputs: list[EngineInput] = Field(default_factory=list)
+    # The person or the model asking.
+    by: str = Field(default="", max_length=200)
     fitArtifact: str | None = None
     # `records`, `fit`, or `simulation:<artifact id>`.
     startFrom: str = "records"
@@ -3001,7 +3342,7 @@ class SimulationRequest(BaseModel):
 
 
 class FermosBinding(BaseModel):
-    """GET /api/fermos/bind (OF-BLD-020 §3.2): a family's parameters bound
+    """GET /api/fermos/bind: a family's parameters bound
     for a strain, product and sugar from a fit, the records, a kept
     simulation and the conventions, starting no integration."""
 
@@ -3345,9 +3686,9 @@ class TrainInlet(BaseModel):
     model_config = ConfigDict(extra="forbid")
 
     kind: Literal["simulation", "run-stream", "typed"]
-    # The artifact: a `fermos.simulation`, or a `proforma.run`,
-    # `proforma.reference` or `pureos.train_run` whose stream is the inlet;
-    # None for a typed inlet.
+    # The artifact: a `fermos.simulation`, or a `proforma.run`, `library.run`
+    # or `pureos.train_run` whose stream is the inlet (or a `proforma.reference`
+    # kept from a retired reference entry); None for a typed inlet.
     ref: str | None = None
     # The stream of that run (run-stream alone).
     streamId: str | None = None
@@ -3413,7 +3754,7 @@ class TrainSpec(BaseModel):
 class TrainValidation(BaseModel):
     """POST /api/pureos/train/validate: every refusal at once, in words;
     runs nothing. POST /api/pureos/train/check answers in the same shape
-    with everything the run would refuse (OF-BLD-020 §5.3)."""
+    with everything the run would refuse."""
 
     ok: bool
     refusals: list[str] = Field(default_factory=list)
@@ -3424,17 +3765,21 @@ class TrainValidation(BaseModel):
 
 
 class TrainRunRequest(BaseModel):
-    """POST /api/pureos/train/run."""
+    """POST /api/pureos/train/run and POST /api/pureos/train/check. It holds
+    these fields alone: a field it does not name is refused."""
 
     model_config = ConfigDict(extra="forbid")
 
     train: TrainSpec
-    # A person's changes in a unit's or the inlet's panel, each an Override
-    # of `pureos:unit:<train id>:<unit id | inlet>`: laid over the values the
-    # train carries, an override replacing the train's value of its key.
-    overrides: list[Override] = Field(default_factory=list)
-    # The person an override that names nobody is by.
-    by: str | None = None
+    # The values a person or a model sets in a unit's or the inlet's panel,
+    # each named `<unit id>.<key>` or `inlet.<key>` with a typed quantity in
+    # that parameter's unit and its origin (alpha 2.2 D2). pureOS converts
+    # each into the Override of `pureos:unit:<train id>:<unit id | inlet>`
+    # (train_spec.overrides_of), laid over the values the train carries: an
+    # input replaces the train's value of its key.
+    inputs: list[EngineInput] = Field(default_factory=list)
+    # The person or the model asking: the run's row is created by them.
+    by: str = Field(default="", max_length=200)
 
 
 class StreamImpurity(BaseModel):
@@ -3545,12 +3890,13 @@ class TrainRun(BaseModel):
 
 
 class TrainFromRunRequest(BaseModel):
-    """POST /api/pureos/train/from-run (OF-BLD-020 §5.3): a run's units read
+    """POST /api/pureos/train/from-run: a run's units read
     into a train, each by its class."""
 
     model_config = ConfigDict(extra="forbid")
 
-    # A `proforma.run`, `proforma.reference` or `pureos.train_run` artifact.
+    # A `proforma.run`, `library.run` or `pureos.train_run` artifact (or a
+    # `proforma.reference` kept from a retired reference entry).
     artifactId: str
     # The id the train takes; by default `from-<artifact id>`.
     trainId: str | None = None
@@ -3658,7 +4004,7 @@ class ProposalMissing(BaseModel):
 class TrainProposal(BaseModel):
     """POST /api/pureos/propose: a train proposed by the written rules, or
     none, with what is missing. (Named apart from `Proposal`, a write a
-    model proposed at a gate, OF-BLD-015 §7.4.)"""
+    model proposed at a gate)"""
 
     product: str
     host: str
@@ -3708,8 +4054,6 @@ class ProjectCreate(BaseModel):
 # Claim and AnswerPlan name Passage and Evidence, which are defined further
 # down; resolve the names now that every model exists.
 Claim.model_rebuild()
-# ProformaRunRequest names Override, which is defined further down (OF-BLD-020 §2.2).
-ProformaRunRequest.model_rebuild()
 # ParamResolveRequest names TrainSpec, defined further down (OF-BLD-020 §5.2).
 ParamResolveRequest.model_rebuild()
 AnswerPlan.model_rebuild()
@@ -3842,7 +4186,9 @@ class SFFFlowsheet(BaseModel):
     reference flowsheets at the pinned commit, whichever door it came
     through; `imported` for any other file. `sffVersion` is what the file
     declares; `validation.schemaVersion` is the schema it was checked
-    against. `graph` is left out of a listing."""
+    against. `url` is the https address a file fetched by its address came
+    from (POST /api/flowsheets/import-url), None for every other door.
+    `graph` is left out of a listing."""
 
     id: str
     title: str
@@ -3854,6 +4200,7 @@ class SFFFlowsheet(BaseModel):
     simulator: str | None = None
     runArtifactId: str | None = None
     libraryId: str | None = None
+    url: str | None = None
     units: int
     streams: int
     validation: SFFValidation
@@ -3892,6 +4239,15 @@ class SFFLibraryImport(BaseModel):
     """POST /api/flowsheets/library/{id}: who keeps the reference flowsheet
     in the project."""
 
+    by: str = Field(min_length=1, max_length=200)
+
+
+class SFFUrlImport(BaseModel):
+    """POST /api/flowsheets/import-url: the public https address of an SFF
+    file to fetch and keep in the project, kept whole as the record's
+    source, query included, and the person who names it."""
+
+    url: str = Field(min_length=1, max_length=2048)
     by: str = Field(min_length=1, max_length=200)
 
 
@@ -4003,25 +4359,24 @@ class LibraryParameters(BaseModel):
 
 class LibraryRunRequest(BaseModel):
     """POST /api/library/{plant}/run: the configuration (None: the plant's
-    own), the values set for the run, each an Override of the plant's scope
-    (a person's assumption or a model's estimate), and who asks for the run."""
+    default, as the biosteam engine names it), the values set for the run,
+    and who asks for the run. It holds these fields alone: a field it does
+    not name is refused."""
+
+    model_config = ConfigDict(extra="forbid")
 
     configuration: str | None = Field(default=None, max_length=40)
-    overrides: list[Override] = Field(default_factory=list)
+    # The values a person or a model sets, each a parameter's key and a typed
+    # quantity in its unit with its origin (alpha 2.2 D2), checked and
+    # converted as the biosteam engine's own run checks and converts them
+    # (engine/biosteam.py `run_plant`).
+    inputs: list[EngineInput] = Field(default_factory=list)
     by: str = Field(default="", max_length=200)
 
 
 # ── engine runs (execution prompt §7.4; engine/runs.py) ─────────────────
 
 RunStatus = Literal["done", "refused"]
-
-
-class RunInput(BaseModel):
-    """One input of an engine run: its name, and its value as a quantity
-    with its origin (ADR-006)."""
-
-    name: str
-    quantity: Quantity
 
 
 class RunSFF(BaseModel):
@@ -4035,11 +4390,46 @@ class RunSFF(BaseModel):
     tags: list[str] = Field(default_factory=list)
 
 
+# The most diagnostics one run keeps, and the longest name each may have (an
+# output's longest, engine/contract.py MAX_OUTPUT_NAME).
+MAX_DIAGNOSTICS = 50
+MAX_DIAGNOSTIC_NAME = 200
+
+
+class RunDiagnostic(BaseModel):
+    """A value a run's computation reports about itself, the time it took or
+    the iterations it made, as a contract engine's worker answers it beside
+    its outputs (docs/api/workers.md, `run`): a name, a finite number or
+    words, and a unit. The run keeps it beside its outputs; its artifact,
+    its replay and every reader of `outputs.values` leave it out, so a
+    replay compares the outputs alone."""
+
+    name: str = Field(min_length=1, max_length=MAX_DIAGNOSTIC_NAME)
+    value: float | str
+    unit: str
+
+    @field_validator("value", mode="before")
+    @classmethod
+    def _finite_number_or_words(cls, v: Any) -> Any:
+        if isinstance(v, bool):
+            raise ValueError("a diagnostic's value is a finite number or words; a boolean is refused")
+        if isinstance(v, float) and not math.isfinite(v):
+            raise ValueError("a diagnostic's number is finite")
+        if isinstance(v, int) and not float_holds(v):
+            raise ValueError("a diagnostic's number is finite, inside a float's range")
+        return v
+
+
 class EngineRun(BaseModel):
     """One engine run in a project: a row of `runs` (GET /api/runs)."""
 
     # Its computation's id: the artifact id of its basis.
     id: str
+    # The engine that ran it (docs/api/engines.md), the `runs.engine` column's
+    # value; a row kept before engines were registered was BioSTEAM's.
+    engine: str = "biosteam"
+    # What the engine ran: a plant or flowsheet for BioSTEAM, one of the
+    # engine's things for any other.
     plant: str
     configuration: str | None = None
     status: RunStatus
@@ -4049,7 +4439,9 @@ class EngineRun(BaseModel):
     # The artifact's, computed on its basis; None for a refused run.
     provenance: Provenance | None = None
     artifactId: str | None = None
-    # The price, a flowsheet's own outputs, and how the package's test held it.
+    # `values`, each output a typed quantity whose origin is the run's
+    # artifact (engine/runs.py `values_of`); a library run's price, a
+    # flowsheet's own outputs and how the package's test held it beside them.
     outputs: dict[str, Any] = Field(default_factory=dict)
     versions: dict[str, str] = Field(default_factory=dict)
     sff: RunSFF | None = None
@@ -4062,6 +4454,12 @@ class EngineRun(BaseModel):
     by: str
     at: str
     durationMs: int | None = None
+    # What its computation reported about itself (the time it took, the
+    # iterations it made), as its engine's worker answered it beside the
+    # outputs, kept from the computation that made the row. They stand on
+    # the run beside its outputs, and a replay compares the outputs alone.
+    # Empty for a run whose engine reports none, the core's three among them.
+    diagnostics: list[RunDiagnostic] = Field(default_factory=list)
 
 
 class RunReport(BaseModel):
@@ -4075,30 +4473,298 @@ class RunReport(BaseModel):
     parameters: ParamScope | None = None
 
 
+# ── engines (alpha 2.2 stage B; docs/api/engines.md, ADR-015) ──────────
+# The shapes an engine's things, parameters and run values have, and what the
+# service says of each engine it found. A number travels only inside a
+# Quantity, with its origin (ADR-006).
+
+ENGINE_NAME = r"^[a-z][a-z0-9-]{0,39}$"
+ENGINE_NAME_MAX = 40
+THING_ID = r"^[A-Za-z0-9][A-Za-z0-9._-]{0,79}$"
+# The longest name a thing's configuration may have, at every door: the
+# route, the tools and the thing's own list.
+CONFIGURATION_MAX = 80
+ConfigurationName = Annotated[str, Field(min_length=1, max_length=CONFIGURATION_MAX)]
+# The longest words a thing may give one of its configurations
+# (`EngineThing.configurationTitles`): an output's or a diagnostic's longest name.
+CONFIGURATION_TITLE_MAX = MAX_DIAGNOSTIC_NAME
+ConfigurationTitle = Annotated[str, Field(min_length=1, max_length=CONFIGURATION_TITLE_MAX)]
+# What a thing's default may rest on (`EngineParameter.origin`): a package's
+# own value or a stated convention, and for a thing the project holds, a
+# record, an artifact or a person's typed value. A model's estimate reaches a
+# run as a value the run sets (ADR-006); a default rests on one of these five.
+DEFAULT_ORIGINS = ("library-default", "convention", "record", "artifact", "person-assumption")
+# The source-rule entry a default's origin stands for, when a parameter names
+# no rule of its own; a record's names the field it binds from
+# (`record:<field id>`), which only the parameter can say.
+RULE_OF_ORIGIN = {"library-default": "library-default", "convention": "convention", "artifact": "artifact",
+                  "person-assumption": "assumption"}
+
+
+class EnginePrecision(BaseModel):
+    """How near a replayed output must come to the run's: within
+    `atol + rtol·|stored|`."""
+
+    rtol: float = Field(ge=0)
+    atol: float = Field(ge=0)
+
+
+class EngineThing(BaseModel):
+    """One thing an engine can run, with the configurations it runs in and,
+    where the engine gives them, the words a person reads for each."""
+
+    id: str = Field(pattern=THING_ID)
+    title: str
+    kind: str | None = None
+    # [] when the thing takes no configuration; each name at most
+    # CONFIGURATION_MAX characters.
+    configurations: list[ConfigurationName] = Field(default_factory=list)
+    defaultConfiguration: str | None = None
+    # Words a person reads for a configuration, by its name (the kinetics
+    # engine's: the kind of artifact the configuration names and when the
+    # project kept it). {} when the engine gives none, left out or null, and a
+    # configuration with no title is read by its name. A run, its basis, its
+    # id and its replay name a configuration by its name alone.
+    configurationTitles: dict[str, ConfigurationTitle] = Field(default_factory=dict, description=(
+        "Words a person reads for a configuration, by its name: each key one of `configurations`, each title 1 to "
+        f"{CONFIGURATION_TITLE_MAX} characters. A configuration with no title is read by its name; `{{}}` when the "
+        "engine gives none."))
+    precision: EnginePrecision
+
+    @field_validator("configurationTitles", mode="before")
+    @classmethod
+    def _null_titles_none(cls, v: Any) -> Any:
+        # A worker may answer null for "none", as it answers a thing's
+        # defaultConfiguration: it reads as a thing that titles none.
+        return {} if v is None else v
+
+    @model_validator(mode="after")
+    def _default_is_one_of_them(self) -> "EngineThing":
+        if self.defaultConfiguration is not None and self.defaultConfiguration not in self.configurations:
+            raise ValueError(f"{self.id}'s default configuration {self.defaultConfiguration!r} is not one of its own")
+        return self
+
+    @model_validator(mode="after")
+    def _each_title_names_one_of_them(self) -> "EngineThing":
+        stray = [c for c in self.configurationTitles if c not in self.configurations]
+        if stray:
+            held = ", ".join(map(repr, self.configurations))
+            raise ValueError(f"{self.id}'s configurationTitles name {', '.join(map(repr, stray))}, and "
+                             + (f"each title names one of its configurations: {held}" if held else
+                                "it takes no configuration to title"))
+        blank = [c for c, words in self.configurationTitles.items() if not words.strip()]
+        if blank:
+            raise ValueError(f"{self.id}'s title for {', '.join(map(repr, blank))} is blank: a title is words a "
+                             "person reads")
+        return self
+
+
+class EngineParameter(ParameterSpec):
+    """One parameter a thing takes: a `ParameterSpec` (the panel's shape,
+    its bounds with their written reason) with its default value and where
+    the default comes from, `library-default` naming the package it was read
+    from or a `convention` saying what the setting is. A thing the project
+    holds (the train engine's trains) has defaults the project holds too: a
+    `record` naming the records that bound it, an `artifact` naming the
+    run, simulation or design it was read from, or a `person-assumption`
+    naming the person who typed it into the thing. A parameter with no
+    default has `value` and `origin` null: a run sets it, the engine binds it
+    from what the project holds (the kinetics engine binds a family's
+    parameter from the project's records), or the thing fills it itself when
+    a run leaves it unset, which its `note` then says with the reason (the
+    train engine's: a value the unit's class decides at run time, a component
+    the inlet does not carry, a split left to the class). A run that leaves
+    unset a parameter none of these gives is refused in words, keeping
+    nothing. The panel's fields an
+    engine may leave unset default here; `sourceRule` is the rule entry the
+    origin's kind stands for (`assumption` for a person's), and `assumption`
+    (a run's value) for a parameter with no default; a record's default
+    names its field in the rule (`record:<field id>`)."""
+
+    key: str = Field(min_length=1, max_length=200)
+    symbol: str = ""
+    gloss: str = ""
+    dimension: str = ""
+    group: str = "parameters"
+    sourceRule: list[str] = Field(default_factory=list)
+    # The default a run uses when it sets none; null for a parameter with no default.
+    value: float | str | None
+    # Where the default comes from; null exactly when there is no default.
+    origin: Origin | None
+
+    @model_validator(mode="before")
+    @classmethod
+    def _rule_from_origin(cls, data: Any) -> Any:
+        if isinstance(data, dict):
+            origin = data.get("origin")
+            kind = origin.get("kind") if isinstance(origin, dict) else getattr(origin, "kind", None)
+            if kind is not None and kind not in DEFAULT_ORIGINS:
+                raise ValueError(f"{data.get('key')}'s default names the origin {kind}, and a default's origin is a "
+                                 "library-default, a convention, a record, an artifact or a person's assumption")
+            if not data.get("sourceRule"):
+                if kind == "record":
+                    raise ValueError(f"{data.get('key')}'s default is a record's: its sourceRule names the field it "
+                                     "binds from (record:<field id>)")
+                data = {**data, "sourceRule": [RULE_OF_ORIGIN[kind]] if kind else ["assumption"]}
+        return data
+
+    @model_validator(mode="after")
+    def _default_has_its_origin(self) -> "EngineParameter":
+        if (self.value is None) != (self.origin is None):
+            raise ValueError(f"{self.key}: a default carries its origin, and a parameter with no default has value "
+                             "and origin null")
+        if self.origin is not None and self.origin.kind == "convention" and not (self.origin.note or "").strip():
+            raise ValueError(f"{self.key}'s convention says what it is (note)")
+        if self.choices is not None and self.value is not None and self.value not in self.choices:
+            raise ValueError(f"{self.key}'s default {self.value!r} is none of its choices")
+        return self
+
+
+class EngineRunRequest(BaseModel):
+    """POST /api/engines/{name}/run: one thing, in one configuration, with
+    the values a person or a model sets, and nothing beside: a field it does
+    not name, a stray number among them, is refused."""
+
+    model_config = ConfigDict(extra="forbid")
+
+    thing: str = Field(min_length=1, max_length=80)
+    configuration: str | None = Field(default=None, max_length=CONFIGURATION_MAX)
+    inputs: list[EngineInput] = Field(default_factory=list)
+    by: str = ""
+
+
+class EngineCheck(BaseModel):
+    """One conformance check (docs/api/engines.md, Conformance)."""
+
+    number: int
+    check: str
+    ok: bool
+    said: str
+
+
+class EngineConformance(BaseModel):
+    """An engine's last conformance verdict, at the version it was checked."""
+
+    engine: str
+    version: str
+    ok: bool
+    checks: list[EngineCheck]
+    by: str
+    at: str
+
+
+class Refusal(BaseModel):
+    """The body of a refusal the service answers in words: a 404 for what is
+    not here, a 422 for what cannot be run, a 503 for an engine or a worker
+    that cannot answer (the engine routes declare each)."""
+
+    detail: str
+
+
+class Health(BaseModel):
+    """GET /api/health: the service answering, the plan route's models
+    (the first a Postdoc answer starts on, and those it falls back to, in
+    order), and whether it holds a key, so a page can say the service is up
+    with no key to call a model with."""
+
+    ok: bool
+    service: str
+    model: str
+    fallbackModel: str
+    hasKey: bool
+
+
+class EngineInfo(BaseModel):
+    """GET /api/engines: one engine as the service found it."""
+
+    name: str
+    # The entry point the object was loaded from, `package.module:ENGINE`.
+    entryPoint: str
+    version: dict[str, str] = Field(default_factory=dict)
+    # The worker's dotted module, or None for an engine computing in the
+    # service's process (kinetics), and the worker's state.
+    worker: str | None = None
+    workerStatus: str = "cold"
+    heavy: list[str] = Field(default_factory=list)
+    things: list[EngineThing] = Field(default_factory=list)
+    # What the engine's things are, in words, for an engine every one of
+    # whose things is a project's own (the train engine's: a project's
+    # trains); None for any other. A project holding none of them lists no
+    # thing, and these words say what one would be.
+    thingsAre: str | None = None
+    conformance: EngineConformance | None = None
+    # Why the engine cannot be used, in words: it failed to load, or a
+    # declared method failed. The service runs on without it.
+    error: str | None = None
+
+
 # ── studies (execution prompt §7.2, §9.1 step 5; studies/) ──────────────
 
 
 class ScenarioValue(BaseModel):
     """One value a scenario sets on its plant: the parameter's key, and the
-    value as a quantity whose origin is a named person's assumption or a
-    model's estimate (ADR-006)."""
+    value as a quantity whose origin is a named person's assumption, a
+    model's estimate (ADR-006), or a reading a person deposited at the bench
+    (a `measurement`: `{"kind": "measurement", "ref": "<deposition id>/<entry
+    id>"}`, its value and unit the reading's own, which the service looks up
+    in the project's depositions, filling the reading's time and its
+    depositor where the value leaves them out, measurements.py)."""
 
     key: str
     quantity: Quantity
 
+    @field_validator("quantity", mode="wrap")
+    @classmethod
+    def _a_reading_may_wait_for_its_time(cls, value: Any, handler: Any, info: ValidationInfo) -> Any:
+        return _reading_may_wait(value, handler, info)
+
     @model_validator(mode="after")
     def _a_value_set_for_a_run(self) -> "ScenarioValue":
         q = self.quantity
-        if q.origin is None or q.origin.kind not in ("person-assumption", "model-estimate"):
-            raise ValueError(f"{self.key}: a scenario's value is a person's assumption or a model's estimate, and "
-                             "names which (quantity.origin)")
-        if not (q.origin.at or "").strip():
+        if q.origin is None or q.origin.kind not in ("person-assumption", "model-estimate", "measurement"):
+            raise ValueError(f"{self.key}: a scenario's value is a person's assumption or a model's estimate, or a "
+                             "deposition's reading, and names which (quantity.origin)")
+        if q.origin.kind != "measurement" and not (q.origin.at or "").strip():
             raise ValueError(f"{self.key}: a scenario's value says when it was set (quantity.origin.at)")
         if isinstance(q.value, bool) or not isinstance(q.value, (int, float)) or not math.isfinite(float(q.value)):
             raise ValueError(f"{self.key}: a scenario's value is a finite number")
         if q.low is not None or q.high is not None:
             raise ValueError(f"{self.key}: an engine run sets one value per parameter; a range is for sampling")
         return self
+
+
+class DepositionReading(BaseModel):
+    """GET /api/depositions/readings: one reading a run may take as a
+    measurement (measurements.py): an entry of one of the project's
+    depositions that a person confirmed and that stands for its measure,
+    with the runbook and the measure it was recorded against, the person
+    who deposited it and the time it was taken. Asked with a unit, a reading
+    whose unit is that unit or converts into it, its value in that unit
+    beside its own. A scenario's value names it as `{"value": value, "unit":
+    unit, "origin": {"kind": "measurement", "ref": ref}}`."""
+
+    # What a measurement names: `<deposition id>/<entry id>`.
+    ref: str
+    depositionId: str
+    entryId: str
+    # The runbook the deposition tests, and its title as the project keeps it.
+    runbookId: str | None = None
+    runbook: str | None = None
+    # The measure of the runbook's schema the reading is of, and its label.
+    measureId: str
+    measure: str | None = None
+    # The reading's own value and unit, as the bench kept them.
+    value: float
+    unit: str
+    # The time it was taken, and the person who deposited it (the deposition row's maker).
+    at: str
+    by: str
+    # Hours into the run for a reading in a series; None for a reading with no sample time.
+    hours: float | None = None
+    # Asked with a unit: the value in that unit (units.convert where the reading's own unit differs).
+    inUnit: float | None = None
+    # The conversion in words, as a run's basis writes it; None where the units are one.
+    note: str | None = None
 
 
 class ScenarioCreate(BaseModel):
@@ -4168,9 +4834,10 @@ class ComparisonReport(BaseModel):
 
 
 class PredictedOutput(BaseModel):
-    """One output of an engine run a runbook predicts: its key in the run's
-    artifact (`outputs.<key>` of a flowsheet's outputs, `price.<key>` of the
-    price) and what the bench calls it."""
+    """One output of an engine run a runbook predicts: its key (`values.<name>`
+    of the run's outputs.values, for a run of any engine; for a library run
+    `outputs.<key>` of a flowsheet's outputs or `price.<key>` of the price as
+    well) and what the bench calls it."""
 
     model_config = ConfigDict(extra="forbid")
 
@@ -4186,3 +4853,441 @@ class RunbookCreate(BaseModel):
     runId: str = Field(min_length=1, max_length=64)
     predict: list[PredictedOutput] = Field(min_length=1, max_length=24)
     by: str = Field(default="", max_length=200)
+
+
+# ── What a project keeps of its pages (project_state.py; alpha 2.2 E.0b) ─
+#
+# Each kind of row a page writes through `PUT /api/state/{kind}/{id}`, in the
+# shape the page's generated types give it (src/api/types.gen.ts, written
+# from these models). A row keeps every field the page sent, those named here
+# and any other (`extra="allow"`), and `GET /api/state` serves it as kept
+# (`response_model_exclude_unset`, api.AS_KEPT): a field the page left out
+# stays out of the answer. A field a row may leave out defaults to None or to
+# an empty collection, so the generated type names it as one a row may lack.
+
+
+class DepositionEntry(BaseModel):
+    """One reading taken at the bench against a runbook's measure (the
+    browser's `DepositionEntry`, src/lib/studies.ts): the words the operator
+    said or typed (`raw`), the number read from them, and whether a person
+    read it back. A correction is a new entry on the same measure, keeping
+    the `at` of the reading it corrects and saying when it was typed
+    (`correctedAt`)."""
+
+    model_config = ConfigDict(extra="allow")
+
+    id: str
+    measureId: str
+    stepId: str
+    at: str
+    value: float
+    unit: str
+    raw: str
+    confirmed: bool
+    correctedAt: str | None = None
+
+
+class DepositionObservation(BaseModel):
+    """Something the operator reported that fits no measure (one of a
+    deposition's `observations`): the words kept as they were said,
+    and a structured reading of them, None until a person adds one."""
+
+    model_config = ConfigDict(extra="allow")
+
+    id: str
+    stepId: str
+    at: str
+    raw: str
+    structured: str | None
+
+
+class ReconciliationDelta(BaseModel):
+    """One prediction of a runbook beside the reading that tests it, in the
+    measure's unit, and the change in percent."""
+
+    model_config = ConfigDict(extra="allow")
+
+    predictionId: str
+    predicted: float
+    observed: float
+    unit: str
+    pctDelta: float
+
+
+class Reconciliation(BaseModel):
+    """A deposition's readings set beside the runbook's predictions (a
+    deposition's `reconciliation`), made once and kept as it was made."""
+
+    model_config = ConfigDict(extra="allow")
+
+    at: str
+    outcome: Literal["confirmed", "refuted", "inconclusive"]
+    deltas: list[ReconciliationDelta]
+    note: str
+
+
+DepositionState = Literal["staged", "running", "closed"]
+
+
+class Deposition(BaseModel):
+    """The bench's record of a run against a runbook (the browser's
+    `Deposition`, src/lib/studies.ts): its readings and observations,
+    appended as they are taken, its state from staged to running to closed,
+    and its reconciliation. A write to one the project keeps is held to what
+    the bench does (`project_state.deposition_refusal`)."""
+
+    model_config = ConfigDict(extra="allow")
+
+    id: str
+    runbookId: str
+    # The protocol whose steps the bench walks; None for readings taken
+    # against the runbook's measures alone.
+    protocolId: str | None
+    operatorId: str | None
+    startedAt: str
+    closedAt: str | None
+    state: DepositionState
+    entries: list[DepositionEntry]
+    observations: list[DepositionObservation]
+    reconciliation: Reconciliation | None
+    # Hours into the run, by entry id: an entry with a time is a reading in a series.
+    sampleTimes: dict[str, float] = Field(default_factory=dict)
+    # What each measure's series is, by measure id, as a person named it.
+    seriesRoles: dict[str, SeriesRole] = Field(default_factory=dict)
+
+
+class MeasuredConditions(BaseModel):
+    """What a measured value was true under: the protocol it was run under
+    (None for readings taken with no protocol's steps), the scale and the
+    strain the runbook names."""
+
+    model_config = ConfigDict(extra="allow")
+
+    protocolId: str | None
+    scale: float
+    strainId: str | None
+
+
+class MeasuredEvidence(BaseModel):
+    """A measured value a reconciliation released (the browser's
+    `MeasuredEvidence`, src/lib/studies.ts): evidence about the run that
+    produced it, kept with its conditions and the run's deviations, and
+    linked to the prediction it tests."""
+
+    model_config = ConfigDict(extra="allow")
+
+    id: str
+    depositionId: str
+    runbookId: str
+    productId: str | None
+    predictionId: str
+    label: str
+    value: float
+    unit: str
+    provenance: Provenance
+    conditions: MeasuredConditions
+    deviations: list[str]
+    # False while the operator has not read the value back.
+    confirmed: bool
+    at: str
+
+
+class ProformaScenario(BaseModel):
+    """A scenario a person made in Proforma (the browser's `Scenario`,
+    src/lib/proforma.ts): the shelf flowsheet it runs (`modelId`), its name,
+    whether it is pinned, and, on `custom_train_v1`, the kept vessel design
+    and train run it is built from. A row an earlier page wrote keeps the
+    fields it carried beside these, alpha 1.0's `dims`, `point` and
+    `assumptions` among them."""
+
+    model_config = ConfigDict(extra="allow")
+
+    id: str
+    modelId: str
+    kind: Literal["biosteam"]
+    name: str
+    description: str
+    product: str
+    pinned: bool
+    # The shelf flowsheet New scenario made it on (GET /api/proforma/shelf).
+    flowsheetId: str | None = None
+    # The newest run the page saw of it; None while it has none.
+    lastRunId: str | None = None
+    createdAt: str | None = None
+    # What a scenario on `custom_train_v1` is built from, by artifact id: a
+    # kept `fermos.vessel` design and a kept `pureos.train_run`.
+    vessel: str | None = None
+    trainRun: str | None = None
+
+
+class TrainMade(BaseModel):
+    """A train a person built in pureOS's Builder and saved (the browser
+    reads it as `TrainMade`, src/lib/durable.ts): the train as data, when it
+    was saved, and the name it was saved under."""
+
+    model_config = ConfigDict(extra="allow")
+
+    train: TrainSpec
+    savedAt: str
+    by: str
+
+
+class RunbookLock(BaseModel):
+    """A runbook's lock as the project keeps it: when its predictions and
+    measures were frozen, and their digest (runbook_lock.py)."""
+
+    lockedAt: str
+    lockHash: str
+
+
+class RefusedRow(BaseModel):
+    """A row the project keeps that does not read as its kind: the kind, the
+    id the page wrote it under, and why, in words."""
+
+    kind: str
+    id: str
+    why: str
+
+
+class ProjectState(BaseModel):
+    """GET /api/state: everything the project keeps of the work done in its
+    pages, keyed as the page keeps it (src/lib/projectState.ts), each row read
+    as its kind's model. A row that does not read is named in `refused` with
+    why, and every other row is served beside it."""
+
+    depositions: list[Deposition]
+    measuredEvidence: list[MeasuredEvidence]
+    # The runbooks a page adopted from a draft and those studies made; a
+    # page's lock rides in runbookLocks.
+    runbooks: list[Runbook]
+    runbookLocks: dict[str, RunbookLock]
+    # The parameter panel's overrides, by scope.
+    overrides: dict[str, list[Override]]
+    # The fermOS fits chosen for a scenario's inputs: scenario id, then input
+    # key, then the fit's artifact id.
+    fits: dict[str, dict[str, str]]
+    scenarios: list[ProformaScenario]
+    # The trains built in pureOS's Builder, by train id.
+    trains: dict[str, TrainMade]
+    # Postdoc's Live conversations, each served whole (postdoc/conversations.py).
+    conversations: list[LiveConversation]
+    # Who deposited each deposition, by id: its row's maker, which no page sends.
+    depositedBy: dict[str, str]
+    refused: list[RefusedRow]
+
+
+class StateKept(BaseModel):
+    """PUT /api/state/{kind}/{id}: the row the project keeps now, as the page
+    sent it, under its kind and id."""
+
+    kind: str
+    id: str
+    value: Any
+
+
+class StateTakenBack(BaseModel):
+    """DELETE /api/state/{kind}/{id}: the row a person took back, by its kind
+    and id; `removed` says the project holds no such row now."""
+
+    kind: str
+    id: str
+    removed: bool
+
+
+# ── A project's protocols (protocols.py; alpha 2.2 E.12a, ADR-017) ──────
+#
+# A protocol as the lab writes it, kept whole as a row of `protocols`
+# (migration 0010) and served whole: its own fields, written when it is made,
+# and its versions, each kept as it was kept and never replaced. Its numbers
+# are what the protocol says, written for its base batch (an amount, a stock's
+# concentration, a timer, the minutes a run takes); a material that rests on a
+# record names the record by its id.
+
+ProtocolCategory = Literal["media", "culture", "analytics", "harvest", "fermentation", "sop"]
+# How a material's amount moves when the batch is scaled: with the batch's
+# volume, with the biomass, or not at all.
+ScalingClass = Literal["per_batch_volume", "fixed", "per_unit_biomass"]
+# A protocol's id, a version's and a step's: a letter or a digit first, then
+# letters, digits, '.', '_' or '-'. Practice names a step as
+# "<protocol>:<step>", so neither holds a colon.
+PROTOCOL_ID = r"^[A-Za-z0-9][A-Za-z0-9._-]{0,79}$"
+PART_ID = r"^[A-Za-z0-9][A-Za-z0-9._-]{0,39}$"
+# A step's placeholders: a material's amount at the batch's scale, and the
+# volume of its stock that holds that amount (src/engine/scale.ts).
+PLACEHOLDER = re.compile(r"\{\{(qty|stock):([^}]+)\}\}")
+
+
+class MaterialStock(BaseModel):
+    """The stock solution a material is drawn from: how much of the material
+    one of `unit` of stock holds, in the material's own unit."""
+
+    conc: FiniteFloat = Field(gt=0)
+    unit: str = Field(min_length=1, max_length=40)
+
+
+class Material(BaseModel):
+    """One material of a version, its amount written for the base batch."""
+
+    name: str = Field(min_length=1, max_length=200)
+    amount: FiniteFloat = Field(ge=0)
+    unit: str = Field(max_length=40)
+    scaling: ScalingClass
+    # The increment an amount is rounded to at a scale, so a scaled amount
+    # stays one the bench can measure; 0 rounds nothing.
+    precision: FiniteFloat = Field(ge=0)
+    stock: MaterialStock | None = None
+    # The record the amount rests on, by its id.
+    sourceRecordId: str | None = Field(default=None, max_length=120)
+
+    @field_validator("name")
+    @classmethod
+    def _a_name_a_step_can_bind(cls, v: str) -> str:
+        if not v.strip():
+            raise ValueError("a material has a name")
+        if "{" in v or "}" in v:
+            raise ValueError(f"a material's name is one a step binds with {{{{qty:name}}}}, and {v!r} holds a brace")
+        return v
+
+
+class Step(BaseModel):
+    """One step of a version: what the person does, with `{{qty:<material>}}`
+    where a material's amount stands and `{{stock:<material>}}` where the
+    volume of its stock does, each at the batch's scale."""
+
+    id: str = Field(pattern=PART_ID)
+    text: str = Field(min_length=1, max_length=4000)
+    timerSec: FiniteFloat | None = Field(default=None, gt=0)
+    timerLabel: str | None = Field(default=None, max_length=200)
+    # The checks the person ticks off within the step.
+    multiCheck: list[str] = Field(default_factory=list, max_length=40)
+    # Why the step is done as written.
+    note: str | None = Field(default=None, max_length=2000)
+    # The records and papers the step rests on, by id.
+    refs: list[str] = Field(default_factory=list, max_length=40)
+    # The skills a person needs to do the step, by their ids in the project's
+    # skill catalogue, which a keep holds them to: Guild's matrix and the
+    # run's gate read them (guild.step_skills).
+    skills: list[str] = Field(default_factory=list, max_length=20)
+
+    @field_validator("text")
+    @classmethod
+    def _says_something(cls, v: str) -> str:
+        if not v.strip():
+            raise ValueError("a step says what the person does")
+        return v
+
+    @field_validator("skills", "refs")
+    @classmethod
+    def _ids(cls, v: list[str]) -> list[str]:
+        return list(dict.fromkeys(s.strip() for s in v if s and s.strip()))
+
+
+class BaseBatch(BaseModel):
+    """The batch a version's amounts are written for: its size, its unit and
+    what it is called."""
+
+    value: FiniteFloat = Field(gt=0)
+    unit: str = Field(min_length=1, max_length=40)
+    label: str = Field(max_length=200)
+
+
+class EstMinutes(BaseModel):
+    """How long a run of the version takes, hands on and in all, in minutes."""
+
+    active: FiniteFloat = Field(ge=0)
+    total: FiniteFloat = Field(ge=0)
+
+
+class ProtocolReference(BaseModel):
+    """A paper or a record the version rests on, by id, with what it gives."""
+
+    paperId: str | None = Field(default=None, max_length=120)
+    recordId: str | None = Field(default=None, max_length=120)
+    note: str | None = Field(default=None, max_length=2000)
+
+
+class ProtocolVersion(BaseModel):
+    """One version of a protocol, kept as it was kept: its base batch, its
+    materials, equipment and safety notes, its steps, the minutes a run takes
+    and what it rests on. The service writes who kept it (`by`) and when
+    (`at`, ISO 8601 in UTC) over what a version sends."""
+
+    version: str = Field(pattern=PART_ID)
+    # What changed from the version before, in words.
+    changelog: str | None = Field(default=None, max_length=4000)
+    baseBatch: BaseBatch
+    materials: list[Material] = Field(default_factory=list, max_length=200)
+    equipment: list[str] = Field(default_factory=list, max_length=100)
+    safety: list[str] = Field(default_factory=list, max_length=100)
+    steps: list[Step] = Field(default_factory=list, max_length=500)
+    estMinutes: EstMinutes
+    references: list[ProtocolReference] = Field(default_factory=list, max_length=100)
+    by: str = Field(default="", max_length=200)
+    at: str = ""
+
+    @model_validator(mode="after")
+    def _its_steps_bind_its_materials(self) -> "ProtocolVersion":
+        materials: dict[str, Material] = {}
+        for m in self.materials:
+            if m.name in materials:
+                raise ValueError(f"version {self.version} names the material {m.name!r} twice")
+            materials[m.name] = m
+        seen: set[str] = set()
+        for st in self.steps:
+            if st.id in seen:
+                raise ValueError(f"version {self.version} has two steps {st.id}")
+            seen.add(st.id)
+            for kind, name in PLACEHOLDER.findall(st.text):
+                held = materials.get(name)
+                if held is None:
+                    raise ValueError(f"step {st.id} binds {name!r}, which is no material of version {self.version}")
+                if kind == "stock" and held.stock is None:
+                    raise ValueError(f"step {st.id} asks for a volume of the stock of {name!r}, and {name!r} names "
+                                     "no stock solution")
+        return self
+
+
+class Protocol(BaseModel):
+    """A protocol a project keeps (the browser's `Protocol`,
+    src/lib/protocols.ts): its own fields, written when it is made, and its
+    versions, the current one named by `currentVersion`."""
+
+    id: str = Field(pattern=PROTOCOL_ID)
+    title: str = Field(min_length=1, max_length=200)
+    category: ProtocolCategory
+    # The organisms it is written for, in words.
+    organisms: list[str] = Field(default_factory=list, max_length=40)
+    bsl: Literal[1, 2]
+    purpose: str = Field(default="", max_length=4000)
+    versions: list[ProtocolVersion] = Field(min_length=1, max_length=200)
+    currentVersion: str
+    # Where the protocol comes from, in words.
+    provenanceNote: str = Field(default="", max_length=2000)
+
+    @model_validator(mode="after")
+    def _current_is_one_of_its_versions(self) -> "Protocol":
+        held = [v.version for v in self.versions]
+        twice = sorted({v for v in held if held.count(v) > 1})
+        if twice:
+            raise ValueError(f"{self.id} holds version {twice[0]} twice; a version is kept once")
+        if self.currentVersion not in held:
+            raise ValueError(f"{self.id}'s current version {self.currentVersion!r} is none of its versions "
+                             f"({', '.join(held)})")
+        return self
+
+
+class ProtocolKeep(BaseModel):
+    """POST /api/protocols: a protocol the project does not keep yet, with its
+    versions, and the name of the person who keeps it."""
+
+    protocol: Protocol
+    by: str = ""
+
+
+class ProtocolVersionKeep(BaseModel):
+    """POST /api/protocols/{id}/versions: a new version of a protocol the
+    project keeps, under a version of its own, and the name of the person who
+    keeps it; it becomes the protocol's current version."""
+
+    version: ProtocolVersion
+    by: str = ""

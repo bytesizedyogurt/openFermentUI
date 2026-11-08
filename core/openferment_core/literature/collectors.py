@@ -29,6 +29,16 @@ text exactly as the PDF library read it. An SGD strain entry is split by
 `split_sgd` into its description, its genotype and the references it cites,
 its markup removed and nothing added.
 
+A file named by its address is fetched with the same manners (`fetch_file`,
+alpha 2.2 D10 and its amendment at C.6): a public https address alone, its
+host read or resolved and checked before each request, the first and each
+redirect's, and the request sent to the address checked; a redirect followed
+to another such address alone; the bytes streamed and refused past the size
+its caller takes; the whole exchange held to a deadline. Its caller is the
+import of an SFF file by the address a person names (engine/sff.py
+`import_url`, through POST /api/flowsheets/import-url), which keeps the file
+as an uploaded one is kept.
+
 The licence is read from the source and mapped to the kit's classes
 (`licence_class`), failing closed: what is not plainly public domain or a
 Creative Commons licence is `unknown`, and the kit leaves `unknown` out of
@@ -43,19 +53,25 @@ from __future__ import annotations
 
 import html
 import io
+import ipaddress
 import json
+import logging
 import os
 import re
+import socket
 import tempfile
 import threading
 import time
 import xml.etree.ElementTree as ET
+from collections.abc import Callable
 from dataclasses import dataclass, field
 from datetime import datetime, timezone
 from pathlib import Path
 from typing import Any
 from urllib.parse import unquote, urlsplit
 
+import anyio
+import anyio.to_thread
 import httpx
 
 from ..models import FetchedSection, FetchLicense, FetchResult, FetchSource
@@ -69,7 +85,7 @@ _CORE = Path(__file__).parent.parent.parent
 
 def _env_path(name: str, default: Path) -> Path:
     """An override from the environment. A relative one is taken from the
-    repository root — the `pnpm intake:*` aliases run from core/, and a path
+    repository root — the `pnpm intake:extract` command runs from core/, and a path
     typed at the root must not quietly land in core/core/."""
     raw = os.environ.get(name, "").strip()
     if not raw:
@@ -86,6 +102,7 @@ TIMEOUT_S = 20.0
 MIN_INTERVAL_S = 0.5
 
 XLINK = "{http://www.w3.org/1999/xlink}"
+log = logging.getLogger(__name__)
 _last_request_at = 0.0
 
 
@@ -95,7 +112,7 @@ class NetworkRefused(RuntimeError):
 
 class Transient(RuntimeError):
     """The network's condition, not the paper's: a 5xx that survived the one
-    retry. Never cached — the next run asks again (OF-BLD-012.1 §6.9)."""
+    retry. Never cached — the next run asks again."""
 
 
 def fixtures_only() -> bool:
@@ -147,6 +164,323 @@ def _get(
         last = response
     assert last is not None
     return last
+
+
+# ── a file by its address (alpha 2.2 D10) ──────────────────────────────
+
+#: The redirects a fetch by address follows, each to another https address. A setting.
+MAX_REDIRECTS = 5
+#: The longest a fetch by address may take from its first request to the
+#: file's last byte, the host's resolution, the connection, the TLS handshake
+#: and the headers included; connecting and each read are held to TIMEOUT_S
+#: besides. A setting.
+FILE_TIMEOUT_S = 120.0
+
+#: What a fetch by address asks a host's name to resolve to: (host, port) to
+#: the addresses, as socket.getaddrinfo answers. A test passes a stand-in.
+Resolve = Callable[[str, int], list[str]]
+
+
+class AddressRefused(ValueError):
+    """An address a fetch by address does not take, in words: one that is
+    not https, one that carries a user name or a password, one whose host is
+    or resolves to an address outside the public internet, or a redirect to
+    any of these."""
+
+
+class TooLarge(ValueError):
+    """The address served more bytes than its caller takes."""
+
+
+class HostFailed(RuntimeError):
+    """The host could not be found or reached in time, or answered an error, in words."""
+
+
+@dataclass(frozen=True)
+class Fetched:
+    """A file an address served: its bytes as they came, the address asked,
+    the address that served it after any redirect, and the content type it
+    was served as ('' when the host said none)."""
+
+    data: bytes
+    url: str
+    served: str
+    kind: str
+
+
+def _size(n: int) -> str:
+    mb = 1024 * 1024
+    return f"{n // mb} MB" if n >= mb and n % mb == 0 else f"{n} bytes"
+
+
+def https_address(url: str) -> str:
+    """`url` as a fetch by address takes it, its spaces trimmed: an https
+    address naming a host, with no user name or password in it (the record
+    keeps the address as its source). Refused in words otherwise."""
+    asked = url.strip()
+    try:
+        parsed = httpx.URL(asked)
+    except httpx.InvalidURL as e:
+        raise AddressRefused(f"{asked!r} is not an address: {e}") from None
+    if parsed.scheme != "https" or not parsed.host:
+        raise AddressRefused(f"{asked or 'an empty address'} is not an https address; a file is fetched from an "
+                             "https address alone")
+    if parsed.userinfo:
+        raise AddressRefused(f"the address names a user or a password; a file is fetched from an address that names "
+                             f"neither, since the record keeps the address as its source ({parsed.host})")
+    return asked
+
+
+IPAddress = ipaddress.IPv4Address | ipaddress.IPv6Address
+
+#: Each class of address a fetch by address refuses, as Python's ipaddress
+#: module decides it, in the order its words are chosen.
+_REFUSED = (
+    ("is_unspecified", "the unspecified address"),
+    ("is_loopback", "a loopback address"),
+    ("is_link_local", "a link-local address"),
+    ("is_multicast", "a multicast address"),
+    ("is_reserved", "a reserved address"),
+    ("is_private", "a private address"),
+    ("is_site_local", "a private address"),
+)
+
+
+def _resolve(host: str, port: int) -> list[str]:
+    """The addresses `host` resolves to, in the order the system gives them."""
+    return [info[4][0] for info in socket.getaddrinfo(host, port, type=socket.SOCK_STREAM, proto=socket.IPPROTO_TCP)]
+
+
+def _literal(host: str) -> IPAddress | None:
+    """The address a host names by its digits, as the system reads them: a
+    dotted quad, an IPv6 address, or a short or numeric form such as 127.1,
+    2130706433 or 0x7f000001."""
+    try:
+        return ipaddress.ip_address(host)
+    except ValueError:
+        pass
+    try:
+        return ipaddress.IPv4Address(socket.inet_aton(host))
+    except (OSError, ValueError):
+        return None
+
+
+def _v4(address: IPAddress) -> IPAddress:
+    """An IPv4-mapped IPv6 address read as its IPv4 address; any other as it is."""
+    mapped = getattr(address, "ipv4_mapped", None)
+    return mapped if mapped is not None else address
+
+
+def _address_words(address: IPAddress) -> str:
+    """An address as the refusal words write it, the same on every Python: an
+    IPv4-mapped IPv6 address as ::ffff: and its dotted IPv4 address (Python
+    3.13 writes it so, and 3.12 writes it in hexadecimal groups); any other as
+    `str` writes it."""
+    mapped = getattr(address, "ipv4_mapped", None)
+    return f"::ffff:{mapped}" if mapped is not None else str(address)
+
+
+def refused_class(address: IPAddress) -> str | None:
+    """Why a fetch by address does not connect to `address`, in words, or
+    None for a public address. An IPv4-mapped IPv6 address is read as its
+    IPv4 address."""
+    seen = _v4(address)
+    for test, said in _REFUSED:
+        if getattr(seen, test, False):
+            return said
+    return None if seen.is_global else "an address outside the public internet"
+
+
+def public_addresses(url: httpx.URL, resolve: Resolve) -> tuple[str, ...]:
+    """The addresses a fetch of `url` may connect to: its host read as an
+    address when it names one by its digits, else every address its name
+    resolves to, each a public one. Refused in words (AddressRefused) when
+    any is loopback, private, link-local, multicast, reserved, unspecified or
+    otherwise outside the public internet; HostFailed when the name resolves
+    to nothing."""
+    host = url.raw_host.decode("ascii")
+    literal = _literal(host)
+    if literal is not None:
+        found = [literal]
+    else:
+        try:
+            said = resolve(host, url.port or 443)
+        except (OSError, UnicodeError) as e:
+            log.info("the host name %s could not be resolved: %s: %s", host, type(e).__name__, e)
+            raise HostFailed(f"the host name {host} could not be found") from None
+        try:
+            found = [ipaddress.ip_address(a) for a in said]
+        except ValueError:
+            raise HostFailed(f"the host name {host} resolved to an address this fetch cannot read") from None
+        if not found:
+            raise HostFailed(f"the host name {host} resolves to no address")
+    for address in found:
+        why = refused_class(address)
+        if why is None:
+            continue
+        if literal is None:
+            resolved = ", ".join(_address_words(a) for a in found)
+            named = f"{host} resolves to {resolved}; {_address_words(address)} is {why}"
+        elif _address_words(literal) == host:
+            named = f"{host} is {why}"
+        else:
+            named = f"{host} reads as {_address_words(literal)}, {why}"
+        raise AddressRefused(f"{named}; a file is fetched from a public address alone")
+    return tuple(dict.fromkeys(str(_v4(a)) for a in found))
+
+
+class _Pinned(httpx.AsyncBaseTransport):
+    """Sends each request to an address its host was checked as, alone: the
+    request goes to that address by its digits, with its Host
+    header and the TLS server name (SNI, and the name its certificate is
+    checked against) the host's own, so no second resolution can move it.
+    Each checked address is tried in the order the host resolved to until
+    one connects, as the system's own connect tries them."""
+
+    def __init__(self, pins: dict[tuple[str, int], tuple[str, ...]], network: httpx.AsyncBaseTransport) -> None:
+        self.pins = pins
+        self.network = network
+
+    async def handle_async_request(self, request: httpx.Request) -> httpx.Response:
+        host = request.url.raw_host.decode("ascii")
+        addresses = self.pins.get((host, request.url.port or 443))
+        if not addresses:
+            raise httpx.ConnectError(f"{host} was not checked before connecting", request=request)
+        failed: httpx.ConnectError | httpx.ConnectTimeout | None = None
+        for address in addresses:
+            sent = httpx.Request(request.method, request.url.copy_with(host=address), headers=request.headers,
+                                 stream=request.stream, extensions={**request.extensions, "sni_hostname": host})
+            try:
+                return await self.network.handle_async_request(sent)
+            except (httpx.ConnectError, httpx.ConnectTimeout) as e:
+                failed = e
+        assert failed is not None
+        raise failed
+
+    async def aclose(self) -> None:
+        await self.network.aclose()
+
+
+def _failure(e: httpx.HTTPError) -> str:
+    """What went wrong with a request, in a person's words; the log keeps the
+    exception's own."""
+    said = str(e)
+    if isinstance(e, httpx.ConnectTimeout):
+        return f"the host did not answer within {TIMEOUT_S:g} s"
+    if isinstance(e, httpx.ReadTimeout):
+        return f"the host sent nothing for {TIMEOUT_S:g} s"
+    if isinstance(e, httpx.TimeoutException):
+        return "the host did not take the request in time"
+    if isinstance(e, httpx.ConnectError):
+        if "CERTIFICATE_VERIFY_FAILED" in said or "certificate" in said.lower():
+            return "the host's certificate could not be verified"
+        if "SSL" in said or "TLS" in said:
+            return "a secure connection to the host could not be made"
+        if "refused" in said.lower():
+            return "the host refused the connection"
+        return "the host could not be reached"
+    if isinstance(e, httpx.RemoteProtocolError):
+        return "the host's answer was not an HTTP answer"
+    if isinstance(e, httpx.DecodingError):
+        return "the host's answer could not be decoded"
+    if isinstance(e, httpx.ReadError):
+        return "the connection broke while the file arrived"
+    return "the host's answer could not be read"
+
+
+async def _whole(response: httpx.Response, at: str, limit: int) -> bytes:
+    """The body as it streams in, refused once it passes `limit` bytes, or
+    as soon as the host states a larger length for an uncompressed body."""
+    said = response.headers.get("content-length", "").strip()
+    if said.isdigit() and int(said) > limit and not response.headers.get("content-encoding"):
+        raise TooLarge(f"the file at {at} is {int(said)} bytes, larger than the {_size(limit)} an import takes")
+    data = bytearray()
+    async for chunk in response.aiter_bytes():
+        data += chunk
+        if len(data) > limit:
+            raise TooLarge(f"the file at {at} is larger than the {_size(limit)} an import takes")
+    return bytes(data)
+
+
+def _redirect(at: str, following: httpx.URL) -> str:
+    """The address a redirect from `at` names, held to the rules the first
+    address is held to; refused in words otherwise."""
+    if following.scheme != "https" or not following.host:
+        raise AddressRefused(f"{at} redirected to {following}, which is not an https address; a redirect is followed "
+                             "to another https address alone")
+    if following.userinfo:
+        raise AddressRefused(f"{at} redirected to an address that names a user or a password ({following.host}); a "
+                             "redirect is followed to an address that names neither, since the record keeps it as its "
+                             "source")
+    return str(following)
+
+
+async def _fetch(asked: str, limit: int, network: httpx.AsyncBaseTransport | None, resolve: Resolve) -> Fetched:
+    pins: dict[tuple[str, int], tuple[str, ...]] = {}
+    network = network or httpx.AsyncHTTPTransport(trust_env=False, limits=httpx.Limits(max_keepalive_connections=0))
+    at, came_from = asked, ""
+    async with httpx.AsyncClient(transport=_Pinned(pins, network), timeout=TIMEOUT_S, trust_env=False,
+                                 headers={"User-Agent": _user_agent()}) as client:
+        for _ in range(MAX_REDIRECTS + 1):
+            url = httpx.URL(at)
+            try:
+                pins[(url.raw_host.decode("ascii"), url.port or 443)] = await anyio.to_thread.run_sync(
+                    public_addresses, url, resolve, abandon_on_cancel=True)
+            except AddressRefused as e:
+                raise AddressRefused(f"{came_from} redirected to {at}: {e}" if came_from else str(e)) from None
+            ahead: str | None = None
+            for attempt in (1, 2):
+                _throttle()
+                try:
+                    async with client.stream("GET", at) as response:
+                        if response.next_request is not None:
+                            ahead = _redirect(at, response.next_request.url)
+                            break
+                        if response.status_code >= 500 and attempt == 1:
+                            continue
+                        if not response.is_success:
+                            raise HostFailed(f"{at} answered {response.status_code} {response.reason_phrase}".strip())
+                        kind = response.headers.get("content-type", "").split(";")[0].strip().lower()
+                        return Fetched(data=await _whole(response, at, limit), url=asked, served=at, kind=kind)
+                except httpx.HTTPError as e:
+                    log.info("the fetch of %s failed: %s: %s", at, type(e).__name__, e)
+                    raise HostFailed(f"{at} could not be fetched: {_failure(e)}") from e
+            assert ahead is not None
+            at, came_from = ahead, at
+    raise HostFailed(f"{asked} redirected more than {MAX_REDIRECTS} times")
+
+
+def fetch_file(url: str, *, limit: int, transport: httpx.AsyncBaseTransport | None = None,
+               resolve: Resolve | None = None) -> Fetched:
+    """The bytes a public https address serves, fetched with the project's
+    manners: the throttle before every request, the User-Agent, a timeout on
+    connecting and on each read (TIMEOUT_S), and one retry on a 5xx. Before
+    each request (the first and each redirect's), the host is read as an
+    address or resolved, and refused unless every address it names is a
+    public one (`public_addresses`); the request then goes to an address
+    that was checked, with no proxy (`_Pinned`). The whole exchange, from the
+    first resolution to the file's last byte, is held to FILE_TIMEOUT_S. The
+    body is streamed and refused past `limit` bytes before the rest is read;
+    a redirect is followed to another https address alone, at most
+    MAX_REDIRECTS times. In fixture mode the network is refused, as every
+    collector refuses it. `transport` stands in for the network and `resolve`
+    for the system's resolver in a test.
+
+    Raises AddressRefused, TooLarge, HostFailed (the host could not be
+    found, reached or read in time, or answered an error) or NetworkRefused,
+    each in words."""
+    asked = https_address(url)
+    if fixtures_only():
+        raise NetworkRefused(f"OPENFERMENT_FIXTURES is set; refusing to GET {asked}")
+
+    async def held() -> Fetched:
+        try:
+            with anyio.fail_after(FILE_TIMEOUT_S):
+                return await _fetch(asked, limit, transport, resolve or _resolve)
+        except TimeoutError:
+            raise HostFailed(f"{asked} did not serve the whole file within {FILE_TIMEOUT_S:g} s") from None
+
+    return anyio.run(held)
 
 
 # ── resolution ─────────────────────────────────────────────────────────

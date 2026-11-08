@@ -4,62 +4,45 @@
 // (lib/projectState.ts and the service's own stores); what this browser keeps
 // is its preferences and the writes the service has not yet acknowledged
 // (src/lib/durable.ts), and localStorage holds the last-open project alone.
-import { useMemo } from 'react';
+import { useEffect, useMemo, useRef, useState } from 'react';
 import { create } from 'zustand';
-import type {
-  Project,
-  InputAssumption,
-  Override,
-  RunbookDraft,
-  ReviewDecision,
-  ActivityEvent,
-  LiveConversation,
-  LiveTurn,
-  TraceStep,
-  Deposition,
-  Deviation,
-  ExtractionRecord,
-  Job,
-  MeasuredEvidence,
-  LearnModule,
-  OverlayPaper,
-  Paper,
-  Product,
-  Protocol,
-  Provenance,
-  RecordStatus,
-  Runbook,
-  SeriesRole,
-  FermosFitResponse,
-  TrainProposal,
-  TrainFromRun,
-  TrainRun,
-  KeptTrain,
-  RunOutput,
-  RunState,
-  Scenario,
-  Strain,
-  TimerState,
-  Overlay,
-  Guild,
-  GuildEvidence,
-  GuildPerson,
-  GuildPolicy,
-  GuildWithdrawal,
-  Practice,
-  PracticeScenario,
-  PracticeSession,
-  Check,
-  CheckNote,
-  CheckResult,
-  Checks,
-  Skill,
-  TrainSpec,
-} from '@/data/types';
+import {
+  CataloguesDown,
+  listLessons,
+  listProducts,
+  listSkills,
+  listStrains,
+  type Lesson,
+  type Product,
+  type Skill,
+  type Strain,
+} from '@/lib/catalogues';
+import type { CheckNote, CheckResult, Checks } from '@/lib/checks';
+import type { Guild, GuildEvidence, GuildPerson, GuildPolicy, GuildWithdrawal } from '@/lib/guild';
+import type { Practice, PracticeScenario, PracticeSession } from '@/lib/practice';
+import { ProtocolsDown, ProtocolsRefused, keepVersion, listProtocols, makeProtocol as makeProtocolOnService, protocolOf, type Protocol, type ProtocolVersion } from '@/lib/protocols';
+import type { FermosFitResponse } from '@/lib/fermos';
+import type { Override } from '@/lib/params';
+import type { LiveConversation, LiveTurn, RunbookDraft, TraceStep } from '@/lib/postdoc';
+import type { Scenario } from '@/lib/proforma';
+import type { KeptTrain, TrainFromRun, TrainProposal, TrainRun, TrainSpec } from '@/lib/pureos';
+import type { ExtractionRecord, Overlay, OverlayPaper, Paper, RecordStatus, ReviewDecision, RunOutput } from '@/lib/review';
+import {
+  measuresOf,
+  outputsOf,
+  predictionsOf,
+  stagesOf,
+  type Deposition,
+  type MeasuredEvidence,
+  type Provenance,
+  type Runbook,
+  type SeriesRole,
+} from '@/lib/studies';
 import { toSI } from '@/engine/units';
 import { runbookLockHash } from '@/engine/lock';
 import { computeDeltas } from '@/engine/reconcile';
 import { parseReadingsCsv, placeRow } from '@/engine/series';
+import { correctionOf } from '@/engine/readings';
 import {
   type DurableReviewDecision,
   EMPTY_SNAPSHOT,
@@ -69,12 +52,14 @@ import {
   loadDurable,
   saveDurable,
   type DurableSnapshot,
+  type ScenarioAssumption,
   type TrainMade,
 } from '@/lib/durable';
 import { DecisionRefused, IntakeDown, extractPaper, loadOverlay, postDecision } from '@/lib/intake';
-import { blocks, writeRefusal, type ReviewAction } from '@/lib/review';
+import { blocks, recordOf, writeRefusal, type ReviewAction } from '@/lib/review';
+import { isFieldId } from '@/data/ontology';
 import { call } from '@/lib/http';
-import { openProjectId, projectSettled, setOpenProjectId } from '@/lib/project';
+import { openProjectId, projectSettled, setOpenProjectId, type Project } from '@/lib/project';
 import {
   EMPTY_STATE,
   applyEntries,
@@ -84,6 +69,7 @@ import {
   flush,
   loadProjectState,
   type OutboxEntry,
+  type ProjectRows,
   type ProjectState,
 } from '@/lib/projectState';
 import {
@@ -105,12 +91,106 @@ export type Theme = 'bench' | 'night';
 export type Density = 'comfortable' | 'dense';
 export type UnitMode = 'published' | 'si';
 
-export interface Toast {
+interface Toast {
   id: string;
   text: string;
   kind: 'info' | 'success' | 'warn' | 'error';
   href?: string;
   hrefLabel?: string;
+}
+
+/**
+ * A line of this page's recent activity, as Home lists it, newest first (`logActivity`): when it happened, the icon
+ * it draws with, its words, the page it links to, and the provenance its tick shows.
+ */
+interface ActivityEvent {
+  at: string;
+  icon: string;
+  text: string;
+  href?: string;
+  provenance: Provenance;
+}
+
+interface JobStage {
+  label: string;
+  ms: number;
+}
+
+export interface Job {
+  id: string;
+  title: string;
+  /**
+   * 'runbook' is a Job that fronts a Runbook: the tray shows the progress bar
+   * while the record it belongs to lives in its own slice (OF-BLD-005 §7).
+   * The two cooperate and stay apart.
+   */
+  kind: 'ingest' | 'extraction' | 'simulation' | 'run' | 'runbook';
+  stages: JobStage[];
+  stageIndex: number;
+  stageProgress: number; // 0-1 within current stage
+  status: 'running' | 'done' | 'failed';
+  failReason?: string;
+  href?: string;
+  /** What the job is on, by its id (the document an extraction reads), so a page finds it; `title` names it in words. */
+  subject?: string;
+  startedAt: number;
+}
+
+/** Something that went other than the protocol says, written at the step it happened at. */
+export interface Deviation {
+  at: string;
+  stepId: string;
+  text: string;
+}
+
+/**
+ * A run of a protocol at the bench, this page's own (alpha 2.2 E.12): the
+ * transient half of a deposition, its current step, live timers and checks.
+ */
+export interface RunState {
+  id: string;
+  protocolId: string;
+  version: string;
+  scale: number; // multiplier vs baseBatch
+  startedAt: number; // epoch ms
+  currentStep: number;
+  completed: Record<string, number>; // stepId -> epoch ms completed
+  skipped: Record<string, string>; // stepId -> reason
+  checks: Record<string, boolean[]>; // stepId -> multiCheck states
+  deviations: Deviation[];
+  timers: TimerState[];
+  finishedAt?: number;
+  /**
+   * The durable Deposition this session is writing into, when there is one
+   * (OF-BLD-006 §4.2).
+   *
+   * A RunState is the transient half — current step, live timers, scroll
+   * position — and it legitimately dies with the tab. The Deposition is the
+   * record, and it does not. Keeping the link here keeps the durable object
+   * free of a reference to something that will not survive alongside it.
+   */
+  depositionId?: string;
+  /**
+   * Who is performing the steps, from Guild's ledger (OF-BLD-013 §2). Starts
+   * as whoever is signing in Guild; a handover changes it. Null when the
+   * ledger has nobody on it, and then no step is gated.
+   */
+  operatorId?: string | null;
+  /** Who stood beside the operator, per step, for a step that needed a cosigner. */
+  cosigned?: Record<string, string>;
+  /** Steps whose completion has already written to Guild's ledger, so a redo does not count twice. */
+  guildRecorded?: Record<string, true>;
+}
+
+/** A countdown a step's timer started, as the bench shows it. */
+interface TimerState {
+  id: string;
+  stepId: string;
+  label: string;
+  totalSec: number;
+  remainingSec: number;
+  running: boolean;
+  startedAt?: number;
 }
 
 interface UndoFrame {
@@ -122,7 +202,7 @@ interface UndoFrame {
 }
 
 let seq = 0;
-export const nextId = (prefix: string) => `${prefix}-${++seq}`;
+const nextId = (prefix: string) => `${prefix}-${++seq}`;
 
 /** An id that stays unique across reloads: the time, and a counter for ties. */
 export const timeId = (prefix: string) => `${prefix}-${Date.now().toString(36)}-${++seq}`;
@@ -227,7 +307,7 @@ function applyDecision(r: ExtractionRecord, d: DurableReviewDecision | ReviewDec
     provenance: d.provenance,
     gold: d.gold,
     corrected: d.corrected,
-    rejectReason: d.rejectReason,
+    rejectReason: d.rejectReason ?? null,
     reviewer: d.reviewer,
   };
   if ('quote' in d && d.quote) next.quote = d.quote;
@@ -264,13 +344,17 @@ function sameDecision(a: ExtractionRecord, b: ExtractionRecord): boolean {
   );
 }
 
-export interface OFState {
+interface OFState {
   // ── the project's data, from the service (session-mutable) ───────────
   papers: Paper[];
   records: ExtractionRecord[];
   runOutputs: RunOutput[];
+  /**
+   * The open project's strains, as its strain catalogue keeps them (lib/catalogues.ts, alpha 2.2 E.9): geneOS's
+   * hosts, the strains a record, a protocol, a runbook or a simulation names, and pureOS's hosts.
+   */
   strains: Strain[];
-  /** The molecule catalogue (OF-BLD-005). Session-mutable like the rest. */
+  /** The open project's products, as its product catalogue keeps them (alpha 2.2 E.9). */
   products: Product[];
   /**
    * Synthesised runbooks. Kept separate from `jobs` on purpose: a Job is a
@@ -286,15 +370,28 @@ export interface OFState {
    */
   depositions: Deposition[];
   /**
+   * Who deposited each deposition, by id: its row's maker on the service,
+   * the person a measurement resting on one of its readings names
+   * (`GET /api/state`'s `depositedBy`). A deposition the service has not
+   * yet acknowledged has none here.
+   */
+  depositedBy: Record<string, string>;
+  /**
    * First-party measurements released by reconciliation. Durable, and
    * deliberately a separate list from `records`: these are evidence about a
    * run, not extractions from a paper (OF-BLD-006 §5).
    */
   measuredEvidence: MeasuredEvidence[];
+  /**
+   * The open project's protocols, each whole with every version kept of it
+   * (ADR-017; lib/protocols.ts), read from the service as the page opens and
+   * after each version a person keeps.
+   */
   protocols: Protocol[];
   scenarios: Scenario[];
-  modules: LearnModule[];
-  /** A lab's skills (stage 2 serves them); none ship with the app. */
+  /** The project's lessons, as its lesson catalogue keeps them, each with its body (ADR-018); none ship with the app. */
+  lessons: Lesson[];
+  /** The project's skills, as its skill catalogue keeps them; none ship with the app. */
   skills: Skill[];
   activity: ActivityEvent[];
   /**
@@ -313,15 +410,12 @@ export interface OFState {
   reviewIndex: number;
   reviewStats: { accepted: number; rejected: number; edited: number; skipped: number; gold: number; startedAt: number };
   undoStack: UndoFrame[];
-  learnProgress: Record<string, boolean>;
-  /** Runbooks adopted from a Postdoc draft, by id (OF-BLD-014 §9.2). Durable. */
-  adoptedRunbookIds: string[];
   /**
-   * Proforma scenarios a person made from a shelf flowsheet, by id
-   * (OF-BLD-019 §3.1, D6): every scenario the project keeps. They live in
-   * `scenarios` and are saved whole as the project's rows, keyed by id.
+   * The runbooks the project keeps and those this page made, by id: each is one of the project's rows, sent when it
+   * changes (lib/projectState.ts). A runbook adopted from a Postdoc draft (OF-BLD-014 §9.2), promoted from a research
+   * runbook or opened to revise a locked one joins it as it is made.
    */
-  createdScenarioIds: string[];
+  adoptedRunbookIds: string[];
   /** A research runbook, unlocked, from a draft; returns its id. */
   adoptRunbookDraft: (draft: RunbookDraft) => string;
   /**
@@ -333,9 +427,9 @@ export interface OFState {
    * geneOS read the overrides, and the field is kept, derived, for the
    * snapshot an older build reads and the one-time migration.
    */
-  proformaAssumptions: Record<string, InputAssumption[]>;
+  proformaAssumptions: Record<string, ScenarioAssumption[]>;
   /** Writes the override `proforma:<scenarioId>` holds for the input, through `setOverride`. */
-  setProformaAssumption: (scenarioId: string, a: InputAssumption) => void;
+  setProformaAssumption: (scenarioId: string, a: ScenarioAssumption) => void;
   /** Removes it, through `clearOverride`. */
   clearProformaAssumption: (scenarioId: string, key: string) => void;
   /**
@@ -425,7 +519,17 @@ export interface OFState {
   dismissTimer: (runId: string, timerId: string) => void;
   tickTimers: (dtMs: number) => void;
   finishRun: (runId: string) => void;
-  addProtocolVersion: (protocolId: string, version: Protocol['versions'][number]) => void;
+  /**
+   * Keep a new version of one of the project's protocols in the reviewer's
+   * name and make it the current one (ADR-017). Null when the service kept
+   * it, else why it did not, in words.
+   */
+  keepProtocolVersion: (protocolId: string, version: ProtocolVersion) => Promise<string | null>;
+  /**
+   * Begin a protocol in the open project in the reviewer's name, with its first version (ADR-017): the service keeps it
+   * once under its id and the store holds it as kept. Answers null when it was kept, else the service's words.
+   */
+  beginProtocol: (protocol: Protocol) => Promise<string | null>;
 
   // runbooks (OF-BLD-005 §7) — a slice of its own, never folded into jobs
   /** Research → industrial in one action, carrying the finding across. */
@@ -493,15 +597,19 @@ export interface OFState {
    */
   dropLiveTurn: (conversationId: string, turnId: string) => void;
 
-  // learn
-  completeLesson: (lessonId: string) => void;
-
   // deposition (OF-BLD-006 §4)
   /**
    * Open a Deposition in `staged` and start the run session that writes into
    * it. Staged is the last moment the measurement schema can change (§4.5).
+   * With `protocolId` null the deposition records readings against the
+   * runbook's measures alone, at the bench DepositionBench serves, and no run
+   * session starts (`runId` null).
    */
-  openDeposition: (runbookId: string, protocolId: string, scale: number) => { depositionId: string; runId: string } | null;
+  openDeposition: (
+    runbookId: string,
+    protocolId: string | null,
+    scale: number,
+  ) => { depositionId: string; runId: string | null } | null;
   /** Staged → running. Nothing is recorded before this. */
   beginDeposition: (depositionId: string) => void;
   /**
@@ -580,15 +688,40 @@ export interface OFState {
    * base the next change is compared with (lib/projectState.ts). Null until
    * the project's rows have loaded, and nothing is sent before then.
    */
-  stateSeen: ProjectState | null;
+  stateSeen: ProjectRows | null;
   /** Project rows the service has not yet acknowledged, oldest first. */
   stateOutbox: OutboxEntry[];
   /** Rows this browser kept itself before alpha 2.0, until a project is open to carry them to. */
-  stateLegacy: ProjectState | null;
+  stateLegacy: ProjectRows | null;
   /** Why the open project's rows could not be loaded, in words; null when they were. */
   stateProblem: string | null;
   /** Load the open project's rows, lay the unsent ones over them, and send what is owed. */
   hydrateProjectState: () => Promise<void>;
+  /**
+   * Whether the store holds the open project's strains, products, skills and lessons, read from its catalogues this
+   * session; with no project open it holds none, and that is settled too.
+   */
+  cataloguesRead: boolean;
+  /** Why the open project's catalogues could not be read, in words; null when they were. */
+  cataloguesProblem: string | null;
+  /**
+   * Read the open project's strains and products (alpha 2.2 E.9) and its skills and lessons (E.12) from its
+   * catalogues, as the page opens and after the catalogues screen keeps an entry or takes in a file. What was read
+   * last stays when a read fails.
+   */
+  hydrateCatalogues: () => Promise<void>;
+  /** Whether the store holds the open project's protocols, read from the service this session. */
+  protocolsRead: boolean;
+  /** Why the open project's protocols could not be read, in words; null when they were. */
+  protocolsProblem: string | null;
+  /** Read the open project's protocols (ADR-017), as the page opens; what was read last stays when a read fails. */
+  hydrateProtocols: () => Promise<void>;
+  /**
+   * Read one of the open project's protocols from the service and hold it beside the rest: a protocol made after the
+   * page read them (`POST /api/protocols`, in a person's name) reaches a screen that names it. Answers null when the
+   * service held it, 'missing' when the project keeps none of the id, and the service's words when it could not say.
+   */
+  readProtocol: (protocolId: string) => Promise<null | 'missing' | string>;
   /** Put a project's rows in the page. */
   applyProjectState: (state: ProjectState) => void;
   /** Send the outbox; what the service does not answer stays for the next try. */
@@ -755,10 +888,12 @@ export interface OFState {
 function freezeLocked(runbooks: Runbook[]): Runbook[] {
   for (const r of runbooks) {
     if (!r.lockedAt) continue;
-    r.predictions.forEach((p) => Object.freeze(p));
-    r.measurementSchema.forEach((m) => Object.freeze(m));
-    Object.freeze(r.predictions);
-    Object.freeze(r.measurementSchema);
+    // A row that set no predictions or no measures froze empty lists of them, and holds none to freeze.
+    for (const list of [r.predictions, r.measurementSchema]) {
+      if (!list) continue;
+      list.forEach((x) => Object.freeze(x));
+      Object.freeze(list);
+    }
   }
   return runbooks;
 }
@@ -774,12 +909,13 @@ const initialState = () => ({
   runbooks: freezeLocked([] as Runbook[]),
   skills: [] as Skill[],
   depositions: [] as Deposition[],
+  depositedBy: {} as Record<string, string>,
   measuredEvidence: [] as MeasuredEvidence[],
   protocols: [] as Protocol[],
   scenarios: [] as Scenario[],
+  lessons: [] as Lesson[],
   // Activity starts empty: what lands in it is what a person did in this
   // browser, never an authored history (OF-BLD-016 §3.1).
-  modules: [] as LearnModule[],
   activity: [] as ActivityEvent[],
   liveConversations: [] as LiveConversation[],
   runs: {} as Record<string, RunState>,
@@ -792,13 +928,11 @@ const initialState = () => ({
   reviewIndex: 0,
   reviewStats: { accepted: 0, rejected: 0, edited: 0, skipped: 0, gold: 0, startedAt: Date.now() },
   undoStack: [] as UndoFrame[],
-  learnProgress: {} as Record<string, boolean>,
-  proformaAssumptions: {} as Record<string, InputAssumption[]>,
+  proformaAssumptions: {} as Record<string, ScenarioAssumption[]>,
   parameterOverrides: {} as Record<string, Override[]>,
   proformaFits: {} as Record<string, Record<string, string>>,
   trainsMade: {} as Record<string, TrainMade>,
   adoptedRunbookIds: [] as string[],
-  createdScenarioIds: [] as string[],
   exports: [] as { name: string; at: string; rows: number }[],
 });
 
@@ -816,43 +950,21 @@ function initialTheme(): Theme {
   return window.matchMedia('(prefers-color-scheme: dark)').matches ? 'night' : 'bench';
 }
 
-/** What kind of source a collector serves, for a paper made from the overlay. */
-const SOURCE_TYPES: Partial<Record<NonNullable<OverlayPaper['source']>, Paper['sourceType']>> = {
-  europepmc: 'journal-article',
-  osti: 'industry-report',
-  sgd: 'database-entry',
-};
-
 /**
- * A document the project holds, as a paper (ADR-002): the citation the kit
- * holds, its passages as its sections, its licence. Nothing is filled in
- * that the kit does not hold; a year it does not know stays unset.
+ * A document the project holds, as a paper (ADR-002): the overlay's entry as
+ * the service wrote it, under its id, named by the id when the kit holds no
+ * title. Nothing is filled in that the kit does not hold.
  */
 function paperOf(id: string, o: OverlayPaper): Paper {
-  return {
-    id,
-    title: o.title ?? id,
-    authors: o.authors ?? [],
-    year: o.year ?? undefined,
-    venue: o.journal ?? '',
-    organisms: [],
-    topics: [],
-    abstract: '',
-    sections: o.sections,
-    ingest: o.ingest,
-    textSource: o.textSource,
-    openAccess: o.licenceClass === 'public' || o.licenceClass === 'open_commercial' || o.licenceClass === 'open_noncommercial',
-    doi: o.doi ?? undefined,
-    pmcid: o.pmcid ?? undefined,
-    sourceUrl: o.url ?? undefined,
-    sourceType: o.source ? SOURCE_TYPES[o.source] : undefined,
-    license: o.license ?? undefined,
-    licenceClass: o.licenceClass ?? undefined,
-    extraction: o.extraction ?? undefined,
-    fetchedFrom: o.source,
-    held: true,
-  };
+  return { ...o, id, title: o.title ?? id };
 }
+
+/**
+ * The candidates whose field the ontology does not name that this page has
+ * named in its activity already, so an overlay that brings one again says
+ * nothing new.
+ */
+const unreadCandidates = new Set<string>();
 
 export const useStore = create<OFState>()((set, get) => ({
   ...initialState(),
@@ -887,6 +999,10 @@ export const useStore = create<OFState>()((set, get) => ({
   stateOutbox: [],
   stateLegacy: null,
   stateProblem: null,
+  cataloguesRead: false,
+  cataloguesProblem: null,
+  protocolsRead: false,
+  protocolsProblem: null,
 
   loadProjects: async () => {
     let listed: Project[];
@@ -934,6 +1050,22 @@ export const useStore = create<OFState>()((set, get) => ({
       set({ stateProblem: e instanceof Error ? e.message : String(e) });
       return;
     }
+    // A row the service keeps that does not read as its kind stays out of what
+    // the page holds, and the page names it with the service's words.
+    const unread = held.refused;
+    for (const r of unread)
+      get().logActivity({
+        at: stamp(),
+        icon: 'alert',
+        text: `The service keeps ${r.kind} ${r.id}, which does not read as its kind, so this page leaves it out: ${r.why}`,
+        href: '#/',
+        provenance: 'user',
+      });
+    if (unread.length)
+      get().toast({
+        text: `The service keeps ${unread.length} row${unread.length === 1 ? '' : 's'} this page cannot read; the activity feed names ${unread.length === 1 ? 'it' : 'each'}: ${unread[0].why}`,
+        kind: 'error',
+      });
     // Rows this browser kept before alpha 2.0 go to the open project, once.
     const legacy = get().stateLegacy;
     const outbox = legacy ? enqueue(get().stateOutbox, changes(EMPTY_STATE, legacy, project, decidedBy())) : get().stateOutbox;
@@ -951,6 +1083,56 @@ export const useStore = create<OFState>()((set, get) => ({
     void get().flushProjectState();
   },
 
+  hydrateCatalogues: async () => {
+    // The catalogues belong to one project: with none open the store holds none.
+    if (!get().projectId) {
+      set({ strains: [], products: [], skills: [], lessons: [], cataloguesRead: true, cataloguesProblem: null });
+      return;
+    }
+    // Reads overlap when the catalogues screen keeps two entries quickly; the newest read's answer is the one kept.
+    const read = ++catalogueReads;
+    try {
+      const [strains, products, skills, lessons] = await Promise.all([listStrains(), listProducts(), listSkills(), listLessons()]);
+      if (read === catalogueReads) set({ strains, products, skills, lessons, cataloguesRead: true, cataloguesProblem: null });
+    } catch (e) {
+      if (read === catalogueReads)
+        set({
+          cataloguesProblem:
+            e instanceof CataloguesDown ? `${e.message} ${e.remedy}` : e instanceof Error ? e.message : String(e),
+        });
+    }
+  },
+
+  hydrateProtocols: async () => {
+    // A project keeps its protocols (ADR-017): with none open the store holds none.
+    if (!get().projectId) {
+      set({ protocols: [], protocolsRead: true, protocolsProblem: null });
+      return;
+    }
+    const read = ++protocolReads;
+    try {
+      const protocols = await listProtocols();
+      if (read === protocolReads) set({ protocols, protocolsRead: true, protocolsProblem: null });
+    } catch (e) {
+      if (read === protocolReads)
+        set({
+          protocolsProblem: e instanceof ProtocolsDown ? `${e.message} ${e.remedy}` : e instanceof Error ? e.message : String(e),
+        });
+    }
+  },
+
+  readProtocol: async (protocolId) => {
+    if (!get().projectId) return 'missing';
+    try {
+      const held = await protocolOf(protocolId);
+      set((s) => ({ protocols: [...s.protocols.filter((p) => p.id !== held.id), held].sort((a, b) => (a.id < b.id ? -1 : a.id > b.id ? 1 : 0)) }));
+      return null;
+    } catch (e) {
+      if (e instanceof ProtocolsRefused && e.status === 404) return 'missing';
+      return e instanceof ProtocolsDown ? `${e.message} ${e.remedy}` : e instanceof Error ? e.message : String(e);
+    }
+  },
+
   applyProjectState: (state) =>
     set((s) => {
       const adopted = new Set(state.runbooks.map((r) => r.id));
@@ -961,17 +1143,17 @@ export const useStore = create<OFState>()((set, get) => ({
           return l && !r.lockedAt ? { ...r, lockedAt: l.lockedAt, lockHash: l.lockHash } : r;
         },
       );
-      const made = new Set(state.scenarios.map((sc) => sc.id));
       return {
         depositions: state.depositions,
+        depositedBy: state.depositedBy,
         measuredEvidence: state.measuredEvidence,
         runbooks: freezeLocked(runbooks),
         adoptedRunbookIds: [...adopted],
         parameterOverrides: state.overrides,
         proformaAssumptions: assumptionsFromOverrides(state.overrides),
         proformaFits: state.fits,
-        scenarios: [...s.scenarios.filter((sc) => !made.has(sc.id) && !s.createdScenarioIds.includes(sc.id)), ...state.scenarios],
-        createdScenarioIds: [...made],
+        // Every scenario is the project's (alpha 2.2 D9): the service's rows, with what this browser still owes laid on.
+        scenarios: state.scenarios,
         trainsMade: state.trains,
         // A turn the service reads as running is being answered there; the screen follows it.
         liveConversations: conversationsHeld(state.conversations, []),
@@ -1098,7 +1280,7 @@ export const useStore = create<OFState>()((set, get) => ({
           ...rest,
           status: 'rejected' as RecordStatus,
           reviewer: decidedBy(),
-          rejectReason: payload?.reason,
+          rejectReason: payload?.reason ?? null,
           audit,
         };
       }
@@ -1278,16 +1460,19 @@ export const useStore = create<OFState>()((set, get) => ({
   // (OF-BLD-012 §5.4). When it does not, nothing is fetched, and the toast
   // names the missing service and the command that starts it.
   extractPaperLive: async (paperId, again = false) => {
+    // The document by its title where the project holds one, and by the kit's id where it holds none.
+    const named = get().papers.find((p) => p.id === paperId)?.title.trim() || paperId;
     const id = get().startJob({
-      title: `Extract ${paperId}`,
+      title: `Extract ${named}`,
       kind: 'ingest',
       stages: [{ label: 'Extract', ms: 30000 }],
       href: `#/biorepo/witness`,
+      subject: paperId,
     });
     get().logActivity({
       at: stamp(),
       icon: 'sparkles',
-      text: `Extracting ${paperId} — one structured model response over its full text`,
+      text: `Extracting ${named} — one structured model response over its full text`,
       href: '#/intake/ingest',
       provenance: 'user',
     });
@@ -1299,7 +1484,7 @@ export const useStore = create<OFState>()((set, get) => ({
         .map(([rule, n]) => `${rule} ${n}`)
         .join(', ');
       get().toast({
-        text: `${paperId} extracted — ${result.candidates.length} candidate${result.candidates.length === 1 ? '' : 's'} anchored, ${result.rejected} refused${dropped ? ` (${dropped})` : ''}, $${result.usage.costUsd.toFixed(4)}`,
+        text: `${named} extracted — ${result.candidates.length} candidate${result.candidates.length === 1 ? '' : 's'} anchored, ${result.rejected} refused${dropped ? ` (${dropped})` : ''}, $${result.usage.costUsd.toFixed(4)}`,
         kind: 'success',
         href: '#/biorepo/witness',
         hrefLabel: 'Open Witness',
@@ -1309,7 +1494,7 @@ export const useStore = create<OFState>()((set, get) => ({
         e instanceof IntakeDown ? `${e.message} ${e.remedy}` : e instanceof Error ? e.message : String(e);
       get().failJob(id, message);
       if (e instanceof IntakeDown && /not running/.test(e.message)) set({ serviceUp: false });
-      get().toast({ text: `Extract ${paperId} failed — ${message}`, kind: 'error' });
+      get().toast({ text: `Extract ${named} failed — ${message}`, kind: 'error' });
       return;
     }
     // The run, the candidates and the decisions are recomputed server-side;
@@ -1494,14 +1679,34 @@ export const useStore = create<OFState>()((set, get) => ({
     }
   },
 
-  addProtocolVersion: (protocolId, version) =>
-    set((s) => ({
-      protocols: s.protocols.map((p) =>
-        p.id === protocolId
-          ? { ...p, versions: [...p.versions, version], currentVersion: version.version }
-          : p,
-      ),
-    })),
+  beginProtocol: async (protocol) => {
+    const by = reviewerName();
+    if (!by) return 'Set your reviewer name in Settings first: a protocol is kept in a person\u2019s name.';
+    try {
+      const kept = await makeProtocolOnService({ protocol, by });
+      set((s) => ({ protocols: [...s.protocols.filter((p) => p.id !== kept.id), kept].sort((a, b) => (a.id < b.id ? -1 : a.id > b.id ? 1 : 0)) }));
+      return null;
+    } catch (e) {
+      return e instanceof ProtocolsDown ? `${e.message} ${e.remedy}` : e instanceof Error ? e.message : String(e);
+    }
+  },
+
+  keepProtocolVersion: async (protocolId, version) => {
+    const by = reviewerName();
+    if (!by) return 'Set your reviewer name in Settings first: a version of a protocol is kept in a person\u2019s name.';
+    try {
+      const kept = await keepVersion(protocolId, { version, by });
+      // The service answers the protocol whole, the new version its current one.
+      set((s) => ({
+        protocols: s.protocols.some((p) => p.id === kept.id)
+          ? s.protocols.map((p) => (p.id === kept.id ? kept : p))
+          : [...s.protocols, kept],
+      }));
+      return null;
+    } catch (e) {
+      return e instanceof ProtocolsDown ? `${e.message} ${e.remedy}` : e instanceof Error ? e.message : String(e);
+    }
+  },
 
   // ── runbooks (OF-BLD-005 §7, §8) ─────────────────────────────────────
 
@@ -1513,11 +1718,12 @@ export const useStore = create<OFState>()((set, get) => ({
     const product = source.productId
       ? s.products.find((p) => p.id === source.productId)
       : undefined;
-    const id = nextId('rb');
+    // The promoted runbook is one of the project's rows, so its id holds across reloads.
+    const id = timeId('rb');
 
     // The research runbook's own findings become the industrial one's first
     // stage. Promotion carries the answer across; it does not restart the work.
-    const carried = source.stages
+    const carried = stagesOf(source)
       .filter((st) => st.status === 'done' && (st.value || st.detail))
       .map((st) => st.value ?? st.detail)
       .filter(Boolean)
@@ -1539,7 +1745,8 @@ export const useStore = create<OFState>()((set, get) => ({
         {
           name: 'Host & construct selection',
           status: 'pending',
-          detail: product ? `Starting from ${product.defaultStrainId}` : null,
+          // The host the research runbook names; a product's entry names none.
+          detail: source.strainId ? `Starting from ${source.strainId}` : null,
           value: null,
         },
         { name: 'Process train', status: 'queued', detail: null, value: null },
@@ -1556,19 +1763,19 @@ export const useStore = create<OFState>()((set, get) => ({
       note: `Promoted from ${source.id}. A research runbook that finds something becomes an industrial one in a single action, and the finding travels with it rather than being retyped.`,
       eta: null,
       outputs: [],
-      productId: source.productId,
+      productId: source.productId ?? null,
       progressPct: 0,
       estCostUsd: null,
-      strainId: source.strainId ?? product?.defaultStrainId ?? null,
+      strainId: source.strainId ?? null,
       // Promotion carries the research finding across verbatim. It does NOT
       // invent process predictions: the titre and recovery models have not run,
       // so those are measured with `predictionId: null` rather than predicted
       // against a number somebody made up at promotion time. When the process
       // stages do produce predictions, that is a new version — this one is
       // locked, and locked means superseded, not edited.
-      predictions: source.predictions.map((p) => ({ ...p, id: `${id}-${p.id}` })),
+      predictions: predictionsOf(source).map((p) => ({ ...p, id: `${id}-${p.id}` })),
       measurementSchema: [
-        ...source.measurementSchema.map((m) => ({
+        ...measuresOf(source).map((m) => ({
           ...m,
           id: `${id}-${m.id}`,
           predictionId: m.predictionId ? `${id}-${m.predictionId}` : null,
@@ -1592,7 +1799,7 @@ export const useStore = create<OFState>()((set, get) => ({
       lockHash: null,
     };
 
-    set((st) => ({ runbooks: [runbook, ...st.runbooks] }));
+    set((st) => ({ runbooks: [runbook, ...st.runbooks], adoptedRunbookIds: [...st.adoptedRunbookIds, id] }));
     get().logActivity({
       at: stamp(),
       icon: 'runbook',
@@ -1601,7 +1808,7 @@ export const useStore = create<OFState>()((set, get) => ({
       provenance: 'user',
     });
     get().toast({
-      text: 'Promoted to an industrial runbook — the clearance finding came across with it',
+      text: 'Promoted to an industrial runbook — the research findings came across with it',
       kind: 'success',
       href: `#/runbooks/${id}`,
       hrefLabel: 'Open',
@@ -1614,7 +1821,7 @@ export const useStore = create<OFState>()((set, get) => ({
       runbooks: s.runbooks.map((r) => {
         if (r.id !== runbookId || r.status !== 'blocked_unverified') return r;
         let unblocked = false;
-        const stages = r.stages.map((st) => {
+        const stages = stagesOf(r).map((st) => {
           if (st.status === 'blocked') {
             unblocked = true;
             return {
@@ -1664,8 +1871,8 @@ export const useStore = create<OFState>()((set, get) => ({
           ? {
               ...r,
               status: 'running' as const,
-              stages: r.stages.map((st, i) =>
-                st.status === 'queued' && i === r.stages.findIndex((x) => x.status === 'queued')
+              stages: stagesOf(r).map((st, i, stages) =>
+                st.status === 'queued' && i === stages.findIndex((x) => x.status === 'queued')
                   ? { ...st, status: 'running' as const }
                   : st,
               ),
@@ -1684,7 +1891,7 @@ export const useStore = create<OFState>()((set, get) => ({
       provenance: 'user',
     });
     get().toast({
-      text: `Authorised. Estimated spend ${r.estCostUsd === null ? 'unpriced' : `$${r.estCostUsd}`}.`,
+      text: `Authorised. Estimated spend ${r.estCostUsd == null ? 'unpriced' : `$${r.estCostUsd}`}.`,
       kind: 'info',
     });
   },
@@ -1697,12 +1904,12 @@ export const useStore = create<OFState>()((set, get) => ({
               ...r,
               status: 'complete' as const,
               progressPct: 100,
-              stages: r.stages.map((st) =>
+              stages: stagesOf(r).map((st) =>
                 st.status === 'review'
                   ? { ...st, status: 'done' as const, detail: `Ruled on by a person — ${verdict}` }
                   : st,
               ),
-              outputs: [...r.outputs, 'Boundary map', 'Reviewer decision'],
+              outputs: [...outputsOf(r), 'Boundary map', 'Reviewer decision'],
             }
           : r,
       ),
@@ -1725,7 +1932,8 @@ export const useStore = create<OFState>()((set, get) => ({
       get().toast({ text: 'Already locked — supersede it to change anything.', kind: 'warn' });
       return;
     }
-    if (r.predictions.length === 0) {
+    const predictions = predictionsOf(r);
+    if (predictions.length === 0) {
       get().toast({
         text: 'Nothing to lock. A runbook with no predictions has made no claim.',
         kind: 'warn',
@@ -1733,7 +1941,7 @@ export const useStore = create<OFState>()((set, get) => ({
       return;
     }
     const lockedAt = new Date().toISOString();
-    const lockHash = runbookLockHash(r.predictions, r.measurementSchema);
+    const lockHash = runbookLockHash(predictions, measuresOf(r));
     set((s) => ({
       runbooks: freezeLocked(
         s.runbooks.map((x) => (x.id === runbookId ? { ...x, lockedAt, lockHash } : x)),
@@ -1742,12 +1950,12 @@ export const useStore = create<OFState>()((set, get) => ({
     get().logActivity({
       at: stamp(),
       icon: 'runbook',
-      text: `Predictions frozen on ${r.title} — ${r.predictions.length} claim${r.predictions.length === 1 ? '' : 's'}`,
+      text: `Predictions frozen on ${r.title} — ${predictions.length} claim${predictions.length === 1 ? '' : 's'}`,
       href: `#/runbooks/${runbookId}`,
       provenance: 'user',
     });
     get().toast({
-      text: `Locked. ${r.predictions.length} prediction${r.predictions.length === 1 ? '' : 's'} frozen against hash ${lockHash.slice(0, 8)}.`,
+      text: `Locked. ${predictions.length} prediction${predictions.length === 1 ? '' : 's'} frozen against hash ${lockHash.slice(0, 8)}.`,
       kind: 'success',
     });
   },
@@ -1770,7 +1978,7 @@ export const useStore = create<OFState>()((set, get) => ({
         x.id === runbookId
           ? {
               ...x,
-              predictions: x.predictions.map((p) => (p.id === predictionId ? { ...p, value } : p)),
+              predictions: predictionsOf(x).map((p) => (p.id === predictionId ? { ...p, value } : p)),
             }
           : x,
       ),
@@ -1784,6 +1992,11 @@ export const useStore = create<OFState>()((set, get) => ({
   // runbook outlives this page in the project's rows.
   adoptRunbookDraft: (draft) => {
     const id = `rb-draft-${Date.now().toString(36)}-${nextId('d').slice(2)}`;
+    // The draft's predictions and measures enter the runbook as the service
+    // wrote them, every field present or left out and every null as it
+    // arrived, since lock.ts and runbook_lock.py read a field left out and a
+    // null apart. The draft and the runbook are the service's generated types.
+    const assay = structuredClone({ predictions: draft.predictions, measurementSchema: draft.measures });
     const runbook: Runbook = {
       id,
       kind: 'research',
@@ -1797,8 +2010,7 @@ export const useStore = create<OFState>()((set, get) => ({
       progressPct: 0,
       estCostUsd: null,
       strainId: draft.strainId || null,
-      predictions: structuredClone(draft.predictions),
-      measurementSchema: structuredClone(draft.measures),
+      ...assay,
       lockedAt: null,
       lockHash: null,
     };
@@ -1811,7 +2023,8 @@ export const useStore = create<OFState>()((set, get) => ({
     const s = get();
     const source = s.runbooks.find((x) => x.id === runbookId);
     if (!source) return null;
-    const id = nextId('rb');
+    // The revision is one of the project's rows, so its id holds across reloads.
+    const id = timeId('rb');
     const revision: Runbook = {
       ...structuredClone({ ...source, predictions: source.predictions, measurementSchema: source.measurementSchema }),
       id,
@@ -1824,7 +2037,7 @@ export const useStore = create<OFState>()((set, get) => ({
       lockedAt: null,
       lockHash: null,
     };
-    set((st) => ({ runbooks: [revision, ...st.runbooks] }));
+    set((st) => ({ runbooks: [revision, ...st.runbooks], adoptedRunbookIds: [...st.adoptedRunbookIds, id] }));
     get().logActivity({
       at: stamp(),
       icon: 'runbook',
@@ -1845,13 +2058,19 @@ export const useStore = create<OFState>()((set, get) => ({
 
   openDeposition: (runbookId, protocolId, scale) => {
     const s = get();
-    const protocol = s.protocols.find((p) => p.id === protocolId);
-    if (!protocol) return null;
-    const depositionId = nextId('dep');
+    const protocol = protocolId === null ? null : s.protocols.find((p) => p.id === protocolId);
+    if (protocol === undefined) return null;
+    // The readings alone are measurements a run may rest on, and a
+    // measurement names the person who took it (measurements.py), so they
+    // wait for a person's name in Settings.
+    if (protocol === null && !reviewerName()) return null;
+    // A reading's id names it for good (`<deposition id>/<entry id>`, the ref
+    // a measurement origin carries), so a deposition's id holds across reloads.
+    const depositionId = timeId('dep');
     const deposition: Deposition = {
       id: depositionId,
       runbookId,
-      protocolId,
+      protocolId: protocol?.id ?? null,
       // OF-BLD-013 §2 — Guild's acting person, when the ledger has one who
       // holds skills.
       operatorId: runOperatorDefault(s),
@@ -1862,16 +2081,31 @@ export const useStore = create<OFState>()((set, get) => ({
       observations: [],
       reconciliation: null,
     };
-    const runId = s.startRun(protocolId, protocol.currentVersion, scale);
+    // Its first write names who deposits it (decidedBy), which the service keeps as its maker.
+    const maker = { [depositionId]: decidedBy() };
+    if (protocol === null) {
+      set((st) => ({ depositions: [deposition, ...st.depositions], depositedBy: { ...st.depositedBy, ...maker } }));
+      const runbook = s.runbooks.find((r) => r.id === runbookId);
+      get().logActivity({
+        at: stamp(),
+        icon: 'run',
+        text: `Deposition staged — readings against ${runbook?.title ?? runbookId}`,
+        href: `#/runbooks/depositions/${depositionId}/bench`,
+        provenance: 'user',
+      });
+      return { depositionId, runId: null };
+    }
+    const runId = s.startRun(protocol.id, protocol.currentVersion, scale);
     set((st) => ({
       depositions: [deposition, ...st.depositions],
+      depositedBy: { ...st.depositedBy, ...maker },
       runs: { ...st.runs, [runId]: { ...st.runs[runId], depositionId } },
     }));
     get().logActivity({
       at: stamp(),
       icon: 'run',
       text: `Deposition staged — ${protocol.title}`,
-      href: `#/runbooks/protocols/${protocolId}/run/${runId}`,
+      href: `#/runbooks/protocols/${protocol.id}/run/${runId}`,
       provenance: 'user',
     });
     return { depositionId, runId };
@@ -1895,7 +2129,7 @@ export const useStore = create<OFState>()((set, get) => ({
             entries: [
               ...d.entries,
               {
-                id: nextId('de'),
+                id: timeId('de'),
                 measureId: match.measureId,
                 stepId,
                 at,
@@ -1914,7 +2148,7 @@ export const useStore = create<OFState>()((set, get) => ({
           ...d,
           observations: [
             ...d.observations,
-            { id: nextId('ob'), stepId, at, raw, structured: null },
+            { id: timeId('ob'), stepId, at, raw, structured: null },
           ],
         };
       }),
@@ -1943,23 +2177,15 @@ export const useStore = create<OFState>()((set, get) => ({
         if (d.id !== depositionId || d.state === 'closed') return d;
         const original = d.entries.find((e) => e.id === entryId);
         if (!original) return d;
-        const id = nextId('de');
-        // A correction is the same reading: it keeps the reading's time (§7.1).
+        const id = timeId('de');
+        // A correction is the same reading: it keeps the time the reading was
+        // taken (`at`, the time a measurement names) and its sample time
+        // (§7.1), and says when it was corrected.
         const t = d.sampleTimes?.[entryId];
         return {
           ...d,
           ...(t !== undefined ? { sampleTimes: { ...d.sampleTimes, [id]: t } } : {}),
-          entries: [
-            ...d.entries,
-            {
-              ...original,
-              id,
-              at,
-              value,
-              raw: `${original.raw} → corrected to ${value} ${original.unit}`,
-              confirmed: true,
-            },
-          ],
+          entries: [...d.entries, correctionOf(original, id, value, at)],
         };
       }),
     }));
@@ -1968,7 +2194,9 @@ export const useStore = create<OFState>()((set, get) => ({
   setSampleTime: (depositionId, entryId, hours) =>
     set((s) => ({
       depositions: s.depositions.map((d) => {
-        if (d.id !== depositionId) return d;
+        // A closed deposition keeps the sample times it closed with (the
+        // service refuses a change, project_state.py).
+        if (d.id !== depositionId || d.state === 'closed') return d;
         const times = { ...(d.sampleTimes ?? {}) };
         if (hours === null || !Number.isFinite(hours)) delete times[entryId];
         else times[entryId] = hours;
@@ -1992,7 +2220,8 @@ export const useStore = create<OFState>()((set, get) => ({
     let kept = 0;
     set((s) => ({
       depositions: s.depositions.map((d) => {
-        if (d.id !== depositionId || d.state === 'staged') return d;
+        // Closing stops new readings, as it stops the bench's.
+        if (d.id !== depositionId || d.state !== 'running') return d;
         const rb = s.runbooks.find((r) => r.id === d.runbookId);
         const schema = rb?.measurementSchema ?? [];
         const { rows, unreadable } = parseReadingsCsv(csv);
@@ -2003,17 +2232,17 @@ export const useStore = create<OFState>()((set, get) => ({
         for (const row of rows) {
           const measureId = placeRow(row, schema);
           if (measureId) {
-            const id = nextId('de');
+            const id = timeId('de');
             entries.push({ id, measureId, stepId: 'attached', at, value: row.value, unit: row.unit, raw: row.line, confirmed: false });
             times[id] = row.time;
             attached += 1;
           } else {
-            observations.push({ id: nextId('ob'), stepId: 'attached', at, raw: row.line, structured: null });
+            observations.push({ id: timeId('ob'), stepId: 'attached', at, raw: row.line, structured: null });
             kept += 1;
           }
         }
         for (const line of unreadable) {
-          observations.push({ id: nextId('ob'), stepId: 'attached', at, raw: line, structured: null });
+          observations.push({ id: timeId('ob'), stepId: 'attached', at, raw: line, structured: null });
           kept += 1;
         }
         return { ...d, entries, observations, sampleTimes: times };
@@ -2066,29 +2295,22 @@ export const useStore = create<OFState>()((set, get) => ({
     const s = get();
     const src = s.scenarios.find((x) => x.id === id);
     if (!src) return id;
-    // A copy of a scenario on a shelf flowsheet is a scenario a person made:
-    // Durable, time-based id, not run (OF-BLD-019 D6).
-    if (src.kind === 'biosteam' && src.flowsheetId)
-      return get().createScenario(
-        src.flowsheetId,
-        `${src.name} (copy)`,
-        src.vessel && src.trainRun ? { vessel: src.vessel, trainRun: src.trainRun } : null,
-      );
-    const copy: Scenario = {
-      ...structuredClone(src),
-      id: nextId('sc'),
-      name: `${src.name} (copy)`,
-      pinned: false,
-    };
-    set({ scenarios: [...s.scenarios, copy] });
-    return copy.id;
+    // A copy of a scenario is a scenario of the project (alpha 2.2 D9): a
+    // time-based id, its flowsheet and parts the source's, and no run of its
+    // own yet (OF-BLD-019 D6).
+    return get().createScenario(
+      src.flowsheetId ?? src.modelId,
+      `${src.name} (copy)`,
+      src.vessel && src.trainRun ? { vessel: src.vessel, trainRun: src.trainRun } : null,
+    );
   },
 
   // OF-BLD-019 §3.1 (D5, D6) — New scenario makes a `biosteam` scenario and
   // nothing else. Its id is time-based, because nextId restarts on a reload
   // and this outlives one (as adopted runbooks and Live conversations do).
   // It holds no input value: the service binds records, and a named person
-  // types an assumption on its page, kept in proformaAssumptions under its id.
+  // types an assumption on its page, kept as an override of its scope
+  // (`proforma:<id>`).
   createScenario: (flowsheetId, name, parts) => {
     const id = timeId('sc');
     const made: Scenario = {
@@ -2099,16 +2321,13 @@ export const useStore = create<OFState>()((set, get) => ({
       name: name.trim() || flowsheetId,
       description: '',
       product: '',
-      dims: [],
-      point: {},
-      assumptions: [],
       pinned: false,
       // OF-BLD-020 §6.1: what a scenario on custom_train_v1 is built from.
       ...(parts ? { vessel: parts.vessel, trainRun: parts.trainRun } : {}),
       lastRunId: null,
       createdAt: new Date().toISOString(),
     };
-    set((s) => ({ scenarios: [...s.scenarios, made], createdScenarioIds: [...s.createdScenarioIds, id] }));
+    set((s) => ({ scenarios: [...s.scenarios, made] }));
     return id;
   },
 
@@ -2159,14 +2378,6 @@ export const useStore = create<OFState>()((set, get) => ({
         return turns.length ? [{ ...c, turns }] : [];
       }),
     })),
-
-  // ── learn ────────────────────────────────────────────────────────────
-  // Lesson progress is this browser's and Durable (OF-BLD-013 §3.2): the map
-  // remembers which lessons were finished here across a refresh. Whether a
-  // person has passed one is the ledger's question, answered by
-  // `recordLessonForGuild` at the moment the checkpoint is passed.
-  completeLesson: (lessonId) =>
-    set((s) => ({ learnProgress: { ...s.learnProgress, [lessonId]: true } })),
 
   // ── Proforma's assumptions (OF-BLD-014 §8.4) ──────────────────────────
   // A typed value carries the person and the day; the service refuses one
@@ -2236,10 +2447,10 @@ export const useStore = create<OFState>()((set, get) => ({
     const deviations = (run?.deviations ?? []).map((x) => x.text);
 
     const evidence: MeasuredEvidence[] = deltas.map((delta) => ({
-      id: nextId('me'),
+      id: timeId('me'),
       depositionId,
       runbookId: runbook.id,
-      productId: runbook.productId,
+      productId: runbook.productId ?? null,
       predictionId: delta.predictionId,
       label: delta.label,
       value: delta.observed,
@@ -2248,7 +2459,7 @@ export const useStore = create<OFState>()((set, get) => ({
       conditions: {
         protocolId: d.protocolId,
         scale: run?.scale ?? 1,
-        strainId: runbook.strainId,
+        strainId: runbook.strainId ?? null,
       },
       deviations,
       confirmed: delta.confirmed,
@@ -2347,9 +2558,9 @@ export const useStore = create<OFState>()((set, get) => ({
         guildPendingWithdrawals: snap.guild?.withdrawals ?? [],
         guildActingId: snap.guild?.actingId ?? s.guildActingId,
         guildHydrated: true,
-        // §3.2 — lessons finished in this browser. Anything finished since the
-        // page loaded is kept beside what the snapshot remembers.
-        learnProgress: { ...(snap.learnProgress ?? {}), ...s.learnProgress },
+        // A lesson shows finished from the ledger's entries (alpha 2.2 E.12): an
+        // older snapshot's lessons finished here are left where they lie, and the
+        // next save leaves them out.
       };
     });
     if (get().serviceUp) void get().syncGuild();
@@ -2360,7 +2571,7 @@ export const useStore = create<OFState>()((set, get) => ({
 
   // ── service overlay (OF-BLD-012 §2.1) ─────────────────────────────────
 
-  applyOverlay: (overlay) =>
+  applyOverlay: (overlay) => {
     set((s) => {
       const merged: Overlay = {
         papers: { ...(s.overlay?.papers ?? {}), ...overlay.papers },
@@ -2382,25 +2593,7 @@ export const useStore = create<OFState>()((set, get) => ({
       // overlay, all of them every time: the service sends the project's
       // whole set, so a paper the last project held and this one does not
       // leaves with it.
-      const notHeld = s.papers.filter((p) => !p.held);
-      const held = Object.entries(overlay.papers)
-        .filter(([id, o]) => o.title != null && !notHeld.some((p) => p.id === id))
-        .map(([id, o]) => paperOf(id, o));
-      const papers = [...notHeld.map((p) => {
-        const o = overlay.papers[p.id];
-        if (!o) return p;
-        const fetched = o.textSource === 'full-text' && o.sections.length > 0;
-        return {
-          ...p,
-          ingest: o.ingest,
-          textSource: fetched ? 'full-text' : p.textSource,
-          // A fetch that brought no text keeps what the paper held.
-          sections: fetched ? o.sections : p.sections,
-          license: fetched ? (o.license ?? undefined) : p.license,
-          fetchedFrom: fetched ? (o.source ?? 'europepmc') : p.fetchedFrom,
-          ingestReason: o.reason ?? undefined,
-        } as Paper;
-      }), ...held];
+      const papers = Object.entries(overlay.papers).map(([id, o]) => paperOf(id, o));
       // §6.4 — Witness reads runs from the store, and the overlay is where
       // they come from: an overlay run replaces one of the same id, and a run
       // the overlay does not carry stays.
@@ -2431,15 +2624,19 @@ export const useStore = create<OFState>()((set, get) => ({
       const local = s.durableReview;
       const present = new Set(s.records.map((r) => r.id));
       const arrivingIds: string[] = [];
+      // A candidate whose field the ontology does not name stays out of the
+      // records (`recordOf`); `applyOverlay` names it below.
       const arriving: ExtractionRecord[] = currentCandidates
         .filter((c) => !present.has(c.id))
-        .map((c) => {
+        .flatMap((c) => {
+          const entering = recordOf(c);
+          if (!entering) return [];
           arrivingIds.push(c.id);
-          const record: ExtractionRecord = stampOriginal({ ...c, audit: [] });
+          const record = stampOriginal(entering);
           const mine = local?.decisions[c.id];
-          if (!mine) return record;
+          if (!mine) return [record];
           decisionAt[c.id] = mine.at ?? local!.savedAt;
-          return applyDecision(record, mine);
+          return [applyDecision(record, mine)];
         });
       // F3 — what happens to the records earlier candidates became. A
       // candidate nobody decided on is the extractor's current opinion, and
@@ -2480,7 +2677,19 @@ export const useStore = create<OFState>()((set, get) => ({
           ? reviewQueue.indexOf(under)
           : Math.min(s.reviewQueue.slice(0, s.reviewIndex).filter((id) => alive.has(id)).length, reviewQueue.length);
       return { overlay: merged, papers, runOutputs, records, reviewQueue, reviewIndex, decisionAt };
-    }),
+    });
+    // A candidate on a field the ontology does not name stays out of the
+    // records, and the page names it once in its activity, as it names a kept
+    // row it cannot read.
+    const unread = (overlay.candidates ?? []).filter((c) => !isFieldId(c.field) && !unreadCandidates.has(c.id));
+    if (unread.length === 0) return;
+    for (const c of unread) unreadCandidates.add(c.id);
+    const n = unread.length;
+    const fields = [...new Set(unread.map((c) => c.field))];
+    const said = `The service sent ${n} candidate${n === 1 ? '' : 's'} on ${fields.length === 1 ? 'a field' : 'fields'} this page's ontology does not name (${fields.join(', ')}), so this page leaves ${n === 1 ? 'it' : 'them'} out of its records`;
+    get().logActivity({ at: stamp(), icon: 'alert', text: said, href: '#/intake', provenance: 'user' });
+    get().toast({ text: `${said}.`, kind: 'warn' });
+  },
 
   hydrateOverlay: async () => {
     // The overlay acts in one project: with none open there is nothing to load.
@@ -2587,7 +2796,10 @@ export const useStore = create<OFState>()((set, get) => ({
       }
       if (e instanceof IntakeDown) {
         set({ serviceUp: false });
-        get().toast({ text: `${e.message} The decision on ${decision.recordId} is kept in this browser only.`, kind: 'error' });
+        get().toast({
+          text: `${e.message} The decision on ${decision.recordId} waits in this browser and is sent when the project next loads with the service answering.`,
+          kind: 'error',
+        });
         return;
       }
       throw e;
@@ -2812,10 +3024,11 @@ export const useStore = create<OFState>()((set, get) => ({
       return {
         runs: { ...s.runs, [runId]: { ...run, operatorId: personId } },
         // The deposition names whoever is performing now; each step's entry
-        // on the ledger names who performed that step.
+        // on the ledger names who performed that step. A closed deposition
+        // keeps the operator it closed with (project_state.py).
         depositions:
           run.depositionId
-            ? s.depositions.map((d) => (d.id === run.depositionId ? { ...d, operatorId: personId } : d))
+            ? s.depositions.map((d) => (d.id === run.depositionId && d.state !== 'closed' ? { ...d, operatorId: personId } : d))
             : s.depositions,
       };
     }),
@@ -2840,7 +3053,7 @@ export const useStore = create<OFState>()((set, get) => ({
     // The gate shows "Nobody chosen" for anyone else, and nothing is written for them.
     if (!canHold(operatorId)) return 0;
     const protocol = s.protocols.find((p) => p.id === run.protocolId);
-    const step = protocol?.versions.find((v) => v.version === run.version)?.steps.find((x) => x.id === stepId);
+    const step = protocol?.versions.find((v) => v.version === run.version)?.steps?.find((x) => x.id === stepId);
     const tags = step?.skills ?? [];
     if (!protocol || tags.length === 0) return 0;
     set((x) => ({
@@ -2908,7 +3121,7 @@ export const useStore = create<OFState>()((set, get) => ({
     const ledger = guildView(s);
     if (!operatorId || !ledger.people.some((p) => p.id === operatorId && p.active && p.role !== 'auditor')) return 0;
     const protocol = s.protocols.find((p) => p.id === run.protocolId);
-    const tags = protocol?.versions.find((v) => v.version === run.version)?.steps.find((x) => x.id === stepId)?.skills ?? [];
+    const tags = protocol?.versions.find((v) => v.version === run.version)?.steps?.find((x) => x.id === stepId)?.skills ?? [];
     if (!protocol || tags.length === 0) return 0;
     set((x) => ({
       runs: { ...x.runs, [runId]: { ...x.runs[runId], guildRecorded: { ...(x.runs[runId].guildRecorded ?? {}), [stepId]: true } } },
@@ -2930,7 +3143,7 @@ export const useStore = create<OFState>()((set, get) => ({
 
   recordLessonForGuild: async (lessonId) => {
     const s = get();
-    const lesson = s.modules.flatMap((m) => m.lessons).find((l) => l.id === lessonId);
+    const lesson = s.lessons.find((l) => l.id === lessonId);
     const counts = lesson?.skills ?? [];
     const personId = runOperatorDefault(s);
     if (!lesson || counts.length === 0 || !personId) return null;
@@ -2958,7 +3171,7 @@ export const useStore = create<OFState>()((set, get) => ({
         at: localToday(),
         observerId: null,
         source: { kind: 'lesson', ref: lessonId },
-        raw: `Primer lesson ${lessonId}, \u201c${lesson.title}\u201d: every checkpoint question answered correctly`,
+        raw: `Primer lesson ${lessonId}, \u201c${lesson.name}\u201d: every checkpoint question answered correctly`,
       }),
     );
     await Promise.all(writes);
@@ -3023,7 +3236,8 @@ export const useStore = create<OFState>()((set, get) => ({
           return;
       for (const w of s.guildPendingWithdrawals)
         if (!(await attempt(`withdrawal of ${w.evidenceId}`, () => postWithdrawal(w)))) return;
-      const fresh = (await loadGuild()) ?? server;
+      // Read again only when this sync sent something: with nothing posted the first read is the ledger.
+      const fresh = posted > 0 ? ((await loadGuild()) ?? server) : server;
       // The service's ledger is the truth for everything this sync sent.
       // Anything made while it ran, and anything it did not send, stays.
       const sent = new Set(s.guildPending);
@@ -3070,11 +3284,19 @@ export const useStore = create<OFState>()((set, get) => ({
     // reset the way it survives a reload.
     const overlay = get().overlay;
     const serviceUp = get().serviceUp;
+    // The project's strains, products, skills and lessons are its catalogues' on the service (alpha 2.2 E.9, E.12),
+    // and its protocols are the service's too (ADR-017): each survives a reset the same way.
+    const { strains, products, skills, lessons, protocols } = get();
     // The open project's rows are the service's, and survive a reset the way
     // the overlay does: they are loaded again, and nothing is taken back on
     // the service. What this browser still owed it goes with the browser's data.
     set({
       ...initialState(),
+      strains,
+      products,
+      skills,
+      lessons,
+      protocols,
       toasts: [],
       serviceUp,
       durableReview: null,
@@ -3085,6 +3307,8 @@ export const useStore = create<OFState>()((set, get) => ({
       stateLegacy: null,
     });
     void get().hydrateProjectState();
+    // The activity went with the reset, so a candidate left out is named again.
+    unreadCandidates.clear();
     if (overlay) get().applyOverlay(overlay);
     // Guild's ledger is the service's when there is one, and survives a reset
     // the way the overlay does; what was only ever in this browser goes.
@@ -3096,7 +3320,7 @@ export const useStore = create<OFState>()((set, get) => ({
     });
     if (serviceUp) void get().syncGuild();
     get().toast({
-      text: 'This browser’s data is cleared: the lessons finished here and every change it had not yet sent to the service are gone; the project’s rows load again from the service',
+      text: 'This browser’s data is cleared: every change it had not yet sent to the service is gone; the project’s rows load again from the service',
       kind: 'info',
     });
   },
@@ -3107,11 +3331,6 @@ export const useStore = create<OFState>()((set, get) => ({
 /** The ledger every Guild screen reads. */
 export function guildView(s: Pick<OFState, 'guild'>): Guild {
   return s.guild;
-}
-
-/** The checks every Guild screen reads, as the service last answered. */
-export function checksView(s: Pick<OFState, 'checks'>): Check[] {
-  return s.checks?.checks ?? [];
 }
 
 /** One move on one open check: `post` asks the service and the queue is fetched again. */
@@ -3219,7 +3438,7 @@ export function overridesFor(scope: string): (s: Pick<OFState, 'parameterOverrid
  * finding 10: kept, they held every later value to the old one, and the
  * service refused it as outside its own low and high).
  */
-export function overrideOfAssumption(scenarioId: string, a: InputAssumption): Override {
+function overrideOfAssumption(scenarioId: string, a: ScenarioAssumption): Override {
   const fixed = a.low === a.value && a.high === a.value;
   return {
     scope: proformaScope(scenarioId),
@@ -3230,6 +3449,7 @@ export function overrideOfAssumption(scenarioId: string, a: InputAssumption): Ov
     by: a.by,
     at: a.at,
     note: a.note ?? null,
+    origin: 'person-assumption',
   };
 }
 
@@ -3246,19 +3466,23 @@ export function overrideEnds(o: Pick<Override, 'value' | 'low' | 'high'>): { low
   return { low: o.low ?? o.value, high: o.high ?? o.value };
 }
 
-/** An override as a Proforma assumption; null for a value in words, which no Proforma input takes. */
-export function assumptionOfOverride(o: Override): InputAssumption | null {
-  if (typeof o.value !== 'number' || !Number.isFinite(o.value)) return null;
+/**
+ * An override as a Proforma assumption; null for a value in words, which no Proforma input takes, and for a reading
+ * deposited at the bench, which is a measurement in its own value and unit (alpha 2.2 E.17), so the derived
+ * `proformaAssumptions` an older build reads holds a person's values alone.
+ */
+export function assumptionOfOverride(o: Override): ScenarioAssumption | null {
+  if (o.origin === 'measurement' || typeof o.value !== 'number' || !Number.isFinite(o.value)) return null;
   const ends = overrideEnds(o);
   return { key: o.key, value: o.value, low: ends.low ?? o.value, high: ends.high ?? o.value, by: o.by, at: o.at, note: o.note ?? null };
 }
 
 /** `proformaAssumptions` as the overrides of every `proforma:` scope give it, by scenario id. */
-export function assumptionsFromOverrides(overrides: Record<string, Override[]>): Record<string, InputAssumption[]> {
-  const out: Record<string, InputAssumption[]> = {};
+export function assumptionsFromOverrides(overrides: Record<string, Override[]>): Record<string, ScenarioAssumption[]> {
+  const out: Record<string, ScenarioAssumption[]> = {};
   for (const [scope, list] of Object.entries(overrides)) {
     if (!scope.startsWith(PROFORMA_SCOPE)) continue;
-    out[scope.slice(PROFORMA_SCOPE.length)] = list.map(assumptionOfOverride).filter((a): a is InputAssumption => a !== null);
+    out[scope.slice(PROFORMA_SCOPE.length)] = list.map(assumptionOfOverride).filter((a): a is ScenarioAssumption => a !== null);
   }
   return out;
 }
@@ -3268,7 +3492,7 @@ export function assumptionsFromOverrides(overrides: Record<string, Override[]>):
  * `proforma:<id>` for every scenario whose scope the snapshot holds no entry
  * for (D3: a snapshot written before the panel carries only the old field).
  */
-export function overridesOfSnapshot(snap: Pick<DurableSnapshot, 'parameterOverrides' | 'proformaAssumptions'>): Record<string, Override[]> {
+function overridesOfSnapshot(snap: Pick<DurableSnapshot, 'parameterOverrides' | 'proformaAssumptions'>): Record<string, Override[]> {
   const out: Record<string, Override[]> = { ...(snap.parameterOverrides ?? {}) };
   for (const [id, typed] of Object.entries(snap.proformaAssumptions ?? {})) {
     const scope = proformaScope(id);
@@ -3277,7 +3501,7 @@ export function overridesOfSnapshot(snap: Pick<DurableSnapshot, 'parameterOverri
   return out;
 }
 
-export function snapshotOf(s: OFState): DurableSnapshot {
+function snapshotOf(s: OFState): DurableSnapshot {
   const reviewDecisions: DurableSnapshot['reviewDecisions'] = {};
   for (const r of s.records) {
     // Only records a reviewer has actually touched.
@@ -3312,7 +3536,6 @@ export function snapshotOf(s: OFState): DurableSnapshot {
       withdrawals: s.guildPendingWithdrawals,
       actingId: s.guildActingId,
     },
-    learnProgress: Object.fromEntries(Object.keys(s.learnProgress).filter((k) => s.learnProgress[k]).map((k) => [k, true as const])),
     outbox: s.stateOutbox,
     // Rows kept here before alpha 2.0 stay until a project is open to take them.
     ...(legacy
@@ -3332,8 +3555,8 @@ export function snapshotOf(s: OFState): DurableSnapshot {
 }
 
 /** The open project's rows as the page holds them (lib/projectState.ts). */
-export function projectStateOf(s: OFState): ProjectState {
-  const runbookLocks: ProjectState['runbookLocks'] = {};
+export function projectStateOf(s: OFState): ProjectRows {
+  const runbookLocks: ProjectRows['runbookLocks'] = {};
   for (const r of s.runbooks) if (r.lockedAt && r.lockHash) runbookLocks[r.id] = lockOf(r.id, r.lockedAt, r.lockHash);
   return {
     depositions: s.depositions,
@@ -3342,7 +3565,7 @@ export function projectStateOf(s: OFState): ProjectState {
     runbookLocks,
     overrides: s.parameterOverrides,
     fits: s.proformaFits,
-    scenarios: s.scenarios.filter((sc) => s.createdScenarioIds.includes(sc.id)),
+    scenarios: s.scenarios,
     trains: s.trainsMade,
     conversations: s.liveConversations,
   };
@@ -3359,8 +3582,8 @@ function lockOf(id: string, lockedAt: string, lockHash: string): { lockedAt: str
 }
 
 /** The rows a snapshot from before alpha 2.0 kept in this browser, or null when it kept none. */
-function legacyStateOf(snap: DurableSnapshot): ProjectState | null {
-  const state: ProjectState = {
+function legacyStateOf(snap: DurableSnapshot): ProjectRows | null {
+  const state: ProjectRows = {
     depositions: snap.depositions ?? [],
     measuredEvidence: snap.measuredEvidence ?? [],
     runbooks: snap.adoptedRunbooks ?? [],
@@ -3389,6 +3612,10 @@ function owedLedger(ledger: Guild, owed: Guild | undefined): Guild {
 
 let stateFlushing = false;
 let stateRetry: ReturnType<typeof setTimeout> | null = null;
+/** How many reads of the project's catalogues this page has asked for; only the newest one's answer is kept. */
+let catalogueReads = 0;
+/** How many reads of the project's protocols this page has asked for; only the newest one's answer is kept. */
+let protocolReads = 0;
 /** How long a project row the service did not answer waits before it is sent again. */
 const STATE_RETRY_MS = 15_000;
 
@@ -3413,7 +3640,6 @@ if (typeof window !== 'undefined') {
         s.parameterOverrides === prev.parameterOverrides &&
         s.proformaFits === prev.proformaFits &&
         s.scenarios === prev.scenarios &&
-        s.createdScenarioIds === prev.createdScenarioIds &&
         s.trainsMade === prev.trainsMade &&
         s.liveConversations === prev.liveConversations)
     )
@@ -3436,7 +3662,6 @@ if (durableAvailable()) {
       s.guildPending === prev.guildPending &&
       s.guildPendingWithdrawals === prev.guildPendingWithdrawals &&
       s.guildActingId === prev.guildActingId &&
-      s.learnProgress === prev.learnProgress &&
       s.stateOutbox === prev.stateOutbox &&
       s.stateLegacy === prev.stateLegacy
     )
@@ -3451,7 +3676,7 @@ if (durableAvailable()) {
  * OF-BLD-020 §5.R — what pureOS's Builder showed of one train this session
  * (`builderShown`): each part absent until the page has shown it.
  */
-export interface BuilderShown {
+interface BuilderShown {
   /** The newest run made on the page, as the service returned it. */
   run?: TrainRun | null;
   /** What the service said reading the train from a kept run's units. */
@@ -3470,6 +3695,44 @@ export function skillById(skills: readonly Skill[]): Record<string, Skill> {
 /** The lab's skills, for a component: none ship with the app (ADR-010). */
 export function useSkills(): Skill[] {
   return useStore((s) => s.skills);
+}
+
+/** Where a screen's protocol stands: read and held, still being read, kept by no one under the id, or unreadable. */
+interface HeldProtocol {
+  protocol: Protocol | undefined;
+  /** `reading` until the project's protocols (or this one) are read; `problem` names why they could not be. */
+  state: 'held' | 'reading' | 'missing' | 'problem';
+  problem: string | null;
+}
+
+/**
+ * The open project's protocol `protocolId`, for a screen that names one by its address. The store reads the project's
+ * protocols as the page opens; a protocol it does not hold once they are read is asked of the service by its id
+ * (`readProtocol`), so one made after the page opened is found, and only the service's answer that the project keeps
+ * none of the id reads as missing.
+ */
+export function useProtocol(protocolId: string): HeldProtocol {
+  const protocol = useStore((s) => s.protocols.find((p) => p.id === protocolId));
+  const read = useStore((s) => s.protocolsRead);
+  const problem = useStore((s) => s.protocolsProblem);
+  const readProtocol = useStore((s) => s.readProtocol);
+  // The service's answer for each id this screen asked after a miss, and the id being asked now.
+  const [answers, setAnswers] = useState<Record<string, null | 'missing' | string>>({});
+  const asking = useRef<string | null>(null);
+  useEffect(() => {
+    if (protocol || !read || protocolId in answers || asking.current === protocolId) return;
+    asking.current = protocolId;
+    void readProtocol(protocolId).then((answer) => {
+      asking.current = null;
+      setAnswers((was) => ({ ...was, [protocolId]: answer }));
+    });
+  }, [protocol, read, protocolId, answers, readProtocol]);
+  if (protocol) return { protocol, state: 'held', problem: null };
+  if (!read) return problem ? { protocol, state: 'problem', problem } : { protocol, state: 'reading', problem: null };
+  const answer = answers[protocolId];
+  if (answer === 'missing') return { protocol, state: 'missing', problem: null };
+  if (typeof answer === 'string') return { protocol, state: 'problem', problem: answer };
+  return { protocol, state: 'reading', problem: null };
 }
 
 /** The lab's skills by id, for a component. */
@@ -3505,9 +3768,9 @@ export function provenanceOf(r: ExtractionRecord): Provenance {
  * to the statistic only: the records stay visible in per-record tables and
  * plots, because they are real values, just not independent evidence.
  */
-export type AggregateExclusion = 'rejected' | 'industry-estimate' | 'computed' | 'assumed' | 'not-primary';
+type AggregateExclusion = 'rejected' | 'industry-estimate' | 'computed' | 'assumed' | 'not-primary';
 
-export function aggregateExclusion(r: ExtractionRecord): AggregateExclusion | null {
+export function aggregateExclusion(r: Pick<ExtractionRecord, 'provenance' | 'status' | 'isPrimary'>): AggregateExclusion | null {
   if (r.status === 'rejected') return 'rejected';
   if (r.provenance === 'industry-estimate') return 'industry-estimate';
   // A computed value is derived from inputs already counted on their own

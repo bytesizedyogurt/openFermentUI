@@ -17,7 +17,6 @@ import {
   Undo2,
   AlertTriangle,
 } from 'lucide-react';
-import type { DecisionCheck, ExtractionRecord } from '@/data/types';
 import { ONTOLOGY_BY_ID, fieldName } from '@/data/ontology';
 import { useStore, provenanceOf, reviewerName } from '@/store';
 import {
@@ -28,11 +27,14 @@ import {
   refusalOf,
   writeRefusal,
   type Refusal,
+  type DecisionCheck,
+  type ExtractionRecord,
 } from '@/lib/review';
 import { useRoute, href } from '@/router';
 import { checkDecision } from '@/lib/intake';
 import { fmt, toSI } from '@/engine/units';
 import { CitationChip } from '@/components/Chip';
+import { idTail } from '@/lib/cite';
 import { ProvenanceBadge, Tick, type ProvKind } from '@/components/Provenance';
 import { QuantityField, type QuantityValue } from '@/components/QuantityField';
 import {
@@ -298,8 +300,8 @@ export default function Guild() {
     : '';
   const [checked, setChecked] = useState<{ key: string; accept: DecisionCheck; gold: DecisionCheck }>({
     key: '',
-    accept: { ok: true },
-    gold: { ok: true },
+    accept: { ok: true, rule: null, why: null },
+    gold: { ok: true, rule: null, why: null },
   });
   // Read inside the effect rather than depended on: these change identity on
   // every store update, and the question only changes when gateKey does.
@@ -543,7 +545,7 @@ export default function Guild() {
     return (
       <>
         <PageHeader
-          eyebrow="Who may verify"
+          eyebrow="Guild"
           title="Guild"
           subtitle="The Guild of Applied Life is who may verify. Accept, correct, or reject each extraction against the span it came from."
         />
@@ -552,7 +554,11 @@ export default function Guild() {
           <EmptyState
             icon={<ClipboardCheck size={22} />}
             title="Nothing waiting for review"
-            body="Every extraction in this session has already been decided. Queue a new batch from the Extract table — filter it first and only those rows enter the queue."
+            body={
+              records.length === 0
+                ? 'The project holds no extraction yet: bring a document in through Intake and run the extractor on it, and each value it reads can be queued here from the Extract table.'
+                : 'Every extraction the project holds has been decided. Queue a new batch from the Extract table — filter it first and only those rows enter the queue.'
+            }
             action={
               <div className="flex gap-2">
                 <LinkButton to="/intake" variant="primary">
@@ -602,7 +608,7 @@ export default function Guild() {
           <div className="text-caption text-ink-soft">
             {origin === 'extract'
               ? 'Queued from the Extract table as it was filtered.'
-              : 'Auto-filled with every unverified record in this session.'}
+              : 'Auto-filled with every unverified record the box below lets in.'}
           </div>
           <label className="mt-1.5 flex items-start gap-2 text-caption">
             <input
@@ -675,7 +681,7 @@ export default function Guild() {
     return (
       <>
         <PageHeader
-          eyebrow="Who may verify"
+          eyebrow="Guild"
           title="Guild — queue complete"
           subtitle="Every record in this queue has been through the reviewer. The tallies below separate what you did from where the records ended up."
         />
@@ -821,9 +827,10 @@ export default function Guild() {
         <Card className="p-4 max-w-2xl">
           <Callout kind="warn" title="This queue entry no longer resolves">
             <p className="mb-2">
-              <span className="font-num">{queue[index]}</span> is in the queue but not in this
-              session&rsquo;s records. The queue itself is session-only — your decisions persist,
-              but a queue built before a reset can outlive the rows it points at.
+              <span className="font-num">{queue[index]}</span> is in the queue, and the project&rsquo;s
+              records, as this page read them, hold none by that id. The queue lives on this page alone,
+              and the decisions made in it are kept; a queue built before a reset can outlive the rows
+              it points at.
             </p>
             <Button size="sm" onClick={() => advanceReview(1)}>
               Skip past it <ChevronRight size={13} />
@@ -896,7 +903,9 @@ export default function Guild() {
         {/* ── centre card ────────────────────────────────────────────── */}
         <Card className="p-4">
           <div className="flex flex-wrap items-center justify-between gap-2 mb-3">
-            <span className="font-num text-caption text-ink-soft">{record.id}</span>
+            <span className="font-num text-caption text-ink-soft" title={record.id}>
+              Record {idTail(record.id)}
+            </span>
             <ProvenanceBadge
               p={prov}
               confidence={record.status === 'unverified' ? record.confidence : undefined}
@@ -918,15 +927,17 @@ export default function Guild() {
                 {record.unit && <span className="text-section-title text-ink-soft ml-1">{record.unit}</span>}
               </div>
             </div>
-            <div className="rounded-card border border-line p-3">
-              <div className="text-caption uppercase tracking-wide text-ink-soft">SI twin</div>
-              <div className="font-num text-display leading-tight">
-                {fmt(record.si.value)}
-                {record.si.unit && (
-                  <span className="text-section-title text-ink-soft ml-1">{record.si.unit}</span>
-                )}
+            {record.si.unit !== record.unit && (
+              <div className="rounded-card border border-line p-3">
+                <div className="text-caption uppercase tracking-wide text-ink-soft">In the field&rsquo;s unit</div>
+                <div className="font-num text-display leading-tight">
+                  {fmt(record.si.value)}
+                  {record.si.unit && (
+                    <span className="text-section-title text-ink-soft ml-1">{record.si.unit}</span>
+                  )}
+                </div>
               </div>
-            </div>
+            )}
             <div className="rounded-card border border-line p-3">
               <div className="text-caption uppercase tracking-wide text-ink-soft">Confidence</div>
               <div className="font-num text-display leading-tight">
@@ -946,7 +957,7 @@ export default function Guild() {
 
           {record.corrected && (
             <div className="mt-3">
-              <Callout kind="info" title="Already corrected in this session">
+              <Callout kind="info" title="Already corrected">
                 Original extraction is preserved in the audit trail; the current value is{' '}
                 <span className="font-num">
                   {fmt(record.corrected.value)} {record.corrected.unit}

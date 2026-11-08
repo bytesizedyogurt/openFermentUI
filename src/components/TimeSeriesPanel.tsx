@@ -1,12 +1,15 @@
 // A deposition's readings as time series (OF-BLD-014 §7.1).
 //
 // Per measure, each reading with its hours into the run, which a person
-// types; the role a series plays (biomass, product, substrate), which a
-// person assigns because a Measure carries no such marker; and readings
-// logged elsewhere, attached as CSV. Nothing here fits anything: fermOS
-// reads these series (§7.2).
+// types while the deposition runs; the role a series plays (biomass,
+// product, substrate), which a person assigns because a Measure carries no
+// such marker; and readings logged elsewhere, attached as CSV while it
+// runs. A closed deposition keeps its readings and their hours as they
+// closed (the service refuses a change, project_state.py), so its hours
+// read as text. Nothing here fits anything: fermOS reads these series
+// (§7.2).
 import { useState } from 'react';
-import type { Deposition, Runbook, SeriesRole } from '@/data/types';
+import { measuresOf, type Deposition, type Runbook, type SeriesRole } from '@/lib/studies';
 import { useStore } from '@/store';
 import { seriesOf } from '@/engine/series';
 import { Button } from './ui';
@@ -21,8 +24,9 @@ export function TimeSeriesPanel({ deposition, runbook }: { deposition: Depositio
   const [csv, setCsv] = useState('');
   const [said, setSaid] = useState<string | null>(null);
   const times = deposition.sampleTimes ?? {};
+  const open = deposition.state === 'running';
   const series = seriesOf(deposition, runbook);
-  const measures = runbook.measurementSchema.filter((m) => deposition.entries.some((e) => e.measureId === m.id));
+  const measures = measuresOf(runbook).filter((m) => deposition.entries.some((e) => e.measureId === m.id));
 
   return (
     <div className="space-y-4" data-testid="time-series">
@@ -33,7 +37,7 @@ export function TimeSeriesPanel({ deposition, runbook }: { deposition: Depositio
           csvName={`series-${deposition.id}`}
         />
       )}
-      {measures.length === 0 && <p className="text-body text-ink-soft">No reading yet. Type them in run mode, or attach them below.</p>}
+      {measures.length === 0 && <p className="text-body text-ink-soft">{open ? 'No reading yet. Type them at the bench, or attach them below.' : 'No reading was kept.'}</p>}
       {measures.map((m) => {
         const s = series.find((x) => x.measureId === m.id);
         return (
@@ -66,18 +70,24 @@ export function TimeSeriesPanel({ deposition, runbook }: { deposition: Depositio
                 .filter((e) => e.measureId === m.id)
                 .map((e) => (
                   <li key={e.id} className="flex flex-wrap items-center gap-2 text-body">
-                    <label className="text-caption text-ink-soft">
-                      <span className="sr-only">Hours into the run for {e.raw}</span>
-                      <input
-                        className="input w-20 py-0.5 font-num"
-                        type="number"
-                        step="any"
-                        aria-label={`Hours into the run for ${e.id}`}
-                        defaultValue={times[e.id] ?? ''}
-                        onBlur={(ev) => setSampleTime(deposition.id, e.id, ev.target.value === '' ? null : Number(ev.target.value))}
-                      />{' '}
-                      h
-                    </label>
+                    {open ? (
+                      <label className="text-caption text-ink-soft">
+                        <span className="sr-only">Hours into the run for {e.raw}</span>
+                        <input
+                          className="input w-20 py-0.5 font-num"
+                          type="number"
+                          step="any"
+                          aria-label={`Hours into the run for ${e.id}`}
+                          defaultValue={times[e.id] ?? ''}
+                          onBlur={(ev) => setSampleTime(deposition.id, e.id, ev.target.value === '' ? null : Number(ev.target.value))}
+                        />{' '}
+                        h
+                      </label>
+                    ) : (
+                      <span className="text-caption text-ink-soft font-num" data-testid="series-hours">
+                        {times[e.id] !== undefined ? `${times[e.id]} h` : 'no time'}
+                      </span>
+                    )}
                     <span className="font-num">
                       {e.value} {e.unit}
                     </span>
@@ -89,7 +99,7 @@ export function TimeSeriesPanel({ deposition, runbook }: { deposition: Depositio
           </div>
         );
       })}
-      {deposition.state !== 'staged' && (
+      {open && (
         <div>
           <label className="block text-caption text-ink-soft mb-1" htmlFor={`csv-${deposition.id}`}>
             Attach readings (CSV): <span className="font-num">time_h, measure, value, unit</span>, one reading a line. A line the

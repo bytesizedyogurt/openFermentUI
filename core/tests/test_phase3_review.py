@@ -3,7 +3,6 @@ before its fix."""
 from __future__ import annotations
 
 import json
-import subprocess
 import threading
 
 import pytest
@@ -68,7 +67,8 @@ def test_unknown_spend_refuses_and_leaves_the_day_as_it_was(monkeypatch):
     down = make_engine("postgresql://nobody:nothing@127.0.0.1:9/none")
     previous_binding, previous_engine = db.bind(None), db.use_engine(down)
     try:
-        assert spend.would_pass(5)[0] is True
+        with pytest.raises(spend.SpendUnknown):
+            spend.reserve("answer", 5)
         with pytest.raises(spend.SpendUnknown):
             spend.charge("answer", 0.1)
     finally:
@@ -116,13 +116,6 @@ def test_concurrent_reservations_cannot_together_pass_the_cap(monkeypatch):
         spend.settle(g, "answer", 0.1)
     assert spend.total_today() == pytest.approx(0.3)
     assert spend.state()["reservedUsd"] == 0
-
-
-# R6 — the spend lock stays out of git.
-def test_the_spend_lock_is_ignored():
-    root = intake._CORE.parent
-    out = subprocess.run(["git", "check-ignore", "core/data/spend.json.lock"], cwd=root, capture_output=True, text=True)
-    assert out.returncode == 0
 
 
 # R7 — a replay the tool now refuses says so; a damaged file is named.

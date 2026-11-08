@@ -10,7 +10,7 @@
 // the verdict. That split matters most for 'inconclusive': whether a run's
 // deviations were large enough to void the comparison is a call about what
 // actually happened in the room, and a threshold cannot make it.
-import type { Deposition, Prediction, Runbook } from '@/data/types';
+import type { Deposition, Prediction, Runbook } from '@/lib/studies';
 
 export interface Delta {
   predictionId: string;
@@ -31,7 +31,7 @@ export interface Delta {
   held: boolean;
 }
 
-export type PredictionKind = 'point' | 'interval' | 'bound';
+type PredictionKind = NonNullable<Prediction['kind']>;
 
 export const kindOf = (p: Prediction): PredictionKind => p.kind ?? 'point';
 
@@ -53,7 +53,7 @@ function pointDelta(predicted: number, observed: number): number {
 }
 
 /** The signed percent a value lies from what held it: a point's value, or the nearer edge. */
-export function deltaOf(p: Prediction, observed: number): number {
+function deltaOf(p: Prediction, observed: number): number {
   const kind = kindOf(p);
   if (kind === 'interval' && p.interval) {
     if (observed < p.interval.low) return pointDelta(p.interval.low, observed);
@@ -87,8 +87,9 @@ export const CONFIRM_BAND_PCT = 10;
  */
 export function computeDeltas(deposition: Deposition, runbook: Runbook): Delta[] {
   const out: Delta[] = [];
-  for (const prediction of runbook.predictions) {
-    const measures = runbook.measurementSchema.filter((m) => m.predictionId === prediction.id);
+  const schema = runbook.measurementSchema ?? [];
+  for (const prediction of runbook.predictions ?? []) {
+    const measures = schema.filter((m) => m.predictionId === prediction.id);
     if (measures.length === 0) continue;
     const ids = new Set(measures.map((m) => m.id));
     const entries = deposition.entries.filter((e) => ids.has(e.measureId));
@@ -113,11 +114,11 @@ export function computeDeltas(deposition: Deposition, runbook: Runbook): Delta[]
 /** Predictions the run simply never got to. */
 export function unmeasured(deposition: Deposition, runbook: Runbook): Prediction[] {
   const measured = new Set(computeDeltas(deposition, runbook).map((d) => d.predictionId));
-  return runbook.predictions.filter((p) => !measured.has(p.id));
+  return (runbook.predictions ?? []).filter((p) => !measured.has(p.id));
 }
 
-export interface OutcomeSuggestion {
-  outcome: 'confirmed' | 'refuted' | 'inconclusive';
+interface OutcomeSuggestion {
+  outcome: NonNullable<Deposition['reconciliation']>['outcome'];
   /** Why, in one sentence, for the person who has to agree or disagree. */
   why: string;
 }

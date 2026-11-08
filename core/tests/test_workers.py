@@ -58,6 +58,27 @@ def test_a_library_printing_to_stdout_does_not_corrupt_the_stream(worker):
     assert worker.call("echo", {"x": "y"}) == {"x": "y"}
 
 
+def test_a_worker_module_that_prints_as_it_is_imported_keeps_the_stream_whole(tmp_path, monkeypatch):
+    """Descriptor 1 is pointed at stderr before the worker module is
+    imported (workers.LAUNCH), so a library that prints at its import, from
+    Python or from C, writes to stderr and every response arrives whole."""
+    (tmp_path / "a_chatty_worker.py").write_text(
+        "import os\n"
+        "print(\"a placeholder library's banner, printed as it is imported\")\n"
+        "os.write(1, b\"a placeholder solver's banner, written to fd 1 as it is imported\\n\")\n"
+        "from openferment_core.workers import serve\n"
+        "if __name__ == '__main__':\n"
+        "    serve({'echo': lambda a: a}, name='chatty')\n")
+    monkeypatch.setenv("PYTHONPATH", str(tmp_path))
+    w = SimWorker("a_chatty_worker", timeout_s=10)
+    try:
+        assert w.call("echo", {"a": "b"}) == {"a": "b"} and w.ping()["worker"] == "chatty"
+        tail = w._tail()
+        assert "printed as it is imported" in tail and "written to fd 1 as it is imported" in tail
+    finally:
+        w.close()
+
+
 def test_a_module_that_does_not_exist_crashes_with_its_reason():
     w = SimWorker("openferment_core.workers.nonesuch", timeout_s=10)
     try:
@@ -117,7 +138,10 @@ ALLOWED = {
     # subclass `bst.Unit`, so the worker alone imports them (held below).
     "biosteam": {"workers/proforma_worker.py", "pureos/catalogue.py", "pureos/inhouse.py",
                  # alpha 2.0 (ADR-004): the library plant runner, in the Proforma worker.
-                 "workers/library_plants.py"},
+                 "workers/library_plants.py",
+                 # alpha 2.2 D8: the replay of runs kept from the shelf's retired reference
+                 # entries, reached by the Proforma worker's replay ops alone.
+                 "workers/kept_references.py"},
     # OF-BLD-019 §4.2: BioSTEAM's property engine, which the service reaches
     # through the Proforma worker's `thermo_props` op and nowhere else.
     "thermosteam": {"workers/proforma_worker.py", "pureos/inhouse.py",

@@ -1,6 +1,6 @@
 """pureOS's tools: `pureos_build` and `pureos_propose`.
 
-`pureos_build` (OF-BLD-020 §5.4, D9, D13): Postdoc, or an outside assistant
+`pureos_build`: Postdoc, or an outside assistant
 over MCP, builds and runs a train from unit type names and record ids. One
 action a call:
 

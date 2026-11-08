@@ -7,7 +7,8 @@
 // (OF-BLD-015 §7.1): code sweeping every module for what the question names,
 // opening to one line a module.
 import { AlertTriangle, CheckCircle2, Database, FileSearch, LayoutGrid, RefreshCw, Repeat, Wrench } from 'lucide-react';
-import type { StopReason, TraceStep } from '@/data/types';
+import type { StopReason, TraceStep } from '@/lib/postdoc';
+import { href } from '@/router';
 
 const ICON: Record<string, typeof Database> = {
   search_records: Database,
@@ -27,7 +28,19 @@ function duration(ms: number): string {
   return ms < 1000 ? `${ms} ms` : `${(ms / 1000).toFixed(1)} s`;
 }
 
+/** Where a step's kept thing opens: a run's page, a comparison's page, or Studies for a scenario; null for a step that keeps none. */
+export function keptLink(step: TraceStep): { to: string; words: string } | null {
+  if (!step.ok || step.kind !== 'tool') return null;
+  const run = /kept run ([0-9a-f]{16})\b/.exec(step.summary);
+  if (run && step.tool === 'engine_run') return { to: `/proforma/runs/${run[1]}`, words: 'Open the run' };
+  const comparison = /kept comparison ([0-9a-f]{16})\b/.exec(step.summary);
+  if (comparison) return { to: `/proforma/comparisons/${comparison[1]}`, words: 'Open the comparison' };
+  if (step.tool === 'study_scenario') return { to: '/proforma/studies', words: 'Open Studies' };
+  return null;
+}
+
 function StepLine({ step }: { step: TraceStep }) {
+  const kept = keptLink(step);
   const Icon =
     step.kind === 'coverage'
       ? step.ok
@@ -46,7 +59,17 @@ function StepLine({ step }: { step: TraceStep }) {
   const line = (
     <span className="flex items-baseline gap-2 min-w-0">
       <Icon size={13} className={`${tone} shrink-0 translate-y-0.5`} aria-hidden />
-      <span className="text-body text-ink min-w-0 break-words">{step.summary}</span>
+      <span className="text-body text-ink min-w-0 break-words">
+        {step.summary}
+        {kept && (
+          <>
+            {' '}
+            <a className="text-caption text-accent hover:underline" href={href(kept.to)} onClick={(e) => e.stopPropagation()}>
+              {kept.words}
+            </a>
+          </>
+        )}
+      </span>
       {(step.kind === 'tool' || step.kind === 'coverage') && <span className="font-num text-caption text-ink-soft shrink-0 ml-auto">{duration(step.ms)}</span>}
     </span>
   );

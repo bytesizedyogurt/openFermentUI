@@ -5,32 +5,69 @@
 // computes nothing of its own: every mass, recovery and cumulative share on
 // the page is a field the service sent. With the service down this says so,
 // and nothing stands in for a train (E.2). Shares lib/http.ts's call.
-import type {
-  Artifact,
-  KeptTrain,
-  Override,
-  ProposeRequest,
-  StreamRow,
-  Train,
-  TrainFromRun,
-  TrainFromRunRequest,
-  TrainParam,
-  TrainProposal,
-  TrainRun,
-  TrainRunRequest,
-  TrainSpec,
-  TrainSummary,
-  TrainUnit,
-  TrainUnitSpec,
-  TrainValidation,
-  UnitSpecs,
-  UnitType,
-  VesselSummary,
-} from '@/data/types';
+//
+// Every shape the service answers or takes here is generated from its models
+// into src/api/types.gen.ts (ADR-007) and named below: a run's train and its
+// units, a proposal with its reasons, the catalogue's unit types and their
+// specs, a train as data with its validation, check and run, a train read
+// from a run, and a train a model kept. A stream, a train on file and a vessel
+// are named in lib/proforma.ts, which reads them for Proforma's pages too.
+import type { components } from '@/api/types.gen';
 import { ServiceDown, ServiceRefused, call } from './http';
-import { proformaNewestRun, proformaReference, proformaScenarios, proformaShelf } from './proforma';
+import { inputsOf, type Override, type ParameterSpec } from './params';
+import {
+  keptReferenceRuns,
+  proformaArtifact,
+  proformaNewestRun,
+  proformaScenarios,
+  proformaShelf,
+  retiredEntryOf,
+  type StreamRow,
+  type TrainSummary,
+  type VesselSummary,
+} from './proforma';
+import { listRuns, titledConfiguration, type Artifact, type EngineInput } from './studies';
 
 export { ServiceDown as PureosDown, ServiceRefused as PureosRefused };
+
+type S = components['schemas'];
+
+/** `GET /api/pureos/train/{key}`: a run's train as the service reads it from the run's stream and unit tables. */
+export type Train = S['Train'];
+/** One unit of a run's train, in run order, with the product's flow through it as the stream table states it. */
+export type TrainUnit = S['TrainUnit'];
+/** `POST /api/pureos/propose`: a product, a host and optionally an inlet, each by its id. */
+export type ProposeRequest = S['ProposeRequest'];
+/** What the written rules propose: a train with each unit's reason, or none with each property nothing holds. */
+export type TrainProposal = S['TrainProposal'];
+export type ProposalReason = S['ProposalReason'];
+export type ProposalMissing = S['ProposalMissing'];
+/** `GET /api/pureos/catalogue`: a unit type; `GET /api/pureos/catalogue/{id}/specs`: its specs with the class's defaults. */
+export type UnitType = S['UnitType'];
+export type UnitSpecs = S['UnitSpecs'];
+/**
+ * A train as data: its inlet, its units in order, each with the values a person typed for it. The service takes one
+ * in a request that may leave its units out, so a reader takes a train's units through `unitsOf`.
+ */
+export type TrainSpec = S['TrainSpec'];
+export type TrainUnitSpec = S['TrainUnitSpec'];
+/** A value a person typed for one parameter of a train's place: an Override without its scope and key. */
+export type TrainParam = S['TrainParam'];
+/** `POST /api/pureos/train/validate`, and `/check`: every refusal at once, by its place. */
+export type TrainValidation = S['TrainValidation'];
+/** `POST /api/pureos/train/run`, and `/check`: the train, a person's values as typed inputs, and who asks. */
+export type TrainRunRequest = S['TrainRunRequest'];
+/** `POST /api/pureos/train/run`: the one `pureos.train_run` artifact, read; a stream's purity within it. */
+export type TrainRun = S['TrainRun'];
+export type StreamPurity = S['StreamPurity'];
+/** `POST /api/pureos/train/from-run`: a kept run's units read into a train, and what it leaves out. */
+export type TrainFromRunRequest = S['TrainFromRunRequest'];
+export type TrainFromRun = S['TrainFromRun'];
+/** `GET /api/pureos/trains-kept`: a train a model built, kept on the service. */
+export type KeptTrain = S['KeptTrain'];
+
+/** A train's units in order: each one it holds, and none when the train as sent left them out. */
+export const unitsOf = (t: Pick<TrainSpec, 'units'>): TrainUnitSpec[] => t.units ?? [];
 
 /** Every train on file. */
 export const pureosTrains = (signal?: AbortSignal) => call<TrainSummary[]>('/api/pureos/trains', { signal });
@@ -86,9 +123,13 @@ export const RUN_WORDS =
 // person typed into its panels, which live in the store's
 // `parameterOverrides` under the train's scopes
 // (`pureos:unit:<train id>:<unit id | inlet>`) and are laid into the train's
-// params as it is sent (`trainSpecOf`). The service validates it, says what a
-// run would refuse, runs it and keeps one `pureos.train_run` artifact; the
-// browser shows the answer and computes nothing.
+// params as it is sent (`trainSpecOf`). A run or a check also sends each of
+// those changes as a typed input named by its place (`trainInputs`, through
+// lib/params.ts `inputsOf`, alpha 2.2 D2), which the service converts back
+// into the Override of the place's scope at its door. The service validates
+// the train, says what a run would refuse, runs it and keeps one
+// `pureos.train_run` artifact and its run of the engine `train`; the browser
+// shows the answer and computes nothing.
 
 const post = <T>(path: string, body: unknown, signal?: AbortSignal) =>
   call<T>(path, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(body), signal });
@@ -139,12 +180,44 @@ export const builderCopyPath = (keptTrainId: string) => `/pureos/build/${NEW_TRA
 export const builderFromRunPath = (artifactId: string) => `/pureos/build/${NEW_TRAIN}?from=${encodeURIComponent(artifactId)}`;
 
 /**
+ * The train a run of the engine `train` ran, as its basis holds it (its `train` input, the train as data the request
+ * sent, docs/api/runs.md, A train run): its id, its name and how many units it holds; null for any other run, or a
+ * basis whose train does not read.
+ */
+export function trainOfRun(run: { engine: string; inputs: { name: string; quantity: { value: unknown } }[] }): { id: string; name: string; units: number } | null {
+  if (run.engine !== 'train') return null;
+  const held = run.inputs.find((i) => i.name === 'train')?.quantity.value;
+  if (typeof held !== 'string') return null;
+  try {
+    const t = JSON.parse(held) as { id?: unknown; name?: unknown; units?: unknown };
+    if (typeof t.id !== 'string' || typeof t.name !== 'string') return null;
+    return { id: t.id, name: t.name, units: Array.isArray(t.units) ? t.units.length : 0 };
+  } catch {
+    return null;
+  }
+}
+
+/**
+ * What a run ran, as a person reads it, from its runs row: a train run names its train's name beside its id
+ * (`trainOfRun`), any other its thing and the configuration it ran in, read by the engine's title for it beside its
+ * name where the reader holds the thing's titles (`titles`, `titledConfiguration`: Studies' run card holds them from
+ * GET /api/engines).
+ */
+export function ranWhat(
+  run: { engine: string; plant: string; configuration?: string | null; inputs: { name: string; quantity: { value: unknown } }[] },
+  titles?: Record<string, string> | null,
+): string {
+  const t = trainOfRun(run);
+  return t ? `${t.name} (${run.plant})` : run.plant + (run.configuration ? ` (${titledConfiguration(run.configuration, titles)})` : '');
+}
+
+/**
  * OF-BLD-020 §6.2 — where the Builder opens a fresh train with its inlet set:
  * a kept simulation's harvest (`simulation:<artifact id>`, fermOS → Simulate's
  * **Use as a train's inlet**) or a scenario's newest run, whose broth its
  * flowsheet names (`scenario:<scenario id>`).
  */
-export type InletFrom = { kind: 'simulation' | 'scenario'; id: string };
+type InletFrom = { kind: 'simulation' | 'scenario'; id: string };
 export const builderInletPath = (from: InletFrom) => `/pureos/build/${NEW_TRAIN}?inlet=${from.kind}:${encodeURIComponent(from.id)}`;
 
 /** The inlet a `?inlet=` names, as a train holds it; null for anything else. */
@@ -169,13 +242,28 @@ export function trainSpecOf(draft: TrainSpec, overrides: Record<string, Override
   return {
     ...draft,
     inlet: { ...draft.inlet, params: params(INLET) },
-    units: draft.units.map((u) => ({ ...u, params: params(u.id) })),
+    units: unitsOf(draft).map((u) => ({ ...u, params: params(u.id) })),
   };
 }
 
-/** Every override of a train's places, as a run request carries them. */
+/** Every override of a train's places: the browser's own bookkeeping of what a person typed there. */
 export const trainOverrides = (train: TrainSpec, overrides: Record<string, Override[]>): Override[] =>
-  [INLET, ...train.units.map((u) => u.id)].flatMap((place) => overrides[unitScope(train.id, place)] ?? []);
+  [INLET, ...unitsOf(train).map((u) => u.id)].flatMap((place) => overrides[unitScope(train.id, place)] ?? []);
+
+/**
+ * A train's overrides as the inputs a run or a check sends (alpha 2.2 D2): each turned by `inputsOf` in the unit its
+ * parameter is in, as its place's scope serves its specs (`specs`, by scope), and named `<place>.<key>`, the place its
+ * scope names. A place whose specs the page has not read yet sends no input: its values travel in the train's own
+ * params (`trainSpecOf`), each a person's as typed, and its inputs follow once its panel has read the units.
+ */
+export function trainInputs(train: TrainSpec, overrides: Override[], specs: Record<string, ParameterSpec[]>): EngineInput[] {
+  return [INLET, ...unitsOf(train).map((u) => u.id)].flatMap((place) => {
+    const scope = unitScope(train.id, place);
+    const read = specs[scope];
+    if (!read) return [];
+    return inputsOf(overrides.filter((o) => o.scope === scope), read).map((i) => ({ ...i, name: `${place}.${i.name}` }));
+  });
+}
 
 /** A value with every object's keys in order, so two copies of a train compare by what they hold, never by the order a serializer wrote. */
 function canonical(v: unknown): unknown {
@@ -191,12 +279,12 @@ function canonical(v: unknown): unknown {
 }
 
 /** One train as text whatever wrote it (the browser, or the service echoing it), an absent optional field the same as null. */
-export const trainText = (t: TrainSpec): string =>
+const trainText = (t: TrainSpec): string =>
   JSON.stringify(
     canonical({
       ...t,
       inlet: { ...t.inlet, ref: t.inlet.ref ?? null, streamId: t.inlet.streamId ?? null, vessel: t.inlet.vessel ?? null, params: t.inlet.params ?? {} },
-      units: t.units.map((u) => ({ ...u, params: u.params ?? {}, records: u.records ?? {}, readFrom: u.readFrom ?? null, outlets: u.outlets ?? {} })),
+      units: unitsOf(t).map((u) => ({ ...u, params: u.params ?? {}, records: u.records ?? {}, readFrom: u.readFrom ?? null, outlets: u.outlets ?? {} })),
     }),
   );
 
@@ -233,7 +321,7 @@ export const routeWords = (route: string) =>
   route === 'onward' ? 'on to the next unit' : route === 'waste' ? 'to waste' : route.startsWith('recycle:') ? `back to ${route.slice('recycle:'.length)}` : route;
 
 /** The streams a kept run's table holds, as its artifact keeps them (a Proforma run's, a reference's): read, never made. */
-export function streamsOfArtifact(a: Artifact | null | undefined): StreamRow[] {
+function streamsOfArtifact(a: Artifact | null | undefined): StreamRow[] {
   const s = (a?.output as Record<string, unknown> | undefined)?.streams;
   return Array.isArray(s) ? (s as StreamRow[]) : [];
 }
@@ -258,7 +346,7 @@ export interface RunChoice {
 }
 
 /** The flowsheet a kept run names: its output's, else its basis's. */
-export function flowsheetOfRun(a: Artifact): string | null {
+function flowsheetOfRun(a: Artifact): string | null {
   const o = (a.output as Record<string, unknown> | undefined)?.flowsheet;
   if (typeof o === 'string' && o) return o;
   const i = a.inputs.find((x) => x.name === 'flowsheet');
@@ -267,14 +355,18 @@ export function flowsheetOfRun(a: Artifact): string | null {
 
 /**
  * The kept runs a train can take a stream of, or be read from: pureOS's own
- * train runs, the newest run of every BioSTEAM scenario (the held ones and
- * the ones made here), and every reference run on the shelf, each with its
- * streams as its artifact or its train holds them.
+ * train runs, the newest run of every BioSTEAM scenario of the project, each
+ * listed once (the service's, then those this browser holds that the service
+ * does not list yet, ADR-014; alpha 2.2 D9), every library plant's run the
+ * project keeps (alpha 2.2 D8: `GET /api/runs?engine=biosteam`, its tool
+ * `library.run`), the reference plants' among them, and every reference run a
+ * person kept from the shelf's retired reference entries (`proforma.reference`,
+ * read as kept), each with its streams as its artifact or its train holds them.
  * Read, never made; a source the service cannot answer is said in words and
  * the rest still come back.
  */
 export async function runChoices(
-  made: { id: string; name: string }[],
+  held: { id: string; name: string }[],
   signal?: AbortSignal,
 ): Promise<{ choices: RunChoice[]; problems: string[] }> {
   const problems: string[] = [];
@@ -293,8 +385,9 @@ export async function runChoices(
   // The shelf names each scenario flowsheet's broth (OF-BLD-020 §6.2).
   const shelf = (await proformaShelf(signal).catch(said('Proforma’s shelf'))) ?? [];
   const brothOf = new Map(shelf.map((f) => [f.id, f.brothStream ?? null]));
-  const held = (await proformaScenarios({ host: null }, signal).catch(said('Proforma’s scenarios'))) ?? [];
-  const scenarios = [...held.map((s) => ({ id: s.id, name: s.name })), ...made];
+  const served = (await proformaScenarios({ host: null }, signal).catch(said('Proforma’s scenarios'))) ?? [];
+  const listed = new Set(served.map((s) => s.id));
+  const scenarios = [...served.map((s) => ({ id: s.id, name: s.name })), ...held.filter((s) => !listed.has(s.id))];
   for (const sc of scenarios) {
     const a = await proformaNewestRun(sc.id, signal).catch(said(`the runs of ${sc.id}`));
     if (!a) continue;
@@ -311,11 +404,18 @@ export async function runChoices(
       streams: streamsOfArtifact(a),
     });
   }
-  for (const f of shelf.filter((x) => x.reference)) {
-    const ref = await proformaReference(f.id, signal).catch(said(`the reference run of ${f.id}`));
-    const a = ref?.artifact;
-    if (a && a.tool === 'proforma.reference')
-      choices.push({ artifactId: a.id, ref: a.id, scenarioId: null, broth: null, tool: a.tool, label: `reference run of ${f.title}`, createdAt: a.createdAt, streams: streamsOfArtifact(a) });
+  const library = (await listRuns(signal, 'biosteam').catch(said('the library plants’ runs'))) ?? [];
+  for (const r of library) {
+    if (r.tool !== 'library.run' || r.status !== 'done' || !r.artifactId) continue;
+    const a = await proformaArtifact(r.artifactId, signal).catch(said(`library run ${r.id}`));
+    if (a)
+      choices.push({ artifactId: a.id, ref: a.id, scenarioId: null, broth: null, tool: a.tool, label: `library run of ${r.plant}${r.configuration ? ` (${r.configuration})` : ''}`, createdAt: a.createdAt, streams: streamsOfArtifact(a) });
+  }
+  const kept = (await keptReferenceRuns(signal).catch(said('the runs kept from the retired reference entries'))) ?? [];
+  for (const a of kept) {
+    const entry = retiredEntryOf(a);
+    if (a.tool !== 'proforma.reference' || !entry) continue;
+    choices.push({ artifactId: a.id, ref: a.id, scenarioId: null, broth: null, tool: a.tool, label: `reference run of ${entry}, kept from the retired entry`, createdAt: a.createdAt, streams: streamsOfArtifact(a) });
   }
   return { choices, problems };
 }

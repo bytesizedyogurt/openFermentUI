@@ -19,8 +19,9 @@ the package's own error.
 A plant's parameters are read back from a fresh build (`parameters`): each a
 `ParameterSpec` whose value is the library's default (origin
 `library-default`), its bounds a convention with its reason. A run
-(`run`) builds the plant afresh, sets a person's values (each an `Override`
-of the plant's scope, a named assumption in the run's basis), simulates,
+(`run`) builds the plant afresh, sets the values a run sets (each an
+`Override` of the plant's scope: a named assumption, a model's estimate or a
+deposition's reading in the run's basis), simulates,
 prices and reads it back, and is kept as one `library.run` artifact; a run
 with no value of its own is held to the package's own test where the
 package has one (`regression`, read from the installed test file by `ast`).
@@ -41,7 +42,7 @@ from importlib.metadata import PackageNotFoundError, version
 from pathlib import Path
 from typing import Any
 
-from ..basis import ASSUMED_KINDS, override_source
+from ..basis import is_set, override_source
 from ..flowsheets import shelf as _shelf
 from ..models import (
     ReplayTolerance,
@@ -66,7 +67,10 @@ LIBRARY_RUN = "library.run"
 LIBRARY_RUN_VERSION = "library run 2"
 # The significant digits a run keeps (as a reference run keeps them): BioSTEAM
 # sums a set of units in an order that moves the last digits from one build to
-# the next, and a replay compares the plant. A precision, stated in every basis.
+# the next, and a replay compares the plant's numbers at these digits. A
+# precision, stated in every basis; the basis note below keeps its words as
+# first written, its id hashing them (docs/PROGRESS.md, Debts: words stored in
+# bases).
 DIGITS = 10
 # numpy.allclose's own absolute tolerance, which the package's test uses
 # beside its rtol: a check holds when |measured − package| ≤ ATOL + rtol·|package|.
@@ -259,7 +263,9 @@ def _override_input(o: Override, unit: str) -> BasisInput:
                              "and a range is a study's to sample")
     if not o.by.strip():
         raise LibraryRefused(f"the override of {o.key} needs the name of the "
-                             + ("model that estimated it" if o.origin == "model-estimate" else "person who set it"))
+                             + ("model that estimated it" if o.origin == "model-estimate"
+                                else "person who deposited its reading" if o.origin == "measurement"
+                                else "person who set it"))
     return BasisInput(name=o.key, value=float(o.value), unit=unit, source=override_source(o))
 
 
@@ -319,7 +325,12 @@ def _named(inputs: list[BasisInput], name: str) -> Any:
 
 
 def _overrides_of(inputs: list[BasisInput]) -> dict[str, float]:
-    return {i.name: float(i.value) for i in inputs if i.source.kind in ASSUMED_KINDS}
+    """The values a run set, by key, as the worker sets them on the plant: a
+    person's assumption, a model's estimate and a deposition's reading
+    alike (basis.is_set). A run that sets one is held to no package test
+    (`_run_library`), and its SFF file rebuilds the plant with them
+    (`plant_of`)."""
+    return {i.name: float(i.value) for i in inputs if is_set(i.source)}
 
 
 def _run_library(inputs: list[BasisInput], seed: int | None) -> dict[str, Any]:
@@ -387,7 +398,8 @@ def run(plant_id: str, configuration: str | None = None, overrides: list[Overrid
 
 def plant_of(art) -> dict[str, Any]:
     """What the worker rebuilds a library run's plant from, for its SFF file
-    (engine/sff.py `export`): the plant, its configuration and the person's values."""
+    (engine/sff.py `export`): the plant, its configuration and the values the
+    run set (`_overrides_of`)."""
     if art.tool != LIBRARY_RUN:
         raise LibraryRefused(f"{art.tool} is not a library run")
     configuration = _named(art.inputs, "configuration")

@@ -3,27 +3,31 @@
 //
 // Three rows, each read from the service or the store, none written here:
 //
-//   Reference runs  every reference biorefinery on the shelf, run whole on
-//                   its package's own defaults: the price of its newest
-//                   stored run, when it ran, its provenance, a Run or Rerun
-//                   with the simulator's status line, and a link to its page
-//                   (/proforma/reference/:id, OF-BLD-019 §3.3), every one read
-//                   at /api/proforma/reference/:id, the benchmark included.
-//                   The corn stover benchmark (OF-BLD-014 §8.2) is the first:
-//                   before Proforma prices anything new, it reproduces a
-//                   published biorefinery.
-//   Flowsheets      every other flowsheet on the shelf, with the inputs it
-//                   takes and New scenario from this.
-//   Scenarios       every BioSTEAM scenario: the price of the newest run
-//                   (read from its artifact) or "not run yet", how its
-//                   inputs stand, and pin.
+//   Reference runs  the library shelf's reference plants (alpha 2.2 D8), the
+//                   corn stover plant (the NREL 2011 design, OF-BLD-014
+//                   §8.2's benchmark) and the dry-grind corn plant, each run
+//                   whole on its package's own values: the price of its
+//                   newest run the project keeps, when it ran, its provenance
+//                   and how many of its package test's values it holds, a Run
+//                   or Rerun in the person's name with the simulator's status
+//                   line, and a link to its page (/proforma/reference/:plant,
+//                   OF-BLD-019 §3.3), read at GET /api/library and
+//                   GET /api/runs. Before Proforma prices anything new, they
+//                   reproduce published biorefineries.
+//   Flowsheets      every flowsheet on the shelf, with the inputs it takes
+//                   and New scenario from this.
+//   Scenarios       every BioSTEAM scenario of the project (alpha 2.2 D9):
+//                   the price of the newest run (read from its artifact) or
+//                   "not run yet", how its inputs stand as the service binds
+//                   each (GET /api/proforma/scenarios), and pin.
 //
 // New scenario opens a chooser over the shelf (components/NewScenarioDialog)
 // and makes a `biosteam` scenario that opens on its page. NOTHING here is
 // disabled because a list is empty: an empty row says why and what fills it.
 import { useEffect, useMemo, useState } from 'react';
 import { BookOpen, FlaskConical, GitCompare, LineChart, Pin, PinOff, Play, Plus } from 'lucide-react';
-import type { Artifact, FlowsheetInfo, ProformaScenarioInfo, Scenario } from '@/data/types';
+import type { FlowsheetInfo, ProformaScenarioInfo, Scenario } from '@/lib/proforma';
+import type { Artifact, EngineRun } from '@/lib/studies';
 import { overridesFor, proformaScope, useStore } from '@/store';
 import { href } from '@/router';
 import { fmt } from '@/engine/units';
@@ -32,28 +36,30 @@ import { Tick, ProvenanceBadge } from '@/components/Provenance';
 import { SubsystemShelf } from '@/components/ReferenceView';
 import { NewScenarioDialog, NoFlowsheetLine, inputSourceWords } from '@/components/NewScenarioDialog';
 import {
-  BENCHMARK_FLOWSHEET,
-  LEGACY_BENCHMARK_TOOL,
   ProformaDown,
+  REFERENCE_PLANTS,
   SIMULATOR_SAYS,
-  type BenchmarkOutput,
   type PriceRead,
-  type ReferenceResponse,
+  type SimulatorStatus,
   inputCounts,
+  keptReferenceRuns,
+  keptRunsOf,
+  libraryPrice,
   newestRunId,
+  packageChecks,
   proformaArtifact,
-  proformaBind,
   proformaNewestRun,
-  proformaReference,
-  referenceChecks,
-  stamp,
-  referencePath,
   proformaScenarios,
   proformaShelf,
-  referencePrice,
+  proformaStatus,
+  referencePath,
+  referenceRunOf,
+  retiredEntryOf,
   runPrice,
-  runProformaReference,
+  stamp,
 } from '@/lib/proforma';
+import { runnable, type LibraryPlant, type LibraryShelf } from '@/lib/library';
+import { StudiesRefused, libraryShelf, listRuns, listScenarios, runPlant } from '@/lib/studies';
 
 const problemOf = (e: unknown) => (e instanceof ProformaDown ? `${e.message} ${e.remedy ?? ''}`.trim() : e instanceof Error ? e.message : String(e));
 
@@ -81,62 +87,90 @@ function Price({ price, provenance, testid }: { price: PriceRead; provenance: Ar
 
 // ── Reference runs ──────────────────────────────────────────────────────
 
-function ReferenceCard({ info }: { info: FlowsheetInfo }) {
-  const [state, setState] = useState<ReferenceResponse | null>(null);
+function ReferenceCard({
+  plant,
+  shelf,
+  run,
+  kept,
+  status,
+  onRan,
+}: {
+  plant: LibraryPlant;
+  shelf: LibraryShelf;
+  /**
+   * The plant's newest run on its package's own values the project keeps; null when none, undefined until the runs
+   * answer, 'unread' when they could not be read.
+   */
+  run: EngineRun | null | undefined | 'unread';
+  /** The runs the project kept from the retired reference entry for this plant (alpha 2.2 D8), newest first. */
+  kept: Artifact[];
+  status: SimulatorStatus | null;
+  onRan: () => void;
+}) {
+  const reviewer = useStore((s) => s.reviewer).trim();
+  const [art, setArt] = useState<Artifact | null>(null);
   const [problem, setProblem] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
 
+  const artifactId = run && run !== 'unread' ? run.artifactId : null;
   useEffect(() => {
+    setArt(null);
+    if (!artifactId) return;
     const ctrl = new AbortController();
-    proformaReference(info.id, ctrl.signal)
-      .then(setState)
+    proformaArtifact(artifactId, ctrl.signal)
+      .then(setArt)
       .catch((e: unknown) => !ctrl.signal.aborted && setProblem(problemOf(e)));
     return () => ctrl.abort();
-  }, [info.id]);
+  }, [artifactId]);
 
-  const run = () => {
+  const go = () => {
     setBusy(true);
     setProblem(null);
-    runProformaReference(info.id)
-      .then(setState)
-      .catch((e: unknown) => setProblem(problemOf(e)))
+    runPlant(plant.id, null, reviewer)
+      .then((report) => {
+        if (report.artifact) setArt(report.artifact);
+        onRan();
+      })
+      .catch((e: unknown) => setProblem(e instanceof StudiesRefused ? `${plant.id} refused: ${e.message}` : problemOf(e)))
       .finally(() => setBusy(false));
   };
 
-  const art = state?.artifact ?? null;
-  const price = art ? referencePrice(info, art) : null;
-  const isBenchmark = info.id === BENCHMARK_FLOWSHEET;
-  const bench = isBenchmark && art ? (art.output as unknown as BenchmarkOutput) : null;
-  // The benchmark kept before reference runs held their tables (§3.R,
-  // findings 0, 15, 22): its price, said to be what it is.
-  const legacy = art?.tool === LEGACY_BENCHMARK_TOOL;
+  const price = art ? libraryPrice(art) : null;
   // How many of the package test's values this run holds (§3.R, finding 30).
-  const checks = referenceChecks(art);
+  const checks = packageChecks(art);
   const within = checks.filter((c) => c.within).length;
+  const test = plant.tests?.find((t) => t === `test_${plant.id}`) ?? plant.tests?.[0] ?? null;
   return (
-    <Card className="p-4 flex flex-col" data-testid="reference-card" data-flowsheet={info.id}>
+    <Card className="p-4 flex flex-col" data-testid="reference-card" data-plant={plant.id}>
       <div className="flex items-start justify-between gap-2 mb-1">
-        <span className="chip font-num">{info.id}</span>
+        <span className="chip font-num">{plant.id}</span>
         <span className="chip">reference</span>
       </div>
-      <a href={href(referencePath(info.id))} className="font-serif text-section-title font-semibold leading-snug hover:text-accent" data-testid="reference-title">
-        {info.title}
+      <a href={href(referencePath(plant.id))} className="font-serif text-section-title font-semibold leading-snug hover:text-accent" data-testid="reference-title">
+        {plant.title ?? plant.id}
       </a>
       <p className="text-caption text-ink-soft mb-2">
-        From <span className="font-num">{info.source}</span>
-        {info.packageTest && (
+        From <span className="font-num">{shelf.package}, {plant.module}</span>
+        {test && (
           <>
             {' '}
-            · held to <span className="font-num">{info.packageTest.split('::').pop()}</span>
+            · held to <span className="font-num">{test}</span>
           </>
         )}
       </p>
-      <p className="text-body text-ink-soft mb-3 flex-1">{info.description}</p>
+      <p className="text-body text-ink-soft mb-3 flex-1">
+        A plant of the library shelf, run whole by BioSTEAM on the package&rsquo;s own values, and held to the values its package&rsquo;s own test
+        asserts.
+      </p>
       {problem && <p className="text-body text-signal-warn mb-2">{problem}</p>}
-      {state && !art && (
+      {run === 'unread' && !art && (
+        <p className="text-body text-signal-warn mb-2" data-testid="reference-runs-unread">
+          Its newest run could not be read: the project&rsquo;s runs did not answer.
+        </p>
+      )}
+      {run === null && !art && (
         <p className="text-body mb-2" data-testid="reference-not-run">
-          Not run on this service yet.{' '}
-          {state.note && <span className="block text-caption text-ink-soft mt-1">{state.note}</span>}
+          {kept.length > 0 ? 'The library plant has not run in this project yet.' : 'Not run in this project yet.'}
         </p>
       )}
       {art && (
@@ -144,60 +178,45 @@ function ReferenceCard({ info }: { info: FlowsheetInfo }) {
           {price ? (
             <Price price={price} provenance={art.provenance} testid="reference-price" />
           ) : (
-            <p className="text-body text-ink-soft">The run holds no price the shelf names for this flowsheet.</p>
-          )}
-          {legacy && state?.note && (
-            <p className="text-caption text-ink-soft" data-testid="reference-legacy">
-              {state.note}
-            </p>
+            <p className="text-body text-ink-soft">The run holds no price: the plant carries no TEA here, or its TEA solved none.</p>
           )}
           {checks.length > 0 && (
             <p className="text-caption font-num" data-testid="reference-within">
-              {within} of {checks.length} values of <span className="font-num">{info.packageTest?.split('::').pop() ?? 'its package’s test'}</span> within
-              the package&rsquo;s tolerance on this run.
+              {within} of {checks.length} values of <span className="font-num">{test ?? 'its package’s test'}</span> within the package&rsquo;s
+              tolerance on this run.
             </p>
           )}
           <p className="text-caption text-ink-soft flex flex-wrap items-center gap-1.5">
             <ProvenanceBadge p={art.provenance} compact /> Ran <span className="font-num">{when(art.createdAt)}</span> ·
             kept as{' '}
-            <a className="font-num hover:text-accent underline underline-offset-2" href={href(`/biorepo/artifacts/${art.id}`)}>
+            <a className="font-num hover:text-accent underline underline-offset-2" href={href(`/proforma/runs/${art.id}`)}>
               {art.id}
             </a>
           </p>
-          {bench?.settings && Array.isArray(bench.references) && (
-            <details className="text-caption text-ink-soft">
-              <summary className="cursor-pointer hover:text-ink">What the package set, read back from it</summary>
-              <p className="mt-1">
-                From <span className="font-num">{bench.package}</span> on{' '}
-                <span className="font-num">{bench.simulator ?? (bench.biosteam ? `biosteam ${bench.biosteam}` : 'BioSTEAM')}</span>; rate of return{' '}
-                <span className="font-num">{fmt(bench.settings.rateOfReturn * 100, 3)} %</span>, income tax{' '}
-                <span className="font-num">{fmt(bench.settings.incomeTax * 100, 3)} %</span>,{' '}
-                <span className="font-num">{fmt(bench.settings.operatingDays, 4)}</span> operating days, plant life{' '}
-                <span className="font-num">
-                  {bench.settings.startYear} to {bench.settings.endYear}
-                </span>
-                .
-              </p>
-              <ul className="list-disc pl-5 mt-1">
-                {bench.references.map((r) => (
-                  <li key={r}>{r}</li>
-                ))}
-              </ul>
-            </details>
-          )}
+        </div>
+      )}
+      {kept.length > 0 && (
+        <div className="text-caption text-ink-soft mb-2" data-testid="reference-kept">
+          {kept.length === 1 ? 'One run' : `${kept.length} runs`} kept from the retired entry{' '}
+          <span className="font-num">{retiredEntryOf(kept[0])}</span>, the newest{' '}
+          <a className="font-num hover:text-accent underline underline-offset-2" href={href(`/biorepo/artifacts/${encodeURIComponent(kept[0].id)}`)}>
+            {kept[0].id}
+          </a>{' '}
+          of <span className="font-num">{when(kept[0].createdAt)}</span>; its page lists them.
         </div>
       )}
       <div className="flex flex-wrap items-center gap-2 mt-auto pt-1">
-        <Button onClick={run} disabled={busy} data-testid="reference-run">
-          <Play size={13} /> {busy ? 'Running…' : art && !legacy ? 'Rerun' : 'Run'}
+        <Button onClick={go} disabled={busy || !reviewer} data-testid="reference-run">
+          <Play size={13} /> {busy ? 'Running…' : art ? 'Rerun' : 'Run'}
         </Button>
-        <LinkButton to={referencePath(info.id)}>
+        <LinkButton to={referencePath(plant.id)}>
           <BookOpen size={13} /> Its page
         </LinkButton>
         <span className="text-caption text-ink-soft" data-testid="reference-status">
-          {state ? SIMULATOR_SAYS[state.simulator.status] : problem ? 'The simulator is the service’s.' : 'Asking the service…'}
-          {state?.simulator.error && <> {state.simulator.error}</>}
+          {status ? SIMULATOR_SAYS[status.status] : 'The simulator is the service’s.'}
+          {status?.error && <> {status.error}</>}
           {busy && ' A first run starts the simulator and takes a minute or two; it stays warm after.'}
+          {!reviewer && ' A run is asked for in a person’s name: set yours in Settings first.'}
         </span>
       </div>
     </Card>
@@ -258,13 +277,12 @@ function BiosteamCard({
 }: {
   scenario: Scenario;
   shelf: FlowsheetInfo[];
-  /** The service's binding of this scenario, when it holds it. */
-  info: ProformaScenarioInfo | null;
+  /** The service's binding of this scenario: null when it lists none for it, undefined until it answers. */
+  info: ProformaScenarioInfo | null | undefined;
 }) {
   // OF-BLD-020 §2.2: a person's changes to the scenario's inputs, its scope's overrides.
   const overrides = useStore(overridesFor(proformaScope(scenario.id)));
   const fits = useStore((s) => s.proformaFits[scenario.id]);
-  const madeHere = useStore((s) => s.createdScenarioIds.includes(scenario.id));
   const [art, setArt] = useState<Artifact | null>(null);
   const [problem, setProblem] = useState<string | null>(null);
   // The service's newest run of this scenario, made in any browser, by the
@@ -281,27 +299,6 @@ function BiosteamCard({
   const runId = newestRunId(served, scenario.lastRunId);
   const flowsheetId = scenario.flowsheetId ?? scenario.modelId;
 
-  // OF-BLD-019 §2.R: a scenario made here is bound by the service as its page
-  // binds it (`GET /api/proforma/bind`, contract (c), with the fits chosen),
-  // so the card counts what the page lists. Until the service answers, the
-  // card counts nothing; if it cannot be asked, the shelf says what can bind.
-  const [made, setMade] = useState<{ info: ProformaScenarioInfo | null } | null>(null);
-  const fitsKey = JSON.stringify(Object.entries(fits ?? {}).sort());
-  useEffect(() => {
-    setMade(null);
-    if (!madeHere || info) return;
-    const ctrl = new AbortController();
-    const chosen = Object.fromEntries(JSON.parse(fitsKey) as [string, string][]);
-    // OF-BLD-020 §6.1: a scenario on custom_train_v1 binds with the vessel design and train run it names.
-    proformaBind(
-      flowsheetId,
-      { host: null, fits: chosen, vessel: scenario.vessel ?? null, trainRun: scenario.trainRun ?? null },
-      ctrl.signal,
-    )
-      .then((b) => setMade({ info: b }))
-      .catch(() => !ctrl.signal.aborted && setMade({ info: null }));
-    return () => ctrl.abort();
-  }, [madeHere, info, flowsheetId, fitsKey, scenario.vessel, scenario.trainRun]);
 
   useEffect(() => {
     setArt(null);
@@ -319,8 +316,11 @@ function BiosteamCard({
   }, [runId, served]);
 
   const flowsheet = shelf.find((f) => f.id === flowsheetId) ?? null;
-  const asked = madeHere && !info;
-  const counts = asked && !made ? null : inputCounts(scenario, info ?? made?.info ?? null, shelf, overrides, fits ?? {});
+  // The service's binding of the scenario (GET /api/proforma/scenarios, every scenario the project's, alpha 2.2 D9):
+  // until it answers, the card counts nothing; a scenario it does not list yet (this browser's, not yet saved,
+  // ADR-014) or one it could not be asked about counts from the shelf, which says what can bind.
+  const refused = info?.refused ?? null;
+  const counts = info === undefined || refused ? null : inputCounts(scenario, info, shelf, overrides, fits ?? {});
   const price = art ? runPrice(art, shelf) : null;
   return (
     <Card className="p-4 flex flex-col" data-testid="biosteam-card" data-scenario={scenario.id}>
@@ -339,7 +339,7 @@ function BiosteamCard({
         {scenario.createdAt && (
           <>
             {' '}
-            · made here <span className="font-num">{when(scenario.createdAt)}</span>
+            · made <span className="font-num">{when(scenario.createdAt)}</span>
           </>
         )}
       </p>
@@ -356,16 +356,24 @@ function BiosteamCard({
         {art && (
           <p className="text-caption text-ink-soft mt-1">
             Ran <span className="font-num">{when(art.createdAt)}</span> ·{' '}
-            <a className="font-num hover:text-accent underline underline-offset-2" href={href(`/biorepo/artifacts/${art.id}`)}>
+            <a className="font-num hover:text-accent underline underline-offset-2" href={href(`/proforma/runs/${art.id}`)}>
               {art.id}
-            </a>
+            </a>{' '}
+            (<a className="hover:text-accent underline underline-offset-2" href={href(`/biorepo/artifacts/${art.id}`)}>its artifact</a>)
           </p>
         )}
       </div>
+      {refused && (
+        <p className="text-caption text-signal-warn mb-3" data-testid="scenario-refused">
+          The service refused its binding as it stands: {refused}
+        </p>
+      )}
       {counts && (
         <p className="text-caption text-ink-soft mb-3 font-num" data-testid="scenario-inputs">
           {counts.total} inputs: {counts.records} {counts.bound ? 'bound to records' : 'can bind to records'}
           {counts.computed > 0 && `, ${counts.computed} with a fermOS fit chosen`}
+          {counts.kept > 0 && `, ${counts.kept} bound to ${counts.keptBy.join(' and ')}`}
+          {counts.measured > 0 && `, ${counts.measured} set to a reading from the bench`}
           {counts.assumed > 0 && `, ${counts.assumed} assumed`}
           {counts.conventions > 0 && `, ${counts.conventions} by convention`}, {counts.waiting} waiting for an assumption
         </p>
@@ -381,7 +389,6 @@ function BiosteamCard({
 
 export default function Proforma() {
   const allScenarios = useStore((s) => s.scenarios);
-  const createdIds = useStore((s) => s.createdScenarioIds);
   const dialogOpen = useStore((s) => s.ui.newScenarioOpen);
   const setUI = useStore((s) => s.setUI);
   const scenarios = useMemo(() => allScenarios.filter((sc) => sc.kind === 'biosteam'), [allScenarios]);
@@ -389,7 +396,26 @@ export default function Proforma() {
   const [shelf, setShelf] = useState<FlowsheetInfo[] | null>(null);
   const [shelfProblem, setShelfProblem] = useState<string | null>(null);
   const [preset, setPreset] = useState<string | null>(null);
-  const [bound, setBound] = useState<ProformaScenarioInfo[]>([]);
+  // The service's binding of every scenario of the project; null until it answers, [] when it cannot be asked.
+  const [bound, setBound] = useState<ProformaScenarioInfo[] | null>(null);
+  const [library, setLibrary] = useState<LibraryShelf | null>(null);
+  const [libraryProblem, setLibraryProblem] = useState<string | null>(null);
+  // The project's runs of the biosteam engine, newest first; undefined until they answer, null when they cannot be read.
+  const [runs, setRuns] = useState<EngineRun[] | null | undefined>(undefined);
+  // The runs kept from the shelf's retired reference entries (alpha 2.2 D8); [] until they answer or when unread.
+  const [kept, setKept] = useState<Artifact[]>([]);
+  const [status, setStatus] = useState<SimulatorStatus | null>(null);
+  const [ranAt, setRanAt] = useState(0);
+  // The studies' scenarios, counted: the empty state names them when the project holds no Proforma scenario.
+  const [studyScenarios, setStudyScenarios] = useState<number | null>(null);
+  useEffect(() => {
+    const ctrl = new AbortController();
+    listScenarios(ctrl.signal).then(
+      (all) => setStudyScenarios(all.length),
+      () => undefined,
+    );
+    return () => ctrl.abort();
+  }, []);
 
   useEffect(() => {
     const ctrl = new AbortController();
@@ -397,23 +423,29 @@ export default function Proforma() {
     proformaShelf(ctrl.signal)
       .then(setShelf)
       .catch((e: unknown) => !ctrl.signal.aborted && setShelfProblem(problemOf(e)));
+    libraryShelf(ctrl.signal)
+      .then(setLibrary)
+      .catch((e: unknown) => !ctrl.signal.aborted && setLibraryProblem(problemOf(e)));
+    // The service binds every scenario of the project (GET /api/proforma/scenarios, OF-BLD-019 §3.2's contract (b)).
+    proformaScenarios({ host: null }, ctrl.signal)
+      .then(setBound)
+      .catch(() => !ctrl.signal.aborted && setBound([]));
     return () => ctrl.abort();
   }, []);
 
-  // The service binds the held scenarios (GET /api/proforma/scenarios,
-  // OF-BLD-019 §3.2's contract (b)); asked only when one of them is on the
-  // index.
-  const needsBinding = scenarios.some((sc) => !createdIds.includes(sc.id));
+  // The reference plants' runs, read again after a card runs one; the simulator's status with them.
   useEffect(() => {
-    if (!needsBinding) return;
     const ctrl = new AbortController();
-    proformaScenarios({ host: null }, ctrl.signal)
-      .then(setBound)
-      .catch(() => {
-        /* the cards count from the shelf instead */
-      });
+    listRuns(ctrl.signal, 'biosteam')
+      .then(setRuns)
+      .catch(() => !ctrl.signal.aborted && setRuns(null));
+    keptReferenceRuns(ctrl.signal).then(
+      (k) => !ctrl.signal.aborted && setKept(k),
+      () => !ctrl.signal.aborted && setKept([]),
+    );
+    proformaStatus(ctrl.signal).then(setStatus, () => !ctrl.signal.aborted && setStatus(null));
     return () => ctrl.abort();
-  }, [needsBinding]);
+  }, [ranAt]);
 
   // The dialog belongs to this page: leaving the page closes it, so it does
   // not reopen on the next visit. (StrictMode's rehearsal unmount leaves the
@@ -430,8 +462,8 @@ export default function Proforma() {
     setUI({ newScenarioOpen: true });
   };
 
-  const references = (shelf ?? []).filter((f) => f.reference);
-  const flowsheets = (shelf ?? []).filter((f) => !f.reference);
+  const references = REFERENCE_PLANTS.map((id) => library?.plants?.find((p) => p.id === id)).filter((p): p is LibraryPlant => !!p);
+  const flowsheets = shelf ?? [];
   const pinnedCount = scenarios.filter((s) => s.pinned).length;
 
   return (
@@ -439,7 +471,7 @@ export default function Proforma() {
       <PageHeader
         eyebrow="Cost and scale"
         title="Proforma"
-        subtitle="Techno-economics on BioSTEAM: published reference biorefineries run whole on their package's defaults, and scenarios made from a flowsheet on the shelf, each input bound to records or to a named person's assumption."
+        subtitle="Techno-economics on BioSTEAM: published plants of the library shelf run whole on their package's own values, and scenarios made from a flowsheet on the shelf, each input bound to records or to a named person's assumption."
         actions={
           <>
             <LinkButton to="/proforma/studies">
@@ -456,9 +488,9 @@ export default function Proforma() {
         }
       />
 
-      {shelfProblem && (
+      {(shelfProblem || libraryProblem) && (
         <Card className="p-4 mb-5" data-testid="shelf-down">
-          <p className="text-body text-signal-warn">The shelf and the reference runs are the service&rsquo;s. {shelfProblem}</p>
+          <p className="text-body text-signal-warn">The shelf and the reference runs are the service&rsquo;s. {shelfProblem ?? libraryProblem}</p>
         </Card>
       )}
 
@@ -468,17 +500,28 @@ export default function Proforma() {
         </h2>
         <p className="text-body text-ink-soft mb-3">
           Published biorefineries from the BioSTEAM project&rsquo;s own <span className="font-num">biorefineries</span>{' '}
-          package, run whole with every setting the package&rsquo;s own, before Proforma prices anything new. Each run is
-          held to the values the package&rsquo;s own test asserts, and its card says how many of them it holds: how close
-          this installation comes to the plant as its authors built it.
+          package, on the library shelf, run whole with every setting the package&rsquo;s own, before Proforma prices anything
+          new. Each run is held to the values the package&rsquo;s own test asserts, and its card says how many of them it
+          holds: how close this installation comes to the plant as its authors built it. Studies runs every other plant of
+          the shelf.
         </p>
-        {shelf && references.length === 0 && (
-          <p className="text-body text-ink-soft">The shelf holds no reference biorefinery.</p>
+        {library && references.length === 0 && (
+          <p className="text-body text-ink-soft">The library shelf holds no reference plant here.</p>
         )}
+        {runs === null && <p className="text-caption text-ink-soft mb-2">The project&rsquo;s runs could not be read, so no card names its newest run.</p>}
         <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
-          {references.map((f) => (
-            <ReferenceCard key={f.id} info={f} />
-          ))}
+          {library &&
+            references.map((p) => (
+              <ReferenceCard
+                key={p.id}
+                plant={p}
+                shelf={library}
+                run={runs === undefined ? undefined : runs === null ? 'unread' : referenceRunOf(p.id, runs, runnable(p).configurations[0] ?? null)}
+                kept={keptRunsOf(p.id, kept)}
+                status={status}
+                onRan={() => setRanAt(Date.now())}
+              />
+            ))}
         </div>
       </section>
 
@@ -487,8 +530,8 @@ export default function Proforma() {
           <FlaskConical size={16} className="text-ink-soft" /> Flowsheets
         </h2>
         <p className="text-body text-ink-soft mb-3">
-          The flowsheets a scenario can run. None holds a process number of its own: records bind the process inputs,
-          and a named person types the rest.
+          The flowsheets a scenario can run. Records bind each flowsheet&rsquo;s process inputs, and a named person types the
+          rest.
         </p>
         {shelf && flowsheets.length === 0 && (
           <p className="text-body">
@@ -508,19 +551,30 @@ export default function Proforma() {
         </h2>
         {scenarios.length === 0 ? (
           <EmptyState
-            title="No scenario yet"
-            body="A scenario runs one flowsheet from the shelf above: New scenario picks the flowsheet, names it and opens it, with its inputs listed."
+            title={studyScenarios ? 'No Proforma scenario yet' : 'No scenario yet'}
+            body={
+              studyScenarios
+                ? `The project's studies hold ${studyScenarios} scenario${studyScenarios === 1 ? '' : 's'}, listed on Studies. A Proforma scenario runs one flowsheet from the shelf above: New scenario picks the flowsheet, names it and opens it, with its inputs listed.`
+                : 'A scenario runs one flowsheet from the shelf above: New scenario picks the flowsheet, names it and opens it, with its inputs listed.'
+            }
             icon={<LineChart size={28} />}
             action={
-              <Button variant="primary" onClick={() => openDialog(null)}>
-                <Plus size={14} /> New scenario
-              </Button>
+              <span className="flex flex-wrap gap-2 justify-center">
+                <Button variant="primary" onClick={() => openDialog(null)}>
+                  <Plus size={14} /> New scenario
+                </Button>
+                {studyScenarios ? (
+                  <LinkButton to="/proforma/studies">
+                    <BookOpen size={14} /> Studies
+                  </LinkButton>
+                ) : null}
+              </span>
             }
           />
         ) : (
           <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-4">
             {scenarios.map((sc) => (
-              <BiosteamCard key={sc.id} scenario={sc} shelf={shelf ?? []} info={bound.find((b) => b.id === sc.id) ?? null} />
+              <BiosteamCard key={sc.id} scenario={sc} shelf={shelf ?? []} info={bound === null ? undefined : (bound.find((b) => b.id === sc.id) ?? null)} />
             ))}
           </div>
         )}

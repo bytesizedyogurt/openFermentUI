@@ -2,7 +2,7 @@
 // one `provenance` value so they can never disagree (OF-DES-001 §7.4).
 import type { ReactNode } from 'react';
 import { Award, ShieldCheck, CircleDashed, UserPen, FlaskConical, Ban, BookMarked, Microscope, TrendingUp, Calculator } from 'lucide-react';
-import type { ExtractionRecord, Provenance } from '@/data/types';
+import type { Provenance } from '@/lib/studies';
 import { aggregateExclusion } from '@/store';
 import { Explain, cx } from './ui';
 
@@ -30,7 +30,7 @@ const META: Record<ProvKind, { label: string; Icon: typeof Award; color: string;
     tick: 'tick-computed',
   },
   'industry-estimate': {
-    label: 'Industry estimate · not evidence',
+    label: 'Industry estimate · a vendor’s figure',
     Icon: TrendingUp,
     color: 'text-ink-soft',
     tick: 'tick-industry-estimate',
@@ -42,7 +42,7 @@ const META: Record<ProvKind, { label: string; Icon: typeof Award; color: string;
     tick: 'tick-unverified',
   },
   user: { label: 'User-entered', Icon: UserPen, color: 'text-signal-info', tick: 'tick-user' },
-  assumed: { label: 'Assumed · not measured', Icon: FlaskConical, color: 'text-signal-warn', tick: 'tick-assumed' },
+  assumed: { label: 'Assumed · rests on an assumption', Icon: FlaskConical, color: 'text-signal-warn', tick: 'tick-assumed' },
   rejected: { label: 'Rejected', Icon: Ban, color: 'text-signal-error', tick: 'tick-rejected' },
 };
 
@@ -124,7 +124,7 @@ const LEGEND_ORDER: ProvKind[] = ['measured', 'gold', 'verified', 'curated', 'co
  * the aggregates apply.
  */
 const entersAggregates = (p: Provenance): boolean =>
-  aggregateExclusion({ provenance: p, status: 'verified', isPrimary: true } as ExtractionRecord) === null;
+  aggregateExclusion({ provenance: p, status: 'verified', isPrimary: true }) === null;
 
 /**
  * The legend, and — behind a disclosure — what each level means for aggregates.
@@ -155,12 +155,12 @@ export function ProvenanceLegend() {
         </span>
       ))}
       {excluded.length > 0 && (
-        <Explain label={`${excluded.length} of these are held out of aggregates`}>
+        <Explain label={`${excluded.length} of these are held out of aggregates`} width={460}>
           <div className="text-body">
             <p className="mb-2 text-ink">
-              A tick says where a number came from. A level marked No is excluded from any aggregate:
-              an industry estimate is no evidence, and a computed value is derived from values already
-              counted. Counting either would overstate what the corpus knows.
+              A tick says where a number came from. A level marked No stays out of every aggregate:
+              an industry estimate is a vendor&rsquo;s figure outside the evidence, and a computed value
+              is derived from values already counted. Counting either would overstate what the corpus knows.
             </p>
             <table className="w-full border-collapse text-body">
               <thead>

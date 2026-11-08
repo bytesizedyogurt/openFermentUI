@@ -1,10 +1,25 @@
 // An engine run's page (execution prompt §7.4, §9.1 step 5): /proforma/runs/:id.
 //
-// One run of a library plant or an openFerment flowsheet, as the service kept
-// it (GET /api/runs/{id}, engine/runs.py). What it reads:
+// One run of a library plant, an openFerment flowsheet or another engine's
+// thing, as the service kept it (GET /api/runs/{id}, engine/runs.py). What it
+// reads:
 //
 //   the run         its plant and configuration, its status and provenance,
 //                   who asked and when, the study scenario that asked for it;
+//                   a train run names its train's name beside its id, links
+//                   to the train on pureOS → Train, and shows the `train`
+//                   input as its name and units, the train as data on asking;
+//   its outputs     a contract engine's or a kinetics run (docs/api/engines.md,
+//                   docs/api/runs.md): each output its name, value and unit,
+//                   with its interval where it carries one (a forecast's
+//                   median between its 5th and 95th percentiles), its origin
+//                   the run's artifact; each number shown to a few digits,
+//                   in full in its title and the CSV; a BioSTEAM run's numbers
+//                   are in its sections below;
+//   its diagnostics what a contract engine's computation reported about
+//                   itself beside its outputs (the time it took, the
+//                   iterations it made), kept with the run and left
+//                   uncompared by a replay;
 //   its parameters  every value the run was bound with, in the parameter panel,
 //                   read-only: a person's assumption or a model's estimate where
 //                   the run set one, the library's own default elsewhere, each
@@ -14,34 +29,49 @@
 //                   the run set first, all of them on asking;
 //   its test        the package's own test beside what this run measured, when
 //                   the run set no value of its own (`output.checks`);
-//   its sections    the sections a scenario run shows (RunReport), over the
-//                   run's `library.run` artifact read as one case
-//                   (`runViewOfRun`): the result, the cost breakdown, the
+//   its sections    the sections a scenario run shows (RunReport): over a
+//                   library run's `library.run` artifact read as one case
+//                   (`runViewOfRun`), the result, the cost breakdown, the
 //                   streams, the equipment, the utilities and the read-back;
+//                   over a Proforma scenario's `proforma.run` artifact, a run
+//                   of the biosteam engine since alpha 2.2 (D6), those and
+//                   its sensitivity and price distribution over its samples,
+//                   as the scenario's own page shows them (`runViewOfArtifact`);
 //   its SFF file    the record the run wrote, as the toolkit checked and scored
 //                   it, and the file itself to download.
 //
-// A scenario is made here from the run (alpha 2.1 stage B): parameters found
-// by words, each value set as the person's assumption, the scenario made and
-// run in their name (POST /api/studies/scenarios, then its run), and the new
-// run's page opens. A runbook is made here from the run's numbers: each output
+// A scenario is made here from the run (alpha 2.1 stage B; alpha 2.2 C.5):
+// NewScenarioDialog, opened from the run, finds parameters by words and sets
+// each one to the person's own value or to a reading deposited at the bench,
+// makes the scenario and runs it in their name (POST /api/studies/scenarios,
+// then its run), and the new run's page opens. A value a reading set reads
+// here as a measurement in words, linked to the deposition its reading was
+// recorded in (DepositionDetail); its parameter's chip says measured, and a
+// run resting on readings and the package's defaults alone is `measured`.
+// A runbook is made here from the run's numbers: each output
 // chosen becomes a prediction in the run's unit, measured at harvest
 // (POST /api/studies/runbooks), and opens on the runbook's page, where it is
 // locked.
+import type { components } from '@/api/types.gen';
 import { SffGraph } from '@/components/SffGraph';
-import { useEffect, useState } from 'react';
+import { useEffect, useState, type ReactNode } from 'react';
 import { BookOpen, Download, ListChecks, Play } from 'lucide-react';
-import type { ParamScope, RegressionCheck, RunReport as EngineRunReport } from '@/data/types';
+import type { ParamScope } from '@/lib/params';
+import type { FlowsheetInfo, RegressionCheck } from '@/lib/proforma';
+import type { Quantity, RunReport as EngineRunReport } from '@/lib/studies';
 import { href, navigate } from '@/router';
 import { useStore } from '@/store';
 import { exportCSV } from '@/lib/csv';
-import { runViewOfRun, stamp } from '@/lib/proforma';
-import { StudiesDown, downloadFlowsheet, makeRunbook, makeScenario, predictable, runReport, runScenario } from '@/lib/studies';
+import { RUN_TOOL, baseCaseRefusal, proformaShelf, regressionTable, runViewOfArtifact, runViewOfRun, plainNote, stamp } from '@/lib/proforma';
+import { trainOfRun } from '@/lib/pureos';
+import { StudiesDown, downloadFlowsheet, listScenarios, makeRunbook, predictable, runReport } from '@/lib/studies';
 import { Button, Callout, Card, LinkButton, PageHeader, cx } from '@/components/ui';
 import { ProvenanceBadge } from '@/components/Provenance';
 import { ParameterPanel } from '@/components/ParameterPanel';
-import { RunReport } from '@/screens/ProformaBiosteam';
-import { regressionTable } from '@/screens/ProformaReference';
+import { NewScenarioDialog } from '@/components/NewScenarioDialog';
+import { ReadingOrigin, readingNote } from '@/components/ReadingOrigin';
+import { RunReport, inputLabels } from '@/screens/ProformaBiosteam';
+import { fmt } from '@/engine/units';
 
 const problemOf = (e: unknown) => (e instanceof StudiesDown ? `${e.message} ${e.remedy ?? ''}`.trim() : e instanceof Error ? e.message : String(e));
 
@@ -51,9 +81,13 @@ export const ORIGIN_WORDS: Record<string, string> = {
   artifact: 'an artifact',
   'person-assumption': 'a person’s assumption',
   'model-estimate': 'a model’s estimate',
+  measurement: 'a reading deposited at the bench',
   'library-default': 'the library’s default',
   convention: 'a convention',
 };
+
+/** The origins of a value a run set for itself (basis.SET_PARAM_ORIGINS): a person's, a model's, a deposition's reading. */
+const SET_HERE = new Set(['assumption', 'model-estimate', 'measurement']);
 
 /**
  * The run's parameters in the panel, read-only: the values the run set first,
@@ -62,7 +96,7 @@ export const ORIGIN_WORDS: Record<string, string> = {
  */
 function Parameters({ runId, data }: { runId: string; data: ParamScope }) {
   const [all, setAll] = useState(false);
-  const set = new Set(data.values.filter((v) => v.origin === 'assumption' || v.origin === 'model-estimate').map((v) => v.key));
+  const set = new Set(data.values.filter((v) => SET_HERE.has(v.origin)).map((v) => v.key));
   const shown: ParamScope = all ? data : { ...data, specs: data.specs.filter((s) => set.has(s.key)), values: data.values.filter((v) => set.has(v.key)) };
   return (
     <Card className="p-4" data-testid="run-parameters" data-set={set.size}>
@@ -83,25 +117,233 @@ function Parameters({ runId, data }: { runId: string; data: ParamScope }) {
   );
 }
 
+/**
+ * One output a run kept (`outputs.values`): its name and the quantity, in its unit, with its origin, the shape the
+ * service writes an input in (`RunInput`). A run's outputs are the engine's own (`EngineRun.outputs`), so each is read
+ * through the guard below (Departures).
+ */
+type RunOutput = components['schemas']['RunInput'];
+
+/** The artifact tools whose run builds no plant, so it keeps no SFF file by design: the kinetics engine's (docs/api/runs.md). */
+const NO_PLANT_TOOLS = new Set(['fermos.simulation', 'growth_forecast', 'fermos.vessel']);
+
+/**
+ * A train run's file, which waits on the toolkit: the SFF schema it ships requires every file's TEA year, and a train
+ * carries no TEA, so every train run keeps those words as its `sffRefused` (docs/PROGRESS.md, Known debts). Said in
+ * plain ink, as a kinetics run's none is; any other refusal of a file is a failure, said as one.
+ */
+const fileWaitsOnToolkit = (run: EngineRunReport['run']) => run.tool === 'pureos.train_run' && /TEA_year/.test(run.sffRefused ?? '');
+
+/**
+ * BioSTEAM's runs, whose page shows their numbers in their artifact's own sections: their `outputs.values`, the
+ * values a comparison reads, fold under the outputs card's summary.
+ */
+const FOLDED_OUTPUTS = new Set(['library.run', RUN_TOOL]);
+
+/** A value as a page shows it: a number to a few significant digits (its full value in the title and the CSV), words as they are. */
+/** A number as this page writes every one: grouped from a thousand up, as the TEA's sentence writes it, else `fmt`. */
+const shown = (v: unknown) =>
+  typeof v === 'number' ? (Number.isFinite(v) && Math.abs(v) >= 1000 ? Math.round(v).toLocaleString('en-US') : fmt(v)) : String(v);
+
+/** A run's time in words: milliseconds under a tenth of a second, seconds above. */
+const took = (ms: number) => (ms < 100 ? `${Math.round(ms)} ms` : `${(ms / 1000).toFixed(1)} s`);
+
+/** Words a sentence follows on: a full stop added when they end with none. */
+const ended = (words: string) => (/[.!?]$/.test(words.trim()) ? words.trim() : `${words.trim()}.`);
+
+/** The outputs a run kept (`outputs.values`), every engine's: the values a comparison of it reads. */
+function runOutputs(run: EngineRunReport['run']): RunOutput[] {
+  const values = run.outputs.values;
+  if (!Array.isArray(values)) return [];
+  return values.filter(
+    (v): v is RunOutput =>
+      typeof v === 'object' && v !== null && typeof (v as RunOutput).name === 'string' && typeof (v as RunOutput).quantity === 'object' && (v as RunOutput).quantity !== null,
+  );
+}
+
+/**
+ * Any engine's run (docs/api/engines.md): each output with its value, its interval where it carries one, its unit
+ * and its origin, the run's artifact. A forecast's value is its median, and its interval the 5th to the 95th
+ * percentile. A BioSTEAM run's table folds under its summary, its numbers shown in the sections below as well.
+ */
+function Outputs({ report }: { report: EngineRunReport }) {
+  const values = runOutputs(report.run);
+  if (!values.length) return null;
+  const folded = FOLDED_OUTPUTS.has(report.run.tool);
+  const forecast = report.run.tool === 'growth_forecast';
+  const banded = values.some((v) => v.quantity.low != null || v.quantity.high != null);
+  const headers = ['Output', forecast ? 'Median' : 'Value', ...(banded ? [forecast ? '5th percentile' : 'Low', forecast ? '95th percentile' : 'High'] : []), 'Unit', 'Origin'];
+  const originOf = (q: Quantity) => (q.origin?.kind === 'artifact' ? `the run's artifact ${q.origin.ref ?? ''}`.trim() : (ORIGIN_WORDS[q.origin?.kind ?? ''] ?? q.origin?.kind ?? '—'));
+  const ends = (q: Quantity) => (banded ? [q.low == null ? '' : String(q.low), q.high == null ? '' : String(q.high)] : []);
+  // The CSV keeps every number in full; the table shows each to a few digits, in full in its title.
+  const rows = values.map((v) => [v.name, String(v.quantity.value), ...ends(v.quantity), v.quantity.unit || '—', originOf(v.quantity)]);
+  const band = (q: Quantity) =>
+    q.low == null && q.high == null ? '—' : `${q.low == null ? '…' : shown(q.low)} to ${q.high == null ? '…' : shown(q.high)}`;
+  return (
+    <Card className="p-4" data-testid="run-outputs" data-engine={report.run.engine}>
+      <div className="flex flex-wrap items-start justify-between gap-2 mb-1">
+        <h2 className="font-serif text-section-title font-semibold">What it computed</h2>
+        <button className="chip" onClick={() => exportCSV(`run-${report.run.id}-outputs.csv`, headers, rows)}>
+          <Download size={12} aria-hidden /> CSV
+        </button>
+      </div>
+      <p className="text-caption text-ink-soft mb-2">
+        Each output the {report.run.engine} engine computed, in its unit, its origin the run&rsquo;s artifact: a replay computes it again from the
+        basis below.
+        {forecast && ' Each is the band’s median, between its 5th and 95th percentiles: a band for readings of a run like the fitted one.'}
+        {folded && ' These are the values a comparison of this run reads; the sections below show the run’s price, its tables and its costs.'}
+      </p>
+      <OutputsTable folded={folded} count={values.length}>
+        <div className="overflow-x-auto">
+          <table className="w-full text-caption">
+            <thead>
+              <tr className="border-b border-line text-ink-soft">
+                {['Output', forecast ? 'Median' : 'Value', ...(banded ? [forecast ? '5th to 95th percentile' : 'Low to high'] : []), 'Unit', 'Origin'].map((h) => (
+                  <th key={h} className="text-left py-1 pr-2 font-medium">
+                    {h}
+                  </th>
+                ))}
+              </tr>
+            </thead>
+            <tbody>
+              {values.map((v) => (
+                <tr key={v.name} className="border-b border-line/50 align-top" data-testid="run-output" data-origin={v.quantity.origin?.kind}>
+                  <td className="py-1 pr-2 font-num">{v.name}</td>
+                  <td className="py-1 pr-2 font-num" title={String(v.quantity.value)} data-testid="run-output-value">
+                    {shown(v.quantity.value)}
+                  </td>
+                  {banded && (
+                    <td className="py-1 pr-2 font-num" title={`${v.quantity.low ?? ''} to ${v.quantity.high ?? ''}`} data-testid="run-output-band">
+                      {band(v.quantity)}
+                    </td>
+                  )}
+                  <td className="py-1 pr-2 font-num">{v.quantity.unit || '—'}</td>
+                  <td className="py-1 pr-2">
+                    {v.quantity.origin?.kind === 'artifact' && v.quantity.origin.ref ? (
+                      <a className="text-accent hover:underline" href={href(`/biorepo/artifacts/${v.quantity.origin.ref}`)}>
+                        {originOf(v.quantity)}
+                      </a>
+                    ) : (
+                      originOf(v.quantity)
+                    )}
+                  </td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        </div>
+      </OutputsTable>
+    </Card>
+  );
+}
+
+/**
+ * What a run's computation reported about itself (`run.diagnostics`: the time it took, the iterations it made), as its
+ * engine's worker answered it beside the outputs. The run keeps them from the computation that made it; a replay
+ * compares the outputs alone and leaves these uncompared.
+ */
+function Diagnostics({ run }: { run: EngineRunReport['run'] }) {
+  const reported = run.diagnostics ?? [];
+  if (!reported.length) return null;
+  return (
+    <Card className="p-4" data-testid="run-diagnostics" data-engine={run.engine}>
+      <h2 className="font-serif text-section-title font-semibold mb-1">What the computation reported about itself</h2>
+      <p className="text-caption text-ink-soft mb-2">
+        Each value the {run.engine} engine&rsquo;s computation reported beside its outputs, kept with the run as its first computation
+        answered it. A replay compares the outputs alone and leaves these uncompared.
+      </p>
+      <div className="overflow-x-auto">
+        <table className="w-full text-caption">
+          <thead>
+            <tr className="border-b border-line text-ink-soft">
+              {['Diagnostic', 'Value', 'Unit'].map((h) => (
+                <th key={h} className="text-left py-1 pr-2 font-medium">
+                  {h}
+                </th>
+              ))}
+            </tr>
+          </thead>
+          <tbody>
+            {reported.map((d) => (
+              <tr key={d.name} className="border-b border-line/50 align-top" data-testid="run-diagnostic">
+                <td className="py-1 pr-2 font-num">{d.name}</td>
+                <td className="py-1 pr-2 font-num" title={String(d.value)} data-testid="run-diagnostic-value">
+                  {shown(d.value)}
+                </td>
+                <td className="py-1 pr-2 font-num">{d.unit || '—'}</td>
+              </tr>
+            ))}
+          </tbody>
+        </table>
+      </div>
+    </Card>
+  );
+}
+
+/** The outputs' table, open for a run whose page shows it alone, folded under its summary for a BioSTEAM run's. */
+function OutputsTable({ folded, count, children }: { folded: boolean; count: number; children: ReactNode }) {
+  if (!folded) return <>{children}</>;
+  return (
+    <details data-testid="run-outputs-folded">
+      <summary className="cursor-pointer text-caption">
+        Every value it kept as an output ({count}), each with its unit and origin
+      </summary>
+      {children}
+    </details>
+  );
+}
+
+/** A train run's `train` input as a person reads it: the train's name and units, the train as data on asking. */
+function TrainInput({ value, train }: { value: unknown; train: { name: string; units: number } }) {
+  let held = String(value);
+  try {
+    held = JSON.stringify(JSON.parse(held), null, 1);
+  } catch {
+    // shown as kept
+  }
+  return (
+    <details data-testid="run-input-train">
+      <summary className="cursor-pointer">
+        {train.name}: {train.units} unit{train.units === 1 ? '' : 's'}
+      </summary>
+      <pre className="text-caption whitespace-pre-wrap break-all max-h-64 overflow-auto mt-1">{held}</pre>
+    </details>
+  );
+}
+
 function Inputs({ report }: { report: EngineRunReport }) {
+  const train = trainOfRun(report.run);
+  const reading = (i: EngineRunReport['run']['inputs'][number]) => i.quantity.origin?.kind === 'measurement';
+  // Each input's origin when it is a reading, in the inputs' order; null for every other input.
+  const measuredOrigins = report.run.inputs.map((i) => (i.quantity.origin?.kind === 'measurement' ? i.quantity.origin : null));
   const rows = report.run.inputs.map((i) => [
     i.name,
     String(i.quantity.value),
     i.quantity.unit || '—',
     ORIGIN_WORDS[i.quantity.origin?.kind ?? ''] ?? i.quantity.origin?.kind ?? '—',
     i.quantity.origin?.by ?? i.quantity.origin?.ref ?? '—',
-    i.quantity.origin?.note ?? '',
+    // A reading's time stands in its Origin cell once; the note keeps the conversion and the person's words.
+    reading(i) ? readingNote(i.quantity.origin?.note) : (i.quantity.origin?.note ?? ''),
   ]);
+  // The file names each reading beside its depositor, and keeps the basis's note whole.
+  const csvRows = report.run.inputs.map((i, n) =>
+    reading(i)
+      ? [...rows[n].slice(0, 4), `${i.quantity.origin?.by ?? 'nobody named'}, reading ${i.quantity.origin?.ref ?? ''}`, i.quantity.origin?.note ?? '']
+      : rows[n],
+  );
   const headers = ['Input', 'Value', 'Unit', 'Origin', 'By or from', 'Rests on'];
   return (
     <Card className="p-4" data-testid="run-inputs">
       <div className="flex flex-wrap items-start justify-between gap-2 mb-1">
         <h2 className="font-serif text-section-title font-semibold">Its basis</h2>
-        <button className="chip" onClick={() => exportCSV(`run-${report.run.id}-inputs.csv`, headers, rows)}>
+        <button className="chip" onClick={() => exportCSV(`run-${report.run.id}-inputs.csv`, headers, csvRows)}>
           <Download size={12} aria-hidden /> CSV
         </button>
       </div>
-      <p className="text-caption text-ink-soft mb-2">Every input the run&rsquo;s computation names, each with its origin as the service computed it.</p>
+      <p className="text-caption text-ink-soft mb-2">
+        Every input the run&rsquo;s computation names, each with its origin as the service computed it; a reading deposited at the bench links to
+        the deposition it was recorded in.
+      </p>
       <div className="overflow-x-auto">
         <table className="w-full text-caption">
           <thead>
@@ -114,11 +356,25 @@ function Inputs({ report }: { report: EngineRunReport }) {
             </tr>
           </thead>
           <tbody>
-            {rows.map((r) => (
-              <tr key={r[0]} className="border-b border-line/50 align-top" data-testid="run-input" data-origin={report.run.inputs.find((i) => i.name === r[0])?.quantity.origin?.kind}>
+            {rows.map((r, i) => (
+              <tr key={r[0]} className="border-b border-line/50 align-top" data-testid="run-input" data-origin={report.run.inputs[i]?.quantity.origin?.kind}>
                 {r.map((c, j) => (
-                  <td key={j} className={cx('py-1 pr-2', j < 3 && 'font-num')}>
-                    {c}
+                  <td
+                    key={j}
+                    className={cx('py-1 pr-2', j < 3 && 'font-num', j === 2 && 'whitespace-nowrap')}
+                    title={j === 1 && !(train && r[0] === 'train') ? c : undefined}
+                  >
+                    {j === 1 && train && r[0] === 'train' ? (
+                      <TrainInput value={report.run.inputs[i]?.quantity.value} train={train} />
+                    ) : j === 1 ? (
+                      shown(report.run.inputs[i]?.quantity.value ?? c)
+                    ) : j === 3 && measuredOrigins[i] ? (
+                      <ReadingOrigin origin={measuredOrigins[i]} />
+                    ) : j === 5 ? (
+                      <span title={c}>{plainNote(c)}</span>
+                    ) : (
+                      c
+                    )}
                   </td>
                 ))}
               </tr>
@@ -184,7 +440,13 @@ function FlowsheetCard({ report }: { report: EngineRunReport }) {
     return report.run.sffRefused ? (
       <Card className="p-4" data-testid="run-sff">
         <h2 className="font-serif text-section-title font-semibold mb-1">Its SFF file</h2>
-        <p className="text-body text-signal-warn">No SFF file could be written: {report.run.sffRefused}</p>
+        {NO_PLANT_TOOLS.has(report.run.tool) ? (
+          <p className="text-body text-ink-soft" data-testid="run-sff-none">This run keeps no SFF file: {ended(report.run.sffRefused)}</p>
+        ) : fileWaitsOnToolkit(report.run) ? (
+          <p className="text-body text-ink-soft" data-testid="run-sff-waits">This run keeps no SFF file yet: {ended(report.run.sffRefused)}</p>
+        ) : (
+          <p className="text-body text-signal-warn">No SFF file could be written: {report.run.sffRefused}</p>
+        )}
       </Card>
     ) : null;
   const earned = Object.entries(f.tags)
@@ -227,174 +489,30 @@ function FlowsheetCard({ report }: { report: EngineRunReport }) {
   );
 }
 
-/** How many matching parameters the finder lists at once. */
-const FOUND_ROWS = 12;
-
-interface Setting {
-  key: string;
-  label: string;
-  unit: string;
-  /** As the person typed it; read as a number when the scenario is made. */
-  value: string;
-  /** What the value rests on, in the person's words. */
-  note: string;
-}
-
 /**
- * A scenario from this run (alpha 2.1 stage B): the person finds parameters
- * of the run by words, sets each one's value as their own assumption, and the
- * scenario is made (POST /api/studies/scenarios) and run (…/{id}/run) in their
- * name. The plant and its configuration are the run's; every value the person
- * leaves alone stays the package's own.
+ * A scenario from this run (alpha 2.1 stage B; alpha 2.2 C.5): NewScenarioDialog, opened on the run, finds its
+ * parameters by words and sets each one to the person's own value or to a reading deposited at the bench, makes the
+ * scenario (POST /api/studies/scenarios) and runs it (…/{id}/run) in their name. The plant and its configuration
+ * are the run's; every value the person leaves alone stays the package's own.
  */
 function MakeScenario({ report }: { report: EngineRunReport }) {
   const reviewer = useStore((s) => s.reviewer).trim();
+  const [open, setOpen] = useState(false);
   const run = report.run;
-  const scope = report.parameters;
-  const [words, setWords] = useState('');
-  const [settings, setSettings] = useState<Setting[]>([]);
-  const [title, setTitle] = useState('');
-  const [note, setNote] = useState('');
-  const [busy, setBusy] = useState(false);
-  const [problem, setProblem] = useState<string | null>(null);
-  const [made, setMade] = useState<string | null>(null);
-  if (run.status !== 'done' || !scope) return null;
-  const valueOf = new Map(scope.values.map((v) => [v.key, v.value]));
-  const numeric = scope.specs.filter((s) => !s.choices && typeof valueOf.get(s.key) === 'number');
-  const wanted = words.toLowerCase().split(/\s+/).filter(Boolean);
-  const taken = new Set(settings.map((s) => s.key));
-  const found = wanted.length
-    ? numeric.filter((s) => !taken.has(s.key) && wanted.every((w) => `${s.key} ${s.label}`.toLowerCase().includes(w)))
-    : [];
-  const add = (key: string) => {
-    const spec = numeric.find((s) => s.key === key);
-    if (!spec) return;
-    setSettings((list) => [...list, { key, label: spec.label, unit: spec.unit, value: String(valueOf.get(key) ?? ''), note: '' }]);
-  };
-  const change = (key: string, patch: Partial<Setting>) => setSettings((list) => list.map((s) => (s.key === key ? { ...s, ...patch } : s)));
-  const make = () => {
-    const at = new Date().toISOString();
-    const bad = settings.find((s) => s.value.trim() === '' || !Number.isFinite(Number(s.value)));
-    if (bad) {
-      setProblem(`${bad.label}: a value is one number, in ${bad.unit || 'the parameter’s own terms'}.`);
-      return;
-    }
-    setBusy(true);
-    setProblem(null);
-    makeScenario({
-      title: title.trim(),
-      plant: run.plant,
-      configuration: run.configuration ?? null,
-      values: settings.map((s) => ({
-        key: s.key,
-        quantity: {
-          value: Number(s.value),
-          unit: s.unit,
-          origin: { kind: 'person-assumption', by: reviewer, at, note: s.note.trim() || note.trim() || null },
-        },
-      })),
-      note: note.trim() || null,
-      by: reviewer,
-    })
-      .then((scenario) => {
-        setMade(scenario.id);
-        return runScenario(scenario.id, reviewer);
-      })
-      .then((rep) => navigate(`/proforma/runs/${rep.run.id}`))
-      .catch((e: unknown) => setProblem(problemOf(e)))
-      .finally(() => setBusy(false));
-  };
+  if (run.status !== 'done' || !report.parameters) return null;
   return (
     <Card className="p-4" data-testid="run-make-scenario">
       <h2 className="font-serif text-section-title font-semibold mb-1">A scenario from this run</h2>
       <p className="text-caption text-ink-soft mb-2">
-        Find a parameter by its words, set its value as your assumption, and the scenario is made on {run.plant}
-        {run.configuration ? ` (${run.configuration})` : ''} and run in your name. Each value starts at this run&rsquo;s; every parameter you leave alone
-        stays the package&rsquo;s own.
+        Set some of this run&rsquo;s parameters, each to your own value or to a reading a person deposited at the bench, and the scenario is made on{' '}
+        {run.plant}
+        {run.configuration ? ` (${run.configuration})` : ''} and run in your name. Every parameter you leave alone stays the package&rsquo;s own.
       </p>
-      <input
-        className="input text-body w-full mb-2"
-        aria-label="Find a parameter"
-        placeholder="Words of a parameter: xylose ethanol, moisture, price…"
-        value={words}
-        onChange={(e) => setWords(e.target.value)}
-        data-testid="scenario-find"
-      />
-      {found.length > 0 && (
-        <ul className="space-y-0.5 mb-2 text-caption" data-testid="scenario-found">
-          {found.slice(0, FOUND_ROWS).map((s) => (
-            <li key={s.key} className="flex flex-wrap items-center gap-2" data-testid="scenario-found-row" data-key={s.key}>
-              <button className="chip" onClick={() => add(s.key)} aria-label={`Set ${s.label}`}>
-                Set
-              </button>
-              <span>{s.label}</span>
-              <span className="font-num text-ink-soft">
-                {String(valueOf.get(s.key))} {s.unit}
-              </span>
-            </li>
-          ))}
-          {found.length > FOUND_ROWS && <li className="text-ink-soft">and {found.length - FOUND_ROWS} more: add words to narrow them.</li>}
-        </ul>
-      )}
-      {wanted.length > 0 && found.length === 0 && <p className="text-caption text-ink-soft mb-2">No parameter of this run left to set matches those words.</p>}
-      {settings.length > 0 && (
-        <table className="w-full text-caption mb-2" data-testid="scenario-settings">
-          <tbody>
-            {settings.map((s) => (
-              <tr key={s.key} className="border-b border-line/50 align-top" data-testid="scenario-setting" data-key={s.key}>
-                <td className="py-1 pr-2">{s.label}</td>
-                <td className="py-1 pr-2">
-                  <input
-                    className="input text-caption font-num w-28"
-                    inputMode="decimal"
-                    aria-label={`Your value for ${s.label}`}
-                    value={s.value}
-                    onChange={(e) => change(s.key, { value: e.target.value })}
-                  />{' '}
-                  <span className="font-num text-ink-soft">{s.unit}</span>
-                </td>
-                <td className="py-1 pr-2">
-                  <input
-                    className="input text-caption w-full"
-                    aria-label={`What ${s.label} rests on`}
-                    placeholder="What it rests on (optional)"
-                    value={s.note}
-                    onChange={(e) => change(s.key, { note: e.target.value })}
-                  />
-                </td>
-                <td className="py-1">
-                  <button className="chip" onClick={() => setSettings((list) => list.filter((x) => x.key !== s.key))} aria-label={`Leave ${s.label} as the run's`}>
-                    Leave
-                  </button>
-                </td>
-              </tr>
-            ))}
-          </tbody>
-        </table>
-      )}
-      <div className="flex flex-wrap items-center gap-2">
-        <input className="input text-body" aria-label="The scenario's title" placeholder="What the scenario asks" value={title} onChange={(e) => setTitle(e.target.value)} />
-        <input className="input text-body flex-1 min-w-48" aria-label="What the scenario rests on" placeholder="What it rests on, in words" value={note} onChange={(e) => setNote(e.target.value)} />
-        <Button variant="primary" disabled={busy || !reviewer || settings.length === 0 || !title.trim()} onClick={make} data-testid="run-make-scenario-go">
-          <Play size={14} /> {busy ? 'Running…' : 'Make the scenario and run it'}
-        </Button>
-      </div>
+      <Button variant="primary" onClick={() => setOpen(true)} data-testid="run-make-scenario-open">
+        <Play size={14} /> New scenario from this run
+      </Button>
       {!reviewer && <p className="text-caption text-ink-soft mt-1">A scenario is made in a person&rsquo;s name: set yours in Settings first.</p>}
-      {problem && (
-        <p className="text-caption text-signal-warn mt-1" data-testid="run-make-scenario-problem">
-          {problem}
-          {made && (
-            <>
-              {' '}
-              The scenario <span className="font-num">{made}</span> is kept;{' '}
-              <a className="underline underline-offset-2" href={href('/proforma/studies')}>
-                Studies
-              </a>{' '}
-              lists it.
-            </>
-          )}
-        </p>
-      )}
+      <NewScenarioDialog open={open} onClose={() => setOpen(false)} fromRun={report} />
     </Card>
   );
 }
@@ -402,7 +520,7 @@ function MakeScenario({ report }: { report: EngineRunReport }) {
 function MakeRunbook({ report }: { report: EngineRunReport }) {
   const reviewer = useStore((s) => s.reviewer).trim();
   const hydrate = useStore((s) => s.hydrateProjectState);
-  const numbers = predictable(report.artifact);
+  const numbers = predictable(report.run, report.artifact);
   const [chosen, setChosen] = useState<Record<string, string>>({});
   const [title, setTitle] = useState(`${report.run.plant} at the bench`);
   const [busy, setBusy] = useState(false);
@@ -446,7 +564,7 @@ function MakeRunbook({ report }: { report: EngineRunReport }) {
               <span className="font-num">{n.output}</span>
             </label>
             <span className="font-num text-ink-soft">
-              {String(n.value)} {n.unit}
+              {shown(n.value)} {n.unit}
             </span>
             {n.output in chosen && (
               <input
@@ -486,10 +604,45 @@ export default function ProformaRun({ runId }: { runId: string }) {
   }, [runId]);
 
   const run = report?.run ?? null;
-  const view = report?.artifact ? runViewOfRun(report.artifact) : null;
-  const price = (report?.artifact?.output?.price ?? {}) as Record<string, unknown>;
+  const art = report?.artifact ?? null;
+  // A Proforma scenario's run names its inputs as the shelf's flowsheet does, and its scenario by name.
+  const [shelf, setShelf] = useState<FlowsheetInfo[] | null>(null);
+  const isScenarioRun = art?.tool === RUN_TOOL;
+  useEffect(() => {
+    if (!isScenarioRun) return;
+    const ctrl = new AbortController();
+    proformaShelf(ctrl.signal).then(setShelf, () => !ctrl.signal.aborted && setShelf([]));
+    return () => ctrl.abort();
+  }, [isScenarioRun]);
+  const proformaScenarios = useStore((s) => s.scenarios);
+  const ownScenario = run?.scenarioId ? (proformaScenarios.find((s) => s.id === run.scenarioId) ?? null) : null;
+  // A study scenario's run names it by its title, from the project's studies.
+  const [studyTitle, setStudyTitle] = useState<string | null>(null);
+  const studyId = run?.scenarioId && !ownScenario ? run.scenarioId : null;
+  useEffect(() => {
+    setStudyTitle(null);
+    if (!studyId) return;
+    const ctrl = new AbortController();
+    listScenarios(ctrl.signal).then(
+      (all) => setStudyTitle(all.find((s) => s.id === studyId)?.title ?? null),
+      () => undefined,
+    );
+    return () => ctrl.abort();
+  }, [studyId]);
+  const flowsheetInfo = isScenarioRun ? (shelf?.find((f) => f.id === run?.plant) ?? null) : null;
+  // A library run reads as one case; a Proforma scenario's run as the scenario's page reads it, with its samples.
+  const view = art ? (runViewOfRun(art) ?? runViewOfArtifact(art)) : null;
+  const scenarioRun = art?.tool === RUN_TOOL;
+  const price = (art?.output?.price ?? {}) as Record<string, unknown>;
   const product = typeof price.product === 'string' ? price.product : 'the product';
-  const where = run ? run.plant + (run.configuration ? ` (${run.configuration})` : '') : runId;
+  // A Proforma run's price is per unit of the basis its TEA states (the run's outputs.values say the same).
+  const priceBasis = scenarioRun
+    ? view?.tables.tea?.basis
+      ? `USD per ${view.tables.tea.basis}`
+      : 'USD per unit of the basis its flowsheet states'
+    : `USD per kg of ${product}`;
+  const train = run ? trainOfRun(run) : null;
+  const where = run ? (train ? `${train.name} (${run.plant})` : run.plant + (run.configuration ? ` (${run.configuration})` : '')) : runId;
 
   return (
     <div data-testid="proforma-run" data-run={runId} data-status={run?.status ?? ''}>
@@ -499,14 +652,30 @@ export default function ProformaRun({ runId }: { runId: string }) {
         subtitle={
           run && (
             <span className="flex flex-wrap items-center gap-2">
-              {run.provenance && <ProvenanceBadge p={run.provenance} />}
+              {run.provenance && (
+                <span data-testid="run-provenance" data-provenance={run.provenance}>
+                  <ProvenanceBadge p={run.provenance} />
+                </span>
+              )}
               <span>
                 {run.status === 'done' ? 'Run' : 'Refused'} for {run.by}, {stamp(run.at)}
-                {run.durationMs != null && <>, in {(run.durationMs / 1000).toFixed(1)} s</>}
-                {run.scenarioId && (
+                {run.durationMs != null && <>, in {took(run.durationMs)}</>}
+                {run.scenarioId && ownScenario && (
                   <>
                     {' '}
-                    · asked for by scenario <span className="font-num">{run.scenarioId}</span>
+                    · asked for by scenario{' '}
+                    <a className="underline underline-offset-2 hover:text-accent" href={href(`/proforma/scenario/${encodeURIComponent(ownScenario.id)}`)}>
+                      {ownScenario.name || ownScenario.id}
+                    </a>
+                  </>
+                )}
+                {run.scenarioId && !ownScenario && (
+                  <>
+                    {' '}
+                    · asked for by scenario{' '}
+                    <a className="underline underline-offset-2 hover:text-accent" href={href('/proforma/studies')} title={run.scenarioId}>
+                      {studyTitle ?? <span className="font-num">{run.scenarioId}</span>}
+                    </a>
                   </>
                 )}
                 .
@@ -519,6 +688,7 @@ export default function ProformaRun({ runId }: { runId: string }) {
             {run?.artifactId && (
               <LinkButton to={`/biorepo/artifacts/${run.artifactId}`}>Its artifact</LinkButton>
             )}
+            {train && <LinkButton to={`/pureos/train/${encodeURIComponent(train.id)}`}>Its train on pureOS</LinkButton>}
             <LinkButton to="/proforma/studies">
               <BookOpen size={14} /> Studies
             </LinkButton>
@@ -537,22 +707,36 @@ export default function ProformaRun({ runId }: { runId: string }) {
       {report && run && (
         <div className="space-y-4">
           {run.status === 'refused' && (
-            <Callout kind="warn" title="The plant refused these values">
-              <span data-testid="run-refused">{run.refused}</span> The receipt is kept with the run, and no artifact or SFF file was written.
+            <Callout kind="warn" title={run.engine === 'biosteam' ? 'The plant refused these values' : `The ${run.engine} engine refused these values`}>
+              <span data-testid="run-refused">{ended(run.refused ?? '')}</span> The receipt is kept with the run, and no artifact or SFF file was written.
+            </Callout>
+          )}
+          {scenarioRun && run.status === 'done' && !(Array.isArray(run.outputs.values) && run.outputs.values.length > 0) && (
+            <Callout kind="warn" title="This run holds no price">
+              <span data-testid="run-holds-no-price">
+                No sample the flowsheet could hold priced it
+                {typeof art?.output?.baseInfeasible === 'string' && art.output.baseInfeasible
+                  ? `; its base case could not run: ${baseCaseRefusal(art.output.baseInfeasible)}`
+                  : ''}
+                . The run is kept with its basis, so the same values asked again answer from it.
+              </span>
             </Callout>
           )}
           {report.parameters && <Parameters runId={run.id} data={report.parameters} />}
+          <Outputs report={report} />
+          <Diagnostics run={run} />
           <Inputs report={report} />
           <PackageTest report={report} />
           {view && (
             <RunReport
               view={view}
-              priceBasis={`USD per kg of ${product}`}
-              labels={{}}
-              unitLabels={{}}
+              priceBasis={priceBasis}
+              labels={inputLabels(null, flowsheetInfo)}
+              unitLabels={inputLabels(null, flowsheetInfo, true)}
               scenarioId={run.scenarioId ?? ''}
               csvName={`run-${run.id}`}
-              oneCase
+              oneCase={!scenarioRun}
+              sffRecord={report.flowsheet?.id ?? null}
             />
           )}
           <FlowsheetCard report={report} />

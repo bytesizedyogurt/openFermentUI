@@ -11,44 +11,190 @@ is now a kind of row in the project's `catalogue` table, kept whole as a
               its trains use (pureOS's `program`) and the other names papers
               give it; a pureOS proposal's host is a strain of this kind
     product   a product a train recovers or ProtParam reads: its class
-              (`category`) and, for a protein, its sequence
-    skill     a Guild skill: its family, what it is and what mastery means
-    lesson    a Primer lesson and the skills it counts toward
+              (`category`, one of the classes pureOS's proposer reads), where
+              the cells leave it (`location`: secreted, or intracellular) and,
+              for a protein, its sequence
+    skill     a Guild skill: its family, what it is and what mastery means,
+              and its policy: how critical it is, how many days a
+              qualification stands, how many supervised runs come before a
+              witnessed check, and the skills it needs first (`prerequisites`);
+              Guild rates nobody on a skill kept with no policy
+              (competence.unrated)
+    lesson    a Primer lesson: the skills it counts toward, how many minutes
+              it takes, its body (prose and the embeds its page draws, in
+              order) and its checkpoint, the questions a learner answers to
+              pass it (ADR-018)
 
 The readers take them in the shapes they always read (`as_*`): geneOS's hosts
 and the strain aliases (module_stores), ProtParam's products, the proposer's
 catalogue, Guild's projection. A catalogue holds names and words, never a
-measured value: a number a paper reports is a record (ADR-006).
+measured value: a number a paper reports is a record (ADR-006). The numbers
+it holds are a person's own writing: a skill's policy, and a lesson's minutes
+and the answers its checkpoint grades against.
 
-Entries arrive by the route (`POST /api/catalogues/{kind}`), by Postdoc's
-`catalogue_write` (marked as the model's), or by Intake from a file of entries
+Entries arrive by the route (`POST /api/catalogues/{kind}`, which the
+catalogues screen at /catalogues sends), by Postdoc's `catalogue_write`
+(marked as the model's), or by Intake from a file of entries
 (`POST /api/intake/catalogue`, JSON or CSV). Nothing here deletes an entry:
-taking a person's entry out of a live instance is the owner's call.
+taking a person's entry out of a live instance is the owner's call. A skill's
+policy and a lesson's body are a person's to write: the route and a file take
+them, and `catalogue_write` takes no number and no lesson's body.
+
+WHO KEPT AN ENTRY (alpha 2.2 D.0). Each entry names its keeper (`by`), the
+lane it was kept in (`agent`): `person` for the route, a file and a call
+naming `?by=`, `model` for a model's or an outside assistant's
+`catalogue_write`; and, in the model's lane, the door it came in by (`via`:
+`postdoc` for Postdoc's loop, `mcp` for the MCP server in its own process,
+`http` for the HTTP endpoint's assistant header). A person's keep replaces
+whatever the id holds. A model's write replaces an entry kept in the model's
+lane under its own name through the same kind of door, Postdoc's entry by
+Postdoc and an outside assistant's by that assistant, and refuses every other
+in words naming the entry and who kept it, with nothing written: a model
+never replaces an entry a person kept, and an assistant that declares
+Postdoc's model id leaves Postdoc's entries as they are. A keeper's name is
+read as `tools.caller_name` writes one, at every door.
+
+WHAT IS AUDITED (alpha 2.2 E.20). A person's keep, by the route or from a
+file, writes its audit row in the keep's own transaction, as a person's other
+writes do (`project_state`, `protocols`): `keep_catalogue` under the module
+that reads the kind (`MODULES`), its target `<kind>/<id>`, naming the keeper,
+and a file's rows name the file. A write through `catalogue_write`, a model's
+or a person's, is audited by its tool as that write, with its door and note.
 """
 from __future__ import annotations
 
 import csv
 import io
 import json
+import logging
+import re
 from datetime import datetime, timezone
-from typing import Any, Literal
+from typing import Annotated, Any, Literal, get_args
 
-from pydantic import BaseModel, Field, ValidationError, field_validator, model_validator
+from pydantic import BaseModel, Field, FiniteFloat, ValidationError, ValidationInfo, field_validator, model_validator
 from sqlalchemy import select
 
-from . import db, projects
+from . import audit, db, projects, units
+from .competence import POLICY as SKILL_POLICY
 from .db import models as t
 from .db import rows
 
 CatalogueKind = Literal["strain", "product", "skill", "lesson"]
 KINDS: tuple[str, ...] = ("strain", "product", "skill", "lesson")
+# The module that reads each kind, which a keep of it is audited under.
+MODULES = {"strain": "geneos", "product": "pureos", "skill": "guild", "lesson": "primer"}
+# A product's class, as pureOS's proposer reads one (pureos/proposer.py
+# CLASS_OF_CATEGORY, each a protein, a small molecule or a polymer);
+# test_catalogues.py holds the two to one list. Each class is a word.
+ProductCategory = Literal["molecular_biology_enzyme", "diagnostic", "research_protein", "food_protein",
+                          "sweet_protein", "structural_protein", "industrial_enzyme", "therapeutic_protein", "hmo",
+                          "terpene", "glycoside", "biopolymer"]
+PRODUCT_CATEGORIES: tuple[str, ...] = get_args(ProductCategory)
+# Where the cells leave a product, as the proposer's rules split on it.
+ProductLocation = Literal["secreted", "intracellular"]
+# The longest a qualification may stand, in days: a hundred years, so the day
+# it lapses stays a calendar date (Python's dates end with the year 9999).
+MAX_RECENCY_DAYS = 36500
 # The twenty amino acids a protein's sequence is written in, one letter each.
 RESIDUES = frozenset("ACDEFGHIKLMNPQRSTVWY")
 MAX_FILE_ROWS = 2000
+# An entry's id: a letter or a digit first, then letters, digits, '.', '_',
+# ':' or '-', at most 80 characters in all.
+ENTRY_ID = re.compile(r"^[A-Za-z0-9][A-Za-z0-9._:-]{0,79}$")
+# A skill's policy, each part named as the catalogues screen names it, with
+# the field that holds it.
+POLICY_WORDS = {"criticality": "how critical it is (criticality)",
+                "recencyDays": "the days a qualification stands (recencyDays)",
+                "supervisedRuns": "the supervised runs before a check (supervisedRuns)"}
+
+log = logging.getLogger(__name__)
+
+
+# A lesson's body (ADR-018): the embeds a lesson's page draws beside its prose
+# (src/components/LessonEmbeds.tsx), each on what its argument names.
+LessonEmbedName = Literal["chip-demo", "record-card", "mini-queue", "metrics-tiles", "strip-plot", "protocol-card",
+                          "ask-prompt", "scenario-widget", "skill-steps"]
+QUESTION_ID = r"^[A-Za-z0-9][A-Za-z0-9._-]{0,39}$"
 
 
 class CatalogueRefused(ValueError):
     """An entry or a file the catalogue will not keep, in words."""
+
+
+class LessonProse(BaseModel):
+    """A run of a lesson's prose, in Markdown."""
+
+    kind: Literal["prose"]
+    md: str = Field(min_length=1, max_length=20000)
+
+
+class LessonEmbed(BaseModel):
+    """One of the embeds a lesson's page draws, with what it is drawn on when
+    it takes one: a paper's id, a record's, a field's, a protocol's, a
+    scenario's or a skill's, or a question to ask."""
+
+    kind: Literal["embed"]
+    embed: LessonEmbedName
+    arg: str | None = Field(default=None, max_length=2000)
+
+
+LessonBlock = Annotated[LessonProse | LessonEmbed, Field(discriminator="kind")]
+
+
+class CheckpointAnswer(BaseModel):
+    """A numeric question's answer as the lesson's author writes it: a value,
+    its unit (empty for a pure number, else one the unit converter reads, so
+    an answer in any unit of its family grades), and how far from the value an
+    answer may stand, in percent of it."""
+
+    value: FiniteFloat
+    unit: str = Field(max_length=40)
+    tolerancePct: FiniteFloat = Field(ge=0, le=100)
+
+    @field_validator("unit")
+    @classmethod
+    def _a_unit_the_converter_reads(cls, v: str) -> str:
+        v = v.strip()
+        if v and units.normalize(v) is None:
+            raise ValueError(f"a numeric answer's unit is one the unit converter reads, or empty for a pure number, "
+                             f"and the converter reads no {v!r}")
+        return v
+
+
+class CheckpointQuestion(BaseModel):
+    """One question of a lesson's checkpoint: a multiple-choice question names
+    its options and the one that answers it (`answerIndex`, from 0); a
+    numeric one holds its answer."""
+
+    id: str = Field(pattern=QUESTION_ID)
+    prompt: str = Field(min_length=1, max_length=2000)
+    kind: Literal["mc", "numeric"]
+    options: list[str] = Field(default_factory=list, max_length=12)
+    answerIndex: int | None = None
+    answer: CheckpointAnswer | None = None
+    # What the learner reads once they answer.
+    explanation: str = Field(default="", max_length=4000)
+    # A paper or a record the question points to, by its id.
+    evidenceChip: str | None = Field(default=None, max_length=120)
+
+    @model_validator(mode="after")
+    def _answered_its_own_way(self) -> "CheckpointQuestion":
+        if self.kind == "mc":
+            if len(self.options) < 2:
+                raise ValueError(f"multiple-choice question {self.id} offers two options or more")
+            if self.answerIndex is None or not 0 <= self.answerIndex < len(self.options):
+                raise ValueError(f"multiple-choice question {self.id} names its answer among its options "
+                                 f"(answerIndex, from 0 to {len(self.options) - 1})")
+            if self.answer is not None:
+                raise ValueError(f"a value to answer with belongs to a numeric question, and {self.id} is multiple "
+                                 "choice")
+        else:
+            if self.answer is None:
+                raise ValueError(f"numeric question {self.id} holds its answer: a value, a unit and a tolerance")
+            if self.options or self.answerIndex is not None:
+                raise ValueError(f"options and an answer's index belong to a multiple-choice question, and {self.id} "
+                                 "is numeric")
+        return self
 
 
 class CatalogueEntryNotFound(KeyError):
@@ -59,14 +205,17 @@ class CatalogueEntry(BaseModel):
     """One entry of a project's catalogue; the fields a kind does not use stay empty."""
 
     kind: CatalogueKind
-    id: str = Field(pattern=r"^[A-Za-z0-9][A-Za-z0-9._:-]{0,79}$")
+    # The pattern is the document's; `_an_id` holds an id to it in words.
+    id: str = Field(json_schema_extra={"pattern": ENTRY_ID.pattern})
     name: str = Field(min_length=1, max_length=200)
     # A strain: its species, the chemical set its trains use, its other names.
     species: str | None = Field(default=None, max_length=200)
     program: str | None = Field(default=None, max_length=80)
     aliases: list[str] = Field(default_factory=list, max_length=40)
-    # A product: its class as the proposer's rules read it, and a protein's sequence.
-    category: str | None = Field(default=None, max_length=80)
+    # A product: its class as the proposer's rules read it, where the cells
+    # leave it (secreted, or kept inside them), and a protein's sequence.
+    category: ProductCategory | None = None
+    location: ProductLocation | None = None
     sequence: str | None = Field(default=None, max_length=20000)
     # Where the sequence was read, in words (a UniProt entry, a paper's table):
     # ProtParam computes from a sequence that names it, and from no other.
@@ -75,19 +224,67 @@ class CatalogueEntry(BaseModel):
     family: str | None = Field(default=None, max_length=80)
     summary: str | None = Field(default=None, max_length=2000)
     mastery: list[str] = Field(default_factory=list, max_length=40)
-    # A lesson: the skills it counts toward, by their ids.
+    # A skill's policy (SKILL_POLICY), as Guild's levels read it: a critical
+    # skill is one where a mistake hurts a person or loses a batch; how many
+    # days a qualification stands with nobody seeing the person perform; how
+    # many cosigned runs come before a witnessed check can qualify; and the
+    # skills that must be at Supervised or above first, by their ids. All
+    # three of the first or none: Guild rates nobody on a skill with none.
+    criticality: Literal["routine", "critical"] | None = None
+    recencyDays: int | None = Field(default=None, ge=1, le=MAX_RECENCY_DAYS)
+    supervisedRuns: int | None = Field(default=None, ge=0)
+    prerequisites: list[str] = Field(default_factory=list, max_length=40)
+    # A lesson: the skills it counts toward, by their ids; how many minutes
+    # it takes; its body, prose and the embeds its page draws, in order; and
+    # its checkpoint, the questions a learner answers to pass it.
     skills: list[str] = Field(default_factory=list, max_length=40)
+    minutes: int | None = Field(default=None, ge=1, le=600)
+    blocks: list[LessonBlock] = Field(default_factory=list, max_length=200)
+    checkpoint: list[CheckpointQuestion] = Field(default_factory=list, max_length=40)
     note: str | None = Field(default=None, max_length=2000)
     # Where the entry came from, in words: a person, a document, a file.
     source: str | None = Field(default=None, max_length=400)
     by: str = Field(default="", max_length=200)
+    # The lane it was kept in, as the audit names one: `person` for a
+    # person's keep, `model` for a model's or an outside assistant's write.
+    # The service writes it over whatever an entry sent holds; an entry
+    # kept before the service wrote it reads it from its source (`keeper`).
+    agent: Literal["model", "person"] | None = None
+    # The door a model's write came in by, as its audit row names it:
+    # `postdoc`, `mcp` or `http` (tools.ToolContext.door); none for a
+    # person's keep. The service writes it too; an entry kept before reads
+    # it from its source (`door`).
+    via: Literal["postdoc", "mcp", "http"] | None = None
     at: str = ""
 
-    @field_validator("aliases", "mastery", "skills")
+    @field_validator("id")
+    @classmethod
+    def _an_id(cls, v: str) -> str:
+        if not ENTRY_ID.fullmatch(v):
+            shown = v if len(v) <= 90 else f"{v[:90]}…"
+            raise ValueError(f"an entry's id starts with a letter or a digit, then holds letters, digits, '.', '_', "
+                             f"':' or '-', at most 80 characters in all, and {shown!r} does not")
+        return v
+
+    @field_validator("aliases", "mastery", "skills", "prerequisites")
     @classmethod
     def _words(cls, v: list[str]) -> list[str]:
         out = [w.strip() for w in v if w and w.strip()]
         return list(dict.fromkeys(out))
+
+    @field_validator("category", mode="before")
+    @classmethod
+    def _a_products_class(cls, v: Any, info: ValidationInfo) -> Any:
+        """A product's class, one of those the proposer reads, in words when it
+        is another; blank reads as none stated."""
+        if v is None or (isinstance(v, str) and not v.strip()):
+            return None
+        if info.data.get("kind") != "product":
+            raise ValueError("a category belongs to a product: the class pureOS's proposer reads")
+        if v not in PRODUCT_CATEGORIES:
+            raise ValueError(f"a product's category is one of the classes pureOS's proposer reads "
+                             f"({', '.join(PRODUCT_CATEGORIES)}), and {v!r} is outside them")
+        return v
 
     @model_validator(mode="after")
     def _fits_its_kind(self) -> "CatalogueEntry":
@@ -103,15 +300,46 @@ class CatalogueEntry(BaseModel):
             self.sequence = seq
         if self.skills and self.kind != "lesson":
             raise ValueError("the skills an entry counts toward belong to a lesson")
+        if (self.minutes is not None or self.blocks or self.checkpoint) and self.kind != "lesson":
+            raise ValueError("minutes, blocks and a checkpoint belong to a lesson")
+        asked = [q.id for q in self.checkpoint]
+        twice = sorted({q for q in asked if asked.count(q) > 1})
+        if twice:
+            raise ValueError(f"a lesson's checkpoint asks question {twice[0]} twice; each question has an id of its own")
         if (self.aliases or self.species or self.program) and self.kind != "strain":
             raise ValueError("a species, a chemical set and other names belong to a strain")
-        if (self.mastery or self.family) and self.kind != "skill":
-            raise ValueError("a family and what mastery means belong to a skill")
+        if self.location is not None and self.kind != "product":
+            raise ValueError("a location belongs to a product: where the cells leave it")
+        policy = [k for k in SKILL_POLICY if getattr(self, k) is not None]
+        if (self.mastery or self.family or policy or self.prerequisites) and self.kind != "skill":
+            raise ValueError("a family, what mastery means and a policy belong to a skill")
+        if (policy or self.prerequisites) and len(policy) < len(SKILL_POLICY):
+            left = _listed_words([POLICY_WORDS[k] for k in SKILL_POLICY if getattr(self, k) is None])
+            whole = _listed_words([POLICY_WORDS[k] for k in SKILL_POLICY])
+            raise ValueError(f"a skill's policy names {whole} together, and this one leaves out {left}")
+        if self.id in self.prerequisites:
+            raise ValueError("a skill's prerequisites are other skills, and this one names itself")
         return self
 
 
+def _listed_words(names: list[str]) -> str:
+    """`a`, `a and b`, `a, b and c`."""
+    return names[0] if len(names) == 1 else f"{', '.join(names[:-1])} and {names[-1]}"
+
+
 def _now() -> str:
-    return datetime.now(timezone.utc).isoformat().replace("+00:00", "Z")
+    """A keep's time, ISO 8601 in UTC, written as the audit writes its rows'
+    (`+00:00`), so a client sets the two side by side."""
+    return datetime.now(timezone.utc).isoformat()
+
+
+def _name(by: str | None) -> str:
+    """A keeper's name as every door reads one (tools.caller_name): control,
+    format and surrogate characters dropped, whitespace collapsed, at most
+    200 characters."""
+    from .tools import caller_name
+
+    return caller_name(by or "")
 
 
 def _row_id(kind: str, entry_id: str) -> str:
@@ -127,14 +355,74 @@ def _kind(kind: str) -> str:
 # ── the store ──────────────────────────────────────────────────────────
 
 
+def _door_of_source(entry: CatalogueEntry) -> str | None:
+    """The door a model's entry kept before the service wrote `via` came in
+    by, read from its source as catalogue_write wrote one then."""
+    if entry.source == f"Postdoc ({entry.by})":
+        return "postdoc"
+    if entry.source == f"{entry.by}, over MCP":
+        return "mcp"
+    if entry.source == f"{entry.by}, at the HTTP endpoint":
+        return "http"
+    return None
+
+
+def keeper(entry: CatalogueEntry) -> str:
+    """The lane an entry was kept in, `model` or `person`: its `agent`. An
+    entry kept before the service wrote that field holds a model's write in
+    its source alone, as catalogue_write wrote one then (`<name>, over MCP`,
+    `Postdoc (<name>)`); every other such entry is a person's."""
+    if entry.agent is not None:
+        return entry.agent
+    return "model" if _door_of_source(entry) else "person"
+
+
+def door(entry: CatalogueEntry) -> str | None:
+    """The door a model's entry came in by (`postdoc`, `mcp` or `http`), its
+    `via`, else read from its source; None for a person's entry."""
+    if keeper(entry) != "model":
+        return None
+    return entry.via or _door_of_source(entry) or "postdoc"
+
+
+def _side(entry: CatalogueEntry) -> str:
+    """Whose an entry of the model's lane is: Postdoc's, or an outside
+    assistant's, through either of the assistant's doors."""
+    return "postdoc" if door(entry) == "postdoc" else "assistant"
+
+
+def _as_kept(body: dict[str, Any]) -> CatalogueEntry:
+    entry = CatalogueEntry.model_validate(body)
+    if entry.agent is not None and (entry.agent == "person" or entry.via is not None):
+        return entry
+    return entry.model_copy(update={"agent": keeper(entry), "via": door(entry)})
+
+
+def _readable(kind: str, bodies: list[Any]) -> list[CatalogueEntry]:
+    """Each row that reads as an entry, read one at a time. A row that does
+    not, one kept in a shape an earlier model allowed, is left out and logged
+    with its kind, its id and why, so one row never stops the rest of its
+    catalogue, nor any reader of it, from reading; a person's keep under its
+    id writes it afresh."""
+    out: list[CatalogueEntry] = []
+    for body in bodies:
+        try:
+            out.append(_as_kept(body))
+        except ValidationError as e:
+            held = body.get("id") if isinstance(body, dict) else None
+            log.warning("the %s catalogue's row %s does not read as an entry and is left out: %s", kind,
+                        held if isinstance(held, str) else "with no id", _first_error(e))
+    return out
+
+
 async def _listed(project_id: str, kind: str) -> list[CatalogueEntry]:
     async with db.session() as s:
         bodies = await rows.bodies(s, t.catalogue, project_id, t.catalogue.c.kind == kind)
-    return sorted((CatalogueEntry.model_validate(b) for b in bodies), key=lambda e: e.id)
+    return sorted(_readable(kind, bodies), key=lambda e: e.id)
 
 
 def listed(kind: str) -> list[CatalogueEntry]:
-    """The open project's entries of one kind, by id."""
+    """The open project's entries of one kind, by id, each with the lane it was kept in."""
     return db.run(_listed(projects.current(), _kind(kind)))
 
 
@@ -145,39 +433,79 @@ def get(kind: str, entry_id: str) -> CatalogueEntry:
     return found
 
 
-async def _keep(project_id: str, entries: list[CatalogueEntry]) -> None:
+def _taken(held: CatalogueEntry) -> str:
+    lane = ("a person's" if keeper(held) == "person" else "Postdoc's" if _side(held) == "postdoc"
+            else "an outside assistant's")
+    return (f"the project's {held.kind} catalogue holds {held.id}, kept by {held.by} in {lane} name; a model's write "
+            "replaces only an entry it kept itself, under its own name and through its own kind of door (Postdoc's "
+            "loop, or an outside assistant's), so nothing was written. Keep this entry under an id of its own")
+
+
+async def _keep(project_id: str, entries: list[CatalogueEntry], audited: dict[str, Any] | None = None) -> None:
+    """The entries kept in one transaction, and with `audited` (a person's
+    keep: what each audit row says beside the kind) each one's audit row in
+    it, so a keep and its rows commit together."""
     async with db.session() as s:
+        # One keep at a time in the project's catalogues: a person's keep
+        # never lands between a model's check and its write.
+        await db.lock(s, "catalogue", project_id)
         for e in entries:
-            await rows.put(s, t.catalogue, project_id, _row_id(e.kind, e.id), e.model_dump(mode="json"), by=e.by,
-                           kind=e.kind)
+            row_id = _row_id(e.kind, e.id)
+            if e.agent == "model":
+                held = await rows.body(s, t.catalogue, project_id, row_id)
+                if held is not None:
+                    try:
+                        was = CatalogueEntry.model_validate(held)
+                    except ValidationError as err:
+                        raise CatalogueRefused(
+                            f"the project's {e.kind} catalogue holds a row under {e.id} that no longer reads as an "
+                            f"entry ({_first_error(err)}); a person keeps it afresh on the catalogues screen, so "
+                            "nothing was written") from None
+                    if keeper(was) != "model" or was.by != e.by or _side(was) != _side(e):
+                        raise CatalogueRefused(_taken(was))
+            await rows.put(s, t.catalogue, project_id, row_id, e.model_dump(mode="json"), by=e.by, kind=e.kind)
+            if audited is not None:
+                await audit.add(project_id, agent="person", who=e.by, module=MODULES[e.kind], action="keep_catalogue",
+                                state="kept", target=f"{e.kind}/{e.id}", detail={"kind": e.kind, **audited})
 
 
-def keep(entry: CatalogueEntry, *, by: str) -> CatalogueEntry:
+def keep(entry: CatalogueEntry, *, by: str, agent: Literal["model", "person"] = "person",
+         via: str | None = None, audited: bool = True) -> CatalogueEntry:
     """An entry kept in the open project's catalogue of its kind, in the name
-    of `by`; an entry already held under the id is replaced by it."""
-    who = (by or "").strip()
+    of `by` (read as `_name` reads one), in the lane `agent` names, a model's
+    through the door `via` names (postdoc when it names none). A person's
+    keep replaces an entry already held under the id. A model's replaces one
+    it kept itself under the same name through the same kind of door, and is
+    refused in words for any other (CatalogueRefused), nothing written. A
+    person's keep writes its audit row with it (`keep_catalogue`); a caller
+    that audits the write itself (`catalogue_write`) passes `audited=False`."""
+    who = _name(by)
     if not who:
         raise CatalogueRefused("a catalogue entry is kept in a person's or a model's name")
-    kept = entry.model_copy(update={"by": who, "at": _now()})
-    db.run(_keep(projects.current(), [kept]))
+    through = (via or "postdoc") if agent == "model" else None
+    kept = entry.model_copy(update={"by": who, "at": _now(), "agent": agent, "via": through})
+    db.run(_keep(projects.current(), [kept], {} if audited and agent == "person" else None))
     return kept
 
 
 def _first_error(err: ValidationError) -> str:
     first = err.errors()[0]
     where = ".".join(str(p) for p in first.get("loc", ())) or "the entry"
-    return f"{where}: {first.get('msg')}"
+    return f"{where}: {str(first.get('msg')).removeprefix('Value error, ')}"
 
 
-def keep_fields(kind: str, fields: dict[str, Any], *, by: str, source: str) -> CatalogueEntry:
-    """An entry made from fields and kept, for a caller that holds no entry
-    (Postdoc's `catalogue_write`): refused in words when the kind does not
-    take them."""
+def keep_fields(kind: str, fields: dict[str, Any], *, by: str, source: str,
+                agent: Literal["model", "person"], via: str | None = None) -> CatalogueEntry:
+    """An entry made from fields and kept in the lane `agent` names, through
+    the door `via` names, for a caller that holds no entry
+    (`catalogue_write`): refused in words when the kind does not take them,
+    and, for a model's write, when the id holds an entry another kept
+    (`keep`). Its caller audits the write as its own."""
     try:
         entry = CatalogueEntry.model_validate({**fields, "kind": _kind(kind), "source": source})
     except ValidationError as e:
         raise CatalogueRefused(_first_error(e)) from None
-    return keep(entry, by=by)
+    return keep(entry, by=by, agent=agent, via=via, audited=False)
 
 
 # ── from a file (Intake) ───────────────────────────────────────────────
@@ -191,7 +519,7 @@ class CatalogueIntake(BaseModel):
     refused: list[str] = Field(default_factory=list)
 
 
-_LISTS = ("aliases", "mastery", "skills")
+_LISTS = ("aliases", "mastery", "skills", "prerequisites")
 
 
 def _rows_of(data: bytes, filename: str) -> list[dict[str, Any]]:
@@ -228,7 +556,7 @@ def intake(kind: str, data: bytes, filename: str, *, by: str) -> CatalogueIntake
     source, every other row refused with its reason. A list holds its items
     in JSON; in CSV it is one column with the items split by `;`."""
     _kind(kind)
-    who = (by or "").strip()
+    who = _name(by)
     if not who:
         raise CatalogueRefused("a catalogue file is taken in a person's name")
     found = _rows_of(data, filename or "the file")
@@ -239,7 +567,7 @@ def intake(kind: str, data: bytes, filename: str, *, by: str) -> CatalogueIntake
     at = _now()
     for i, r in enumerate(found, start=1):
         try:
-            e = CatalogueEntry.model_validate({**r, "kind": kind, "by": who, "at": at,
+            e = CatalogueEntry.model_validate({**r, "kind": kind, "by": who, "at": at, "agent": "person", "via": None,
                                                "source": r.get("source") or f"the file {filename}"})
         except ValidationError as err:
             out.refused.append(f"row {i}: {_first_error(err)}")
@@ -247,7 +575,7 @@ def intake(kind: str, data: bytes, filename: str, *, by: str) -> CatalogueIntake
         good.append(e)
         out.kept.append(e.id)
     if good:
-        db.run(_keep(projects.current(), good))
+        db.run(_keep(projects.current(), good, {"file": filename or "the file"}))
     return out
 
 
@@ -279,18 +607,26 @@ def as_strain_aliases() -> dict[str, str]:
 
 
 def as_products() -> list[dict[str, Any]]:
-    """The products as ProtParam and the proposer read them."""
-    return [{"id": e.id, "name": e.name, "category": e.category, "sequence": e.sequence,
+    """The products as ProtParam and the proposer read them: the proposer
+    reads a product's class and where the cells leave it."""
+    return [{"id": e.id, "name": e.name, "category": e.category, "location": e.location, "sequence": e.sequence,
              "sequenceSource": e.sequenceSource, "source": e.source} for e in _entries("product")]
 
 
 def as_skills() -> list[dict[str, Any]]:
-    return [{"id": e.id, "name": e.name, "family": e.family, "summary": e.summary, "mastery": list(e.mastery)}
-            for e in _entries("skill")]
+    """The skills as Guild reads them (guild.projection): what each is and
+    what mastery means, and the policy its levels read, None where the entry
+    holds none (competence.unrated)."""
+    return [{"id": e.id, "name": e.name, "family": e.family, "summary": e.summary, "mastery": list(e.mastery),
+             "criticality": e.criticality, "recencyDays": e.recencyDays, "supervisedRuns": e.supervisedRuns,
+             "prerequisites": list(e.prerequisites)} for e in _entries("skill")]
 
 
 def as_lessons() -> list[dict[str, Any]]:
-    return [{"lessonId": e.id, "id": e.id, "title": e.name, "skills": list(e.skills)} for e in _entries("lesson")]
+    """The lessons as Guild and the module reads read them: the skills each
+    counts toward, its title, its words and its minutes."""
+    return [{"lessonId": e.id, "id": e.id, "title": e.name, "skills": list(e.skills), "minutes": e.minutes,
+             "summary": e.summary, "note": e.note} for e in _entries("lesson")]
 
 
 async def _count(project_id: str) -> dict[str, int]:

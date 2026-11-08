@@ -74,6 +74,10 @@ def test_the_same_values_on_the_same_plant_are_one_scenario(worker):
     ([person("stream.sugarcane.price", 0.05, "USD/t")], "is in USD/kg"),
     ([person("unit.T202.vessel_type", 1.0, "")], "read back in words"),
     ([person("stream.sugarcane.price", 0.05, "USD/kg"), estimate("stream.sugarcane.price", 0.04, "USD/kg")], "twice"),
+    ([ScenarioValue(key="stream.sugarcane.price", quantity=Quantity(value=0.05, unit="USD/kg", basis="a placeholder basis",
+                                                                    origin=Origin(kind="person-assumption", by="Ada Moreno",
+                                                                                  at="2026-10-30")))],
+     "also carries the basis 'a placeholder basis'"),
 ])
 def test_a_scenario_refuses_what_its_plant_cannot_take(worker, values, said):
     with pytest.raises(scenarios.ScenarioRefused, match=said):
@@ -109,6 +113,11 @@ def test_running_a_scenario_is_an_engine_run_naming_each_values_author(worker):
     assert scenarios.get(made.id).runIds == [rep.run.id]
     again = scenarios.run(made.id, by="Ada Moreno")
     assert again.run.id == rep.run.id and scenarios.get(made.id).runIds == [rep.run.id]
+    # The scenario's run takes the library's one path (alpha 2.2 D2): its values, sent as inputs at the library's
+    # door, are the same run.
+    inputs = [i.model_dump(mode="json", exclude_none=True) for i in scenarios.inputs(made)]
+    routed = TestClient(app).post("/api/library/sugarcane/run", json={"inputs": inputs, "by": "Grace Hopper"})
+    assert routed.status_code == 200 and routed.json()["run"]["id"] == rep.run.id
 
 
 def test_a_refused_run_is_kept_with_its_scenario_as_a_receipt(worker, monkeypatch):
@@ -127,8 +136,9 @@ def test_a_refused_run_is_kept_with_its_scenario_as_a_receipt(worker, monkeypatc
 
 
 def test_the_proforma_screens_scenarios_stay_theirs_in_the_same_table(worker):
-    project_state.put("scenarios", "sc-made-1", {"id": "sc-made-1", "kind": "biosteam", "name": "n", "pinned": False},
-                      "Ada Moreno")
+    project_state.put("scenarios", "sc-made-1", {"id": "sc-made-1", "modelId": "a-placeholder-flowsheet",
+                                                 "kind": "biosteam", "name": "n", "description": "", "product": "",
+                                                 "pinned": False}, "Ada Moreno")
     made = scenarios.make(asked())
     assert [s["id"] for s in project_state.load()["scenarios"]] == ["sc-made-1"]
     assert [s.id for s in scenarios.listed()] == [made.id]
@@ -147,3 +157,48 @@ def test_the_routes_make_read_run_and_refuse(worker):
     bad = client.post("/api/studies/scenarios", json=asked(
         values=[person("stream.sugarcane.price", 0.05, "USD/t")]).model_dump(mode="json"))
     assert bad.status_code == 422 and "is in USD/kg" in bad.json()["detail"]
+
+
+def test_a_kept_value_its_plant_no_longer_reads_is_refused_in_words_at_the_route_and_the_tool(worker, monkeypatch):
+    """A kept scenario whose value the plant's parameters refuse before
+    anything runs (a key the plant no longer reads, as a package change
+    would leave one) is a 422 in words at its run route and the tool's
+    refusal in words, and nothing is kept (docs/api/studies.md)."""
+    from openferment_core import tools
+    from test_library import SUGARCANE_PARAMETERS
+
+    made = scenarios.make(asked())
+    fewer = [p for p in SUGARCANE_PARAMETERS if p["key"] != "stream.sugarcane.price"]
+
+    def moved(op, args):
+        answer = worker(op, args)
+        return {**answer, "parameters": fewer} if op == "library_parameters" else answer
+
+    monkeypatch.setattr(simulator, "call", moved)
+    monkeypatch.setattr(library, "_PARAMETERS", {})
+    ran = TestClient(app, raise_server_exceptions=False).post(f"/api/studies/scenarios/{made.id}/run",
+                                                              json={"by": "Ada Moreno"})
+    assert ran.status_code == 422, ran.text
+    assert "stream.sugarcane.price" in ran.json()["detail"] and "no parameter" in ran.json()["detail"]
+    tool = tools.run("engine_run", {"scenario": made.id}, tools.ToolContext(person="Ada Moreno"))
+    assert tool.error.startswith("engine_run refused: ") and "stream.sugarcane.price" in tool.error, tool.error
+    assert runs.listed() == [] and scenarios.get(made.id).runIds == [] and "library_run" not in worker.calls
+
+
+def test_a_scenario_on_a_plant_that_takes_configurations_runs_in_its_default(worker):
+    """A plant that takes configurations, a scenario naming none: made,
+    checked against the parameters of the plant's default (engine/biosteam.py
+    `default_configuration`) and run there, as every door runs it."""
+    from openferment_core.engine import biosteam
+
+    default = biosteam.default_configuration("cane", None)
+    assert default is not None
+    client = TestClient(app)
+    made = client.post("/api/studies/scenarios", json=asked(plant="cane", values=[
+        person("stream.sugarcane.price", 0.05, "USD/kg")]).model_dump(mode="json"))
+    assert made.status_code == 200, made.json()
+    assert made.json()["configuration"] is None
+    asked_for = [args.get("configuration") for op, args in worker.library.calls if op == "library_parameters"]
+    assert asked_for == [default], "the parameters read are the default's"
+    ran = client.post(f"/api/studies/scenarios/{made.json()['id']}/run", json={"by": "Ada Moreno"})
+    assert ran.status_code == 200 and ran.json()["run"]["configuration"] == default

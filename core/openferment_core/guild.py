@@ -1,4 +1,4 @@
-"""Guild — the competence ledger, and the only functions that write it (OF-BLD-013 §1.2, §2.1, §3.1).
+"""Guild — the competence ledger, and the only functions that write it.
 
 A project's ledger is its rows in `guild_people` and `guild_evidence`, with
 the lead's policy in the project's settings: the people on the team and
@@ -55,9 +55,17 @@ The rules, by name:
   policy      a check rate outside none to twelve a quarter
 
 Nothing is repaired on the way through. The skills, the protocol steps that
-need them and the lessons that count toward them come from `projection()`;
-no store holds a skills catalogue yet, so there are none, and the tests hand
-in a frozen fixture.
+need them and the lessons that count toward them come from `projection()`:
+the skills and the lessons from the project's catalogues (catalogues.py),
+each skill with the policy its entry holds, and the steps from the project's
+protocols (protocols.py), each step with the skills a keep held to the skill
+catalogue; most tests hand in a frozen fixture in its place. A skill kept
+with no policy is left out of every level (competence.unrated): nobody holds
+it, so a run of it alone and a cosign of it are refused in words that say
+so. The projection is read before a transaction begins, and a write inside
+one takes what its caller read (`write_check_entries_in`): a store's read
+goes through `db.run`, which refuses to run on the database's own thread,
+where a transaction's coroutine runs.
 """
 from __future__ import annotations
 
@@ -65,17 +73,17 @@ import copy
 import logging
 import re
 from datetime import date, datetime, timedelta, timezone
-from typing import TYPE_CHECKING, Any
+from typing import TYPE_CHECKING, Any, get_args
 
 from sqlalchemy import select, update
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from . import db, projects
 from .biorepo import MIN_REVIEWER_CHARS, PLACEHOLDER_REVIEWERS
-from .competence import Competence
+from .competence import Competence, unrated
 from .db import models as t
 from .db import rows
-from .models import Guild, GuildEvidence, GuildPerson, GuildPolicy, GuildWithdrawal
+from .models import Guild, GuildEvidence, GuildPerson, GuildPolicy, GuildRule, GuildWithdrawal
 
 if TYPE_CHECKING:
     from .models import Check
@@ -85,22 +93,8 @@ log = logging.getLogger("openferment.guild")
 # Where the lead's policy sits in the project's settings.
 POLICY_KEY = "guildPolicy"
 
-RULES = (
-    "name",
-    "role",
-    "added",
-    "duplicate",
-    "person",
-    "skill",
-    "source",
-    "observer",
-    "authority",
-    "outcome",
-    "note",
-    "date",
-    "evidence",
-    "policy",
-)
+# The rules an entry is refused under, in order: the check route answers each by name (models.GuildRule).
+RULES: tuple[str, ...] = get_args(GuildRule)
 
 # What the ledger accepts, kind by kind, and from which sources (OF-BLD-013
 # §1, §2, §3). A sign-off is an assessor's; a designation is the lead's; a run
@@ -138,21 +132,27 @@ class GuildRefused(ValueError):
 
 
 # alpha 2.0 deleted the TypeScript skills, protocols and lessons these were
-# projected from (ADR-010), and no store holds them yet: a lab has defined no
-# skill, and every list is empty. Tests hand in alpha 1.0's frozen export in
-# place of `projection`.
+# projected from (ADR-010); a project keeps its own (catalogues.py,
+# protocols.py), and a project that keeps none, like no project open, reads
+# every list empty. Most tests hand in alpha 1.0's frozen export in place of
+# `projection`.
 EMPTY_PROJECTION: dict[str, Any] = {"skills": [], "steps": [], "lessons": [], "protocols": []}
 
 
 def projection() -> dict[str, Any]:
     """The skills and the lessons that count toward them, from the open
-    project's catalogues (catalogues.py), a copy of its own for each caller;
-    no store holds protocol steps' skills yet, so a step needs none."""
-    from . import catalogues
+    project's catalogues (catalogues.py), and the steps that need a skill,
+    from its protocols (protocols.py): every version's steps with their
+    skills, and the current version of each protocol a step of which needs
+    one, as Practice quotes it. A copy of its own for each caller."""
+    from . import catalogues, protocols
 
     out = copy.deepcopy(EMPTY_PROJECTION)
     out["skills"] = catalogues.as_skills()
     out["lessons"] = [{"lessonId": lesson["lessonId"], "skills": lesson["skills"]} for lesson in catalogues.as_lessons()]
+    held = protocols.held()
+    out["steps"] = protocols.as_steps(held)
+    out["protocols"] = protocols.as_quoted(held)
     return out
 
 
@@ -372,7 +372,7 @@ def write_evidence(entry: GuildEvidence, *, dry_run: bool = False) -> GuildEvide
     every rule runs and nothing is written, so asking and deciding are the
     same code. An entry with a check as its source is refused here: it is
     written by running the check (`checks.record`), which calls every
-    criterion first (OF-BLD-013 §5.5).
+    criterion first.
     """
     return _write_entries([entry], dry_run=dry_run, from_check=None)[0]
 
@@ -482,11 +482,12 @@ async def _write_prechecked(
 
 
 async def write_check_entries_in(
-    s: AsyncSession, project_id: str, entries: list[GuildEvidence], check: Check, *, dry_run: bool = False
+    s: AsyncSession, project_id: str, entries: list[GuildEvidence], check: Check, known: dict[str, dict[str, Any]],
+    *, dry_run: bool = False
 ) -> list[GuildEvidence]:
     """`write_check_entries` inside the run's own transaction, so the entries
-    and the check they close commit together (`checks.record`)."""
-    known = skills()
+    and the check they close commit together (`checks.record`), against the
+    skills its caller read before the transaction began (`skills()`)."""
     days = [_precheck(e, known, check.id, check) for e in entries]
     return await _admit_and_keep(s, project_id, entries, days, known, dry_run)
 
@@ -544,6 +545,8 @@ def _admit(
     if person.role == "auditor":
         raise GuildRefused("role", f"{person.name} is an auditor; an auditor reads the ledger and holds no skills")
     skill_name = known[entry.skillId]["name"]
+    # Why nobody holds the skill whatever the ledger says, when its catalogue entry holds no policy.
+    no_policy = unrated(known[entry.skillId])
 
     def holds(person_id: str) -> bool:
         # Judged on the day the step was run, from what the ledger held
@@ -574,6 +577,8 @@ def _admit(
         if kind == "independent" and not holds(person.id):
             raise GuildRefused(
                 "authority",
+                f"{no_policy}: nobody holds it, and a run of it alone is a deviation until its catalogue entry "
+                "holds its policy" if no_policy else
                 f"{person.name} does not hold {skill_name} today, so a run of it alone is a deviation, "
                 "or a supervised run with a cosigner",
             )
@@ -596,7 +601,8 @@ def _admit(
             if not holds(observer.id):
                 raise GuildRefused(
                     "authority",
-                    f"{observer.name} does not hold {skill_name} today, so cannot cosign it",
+                    f"{no_policy}: nobody holds it, and nobody cosigns it until its catalogue entry holds its "
+                    "policy" if no_policy else f"{observer.name} does not hold {skill_name} today, so cannot cosign it",
                 )
         elif not _assessor_on(ledger, observer.id, entry.skillId):
             raise GuildRefused(

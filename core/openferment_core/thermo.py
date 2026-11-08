@@ -1,4 +1,4 @@
-"""thermosteam answers property questions (OF-BLD-019 §4.2, D9).
+"""thermosteam answers property questions.
 
 thermosteam is BioSTEAM's property engine: a database of chemicals with
 their models for density, heat capacity, viscosity and vapour-liquid
@@ -8,7 +8,9 @@ it, and talks to it only through the worker's JSON contract.
 
 A QUESTION NAMES A MIXTURE ON FILE, NEVER A NUMBER. Two kinds:
 
-- a stream of a Proforma run: the run's artifact id and the stream's id. Its
+- a stream of a kept run: the run's artifact id and the stream's id, the run
+  a Proforma run or any run a train's inlet reads a stream of (`STREAM_RUNS`:
+  a reference run, a pureOS train run, a library plant's run). Its
   composition, temperature, pressure and phase are the stream table's row
   (`proforma.tables_of`), and the run is the answer's source, so the run's
   provenance enters the answer's.
@@ -33,11 +35,12 @@ names the library and its version, every input with its source, and its
 provenance is `basis_provenance`'s: `computed` for a preset of conventions,
 the weakest of that and the record or the run otherwise.
 
-    POST /api/thermo/props   computes (or returns the stored answer)
-    GET  /api/thermo/props   the stored answer for the same question, or none;
-                             it starts no simulator
+    POST /api/thermo/props   computes (or returns the stored answer): the
+                             artifact beside what it holds (ThermoPropsAnswer)
+    GET  /api/thermo/props   the stored answer for the same question, as the
+                             same pair, or none; it starts no simulator
 
-A PRODUCT'S VOLATILITY (OF-BLD-020 §7.1, D12) is its own question and its
+A PRODUCT'S VOLATILITY is its own question and its
 own artifact tool, `volatility`, beside `thermo_props`, so the contract above
 is unchanged. `volatility(product)` names a product by id; `CHEMICALS` maps
 it to the library's own name for it (ethanol → Ethanol), and a product with no
@@ -64,11 +67,15 @@ from .models import Artifact, BasisInput, BasisSource, Evidence, ThermoProps, Th
 
 TOOL = "thermo_props"
 RUN = "proforma.run"
+# The runs whose stream table a stream is read from: the ones a train's
+# run-stream inlet reads (pureos/train_spec.py `STREAM_TOOLS`, held equal by
+# test_thermo), so pureOS → Train reads the properties of a train run's
+# streams as of a Proforma run's.
+STREAM_RUNS = (RUN, "proforma.reference", "pureos.train_run", "library.run")
 VERSION_WORDS = "thermo props 1"
 STREAM = "stream"
 AZEOTROPE = "ethanol-water-azeotrope"
 BEER = "beer-at-titre-of"
-PRESETS = (AZEOTROPE, BEER)
 TITRE_FIELD = "ethanol_titre"
 KG_M3 = "kg m⁻³"
 # The library's own names for the two chemicals the presets ask about.
@@ -162,9 +169,9 @@ def _run_of(aid: str) -> Artifact:
     except artifacts.ArtifactNotFound:
         raise ThermoNotFound(f"no artifact {aid!r} is on file here: a stream is read from a Proforma run's stream "
                              "table, so run the scenario in Proforma first") from None
-    if art.tool != RUN:
-        raise ThermoRefused(f"artifact {aid} is a {art.tool} artifact, not a Proforma run; a stream is read from a "
-                            "run's stream table")
+    if art.tool not in STREAM_RUNS:
+        raise ThermoRefused(f"artifact {aid} is a {art.tool} artifact; a stream is read from the stream table of a "
+                            f"run: a {', '.join(STREAM_RUNS[:-1])} or {STREAM_RUNS[-1]} artifact")
     return art
 
 
@@ -219,7 +226,8 @@ def basis_inputs(req: ThermoPropsRequest, pool: Any = None) -> tuple[list[BasisI
         flow_unit = tu.get("massFlow", "kg/hr")
         return [
             BasisInput(name="question", value=STREAM, unit="", source=BasisSource(
-                kind="convention", note="a stream of a Proforma run, at its own temperature, pressure and phase")),
+                kind="convention", note=("a stream of a Proforma run" if art.tool == RUN else f"a stream of a kept run "
+                                         f"({art.tool})") + ", at its own temperature, pressure and phase")),
             BasisInput(name="stream", value=row.id, unit="", source=src),
             BasisInput(name="T", value=row.T, unit=tu.get("T", "K"), source=src),
             BasisInput(name="P", value=row.P, unit=tu.get("P", "Pa"), source=src),

@@ -1,4 +1,4 @@
-"""The day's spend on models, by role, and the daily cap (OF-BLD-014 §3.3, E.7).
+"""The day's spend on models, by role, and the daily cap.
 
 `llm.py` charges every response here, and asks before every call whether the
 call could pass `OPENFERMENT_DAILY_BUDGET_USD`. The day is the UTC day; a new
@@ -202,14 +202,3 @@ def settle(rid: str | None, role: str, usd: float) -> float:
 def charge(role: str, usd: float) -> float:
     """Add `usd` to today's spend under `role`; return today's total."""
     return settle(None, role, usd)
-
-
-def would_pass(projected_usd: float) -> tuple[bool, float, float]:
-    """Whether a call that may cost `projected_usd` could take today past the
-    cap, counting what is reserved. Unknown spend always would."""
-    cap = daily_budget()
-    try:
-        s = state()
-    except SpendUnknown:
-        return True, 0.0, cap
-    return s["totalUsd"] + s["reservedUsd"] + projected_usd > cap, s["totalUsd"], cap

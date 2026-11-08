@@ -1,4 +1,4 @@
-"""A vessel and a train, priced: the seam (OF-BLD-020 §6.1, D11, E.2‴, E.3‴).
+"""A vessel and a train, priced: the seam (E.2‴, E.3‴).
 
     glucose ──────┐                                           the train pureOS ran,
                   ├─ M1 ── the fermenter fermOS designed ── beer ── unit by unit ── product
@@ -353,7 +353,7 @@ def evaluate(b: Built, values: dict[str, float]) -> dict[str, Any]:
     tea._sales = 0
     b.price = float(tea.solve_price(product))
     # The price per kg of the product the train traces, contained in its
-    # product stream (as the PHA flowsheet prices per kg of PHA contained):
+    # product stream (as a flowsheet prices per kg of its product contained):
     # the stream's price times its mass over the product's.
     price = b.price * float(product.F_mass) / contained
     hours = float(tea.operating_hours)

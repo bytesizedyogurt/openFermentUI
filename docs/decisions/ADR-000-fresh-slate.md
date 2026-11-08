@@ -68,7 +68,7 @@ The new `CLAUDE.md` (stage 8) carries only R, P and C lines, each labelled.
 | Hosting | `scripts/host/` install, deploy, nightly; launchd jobs never root | C | Kept, wording generalized, PostgreSQL steps added |
 | Hosting | Bind `127.0.0.1`; widening is the owner's decision | R | Execution prompt §11.1; kept |
 | Hosting | `guard.py` host and origin checks on every changing request | R | Execution prompt §11.1 (never weaken); kept |
-| Hosting | Every kept file written through `atomic.write_text` | X | Stores move to PostgreSQL; `atomic.py` stays for export files |
+| Hosting | Every kept file written through `atomic.write_text` | X | Stores move to PostgreSQL; `atomic.py` stays for the one file the service keeps on disk, a genome-scale model it fetched (`atomic.write_bytes`) |
 | Hosting | `biorepo.json` merge driver | X | No JSON store remains (ADR-001) |
 | Guild | A level is computed, never stored | C | Kept |
 | Guild | Rules live in `guild.py`; the browser asks | C | Kept over PostgreSQL |
@@ -118,6 +118,14 @@ The new `CLAUDE.md` (stage 8) carries only R, P and C lines, each labelled.
 - Stage 1 deletes what the X rows describe, each deletion in its own commit with its reason.
 - The new `CLAUDE.md` stays under 250 lines and labels every line R, P or C.
 - `STATE.md`'s open "Live owed" items fold into `docs/PROGRESS.md` at stage 8.
+
+## Implementation (alpha 2.2 H.0)
+
+- `prototype:up` stands re-classified C. Stage 8.3 rewrote `scripts/prototype-up.sh` as the
+  one-command live app: `session-start.sh`, the build, the service on `127.0.0.1:8000` and the app on
+  `127.0.0.1:4173`, both on loopback, every record in the database `core/.env` names. The demo set
+  and `shots` stay deleted as the row above says. `README.md` and Postdoc's service-down callout name
+  the command, and the script's header calls it the live app.
 
 ## Revisit condition
 

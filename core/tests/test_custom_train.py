@@ -36,8 +36,9 @@ from fastapi.testclient import TestClient
 from openferment_core import artifacts, composite, intake, proforma, pureos, vessel
 import standins  # test-only stand-ins, moved out of demo.py (alpha 2.0 stage 1)
 from openferment_core.flowsheets import shelf
-from openferment_core.models import Override, ProformaRunRequest, VesselRequest
+from openferment_core.models import Override, ProformaRunRequest
 from openferment_core.pureos import catalogue, train_spec
+from standins import proforma_inputs, resolve_json, vessel_request
 from test_train import TrainWorker, spec_of
 from test_vessel import ANAEROBIC_ID, StandInWorker as VesselWorker, keep, standin_simulation
 
@@ -60,6 +61,12 @@ def over(key, value, *, scope=SCOPE, by=BY) -> Override:
     return Override(scope=scope, key=key, value=value, by=by, at=AT, note=STANDIN)
 
 
+def kept_scenario(sid: str, flowsheet: str, name: str, **parts) -> dict:
+    """A scenario as New scenario keeps it in the project's rows (src/store.ts `createScenario`)."""
+    return {"id": sid, "modelId": flowsheet, "flowsheetId": flowsheet, "kind": "biosteam", "name": name,
+            "description": "", "product": "", "pinned": False, **parts}
+
+
 def inputs_typed(**more) -> list[Override]:
     return [over(k, v) for k, v in {**INPUTS_STANDIN, **more}.items()]
 
@@ -76,7 +83,8 @@ class Worker:
         self.calls.append((op, args))
         if op.startswith("vessel_"):
             return self.vessel(op, args)
-        if op in ("catalogue_specs", "train_specs", "flowsheet_unit_values", "train_run"):
+        if op in ("catalogue_specs", "train_specs", "flowsheet_unit_values", "train_run") or (
+                op == "sff_export" and isinstance(args.get("train"), dict)):
             return self.train(op, args)
         return standins._standin_call(op, args)
 
@@ -105,7 +113,7 @@ def parts(store, worker):
     """A stand-in vessel design (the NREL vessel, at a stand-in plant scale)
     and a stand-in train run, each made by the real code on the stand-in
     workers."""
-    d = vessel.design(VesselRequest(simulation=ANAEROBIC_ID, overrides=[Override(
+    d = vessel.design(vessel_request(simulation=ANAEROBIC_ID, overrides=[Override(
         scope=f"fermos:vessel:{ANAEROBIC_ID}", key="plant_scale", value=PLANT_STANDIN, by=BY, at=AT, note=STANDIN)]))
     run = pureos.run_train(spec_of())
     return SimpleNamespace(vessel=d.artifactId, train=run.artifactId)
@@ -121,9 +129,14 @@ def client():
 POOL = SimpleNamespace(records=[], records_by_id={})
 
 
-def request(parts, **kw) -> ProformaRunRequest:
+def request(parts, overrides=None, **kw) -> ProformaRunRequest:
+    """A run of the composite as the browser sends one: the scope's overrides,
+    the inputs' and the Finance group's, as typed inputs in each parameter's
+    unit (alpha 2.2 D2)."""
+    typed = inputs_typed() if overrides is None else overrides
     return ProformaRunRequest(**{"scenarioId": SCENARIO, "flowsheet": FLOWSHEET, "vessel": parts.vessel,
-                                 "trainRun": parts.train, "overrides": inputs_typed(), "samples": 3, **kw})
+                                 "trainRun": parts.train, "inputs": proforma_inputs(typed, FLOWSHEET), "samples": 3,
+                                 **kw})
 
 
 # ── the shelf (offline) ────────────────────────────────────────────────
@@ -131,7 +144,7 @@ def request(parts, **kw) -> ProformaRunRequest:
 
 def test_the_shelf_holds_the_composite_the_yeast_programs_built_from_a_vessel_and_a_train():
     info = shelf.info(FLOWSHEET)
-    assert not info.reference and info.builtFrom == ["fermos.vessel", "pureos.train_run"]
+    assert info.builtFrom == ["fermos.vessel", "pureos.train_run"]
     # Its program is the chemical set its train builds on, the one pureOS holds.
     assert set(train_spec.PROGRAM_CHEMICALS) == {info.program} == {"yeast"}
     assert [i.key for i in info.inputs] == ["feed_glucose_conc", "titre", "yield", "productivity", "plant_scale",
@@ -187,7 +200,7 @@ def test_a_part_of_another_tool_not_on_file_or_damaged_is_refused_in_words(parts
     from standins import plant_damaged
 
     plant_damaged("b" * 16)
-    with pytest.raises(proforma.ScenarioRefused, match="the train run, artifact bbbbbbbbbbbbbbbb is damaged on disk"):
+    with pytest.raises(proforma.ScenarioRefused, match="the train run, artifact bbbbbbbbbbbbbbbb is damaged in its row"):
         composite.parts_of(parts.vessel, "b" * 16)
 
 
@@ -202,7 +215,7 @@ def test_a_train_run_of_another_chemical_set_is_refused(parts, monkeypatch):
 
 
 def test_a_train_unit_the_fermenter_takes_is_refused(store, worker):
-    d = vessel.design(VesselRequest(simulation=ANAEROBIC_ID, overrides=[Override(
+    d = vessel.design(vessel_request(simulation=ANAEROBIC_ID, overrides=[Override(
         scope=f"fermos:vessel:{ANAEROBIC_ID}", key="plant_scale", value=PLANT_STANDIN, by=BY, at=AT, note=STANDIN)]))
     spec = spec_of(units=[{"id": "R1", "type": "centrifugation", "params": {"split.Yeast": {
         "value": 0.9, "by": BY, "at": AT, "note": STANDIN}}}])
@@ -221,14 +234,14 @@ def test_the_vessel_design_binds_the_plant_scale_it_was_designed_at_and_a_person
     assert scale.binding == "artifact" and scale.value == PLANT_STANDIN and scale.source.id == parts.vessel
     assert f"the plant scale vessel design {parts.vessel} was designed at, typed by {BY}" == scale.source.note
     assert got.product == "ethanol" and "plant_scale" not in got.waiting
-    typed = proforma.named_values(None, [over("plant_scale", 7.0)])[0]
+    typed = proforma.named_values(None, [over("plant_scale", 7.0)])
     mine = proforma.bind_flowsheet(FLOWSHEET, pool=POOL, vessel=parts.vessel, train_run=parts.train, assumptions=typed)
     assert next(i for i in mine.inputs if i.key == "plant_scale").binding == "assumption"
 
 
 def test_a_batch_volume_design_is_refused_as_the_composites_fermenter(store, worker, monkeypatch):
     # A design of one vessel's batch volume (its basis names no plant scale).
-    d = vessel.design(VesselRequest(simulation=ANAEROBIC_ID, overrides=[Override(
+    d = vessel.design(vessel_request(simulation=ANAEROBIC_ID, overrides=[Override(
         scope=f"fermos:vessel:{ANAEROBIC_ID}", key="plant_scale", value=PLANT_STANDIN, by=BY, at=AT, note=STANDIN)]))
     art = artifacts.get(d.artifactId)
     art = art.model_copy(update={"inputs": [i.model_copy(update={"name": i.name.replace("plant_scale", "batch_volume")})
@@ -271,8 +284,8 @@ def test_the_panel_serves_finance_from_the_packages_own_file_and_a_persons_value
     dep = next(s for s in finance if s["key"] == "depreciation")
     assert defaults["depreciation"] in dep["choices"] and all(c.startswith("MACRS") for c in dep["choices"])
     # A person's value is their named assumption, and the resolve says what a run adds for it.
-    ask = {"flowsheet": FLOWSHEET, "vessel": parts.vessel, "trainRun": parts.train,
-           "overrides": [over("IRR", 0.1).model_dump(), over("depreciation", "MACRS10").model_dump()]}
+    fields = {"flowsheet": FLOWSHEET, "vessel": parts.vessel, "trainRun": parts.train}
+    ask = {**fields, "inputs": resolve_json(SCOPE, [over("IRR", 0.1), over("depreciation", "MACRS10")], **fields)}
     r = client.post(f"/api/params/{SCOPE}/resolve", json=ask)
     assert r.status_code == 200, r.text
     added = {b["name"]: b for b in r.json()["basisInputs"]}
@@ -280,11 +293,12 @@ def test_the_panel_serves_finance_from_the_packages_own_file_and_a_persons_value
     assert added["finance.depreciation"]["value"] == "MACRS10"
     assert added["assumptions read from"]["value"] == "overrides"
     # A schedule that does not sum to the whole is refused in the run's own words.
-    bad = {**ask, "overrides": [over("construction_schedule.1", 0.9).model_dump()]}
+    bad = {**ask, "inputs": resolve_json(SCOPE, [over("construction_schedule.1", 0.9)], **fields)}
     r = client.post(f"/api/params/{SCOPE}/resolve", json=bad)
     assert r.status_code == 422 and "the construction schedule's shares sum to" in r.json()["detail"]
     # A choice not offered, and a scope with no parts, are refused in words.
-    r = client.post(f"/api/params/{SCOPE}/resolve", json={**ask, "overrides": [over("depreciation", "MACRS8").model_dump()]})
+    r = client.post(f"/api/params/{SCOPE}/resolve", json={**ask, "inputs": resolve_json(SCOPE, [over("depreciation", "MACRS8")],
+                                                                                     **fields)})
     assert r.status_code == 422 and "depreciation is one of" in r.json()["detail"]
     r = client.get(f"/api/params/{SCOPE}?flowsheet={FLOWSHEET}")
     assert r.status_code == 422 and "names no vessel design (vessel) and no train run (trainRun)" in r.json()["detail"]
@@ -405,7 +419,7 @@ def _sim_parts(aerobic: bool):
     from test_vessel import real_simulation
 
     sim = real_simulation(aerobic)
-    d = vessel.design(VesselRequest(simulation=sim.artifactId, overrides=[Override(
+    d = vessel.design(vessel_request(simulation=sim.artifactId, overrides=[Override(
         scope=f"fermos:vessel:{sim.artifactId}", key="plant_scale", value=PLANT_STANDIN, by=BY, at=AT, note=STANDIN)]))
     run = pureos.run_train(three_units(kind="simulation", ref=sim.artifactId, vessel=d.artifactId))
     return SimpleNamespace(vessel=d.artifactId, train=run.artifactId, design=d, run=run)
@@ -473,3 +487,98 @@ def test_a_yield_the_vessels_reaction_cannot_reach_is_a_case_it_cannot_hold(real
     with pytest.raises(proforma.ScenarioRefused, match="yield: 2 of 2.*this yield is above what the vessel's reaction "
                                                        "makes of the glucose"):
         proforma.run(request(p, overrides=inputs_typed(**{"yield": 0.5}), samples=2), pool=POOL)
+
+
+# Each composite run's artifact id through the panel's overrides at b6a85d0,
+# measured there on these stand-ins, three samples, no host drawing the diagram.
+PANEL_IDS = {"inputs": "5787b339a1c448e9", "inputs and a Finance value": "f32cbb91635cb3d5"}
+
+
+def test_a_composite_run_sent_as_inputs_keeps_the_artifact_id_its_overrides_gave(parts, worker, monkeypatch):
+    """Alpha 2.2 D6, the amendment at C.4: a composite run a person makes
+    through the panel keeps the artifact id it had, a Finance value among its
+    values: sent as inputs, its values base as the panel's overrides based
+    them, the line saying so included (proforma.values_read)."""
+    monkeypatch.setattr(proforma, "drawn_here", lambda: False)
+    for name, typed in (("inputs", inputs_typed()), ("inputs and a Finance value", [*inputs_typed(), over("IRR", 0.1)])):
+        r = proforma.run(request(parts, overrides=typed), pool=POOL)
+        assert r.artifactId == PANEL_IDS[name], name
+        got = {i.name: i for i in artifacts.get(r.artifactId).inputs}
+        assert got[proforma.ASSUMPTIONS_READ].value == "overrides", name
+
+
+# ── the composite as a thing of the biosteam engine (alpha 2.2 D6) ─────
+
+
+def test_the_biosteam_engine_runs_the_composite_in_each_pair_its_kept_scenarios_name(parts, worker):
+    """custom_train_v1 is built from a vessel design and a train run a
+    scenario names, so the biosteam engine lists it while the project keeps a
+    scenario of it, one configuration for each pair of parts those name;
+    its parameters are what the scenario binds with those parts, and a run
+    in one is one row of proforma.run, its configuration the parts'."""
+    from openferment_core import project_state
+    from openferment_core.engine import EngineRefused, registry, runs
+
+    registry.reset()
+    biosteam = registry.get("biosteam")
+    assert FLOWSHEET not in {t.id for t in biosteam.things()}, "listed while the project keeps a scenario of it"
+    project_state.put("scenarios", SCENARIO, kept_scenario(SCENARIO, FLOWSHEET, "A STAND-IN composite",
+                                                           vessel=parts.vessel, trainRun=parts.train), by=BY)
+    configuration = proforma.parts_configuration(parts.vessel, parts.train)
+    (thing,) = [t for t in biosteam.things() if t.id == FLOWSHEET]
+    assert (thing.kind, thing.configurations, thing.defaultConfiguration) == ("scenario", [configuration], None)
+    params = {p.key: p for p in biosteam.parameters(FLOWSHEET, configuration)}
+    assert (params["plant_scale"].origin.kind, params["plant_scale"].origin.ref) == ("artifact", parts.vessel)
+    assert params["IRR"].origin.kind == "library-default" and params["IRR"].value == shelf.package_tea_defaults()["IRR"]
+    for named, said in ((None, "none was named"), ("vessel 0, train run 0", "is none of them")):
+        with pytest.raises(EngineRefused, match=said):
+            biosteam.run(FLOWSHEET, named, [], BY)
+    asked = proforma_inputs(inputs_typed(), FLOWSHEET)
+    run = biosteam.run(FLOWSHEET, configuration, asked, BY)
+    assert (run.engine, run.tool, run.plant, run.configuration, run.scenarioId, run.by) == (
+        "biosteam", proforma.RUN, FLOWSHEET, configuration, FLOWSHEET, BY)
+    assert run.status == "done" and run.sff is not None
+    assert biosteam.run(FLOWSHEET, configuration, asked, "Another STAND-IN person").id == run.id
+    assert [r.id for r in runs.listed("biosteam")] == [run.id]
+    registry.reset()
+
+
+def test_every_kept_scenario_is_the_projects_and_a_kept_composite_binds_with_the_parts_it_names(parts, worker, client):
+    """alpha 2.2 D9: GET /api/proforma/scenarios reads every scenario the
+    project keeps as the project's, and a kept custom_train_v1 scenario binds
+    with the vessel design and the train run it names, where it answered 500
+    before (composite.parts_of(None, None)); one whose parts cannot stand is
+    listed with its refusal in words, so one scenario never stops the list."""
+    from openferment_core import project_state
+
+    project_state.put("scenarios", SCENARIO, kept_scenario(SCENARIO, FLOWSHEET, "A STAND-IN composite",
+                                                           vessel=parts.vessel, trainRun=parts.train), by=BY)
+    project_state.put("scenarios", "sc-ethanol-test", kept_scenario("sc-ethanol-test", proforma.ETHANOL,
+                                                                    "A STAND-IN ethanol"), by=BY)
+    got = client.get("/api/proforma/scenarios")
+    assert got.status_code == 200, got.text
+    listed = {s["id"]: s for s in got.json()}
+    assert set(listed) == {SCENARIO, "sc-ethanol-test"}
+    composite = listed[SCENARIO]
+    assert composite["flowsheet"] == FLOWSHEET and composite["refused"] is None and composite["inputs"]
+    # The plant scale the vessel was designed at binds it, as the scenario's page binds it.
+    by_key = {i["key"]: i for i in composite["inputs"]}
+    assert by_key["plant_scale"]["binding"] == "artifact" and by_key["plant_scale"]["value"] == PLANT_STANDIN
+    assert listed["sc-ethanol-test"]["refused"] is None and listed["sc-ethanol-test"]["flowsheet"] == proforma.ETHANOL
+    # A kept composite whose parts cannot stand is listed, refused in words, beside the rest.
+    project_state.put("scenarios", "sc-composite-missing", kept_scenario("sc-composite-missing", FLOWSHEET, "No parts"),
+                      by=BY)
+    again = client.get("/api/proforma/scenarios")
+    assert again.status_code == 200, again.text
+    missing = {s["id"]: s for s in again.json()}["sc-composite-missing"]
+    assert "no vessel design (vessel) and no train run (trainRun)" in missing["refused"] and missing["inputs"] == []
+    assert {s["id"] for s in again.json()} == {SCENARIO, "sc-ethanol-test", "sc-composite-missing"}
+    # A kept scenario on a flowsheet the shelf no longer holds (a retired entry's id, alpha 2.2 D8) is listed too.
+    project_state.put("scenarios", "sc-retired-entry", kept_scenario("sc-retired-entry", "cornstover_benchmark",
+                                                                     "Retired"), by=BY)
+    third = client.get("/api/proforma/scenarios")
+    assert third.status_code == 200, third.text
+    retired = {s["id"]: s for s in third.json()}["sc-retired-entry"]
+    assert retired["refused"].startswith("there is no flowsheet cornstover_benchmark on the shelf")
+    assert retired["inputs"] == [] and retired["leavesOut"] == [] and retired["priceBasis"] == ""
+    assert len(third.json()) == 4

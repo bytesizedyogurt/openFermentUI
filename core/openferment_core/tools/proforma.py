@@ -1,5 +1,5 @@
-"""Proforma's tools: `selling_price` (OF-BLD-014 §8.5), `run_flowsheet` and
-`stream_table` (OF-BLD-019 §6.1).
+"""Proforma's tools: `selling_price`, `run_flowsheet` and
+`stream_table`.
 
 `selling_price`: the price a person's run produced.
 
@@ -15,11 +15,22 @@ source as the service binds them (`proforma.bound`), and says how a run is
 made. It never runs a scenario and never makes an assumption: both are a
 person's, in Proforma.
 
-`proforma_benchmark` names the benchmark instead (§8.2): the NREL 2011 corn
-stover ethanol design as `biorefineries.cornstover` builds it, with every
-setting the package's own. Its stored run comes back as one `Evidence`, the
-price per gallon; with none stored the tool refuses. It runs nothing here
-either: a person runs the benchmark in Proforma, on the corn stover reference card or its page (/proforma/reference/cornstover_benchmark).
+A plant of the library shelf, by its id, names its newest run on its
+package's own values the project keeps (alpha 2.2 D8): the reference plants
+`cornstover` (the NREL 2011 corn stover design, the benchmark the shelf's
+retired entry ran) and `corn` (the dry-grind corn plant), or any plant
+`engine_plants` lists. The product's selling price solved at the TEA's rate
+of return comes back as one `Evidence`, the id `engine_report` gives the same
+number (`<artifact id>:price.solvedPrice`), with how many of the package
+test's values the run holds; with no such run kept the tool refuses, says
+how one is made and names any run the project kept from a retired entry of
+that plant. An id of a retired reference entry (`proforma_benchmark`,
+`cornstover_benchmark`, `corn_drygrind`) answers as its library plant, and
+the summary says so; when the project keeps no run of that plant on its
+package's own values, it answers from the newest run the project kept from
+the entry (the benchmark, or a reference run), its price as the entry named
+it (`proforma.retired_evidence`), and the summary says the run was kept from
+a retired entry. It runs nothing here either.
 
 `run_flowsheet` takes a scenario id and nothing else, and runs the scenario
 as its page runs it (`project_state.run_request`: the overrides a person set on
@@ -33,14 +44,16 @@ override binds waits, and the refusal is `proforma.run`'s own words, the ones
 call to `proforma.run` there.
 
 `stream_table` reads a kept run's stream table: a `proforma.run` artifact
-(a scenario's run) or a `proforma.reference` artifact (a reference
-biorefinery's, §2.2), through `proforma.tables_of`. The summary is the table
+(a scenario's run), a `library.run` artifact (a library plant's run, alpha
+2.2 D8) or a `proforma.reference` artifact kept from a retired reference
+entry, through `proforma.tables_of`. The summary is the table
 cut to the cap (the plant's feeds and products first), saying how many
 streams it left out; the whole table rides in `ToolResult.data`, for the
-endpoint and the MCP server. Both tools return the run as one `Evidence`
-whose id is the artifact's, so a claim cites the run by it as it cites a
-ceiling: the median price of a scenario's run, or the price a reference
-biorefinery's package gives on its own defaults.
+endpoint and the MCP server. A scenario's run comes back as one `Evidence`
+whose id is the artifact's, the median price, so a claim cites the run by it
+as it cites a ceiling, and a reference run kept from a retired entry the same
+way, the price its package gives on its own defaults; a library run's numbers
+are cited by the ids `engine_report` names.
 """
 from __future__ import annotations
 
@@ -50,13 +63,20 @@ from typing import Any
 from pydantic import BaseModel, ConfigDict, Field
 
 from .. import proforma, project_state
-from ..basis import ASSUMED_KINDS
+from ..basis import ASSUMED_KINDS, SET_ORIGINS, is_measurement
 from ..models import Evidence, ToolResult
 from . import MAX_SUMMARY_CHARS, Tool, ToolContext, register
 
 NAME = "selling_price"
 RUN_NAME = "run_flowsheet"
 TABLE_NAME = "stream_table"
+# The runs whose stream table stream_table reads: a library plant's run among
+# them (alpha 2.2 D8), whose tables the Proforma worker reads as a run's, and
+# a run kept from a retired reference entry, read as kept.
+TABLE_TOOLS = proforma.TABLE_TOOLS
+LIBRARY_RUN = "library.run"
+# The library plant an id of a retired reference entry names (alpha 2.2 D8).
+RETIRED_IDS = {proforma.BENCHMARK: "cornstover", **proforma.RETIRED_PLANTS}
 
 
 class SellingPriceInput(BaseModel):
@@ -64,48 +84,115 @@ class SellingPriceInput(BaseModel):
 
     scenarioId: str = Field(description=(
         "The id of a BioSTEAM scenario the project keeps (proforma_read lists them), whose newest kept run it reads; "
-        f"or {proforma.BENCHMARK}, the NREL 2011 corn stover ethanol design as biorefineries.cornstover builds it."))
+        "or a plant of the library shelf by its id (engine_plants lists them: cornstover is the NREL 2011 corn stover "
+        "design, corn the dry-grind corn plant), whose newest run on its package's own values it reads."))
 
 
-def _benchmark() -> ToolResult:
-    art = proforma.stored_benchmark()
-    if art is None:
-        return ToolResult(error=f"{NAME} refused: the benchmark has not been run on this service. A person runs it in Proforma, on the corn stover reference card or its page (/proforma/reference/cornstover_benchmark).")
-    ev = proforma.benchmark_evidence(art)
-    o = art.output
+def _sets_values(run) -> bool:
+    """Whether a kept engine run set a value of its own: a person's
+    assumption, a model's estimate or a deposition's reading."""
+    return any(i.quantity.origin is not None and i.quantity.origin.kind in SET_ORIGINS for i in run.inputs)
+
+
+def _library_price(plant: str, asked: str) -> ToolResult:
+    """The newest run of a library plant on its package's own values the
+    project keeps, its solved price as one Evidence (the id engine_report
+    gives it); a refusal in words when none is kept or it holds no price."""
+    from ..engine import library, runs
+    from .engine import run_evidence as engine_evidence
+
+    kept = [r for r in runs.listed(runs.LIBRARY_ENGINE)
+            if r.tool == LIBRARY_RUN and r.plant == plant and r.status == "done" and r.artifactId
+            and not _sets_values(r)]
+    if not kept:
+        retired = proforma.kept_from_retired(plant)
+        if asked != plant and retired:
+            return _retired_price(retired[0], plant, asked)
+        held = ""
+        if retired:
+            entry = proforma.retired_entry_of(retired[0])
+            held = (f" The project keeps {retired[0].tool} artifact {retired[0].id}, a run kept from the retired entry "
+                    f"{entry}; {NAME} reads its price by the id "
+                    f"{proforma.BENCHMARK if retired[0].tool == proforma.BENCHMARK else entry}.")
+        return ToolResult(error=(
+            f"{NAME} refused: no run of the library plant {plant} on its package's own values is kept in this "
+            f"project. engine_run runs it (plant {plant}), and a person runs it in Proforma, on its reference card or "
+            f"in Studies; {NAME} reads the newest kept run and runs nothing.{held}"))
+    run = kept[0]  # listed newest first
+    report = runs.report(run.id)
+    found = {e.id.rsplit(":", 1)[-1]: e for e in engine_evidence(report)}
+    ev = found.get("price.solvedPrice") or found.get("price.packagePrice")
+    if ev is None:
+        return ToolResult(error=(f"{NAME} refused: run {run.id} of the library plant {plant} holds no price: its plant "
+                                 "carries no TEA here, or its TEA solved none (engine_report reads its numbers)"))
+    o = report.artifact.output if report.artifact else {}
+    price = o.get("price") or {}
+    checks = [c for c in o.get("checks") or [] if isinstance(c, dict)]
+    summary: dict[str, Any] = {
+        "evidenceId": ev.id,
+        "runId": run.id,
+        "plant": plant,
+        "configuration": run.configuration,
+        "title": library.plant(plant).title,
+        "value": ev.value,
+        "unit": ev.unit,
+        "product": price.get("product"),
+        "provenance": ev.provenance,
+        "packageTest": (f"{sum(1 for c in checks if c.get('within'))} of {len(checks)} values of the package's own "
+                        "test within its tolerance on this run" if checks else
+                        o.get("regressionNote") or "the package's test holds no values for this plant"),
+        "meaning": (f"{ev.label}, on the package's own values, from the newest run of {plant} kept in this project; "
+                    "engine_report reads the run's other numbers (its TEA breakdown, its outputs) as evidence ids"),
+    }
+    if asked != plant:
+        summary["retired"] = (f"{asked} retired with the shelf's hand-written reference entries (alpha 2.2): it is the "
+                              f"library plant {plant}, read here by that id")
+    return ToolResult(summary=summary, evidence=[ev])
+
+
+def _retired_price(art, plant: str, asked: str) -> ToolResult:
+    """The price of the newest run the project kept from a retired reference
+    entry of `plant`, as one Evidence whose id is the artifact's; a refusal
+    in words when it holds none."""
+    ev = proforma.retired_evidence(art)
+    entry = proforma.retired_entry_of(art)
+    if ev is None:
+        return ToolResult(error=(f"{NAME} refused: {art.tool} artifact {art.id}, the newest run kept from the retired "
+                                 f"entry {entry}, holds no price; the library plant {plant}'s run gives one (engine_run "
+                                 f"runs it, plant {plant})"))
+    o = art.output if isinstance(art.output, dict) else {}
     return ToolResult(
         summary={
             "evidenceId": ev.id,
+            "artifactId": art.id,
+            "tool": art.tool,
+            "entry": entry,
+            "plant": plant,
+            "title": proforma.RETIRED[entry].title if entry else None,
             "value": ev.value,
             "unit": ev.unit,
             "provenance": ev.provenance,
             "package": o.get("package"),
             "simulator": o.get("biosteam"),
-            # The package's financial settings stay in the artifact; named here
-            # in words, so a claim names them and cites the evidence.
-            "settings": "the package's own: rate of return, income tax, operating days, and the start and end years, as stored with the artifact",
+            "settings": "the package's own, as stored with the artifact",
             "references": o.get("references"),
-            "meaning": "the price at which the modelled corn stover ethanol plant breaks even, from the package's own settings; "
-                       "a cellulosic design, not a batch fermentation of glucose",
+            "keptAt": art.createdAt,
+            "retired": (f"{asked} retired with the shelf's hand-written reference entries (alpha 2.2); this run was kept "
+                        f"from the entry {entry} before it retired, and the project keeps no run of the library plant "
+                        f"{plant} on its package's own values (engine_run runs one, plant {plant})"),
+            "meaning": f"{ev.label}, from the newest run kept in this project from the retired entry {entry}",
         },
         evidence=[ev],
     )
 
 
 def _not_held(sid: str, ctx: ToolContext) -> str:
-    """An id that is no BioSTEAM scenario the project keeps, refused in
-    words: a reference biorefinery is read elsewhere. Names the ids it
-    takes."""
-    from ..flowsheets import shelf
-
-    reference = shelf.SHELF.get(sid)
-    if reference is not None and reference.reference:
-        return (f"{NAME} refused: {sid} is a reference biorefinery, not a scenario: proforma_read lists its kept runs, "
-                "and stream_table returns a run's evidence id, the price its package gives on its own defaults; the "
-                f"corn stover benchmark's stored run is read here as {proforma.BENCHMARK}")
+    """An id that is no BioSTEAM scenario the project keeps and no plant of
+    the library shelf, refused in words naming the ids it takes."""
     shown = [s["id"] for s in proforma.held_scenarios()]
-    return (f"{NAME} refused: {sid} is not a BioSTEAM scenario this project keeps; the ids it takes are "
-            f"{', '.join([*shown, proforma.BENCHMARK])}")
+    return (f"{NAME} refused: {sid} is no BioSTEAM scenario this project keeps and no plant of the library shelf; "
+            f"the scenarios it takes are {', '.join(shown) or 'none yet'}, and a library plant by its id "
+            "(engine_plants lists them)")
 
 
 def _no_run(sid: str, row: dict, ctx: ToolContext) -> str:
@@ -115,16 +202,19 @@ def _no_run(sid: str, row: dict, ctx: ToolContext) -> str:
     name = row.get("name") or sid
     try:
         req = project_state.run_request(row)
-        typed, _ = proforma.named_values(sid, req.overrides)
-        bound = proforma.bound(req.flowsheet or row["modelId"], scenario_id=sid, name=name, pool=ctx.pool,
+        flowsheet = req.flowsheet or row["modelId"]
+        typed = proforma.named_values(sid, proforma.overrides_of(sid, flowsheet, req.inputs))
+        bound = proforma.bound(flowsheet, scenario_id=sid, name=name, pool=ctx.pool,
                                assumptions=typed, fits=req.fits, vessel=req.vessel, train_run=req.trainRun)
     except proforma.ScenarioRefused as e:
         return f"{NAME} refused: no run of {sid} is on file here, and its inputs could not be bound: {e}"
     waiting = [f"{i.key} ({i.label})" for i in bound.inputs if i.binding == "waiting"]
     if waiting:
-        why = f"these inputs wait for a source, a record or a named person's assumption: {', '.join(waiting)}"
-        how = (f"A run is made in Proforma, on the page of {name}: a named person's assumption is kept there for each "
-               "input that waits, and the person runs it")
+        why = (f"these inputs wait for a source, a record, a named person's assumption or a reading deposited at the "
+               f"bench: {', '.join(waiting)}")
+        how = (f"A run is made in Proforma, on the page of {name}: a named person's assumption, or a reading "
+               "deposited at the bench that a person chooses, is kept there for each input that waits, and the "
+               "person runs it")
     else:
         why = "every input has a source as the service binds it, and nobody has run it"
         how = f"A person runs it in Proforma, on the page of {name}, or run_flowsheet runs it as the service binds it"
@@ -132,16 +222,18 @@ def _no_run(sid: str, row: dict, ctx: ToolContext) -> str:
 
 
 def _run(inp: SellingPriceInput, ctx: ToolContext) -> ToolResult:
+    from ..engine import library
     from ..flowsheets import shelf
 
     sid = inp.scenarioId.strip()
-    if sid == proforma.BENCHMARK:
-        return _benchmark()
     if not sid:
-        return ToolResult(error=f"{NAME} refused: name the scenario by its id (proforma_read lists them), or "
-                                f"{proforma.BENCHMARK}")
+        return ToolResult(error=f"{NAME} refused: name the scenario by its id (proforma_read lists them), or a plant "
+                                "of the library shelf by its id (engine_plants lists them)")
     row = {s["id"]: s for s in proforma.held_scenarios()}.get(sid)
     if row is None:
+        plant = RETIRED_IDS.get(sid, sid)
+        if any(p.id == plant for p in library.shelf().plants):
+            return _library_price(plant, sid)
         return ToolResult(error=_not_held(sid, ctx))
     art = proforma.latest_run(sid)
     if art is None:
@@ -159,6 +251,8 @@ def _run(inp: SellingPriceInput, ctx: ToolContext) -> ToolResult:
         flowsheet, info = row["modelId"], shelf.info(row["modelId"])
     o = art.output
     assumed = sorted({i.name.split(" ")[0] for i in art.inputs if i.source.kind in ASSUMED_KINDS})
+    # The inputs a deposition's reading set (basis.is_measurement, beside the assumed ones).
+    measured = sorted({i.name.split(" ")[0] for i in art.inputs if is_measurement(i.source)})
     return ToolResult(
         summary={
             "evidenceId": ev.id,
@@ -172,6 +266,7 @@ def _run(inp: SellingPriceInput, ctx: ToolContext) -> ToolResult:
             "samples": o["samples"],
             "infeasible": o["infeasible"],
             "assumedInputs": assumed,
+            "measuredInputs": measured,
             "leavesOut": info.leavesOut,
             "meaning": f"{info.title}: the minimum selling price across its inputs' ranges, from the newest run kept "
                        f"for {sid}",
@@ -186,9 +281,13 @@ TOOL = register(
         description=(
             "The minimum selling price the most recent kept run of one of the project's BioSTEAM scenarios produced, as one evidence "
             "id to cite: the median with its 5th to 95th percentile, the infeasible share, which inputs rest on an "
-            "assumption, and what the flowsheet leaves out. Refuses when no run is on file, naming the inputs still "
-            "waiting for a source and how a run is made. With proforma_benchmark it returns the stored benchmark instead: the NREL 2011 "
-            "corn stover ethanol design's minimum ethanol selling price as biorefineries.cornstover computes it. "
+            "assumption and which on a deposition's reading, and what the flowsheet leaves out. Refuses when no run is on file, naming the inputs still "
+            "waiting for a source and how a run is made. With a plant of the library shelf by its id (cornstover, the NREL 2011 "
+            "corn stover design; corn, the dry-grind corn plant; any plant engine_plants lists) it reads that plant's newest kept "
+            "run on its package's own values: the selling price its TEA solves, as the evidence id engine_report gives it, and "
+            "how many of the package test's values the run holds. An id of a retired reference entry (proforma_benchmark, "
+            "cornstover_benchmark, corn_drygrind) reads its library plant, or, when the project keeps no such run, the "
+            "newest run the project kept from that entry, its price as the entry named it. "
             "It cannot run a scenario or make an assumption."
         ),
         input_model=SellingPriceInput,
@@ -249,9 +348,10 @@ class StreamTableInput(BaseModel):
     model_config = ConfigDict(extra="forbid")
 
     artifactId: str = Field(description=(
-        "The artifact id of a kept Proforma run: a proforma.run artifact (a scenario's run, as run_flowsheet, "
-        "selling_price or proforma_read return it) or a proforma.reference artifact (a reference biorefinery's "
-        "run, as proforma_read lists it). Nothing else: no number, no stream, no setting."))
+        "The artifact id of a kept run: a proforma.run artifact (a scenario's run, as run_flowsheet, "
+        "selling_price or proforma_read return it), a library.run artifact (a library plant's run, as engine_run, "
+        "engine_report and proforma_read name it), or a proforma.reference artifact kept from a retired reference "
+        "entry. Nothing else: no number, no stream, no setting."))
 
 
 def _sig(v: Any) -> Any:
@@ -261,29 +361,20 @@ def _sig(v: Any) -> Any:
 
 
 def run_evidence(art) -> Evidence | None:
-    """A kept Proforma run as the one `Evidence` a claim cites it by, its id
-    the artifact's: a scenario's run is its median price (`proforma.evidence_of`),
-    a reference run the price its package gives on its own defaults. None
-    when the run holds no price to cite."""
-    from .. import artifacts
-    from ..flowsheets import shelf
-
-    if art.tool == proforma.RUN:
-        try:
-            return proforma.evidence_of(art)
-        except proforma.ScenarioRefused:
-            return None
-    flowsheet = str(art.output.get("flowsheet") or next((i.value for i in art.inputs if i.name == "flowsheet"), ""))
+    """A kept run as the one `Evidence` a claim cites it by, its id the
+    artifact's: a scenario's run its median price (`proforma.evidence_of`),
+    a reference run kept from a retired entry the price its package gives on
+    its own defaults, as the entry named it (`proforma.retired_evidence`).
+    None for a run that holds no price to cite, and for a library run, whose
+    numbers are cited by the ids engine_report names."""
+    if art.tool == proforma.REFERENCE:
+        return proforma.retired_evidence(art)
+    if art.tool != proforma.RUN:
+        return None
     try:
-        info = shelf.info(flowsheet)
-    except shelf.NotOnShelf:
+        return proforma.evidence_of(art)
+    except proforma.ScenarioRefused:
         return None
-    value = art.output.get(info.priceOutput) if info.priceOutput else None
-    if not isinstance(value, (int, float)) or isinstance(value, bool):
-        return None
-    return Evidence(id=art.id, label=f"{info.title}: the price {info.source} gives on the package's own defaults",
-                    value=float(value), unit=info.priceBasis or "", provenance=art.provenance,
-                    basis=artifacts.basis_of(art), figure=None)
 
 
 def _row(s) -> dict[str, Any]:
@@ -308,12 +399,15 @@ def _stream_table(inp: StreamTableInput, ctx: ToolContext) -> ToolResult:
     try:
         art = artifacts.get(aid)
     except artifacts.ArtifactNotFound:
-        return ToolResult(error=f"{TABLE_NAME} refused: no kept artifact {aid!r}; proforma_read lists the runs on file")
+        return ToolResult(error=f"{TABLE_NAME} refused: no kept artifact {aid!r}; proforma_read lists the runs on file, "
+                                "the runs kept from the retired reference entries among them, and biorepo_read lists "
+                                "every kept artifact")
     except artifacts.ArtifactDamaged as e:
         return ToolResult(error=f"{TABLE_NAME} could not read {aid}: {e}")
-    if art.tool not in (proforma.RUN, proforma.REFERENCE):
-        return ToolResult(error=f"{TABLE_NAME} refused: {aid} is a {art.tool} artifact, not a Proforma run; it reads the "
-                                f"stream table of a {proforma.RUN} or {proforma.REFERENCE} artifact")
+    if art.tool not in TABLE_TOOLS:
+        return ToolResult(error=f"{TABLE_NAME} refused: {aid} is a {art.tool} artifact, and {TABLE_NAME} reads the "
+                                f"stream table of a {proforma.RUN} or {LIBRARY_RUN} artifact, or of a "
+                                f"{proforma.REFERENCE} artifact kept from a retired reference entry")
     scenario_id = pureos.scenario_of(art, pureos.held_scenarios())[0] if art.tool == proforma.RUN else None
     t = proforma.tables_of(art)
     if not t.streams:
@@ -344,8 +438,15 @@ def _stream_table(inp: StreamTableInput, ctx: ToolContext) -> ToolResult:
         "streams": rows,
         "meaning": ("the base case's streams as BioSTEAM held them after the run, read from the kept artifact and never "
                     "simulated again; cite the run by its evidence id" if ev else
-                    "the base case's streams as BioSTEAM held them after the run; this run holds no price, so it has "
-                    "no evidence id to cite"),
+                    "the base case's streams as BioSTEAM held them after the run, read from the kept artifact and never "
+                    "simulated again; a library plant's run is cited by the evidence id engine_report names for each "
+                    "of its outputs" if art.tool == LIBRARY_RUN else
+                    "the base case's streams as BioSTEAM held them in a run kept from a reference entry that retired "
+                    "from Proforma's shelf at alpha 2.2, read as kept; this run holds no price, and the library "
+                    "plant's run of the same package (engine_run, then engine_report) gives the evidence ids to cite"
+                    if art.tool == proforma.REFERENCE
+                    else "the base case's streams as BioSTEAM held them after the run; this run holds no price, so it "
+                         "has no evidence id to cite"),
     }
     budget = MAX_SUMMARY_CHARS - HEADROOM
     while _size(summary) > budget and summary["streams"]:
@@ -367,10 +468,12 @@ TABLE_TOOL = register(
             "Read the stream table a kept Proforma run holds: every stream of the base case with the unit it leaves "
             "and the unit it enters (none for a feed or a product), its phase, temperature, pressure, mass flow, "
             "price and largest components, as BioSTEAM held them after the run. Takes the run's artifact id and "
-            "nothing else (a scenario's proforma.run artifact, or a reference biorefinery's proforma.reference "
-            "artifact); you never type a number. The plant's feeds and products come first; a long table is cut to "
-            "what a model may read and says how many streams it left out. Returns the run's evidence id to cite: a "
-            "price, a cost or a recovery read from a run is cited by it. It runs nothing."
+            "nothing else (a scenario's proforma.run artifact or a library plant's library.run artifact, the corn "
+            "stover and dry-grind corn reference plants' among them, or a proforma.reference artifact kept from a "
+            "retired reference entry); you never type a number. The plant's feeds and products come first; a long "
+            "table is cut to what a model may read and says how many streams it left out. A scenario's run and a "
+            "kept reference run return their evidence id to cite, the run's price; a library plant's numbers are "
+            "cited by the evidence ids engine_report names for its outputs. It runs nothing."
         ),
         input_model=StreamTableInput,
         run=_stream_table,

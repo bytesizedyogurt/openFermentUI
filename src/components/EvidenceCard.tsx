@@ -5,7 +5,9 @@
 // basis on the service, and the basis opens to every input and where each
 // came from, with a link to the stored artifact that replays it.
 import { ExternalLink } from 'lucide-react';
-import type { BasisInput, Evidence, ExtractionRecord } from '@/data/types';
+import type { ExtractionRecord } from '@/lib/review';
+import type { Evidence } from '@/lib/postdoc';
+import type { BasisInput } from '@/lib/studies';
 import { useStore } from '@/store';
 import { CeilingGap } from './figures';
 import { productOfBasis, productWords, yieldsOnSugar } from '@/lib/geneos';
@@ -64,7 +66,7 @@ export function EvidenceCard({ evidence }: { evidence: Evidence }) {
         </div>
         <details className="mt-0.5">
           <summary className="cursor-pointer text-caption text-ink-soft hover:text-accent">
-            Basis: {b.tool} {b.toolVersion}
+            Basis: <span title={b.tool}>{b.toolVersion}</span>
           </summary>
           <ul className="mt-1 space-y-0.5 text-caption">
             {b.inputs.map((i) => (

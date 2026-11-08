@@ -11,7 +11,7 @@
 // running at all and will not be until somebody acts.
 import { useMemo } from 'react';
 import { GitBranch } from 'lucide-react';
-import type { Runbook, RunbookStatus } from '@/data/types';
+import { stagesOf, type Runbook, type RunbookStatus } from '@/lib/studies';
 import { useStore } from '@/store';
 import { href } from '@/router';
 import { RUNBOOK_STATUS_LABEL, RUNBOOK_STATUS_NOTE, RUNBOOK_STATUS_ORDER } from '@/data/labels';
@@ -24,8 +24,11 @@ import { RUNBOOK_TABS } from '@/data/tabs';
 function RunbookCard({ r }: { r: Runbook }) {
   const products = useStore((s) => s.products);
   const product = r.productId ? products.find((p) => p.id === r.productId) : undefined;
-  const done = r.stages.filter((s) => s.status === 'done').length;
-  const halted = r.stages.find((s) => s.status === 'blocked' || s.status === 'review');
+  const stages = stagesOf(r);
+  const done = stages.filter((s) => s.status === 'done').length;
+  const halted = stages.find((s) => s.status === 'blocked' || s.status === 'review');
+  // A row served as kept may leave out its progress, which then stands at none.
+  const progress = r.progressPct ?? 0;
 
   return (
     <a
@@ -51,18 +54,19 @@ function RunbookCard({ r }: { r: Runbook }) {
 
       {product && (
         <div className="text-caption text-ink-soft mt-1 truncate">
-          {product.name} · {PRODUCT_CATEGORY_LABEL[product.category]}
+          {product.name}
+          {product.category && ` · ${PRODUCT_CATEGORY_LABEL[product.category]}`}
         </div>
       )}
 
       <div className="mt-2 flex items-center gap-1" aria-hidden>
-        {r.stages.map((s, i) => (
+        {stages.map((s, i) => (
           <StageDot key={`${s.name}-${i}`} status={s.status} />
         ))}
       </div>
       <div className="mt-1.5">
         <Bar
-          value={r.progressPct}
+          value={progress}
           max={100}
           className={
             r.status === 'blocked_unverified'
@@ -75,13 +79,13 @@ function RunbookCard({ r }: { r: Runbook }) {
       </div>
 
       <div className="flex flex-wrap items-center gap-x-3 gap-y-0.5 text-caption text-ink-soft mt-1.5">
-        <span className="font-num">{r.progressPct}%</span>
+        <span className="font-num">{progress}%</span>
         <span>
-          <span className="font-num">{done}</span>/<span className="font-num">{r.stages.length}</span>{' '}
+          <span className="font-num">{done}</span>/<span className="font-num">{stages.length}</span>{' '}
           stages
         </span>
         {r.eta && <span className="font-num">{r.eta}</span>}
-        {r.estCostUsd !== null && (
+        {r.estCostUsd != null && (
           <span className="font-num" title="Modeled compute spend, not a quotation">
             ${r.estCostUsd < 1 ? r.estCostUsd.toFixed(2) : r.estCostUsd}
           </span>
@@ -130,7 +134,7 @@ export default function Runbooks() {
 
   return (
     <>
-      <PageHeader eyebrow="Claims to be tested" title="Runbooks" subtitle={subtitle} />
+      <PageHeader eyebrow="Runbooks" title="Runbooks" subtitle={subtitle} />
       <OwnerTabs tabs={RUNBOOK_TABS} />
 
       <div className="flex flex-wrap items-center gap-x-5 gap-y-1.5 mb-4 text-caption text-ink-soft">
@@ -157,11 +161,10 @@ export default function Runbooks() {
         <span className="inline-flex items-center gap-1.5">
           <span className="font-num text-ink">${spend.toFixed(2)}</span> modeled compute spend
           <Explain label="What the cost figure means">
-            An estimate of the compute a runbook consumes — retrieval, prediction, enumeration —
-            not a quotation and not a process cost. It is here because enumeration compute is the
-            one input a person authorises before it is spent, which is why{' '}
-            <span className="font-medium">awaiting budget</span> is a state on this board rather
-            than a footnote.
+            A modeled estimate of the compute each runbook consumes, retrieval and prediction among
+            it. A person authorises a runbook&rsquo;s compute before it is spent, which is why the
+            board groups the runbooks <span className="font-medium">awaiting budget</span> in a
+            column of their own.
           </Explain>
         </span>
       </div>
@@ -193,9 +196,14 @@ export default function Runbooks() {
         <Card data-testid="runbooks-empty">
           <EmptyState
             icon={<GitBranch size={22} aria-hidden />}
-            title="No runbooks in this session"
-            body="A runbook starts as a draft in Postdoc: ask it to draft one from the evidence, then press Turn into a runbook, and it lands here."
-            action={<LinkButton to="/postdoc">Draft a runbook in Postdoc</LinkButton>}
+            title="The project keeps no runbook yet"
+            body="A runbook starts two ways: as a draft in Postdoc, which you ask to draft one from the evidence and then press Turn into a runbook; or from a run's numbers, on the run's page under A runbook from this run (Studies lists the runs). Either way it lands here."
+            action={
+              <div className="flex flex-wrap gap-2 justify-center">
+                <LinkButton to="/postdoc/new">Draft a runbook in Postdoc</LinkButton>
+                <LinkButton to="/proforma/studies">A run&rsquo;s runbook, from Studies</LinkButton>
+              </div>
+            }
           />
         </Card>
       )}

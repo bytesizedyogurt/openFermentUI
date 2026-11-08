@@ -63,7 +63,9 @@ def comparison_result(report: ComparisonReport, *, state: str = "open") -> ToolR
 
 class ScenarioValueIn(BaseModel):
     key: str = Field(max_length=200, description="The parameter's key, as engine_parameters gives it.")
-    quantity: QuantityIn = Field(description="The value, in the parameter's own unit, with what it rests on.")
+    quantity: QuantityIn = Field(description=(
+        "The value, in the parameter's own unit, with what it rests on; a deposition's reading in the reading's own "
+        "unit, which the service converts into the parameter's where it converts."))
 
 
 class StudyScenarioInput(BaseModel):
@@ -72,7 +74,8 @@ class StudyScenarioInput(BaseModel):
     configuration: str = Field(default="", max_length=40, description="One of the plant's configurations; empty for its own.")
     values: list[ScenarioValueIn] = Field(
         max_length=24, description="The parameters it sets, each a quantity in the parameter's own unit with a note "
-                                   "saying what the value rests on; every other parameter keeps the library's default.")
+                                   "saying what the value rests on, or a deposition's reading in its own unit "
+                                   "(runbooks_read, kind reading); every other parameter keeps the library's default.")
     note: str = Field(default="", max_length=2000, description="Why the scenario, in words.")
 
 
@@ -143,9 +146,14 @@ SCENARIO_TOOL = register(Tool(
         "Keep a study scenario on a plant from the library shelf: a title, the plant and its configuration, and "
         "the values it sets, each a parameter's key and a quantity (value and unit, the parameter's own unit) "
         "with a note saying in words what the value rests on. Each value is marked as your estimate, with your "
-        "model id, and a run of the scenario is assumed. Checked against the plant's parameters: a key it does "
-        "not read, a unit it does not use or a value of the wrong kind is refused before anything is kept. The "
-        "same plant and values are one scenario. Run it with engine_run."
+        "model id, and a run of the scenario is assumed. A value may also be a deposition's reading that "
+        "runbooks_read lists (kind reading): its value and unit as the reading gives them, in the reading's own "
+        "unit, and origin {\"kind\": \"measurement\", \"ref\": \"<the reading's id>\"}; the service looks it "
+        "up and marks it with who deposited it and when it was taken, and a run resting on readings and the "
+        "library's defaults alone is measured. Checked against the plant's parameters: a key it does not read, a "
+        "unit it does not use or a value of the wrong kind is refused before anything is kept, as is a reading "
+        "the project does not hold, one nobody read back, one corrected since, or one in a unit that does not "
+        "convert into the parameter's. The same plant and values are one scenario. Run it with engine_run."
     ),
     input_model=StudyScenarioInput, run=_scenario, strict=False, writes=True,
 ))

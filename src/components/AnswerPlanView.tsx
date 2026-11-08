@@ -14,20 +14,10 @@
 // The provenance tick reuses the existing visual language rather than inventing
 // a fourth one — a claim is evidence, and evidence in this system is ticked.
 import { AlertTriangle, ExternalLink, HelpCircle, Quote, SearchX } from 'lucide-react';
-import type {
-  AnswerPlan,
-  Claim,
-  ClaimValue,
-  CoverageMap,
-  ModuleRow,
-  Evidence,
-  ExtractionRecord,
-  Paper,
-  Passage,
-  RunbookDraft,
-} from '@/data/types';
+import type { ExtractionRecord, Paper } from '@/lib/review';
+import type { AnswerPlan, Claim, ClaimValue, CoverageMap, Evidence, ModuleRow, Passage, RunbookDraft } from '@/lib/postdoc';
 import { useStore, provenanceOf } from '@/store';
-import { navigate } from '@/router';
+import { navigate, href } from '@/router';
 import { fmt } from '@/engine/units';
 import { ProvenanceBadge, Tick } from './Provenance';
 import { ComponentTag } from './ComponentTag';
@@ -36,6 +26,7 @@ import { cachedShare, formatCost } from '@/lib/postdoc';
 import { PassageQuote } from './PassageQuote';
 import { EvidenceCard } from './EvidenceCard';
 import { STOPPED_WORDS } from './PlanTrace';
+import { depositionPath } from './ReadingOrigin';
 
 /** The value, rendered from the record — never from the claim's text. */
 function RecordValue({ record }: { record: ExtractionRecord }) {
@@ -105,9 +96,8 @@ function ClaimValues({ values }: { values: ClaimValue[] }) {
 
 const SUPPORT_NOTE: Record<Claim['support'], string | null> = {
   direct: null,
-  inferred: 'Inferred — this follows from the cited records rather than being stated by one.',
-  unsupported:
-    'Stated as an absence. No record backs this, which is the point of it — nobody has measured it.',
+  inferred: 'Inferred: it follows from the cited records together.',
+  unsupported: 'Stated as an absence: the claim names what the project holds none of.',
 };
 
 /** OF-BLD-015 §7.2 — where a module row lives in the app, when it has a page. */
@@ -115,6 +105,11 @@ function rowHref(row: ModuleRow): string {
   const at: Record<string, string> = {
     'runbooks/runbook': `/runbooks/${row.id}`,
     'runbooks/protocol': `/runbooks/protocols/${row.id}`,
+    // A deposition's record, and a reading or a released value on it.
+    'runbooks/deposition': depositionPath(row.id),
+    'fermos/deposition': depositionPath(row.id),
+    'runbooks/reading': depositionPath(String(row.detail?.depositionId ?? ''), String(row.detail?.entryId ?? '')),
+    'runbooks/measured-evidence': depositionPath(String(row.detail?.depositionId ?? '')),
     'geneos/host': `/geneos/hosts/${row.id}`,
     'geneos/model': '/geneos/model',
     'proforma/scenario': `/proforma/scenario/${row.id}`,
@@ -135,7 +130,7 @@ function ModuleRowChips({ refs, rows }: { refs: string[]; rows: Map<string, Modu
       {cited.map((row) => (
         <a
           key={row.ref}
-          href={`#${rowHref(row)}`}
+          href={href(rowHref(row))}
           className="text-caption text-ink-soft hover:text-accent inline-flex items-baseline gap-1"
           title={`${row.ref} · ${row.status}`}
         >
@@ -221,12 +216,11 @@ function ClaimRow({
               {citedPapers.map((paper) => (
                 <a
                   key={paper.id}
-                  href={`#/biorepo/paper/${paper.id}`}
+                  href={href(`/biorepo/paper/${paper.id}`)}
                   className="text-caption text-ink-soft hover:text-accent inline-flex items-baseline gap-1"
-                  title={paper.title}
+                  title={`${paper.title} (${paper.id})`}
                 >
-                  <span className="font-num">{paper.id}</span>
-                  <span className="truncate max-w-[28ch]">{paper.title}</span>
+                  <span className="truncate max-w-[48ch]">{paper.title}</span>
                 </a>
               ))}
             </div>
@@ -240,7 +234,8 @@ function ClaimRow({
 /** A runbook the agent drafted (OF-BLD-014 §9.2): its numbers were written by the service. */
 function DraftCard({ draft }: { draft: RunbookDraft }) {
   const adopt = useStore((s) => s.adoptRunbookDraft);
-  const predictionLabel = (id: string | null) => draft.predictions.find((p) => p.id === id)?.label ?? 'nothing predicted';
+  // A measure names the prediction it tests; one that tests none holds null or leaves the field out.
+  const predictionLabel = (id?: string | null) => draft.predictions.find((p) => p.id === id)?.label ?? 'nothing predicted';
   return (
     <Card className="p-4" data-testid="runbook-draft">
       <div className="text-caption uppercase tracking-wide text-ink-soft">Runbook draft</div>
@@ -340,7 +335,7 @@ export function AnswerPlanView({ plan }: { plan: AnswerPlan }) {
           <div className="flex items-center gap-2 mb-1.5">
             <SearchX size={15} className="text-ink-soft shrink-0" aria-hidden />
             <span id="plan-gaps" className="font-medium text-reading">
-              What the corpus does not have
+              Gaps in the corpus
             </span>
           </div>
           <ul className="space-y-1">
@@ -367,8 +362,8 @@ export function AnswerPlanView({ plan }: { plan: AnswerPlan }) {
             </span>
           </div>
           <p className="text-body text-ink-soft">
-            Dropped whole, never repaired — a claim that fails validation is not shown in any
-            form. Numbers belong to the record, not to the sentence.
+            A claim that fails validation is dropped whole. Numbers stand in the record&rsquo;s typed
+            values.
           </p>
           <ul className="mt-1.5 space-y-0.5">
             {plan.rejectionReasons.map((reason) => (
@@ -383,7 +378,13 @@ export function AnswerPlanView({ plan }: { plan: AnswerPlan }) {
       <div className="flex flex-wrap items-center gap-x-4 gap-y-1 pt-1">
         <ComponentTag
           component="Postdoc"
-          action={plan.declined ? 'declined' : `${plan.claims.length} claim${plan.claims.length === 1 ? '' : 's'}`}
+          action={
+            last?.kind === 'final' && !last.ok
+              ? 'no answer'
+              : plan.declined
+                ? 'declined'
+                : `${plan.claims.length} claim${plan.claims.length === 1 ? '' : 's'}`
+          }
         />
         {/* Cost is quiet but present. A visible per-query price is what makes
             the budget-gating story real rather than theoretical. The models,
@@ -400,7 +401,7 @@ export function AnswerPlanView({ plan }: { plan: AnswerPlan }) {
               <span className="opacity-45">·</span>
             </>
           )}
-          {plan.usage.inputTokens.toLocaleString()} in / {plan.usage.outputTokens.toLocaleString()} out
+          {plan.usage.inputTokens.toLocaleString()} tokens in / {plan.usage.outputTokens.toLocaleString()} out
           {/* OF-BLD-014 §3.3 — how much of the prompt the cache served. */}
           {cachedShare(plan.usage) !== null && (
             <>
@@ -442,7 +443,7 @@ function CoverageFooter({ coverage }: { coverage: CoverageMap }) {
   const partial = coverage.modules.filter((m) => m.partial);
   return (
     <span className="text-caption text-ink-soft" data-testid="plan-coverage">
-      Searched {inWords(coverage.searched)}, found in {coverage.found ? inWords(coverage.found) : 'none'}
+      Searched {inWords(coverage.searched)} module{coverage.searched === 1 ? '' : 's'}, found it in {coverage.found ? inWords(coverage.found) : 'none'}
       {found.length > 0 && <>: {found.map((m) => `${m.label} (${m.count})`).join(', ')}</>}
       {partial.length > 0 && (
         <span title={partial.map((m) => `${m.label}: ${m.partial}`).join('\n')}>

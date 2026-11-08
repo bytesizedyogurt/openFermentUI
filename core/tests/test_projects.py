@@ -47,7 +47,7 @@ def test_making_a_project_is_audited_under_it():
     rows = client(headers={projects.HEADER: made["id"]}).get("/api/audit").json()
     assert [(r["action"], r["who"], r["target"]) for r in rows] == [("create_project", "Ada Moreno", made["id"])]
     # The test project's own log does not hold it.
-    assert all(r["target"] != made["id"] for r in client().get("/api/audit").json())
+    assert all(r.get("target") != made["id"] for r in client().get("/api/audit").json())
 
 
 def test_a_request_acts_in_the_project_it_names_and_no_other():

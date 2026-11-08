@@ -1,5 +1,5 @@
 """The seam on the service's side: a vessel and a train become a flowsheet
-Proforma prices (OF-BLD-020 §6.1, D11, D3, E.2‴, E.3‴; Appendix 2 §D).
+Proforma prices (E.2‴, E.3‴; Appendix 2 §D).
 
 `custom_train_v1` (flowsheets/shelf.py, flowsheets/custom_train_v1.py) is
 built from two kept artifacts a scenario names, as the project's scenario
@@ -63,7 +63,7 @@ import math
 from typing import Any, Iterable, NamedTuple
 
 from . import params
-from .basis import ASSUMED_KINDS
+from .basis import is_set
 from .flowsheets import shelf as _shelf
 from .models import Artifact, BasisInput, BasisSource, Override, ParameterSpec, ParameterValue
 
@@ -161,7 +161,7 @@ def parts_of(vessel: str | None, train_run: str | None) -> Parts:
 
 def _batch_volume(v: Artifact) -> str | None:
     """Why a vessel designed for one vessel's batch volume cannot be a
-    composite's fermenter, in words, or None (OF-BLD-020 §6.R, main-4/22).
+    composite's fermenter, in words, or None (main-4/22).
 
     Its one vessel was sized for the batch volume fed over its cycle; the
     composite feeds the fermenter the plant's flow from the plant scale, so
@@ -181,7 +181,7 @@ def _batch_volume(v: Artifact) -> str | None:
 
 def _side_inlets(t: Artifact, units: list[dict[str, Any]]) -> str | None:
     """Why a train run whose units are fed a side inlet cannot be a
-    composite's train, in words, or None (OF-BLD-020 §6.R, main-25).
+    composite's train, in words, or None (main-25).
 
     A side inlet's flow (a solvent, say) is a person's kg h⁻¹ for the train
     run's own inlet; the composite sets the beer from the plant scale, and
@@ -257,7 +257,7 @@ def vessel_scale(inputs: list, parts: Parts) -> None:
     """Bind `plant_scale` to the plant scale the vessel was designed at, in
     place, unless a person's value already stands for it (D3: it wins). A
     design of one vessel's batch volume never reaches here: `parts_of`
-    refuses it (OF-BLD-020 §6.R, main-4/22); a design that names no plant
+    refuses it (main-4/22); a design that names no plant
     scale all the same leaves the input waiting for a named person, saying
     why."""
     given = {i.name: i for i in parts.vessel.inputs}
@@ -530,7 +530,7 @@ def basis_inputs(parts: Parts, finance: list[ParameterValue]) -> list[BasisInput
             # design, so the run's provenance follows the artifact.
             out.append(BasisInput(name=f"{FERMENTER}{key}{part}", value=i.value, unit=i.unit, source=BasisSource(
                 kind="artifact", id=v.id, note=f"as vessel design {v.id} holds it ({words})",
-                by=i.source.by if i.source.kind in ASSUMED_KINDS else None)))
+                by=i.source.by if is_set(i.source) else None)))
     if named.get("vessel type") is not None:
         vt = named["vessel type"]
         out.append(BasisInput(name=f"{FERMENTER}design", value=vt.value, unit="", source=BasisSource(

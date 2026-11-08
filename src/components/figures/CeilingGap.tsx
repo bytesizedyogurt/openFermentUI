@@ -4,7 +4,8 @@
 // the rules is the figure's whole message, so it prints no derived
 // percentage. A point above a rule is ringed, for a reviewer to check its
 // basis.
-import type { ComputedBasis, ExtractionRecord, Provenance } from '@/data/types';
+import type { ComputedBasis, Provenance } from '@/lib/studies';
+import type { ExtractionRecord } from '@/lib/review';
 import { EvidenceStrip, toTable as stripTable, type EvidenceStripProps } from './EvidenceStrip';
 import type { FigureTable } from './FigureFrame';
 
@@ -31,6 +32,8 @@ export interface CeilingGapProps {
   ceilings: Ceiling[];
   groupBy?: EvidenceStripProps['groupBy'];
   csvName?: string;
+  /** The sugar the ceiling is on, and how many records of the field name another sugar or none (lib/geneos `yieldsOnSugar`). */
+  sugar?: { name: string; elsewhere: number };
 }
 
 function asStrip(props: CeilingGapProps): EvidenceStripProps {
@@ -46,7 +49,10 @@ function asStrip(props: CeilingGapProps): EvidenceStripProps {
     csvName: props.csvName ?? 'ceiling-gap',
     notes: CEILING_NOTES,
     empty: {
-      what: 'no reported yield of this field in the store.',
+      what:
+        props.sugar && props.sugar.elsewhere > 0
+          ? `no reported yield on ${props.sugar.name}; ${props.sugar.elsewhere} record${props.sugar.elsewhere === 1 ? '' : 's'} of this field name another sugar or none.`
+          : 'no reported yield of this field in the store.',
       where: 'Reported yields arrive through Intake and its extraction; ceilings are computed in geneOS → Model.',
     },
   };

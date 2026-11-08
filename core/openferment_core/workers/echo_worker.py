@@ -1,4 +1,4 @@
-"""A worker for the tests (OF-BLD-014 §3.4). It echoes, sleeps on request and
+"""A worker for the tests. It echoes, sleeps on request and
 exits on request, so start, timeout, crash and restart are each exercised.
 It computes nothing.
 """

@@ -1,4 +1,4 @@
-"""Competence, mirrored (OF-BLD-013 §2.1).
+"""Competence, mirrored.
 
 `src/engine/competence.ts` is the reference implementation; this is its
 mirror, for the one place the service needs a level: deciding whether the
@@ -9,8 +9,18 @@ tests/test_competence.py replays here. If they disagree, the TypeScript side
 is right.
 
 Only what a rule needs is mirrored: the ladder, the lapse, the suspension,
-the effective level, and (since checks are proposed by the service at night,
-OF-BLD-013 §5.2) the confidence sort.
+the effective level, and (since checks are proposed by the service at night) the confidence sort.
+
+A SKILL WITH NO POLICY (alpha 2.2 E.8). The skills are the project's skills
+catalogue (catalogues.py, `as_skills`), and an entry there may be kept with
+no policy: no criticality, no recency, no count of supervised runs. Such a
+skill is left out of every level (`unrated`): its level is 0, nobody holds
+it, and the rules that read a level (guild.py's cosign and run alone,
+checks.py's ranking and a check asked for by name) say so in words. The
+browser's skills are the same catalogue's (alpha 2.2 E.12), and
+competence.ts leaves such a skill out the same way: the competence fixture
+holds skills that each carry a policy, and competence-unrated.json a skill
+kept with none beside one that needs it, each held equal here.
 """
 from __future__ import annotations
 
@@ -21,6 +31,20 @@ from typing import Any, Iterable
 from .models import GuildEvidence, GuildPerson
 
 PERFORMED = frozenset({"witnessed", "supervised", "independent"})
+# A skill's policy, as its catalogue entry holds it: how critical it is, how
+# many days a qualification stands with nobody seeing the person perform, and
+# how many cosigned runs come before a witnessed check can qualify.
+POLICY = ("criticality", "recencyDays", "supervisedRuns")
+
+
+def unrated(skill: dict[str, Any]) -> str | None:
+    """Why Guild rates nobody on `skill`, in words: a skill whose catalogue
+    entry holds no policy. None when it holds one."""
+    if all(skill.get(k) is not None for k in POLICY):
+        return None
+    return (f"{skill.get('name') or skill.get('id')} has no policy in the project's skills catalogue (its criticality, "
+            "how many days a qualification stands and how many supervised runs come before a witnessed check), so "
+            "Guild rates nobody on it")
 
 
 @dataclass(frozen=True)
@@ -83,7 +107,8 @@ class Competence:
         if k in self._base:
             return self._base[k]
         skill = self.skills.get(skill_id)
-        if skill is None or k in self._visiting:
+        # A skill kept with no policy is left out of every level (`unrated`).
+        if skill is None or unrated(skill) or k in self._visiting:
             return 0
         self._visiting.add(k)
         ev = self._entries(person_id, skill_id)
@@ -93,7 +118,7 @@ class Competence:
 
         knowledge = _signed_off(ev)
         supervised = sum(1 for e in ev if e.kind == "supervised" and e.outcome == "pass")
-        prereq_ok = all(self.level(person_id, p) >= 2 for p in skill["prerequisites"])
+        prereq_ok = all(self.level(person_id, p) >= 2 for p in skill.get("prerequisites") or ())
         if passed("designation"):
             lvl = 4
         elif knowledge and prereq_ok and passed("witnessed") and supervised >= skill["supervisedRuns"]:
@@ -112,13 +137,17 @@ class Competence:
         skill = self.skills[skill_id]
         ev = self._entries(person_id, skill_id)
         lvl = self.level(person_id, skill_id)
+        supervised_count = sum(1 for e in ev if e.kind == "supervised" and e.outcome == "pass")
+        if unrated(skill):
+            # Left out of every level: nothing lapses or is suspended, and the confidence sort has nothing to read.
+            return Status(level=0, effective=0, lapsed=False, suspended=False, lapsesAt=None,
+                          supervisedCount=supervised_count, knowledgeComplete=_signed_off(ev))
         performed = [e for e in ev if e.kind in PERFORMED and e.outcome == "pass"]
         last = _day(performed[-1].at) if performed else None
         witnessed = [e for e in ev if e.kind == "witnessed"]
         lapses_at = _add_days(last, skill["recencyDays"]) if lvl == 3 and last else None
         lapsed = bool(lapses_at and lapses_at < self.today)
         suspended = lvl == 3 and bool(witnessed) and witnessed[-1].outcome == "fail"
-        supervised_count = sum(1 for e in ev if e.kind == "supervised" and e.outcome == "pass")
 
         # The confidence sort, as competence.ts scores it.
         today = self.today

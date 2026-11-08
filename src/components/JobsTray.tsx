@@ -2,8 +2,7 @@
 // stage-level progress here, completion toast that deep-links to the result.
 // Jobs never modally block the interface.
 import { CheckCircle2, Loader2, XCircle, Trash2 } from 'lucide-react';
-import type { Job } from '@/data/types';
-import { useStore } from '@/store';
+import { useStore, type Job } from '@/store';
 import { navigate } from '@/router';
 import { ComponentTag, type ComponentName } from './ComponentTag';
 import { cx, EmptyState } from './ui';
@@ -60,7 +59,7 @@ export function JobsPanel({ onClose }: { onClose: () => void }) {
             </div>
             <div className="text-caption text-ink-soft mt-0.5 pl-6">
               {activeProto.title} · {Object.keys(activeRun.completed).length}/
-              {activeProto.versions.find((v) => v.version === activeRun.version)?.steps.length} steps
+              {activeProto.versions.find((v) => v.version === activeRun.version)?.steps?.length ?? 0} steps
               {activeRun.timers.filter((t) => t.running).length > 0 &&
                 ` · ${activeRun.timers.filter((t) => t.running).length} timer(s) running`}
             </div>

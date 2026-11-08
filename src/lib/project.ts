@@ -6,7 +6,11 @@
 // The id of the project last opened here is remembered (durable.ts), so the
 // first call after a reload already names it. Imports nothing of the service
 // clients, which all import this.
+import type { components } from '@/api/types.gen';
 import { lastProject, rememberProject } from './durable';
+
+/** A project the service holds (`GET /api/projects`): its id, name and description, and who made it and when. */
+export type Project = components['schemas']['Project'];
 
 export const PROJECT_HEADER = 'X-OpenFerment-Project';
 
@@ -41,7 +45,7 @@ export function setOpenProjectId(id: string | null): void {
 }
 
 /** `init` with the open project named, unless the caller named one. */
-export function withProject(init: RequestInit = {}): RequestInit {
+function withProject(init: RequestInit = {}): RequestInit {
   if (!open) return init;
   const headers = new Headers(init.headers);
   if (!headers.has(PROJECT_HEADER)) headers.set(PROJECT_HEADER, open);

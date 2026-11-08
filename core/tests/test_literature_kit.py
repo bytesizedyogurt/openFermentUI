@@ -119,6 +119,24 @@ def test_stats_count_the_projects_documents(tmp_path):
     assert counts["documents"] == len(db.run(kit.visible(HERE)).documents) >= 1
     assert counts["sources"] == {kit.source(HERE, "paste"): counts["documents"]}
     assert counts["chunks"] >= stored.chunks
+    # The concept graph is the project's (test_literature_graph.py): no build
+    # has read these passages, whatever other tests' builds left in the kit.
+    assert (counts["entities"], counts["relationships"], counts["communities"]) == (0, 0, 0)
+
+
+def test_stats_ask_for_the_project_before_they_read_the_database(monkeypatch):
+    def unreachable():
+        raise AssertionError("the database was read before the project was asked for")
+
+    monkeypatch.setattr(kit.service(), "session_factory", unreachable)
+
+    async def go():
+        with projects.using(None):
+            return await kit.service().stats()
+
+    with pytest.raises(ApiError) as refused:
+        db.run(go())
+    assert refused.value.code == "project_required"
 
 
 def test_the_kits_settings_are_openferments_whatever_the_environment_says(monkeypatch, tmp_path):

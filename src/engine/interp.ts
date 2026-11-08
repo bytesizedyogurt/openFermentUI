@@ -7,7 +7,7 @@ export interface Grid {
   data: Float64Array | number[];
 }
 
-export function gridIndex(dims: { values: number[] }[], idx: number[]): number {
+function gridIndex(dims: { values: number[] }[], idx: number[]): number {
   let flat = 0;
   for (let d = 0; d < dims.length; d++) {
     flat = flat * dims[d].values.length + idx[d];
@@ -43,6 +43,12 @@ export function interpolate(grid: Grid, point: Record<string, number>): number {
   for (const d of dims) {
     const v = p[d.key];
     const vs = d.values;
+    // A dimension of one value holds every point at it: its lower index 0 and fraction 0.
+    if (vs.length < 2) {
+      lower.push(0);
+      frac.push(0);
+      continue;
+    }
     let i = vs.length - 2;
     for (let j = 0; j < vs.length - 1; j++) {
       if (v <= vs[j + 1]) {

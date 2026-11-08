@@ -2,7 +2,7 @@
 // product the network allows at that growth on the other, drawn as a computed
 // curve over the shaded region a cell could occupy. Computed, so dotted
 // (E.8 rule 2), and the basis travels with it.
-import type { ComputedBasis } from '@/data/types';
+import type { ComputedBasis } from '@/lib/studies';
 import { fmt } from '@/engine/units';
 import { FigureFrame, lineStroke, type FigureTable } from './FigureFrame';
 

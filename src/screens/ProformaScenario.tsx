@@ -2,16 +2,18 @@
 // assumption ticked, the waterfall always summing to the headline, and
 // simulation treated as work rather than magic.
 //
-// OF-BLD-019 §3.2 (D1, D5, D6): the BioSTEAM page is THE scenario page. A
-// held BioSTEAM scenario and one a person made here with New scenario open
-// the same page (BiosteamScenario, below): header, inputs with their sources,
-// Run with the worker's status line, and every section of the newest run read
-// from its one artifact (ProformaBiosteam.tsx).
+// OF-BLD-019 §3.2 (D1, D5, D6): the BioSTEAM page is THE scenario page. Every
+// BioSTEAM scenario of the project opens it (BiosteamScenario, below; alpha
+// 2.2 D9): header, inputs with their sources, Run with the worker's status
+// line, and every section of the newest run read from its one artifact
+// (ProformaBiosteam.tsx).
 import { useEffect, useMemo, useState } from 'react';
 import { Download, GitCompare, Pin, PinOff, Play, Route } from 'lucide-react';
-import { overrideEnds, overridesFor, proformaScope, useStore } from '@/store';
+import { overridesFor, proformaScope, useStore } from '@/store';
 import { href, navigate, useRoute } from '@/router';
-import type { Artifact, BasisInput, CeilingCheck, CeilingRow, FermosFitInfo, FlowsheetInfo, ParamScope, ProformaScenarioInfo, Scenario, ScenarioInput } from '@/data/types';
+import type { ParamScope } from '@/lib/params';
+import type { CeilingCheck, CeilingRow, FermosFitInfo, FlowsheetInfo, ProformaScenarioInfo, Scenario, ScenarioInput } from '@/lib/proforma';
+import type { Artifact, BasisInput } from '@/lib/studies';
 import {
   FIT_TOOL_WORDS,
   ProformaDown,
@@ -19,18 +21,20 @@ import {
   ceilingCheck,
   fermosFits,
   fitsFrom,
+  isReading,
+  laidOn,
   modellerQuestions,
   newestRunId,
   partsOf,
   proformaArtifact,
   proformaNewestRun,
   proformaBind,
-  proformaScenarios,
   proformaShelf,
   proformaStatus,
   questionsText,
   scenarioRunOverrides,
   runProformaScenario,
+  runSpecs,
   runViewOfArtifact,
   runViewOfResult,
   stamp,
@@ -44,6 +48,7 @@ import { paramScope } from '@/lib/params';
 import { ParameterPanel } from '@/components/ParameterPanel';
 import { TOUCH_CHIP } from '@/components/ParameterRow';
 import { inputSourceWords } from '@/components/NewScenarioDialog';
+import { ReadingOrigin, depositionPath, readingOf } from '@/components/ReadingOrigin';
 import { fmt } from '@/engine/units';
 import { exportText } from '@/lib/csv';
 import { PageHeader, Card, Button, Callout, cx, EmptyState } from '@/components/ui';
@@ -55,14 +60,16 @@ import { RunReport, inputLabels } from './ProformaBiosteam';
 
 // ── The BioSTEAM scenario page (OF-BLD-014 §8.4; OF-BLD-019 §3.2) ───────
 //
-// ONE page for a held BioSTEAM scenario and for one a person made here with
-// New scenario (D6). It reads, and never types:
+// ONE page for every BioSTEAM scenario of the project (D6; alpha 2.2 D9),
+// each made with New scenario. It reads, and never types:
 //
 //   the shelf       the flowsheet's title, source and each input's
 //                   dimension (GET /api/proforma/shelf);
-//   the binding     a held scenario from GET /api/proforma/scenarios, one
-//                   made here from GET /api/proforma/bind?flowsheet= (the
-//                   scenario run contract, src/lib/proforma.ts), each input
+//   the binding     GET /api/proforma/bind?flowsheet= with the scenario's
+//                   fits and parts (the scenario run contract,
+//                   src/lib/proforma.ts), its flowsheet named, so a
+//                   scenario this browser has not yet saved binds as a kept
+//                   one does (ADR-014); each input
 //                   bound to records, an artifact, a named person's
 //                   assumption, or waiting: its host list, what it leaves
 //                   out, and the questions for a modeller read it;
@@ -70,11 +77,13 @@ import { RunReport, inputLabels } from './ProformaBiosteam';
 //                   `proforma:<scenario id>` (GET /api/params/{scope}, a
 //                   scenario naming its flowsheet), every input with its
 //                   value and source, a slider inside its bounds, Reset to
-//                   source and Why. A person's change is an Override the
-//                   project keeps under the reviewer name, the
-//                   one thing a run carries of a person (`overrides`), and it
-//                   wins over the records and any fermOS fit for its input,
-//                   here and in the service alike;
+//                   source and Why. A person's change, or a reading
+//                   deposited at the bench that a person chose on its row
+//                   (alpha 2.2 E.17), is an Override the project keeps under
+//                   the reviewer name, the one thing a run carries of a
+//                   person (`overrides`), and it wins over the records and
+//                   any fermOS fit for its input, here and in the service
+//                   alike;
 //   the parts       OF-BLD-020 §6.1: a scenario on `custom_train_v1` names
 //                   the vessel design and the train run it is built from
 //                   (`partsOf`), sent with every binding, panel read and run,
@@ -143,6 +152,28 @@ function BasisAssumptions({ inputs, labels }: { inputs: BasisInput[]; labels: Re
 }
 
 /**
+ * The readings deposited at the bench that the run shown rests on, read from the run (alpha 2.2 E.17): each input its
+ * basis names a reading as, with the reading and its depositor, linked to its deposition.
+ */
+function BasisReadings({ inputs, labels }: { inputs: BasisInput[]; labels: Record<string, string> }) {
+  const read = inputs.filter((i) => isReading(i.source) && !/ (low|high)$/.test(i.name));
+  if (read.length === 0) return null;
+  return (
+    <p className="text-caption text-ink-soft mt-1" data-testid="run-basis-readings">
+      The run shown sets{' '}
+      {read.map((i, n) => (
+        <span key={i.name} data-key={i.name}>
+          {n > 0 && (n === read.length - 1 ? ' and ' : ', ')}
+          {labels[i.name] ?? i.name} to{' '}
+          <ReadingOrigin origin={{ ref: i.source.id, by: i.source.by, at: /^measured on (\S+?)(?:: |$)/.exec(i.source.note ?? '')?.[1] ?? null }} by />
+        </span>
+      ))}
+      , as its basis names them.
+    </p>
+  );
+}
+
+/**
  * Use a fermOS fit (OF-BLD-019 §5.1, D10). A source, not a copy: the fits
  * fermOS keeps (GET /api/fermos/fits) are listed with their provenance, the
  * run each was fitted to and what each can feed this flowsheet's titre,
@@ -165,7 +196,7 @@ function FermosFitSlot({
 }: {
   flowsheetId: string;
   chosen: Record<string, string>;
-  /** The inputs a person's value overrides, each with the person's name: no fit feeds them. */
+  /** The inputs a person's value or a reading a person chose overrides, each with whose value it is, in words: no fit feeds them. */
   overridden: Record<string, string>;
   onChoose: (fits: Record<string, string>) => void;
   /** Stop using these artifacts: only the inputs each feeds are cleared (§5.R). */
@@ -217,7 +248,8 @@ function FermosFitSlot({
         and productivity as that titre over that hour. A simulation fermOS keeps gives its own end state instead, computed and never
         measured: titre at harvest, the yield it achieved, and its harvest hour as the batch time. A productivity feeds the fermenter
         only beside titre from the same fit or simulation, since the batch time is the titre over the productivity. The run then names
-        the fit or simulation as the source of each input it feeds; a value a person types in the panel wins over it for that input.
+        the fit or simulation as the source of each input it feeds; a value a person types in the panel, or a reading deposited at the
+        bench that a person chooses there, wins over it for that input.
       </p>
       {arrived && (
         <p className="text-caption mb-2" data-testid="fermos-fit-arrived">
@@ -310,7 +342,7 @@ function FermosFitSlot({
                       {used.length > 0 ? `In use for ${used.join(', ')}.` : 'In use for no input: a person’s value wins wherever it was chosen.'}{' '}
                       {beaten.length > 0 && (
                         <span data-testid="fermos-fit-overridden">
-                          Chosen for {beaten.map((k) => `${k}, where ${overridden[k]}’s value wins`).join('; ')}: the run does not use the fit
+                          Chosen for {beaten.map((k) => `${k}, where ${overridden[k]} wins`).join('; ')}: the run does not use the fit
                           there.{' '}
                         </span>
                       )}
@@ -351,6 +383,20 @@ function CeilingYieldSource({ check }: { check: CeilingCheck }) {
       <span className="chip" data-testid="ceiling-yield-source" data-binding="records">
         {check.yieldRecords} record{check.yieldRecords === 1 ? '' : 's'}
       </span>
+    );
+  // A yield set to a reading deposited at the bench: the reading, linked to its deposition (alpha 2.2 E.17).
+  const reading = check.yieldBinding === 'assumption' && isReading(src) ? readingOf(src?.id) : null;
+  if (reading)
+    return (
+      <a
+        className="chip hover:text-accent"
+        href={href(depositionPath(reading.deposition, reading.entry))}
+        data-testid="ceiling-yield-source"
+        data-binding="measurement"
+        data-ref={src?.id ?? ''}
+      >
+        measured · deposited by {src?.by ?? 'nobody named'} · reading {src?.id}
+      </a>
     );
   if (check.yieldBinding === 'assumption')
     return (
@@ -543,7 +589,7 @@ function StatusLine({ status, problem, running, elapsed }: { status: SimulatorSt
   );
 }
 
-function BiosteamScenario({ scenario, madeHere }: { scenario: Scenario; madeHere: boolean }) {
+function BiosteamScenario({ scenario }: { scenario: Scenario }) {
   // OF-BLD-020 §2.2 (D3): a person's changes to this scenario's inputs, kept
   // with the project under the scenario's scope and sent with the run.
   const scope = proformaScope(scenario.id);
@@ -553,6 +599,8 @@ function BiosteamScenario({ scenario, madeHere }: { scenario: Scenario; madeHere
   const clearFit = useStore((s) => s.clearProformaFit);
   const togglePin = useStore((s) => s.togglePin);
   const recordScenarioRun = useStore((s) => s.recordScenarioRun);
+  // The person asking for a run: its row is created by them (alpha 2.2 D3).
+  const reviewer = useStore((s) => s.reviewer).trim();
   const flowsheetId = scenario.flowsheetId ?? scenario.modelId;
   // OF-BLD-020 §6.1: what a scenario on custom_train_v1 is built from.
   const parts = partsOf(scenario);
@@ -595,40 +643,34 @@ function BiosteamScenario({ scenario, madeHere }: { scenario: Scenario; madeHere
     return () => ctrl.abort();
   }, []);
 
-  // The binding: a held scenario by (b), one made here by its flowsheet (c);
-  // with a fermOS fit chosen, either by (c) with the fits (OF-BLD-019 §5.1),
-  // which binds a held scenario's flowsheet exactly as (b) does.
+  // The binding (c): the scenario's flowsheet with the fermOS fits a person
+  // chose (OF-BLD-019 §5.1) and, on custom_train_v1, its parts; every
+  // scenario of the project binds so (alpha 2.2 D9), one this browser has
+  // not yet saved among them (ADR-014).
   const fitsKey = JSON.stringify(Object.entries(chosenFits).sort());
   useEffect(() => {
     const ctrl = new AbortController();
     setInfo(null);
     setBindProblem(null);
     const fits = Object.fromEntries(JSON.parse(fitsKey) as [string, string][]);
-    const ask = { host };
-    const bound =
-      madeHere || Object.keys(fits).length > 0
-        ? proformaBind(flowsheetId, { ...ask, fits, vessel: vesselId, trainRun: trainRunId }, ctrl.signal)
-        : proformaScenarios(ask, ctrl.signal).then((all) => {
-            const found = all.find((x) => x.id === scenario.id);
-            if (!found) throw new Error(`The service binds no scenario ${scenario.id}: it is not among the BioSTEAM scenarios this service holds.`);
-            return found;
-          });
-    bound.then(setInfo).catch((e: unknown) => !ctrl.signal.aborted && setBindProblem(problemOf(e)));
+    proformaBind(flowsheetId, { host, fits, vessel: vesselId, trainRun: trainRunId }, ctrl.signal)
+      .then(setInfo)
+      .catch((e: unknown) => !ctrl.signal.aborted && setBindProblem(problemOf(e)));
     return () => ctrl.abort();
-  }, [madeHere, flowsheetId, scenario.id, host, fitsKey, vesselId, trainRunId]);
+  }, [flowsheetId, host, fitsKey, vesselId, trainRunId]);
 
   // The inputs as the parameter panel shows them (OF-BLD-020 §2.2): the
-  // scenario's scope, bound by the service as a run binds it, a scenario made
-  // here naming its flowsheet, with the host and the fits chosen.
+  // scenario's scope, bound by the service as a run binds it, the scenario
+  // naming its flowsheet, with the host and the fits chosen.
   const ask = useMemo(
     () => ({
-      flowsheet: madeHere ? flowsheetId : null,
+      flowsheet: flowsheetId,
       host,
       fits: Object.fromEntries(JSON.parse(fitsKey) as [string, string][]),
       // A composite's parts, as the run names them (OF-BLD-020 §6.1).
       ...(vesselId || trainRunId ? { vessel: vesselId, trainRun: trainRunId } : {}),
     }),
-    [madeHere, flowsheetId, host, fitsKey, vesselId, trainRunId],
+    [flowsheetId, host, fitsKey, vesselId, trainRunId],
   );
   useEffect(() => {
     const ctrl = new AbortController();
@@ -643,20 +685,36 @@ function BiosteamScenario({ scenario, madeHere }: { scenario: Scenario; madeHere
   // The ceiling check (OF-BLD-019 §5.2, D11): the yield as this page binds
   // it (host, fits, and the yield's override when a person typed one),
   // read by the service against the newest stored geneOS ceilings.
+  // The yield's change goes as a typed input in the yield's unit, as a run sends it (alpha 2.2 D2).
   const yieldTyped = JSON.stringify(overrides.filter((o) => o.key === 'yield'));
+  const yieldUnit =
+    panel?.specs.find((sp) => sp.key === 'yield')?.unit ??
+    info?.inputs.find((i) => i.key === 'yield')?.unit ??
+    shelf?.find((f) => f.id === flowsheetId)?.inputs.find((i) => i.key === 'yield')?.unit ??
+    null;
   useEffect(() => {
     const ctrl = new AbortController();
     setCeiling(null);
     setCeilingProblem(null);
     const fits = Object.fromEntries(JSON.parse(fitsKey) as [string, string][]);
+    const typedYield = JSON.parse(yieldTyped) as typeof overrides;
+    // A typed yield waits for its unit, which the panel, the binding or the shelf names.
+    if (typedYield.length > 0 && yieldUnit === null) return () => ctrl.abort();
     ceilingCheck(
-      { scenarioId: scenario.id, flowsheet: madeHere ? flowsheetId : null, host, fits, overrides: JSON.parse(yieldTyped) as typeof overrides },
+      {
+        scenarioId: scenario.id,
+        flowsheet: flowsheetId,
+        host,
+        fits,
+        overrides: typedYield,
+        specs: yieldUnit === null ? [] : [{ key: 'yield', unit: yieldUnit }],
+      },
       ctrl.signal,
     )
       .then(setCeiling)
       .catch((e: unknown) => !ctrl.signal.aborted && setCeilingProblem(problemOf(e)));
     return () => ctrl.abort();
-  }, [madeHere, flowsheetId, scenario.id, host, fitsKey, yieldTyped]);
+  }, [flowsheetId, scenario.id, host, fitsKey, yieldTyped, yieldUnit]);
 
 
   // The newest run: the service's, which holds every run any browser, the
@@ -725,35 +783,26 @@ function BiosteamScenario({ scenario, madeHere }: { scenario: Scenario; madeHere
   // applies the same rule on the run, and the panel shows its own answer.
   const bound = useMemo<ProformaScenarioInfo | null>(() => {
     if (!info) return null;
-    const by = new Map(overrides.filter((o) => typeof o.value === 'number').map((o) => [o.key, o]));
-    const inputs = info.inputs.map((i): ScenarioInput => {
-      const o = by.get(i.key);
-      if (!o || typeof o.value !== 'number') return i;
-      // One end typed, the other is the value; neither, held at the value (overrideEnds, as the service reads it).
-      const ends = overrideEnds(o);
-      const low = ends.low ?? o.value;
-      const high = ends.high ?? o.value;
-      return {
-        ...i,
-        binding: 'assumption',
-        value: o.value,
-        low,
-        high,
-        sampling: low === high ? 'fixed' : 'uniform',
-        source: { kind: 'assumption', id: null, by: o.by, note: `typed on ${o.at}${o.note ? `: ${o.note}` : ''}` },
-        records: [],
-        recordIds: [],
-      };
-    });
+    const inputs = laidOn(info.inputs, overrides);
     return { ...info, id: scenario.id, name: scenario.name, inputs, waiting: inputs.filter((i) => i.binding === 'waiting').map((i) => i.key) };
   }, [info, overrides, scenario.id, scenario.name]);
 
-  // The inputs a person's value overrides, with the person: a fit chosen for one does not feed it (D3).
+  // The inputs a person's value or a reading a person chose overrides, with whose value it is in words: a fit chosen
+  // for one does not feed it (D3).
   const overridden = useMemo(
-    () => Object.fromEntries(overrides.filter((o) => typeof o.value === 'number').map((o) => [o.key, o.by])) as Record<string, string>,
+    () =>
+      Object.fromEntries(
+        overrides
+          .filter((o) => typeof o.value === 'number')
+          .map((o) => [o.key, o.origin === 'measurement' ? `the reading ${o.by} deposited` : `${o.by}’s value`]),
+      ) as Record<string, string>,
     [overrides],
   );
 
+  // A composite's Finance values go in the units its panel names (OF-BLD-020 §6.1): its run waits for the panel
+  // while one of its scope's changes names no input, and a panel that failed leaves the service to refuse them.
+  const financeWaits =
+    !!parts && panel === null && panelProblem === null && overrides.some((o) => !(info?.inputs ?? []).some((i) => i.key === o.key));
   const priceBasis = bound?.priceBasis || flowsheet?.priceBasis || 'on the basis its flowsheet states';
   const labels = inputLabels(bound?.inputs ?? null, flowsheet);
   const unitLabels = inputLabels(bound?.inputs ?? null, flowsheet, true);
@@ -768,13 +817,20 @@ function BiosteamScenario({ scenario, madeHere }: { scenario: Scenario; madeHere
     // run carries every override of its scope, whether or not the panel has
     // answered, so a Finance value is never dropped while the scope loads or
     // after it failed (§6.R, main-15/26); the service splits and checks them.
+    // Each goes as a typed input in its parameter's unit (alpha 2.2 D2): the
+    // panel's specs name the unit, or the inputs as bound and the shelf's
+    // while it has not answered; a composite's run waits for its panel, which
+    // names its Finance group's units, and the service refuses in words a
+    // change it cannot place.
     const finance = (panel?.specs ?? []).filter((sp) => sp.group === 'Finance').map((sp) => sp.key);
     const sent = scenarioRunOverrides(overrides, { inputs: bound.inputs.map((i) => i.key), finance, composite: !!parts });
     const fits = Object.fromEntries(Object.entries(chosenFits).filter(([k]) => bound.inputs.find((i) => i.key === k)?.binding === 'artifact'));
     runProformaScenario({
       scenarioId: scenario.id,
-      flowsheet: madeHere ? flowsheetId : null,
+      flowsheet: flowsheetId,
       overrides: sent,
+      specs: runSpecs(panel, flowsheet, bound),
+      by: reviewer,
       host,
       fits,
       ...(parts ? { vessel: parts.vessel, trainRun: parts.trainRun } : {}),
@@ -859,7 +915,8 @@ function BiosteamScenario({ scenario, madeHere }: { scenario: Scenario; madeHere
             <p className="text-body text-ink-soft">
               {`Made in this project${scenario.createdAt ? ` on ${stamp(scenario.createdAt)}` : ''}. `}
               The service holds no run of it. It holds no input value of its own: a run binds its process inputs to
-              records and takes every other input from a named person&rsquo;s assumption. Give every input that waits a source, then run it.
+              records and takes every other input from a named person&rsquo;s assumption or a reading deposited at the bench that a person
+              chose for it. Give every input that waits a source, then run it.
             </p>
           </Card>
         )}
@@ -884,8 +941,8 @@ function BiosteamScenario({ scenario, madeHere }: { scenario: Scenario; madeHere
           {flowsheet && <p className="text-caption text-ink-soft mb-2">{flowsheet.description}</p>}
           <p className="text-caption text-ink-soft mb-3">
             Records of an input&rsquo;s field pass the same gate statistics pass. Three or more give their median and range, sampled
-            triangular; two a pair, sampled uniform; one is held fixed. Every other input is a named person&rsquo;s assumption, or a
-            convention the run states.
+            triangular; two a pair, sampled uniform; one is held fixed. Every other input is a named person&rsquo;s assumption, a reading
+            deposited at the bench that a person chose for it on its row, or a convention the run states.
           </p>
           {bindProblem && (
             <Callout kind="warn">
@@ -905,6 +962,7 @@ function BiosteamScenario({ scenario, madeHere }: { scenario: Scenario; madeHere
                 request={ask}
                 onRefused={setRefused}
                 groups={PROFORMA_GROUPS}
+                readings
                 recordsOf={(key) => <RecordsChooser input={info?.inputs.find((i) => i.key === key)} />}
               />
               {Object.keys(chosenFits).length > 0 && (
@@ -912,7 +970,7 @@ function BiosteamScenario({ scenario, madeHere }: { scenario: Scenario; madeHere
                   {Object.entries(chosenFits).map(([key, id]) =>
                     key in overridden ? (
                       <span key={key} className="mr-3" data-testid="fit-line" data-key={key} data-overridden="true">
-                        {labels[key] ?? key}: {overridden[key]}&rsquo;s value replaces the fermOS {fitWord(key)} <span className="font-num">{id}</span>, and the run
+                        {labels[key] ?? key}: {overridden[key]} replaces the fermOS {fitWord(key)} <span className="font-num">{id}</span>, and the run
                         does not use the {fitWord(key)} here:{' '}
                         <button className="underline hover:text-accent min-h-[44px]" onClick={() => clearFit(scenario.id, key)} data-testid="fit-stop-input" data-key={key}>
                           stop using it here
@@ -975,7 +1033,11 @@ function BiosteamScenario({ scenario, madeHere }: { scenario: Scenario; madeHere
             )}
           </div>
           <div className="mt-3 flex flex-wrap items-center gap-3">
-            <Button variant="primary" onClick={go} disabled={running || starting || !bound || bound.waiting.length > 0 || refused !== null}>
+            <Button
+              variant="primary"
+              onClick={go}
+              disabled={running || starting || !bound || bound.waiting.length > 0 || refused !== null || !reviewer || financeWaits}
+            >
               <Play size={14} /> {running ? 'Simulating…' : view ? 'Run the scenario again' : 'Run the scenario'}
             </Button>
             <StatusLine status={status} problem={statusProblem} running={running} elapsed={elapsed} />
@@ -985,6 +1047,16 @@ function BiosteamScenario({ scenario, madeHere }: { scenario: Scenario; madeHere
               </span>
             )}
           </div>
+          {!reviewer && (
+            <p className="text-caption text-ink-soft mt-2" data-testid="run-needs-name">
+              A run is asked for in a person&rsquo;s name: set yours in Settings first.
+            </p>
+          )}
+          {financeWaits && (
+            <p className="text-caption text-ink-soft mt-2" data-testid="run-waits-panel">
+              Run waits for the parameter panel, which names the unit of each Finance value this scenario sets.
+            </p>
+          )}
           {refused !== null && (
             <p className="text-caption text-signal-warn mt-2" data-testid="run-held">
               Run waits until the service takes these values, since a run of them would be refused in the same words: {refused}
@@ -1003,6 +1075,7 @@ function BiosteamScenario({ scenario, madeHere }: { scenario: Scenario; madeHere
             </div>
           )}
           {view && <BasisAssumptions inputs={view.basis.inputs} labels={labels} />}
+          {view && <BasisReadings inputs={view.basis.inputs} labels={labels} />}
         </Card>
 
         <CeilingCheckSlot check={ceiling} problem={ceilingProblem} />
@@ -1068,7 +1141,6 @@ const FIT_INPUTS = ['titre', 'yield', 'productivity'];
 /** A BioSTEAM scenario the service simulates, by its id. */
 export default function ProformaScenario({ scenarioId }: { scenarioId: string }) {
   const scenario = useStore((s) => s.scenarios.find((x) => x.id === scenarioId));
-  const madeHere = useStore((s) => s.createdScenarioIds.includes(scenarioId));
   const stateLoaded = useStore((s) => s.stateSeen !== null || s.stateProblem !== null);
   // The project's scenarios arrive with its rows, just after the page loads:
   // a deep link waits for them rather than say the scenario does not exist.
@@ -1077,9 +1149,9 @@ export default function ProformaScenario({ scenarioId }: { scenarioId: string })
     return (
       <EmptyState
         title="Scenario not found"
-        body={`No BioSTEAM scenario with id ${scenarioId} exists in this session.`}
+        body={`The project keeps no BioSTEAM scenario ${scenarioId}. The link may be from another project.`}
         action={<Button onClick={() => navigate('/proforma')}>Back to Proforma</Button>}
       />
     );
-  return <BiosteamScenario key={scenario.id} scenario={scenario} madeHere={madeHere} />;
+  return <BiosteamScenario key={scenario.id} scenario={scenario} />;
 }

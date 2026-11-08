@@ -16,11 +16,11 @@
 // proposed in this session (the store's `proposedTrains`, under the id
 // **Propose a train** gave it): its units in order, what the rules miss above
 // the steps (`ProposalMissingList`) and each unit's reason beside its card
-// (`ProposalReasonLine`); Save makes it a train of this browser.
+// (`ProposalReasonLine`); Save keeps it as one of the project's trains.
 // `?copy=<id>` opens a copy of a train a model built (`GET
-// /api/pureos/trains-kept`, pureOS's **Made by Postdoc**) as a new train of
-// this browser, naming the train it copies; the kept train stays the
-// model's. Save moves a new train to its own address; what the page showed (its run, what it was read or copied
+// /api/pureos/trains-kept`, pureOS's **Made by Postdoc**) as a new train
+// that names the train it copies, and Save keeps it with the project; the
+// kept train stays the model's. Save moves a new train to its own address; what the page showed (its run, what it was read or copied
 // from, Price this in Proforma) is kept by train id in the store
 // (`builderShown`), so the page mounted at the new address shows it still.
 //
@@ -51,8 +51,11 @@
 // is the service's answer (`POST /api/pureos/train/validate`, then
 // `/check`), each refusal on the card of the unit it belongs to, and Run
 // stays off while any stands, saying what. Run posts the whole train and
-// every override of its scopes; the result is the one `pureos.train_run`
-// artifact the service keeps: purity by stream (PurityByStream), recovery by
+// every override of its scopes as typed inputs, each in the unit its place's
+// panel read for it (lib/pureos.trainInputs); the result is the one
+// `pureos.train_run` artifact the service keeps, with its run of the engine
+// `train` on the project's Runs, linked from the result (/proforma/runs/<id>,
+// the run's id the artifact's): purity by stream (PurityByStream), recovery by
 // unit (RecoveryByUnit), the stream table, the unit table with BioSTEAM's
 // costs or *no cost model*, the utilities, the diagram or the units in order
 // with the words why, the parameters with their sources, the basis naming
@@ -68,31 +71,23 @@
 // one the inlet names, else one designed for the inlet's simulation, chosen
 // first), and opens it; while either is missing it says, in words, what it
 // needs and how one is made (Run here; fermOS → Vessel).
-import { useEffect, useMemo, useRef, useState } from 'react';
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { ArrowDown, ArrowLeft, ArrowUp, Download, Plus, Trash2 } from 'lucide-react';
-import type {
-  FermosHarvest,
-  KeptTrain,
-  ParamScope,
-  ProposalReason,
-  SimulationSummary,
-  StreamRow,
-  TrainFromRun,
-  TrainProposal,
-  TrainRun,
-  TrainSpec,
-  TrainUnitSpec,
-  TrainValidation,
-  UnitSpecs,
-  UnitType,
-  VesselSummary,
-} from '@/data/types';
 import { href, navigate, useRoute } from '@/router';
 import { overridesFor, timeId, useStore } from '@/store';
-import { paramScope, type ParamAsk } from '@/lib/params';
+import { paramScope, type ParamAsk, type ParameterSpec, type ParamScope } from '@/lib/params';
 import { PRODUCT_WORDS, productWords } from '@/lib/geneos';
-import { STATE_WORDS, fermosHarvest, fermosSimulations } from '@/lib/fermos';
-import { NO_DIAGRAM, compositeVessels, diagramSrc, scenarioFromVesselAndTrain, stamp, vesselWords } from '@/lib/proforma';
+import { STATE_WORDS, fermosHarvest, fermosSimulations, type FermosHarvest, type SimulationSummary } from '@/lib/fermos';
+import {
+  NO_DIAGRAM,
+  compositeVessels,
+  diagramSrc,
+  scenarioFromVesselAndTrain,
+  stamp,
+  vesselWords,
+  type StreamRow,
+  type VesselSummary,
+} from '@/lib/proforma';
 import { exportCSV } from '@/lib/csv';
 import {
   INLET,
@@ -114,13 +109,25 @@ import {
   sameTrain,
   share,
   trainFromRun,
+  trainInputs,
   trainOverrides,
   trainSpecOf,
   unitOf,
   unitScope,
   unitSpecs,
+  unitsOf,
   validateTrain,
+  type KeptTrain,
+  type ProposalReason,
   type RunChoice,
+  type TrainFromRun,
+  type TrainProposal,
+  type TrainRun,
+  type TrainSpec,
+  type TrainUnitSpec,
+  type TrainValidation,
+  type UnitSpecs,
+  type UnitType,
 } from '@/lib/pureos';
 import { fmt } from '@/engine/units';
 import { Button, Callout, Card, EmptyState, PageHeader, SectionTitle, Stat, cx } from '@/components/ui';
@@ -135,12 +142,12 @@ import { PUREOS_TABS } from '@/data/tabs';
 import { StreamTable } from './PureOSTrain';
 
 /** What Price this in Proforma does, said beside its choices (OF-BLD-020 §6.2). */
-export const PRICE_TRAIN_WORDS =
-  'Proforma prices this train as the train of custom_train_v1: a fermenter rebuilt from a fermOS vessel design, its beer through the units of the train run kept here, priced with the TEA the shelf flowsheets use. The scenario is made in this browser and opens on its page, where it binds and says what waits.';
+const PRICE_TRAIN_WORDS =
+  'Proforma prices this train as the train of custom_train_v1: a fermenter rebuilt from a fermOS vessel design, its beer through the units of the train run kept here, priced with the TEA the shelf flowsheets use. The scenario is the project’s, saved with its other scenarios, and opens on its page, where it binds and says what waits.';
 /** What it needs while no train run is kept on the page. */
-export const PRICE_NEEDS_RUN = 'A train run: Run this train first. Proforma prices a kept train run, and this page holds none yet.';
+const PRICE_NEEDS_RUN = 'A train run: Run this train first. Proforma prices a kept train run, and this page holds none yet.';
 /** What it needs while no vessel design is kept on the service, and how one is made. */
-export const PRICE_NEEDS_VESSEL =
+const PRICE_NEEDS_VESSEL =
   'A vessel design: none is kept on this service yet. fermOS → Vessel designs one for a kept simulation (fermOS → Simulate keeps one); it is then listed here.';
 
 /** How long the page waits after a change before asking the service what a run would refuse. */
@@ -152,21 +159,16 @@ const problemOf = (e: unknown) =>
   e instanceof PureosDown ? `${e.message} ${e.remedy ?? ''}`.trim() : e instanceof PureosRefused ? e.message : e instanceof Error ? e.message : String(e);
 
 /**
- * The project's BioSTEAM scenarios, by id and name: their newest
- * runs are among the runs a train can take a stream of. Selected as the
- * store holds them and filtered here, so a render never sees a new list
- * from the store's own snapshot (React's error 185, an endless update).
+ * The project's BioSTEAM scenarios as this browser holds them, by id and
+ * name: their newest runs are among the runs a train can take a stream of,
+ * each listed once beside the service's (`runChoices`; alpha 2.2 D9).
+ * Selected as the store holds them and filtered here, so a render never sees
+ * a new list from the store's own snapshot (React's error 185, an endless
+ * update).
  */
-function useMadeScenarios(): { id: string; name: string }[] {
+function useHeldScenarios(): { id: string; name: string }[] {
   const scenarios = useStore((s) => s.scenarios);
-  const ids = useStore((s) => s.createdScenarioIds);
-  return useMemo(
-    () =>
-      scenarios
-        .filter((sc) => ids.includes(sc.id) && sc.kind === 'biosteam')
-        .map((sc) => ({ id: sc.id, name: sc.name })),
-    [scenarios, ids],
-  );
+  return useMemo(() => scenarios.filter((sc) => sc.kind === 'biosteam').map((sc) => ({ id: sc.id, name: sc.name })), [scenarios]);
 }
 
 /**
@@ -189,7 +191,7 @@ function freshTrain(product: string, inlet: TrainSpec['inlet'] | null = null): T
 const structureOf = (t: TrainSpec): TrainSpec => ({
   ...t,
   inlet: { ...t.inlet, params: {} },
-  units: t.units.map((u) => ({ ...u, params: {} })),
+  units: unitsOf(t).map((u) => ({ ...u, params: {} })),
 });
 
 export default function PureOSBuilder({ trainId }: { trainId: string }) {
@@ -331,7 +333,7 @@ export default function PureOSBuilder({ trainId }: { trainId: string }) {
       )}
 
       <div className="mt-5">
-        <ComponentTag component="pureOS" action={draft ? `train of ${draft.units.length} units, built here` : 'train builder'} />
+        <ComponentTag component="pureOS" action={draft ? `train of ${unitsOf(draft).length} units, built here` : 'train builder'} />
       </div>
     </div>
   );
@@ -350,7 +352,7 @@ function FromRunNote({ info }: { info: { artifactId: string; answer: TrainFromRu
   const a = info.answer;
   return (
     <div className="mb-4">
-      <Callout kind="info" title={`Read from run ${info.artifactId}: ${a.train.units.length} units by their class`}>
+      <Callout kind="info" title={`Read from run ${info.artifactId}: ${unitsOf(a.train).length} units by their class`}>
         <ul className="text-caption space-y-0.5" data-testid="builder-from-run">
           {a.notes.map((n) => (
             <li key={n}>{n}</li>
@@ -403,8 +405,8 @@ function CopyNote({ info }: { info: CopyInfo }) {
       <Callout kind="info" title={`A copy of train ${k.spec.id}, which Postdoc built`}>
         <p className="text-caption" data-testid="builder-copy-of" data-kept={k.spec.id}>
           Built by {k.madeBy}
-          {k.effort ? ` at effort ${k.effort}` : ''}, {stamp(k.at)}, last changed {stamp(k.updatedAt)}. This page holds a copy of it as a new train of
-          this browser: change it here and Save keeps the copy under your name, while the train the model built stays the model&rsquo;s, as it is.
+          {k.effort ? ` at effort ${k.effort}` : ''}, {stamp(k.at)}, last changed {stamp(k.updatedAt)}. This page opens a copy of it as a new
+          train: change it here, and Save keeps the copy with the project under your name; the train the model built stays the model&rsquo;s, as it is.
         </p>
       </Callout>
     </div>
@@ -419,7 +421,7 @@ function ProposalNote({ proposal }: { proposal: TrainProposal }) {
         <p className="text-caption">
           For <span className="font-num">{proposal.product}</span> made in <span className="font-num">{proposal.host}</span>
           {proposal.productClass ? `, a ${proposal.productClass}` : ''}. Each unit below carries the rule that put it there and the property it read;
-          every parameter is at its library default or waits for a person. Save keeps it as a train of this browser.
+          every parameter is at its library default or waits for a person. Save keeps it as one of the project&rsquo;s trains.
         </p>
       </Callout>
       <ProposalMissingList missing={proposal.missing} />
@@ -451,9 +453,18 @@ function Builder({
     () => Object.fromEntries(Object.entries(overridesAll).filter(([scope]) => scope.startsWith(prefix))),
     [overridesAll, prefix],
   );
+  const units = unitsOf(draft);
   const spec = useMemo(() => trainSpecOf(draft, mine), [draft, mine]);
-  const specKey = JSON.stringify(spec);
   const overrides = useMemo(() => trainOverrides(spec, mine), [spec, mine]);
+  // Each place's specs as its panel read them: the units its values are sent in as inputs (lib/pureos.trainInputs).
+  const [placeSpecs, setPlaceSpecs] = useState<Record<string, ParameterSpec[]>>({});
+  const readSpecs = useCallback(
+    (scope: string, specs: ParameterSpec[]) => setPlaceSpecs((was) => (was[scope] === specs ? was : { ...was, [scope]: specs })),
+    [],
+  );
+  const inputs = useMemo(() => trainInputs(spec, overrides, placeSpecs), [spec, overrides, placeSpecs]);
+  // The train and the inputs a check or a run sends: the check is asked again when either changes.
+  const specKey = JSON.stringify([spec, inputs]);
 
   const [catalogue, setCatalogue] = useState<UnitType[] | null>(null);
   const [catalogueProblem, setCatalogueProblem] = useState<string | null>(null);
@@ -475,7 +486,7 @@ function Builder({
     const asked = specKey;
     const timer = window.setTimeout(() => {
       validateTrain(spec, ctrl.signal)
-        .then((v) => (v.ok ? checkTrain({ train: spec, overrides, by: reviewer || null }, ctrl.signal) : v))
+        .then((v) => (v.ok ? checkTrain({ train: spec, inputs, by: reviewer }, ctrl.signal) : v))
         .then((answer) => setCheck({ key: asked, answer }))
         .catch((e: unknown) => !ctrl.signal.aborted && setCheckProblem(problemOf(e)));
     }, CHECK_AFTER_MS);
@@ -483,7 +494,7 @@ function Builder({
       window.clearTimeout(timer);
       ctrl.abort();
     };
-    // `specKey` names the train and its values; the overrides are in it.
+    // `specKey` names the train, its values and the inputs sent with it.
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [specKey]);
   const fresh = check && check.key === specKey ? check.answer : null;
@@ -510,7 +521,7 @@ function Builder({
     inFlight.current = ctrl;
     setBusy(true);
     setRunProblem(null);
-    runTrain({ train: spec, overrides, by: reviewer || null }, ctrl.signal)
+    runTrain({ train: spec, inputs, by: reviewer }, ctrl.signal)
       .then((r) => !ctrl.signal.aborted && setRun(r))
       .catch((e: unknown) => {
         if (ctrl.signal.aborted) return;
@@ -527,19 +538,19 @@ function Builder({
   const clearScope = (place: string) => {
     for (const o of mine[unitScope(draft.id, place)] ?? []) clearOverride(o.scope, o.key);
   };
-  const addUnit = (type: UnitType) => change({ units: [...draft.units, unitOf(type, nextUnitId(draft.units))] });
+  const addUnit = (type: UnitType) => change({ units: [...units, unitOf(type, nextUnitId(units))] });
   const moveUnit = (i: number, by: -1 | 1) => {
-    const units = [...draft.units];
-    const [u] = units.splice(i, 1);
-    units.splice(i + by, 0, u);
-    change({ units });
+    const order = [...units];
+    const [u] = order.splice(i, 1);
+    order.splice(i + by, 0, u);
+    change({ units: order });
   };
   const removeUnit = (i: number) => {
-    clearScope(draft.units[i].id);
-    change({ units: draft.units.filter((_, n) => n !== i) });
+    clearScope(units[i].id);
+    change({ units: units.filter((_, n) => n !== i) });
   };
   const routeOutlet = (i: number, port: string, to: string) =>
-    change({ units: draft.units.map((u, n) => (n === i ? { ...u, outlets: { ...u.outlets, [port]: to } } : u)) });
+    change({ units: units.map((u, n) => (n === i ? { ...u, outlets: { ...u.outlets, [port]: to } } : u)) });
 
   const savedSame = saved ? sameTrain(saved.train, spec) : false;
   const doSave = () => {
@@ -601,25 +612,25 @@ function Builder({
 
       {proposal && <ProposalNote proposal={proposal} />}
 
-      <InletSection draft={draft} spec={spec} change={change} clearInlet={() => clearScope(INLET)} refusals={placeRefusals(INLET)} />
+      <InletSection draft={draft} spec={spec} change={change} clearInlet={() => clearScope(INLET)} refusals={placeRefusals(INLET)} onSpecs={readSpecs} />
 
       <section aria-labelledby="builder-steps" data-testid="builder-steps">
-        <SectionTitle right={<span className="font-num text-caption text-ink-soft">{draft.units.length} units</span>}>
+        <SectionTitle right={<span className="font-num text-caption text-ink-soft">{units.length} units</span>}>
           <span id="builder-steps">Steps, in order</span>
         </SectionTitle>
-        {draft.units.length === 0 && (
+        {units.length === 0 && (
           <p className="text-body text-ink-soft" data-testid="builder-no-units">
             No unit yet: add the first from the palette below. A train sends one outlet of each unit on to the next, and the last unit&rsquo;s is the product stream.
           </p>
         )}
         <div className="space-y-3">
-          {draft.units.map((u, i) => (
+          {units.map((u, i) => (
             <UnitCard
               key={u.id}
               unit={u}
               index={i}
-              count={draft.units.length}
-              units={draft.units}
+              count={units.length}
+              units={units}
               type={typeOf.get(u.type) ?? null}
               spec={spec}
               refusals={placeRefusals(u.id)}
@@ -627,6 +638,7 @@ function Builder({
               move={(by) => moveUnit(i, by)}
               remove={() => removeUnit(i)}
               route={(port, to) => routeOutlet(i, port, to)}
+              onSpecs={readSpecs}
             />
           ))}
         </div>
@@ -769,8 +781,21 @@ function PriceInProforma({ run, spec, changed }: { run: TrainRun | null; spec: T
   );
 }
 
-/** One place's parameters, as the service binds them with the train: the panel, asked again as the train changes. */
-function PlacePanel({ scope, ask, groups }: { scope: string; ask: ParamAsk; groups?: string[] }) {
+/**
+ * One place's parameters, as the service binds them with the train: the panel, asked again as the train changes. The
+ * specs it reads go to `onSpecs`, so a run sends the place's values in the units its parameters are in.
+ */
+function PlacePanel({
+  scope,
+  ask,
+  groups,
+  onSpecs,
+}: {
+  scope: string;
+  ask: ParamAsk;
+  groups?: string[];
+  onSpecs?: (scope: string, specs: ParameterSpec[]) => void;
+}) {
   const [data, setData] = useState<ParamScope | null>(null);
   const [problem, setProblem] = useState<string | null>(null);
   const askKey = JSON.stringify(ask);
@@ -781,6 +806,7 @@ function PlacePanel({ scope, ask, groups }: { scope: string; ask: ParamAsk; grou
         .then((d) => {
           setData(d);
           setProblem(null);
+          onSpecs?.(scope, d.specs);
         })
         .catch((e: unknown) => !ctrl.signal.aborted && setProblem(problemOf(e)));
     }, SCOPE_AFTER_MS);
@@ -828,18 +854,52 @@ function StrayOverrides({ scope, data }: { scope: string; data: ParamScope | nul
   );
 }
 
+/**
+ * A run-stream inlet whose stream entered, in its run, a unit other than the
+ * train's first: once a person removes or moves the first units of a train
+ * read from a run, the inlet still names the stream those units took. Said in
+ * words, with each stream the train's first unit took in that run (its sink in
+ * the run's stream table) a click away; a first unit the run did not hold, or
+ * one renamed, says nothing.
+ */
+function InletAway({ run, streamId, first, take }: { run: RunChoice; streamId: string; first: string | null; take: (streamId: string) => void }) {
+  const entered = run.streams.find((s) => s.id === streamId)?.sink ?? null;
+  const into = first ? run.streams.filter((s) => s.sink === first) : [];
+  if (!first || !entered || entered === first || into.length === 0) return null;
+  return (
+    <div className="mt-2" data-testid="builder-inlet-away" data-entered={entered} data-first={first}>
+      <Callout kind="warn">
+        <p>
+          The inlet is stream <span className="font-num">{streamId}</span>, which entered <span className="font-num">{entered}</span> in run{' '}
+          <span className="font-num">{run.artifactId}</span>; the train&rsquo;s first unit is <span className="font-num">{first}</span>, which in that run took{' '}
+          {into.map((s) => s.id).join(', ')}.
+        </p>
+        <div className="flex flex-wrap gap-2 mt-1">
+          {into.map((s) => (
+            <Button key={s.id} size="sm" className="min-h-[44px]" onClick={() => take(s.id)} data-testid="builder-inlet-take">
+              Take {s.id} · {composition(s)}
+            </Button>
+          ))}
+        </div>
+      </Callout>
+    </div>
+  );
+}
+
 function InletSection({
   draft,
   spec,
   change,
   clearInlet,
   refusals,
+  onSpecs,
 }: {
   draft: TrainSpec;
   spec: TrainSpec;
   change: (patch: Partial<TrainSpec>) => void;
   clearInlet: () => void;
   refusals: string[];
+  onSpecs: (scope: string, specs: ParameterSpec[]) => void;
 }) {
   const inlet = draft.inlet;
   const [sims, setSims] = useState<SimulationSummary[] | null>(null);
@@ -848,8 +908,8 @@ function InletSection({
   const [vessels, setVessels] = useState<VesselSummary[]>([]);
   const [runs, setRuns] = useState<{ choices: RunChoice[]; problems: string[] } | null>(null);
   const [problem, setProblem] = useState<string | null>(null);
-  const made = useMadeScenarios();
-  const madeKey = made.map((m) => m.id).join();
+  const held = useHeldScenarios();
+  const heldKey = held.map((m) => m.id).join();
   useEffect(() => {
     setProblem(null);
     const ctrl = new AbortController();
@@ -868,12 +928,12 @@ function InletSection({
         .catch(() => undefined);
     }
     if (inlet.kind === 'run-stream')
-      runChoices(made, ctrl.signal)
+      runChoices(held, ctrl.signal)
         .then((r) => !ctrl.signal.aborted && setRuns(r))
         .catch((e: unknown) => !ctrl.signal.aborted && setProblem(problemOf(e)));
     return () => ctrl.abort();
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [inlet.kind, madeKey]);
+  }, [inlet.kind, heldKey]);
 
   const setKind = (kind: TrainSpec['inlet']['kind']) => {
     if (kind === inlet.kind) return;
@@ -982,6 +1042,9 @@ function InletSection({
         )}
       </div>
       {inlet.kind === 'simulation' && inlet.ref && <HarvestRead read={chosenHarvest} />}
+      {inlet.kind === 'run-stream' && chosenRun && inlet.streamId && (
+        <InletAway run={chosenRun} streamId={inlet.streamId} first={unitsOf(draft)[0]?.id ?? null} take={(sid) => change({ inlet: { ...inlet, streamId: sid } })} />
+      )}
       {inlet.kind === 'run-stream' && chosenRun?.scenarioId && (
         <p className="text-caption text-ink-soft mt-1" data-testid="builder-inlet-scenario" data-broth={chosenRun.broth ?? ''}>
           The train names scenario <span className="font-num">{chosenRun.scenarioId}</span>, so the service reads its newest run when the train runs (now{' '}
@@ -1016,7 +1079,7 @@ function InletSection({
       )}
       {complete ? (
         <div className="card p-3 mt-2">
-          <PlacePanel scope={unitScope(draft.id, INLET)} ask={{ train: spec }} />
+          <PlacePanel scope={unitScope(draft.id, INLET)} ask={{ train: spec }} onSpecs={onSpecs} />
         </div>
       ) : (
         <p className="text-caption text-ink-soft mt-1">Choose the {inlet.kind === 'simulation' ? 'simulation' : 'run and its stream'} the broth is; its values then show here, each with its source.</p>
@@ -1082,6 +1145,7 @@ function UnitCard({
   move,
   remove,
   route,
+  onSpecs,
 }: {
   unit: TrainUnitSpec;
   index: number;
@@ -1095,6 +1159,7 @@ function UnitCard({
   move: (by: -1 | 1) => void;
   remove: () => void;
   route: (port: string, to: string) => void;
+  onSpecs: (scope: string, specs: ParameterSpec[]) => void;
 }) {
   const ports = (type?.insOuts ?? []).filter((p) => p.side === 'out');
   const choices = routeChoices(units, index);
@@ -1160,7 +1225,7 @@ function UnitCard({
       )}
       <details className="mt-2" open data-testid="unit-params">
         <summary className="cursor-pointer text-caption text-ink-soft hover:text-accent inline-flex items-center min-h-[44px]">Its parameters, each with its source</summary>
-        <PlacePanel scope={unitScope(spec.id, unit.id)} ask={{ train: spec, unitType: unit.type }} />
+        <PlacePanel scope={unitScope(spec.id, unit.id)} ask={{ train: spec, unitType: unit.type }} onSpecs={onSpecs} />
       </details>
     </Card>
   );
@@ -1266,14 +1331,14 @@ function TypeDetails({ type }: { type: UnitType }) {
 
 /** Start a fresh train from a kept run's units, read by the service. */
 function StartFromRun() {
-  const made = useMadeScenarios();
+  const held = useHeldScenarios();
   const [open, setOpen] = useState(false);
   const [runs, setRuns] = useState<{ choices: RunChoice[]; problems: string[] } | null>(null);
   const [chosen, setChosen] = useState('');
   useEffect(() => {
     if (!open) return;
     const ctrl = new AbortController();
-    runChoices(made, ctrl.signal)
+    runChoices(held, ctrl.signal)
       .then((r) => !ctrl.signal.aborted && setRuns(r))
       .catch(() => undefined);
     return () => ctrl.abort();
@@ -1330,7 +1395,10 @@ function RunResult({ run, changed }: { run: TrainRun; changed: boolean }) {
             <a className="font-num text-ink hover:text-accent" href={href(`/biorepo/artifacts/${run.artifactId}`)}>
               {run.artifactId}
             </a>{' '}
-            on {stamp(run.createdAt)} · {t.tablesSource ?? 'tables'}
+            on {stamp(run.createdAt)} · {t.tablesSource ?? 'tables'} ·{' '}
+            <a className="text-ink hover:text-accent underline underline-offset-2" href={href(`/proforma/runs/${encodeURIComponent(run.artifactId)}`)} data-testid="builder-result-run">
+              its run of the engine train
+            </a>
           </span>
           <a className="chip" href={href(`/pureos/train/${encodeURIComponent(run.spec.id)}`)} data-testid="builder-open-train">
             Open as a train

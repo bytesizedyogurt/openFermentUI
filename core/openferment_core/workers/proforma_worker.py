@@ -1,5 +1,4 @@
-"""The Proforma worker: BioSTEAM in a process of its own, kept warm
-(OF-BLD-014 §8.1).
+"""The Proforma worker: BioSTEAM in a process of its own, kept warm.
 
 With flowsheets/, the only place in openferment_core that imports `biosteam`
 (test_workers holds it to that). A cold import takes about forty seconds, so
@@ -7,53 +6,51 @@ the worker builds each flowsheet once and keeps it; every later request sets
 its inputs on the built objects and re-simulates (Appendix 3, trap 3).
 
     ping        answered by `serve`
-    benchmark   the published reference biorefinery (§8.2), built afresh
-                inside `package_defaults()` (OF-BLD-019 §2.R)
     evaluate    one case of a flowsheet: its inputs in, its outputs out
     grid        the outputs over a grid of up to three inputs
     montecarlo  Latin hypercube samples of the inputs, seeded
-    run         one whole run (OF-BLD-019 §2.1): the base case, the tables
+    run         one whole run: the base case, the tables
                 read from BioSTEAM's objects right after it (TEA breakdown,
                 streams, units, utility duties, the diagram), the grid and
                 the samples; proforma.py keeps it as one artifact (D1). A
-                flowsheet built from a structure (OF-BLD-020 §6.1,
-                `custom_train_v1`: a vessel design's fermenter, a train run's
+                flowsheet built from a structure (`custom_train_v1`: a vessel design's fermenter, a train run's
                 units and the TEA's finance) takes it as `structure`, and the
                 worker keeps a built plant per structure (STRUCTURES_KEPT)
-    reference   a published reference biorefinery run whole on its
-                package's defaults (OF-BLD-019 §2.2): built afresh inside
+    replay_reference, replay_benchmark  a run kept from one of the two
+                reference entries that retired from the shelf (alpha 2.2
+                D8), recomputed from its basis for its replay
+                (`kept_references.py`): the plant built afresh inside
                 `package_defaults()`, as the package's own test builds it;
                 its outputs, the quantities that test asserts, its defaults
-                read back and every table; numbers rounded to the digits
-                the basis states, so a replay compares the plant and not
-                the order BioSTEAM sums a set of units in
-    thermo_props  thermosteam's answer for one mixture (OF-BLD-019 §4.2, D9):
+                read back and every table, numbers rounded to the digits
+                the basis states; or the corn stover plant's price solved
+                as the package solves it
+    thermo_props  thermosteam's answer for one mixture:
                 a Stream on the library's own chemicals at T and P, and its
                 density, heat capacity, viscosity, bubble and dew points;
                 thermo.py keeps it as one artifact
-    volatility  a chemical's volatility beside a partner (OF-BLD-020 §7.1,
-                D12): each one's normal boiling point as the library holds
+    volatility  a chemical's volatility beside a partner: each one's normal boiling point as the library holds
                 it, and whether the library's own vapour-liquid equilibrium
                 gives the pair a minimum-boiling azeotrope at its default
                 pressure, by the preset's search; thermo.py keeps it as one
                 `volatility` artifact
     vessel_specs  what fermOS's vessel class takes and its own defaults,
-                read from BioSTEAM at import (OF-BLD-020 §4.1, E.3‴):
+                read from BioSTEAM at import (E.3‴):
                 `flowsheets/vessel.py`'s `specs`
-    vessel_design one vessel designed for a simulation (OF-BLD-020 §4.1, D7):
+    vessel_design one vessel designed for a simulation:
                 `AeratedBioreactor` or `NRELAnaerobicBatchBioreactor`, built
                 afresh inside `package_defaults()`, its design, costs and the
                 oxygen balance read; vessel.py keeps it as one artifact
     catalogue_specs  what one of pureOS's unit types takes and its class's
                 own defaults, choices and refusals, read from its code at
-                import on the yeast program's chemicals (OF-BLD-020 §5.1):
+                import on the yeast program's chemicals:
                 `pureos/catalogue.py`'s `read_class`, handed the class
                 (BioSTEAM's, or the in-house one) and the chemical IDs
     catalogue_unit_check  one unit of a type built alone on given inlets
                 and values (catalogue keys), simulated, and read: its streams,
                 design, costs and the attributes it holds (`build_unit`,
                 `unit_report`); the catalogue's sim test runs every type so
-    train_specs   what a train builds on (OF-BLD-020 §5.2): the yeast
+    train_specs   what a train builds on: the yeast
                 program's chemical IDs and thermosteam's Stream defaults
     flowsheet_unit_values  a shelf flowsheet's own units read by catalogue
                 key, as its package builds them (a train's `readFrom`)
@@ -62,12 +59,10 @@ its inputs on the built objects and re-simulates (Appendix 3, trap 3).
                 and read: stream, unit and utility tables, the diagram or
                 the unit list, each unit's costs, the inlet as built
     sff_export  a run's base case written as an SFF file (alpha 2.0,
-                ADR-003): a reference biorefinery built afresh inside
-                `package_defaults()` as its reference run builds it, or a
-                shelf flowsheet's warm plant set to the run's base values
-                (its solved price on the product while it is written, as
-                its tables are read); then validated, scored and tagged by
-                the vendored toolkit (`sff_toolkit.export_checked`)
+                ADR-003): a shelf flowsheet's warm plant set to the run's
+                base values (its solved price on the product while it is
+                written, as its tables are read); then validated, scored and
+                tagged by the vendored toolkit (`sff_toolkit.export_checked`)
     sff_validate, sff_score  a file the service wrote, checked by the
                 vendored toolkit (`sff_toolkit`)
     library_discover  every subpackage of the installed `biorefineries`,
@@ -90,7 +85,7 @@ every worker with PYTHONBREAKPOINT=0, and this module also sets
 `sys.breakpointhook` to raise in words, so the request fails and the worker
 answers the next one.
 
-THE WARM WORKER KEEPS NO PLANT'S SETTINGS (OF-BLD-019 §2.R). BioSTEAM keeps
+THE WARM WORKER KEEPS NO PLANT'S SETTINGS. BioSTEAM keeps
 process-wide state a plant can change: the utility prices and the plant cost
 index, the stream and unit tickets that name what a package leaves unnamed,
 and the chemicals thermosteam's `chemical_cache` keeps per package, whose
@@ -135,7 +130,7 @@ from thermosteam.utils import chemical_cache
 
 from .. import flowsheets
 from ..flowsheets.shelf import TABLE_UNITS
-from . import library_plants, serve, sff_toolkit
+from . import kept_references, library_plants, serve, sff_toolkit
 from .dot_names import stable_names
 
 # BioSTEAM's stream utility prices as it imports them (process water, natural
@@ -161,6 +156,13 @@ class Refused(ValueError):
     """The request cannot be computed, in words."""
 
 
+def _said(e: KeyError) -> str:
+    """A KeyError's own words, as its raiser wrote them: `str()` of a
+    KeyError puts them in quotes (`flowsheets.load` refuses an unknown id
+    with one)."""
+    return str(e.args[0]) if e.args else str(e)
+
+
 # How many plants built from a structure (OF-BLD-020 §6.1: custom_train_v1,
 # one per vessel design, train run and finance) the worker keeps warm; the
 # oldest is let go past it. A setting, not a measurement.
@@ -179,10 +181,7 @@ def built(name: str, structure: dict[str, Any] | None = None) -> tuple[Any, Any]
     try:
         module = flowsheets.load(name)
     except KeyError as e:
-        raise Refused(str(e)) from e
-    if not hasattr(module, "build"):
-        raise Refused(f"{name} is a reference biorefinery: it runs whole on its package's own defaults, "
-                      "through its reference run, not case by case")
+        raise Refused(_said(e)) from e
     takes = bool(getattr(module, "STRUCTURED", False))
     if takes and structure is None:
         raise Refused(f"{name} is built from a vessel design and a train run, which this request does not name")
@@ -543,7 +542,7 @@ def run(name: str, base: dict[str, float], specs: dict[str, dict[str, Any]], sam
     """One whole run: the base case and its tables, read before any other
     case moves the objects; then the grid, when one is asked; then the
     samples, Latin hypercube and seeded, as `montecarlo`. A flowsheet built
-    from a structure (OF-BLD-020 §6.1, custom_train_v1) takes it here, and
+    from a structure (custom_train_v1) takes it here, and
     every case of the run is of the one plant it builds."""
     module, b = built(name, structure)
     try:
@@ -559,7 +558,7 @@ def run(name: str, base: dict[str, float], specs: dict[str, dict[str, Any]], sam
     return {"base": base_out, "baseInfeasible": base_infeasible, "tables": out_tables, "grid": out_grid, "montecarlo": mc}
 
 
-# ── a reference biorefinery's run (OF-BLD-019 §2.2) ────────────────────
+# ── a plant built as its package's own test builds it (OF-BLD-019 §2.R) ──
 
 
 # The code every function thermosteam's `chemical_cache` decorator makes
@@ -599,14 +598,14 @@ def _fresh_cache(fn: Any) -> None:
 
 @contextmanager
 def package_defaults() -> Iterator[None]:
-    """A plant builds, and a reference biorefinery is read, as in a worker
+    """A plant builds, and a kept reference run replays, as in a worker
     that had built nothing before: BioSTEAM's defaults first, as the
     package's own test runs it (`default_settings` in
     biorefineries/tests/test_biorefineries.py calls
     `bst.process_tools.default()`, which also clears the tickets and
     thermosteam's chemical cache), the stream utility prices BioSTEAM
     imports with (which `default()` leaves as the last plant set them), and
-    every package's chemicals made anew from empty caches (OF-BLD-019 §2.R). Afterwards what the worker held
+    every package's chemicals made anew from empty caches. Afterwards what the worker held
     before is put back, not the defaults, because the worker keeps other
     plants warm whose costs read these globals (a PowerUtility's cost reads
     the class's price when it is asked); a chemicals cache first filled
@@ -689,15 +688,15 @@ def rounded(value: Any, digits: int) -> Any:
     return value
 
 
-def reference(name: str, digits: int, draw: bool | None = None) -> dict[str, Any]:
-    """A reference biorefinery, run whole: built afresh inside
-    `package_defaults()`, then everything read before the settings go back."""
+def replay_reference(name: str, digits: int, draw: bool | None = None) -> dict[str, Any]:
+    """A run kept from a retired reference entry (alpha 2.2 D8), recomputed
+    for its replay as the entry's reference run computed it: the plant built
+    afresh inside `package_defaults()`, then everything read before the
+    settings go back."""
     try:
-        module = flowsheets.load(name)
+        module = kept_references.plant(name)
     except KeyError as e:
-        raise Refused(str(e)) from e
-    if not hasattr(module, "load"):
-        raise Refused(f"{name} is not a reference biorefinery: it is run case by case, on its inputs")
+        raise Refused(_said(e)) from e
     if not 1 <= digits <= 17:
         raise Refused("a reference run keeps between 1 and 17 significant digits")
     with package_defaults():
@@ -714,8 +713,8 @@ def reference(name: str, digits: int, draw: bool | None = None) -> dict[str, Any
     return rounded(out, digits)
 
 
-def _op_reference(args):
-    return reference(str(args["flowsheet"]), int(args.get("digits", 17)), args.get("diagram"))
+def _op_replay_reference(args):
+    return replay_reference(str(args["flowsheet"]), int(args.get("digits", 17)), args.get("diagram"))
 
 
 # ── thermosteam answers property questions (OF-BLD-019 §4.2, D9) ───────
@@ -1005,23 +1004,21 @@ def _op_evaluate(args):
 
 
 def _op_grid(args):
-    return grid(str(args["flowsheet"]), dict(args["axes"]), dict(args.get("base") or {}))
+    return grid(str(args["flowsheet"]), dict(args["axes"]), dict(args.get("base") or {}), args.get("structure"))
 
 
 def _op_montecarlo(args):
     return montecarlo(str(args["flowsheet"]), dict(args["specs"]), int(args.get("n", 500)), int(args.get("seed", 0)),
-                      dict(args.get("base") or {}))
+                      dict(args.get("base") or {}), args.get("structure"))
 
 
-def _op_benchmark(args):
-    """The benchmark (§8.2), built afresh inside `package_defaults()`: the
-    corn stover plant sets its own utility prices and cost index as it
-    builds, and these go back with everything else afterwards, so no later
-    case prices on them (OF-BLD-019 §2.R)."""
-    from openferment_core.flowsheets import cornstover_benchmark
-
+def _op_replay_benchmark(args):
+    """A kept benchmark recomputed for its replay (alpha 2.2 D8), built afresh
+    inside `package_defaults()`: the corn stover plant sets its own utility
+    prices and cost index as it builds, and these go back with everything
+    else afterwards, so no later case prices on them."""
     with package_defaults():
-        return cornstover_benchmark.run()
+        return kept_references.benchmark()
 
 
 def _op_vessel_specs(args):
@@ -1041,10 +1038,14 @@ def _op_vessel_design(args):
 
 def unit_class(type_id: str) -> tuple[Any, Any]:
     """A catalogue entry and its class: BioSTEAM's by name, or the in-house
-    one, which only this worker imports (E.3‴)."""
+    one, which only this worker imports (E.3‴). A type the catalogue does
+    not hold is refused in the catalogue's words."""
     from ..pureos import catalogue, inhouse
 
-    e = catalogue.entry(type_id)
+    try:
+        e = catalogue.entry(type_id)
+    except catalogue.CatalogueUnknown as ex:
+        raise Refused(str(ex)) from ex
     if e.inhouse:
         return e, getattr(inhouse, e.inhouse)
     return e, getattr(bst, e.biosteam)
@@ -1160,24 +1161,33 @@ def _op_flowsheet_unit_values(args):
     return {"flowsheet": name, "units": out, "versions": _versions()}
 
 
-def _op_train_run(args):
-    """One train built and run (OF-BLD-020 §5.2): inside `package_defaults()`
-    on the yeast program's chemicals, BioSTEAM's default utility prices and
-    cost index set as every scenario flowsheet sets them, a fresh flowsheet;
-    the train built by `flowsheets/train.Built` and simulated whole; then its
-    tables read with this worker's own readers (no TEA: a train is not priced
-    here) and each unit's costs. A train that cannot be built or run is the
+def _simulated_train(spec: dict[str, Any]) -> Any:
+    """A train built from its plain spec and simulated whole, inside the
+    caller's `package_defaults()`: on the yeast program's chemicals,
+    BioSTEAM's default utility prices and cost index set as every scenario
+    flowsheet sets them, a fresh flowsheet, the train built by
+    `flowsheets/train.Built`. A train that cannot be built or run is the
     module's refusal, in words naming the unit and BioSTEAM's error."""
     from ..flowsheets import train as train_fs
 
+    chems = yeast_chemicals()
+    bst.settings.set_thermo(chems)
+    bst.process_tools.default_utilities()
+    bst.process_tools.default_CEPCI()
+    bst.main_flowsheet.set_flowsheet(bst.Flowsheet(str(spec["system"])))
+    b = train_fs.Built(dict(spec), unit_class, chems)
+    b.simulate()
+    return b
+
+
+def _op_train_run(args):
+    """One train built and run: inside `package_defaults()`,
+    built and simulated whole (`_simulated_train`); then its tables read with
+    this worker's own readers (no TEA: a train is not priced here) and each
+    unit's costs. A train that cannot be built or run is the module's
+    refusal, in words naming the unit and BioSTEAM's error."""
     with package_defaults():
-        chems = yeast_chemicals()
-        bst.settings.set_thermo(chems)
-        bst.process_tools.default_utilities()
-        bst.process_tools.default_CEPCI()
-        bst.main_flowsheet.set_flowsheet(bst.Flowsheet(str(args["system"])))
-        b = train_fs.Built(dict(args), unit_class, chems)
-        b.simulate()
+        b = _simulated_train(args)
         system = b.system
         return {
             "tablesSource": f"BioSTEAM {version('biosteam')}, thermosteam {version('thermosteam')}",
@@ -1196,16 +1206,55 @@ def _op_train_run(args):
         }
 
 
+# The metadata field a file holds that only a TEA gives: the year its costs
+# are reported in, which the toolkit's exporter reads from the system's TEA
+# (`tea.duration[0]`, export/_export.py) and its schema may require.
+TEA_YEAR = "TEA_year"
+
+
+def _train_needs_tea() -> str:
+    """Why the toolkit writes no file for a train while its schema requires
+    the TEA year, in words, the reason first."""
+    return (f"a train carries no TEA, and the SFF schema the toolkit ships ({sff_toolkit.SCHEMA_VERSION}) requires "
+            f"every file's metadata.{TEA_YEAR}, the year its costs are reported in, which the toolkit's exporter reads "
+            "from the system's TEA (export/_export.py)")
+
+
+def _train_export(spec: dict[str, Any], path: str, meta: dict[str, Any] | None, title: str | None) -> dict[str, Any]:
+    """A pureOS train run's train written as an SFF file and checked, as a
+    library plant's is. A train carries no TEA (no TEA prices a train here),
+    so while the schema the toolkit ships requires every file's TEA year
+    (`sff_toolkit.metadata_required`), the train is refused in those words
+    before anything is built (`_train_needs_tea`), and a run's file costs no
+    second build. Once the schema leaves the year to the file, the train is
+    rebuilt from the train_run request its run's basis gives, inside
+    `package_defaults()`, simulated whole as `train_run` simulates it
+    (`_simulated_train`) and written by the toolkit with no TEA; what the
+    toolkit cannot write then is refused with its own words quoted after.
+    The run keeps the words as its `sffRefused`."""
+    if TEA_YEAR in sff_toolkit.metadata_required():
+        raise Refused(_train_needs_tea())
+    with package_defaults():
+        b = _simulated_train(spec)
+        try:
+            return sff_toolkit.export_checked(b.system, None, path, metadata=meta, process_title=title)
+        except Exception as e:  # noqa: BLE001 (the toolkit's words are the run's, kept with it)
+            raise Refused(f"the toolkit's exporter could not write the train's file ({type(e).__name__}: {e})") from e
+
+
 def _op_sff_export(args):
     """A run's base case written as an SFF file at the path the service names,
     with openFerment's block in its metadata, then checked (ADR-003). A
-    reference biorefinery is built afresh inside `package_defaults()`, as
-    its reference run builds it; a shelf flowsheet's warm plant is set to
-    the run's base values and simulated, as `run` sets its base case, and
-    its solved price stands on the product while the file is written."""
+    shelf flowsheet's warm plant is set to the run's base values and
+    simulated, as `run` sets its base case, and its solved price stands on
+    the product while the file is written; a library plant is built afresh
+    and set as its run set it; a pureOS train is rebuilt from its run's
+    train_run request and simulated (`_train_export`)."""
     path = str(args["path"])
     meta = args.get("metadata") or None
     title = args.get("title") or None
+    if isinstance(args.get("train"), dict):
+        return _train_export(args["train"], path, meta, title)
     if args.get("library"):
         try:
             return library_plants.export(str(args["library"]), args.get("configuration"),
@@ -1214,16 +1263,6 @@ def _op_sff_export(args):
         except library_plants.Refused as e:
             raise Refused(str(e)) from e
     name = str(args["flowsheet"])
-    try:
-        module = flowsheets.load(name)
-    except KeyError as e:
-        raise Refused(str(e)) from e
-    if hasattr(module, "load"):
-        with package_defaults():
-            b = module.load()
-            parts = module.parts(b)
-            return sff_toolkit.export_checked(parts["system"], parts.get("tea"), path, metadata=meta,
-                                              process_title=title)
     structure = args.get("structure")
     module, b = built(name, structure)
     evaluate(name, {k: float(v) for k, v in (args.get("base") or {}).items()}, structure)
@@ -1285,8 +1324,9 @@ def _op_library_cases(args):
             for c in out]
 
 
-HANDLERS = {"evaluate": _op_evaluate, "grid": _op_grid, "montecarlo": _op_montecarlo, "benchmark": _op_benchmark,
-            "run": _op_run, "reference": _op_reference, "thermo_props": _op_thermo_props,
+HANDLERS = {"evaluate": _op_evaluate, "grid": _op_grid, "montecarlo": _op_montecarlo, "run": _op_run,
+            "replay_reference": _op_replay_reference, "replay_benchmark": _op_replay_benchmark,
+            "thermo_props": _op_thermo_props,
             "vessel_specs": _op_vessel_specs, "vessel_design": _op_vessel_design,
             "catalogue_specs": _op_catalogue_specs, "catalogue_unit_check": _op_catalogue_unit_check}
 

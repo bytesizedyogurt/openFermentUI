@@ -1,5 +1,4 @@
-"""pureOS's train, built and run in the Proforma worker (OF-BLD-020 §5.2, D9,
-D10, E.3‴).
+"""pureOS's train, built and run in the Proforma worker (E.3‴).
 
 Not a flowsheet on the shelf (it is not in KNOWN): the worker's `train_run`
 op hands this module a train as plain JSON, every value already resolved

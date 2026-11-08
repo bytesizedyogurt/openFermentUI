@@ -8,7 +8,7 @@
 // page that opens the stream is sent what happens from then on, and reads the
 // record from the tables.
 
-export type EventType =
+type EventType =
   | 'job.queued'
   | 'job.running'
   | 'job.done'
@@ -21,7 +21,7 @@ export type EventType =
   | 'turn.plan'
   | 'turn.decline';
 
-export const EVENT_TYPES: readonly EventType[] = [
+const EVENT_TYPES: readonly EventType[] = [
   'job.queued',
   'job.running',
   'job.done',

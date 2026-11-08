@@ -10,11 +10,11 @@
 // unconfirmed entry whose `raw` is the line itself, matched to the schema by
 // the capture matcher; a row it cannot place stays verbatim as an
 // observation.
-import type { Deposition, DepositionEntry, Measure, Runbook, SeriesRole } from '@/data/types';
+import type { Deposition, DepositionEntry, Measure, Runbook, SeriesRole } from '@/lib/studies';
 import { matchToSchema } from './capture';
 import { convert } from './units';
 
-export interface SeriesPoint {
+interface SeriesPoint {
   t: number;
   value: number;
   entryId: string;
@@ -42,7 +42,7 @@ function inUnit(e: DepositionEntry, unit: string): number | null {
 export function seriesOf(dep: Deposition, runbook: Pick<Runbook, 'measurementSchema'>): Series[] {
   const times = dep.sampleTimes ?? {};
   const out: Series[] = [];
-  for (const m of runbook.measurementSchema) {
+  for (const m of runbook.measurementSchema ?? []) {
     const byTime = new Map<number, SeriesPoint>();
     for (const e of dep.entries) {
       if (e.measureId !== m.id || times[e.id] === undefined) continue;
@@ -57,7 +57,7 @@ export function seriesOf(dep: Deposition, runbook: Pick<Runbook, 'measurementSch
   return out;
 }
 
-export interface CsvRow {
+interface CsvRow {
   line: string;
   time: number;
   measure: string;
@@ -65,7 +65,7 @@ export interface CsvRow {
   unit: string;
 }
 
-export interface ParsedCsv {
+interface ParsedCsv {
   rows: CsvRow[];
   /** Lines that are not a row of four fields with a time and a value. */
   unreadable: string[];

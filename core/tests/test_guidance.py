@@ -4,7 +4,7 @@ CLAUDE.md stays under 250 lines and labels every line: a heading names a
 section, and every other line that holds words starts `- R:`, `- P:` or
 `- C:`. It has the sections stage 8 names; each architecture line names a
 decision record that exists, and each contract line a document that exists.
-The decision records 000 to 014 exist, each with its decision and its
+The decision records 000 to 018 exist, each with its decision and its
 revisit condition. docs/PROGRESS.md opens with a Resume section of numbered
 steps a fresh session follows cold.
 """
@@ -18,7 +18,7 @@ LABEL = re.compile(r"^- (R|P|C): \S")
 SECTIONS = ("Mission and scope", "Run and test", "Verified constraints and sources", "Architecture decisions",
             "Communication contracts", "Working assumptions", "Open questions", "Revisit conditions",
             "Stop conditions", "Where the history lives")
-RECORDS = range(0, 15)
+RECORDS = range(0, 19)
 
 
 def _lines() -> list[str]:

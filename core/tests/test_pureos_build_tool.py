@@ -24,6 +24,8 @@ import pytest
 from fastapi.testclient import TestClient
 
 from openferment_core import artifacts, audit, intake, module_stores, proposals, pureos, tools
+from openferment_core.engine import conform
+from openferment_core.engine import runs as engine_runs
 from openferment_core.pureos import build, kept, train_spec
 from openferment_core.validate import SeenSet, validate_plan
 from test_module_tools import ctx_for, read
@@ -152,6 +154,16 @@ def test_new_keeps_a_train_for_the_product_from_a_runs_stream_marked_as_the_mode
     assert line.detail["tool"] == "pureos_build"
     # At no gate: nothing was proposed.
     assert proposals.read().proposals == []
+
+
+def test_a_person_named_at_the_http_door_is_refused_a_kept_train_in_the_stores_words(store, inlet):
+    """A kept train holds a model's work alone; a person's trains are the
+    project's rows from the Builder. A call naming a person (the HTTP door's
+    ?by=) keeps nothing and audits nothing."""
+    c = tools.ToolContext(pool_factory=lambda: stand_in_pool(), person="Ada Lovelace")
+    r = tools.run("pureos_build", {"action": "new", "product": "ethanol", "inletRef": inlet}, c)
+    assert r.error.startswith("pureos_build refused: a kept train is a model's")
+    assert kept.read().trains == [] and audit.read() == []
 
 
 def test_units_are_added_in_order_named_by_type_and_taken_out(store, inlet):
@@ -293,6 +305,12 @@ def test_run_keeps_one_train_run_cited_by_its_artifact_id_with_the_whole_run_in_
     assert audit.read()[-1].detail["tool"] == "pureos_write" and audit.read()[-1].detail["note"] == "again"
     mine = [c for c in worker.calls if c[0] == "train_run" and c[1]["system"] == f"pureos_{tid.replace('-', '_')}"]
     assert len(mine) == 1, "the same train is the same artifact, and the worker is not asked twice"
+    # alpha 2.2 D3: the run is one row of the train engine, created by the caller the tool names, at either tool.
+    row = engine_runs.get(art.id)
+    assert (row.engine, row.plant, row.configuration, row.tool, row.status, row.by) == (
+        "train", tid, None, "pureos.train_run", "done", MODEL)
+    assert conform._created_by(art.id) == MODEL and row.sff is not None and row.sff.recordId == f"run-{art.id}"
+    assert [x.id for x in engine_runs.listed("train") if x.plant == tid] == [art.id]
 
 
 def test_a_run_with_a_value_waiting_returns_the_refusals_words_and_keeps_nothing(store, inlet, worker):
@@ -307,6 +325,7 @@ def test_a_run_with_a_value_waiting_returns_the_refusals_words_and_keeps_nothing
     assert not [c for c in worker.calls if c[0] == "train_run" and c[1]["system"] == f"pureos_{tid.replace('-', '_')}"]
     w = tools.run("pureos_write", {"action": "run_train", "target": tid, "fields": {}, "note": ""}, ctx())
     assert w.error == r.error.replace("pureos_build", "pureos_write", 1)
+    assert not [x for x in engine_runs.listed("train") if x.plant == tid], "a value that waits keeps no row"
 
 
 def test_a_worker_that_cannot_answer_is_said_in_words(store, inlet, monkeypatch):

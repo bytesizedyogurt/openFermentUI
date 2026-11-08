@@ -35,8 +35,8 @@ export const RUNBOOK_TABS: OwnerTab[] = [
   { label: 'Ledger', to: '/runbooks/ledger' },
 ];
 
-// OF-BLD-013 §3.3. The module map keeps /primer, so every link to it that
-// exists today still lands on it; a person's path sits beside it.
+// OF-BLD-013 §3.3. The project's lessons keep /primer, so every link to it
+// that exists today still lands on it; a person's path sits beside it.
 export const PRIMER_TABS: OwnerTab[] = [
   { label: 'Lessons', to: '/primer' },
   { label: 'My path', to: '/primer/path' },
@@ -73,5 +73,16 @@ export const FERMOS_TABS: OwnerTab[] = [
 export const PUREOS_TABS: OwnerTab[] = [
   { label: 'Trains', to: '/pureos' },
   { label: 'Builder', to: '/pureos/build' },
-  { label: 'Train', to: '/pureos/train' },
+];
+
+/** pureOS's tabs on one train's page: the two above and the train it shows, a tab only while its id is in the address. */
+export const pureosTrainTabs = (key: string): OwnerTab[] => [...PUREOS_TABS, { label: 'Train', to: `/pureos/train/${encodeURIComponent(key)}` }];
+
+// alpha 2.2 E.8 — the project's catalogues, one tab a kind: the strains (the
+// destination's own path), the products, Guild's skills and Primer's lessons.
+export const CATALOGUE_TABS: OwnerTab[] = [
+  { label: 'Strains', to: '/catalogues' },
+  { label: 'Products', to: '/catalogues/products' },
+  { label: 'Skills', to: '/catalogues/skills' },
+  { label: 'Lessons', to: '/catalogues/lessons' },
 ];

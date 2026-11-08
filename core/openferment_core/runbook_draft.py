@@ -1,5 +1,4 @@
-"""A runbook Postdoc drafts, with every number written by the service
-(OF-BLD-014 §9.2).
+"""A runbook Postdoc drafts, with every number written by the service.
 
 The agent names what to predict and what to measure, in ids and words: an
 item points at one computed evidence item, or at records of one field, and a

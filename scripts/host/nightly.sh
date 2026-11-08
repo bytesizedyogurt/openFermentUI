@@ -1,14 +1,17 @@
 #!/bin/bash
-# Nightly extraction (OF-BLD-012 §B.8), and the night's check proposals
-# (OF-BLD-013 §5.2). The com.umutuzo.openferment.nightly LaunchDaemon runs
-# this at 03:00; running it by hand does the same thing.
+# The nightly job (OF-BLD-012 §B.8, OF-BLD-013 §5.2). The
+# com.umutuzo.openferment.nightly LaunchDaemon runs this at 03:00; running it
+# by hand does the same thing. In order: the database's dump into
+# ~/openferment-backups/ (the newest seven kept), the night's extraction, the
+# nightly checks, the check proposals, and a brief for each new check.
 #
-# Extracts from every document the project holds in its literature (ADR-002;
-# documents arrive through Intake, collected by a person). The batch skips
-# what is already extracted, so a night with nothing new costs nothing, and
-# extraction prints its cost per document. The running service reads the new
-# rows on its next request; no restart. Exits non-zero when a batch failed,
-# so the log says so.
+# Extracts from every document the project OPENFERMENT_PROJECT names holds in
+# its literature (ADR-002; documents arrive through Intake, collected by a
+# person), and waits while none is named. The batch skips what is already
+# extracted, so a night with nothing new costs nothing, and extraction prints
+# its cost per document. The running service reads the new rows on its next
+# request; no restart. Exits non-zero when any of the five steps failed, so
+# the log says so.
 set -uo pipefail
 # shellcheck source=lib.sh
 source "$(dirname "$0")/lib.sh"
@@ -23,9 +26,13 @@ for name in OPENFERMENT_DATABASE_URL OPENFERMENT_PROJECT; do
   [ -n "$value" ] && export "$name=$value"
 done
 
-echo "── $(date '+%Y-%m-%d %H:%M:%S') nightly extraction"
-
 status=0
+# The database as the night finds it, before the night's work writes to it
+# (lib.sh's backup_database: the keg's pg_dump, seven daily files kept).
+echo "── $(date '+%Y-%m-%d %H:%M:%S') nightly dump"
+backup_database || status=$?
+
+echo "── $(date '+%Y-%m-%d %H:%M:%S') nightly extraction"
 # Candidates belong to a project: the one OPENFERMENT_PROJECT names.
 if [ -n "${OPENFERMENT_PROJECT:-}" ]; then
   "$PY" -m openferment_core.extract --all || status=$?

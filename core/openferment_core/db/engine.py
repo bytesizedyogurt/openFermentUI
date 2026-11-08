@@ -53,7 +53,8 @@ def database_url() -> URL:
         raise DatabaseUnavailable(
             f"{URL_SETTING} is not set. Put it in core/.env: "
             "postgresql://openferment:openferment@127.0.0.1:5432/openferment_dev for `pnpm db:up`, "
-            "then run `pnpm db:migrate`."
+            "then run `pnpm db:migrate`; on the live host scripts/host/install.sh writes it (the database "
+            "openferment)."
         )
     return as_async(raw)
 

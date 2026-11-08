@@ -14,10 +14,9 @@
 // (/pureos/build/:trainId, OF-BLD-020 §5.3) opens the same proposal from the
 // store (`proposedTrains`) and mounts `ProposalMissingList` above its steps
 // and `ProposalReasonLine` beside each unit's card.
-import type { ProposalMissing, ProposalReason, TrainProposal } from '@/data/types';
 import { UNIT_OPERATIONS_BY_ID } from '@/data/vocabulary';
 import { href } from '@/router';
-import { builderPath } from '@/lib/pureos';
+import { builderPath, type ProposalMissing, type ProposalReason, type TrainProposal } from '@/lib/pureos';
 import { Callout, Card } from '@/components/ui';
 
 const LINK = 'text-accent hover:underline inline-flex min-h-[44px] items-center';

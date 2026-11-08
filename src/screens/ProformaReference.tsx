@@ -1,123 +1,96 @@
-// A reference biorefinery's page (OF-BLD-019 §3.3, D3): /proforma/reference/:id.
+// A reference plant's page (alpha 2.2 D8; OF-BLD-019 §3.3): /proforma/reference/:plant.
 //
-// One page for every reference flowsheet on the shelf: the corn stover
-// benchmark (the NREL 2011 design) and the dry-grind corn ethanol plant, each
-// run whole by BioSTEAM on its package's own defaults. It reads, and never
-// types:
+// One page for each plant of the library shelf a reference run reads: the
+// corn stover plant (the NREL 2011 design, the benchmark) and the dry-grind
+// corn plant, each run whole by BioSTEAM on its package's own values through
+// the library's door, and any other plant of the shelf by its id (called a
+// plant of the library shelf, and held to a package test only when its
+// entry names one). It reads, and never types:
 //
-//   GET /api/proforma/reference/{id}   the shelf's entry, the newest stored
-//                                      `proforma.reference` run (or none), the
-//                                      package test's values as the service
-//                                      read them from the installed test
-//                                      file, the simulator's status;
-//   POST /api/proforma/reference/{id}  Run or Rerun (a basis already run
-//                                      returns its stored artifact).
+//   GET  /api/library                     the plant's entry: its title, its module,
+//                                         its package test, its default
+//                                         configuration, the changes it needs to
+//                                         build here
+//   GET  /api/runs?engine=biosteam        the project's runs: the plant's newest
+//                                         run on its package's own values, in the
+//                                         configuration a run of it takes when it
+//                                         names none
+//   GET  /api/runs/{id}                   that run's report: its artifact, its SFF
+//                                         record, its parameters
+//   GET  /api/biorepo/artifacts?tool=     the runs a person kept from the shelf's
+//                                         retired reference entry for this plant
+//                                         (alpha 2.2 D8), each listed with its
+//                                         checks and a link to BioRepo's page
+//   GET  /api/library/{plant}/regression  the package test's values, before a run
+//   POST /api/library/{plant}/run         Run or Rerun, in the person's name (a
+//                                         basis already run answers from its row)
 //
-// The header names the source package and version, the provenance as the
-// artifact computes it, and the package test the run is held to. The price is the output the shelf names (`priceOutput`). Below it,
-// "Held to its package's own test" sets each regression value of the package
-// beside what this run measured, the relative difference and whether it is
-// within the package's tolerance, every number from the artifact's `checks`
-// (or, before a run, the service's `regression`), none typed here. Then the
-// same sections a scenario page shows, over the reference artifact read as a
-// run (`runViewOfReference`): the cost breakdown closing on the TEA's own
-// product price, what the TEA holds (its installed equipment cost is the
-// TEA's, never a sum over the units: a TEA with a Lang factor prices
-// installation on the purchase costs as a whole), streams, equipment,
-// utilities, the diagram, and what the package set, read back. A reference
-// run is one case, so it has no distribution, sensitivity or sliders. A
-// change this installation makes so the package runs at all (the corn
-// plant's `compatibility` convention) is said in words.
+// The header names the plant's package and version, the provenance as the
+// run's artifact computes it, and the package test the run is held to. The
+// price is the one the run's TEA solves at the package's rate of return.
+// Below it, "Held to its package's own test" sets each value of the
+// package's test beside what this run measured, the relative difference and
+// whether it is within the package's tolerance, every number from the
+// artifact's `checks` (or, before a run, the service's `regression`), none
+// typed here (the table is lib/proforma's `regressionTable`, the run's page
+// shows the same). Then the sections the run's page shows, over the library
+// run read as one case (`runViewOfRun`): the result, the cost breakdown, the
+// streams, the equipment, the utilities and what the package set, read back;
+// the plant's drawing is its SFF file's graph, on the run's page. A change
+// this installation makes so the package builds at all (the plant's
+// `compat`) is said in words.
 import { useEffect, useState } from 'react';
 import { BookOpen, Play } from 'lucide-react';
-import type { Artifact, FlowsheetInfo, PackageRegression, RegressionCheck } from '@/data/types';
+import type { PackageRegression, RegressionCheck } from '@/lib/proforma';
+import type { Artifact, EngineRun, RunReport as EngineRunReport } from '@/lib/studies';
 import { href } from '@/router';
+import { useStore } from '@/store';
 import { fmt } from '@/engine/units';
 import { exportCSV } from '@/lib/csv';
+import { runnable, type LibraryPlant, type LibraryShelf } from '@/lib/library';
 import { PageHeader, Card, Button, Callout, LinkButton, cx } from '@/components/ui';
 import { ProvenanceBadge, Tick } from '@/components/Provenance';
 import {
-  LEGACY_BENCHMARK_TOOL,
   ProformaDown,
-  REFERENCE_TOOL,
+  REFERENCE_PLANTS,
   SIMULATOR_SAYS,
-  basisInput,
-  proformaReference,
-  referenceChecks,
-  referencePrice,
-  runProformaReference,
-  runViewOfReference,
+  type SimulatorStatus,
+  keptReferenceRuns,
+  keptRunsOf,
+  libraryPrice,
+  libraryRegression,
+  packageChecks,
+  proformaStatus,
+  referenceRunOf,
+  regressionRows,
+  regressionTable,
+  retiredEntryOf,
+  runViewOfRun,
   stamp,
-  type ReferenceResponse,
 } from '@/lib/proforma';
-import { CostBreakdown, DiagramCard, EquipmentTable, ReadBack, StreamsTable, UtilitiesCard, cell } from '@/screens/ProformaBiosteam';
+import { StudiesRefused, libraryShelf, listRuns, runPlant, runReport } from '@/lib/studies';
+import { RunReport } from '@/screens/ProformaBiosteam';
 
 const problemOf = (e: unknown) => (e instanceof ProformaDown ? `${e.message} ${e.remedy ?? ''}`.trim() : e instanceof Error ? e.message : String(e));
-
-/** A value as a regression table prints it: thousands grouped, else five significant figures. */
-const sig = (v: number | null | undefined, n = 5): string => {
-  if (v == null || !Number.isFinite(v)) return '—';
-  if (Math.abs(v) >= 1000) return Math.round(v).toLocaleString('en-US');
-  return String(Number(v.toPrecision(n)));
-};
-/** A share as a percentage, for the relative difference and the tolerance. */
-const pct = (v: number | null | undefined): string => (v == null || !Number.isFinite(v) ? '—' : `${sig(v * 100, 2)} %`);
 
 const num = (v: unknown): number | null => (typeof v === 'number' && Number.isFinite(v) ? v : null);
 
 // ── Held to its package's own test ──────────────────────────────────────
 
-interface RegressionRow {
-  expression: string;
-  label: string;
-  unit: string;
-  package: number;
-  rtol: number;
-  measured: number | null;
-  relDiff: number | null;
-  within: boolean | null;
-}
-
-/** The rows: the run's checks when it ran, else the package's values with nothing beside them. */
-export function regressionRows(regression: PackageRegression | null, checks: RegressionCheck[], ran: boolean): RegressionRow[] {
-  if (ran && checks.length) return checks.map((c) => ({ ...c }));
-  return (regression?.values ?? []).map((v) => ({ ...v, measured: null, relDiff: null, within: null }));
-}
-
-export function regressionTable(rows: RegressionRow[]) {
-  const headers = ['Quantity', 'Expression', 'Unit', "Package's value", 'This run', 'Relative difference', 'Tolerance', 'Within'];
-  const body = rows.map((r) => [
-    r.label,
-    r.expression,
-    r.unit || '—',
-    sig(r.package),
-    sig(r.measured),
-    r.relDiff == null ? (r.measured != null && r.package === 0 ? 'package value is zero' : '—') : pct(r.relDiff),
-    pct(r.rtol),
-    r.within == null ? 'not run' : r.within ? 'within' : 'outside',
-  ]);
-  return { headers, rows: body };
-}
-
 function RegressionCard({
   regression,
   checks,
-  art,
+  ran,
   packageTest,
-  id,
+  plant,
 }: {
   regression: PackageRegression | null;
   checks: RegressionCheck[];
-  art: Artifact | null;
+  ran: boolean;
   packageTest: string | null;
-  id: string;
+  plant: string;
 }) {
-  // Only a reference run is checked against the package's test; the
-  // benchmark kept before reference runs held their checks measured a price
-  // alone, so nothing stands beside the package's values for it (§3.R).
-  const checked = art?.tool === REFERENCE_TOOL;
-  art = checked ? art : null;
-  const rows = regressionRows(regression, checks, !!art);
+  const rows = regressionRows(regression, checks, ran);
   const t = regressionTable(rows);
   const within = rows.filter((r) => r.within === true).length;
   return (
@@ -125,7 +98,7 @@ function RegressionCard({
       <div className="flex flex-wrap items-start justify-between gap-2 mb-1">
         <h2 className="font-serif text-section-title font-semibold">Held to its package&rsquo;s own test</h2>
         {rows.length > 0 && (
-          <button className="chip" data-testid="csv-regression" onClick={() => exportCSV(`${id}-package-test.csv`, t.headers, t.rows)}>
+          <button className="chip" data-testid="csv-regression" onClick={() => exportCSV(`${plant}-package-test.csv`, t.headers, t.rows)}>
             CSV
           </button>
         )}
@@ -140,7 +113,7 @@ function RegressionCard({
           </>
         ) : (
           <>
-            The service read no regression test for this flowsheet
+            The service read no package test for this plant
             {packageTest ? (
               <>
                 {' '}
@@ -151,12 +124,12 @@ function RegressionCard({
           </>
         )}
       </p>
-      {art && rows.length > 0 && (
+      {ran && rows.length > 0 && (
         <p className="text-body mb-2 font-num" data-testid="regression-summary">
           {within} of {rows.length} within the package&rsquo;s tolerance on this run.
         </p>
       )}
-      {!art && rows.length > 0 && <p className="text-body mb-2">Not run on this service yet: run it, and this run&rsquo;s values stand beside the package&rsquo;s.</p>}
+      {!ran && rows.length > 0 && <p className="text-body mb-2">Not run in this project yet: run it, and this run&rsquo;s values stand beside the package&rsquo;s.</p>}
       {rows.length > 0 && (
         <div className="overflow-x-auto">
           <table className="w-full text-caption">
@@ -192,82 +165,143 @@ function RegressionCard({
   );
 }
 
-// ── What the TEA holds ──────────────────────────────────────────────────
+// ── Runs kept from the retired reference entry (alpha 2.2 D8) ───────────
 
-function TeaCard({ art, readBack }: { art: Artifact; readBack: Record<string, unknown> }) {
-  const view = runViewOfReference(art);
-  const tea = view?.tables.tea ?? null;
-  if (!view || !tea) return null;
-  const units = view.tables.tableUnits;
-  const annual = units.annual ?? 'USD/yr';
-  const cost = units.cost ?? 'USD';
-  const lang = num(readBack.langFactor);
-  const rows: [string, string, string, string?][] = [
-    ['Product price', sig(tea.productPrice), tea.basis ? `USD per ${tea.basis}` : (units.price ?? 'USD/kg')],
-    ['Internal rate of return', sig(tea.IRR), 'share'],
-    ['Sales', cell(tea.sales), annual],
-    ['Material cost', cell(tea.materialCost), annual],
-    ['of which feedstock', cell(tea.feedstockCost), annual],
-    ['Utility cost', cell(tea.utilityCost), annual],
-    ['Purchase cost of equipment', cell(tea.purchaseCost), cost],
-    ['Installed equipment cost', cell(tea.installedEquipmentCost), cost, 'tea-installed'],
-    ['Fixed capital investment', cell(tea.FCI), cost],
-    ['Total capital investment', cell(tea.TCI), cost],
-    ['Fixed operating cost', cell(tea.FOC), annual],
-    ['Labour', cell(tea.laborCost), annual],
-    ['Capital recovery', cell(tea.capitalRecovery), annual],
-    ['Co-product credits', cell(tea.coproductCredits), annual],
-    ['Operating hours', cell(tea.operatingHours), 'h/yr'],
-  ];
+function KeptRunsCard({ kept }: { kept: Artifact[] }) {
+  const entries = [...new Set(kept.map((a) => retiredEntryOf(a)).filter((e): e is string => !!e))];
   return (
-    <Card className="p-4" data-testid="tea-summary">
-      <h2 className="font-serif text-section-title font-semibold mb-1">What the TEA holds</h2>
+    <Card className="p-4" data-testid="kept-reference-runs">
+      <h2 className="font-serif text-section-title font-semibold mb-1">Runs kept from the retired reference entry</h2>
       <p className="text-caption text-ink-soft mb-2">
-        Read from the package&rsquo;s {tea.teaClass} object after the run, through its own attributes; nothing here is summed in the browser.
+        Proforma&rsquo;s shelf held a hand-written entry for this plant (<span className="font-num">{entries.join(', ')}</span>) until alpha 2.2. The
+        runs a person kept from it stay theirs: each replays as kept and is held to this plant&rsquo;s package test, and BioRepo&rsquo;s page for it
+        shows the whole run.
       </p>
-      <table className="w-full text-caption">
-        <tbody>
-          {rows.map(([label, value, unit, testid]) => (
-            <tr key={label} className="border-t border-line/50" data-testid={testid}>
-              <td className="py-0.5 pr-2">{label}</td>
-              <td className="py-0.5 px-1.5 text-right font-num">{value}</td>
-              <td className="py-0.5 pl-1.5 font-num text-ink-soft">{unit}</td>
-            </tr>
-          ))}
-        </tbody>
-      </table>
-      <p className="text-caption text-ink-soft mt-2" data-testid="tea-installed-note">
-        The installed equipment cost is the TEA&rsquo;s own figure, the one the price rests on. The equipment table below lists each unit&rsquo;s installed
-        cost as BioSTEAM&rsquo;s unit holds it; their sum need not equal the TEA&rsquo;s, because a TEA with a Lang factor prices installation on the
-        purchase costs as a whole.
-        {lang != null && (
-          <>
-            {' '}
-            The Lang factor read back from this package: <span className="font-num">{sig(lang)}</span>.
-          </>
-        )}
-      </p>
+      <ul className="space-y-3">
+        {kept.map((a) => {
+          const checks = packageChecks(a);
+          const rows = regressionRows(null, checks, true);
+          const t = regressionTable(rows);
+          const within = rows.filter((r) => r.within === true).length;
+          return (
+            <li key={a.id} className="border-t border-line pt-2" data-testid="kept-reference-run" data-artifact={a.id}>
+              <p className="text-caption flex flex-wrap items-center gap-1.5">
+                <ProvenanceBadge p={a.provenance} compact />
+                {a.tool === 'proforma_benchmark' ? 'The benchmark' : `A reference run of ${retiredEntryOf(a)}`}, kept{' '}
+                <span className="font-num">{stamp(a.createdAt)}</span> ·{' '}
+                <a className="font-num underline underline-offset-2 hover:text-accent" href={href(`/biorepo/artifacts/${encodeURIComponent(a.id)}`)}>
+                  {a.id}
+                </a>
+              </p>
+              {rows.length > 0 ? (
+                <>
+                  <p className="text-caption font-num mt-1" data-testid="kept-reference-within">
+                    {within} of {rows.length} within the package&rsquo;s tolerance on this run.
+                  </p>
+                  <div className="overflow-x-auto mt-1">
+                    <table className="w-full text-caption">
+                      <thead>
+                        <tr className="border-b border-line text-ink-soft">
+                          {t.headers.map((h, i) => (
+                            <th key={h} className={i < 3 ? 'text-left py-1 pr-2 font-medium' : 'text-right py-1 px-1.5 font-medium'}>
+                              {h}
+                            </th>
+                          ))}
+                        </tr>
+                      </thead>
+                      <tbody>
+                        {t.rows.map((cells, i) => (
+                          <tr key={rows[i].expression} className="border-b border-line/50 align-top">
+                            {cells.map((c, j) => (
+                              <td key={j} className={j < 3 ? 'py-1 pr-2' : 'py-1 px-1.5 text-right font-num'}>
+                                {c}
+                              </td>
+                            ))}
+                          </tr>
+                        ))}
+                      </tbody>
+                    </table>
+                  </div>
+                </>
+              ) : (
+                <p className="text-caption text-ink-soft mt-1">This run keeps no checks against the package&rsquo;s test.</p>
+              )}
+            </li>
+          );
+        })}
+      </ul>
     </Card>
   );
 }
 
 // ── the page ────────────────────────────────────────────────────────────
 
-export default function ProformaReference({ flowsheetId }: { flowsheetId: string }) {
-  const [state, setState] = useState<ReferenceResponse | null>(null);
+export default function ProformaReference({ plantId }: { plantId: string }) {
+  const reviewer = useStore((s) => s.reviewer).trim();
+  const [shelf, setShelf] = useState<LibraryShelf | null>(null);
+  // Whether the shelf answered, either way: the plant's default configuration waits on it.
+  const [shelfAsked, setShelfAsked] = useState(false);
+  const [report, setReport] = useState<EngineRunReport | null>(null);
+  // The project's runs: undefined until they answer, null when they could not be read.
+  const [runs, setRuns] = useState<EngineRun[] | null | undefined>(undefined);
+  // The runs kept from the retired entry for this plant: undefined until they answer, null when unread.
+  const [kept, setKept] = useState<Artifact[] | null | undefined>(undefined);
+  const [regression, setRegression] = useState<PackageRegression | null>(null);
+  const [status, setStatus] = useState<SimulatorStatus | null>(null);
   const [problem, setProblem] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
   const [elapsed, setElapsed] = useState(0);
 
   useEffect(() => {
     const ctrl = new AbortController();
-    setState(null);
+    setShelf(null);
+    setShelfAsked(false);
+    setReport(null);
+    setRuns(undefined);
+    setKept(undefined);
+    setRegression(null);
     setProblem(null);
-    proformaReference(flowsheetId, ctrl.signal)
-      .then(setState)
-      .catch((e: unknown) => !ctrl.signal.aborted && setProblem(problemOf(e)));
+    const said = (e: unknown) => !ctrl.signal.aborted && setProblem(problemOf(e));
+    // The package test's values are asked for once the shelf names the plant.
+    libraryShelf(ctrl.signal)
+      .then((sh) => {
+        if (ctrl.signal.aborted) return;
+        setShelf(sh);
+        if (sh.plants?.some((p) => p.id === plantId))
+          libraryRegression(plantId, ctrl.signal).then(setRegression, () => !ctrl.signal.aborted && setRegression(null));
+      }, said)
+      .finally(() => !ctrl.signal.aborted && setShelfAsked(true));
+    proformaStatus(ctrl.signal).then(setStatus, () => !ctrl.signal.aborted && setStatus(null));
+    listRuns(ctrl.signal, 'biosteam').then(
+      (rs) => !ctrl.signal.aborted && setRuns(rs),
+      (e: unknown) => {
+        if (ctrl.signal.aborted) return;
+        setRuns(null);
+        said(e);
+      },
+    );
+    keptReferenceRuns(ctrl.signal).then(
+      (all) => !ctrl.signal.aborted && setKept(keptRunsOf(plantId, all)),
+      () => !ctrl.signal.aborted && setKept(null),
+    );
     return () => ctrl.abort();
-  }, [flowsheetId]);
+  }, [plantId]);
+
+  const plant: LibraryPlant | null = shelf?.plants?.find((p) => p.id === plantId) ?? null;
+  // The configuration a run of the plant takes when it names none: its default, as the library door runs it.
+  const configuration = plant ? (runnable(plant).configurations[0] ?? null) : null;
+  const chosen = runs && shelfAsked ? referenceRunOf(plantId, runs, configuration) : null;
+  useEffect(() => {
+    if (!chosen) return;
+    const ctrl = new AbortController();
+    runReport(chosen.id, ctrl.signal).then(
+      (r) => !ctrl.signal.aborted && setReport(r),
+      (e: unknown) => !ctrl.signal.aborted && setProblem(problemOf(e)),
+    );
+    return () => ctrl.abort();
+  }, [chosen?.id]);
+  // The project's runs answered (with the plant's reference run or none), and the shelf named its configuration.
+  const asked = runs !== undefined && runs !== null && shelfAsked && (!chosen || report !== null);
 
   useEffect(() => {
     if (!busy) return;
@@ -280,41 +314,41 @@ export default function ProformaReference({ flowsheetId }: { flowsheetId: string
   const run = () => {
     setBusy(true);
     setProblem(null);
-    runProformaReference(flowsheetId)
-      .then((r) => setState((s) => ({ ...(s ?? {}), ...r })))
-      .catch((e: unknown) => setProblem(problemOf(e)))
-      .finally(() => setBusy(false));
+    runPlant(plantId, null, reviewer)
+      .then((r) => {
+        setReport(r);
+      })
+      .catch((e: unknown) => setProblem(e instanceof StudiesRefused ? `${plantId} refused: ${e.message}` : problemOf(e)))
+      .finally(() => {
+        setBusy(false);
+        proformaStatus().then(setStatus, () => setStatus(null));
+      });
   };
 
-  const info: FlowsheetInfo | null = state?.flowsheet ?? null;
-  const art = state?.artifact ?? null;
-  const view = art ? runViewOfReference(art) : null;
-  const regression = state?.regression ?? (art?.output?.regression as PackageRegression | undefined) ?? null;
-  const checks = referenceChecks(art);
-  const price = art ? referencePrice(info, art) : null;
-  const compat = basisInput(art, 'compatibility');
-  const simulator = basisInput(art, 'simulator');
-  const thermo = basisInput(art, 'thermodynamics');
-  const pkg = basisInput(art, 'flowsheet');
+  // A plant the shelf does not hold: the page claims nothing about it and offers no run.
+  const missing = shelf !== null && plant === null;
+  // A reference plant is one of the two the reference runs read; any other is a plant of the library shelf.
+  const reference = REFERENCE_PLANTS.includes(plantId);
+  const keptHere = kept ?? [];
+  const art = report?.run.status === 'done' ? (report.artifact ?? null) : null;
+  const view = art ? runViewOfRun(art) : null;
+  const checks = packageChecks(art);
+  const price = art ? libraryPrice(art) : null;
   const o = (art?.output ?? {}) as Record<string, unknown>;
-  const refs = Array.isArray(o.references) ? (o.references as unknown[]).filter((r): r is string => typeof r === 'string') : [];
-  const irr = num(o.IRR) ?? num(view?.tables.tea?.IRR);
-  const title = info?.title ?? flowsheetId;
-  // The benchmark kept before reference runs held their tables (OF-BLD-014
-  // §8.2): shown, price only, with the note that says so; Run makes the full
-  // reference run.
-  const legacy = art?.tool === LEGACY_BENCHMARK_TOOL;
-  // A 404 in words: the service holds no such reference (§3.R, finding 14).
-  // The page then claims nothing about it and offers no run.
-  const missing = !!problem && !state;
+  const irr = num((o.price as Record<string, unknown> | undefined)?.IRR) ?? num(view?.tables.tea?.IRR);
+  const packageTest = plant?.tests?.find((t) => t === `test_${plantId}`) ?? plant?.tests?.[0] ?? null;
+  const title = plant?.title ?? plantId;
+  const shownRegression = regression ?? ((o.regression as PackageRegression | undefined) || null);
 
   return (
-    <div data-testid="proforma-reference" data-flowsheet={flowsheetId}>
+    <div data-testid="proforma-reference" data-plant={plantId}>
       <PageHeader
-        eyebrow={<><span className="normal-case font-num">{flowsheetId}</span>{missing ? null : ' · reference biorefinery'}</>}
+        eyebrow={<><span className="normal-case font-num">{plantId}</span>{missing ? null : reference ? ' · reference plant' : ' · plant of the library shelf'}</>}
         title={title}
         subtitle={
-          missing ? undefined : (info?.description ?? 'A published biorefinery from the BioSTEAM project’s own biorefineries package, run whole on its package’s defaults.')
+          missing
+            ? undefined
+            : `A published plant from the BioSTEAM project’s own biorefineries package, on the library shelf, run whole on its package’s own values${packageTest ? ' and held to its package’s own test' : ''}.`
         }
         actions={
           <LinkButton to="/proforma">
@@ -323,158 +357,177 @@ export default function ProformaReference({ flowsheetId }: { flowsheetId: string
         }
       />
 
-      {problem && (
+      {(problem || missing) && (
         <div className="mb-4">
           <Callout kind="warn">
-            <span data-testid="reference-problem">{problem}</span>
+            <span data-testid="reference-problem">{missing ? `The library shelf holds no plant ${plantId}.` : problem}</span>
             {missing && (
               <span className="block mt-1">
                 <a className="text-accent hover:underline" href={href('/proforma')}>
                   Proforma
                 </a>
-                &rsquo;s Reference runs row lists the reference biorefineries this service holds.
+                &rsquo;s Reference runs row lists the reference plants, and{' '}
+                <a className="text-accent hover:underline" href={href('/proforma/studies')}>
+                  Studies
+                </a>{' '}
+                runs any plant the shelf holds.
               </span>
             )}
           </Callout>
         </div>
       )}
       {missing ? null : (
-      <>
-      {state?.note && <p className="text-caption text-ink-soft mb-3" data-testid="reference-note">{state.note}</p>}
-
-      <div className="flex flex-wrap items-center gap-x-3 gap-y-1 mb-4 text-caption text-ink-soft" data-testid="reference-meta">
-        <span>
-          Source: <span className="text-ink font-num">{info?.source ?? 'the shelf has not answered'}</span>
-          {pkg?.source.id && <> (<span className="font-num">{pkg.source.id}</span>)</>}
-        </span>
-        {simulator && (
-          <span>
-            · on <span className="font-num text-ink">{String(simulator.value)}</span>
-            {thermo && (
-              <>
-                , <span className="font-num text-ink">{String(thermo.value)}</span>
-              </>
-            )}
-          </span>
-        )}
-        {info?.packageTest && (
-          <span data-testid="reference-package-test">
-            · Held to <span className="font-num text-ink">{info.packageTest}</span>
-          </span>
-        )}
-        {art ? (
-          <span className="inline-flex items-center gap-1" data-testid="reference-provenance">
-            · Provenance, as the artifact computes it: <ProvenanceBadge p={art.provenance} />
-          </span>
-        ) : (
-          <span className="chip">not run yet</span>
-        )}
-      </div>
-
-      <div className="space-y-4">
-        <Card className="p-4" data-testid="reference-run-card">
-          <div className="flex flex-wrap items-center gap-3">
-            <Button variant="primary" onClick={run} disabled={busy || !state} data-testid="reference-run">
-              <Play size={14} /> {busy ? 'Running…' : art && !legacy ? 'Rerun' : 'Run'}
-            </Button>
-            <span className="text-caption text-ink-soft" data-testid="reference-status">
-              {state ? SIMULATOR_SAYS[state.simulator.status] : problem ? 'The simulator is the service’s.' : 'Asking the service…'}
-              {state?.simulator.error && <> {state.simulator.error}</>}
-              {busy && (
-                <>
-                  {' '}
-                  Running for <span className="font-num">{elapsed}</span> s; a first run starts the simulator and loads the plant, and takes a minute or two.
-                </>
-              )}
+        <>
+          <div className="flex flex-wrap items-center gap-x-3 gap-y-1 mb-4 text-caption text-ink-soft" data-testid="reference-meta">
+            <span>
+              Source: <span className="text-ink font-num">{shelf ? `${shelf.package}, ${plant?.module ?? plantId}` : 'the library shelf has not answered'}</span>
             </span>
+            {shelf && (
+              <span>
+                · on <span className="font-num text-ink">{shelf.simulator}</span>, <span className="font-num text-ink">{shelf.thermosteam}</span>
+              </span>
+            )}
+            {packageTest && shelf && (
+              <span data-testid="reference-package-test">
+                · Held to <span className="font-num text-ink">{shelf.testFile}::{packageTest}</span>
+              </span>
+            )}
+            {configuration && (
+              <span data-testid="reference-configuration">
+                · in its default configuration, <span className="font-num text-ink">{configuration}</span>
+              </span>
+            )}
+            {art ? (
+              <span className="inline-flex items-center gap-1" data-testid="reference-provenance">
+                · Provenance, as the artifact computes it: <ProvenanceBadge p={art.provenance} />
+              </span>
+            ) : (
+              asked && <span className="chip">not run yet</span>
+            )}
           </div>
-          {state && !art && !busy && (
-            <p className="text-body mt-3" data-testid="reference-not-run">
-              Not run on this service yet. A run is BioSTEAM building the package&rsquo;s plant on its own defaults and solving it once; the service
-              keeps it as one artifact.
-            </p>
-          )}
-          {art && (
-            <div className="mt-3" data-testid="reference-result">
-              {price ? (
-                <Tick p={art.provenance}>
-                  <div className="text-caption uppercase tracking-wide text-ink-soft">{info?.priceOutput ? `Price (${info.priceOutput})` : 'Price'}</div>
-                  <div className="font-num text-display leading-none" data-testid="reference-price">
-                    {fmt(price.value, 4)}
-                  </div>
-                  <div className="text-caption text-ink-soft mt-1">
-                    {price.basis}; {price.reads}.
-                    {irr != null && (
+
+          <div className="space-y-4">
+            <Card className="p-4" data-testid="reference-run-card">
+              <div className="flex flex-wrap items-center gap-3">
+                <Button variant="primary" onClick={run} disabled={busy || !shelf || !reviewer} data-testid="reference-run">
+                  <Play size={14} /> {busy ? 'Running…' : art ? 'Rerun' : 'Run'}
+                </Button>
+                <span className="text-caption text-ink-soft" data-testid="reference-status">
+                  {status ? SIMULATOR_SAYS[status.status] : 'The simulator is the service’s.'}
+                  {status?.error && <> {status.error}</>}
+                  {busy && (
+                    <>
+                      {' '}
+                      Running for <span className="font-num">{elapsed}</span> s; a first run starts the simulator and builds the plant, and takes a minute or two.
+                    </>
+                  )}
+                </span>
+              </div>
+              {!reviewer && <p className="text-caption text-ink-soft mt-2">A run is asked for in a person&rsquo;s name: set yours in Settings first.</p>}
+              {runs === null && !art && (
+                <p className="text-body mt-3 text-signal-warn" data-testid="reference-runs-unread">
+                  The project&rsquo;s runs could not be read, so this page cannot say whether the plant has run here.
+                </p>
+              )}
+              {asked && !art && !busy && (
+                <p className="text-body mt-3" data-testid="reference-not-run">
+                  {keptHere.length > 0
+                    ? 'The library plant has not run in this project yet; the runs kept from its retired entry are listed below. '
+                    : 'Not run in this project yet. '}
+                  A run is BioSTEAM building the package&rsquo;s plant on its own values and solving it once; the service keeps it as one run with
+                  its artifact and its SFF file, and the same run asked again answers from it.
+                </p>
+              )}
+              {report && art && (
+                <div className="mt-3" data-testid="reference-result">
+                  {price ? (
+                    <Tick p={art.provenance}>
+                      <div className="text-caption uppercase tracking-wide text-ink-soft">Price</div>
+                      <div className="font-num text-display leading-none" data-testid="reference-price">
+                        {fmt(price.value, 4)}
+                      </div>
+                      <div className="text-caption text-ink-soft mt-1">
+                        {price.basis}; {price.reads}.
+                        {irr != null && (
+                          <>
+                            {' '}
+                            Internal rate of return the TEA holds: <span className="font-num">{fmt(irr, 4)}</span>.
+                          </>
+                        )}
+                      </div>
+                    </Tick>
+                  ) : (
+                    <p className="text-body text-ink-soft">The run holds no price: the plant carries no TEA here, or its TEA solved none.</p>
+                  )}
+                  <p className="text-caption text-ink-soft mt-2">
+                    Run{' '}
+                    <a className="font-num hover:text-accent underline underline-offset-2" href={href(`/proforma/runs/${report.run.id}`)} data-testid="reference-run-page">
+                      {report.run.id}
+                    </a>
+                    , kept by {report.run.by}, computed <span className="font-num">{stamp(art.createdAt)}</span>
+                    {art.durationMs > 0 && (
                       <>
                         {' '}
-                        Internal rate of return at this price: <span className="font-num">{sig(irr)}</span>.
+                        in <span className="font-num">{fmt(art.durationMs / 1000, 1)}</span> s
                       </>
                     )}
-                  </div>
-                </Tick>
-              ) : (
-                <p className="text-body text-ink-soft">The run holds no price the shelf names for this flowsheet.</p>
+                    , with <span className="font-num">{art.toolVersion}</span>
+                    {view?.tables.tablesSource && <> · tables from {view.tables.tablesSource}</>}
+                    {report.flowsheet && (
+                      <>
+                        {' '}
+                        · its SFF file{' '}
+                        <a className="font-num underline underline-offset-2 hover:text-accent" href={href(`/flowsheets/${report.flowsheet.id}`)}>
+                          {report.flowsheet.id}
+                        </a>
+                      </>
+                    )}
+                    . The run&rsquo;s page draws the plant from its SFF file and lists its parameters.
+                  </p>
+                </div>
               )}
-              <p className="text-caption text-ink-soft mt-2">
-                Run{' '}
-                <a className="font-num hover:text-accent underline underline-offset-2" href={href(`/biorepo/artifacts/${art.id}`)}>
-                  {art.id}
-                </a>
-                , computed <span className="font-num">{stamp(art.createdAt)}</span>
-                {art.durationMs > 0 && (
-                  <>
-                    {' '}
-                    in <span className="font-num">{fmt(art.durationMs / 1000, 1)}</span> s
-                  </>
-                )}
-                , by <span className="font-num">{art.toolVersion}</span>
-                {view?.tables.tablesSource && <> · tables from {view.tables.tablesSource}</>}.
+            </Card>
+
+            {(plant?.compat ?? []).map((c) => (
+              <Card key={c.change} className="p-4" data-testid="compatibility">
+                <h2 className="font-serif text-section-title font-semibold mb-1">What this installation changes so the package builds</h2>
+                <p className="text-body">
+                  <span className="font-num">{c.change}</span>
+                </p>
+                <p className="text-caption text-ink-soft mt-1">{c.why}</p>
+                <p className="text-caption text-ink-soft mt-1">Every run&rsquo;s basis states it as a convention.</p>
+              </Card>
+            ))}
+
+            <RegressionCard regression={shownRegression} checks={checks} ran={!!art} packageTest={packageTest} plant={plantId} />
+
+            {keptHere.length > 0 && <KeptRunsCard kept={keptHere} />}
+            {kept === null && (
+              <p className="text-caption text-ink-soft" data-testid="kept-reference-unread">
+                The runs kept from the retired reference entries could not be read; BioRepo lists every artifact the project keeps.
               </p>
-            </div>
-          )}
-        </Card>
+            )}
 
-        {compat && (
-          <Card className="p-4" data-testid="compatibility">
-            <h2 className="font-serif text-section-title font-semibold mb-1">What this installation changes so the package runs</h2>
-            <p className="text-body">
-              <span className="font-num">{String(compat.value)}</span>
-            </p>
-            {compat.source.note && <p className="text-caption text-ink-soft mt-1">{compat.source.note}</p>}
-            <p className="text-caption text-ink-soft mt-1">The run&rsquo;s basis states it as a {compat.source.kind}.</p>
-          </Card>
-        )}
-
-        <RegressionCard regression={regression} checks={checks} art={art} packageTest={info?.packageTest ?? null} id={flowsheetId} />
-
-        {view && (
-          <>
-            <CostBreakdown view={view} priceBasis={info?.priceBasis ?? 'on the basis the package states'} csvName={flowsheetId} totalLabel="The TEA’s product price" />
-            {art && <TeaCard art={art} readBack={(o.readBack ?? {}) as Record<string, unknown>} />}
-            <p className="text-caption text-ink-soft" data-testid="reference-one-case">
-              A reference run is one case on the package&rsquo;s own defaults: it samples nothing, so it has no price distribution, no sensitivity and
-              no sliders.
-            </p>
-            <StreamsTable view={view} csvName={flowsheetId} />
-            <EquipmentTable view={view} csvName={flowsheetId} />
-            <UtilitiesCard view={view} csvName={flowsheetId} />
-            <DiagramCard view={view} csvName={flowsheetId} />
-            <ReadBack view={view} flowsheet={info} />
-          </>
-        )}
-
-        {refs.length > 0 && (
-          <Card className="p-4" data-testid="reference-citations">
-            <h2 className="font-serif text-section-title font-semibold mb-1">What the package cites for the design</h2>
-            <ul className="list-disc pl-5 text-body">
-              {refs.map((r) => (
-                <li key={r}>{r}</li>
-              ))}
-            </ul>
-          </Card>
-        )}
-      </div>
-      </>
+            {view && (
+              <>
+                <p className="text-caption text-ink-soft" data-testid="reference-one-case">
+                  A reference run is one case on the package&rsquo;s own values: it samples nothing, so it has no price distribution, no sensitivity and
+                  no sliders.
+                </p>
+                <RunReport
+                  view={view}
+                  priceBasis={price ? price.basis : 'USD per kg of the product the package names'}
+                  labels={{}}
+                  unitLabels={{}}
+                  scenarioId=""
+                  csvName={plantId}
+                  oneCase
+                  sffRecord={report?.flowsheet?.id ?? null}
+                />
+              </>
+            )}
+          </div>
+        </>
       )}
     </div>
   );

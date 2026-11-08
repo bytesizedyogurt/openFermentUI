@@ -13,14 +13,17 @@
 //   the rows     every number of the price block and of a flowsheet's outputs,
 //                in its unit, each run's value and its change;
 //   the values   every value any run set for itself, each run's with its
-//                origin, the library's default where a run set none.
+//                origin, the library's default where a library run set none;
+//                a dash marks a run that holds no such value (a comparison
+//                that holds a run of another engine, `study comparison 2`).
 import { useEffect, useState } from 'react';
 import { BookOpen, Download } from 'lucide-react';
-import type { ComparisonReport } from '@/data/types';
+import type { ComparisonReport, EngineRun } from '@/lib/studies';
 import { href } from '@/router';
 import { exportCSV } from '@/lib/csv';
 import { stamp } from '@/lib/proforma';
-import { StudiesDown, comparisonReport } from '@/lib/studies';
+import { StudiesDown, comparisonReport, listRuns } from '@/lib/studies';
+import { ranWhat } from '@/lib/pureos';
 import { Callout, Card, LinkButton, PageHeader } from '@/components/ui';
 import { ProvenanceBadge } from '@/components/Provenance';
 import { Tornado, type TornadoRow } from '@/components/figures';
@@ -42,11 +45,12 @@ interface ComparedRow {
 }
 interface ComparedValue {
   key: string;
-  values: { value: number | string | null; unit: string; origin: string; by: string | null }[];
+  /** Each run's value, its origin and who set it; a deposition's reading with its ref. */
+  values: { value: number | string | null; unit: string | null; origin: string | null; by: string | null; ref?: string }[];
 }
 
 /** The artifact's output as the comparison computed it (studies/comparisons.py `_compare`). */
-export function comparedOf(report: ComparisonReport): { runs: ComparedRun[]; rows: ComparedRow[]; values: ComparedValue[] } {
+function comparedOf(report: ComparisonReport): { runs: ComparedRun[]; rows: ComparedRow[]; values: ComparedValue[] } {
   const o = report.artifact.output as Record<string, unknown>;
   return {
     runs: Array.isArray(o.runs) ? (o.runs as ComparedRun[]) : [],
@@ -55,11 +59,42 @@ export function comparedOf(report: ComparisonReport): { runs: ComparedRun[]; row
   };
 }
 
+/**
+ * An output's name in words, by its key in the comparison (`price.<attribute>`, the run's price block, as
+ * core/openferment_core/tools/engine.py PRICE_WORDS says each; `outputs.<key>`, a flowsheet's outputs); the
+ * key itself for one this table does not name. The table below the figure keeps every key.
+ */
+const OUTPUT_WORDS: Record<string, string> = {
+  'price.solvedPrice': 'Selling price solved at the rate of return',
+  'price.packagePrice': 'Product price as the package sets it',
+  'price.IRR': 'Internal rate of return',
+  'price.NPV': 'Net present value',
+  'price.TCI': 'Total capital investment',
+  'price.FCI': 'Fixed capital investment',
+  'price.installed_equipment_cost': 'Installed equipment cost',
+  'price.sales': 'Yearly sales',
+  'price.material_cost': 'Yearly material cost',
+  'price.utility_cost': 'Yearly utility cost',
+  'price.FOC': 'Fixed operating cost',
+  'price.VOC': 'Variable operating cost',
+  'price.feedstockKgPerH': 'Feedstock flow',
+  'outputs.mespUsdPerKg': 'Minimum selling price per kg',
+  'outputs.mespUsdPerGal': 'Minimum selling price per gallon',
+  'outputs.ethanolKgPerH': 'Ethanol made per hour',
+  'outputs.dryFeedKgPerH': 'Dry feed per hour',
+  'outputs.ethanolKgPerKgDryFeed': 'Ethanol per kg of dry feed',
+  'outputs.ethanolDensityKgPerGal': 'Ethanol mass per gallon',
+};
+export const outputWords = (key: string) => OUTPUT_WORDS[key] ?? key;
+
 /** One Tornado row per output whose every later change is a number, in percent; the rest are said in the table alone. */
-export function changeRows(rows: ComparedRow[]): TornadoRow[] {
-  return rows
-    .filter((r) => r.change.length > 1 && r.change.slice(1).every((c) => typeof c === 'number' && Number.isFinite(c)))
-    .map((r) => ({ label: r.key, values: r.change.slice(1).map((c) => (c as number) * 100), tag: r.unit || undefined }));
+function changeRows(rows: ComparedRow[]): TornadoRow[] {
+  return rows.flatMap((r) => {
+    const later = r.change.slice(1);
+    // A run that holds no number for the output leaves its row to the table, which says its change as —.
+    const changes = later.filter((c): c is number => typeof c === 'number' && Number.isFinite(c));
+    return later.length > 0 && changes.length === later.length ? [{ label: outputWords(r.key), values: changes.map((c) => c * 100), tag: r.unit || undefined }] : [];
+  });
 }
 
 const shown = (v: number | string | null | undefined) =>
@@ -69,6 +104,8 @@ const pct = (c: number | null) => (c == null ? '—' : `${c >= 0 ? '+' : ''}${(c
 export default function ProformaComparison({ comparisonId }: { comparisonId: string }) {
   const [report, setReport] = useState<ComparisonReport | null>(null);
   const [problem, setProblem] = useState<string | null>(null);
+  // The project's runs rows, by id: each compared run is named from its own (`ranWhat`), as Studies names it.
+  const [rows, setRows] = useState<Map<string, EngineRun>>(new Map());
 
   useEffect(() => {
     const ctrl = new AbortController();
@@ -77,20 +114,32 @@ export default function ProformaComparison({ comparisonId }: { comparisonId: str
     comparisonReport(comparisonId, ctrl.signal)
       .then(setReport)
       .catch((e: unknown) => !ctrl.signal.aborted && setProblem(problemOf(e)));
+    listRuns(ctrl.signal)
+      .then((list) => setRows(new Map(list.map((r) => [r.id, r]))))
+      .catch(() => undefined);
     return () => ctrl.abort();
   }, [comparisonId]);
 
   const c = report?.comparison ?? null;
   const out = report ? comparedOf(report) : null;
+  // A comparison of library runs alone is `study comparison 1`; one holding another engine's run is version 2
+  // (studies/comparisons.py), whose outputs each come in the unit their run's artifact states.
+  const libraryOnly = report?.artifact.toolVersion === 'study comparison 1';
   const names = (out?.runs ?? []).map((_, i) => `Run ${i + 1}`);
-  const moved = out ? changeRows(out.rows) : [];
-  const still = moved.filter((r) => r.values.every((v) => v === 0));
+  // The outputs no later run moved take no row in the figure; the sentence under it names them.
+  const changed = out ? changeRows(out.rows) : [];
+  const still = changed.filter((r) => r.values.every((v) => v === 0));
+  const moved = changed.filter((r) => r.values.some((v) => v !== 0));
   const rowsHead = ['Output', 'Unit', ...names, ...names.slice(1).map((n) => `${n}: change`)];
   const rowsBody = (out?.rows ?? []).map((r) => [r.key, r.unit || '—', ...r.values.map(shown), ...r.change.slice(1).map(pct)]);
   const valuesHead = ['Value', ...names];
   const valuesBody = (out?.values ?? []).map((v) => [
     v.key,
-    ...v.values.map((x) => `${shown(x.value)} ${x.unit} (${ORIGIN_WORDS[x.origin] ?? x.origin}${x.by ? `, ${x.by}` : ''})`),
+    ...v.values.map((x) =>
+      x.origin == null
+        ? '— (this run holds no such value)'
+        : `${shown(x.value)} ${x.unit ?? ''} (${ORIGIN_WORDS[x.origin] ?? x.origin}${x.by ? `, ${x.by}` : ''}${x.ref ? `, reading ${x.ref}` : ''})`,
+    ),
   ]);
 
   return (
@@ -103,7 +152,7 @@ export default function ProformaComparison({ comparisonId }: { comparisonId: str
             <span className="flex flex-wrap items-center gap-2">
               <ProvenanceBadge p={c.provenance} />
               <span>
-                {c.runIds.length} runs set side by side for {c.by || 'this browser'}, {stamp(c.at)}. Each change is reckoned from the first run.
+                {c.runIds.length} runs set side by side for {c.by || 'nobody named'}, {stamp(c.at)}. Each change is reckoned from the first run.
               </span>
             </span>
           )
@@ -136,8 +185,8 @@ export default function ProformaComparison({ comparisonId }: { comparisonId: str
                   <a className="font-num underline underline-offset-2 hover:text-accent" href={href(`/proforma/runs/${r.artifactId}`)}>
                     {r.artifactId}
                   </a>{' '}
-                  {r.plant}
-                  {r.configuration ? ` (${r.configuration})` : ''}, {r.provenance}
+                  {rows.get(r.artifactId) ? ranWhat(rows.get(r.artifactId)!) : `${r.plant ?? 'a run'}${r.configuration ? ` (${r.configuration})` : ''}`}
+                  {rows.get(r.artifactId) && rows.get(r.artifactId)!.engine !== 'biosteam' ? ` on ${rows.get(r.artifactId)!.engine}` : ''}, {r.provenance}
                   {i === 0 && <span className="text-ink-soft"> · each change is reckoned from this run</span>}
                 </li>
               ))}
@@ -146,12 +195,16 @@ export default function ProformaComparison({ comparisonId }: { comparisonId: str
 
           <Tornado
             title="How far does each run move each output from the first?"
-            drawn={`One row per output whose every later change is a number, sorted by how far it moved; each bar is ${names.length > 2 ? 'a later run’s' : 'the second run’s'} change from run 1.`}
+            drawn={`One row per output that moved, every later change a number, sorted by how far it moved; each bar is ${names.length > 2 ? 'a later run’s' : 'the second run’s'} change from run 1.`}
             series={names.slice(1)}
             unit="% from run 1"
             rows={moved}
             provenance={c.provenance}
             csvName={`comparison-${c.id}-changes`}
+            empty={{
+              what: changed.length ? 'no later run moved an output from run 1.' : 'each output here is a number in some of these runs alone.',
+              where: 'A bar is drawn for an output every run answers with a number; the table below holds every number, run by run.',
+            }}
             notes={[
               'Every change is the comparison artifact’s own, relative to the first run’s value; the browser divides nothing.',
               ...(still.length ? [`${still.length} of these outputs did not move: ${still.map((r) => r.label).join(', ')}.`] : []),
@@ -165,7 +218,11 @@ export default function ProformaComparison({ comparisonId }: { comparisonId: str
                 <Download size={12} aria-hidden /> CSV
               </button>
             </div>
-            <p className="text-caption text-ink-soft mb-2">The price block in BioSTEAM&rsquo;s TEA units and a flowsheet&rsquo;s outputs in theirs, read from each run&rsquo;s artifact.</p>
+            <p className="text-caption text-ink-soft mb-2" data-testid="comparison-rows-units">
+              {libraryOnly
+                ? 'The price block in BioSTEAM’s TEA units and a flowsheet’s outputs in theirs, read from each run’s artifact.'
+                : 'Each output in the unit its run’s artifact states, a library run’s price block in BioSTEAM’s TEA units, read from each run’s artifact.'}
+            </p>
             <div className="overflow-x-auto">
               <table className="w-full text-caption">
                 <thead>
@@ -203,7 +260,7 @@ export default function ProformaComparison({ comparisonId }: { comparisonId: str
             </div>
             {valuesBody.length ? (
               <>
-                <p className="text-caption text-ink-soft mb-2">Each value any run set for itself, each run&rsquo;s with its origin; a run that set none ran on the library&rsquo;s default.</p>
+                <p className="text-caption text-ink-soft mb-2">Each value any run set for itself, each run&rsquo;s with its origin. A library run that set none ran on the library&rsquo;s default, and a dash marks a run that holds no such value.</p>
                 <div className="overflow-x-auto">
                   <table className="w-full text-caption">
                     <thead>

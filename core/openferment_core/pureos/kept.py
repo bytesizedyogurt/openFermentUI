@@ -1,4 +1,4 @@
-"""The trains a model built, kept on the service (OF-BLD-020 §5.4).
+"""The trains a model built, kept on the service.
 
 A person's trains are the project's rows, saved from pureOS's Builder
 (project_state.py), and travel whole with a run. A model builds a train across tool calls

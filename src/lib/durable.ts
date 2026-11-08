@@ -9,17 +9,19 @@
 //
 // So state is split by lifetime rather than persisted wholesale:
 //
-//   Reference  papers, protocols, products, vocabulary — never mutated, so
-//              there is nothing to persist. Reloading gets them from source.
+//   Reference  papers, vocabulary — never mutated, so there is nothing to
+//              persist. Reloading gets them from source.
 //   Service    since alpha 2.0 (stage 2) every scientific record lives on the
 //              service, in the open project: review decisions, Guild's
 //              ledger, depositions, measured evidence, runbooks and their
 //              locks, overrides, fits, scenarios, trains and Live
-//              conversations (lib/projectState.ts).
-//   Durable    who is deciding and who is acting, the lessons finished here,
-//              and the writes the service has not yet acknowledged: review
-//              decisions, Guild changes and project rows made while it was
-//              away — must survive until they are sent.
+//              conversations (lib/projectState.ts), and since alpha 2.2 its
+//              catalogues and protocols, a lesson's passing among the
+//              ledger's entries (E.12).
+//   Durable    who is deciding and who is acting, and the writes the service
+//              has not yet acknowledged: review decisions, Guild changes and
+//              project rows made while it was away — must survive until they
+//              are sent.
 //   Ephemeral  open panels, density, theme, sim speed — must NOT survive. A
 //              theme that follows you across sessions is a preference; a
 //              collapsed panel that does is a bug.
@@ -33,7 +35,13 @@
 // all of these end with the app running normally on in-memory state. Losing
 // persistence is bad; refusing to open the screen because persistence is
 // unavailable would be worse.
-import type { Deposition, Guild, GuildWithdrawal, InputAssumption, LiveConversation, MeasuredEvidence, Override, Runbook, Provenance, RecordStatus, ReviewDecision, Scenario, TrainSpec } from '@/data/types';
+import type { components } from '@/api/types.gen';
+import type { Guild, GuildWithdrawal } from '@/lib/guild';
+import type { Deposition, MeasuredEvidence, Provenance, Runbook } from './studies';
+import type { RecordStatus, ReviewDecision } from './review';
+import type { Override } from './params';
+import type { LiveConversation } from './postdoc';
+import type { Scenario } from './proforma';
 import type { OutboxEntry } from './projectState';
 
 const DB_NAME = 'openferment';
@@ -45,17 +53,18 @@ const KEY = 'snapshot';
  * A review decision, reduced to the fields review actually changes.
  *
  * Named DurableReviewDecision (OF-BLD-012 §2.1) because the service's
- * ReviewDecision in `src/data/types.ts` is this plus recordId, at, and an
- * optional replacement span. `DecisionMirror` below has the compiler hold the
- * two together: every field here must exist there with the same type.
+ * ReviewDecision (`src/lib/review.ts`, generated) is this plus recordId, at,
+ * and an optional replacement span. Each field reads its type from it, and
+ * `DecisionMirror` below has the compiler hold the two together: every field
+ * here must exist there with the same type.
  */
 export interface DurableReviewDecision {
   status: RecordStatus;
   provenance: Provenance;
-  gold?: { value: number | string; unit: string };
-  corrected?: { value: number; unit: string };
-  rejectReason?: string;
-  reviewer?: string;
+  gold?: ReviewDecision['gold'];
+  corrected?: ReviewDecision['corrected'];
+  rejectReason?: ReviewDecision['rejectReason'];
+  reviewer?: ReviewDecision['reviewer'];
   /**
    * When THIS decision was made, ISO. Compared against the service's
    * decision for the same record — the later wins (OF-BLD-012 §7.3). The
@@ -70,8 +79,8 @@ export interface DurableReviewDecision {
    * still standing on the paper's words after a reload, and is posted with
    * them when the service is back.
    */
-  quote?: string;
-  sectionId?: string;
+  quote?: ReviewDecision['quote'];
+  sectionId?: ReviewDecision['sectionId'];
 }
 
 /**
@@ -131,10 +140,10 @@ export interface DurableSnapshot {
     actingId: string | null;
   };
   /**
-   * Lessons finished in this browser, by id (OF-BLD-013 §3.2). Optional for
-   * the same reason as `guild`. What a lesson counts toward a person's skills
-   * lives on the ledger; this only keeps the module map honest across a
-   * refresh.
+   * LEGACY, left where it lies. The lessons finished in this browser, by id,
+   * as a snapshot before alpha 2.2 E.12 kept them; a lesson shows finished
+   * from the ledger's entries for whoever is learning, so nothing reads this,
+   * and the next save leaves it out.
    */
   learnProgress?: Record<string, true>;
   /**
@@ -142,7 +151,7 @@ export interface DurableSnapshot {
    * (OF-BLD-014 §8.4); a snapshot that holds them with no
    * `parameterOverrides` entry for a scenario is read into that scope (D3).
    */
-  proformaAssumptions?: Record<string, InputAssumption[]>;
+  proformaAssumptions?: Record<string, ScenarioAssumption[]>;
   /** LEGACY, read once: the parameter panel's overrides, by scope (OF-BLD-020 D3). */
   parameterOverrides?: Record<string, Override[]>;
   /** LEGACY, read once: the fermOS fits chosen for a scenario's inputs (OF-BLD-019 §5.1). */
@@ -157,14 +166,27 @@ export interface DurableSnapshot {
   trainsMade?: Record<string, TrainMade>;
 }
 
-/** A train built in pureOS's Builder and saved (OF-BLD-020 §5.3): one of the project's rows. */
-export interface TrainMade {
-  /** The train as data, every value typed into its panels laid in as each place's params. */
-  train: TrainSpec;
-  /** When it was saved, ISO, UTC. */
-  savedAt: string;
-  /** The reviewer name it was saved under. */
+/**
+ * A train built in pureOS's Builder and saved (OF-BLD-020 §5.3): one of the project's rows, the service's `TrainMade`
+ * generated from its model (ADR-007). It holds the train as data, every value typed into its panels laid in as each
+ * place's params; when it was saved, ISO, UTC; and the reviewer name it was saved under.
+ */
+export type TrainMade = components['schemas']['TrainMade'];
+
+/**
+ * A value a named person typed for one input of a Proforma scenario, with its range (OF-BLD-014 §8.4): the browser's
+ * own shape, as a snapshot written before the parameter panel keeps it (`proformaAssumptions`, read once into the
+ * scenario's overrides, each a person's assumption), and as the store reads a `proforma:` scope's numeric overrides
+ * (`assumptionsFromOverrides`).
+ */
+export interface ScenarioAssumption {
+  key: string;
+  value: number;
+  low: number;
+  high: number;
   by: string;
+  at: string;
+  note: string | null;
 }
 
 export const EMPTY_SNAPSHOT: DurableSnapshot = {

@@ -49,7 +49,8 @@
  */
 import { readFileSync, readdirSync, statSync } from 'node:fs';
 import { join, relative } from 'node:path';
-import type { ExtractionRecord, Provenance } from '../src/data/types';
+import type { ExtractionRecord } from '../src/lib/review';
+import type { Provenance } from '../src/lib/studies';
 import { ENCODING, NEVER_EVIDENCE, pointKey } from '../src/components/figures/encoding';
 import { stripPoints, toTable as stripTable } from '../src/components/figures/EvidenceStrip';
 import { toTable as ceilingTable } from '../src/components/figures/CeilingGap';
@@ -58,7 +59,7 @@ import { toTable as distributionTable } from '../src/components/figures/Distribu
 import { toTable as tornadoTable } from '../src/components/figures/Tornado';
 import { toTable as ledgerTable } from '../src/components/figures/IntervalLedger';
 import { emptyOf as recoveryEmpty, noBar, toTable as recoveryTable } from '../src/components/figures/RecoveryByUnit';
-import { bars as waterfallBars, toTable as waterfallTable } from '../src/components/figures/CostWaterfall';
+import { bars as waterfallBars, toTable as waterfallTable, priceNote, waterfallTotal } from '../src/components/figures/CostWaterfall';
 import { OxygenBalance as OxygenBalanceFigure, emptyOf as oxygenEmpty, toTable as oxygenTable } from '../src/components/figures/OxygenBalance';
 import {
   PurityByStream as PurityByStreamFigure,
@@ -71,7 +72,7 @@ import { createElement } from 'react';
 import { renderToStaticMarkup } from 'react-dom/server';
 import { fmt } from '../src/engine/units';
 import { toTable as timeCourseTable, type TimeCourseProps } from '../src/components/figures/TimeCourse';
-import type { TrainUnit } from '../src/data/types';
+import type { TrainUnit } from '../src/lib/pureos';
 import { gatherLinks } from '../src/components/Dossier';
 import { ArtifactsDown, ArtifactRefused } from '../src/lib/artifacts';
 import { YIELD_FIELD, yieldFieldKnown, yieldsOnSugar } from '../src/lib/geneos';
@@ -278,7 +279,7 @@ ok.push('an assumed mark is held out of the median, a ceiling keeps its provenan
   // §4.R: a run with no tables names no product too; the figure says the
   // tables are missing and why, in the train's words, never that the run's
   // flowsheet prices nothing.
-  const why = 'this run was kept before runs carried their tables (OF-BLD-019 §2.1); run the scenario again';
+  const why = 'this run was kept before runs carried their tables; run the scenario again';
   const old = recoveryEmpty({ title: 't', product: null, units: [], provenance: 'assumed', massUnit: 'kg/hr', why });
   if (!old || !/kept no unit table/.test(old.what) || /names no product/.test(old.what) || old.where !== why)
     problems.push(`a run that kept no unit table is drawn as one naming no product: ${JSON.stringify(old)}`);
@@ -308,6 +309,13 @@ ok.push('an assumed mark is held out of the median, a ceiling keeps its provenan
   if (!credit || !(credit.to < credit.from)) problems.push('a co-product credit does not run back');
   const util = drawn.find((b) => b.key === 'utilities');
   if (!util || util.from !== 1.0) problems.push('a CostWaterfall bar does not start where the line before it ended');
+  // A library run reads its breakdown at the product's set price, and its TEA
+  // may solve another: the last row is the price the lines sum to, and the
+  // solved price is said beside the figure.
+  const apart = waterfallTotal(0.72, 0.85);
+  if (apart?.value !== 0.72 || apart.label === 'Base-case price') problems.push("CostWaterfall's last row leaves the price its lines sum to for a solved price they do not sum to");
+  if (!priceNote(0.72, 0.85, 'USD per kg')?.includes('0.85')) problems.push('a run whose TEA solved another price than its breakdown reads says nothing of it');
+  if (priceNote(0.72, 0.72, 'USD per kg') !== null || waterfallTotal(0.72, 0.72)?.label !== 'Base-case price') problems.push('a run whose breakdown is read at its solved price is given a note or a label of a price apart');
   const index = readFileSync('src/components/figures/index.ts', 'utf8');
   for (const name of ['CostWaterfall', 'Tornado']) {
     const src = readFileSync(`src/components/figures/${name}.tsx`, 'utf8');

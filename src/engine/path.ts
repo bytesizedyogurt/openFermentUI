@@ -6,23 +6,55 @@
 //
 //   refresh   Qualified, and suspended, lapsed, or lapsing within the window
 //   held      Qualified or Assessor, and current
-//   waiting   a prerequisite is below Supervised, so nothing here moves it yet
+//   waiting   a prerequisite is below Supervised, or the skill's catalogue
+//             entry holds no policy, so nothing here moves it yet
 //   bench     the screen has done its part: every lesson passed and a training
 //             sign-off is next, or the supervised runs are done and a
 //             witnessed check is next
 //   next      a lesson to take, supervised runs to do, or (when no lesson
 //             counts toward the skill) a training sign-off to ask for
-import type { Skill } from '@/data/types';
-import { addDays, readyForCheck, statusOf, type CompetenceStatus, type StatusMap } from './competence';
+import type { Lesson, Skill } from '@/lib/catalogues';
+import type { GuildEvidence } from '@/lib/guild';
+import { addDays, rated, readyForCheck, statusOf, type CompetenceStatus, type StatusMap } from './competence';
+
+/**
+ * Whether the ledger holds `personId`'s passing of lesson `lessonId` toward `skillId`: a knowledge entry Primer wrote
+ * as the checkpoint was passed, standing. This is how a lesson shows passed (alpha 2.2 E.12): the browser keeps no
+ * lesson of its own.
+ */
+export function passedLesson(evidence: readonly GuildEvidence[], personId: string, skillId: string, lessonId: string): boolean {
+  return evidence.some(
+    (e) =>
+      e.personId === personId &&
+      e.skillId === skillId &&
+      e.kind === 'knowledge' &&
+      e.source.kind === 'lesson' &&
+      e.source.ref === lessonId &&
+      !e.withdrawnAt,
+  );
+}
+
+/** The skills of `lesson` whose passing the ledger holds for `personId`, in the lesson's order. */
+export function lessonOnLedger(evidence: readonly GuildEvidence[], personId: string, lesson: Pick<Lesson, 'id' | 'skills'>): string[] {
+  return (lesson.skills ?? []).filter((sk) => passedLesson(evidence, personId, sk, lesson.id));
+}
+
+/** A lesson shows passed for `personId` when the ledger holds its passing on every skill it counts toward. */
+export function lessonPassed(evidence: readonly GuildEvidence[], personId: string, lesson: Pick<Lesson, 'id' | 'skills'>): boolean {
+  const counts = lesson.skills ?? [];
+  return counts.length > 0 && lessonOnLedger(evidence, personId, lesson).length === counts.length;
+}
 
 export type PathSection = 'next' | 'refresh' | 'bench' | 'held' | 'waiting';
 
-export type PathStep =
+type PathStep =
   | { kind: 'suspended' }
   | { kind: 'lapsed' }
   | { kind: 'lapsing' }
   | { kind: 'held' }
   | { kind: 'waiting'; on: string[] }
+  /** The skill's catalogue entry holds no policy, so Guild rates nobody on it. */
+  | { kind: 'unrated' }
   | { kind: 'witnessed-check' }
   | { kind: 'cosigned-runs'; done: number; needed: number }
   | { kind: 'lesson'; lessonId: string; passed: number; total: number }
@@ -58,6 +90,7 @@ export function pathOf(input: {
   const items = skills.map((skill): PathItem => {
     const st = statusOf(status, personId, skill.id);
     const at = (section: PathSection, step: PathStep): PathItem => ({ skill, status: st, section, step, soon: soon.has(skill.id) });
+    if (!rated(skill)) return at('waiting', { kind: 'unrated' });
     if (st.level >= 3) {
       if (st.suspended) return at('refresh', { kind: 'suspended' });
       if (st.lapsed) return at('refresh', { kind: 'lapsed' });

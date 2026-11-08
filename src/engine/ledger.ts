@@ -7,13 +7,13 @@
 // recorded inconclusive: an inconclusive run is counted as a run, never as a
 // test of anything. The latest such run decides held or missed, through
 // `holds` in reconcile.ts, the one place that decides it for every kind.
-import type { Deposition, Prediction, Runbook } from '@/data/types';
+import type { Deposition, Prediction, Runbook } from '@/lib/studies';
 import { holds } from './reconcile';
 
 /** The tested count below which a hit rate is not shown (the screen says so). */
 export const HIT_RATE_MIN_TESTED = 5;
 
-export interface LedgerRow {
+interface LedgerRow {
   runbookId: string;
   runbookTitle: string;
   lockedAt: string;
@@ -37,14 +37,15 @@ export function ledgerRows(runbooks: Runbook[], depositions: Deposition[]): Ledg
   const rows: LedgerRow[] = [];
   for (const rb of runbooks) {
     if (!rb.lockedAt) continue;
+    // Each reconciled run with its reconciliation, so no reader below meets a run without one.
     const runs = depositions
-      .filter((d) => d.runbookId === rb.id && d.reconciliation && d.reconciliation.outcome !== 'inconclusive')
-      .sort((a, b) => (a.reconciliation!.at < b.reconciliation!.at ? -1 : 1));
-    for (const p of rb.predictions) {
+      .flatMap((d) => (d.runbookId === rb.id && d.reconciliation && d.reconciliation.outcome !== 'inconclusive' ? [{ d, r: d.reconciliation }] : []))
+      .sort((a, b) => (a.r.at < b.r.at ? -1 : 1));
+    for (const p of rb.predictions ?? []) {
       let observed: LedgerRow['observed'] = null;
-      for (const d of runs) {
-        const delta = d.reconciliation!.deltas.find((x) => x.predictionId === p.id);
-        if (delta) observed = { value: delta.observed, unit: delta.unit, depositionId: d.id, at: d.reconciliation!.at };
+      for (const { d, r } of runs) {
+        const delta = r.deltas.find((x) => x.predictionId === p.id);
+        if (delta) observed = { value: delta.observed, unit: delta.unit, depositionId: d.id, at: r.at };
       }
       rows.push({
         runbookId: rb.id,

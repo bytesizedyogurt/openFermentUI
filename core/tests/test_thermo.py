@@ -177,8 +177,28 @@ def test_a_stream_not_on_file_or_not_one_phase_is_refused_before_the_worker(stor
 
 def test_an_artifact_that_is_no_run_has_no_stream_table(store, worker):
     _keep(_run("bbbbbbbbbbbbbbb3", tool="geneos.ceiling"))
-    with pytest.raises(thermo.ThermoRefused, match="geneos.ceiling artifact, not a Proforma run"):
+    with pytest.raises(thermo.ThermoRefused, match="geneos.ceiling artifact; a stream is read from the stream table of "
+                                                   "a run: a proforma.run, proforma.reference, pureos.train_run or "
+                                                   "library.run artifact"):
         thermo.props(ThermoPropsRequest(artifactId="bbbbbbbbbbbbbbb3", streamId="beer"))
+
+
+def test_a_stream_of_any_run_a_trains_inlet_reads_is_read_as_a_proforma_runs(store, worker):
+    """pureOS → Train asks the properties of a train run's streams: every
+    run whose stream table a train's inlet reads is read here too, its
+    question said with its tool, and the run the answer's source."""
+    from openferment_core.pureos import train_spec
+
+    assert set(thermo.STREAM_RUNS) == set(train_spec.STREAM_TOOLS)
+    for aid, tool in (("bbbbbbbbbbbbbbb6", "pureos.train_run"), ("bbbbbbbbbbbbbbb7", "library.run")):
+        _keep(_run(aid, tool=tool))
+        art = thermo.props(ThermoPropsRequest(artifactId=aid, streamId="beer"))
+        by = {i.name: i for i in art.inputs}
+        assert by["stream"].source.id == aid and by["question"].source.note.startswith(f"a stream of a kept run ({tool})")
+    assert len(worker.calls) == 2
+    # A Proforma run's question keeps its words, so a kept answer keeps its id.
+    kept = thermo.props(ThermoPropsRequest(artifactId=RUN_ID, streamId="beer"))
+    assert {i.name: i for i in kept.inputs}["question"].source.note.startswith("a stream of a Proforma run")
 
 
 def test_a_stream_chemical_the_library_lacks_is_refused_in_words_and_nothing_is_kept(store, worker):
@@ -295,12 +315,17 @@ def client():
 
 def test_post_answers_get_reads_and_neither_takes_a_number(store, worker, client):
     q = {"artifactId": RUN_ID, "streamId": "beer"}
-    assert client.get("/api/thermo/props", params=q).json() == {"artifact": None} and worker.calls == []
+    assert client.get("/api/thermo/props", params=q).json() == {"artifact": None, "props": None}
+    assert worker.calls == []
     made = client.post("/api/thermo/props", json=q)
-    assert made.status_code == 200 and made.json()["tool"] == "thermo_props"
-    ThermoProps.model_validate(made.json()["output"])
-    kept = client.get("/api/thermo/props", params=q).json()["artifact"]
-    assert kept["id"] == made.json()["id"] and len(worker.calls) == 1
+    assert made.status_code == 200 and list(made.json()) == ["artifact", "props"]
+    answer = made.json()
+    assert answer["artifact"]["tool"] == "thermo_props"
+    assert answer["props"] == ThermoProps.model_validate(answer["artifact"]["output"]).model_dump(mode="json")
+    kept = client.get("/api/thermo/props", params=q).json()
+    assert kept == answer and len(worker.calls) == 1
+    # Asked again, the stored answer comes back as the same pair, and nothing is asked of thermosteam.
+    assert client.post("/api/thermo/props", json=q).json() == answer and len(worker.calls) == 1
 
 
 @pytest.mark.parametrize("body, status, words", [
@@ -331,7 +356,7 @@ def test_a_damaged_file_is_a_409_in_words_never_a_500(store, worker, client):
     plant_damaged("bbbbbbbbbbbbbbb2")
     q = {"artifactId": "bbbbbbbbbbbbbbb2", "streamId": "beer"}
     for r in (client.get("/api/thermo/props", params=q), client.post("/api/thermo/props", json=q)):
-        assert r.status_code == 409 and "bbbbbbbbbbbbbbb2 is damaged on disk" in r.json()["detail"], r.text
+        assert r.status_code == 409 and "bbbbbbbbbbbbbbb2 is damaged in its row" in r.json()["detail"], r.text
     # The run parses and the answer kept for its stream does not.
     asked = {"artifactId": RUN_ID, "streamId": "beer"}
     inputs, _ = thermo.basis_inputs(ThermoPropsRequest(**asked), None)
@@ -339,7 +364,7 @@ def test_a_damaged_file_is_a_409_in_words_never_a_500(store, worker, client):
     answer = artifacts.artifact_id(reg.tool, reg.version, inputs)
     plant_damaged(answer)
     for r in (client.get("/api/thermo/props", params=asked), client.post("/api/thermo/props", json=asked)):
-        assert r.status_code == 409 and f"{answer} is damaged on disk" in r.json()["detail"], r.text
+        assert r.status_code == 409 and f"{answer} is damaged in its row" in r.json()["detail"], r.text
     assert worker.calls == [], "nothing is asked of thermosteam over a damaged answer"
 
 
@@ -464,7 +489,7 @@ def test_stored_volatility_reads_without_asking_the_worker(store, vworker):
 
 
 @pytest.mark.parametrize("product, err, words", [
-    ("phb", thermo.VolatilityMissing, "product 'phb' names no chemical of thermosteam's library here"),
+    ("placeholder-product", thermo.VolatilityMissing, "product 'placeholder-product' names no chemical of thermosteam's library here"),
     ("taq-dna-polymerase", thermo.VolatilityMissing, "ethanol → Ethanol"),
     ("", thermo.ThermoRefused, "names a product by its id"),
 ])
@@ -547,8 +572,8 @@ def test_the_volatility_endpoints_answer_read_and_say_what_is_missing(store, vwo
     assert made.status_code == 200 and made.json()["tool"] == "volatility"
     Volatility.model_validate(made.json()["output"])
     assert client.get("/api/thermo/volatility", params={"product": "ethanol"}).json()["artifact"]["id"] == made.json()["id"]
-    for r in (client.post("/api/thermo/volatility", json={"product": "phb"}),
-              client.get("/api/thermo/volatility", params={"product": "phb"})):
+    for r in (client.post("/api/thermo/volatility", json={"product": "placeholder-product"}),
+              client.get("/api/thermo/volatility", params={"product": "placeholder-product"})):
         assert r.status_code == 404 and "names no chemical" in r.json()["detail"]
     r = client.post("/api/thermo/volatility", json={"product": "unobtainium-product"})
     assert r.status_code == 422 and "no chemical named Unobtainium" in r.json()["detail"]
@@ -567,7 +592,7 @@ def test_a_damaged_volatility_is_a_409_in_words(store, vworker, client):
     plant_damaged(art.id)
     for r in (client.get("/api/thermo/volatility", params={"product": "ethanol"}),
               client.post("/api/thermo/volatility", json={"product": "ethanol"})):
-        assert r.status_code == 409 and f"{art.id} is damaged on disk" in r.json()["detail"], r.text
+        assert r.status_code == 409 and f"{art.id} is damaged in its row" in r.json()["detail"], r.text
 
 
 @pytest.mark.sim
@@ -609,4 +634,4 @@ def test_a_products_chemical_the_library_lacks_is_refused_in_words(warm, monkeyp
     with pytest.raises(thermo.ThermoRefused, match="no chemical named Unobtainium"):
         thermo.volatility("made-up")
     with pytest.raises(thermo.VolatilityMissing, match="names no chemical"):
-        thermo.volatility("phb")
+        thermo.volatility("placeholder-product")

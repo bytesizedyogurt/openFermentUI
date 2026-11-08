@@ -130,3 +130,28 @@ def test_the_command_reports_what_it_carried_and_refuses_in_words(alpha1, capsys
     assert import_alpha1.main(["--name", "Again", "--by", "Ada Moreno", "--data", str(alpha1 / "nowhere")]) == 2
     assert "is not a directory" in capsys.readouterr().err
     assert json.loads((alpha1 / "proposals.json").read_text())["proposals"][0]["id"] == "pr-1"
+
+
+def test_a_database_behind_the_newest_schema_is_refused_in_words_and_written_nothing(alpha1, capsys, monkeypatch,
+                                                                                       test_database):
+    from openferment_core.db import migrate
+    from openferment_core.db.engine import make_engine
+
+    monkeypatch.setattr(import_alpha1, "load_dotenv", lambda *a, **k: None)
+    test_database.open()
+    name = f"{test_database.name}_unmigrated"
+    bare = migrate.create(name, test_database.server)
+    engine = make_engine(bare)
+    binding = db.Binding(engine)
+    previous = db.bind(binding)
+    try:
+        assert import_alpha1.main(["--name", "Carried", "--by", "Ada Moreno", "--data", str(alpha1)]) == 2
+        err = capsys.readouterr().err
+        assert f"refused: the database is at revision none of {migrate.head()}. Run: pnpm db:migrate" in err
+        assert "Traceback" not in err
+        assert migrate.revision(bare) is None, "the refusal migrated nothing and wrote nothing"
+    finally:
+        db.bind(previous)
+        db.run(binding.close())
+        db.run(engine.dispose())
+        migrate.drop(name, test_database.server)

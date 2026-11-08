@@ -6,8 +6,7 @@ import numpy as np
 import pytest
 
 from openferment_core import fermos
-from openferment_core.models import StartValues
-from test_fermos import SD, T, batch, store  # noqa: F401
+from test_fermos import SD, T, batch, forecast_inputs, store  # noqa: F401
 
 
 def _fit(seed=4):
@@ -46,7 +45,7 @@ def test_the_yield_interval_does_not_grow_with_reading_scatter():
 def test_the_runs_own_starting_value_is_not_an_assumption(store):  # noqa: F811
     fit = fermos.fit("dep-r5", batch(T, np.random.default_rng(4), SD))
     x0 = fermos.param(fit.kinetic, "X0").value
-    same = fermos.forecast_run(fit_artifact=fit.kineticArtifactId, start=StartValues(X0=x0))
+    same = fermos.forecast_run(fit_artifact=fit.kineticArtifactId, inputs=forecast_inputs(fit.kineticArtifactId, x0=x0))
     assert same.evidence.provenance == "computed"
     own = fermos.forecast_run(fit_artifact=fit.kineticArtifactId)
     assert same.artifactId == own.artifactId
@@ -56,4 +55,4 @@ def test_a_start_for_a_series_the_run_lacks_is_refused(store):  # noqa: F811
     runs = batch(T, np.random.default_rng(4), SD)[:1]
     fit = fermos.fit("dep-r5b", runs)
     with pytest.raises(fermos.FitRefused, match="no product series"):
-        fermos.forecast_run(fit_artifact=fit.kineticArtifactId, start=StartValues(P0=1.0), changed_by="Sean Creighton")
+        fermos.forecast_run(fit_artifact=fit.kineticArtifactId, inputs=forecast_inputs(fit.kineticArtifactId, p0=1.0))

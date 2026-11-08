@@ -28,8 +28,8 @@ from fastapi.testclient import TestClient
 
 import test_vessel as tv
 from openferment_core import artifacts, fermos, kinetics, proforma, pureos, vessel
-from openferment_core.models import Artifact, Override, TrainSpec, VesselRequest
-from standins import plant_artifact
+from openferment_core.models import Artifact, Override, TrainSpec
+from standins import inputs_json, plant_artifact, vessel_request
 from test_train import (  # noqa: F401 (the fixtures, by name)
     AT,
     BY,
@@ -155,7 +155,7 @@ def test_a_vessels_broth_and_the_titre_it_is_sized_by_are_read_at_one_hour(store
 
 def test_a_design_through_the_new_read_is_kept_under_a_version_of_its_own(store, vessel_worker):
     sim = tv.real_simulation(True, t_end=LENGTHS[0])
-    d = vessel.design(VesselRequest(simulation=sim.artifactId, overrides=[scale(sim.artifactId)]))
+    d = vessel.design(vessel_request(simulation=sim.artifactId, overrides=[scale(sim.artifactId)]))
     art = artifacts.get(d.artifactId)
     assert art.toolVersion.startswith("vessel 3 · ")
     # The same basis under the version that read the nearest kept point names another artifact.
@@ -173,7 +173,7 @@ def test_a_kept_simulation_whose_series_cannot_be_read_is_a_422_on_the_vessel(st
     bad = keep_copy(art, "e" * 16, series={**art.output["series"], "S": art.output["series"]["S"][:-1]})
     r = client.get(f"/api/fermos/vessel/specs?simulation={bad.id}")
     assert r.status_code == 422 and "cannot be read" in r.json()["detail"], r.text
-    r = client.post("/api/fermos/vessel", json={"simulation": bad.id, "overrides": [scale(bad.id).model_dump()]})
+    r = client.post("/api/fermos/vessel", json={"simulation": bad.id, "inputs": inputs_json([scale(bad.id)], vessel.UNITS)})
     assert r.status_code == 422 and "cannot be read" in r.json()["detail"], r.text
     r = client.get(f"/api/params/fermos:vessel:{bad.id}")
     assert r.status_code == 422 and "cannot be read" in r.json()["detail"], r.text

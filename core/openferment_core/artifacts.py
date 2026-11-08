@@ -1,4 +1,4 @@
-"""What was computed is kept and can be replayed (OF-BLD-014 §3.2, E.5).
+"""What was computed is kept and can be replayed.
 
 Every calculation from §3.4 on goes through `compute`: a tool registers a pure
 function from its inputs to a small output, and `compute` runs it once per
@@ -74,6 +74,12 @@ class Registered:
     # A tool whose basis states the precision its numbers keep (a library
     # run's significant digits) reads the tolerance a replay holds them to.
     tolerance_of: Callable[[Sequence[BasisInput]], ReplayTolerance] | None = None
+    # A tool whose output states its numbers with their units reads them as a
+    # run's typed outputs (engine/runs.py `values_of`): each (name, value,
+    # unit), read from the artifact alone. The module that registers the tool
+    # reads them, so the engine package imports none of it (a pureOS train
+    # run's recoveries are pureOS's own reading of its stream table).
+    values_of: Callable[[Artifact], list[tuple[str, Any, str]]] | None = None
 
     def version_for(self, inputs: Sequence[BasisInput]) -> str:
         return self.version_of(inputs) if self.version_of is not None else self.version
@@ -87,14 +93,16 @@ _LAZY: dict[str, Callable[[], None]] = {}
 
 def register(tool: str, version: str, fn: ToolFn,
              version_of: Callable[[Sequence[BasisInput]], str] | None = None,
-             tolerance_of: Callable[[Sequence[BasisInput]], ReplayTolerance] | None = None) -> None:
+             tolerance_of: Callable[[Sequence[BasisInput]], ReplayTolerance] | None = None,
+             values_of: Callable[[Artifact], list[tuple[str, Any, str]]] | None = None) -> None:
     """Make `tool` computable and replayable. Registering a name again replaces
     it: that is how a tool's code changes between versions. `version_of`,
     when given, reads the version from the inputs, so one tool name can
     carry what it computes in its version (`version` is then its stem).
     `tolerance_of` reads the precision the basis states, which a replay
-    holds each number to."""
-    _REGISTRY[tool] = Registered(tool, version, fn, version_of, tolerance_of)
+    holds each number to. `values_of` reads the artifact's numbers with
+    their units as a run's typed outputs."""
+    _REGISTRY[tool] = Registered(tool, version, fn, version_of, tolerance_of, values_of)
 
 
 def register_lazy(tool: str, registrar: Callable[[], None]) -> None:
@@ -160,7 +168,7 @@ def _valid(aid: str, raw: Any) -> Artifact:
         return Artifact.model_validate(raw)
     except ValueError as e:
         raise ArtifactDamaged(
-            f"artifact {aid} is damaged on disk (its row in the artifact store): {e}".splitlines()[0]
+            f"artifact {aid} is damaged in its row of the artifacts table: {e}".splitlines()[0]
         ) from None
 
 
@@ -196,6 +204,31 @@ def all_artifacts() -> list[Artifact]:
     not read as an artifact is skipped, so one damaged row never hides the
     rest."""
     return db.run(_all(projects.current()))
+
+
+async def _of_tools(project_id: str, tools: tuple[str, ...]) -> list[Artifact]:
+    async with db.session() as s:
+        found = (await s.execute(select(t.artifacts.c.body).where(
+            t.artifacts.c.project_id == project_id, t.artifacts.c.tool.in_(tools)))).scalars()
+        bodies = list(found)
+    out: list[Artifact] = []
+    for raw in bodies:
+        try:
+            out.append(Artifact.model_validate(raw))
+        except ValueError:
+            continue
+    out.sort(key=lambda a: (a.createdAt, a.id), reverse=True)
+    return out
+
+
+def of_tools(*tools: str) -> list[Artifact]:
+    """The current project's artifacts of the tools named, newest first, read
+    by the table's tool column (its index with the project): a reader that
+    lists one kind of artifact reads no other body. A row that does not read
+    as an artifact is skipped, as `all_artifacts` skips one."""
+    if not tools:
+        return []
+    return db.run(_of_tools(projects.current(), tuple(tools)))
 
 
 async def _count() -> int:
@@ -372,7 +405,9 @@ def _within(stored: Any, replayed: Any, tol: ReplayTolerance) -> bool:
 def replay(aid: str) -> ReplayResult:
     """Recompute a stored artifact with the tool registered now, and compare:
     identical, or within the precision its basis states when the tool reads
-    one (`tolerance_of`). A replay changes nothing stored."""
+    one (`tolerance_of`). A replay changes nothing stored. It computes with
+    the tool registered now, and when that tool's version differs from the
+    one the artifact was kept at, its first difference is `toolVersion`."""
     artifact = get(aid)
     reg = registered(artifact.tool)
     try:
@@ -397,11 +432,12 @@ def replay(aid: str) -> ReplayResult:
         if len(differences) > MAX_DIFFERENCES:
             differences = differences[:MAX_DIFFERENCES]
             differences.append(ReplayDifference(path="…", stored="more differences not listed", replayed=None))
-        now = reg.version_for(artifact.inputs)
-        if now != artifact.toolVersion:
-            differences.insert(
-                0, ReplayDifference(path="toolVersion", stored=artifact.toolVersion, replayed=now)
-            )
+    # A replay computes with the tool installed now. When its version moved
+    # since the artifact was kept, the first difference names the version it
+    # was kept at and the version it ran at, an identical output included.
+    now = reg.version_for(artifact.inputs)
+    if now != artifact.toolVersion:
+        differences.insert(0, ReplayDifference(path="toolVersion", stored=artifact.toolVersion, replayed=now))
     identical = replayed == artifact.outputHash
     return ReplayResult(
         artifactId=aid,

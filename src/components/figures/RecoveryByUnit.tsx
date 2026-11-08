@@ -8,7 +8,8 @@
 // draws no bar and says why in words: a recovery is never divided out of a
 // zero here. Bars take the stroke the run's provenance gives them, so a run
 // that rests on an assumption reads as modeled.
-import type { Provenance, TrainUnit } from '@/data/types';
+import type { TrainUnit } from '@/lib/pureos';
+import type { Provenance } from '@/lib/studies';
 import { fmt } from '@/engine/units';
 import { DASH_ARRAY, ENCODING, markColor } from './encoding';
 import { FigureFrame, type FigureTable } from './FigureFrame';
@@ -149,15 +150,15 @@ export function RecoveryByUnit(props: RecoveryByUnitProps) {
               <text x={L - 6} y={y0 + ROW / 2 + 4} fontSize={11} textAnchor="end" fill="currentColor" opacity={u.onPath ? 1 : 0.6}>
                 {u.id} · {u.unitClass}
               </text>
-              {why ? (
+              {why != null || u.recovery == null ? (
                 <text x={L + 4} y={y0 + ROW / 2 + 4} fontSize={10} fill="currentColor" opacity={0.65}>
-                  {why.length > 70 ? `${why.slice(0, 69)}…` : why}
+                  {why == null ? '' : why.length > 70 ? `${why.slice(0, 69)}…` : why}
                 </text>
               ) : (
                 <rect
                   x={x(0)}
                   y={y0 + 5}
-                  width={Math.max(0.5, x(u.recovery!) - x(0))}
+                  width={Math.max(0.5, x(u.recovery) - x(0))}
                   height={ROW - 10}
                   fill={color}
                   fillOpacity={0.3}

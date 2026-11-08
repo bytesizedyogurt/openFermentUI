@@ -15,14 +15,14 @@
 // Every node is a Sheet away from its full vocabulary record — that is how
 // unit operations get detail pages without earning a rail destination.
 //
-// The train starts at the fermenter, named by the host the store holds, and
-// ends at its last operation. The scale and storage-format vocabularies left
+// The train starts at the fermenter, named by the host the store holds (its
+// species and name as the project's strain catalogue keeps them), and ends at
+// its last operation. The scale and storage-format vocabularies left
 // with the seed (alpha 2.0, ADR-010), so no volume, format or cold chain is
 // drawn.
 import { Fragment, useState } from 'react';
 import { ArrowRight, FlaskConical, Package } from 'lucide-react';
-import { UNIT_OPERATIONS_BY_ID } from '@/data/vocabulary';
-import type { UnitOperation } from '@/data/types';
+import { UNIT_OPERATIONS_BY_ID, type UnitOperation } from '@/data/vocabulary';
 import { useStore } from '@/store';
 import { Callout, EmptyState, Sheet, cx } from './ui';
 
@@ -86,13 +86,11 @@ function OpNode({
 export function ProcessTrain({
   unitOperationIds,
   strainId,
-  processCode,
   emptyBody,
 }: {
   /** Ordered fermenter to vial. This array is the train — stage order is not. */
   unitOperationIds: string[];
   strainId?: string | null;
-  processCode?: string;
   emptyBody?: string;
 }) {
   const [open, setOpen] = useState<UnitOperation | null>(null);
@@ -121,8 +119,8 @@ export function ProcessTrain({
     <div>
       <ol className="flex items-stretch gap-1 overflow-x-auto pb-2" aria-label="Process train">
         <Terminal
-          title={strain ? strain.binomial : 'Host not chosen'}
-          lines={[{ text: strain ? strain.designation : 'Pick a host to fix the train' }]}
+          title={strain ? (strain.species ?? strain.name) : 'Host not chosen'}
+          lines={strain ? (strain.species ? [{ text: strain.name }] : []) : [{ text: 'Pick a host to fix the train' }]}
         />
         {ops.map((op, i) => (
           // A step can legitimately repeat inside one train, so the key pairs
@@ -138,7 +136,6 @@ export function ProcessTrain({
         <span className="font-num">
           {ops.length} unit operation{ops.length === 1 ? '' : 's'}
         </span>
-        {processCode && <span>process family {processCode}</span>}
         <span>click a step for its definition</span>
       </div>
 

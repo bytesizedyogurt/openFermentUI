@@ -127,6 +127,16 @@ def test_model_checks_both_models_in_the_chain(errors, mark, says):
     assert check.mark == mark and says in check.detail, check.detail
 
 
+def test_the_model_row_names_the_plan_routes_models_and_effort(monkeypatch):
+    """alpha 2.2 F.2f: the row reads the plan route, its default effort high,
+    and a route table's own effort where one names it."""
+    check = ready.check_model(True, client_factory=FakeClient)
+    assert check.mark == "ok" and check.detail.endswith(f"{OPUS} then {SONNET} on the plan route, effort high"), check.detail
+    monkeypatch.setenv("OPENFERMENT_ROUTES", '{"plan": {"models": ["claude-haiku-5-5"], "effort": "max"}}')
+    check = ready.check_model(True, client_factory=FakeClient)
+    assert check.mark == "ok" and check.detail.endswith("claude-haiku-5-5 on the plan route, effort max"), check.detail
+
+
 def test_a_model_with_no_price_on_file_is_named(monkeypatch):
     monkeypatch.setenv("OPENFERMENT_FALLBACK_MODEL", "claude-some-future-model")
     check = ready.check_model(True, client_factory=FakeClient)
@@ -277,6 +287,80 @@ def test_the_lane_is_the_last_line_of_every_report(monkeypatch):
     monkeypatch.setenv("ANTHROPIC_API_KEY", FAKE_KEY)
     assert ready.report(ready.run(no_network=True, port=1)).splitlines()[-1] == "lane: none", \
         "a model unasked is a key unconfirmed, as Europe PMC unasked is Europe PMC unconfirmed"
+
+
+# ── the probe (alpha 2.2, A.4) ─────────────────────────────────────────
+# An account past its own usage limit still answers the Models API (measured
+# 2026-11-02), so the model row passes; one real call is the only check that
+# sees the limit.
+
+
+class FakeMessages:
+    """The Messages API: every stream answers with `outcome`, or opening one
+    raises it. Each request is kept."""
+
+    def __init__(self, outcome):
+        self.outcome = outcome
+        self.messages = self
+        self.asked: list[dict] = []
+
+    def stream(self, **request):
+        self.asked.append(request)
+        outcome = self.outcome
+
+        class Stream:
+            def __enter__(self_inner):
+                if isinstance(outcome, Exception):
+                    raise outcome
+                return self_inner
+
+            def __exit__(self_inner, *exc):
+                return False
+
+            def get_final_message(self_inner):
+                return outcome
+
+        return Stream()
+
+
+def _answered(model):
+    from types import SimpleNamespace
+
+    return SimpleNamespace(model=model, stop_reason="end_turn", stop_details=None,
+                           content=[SimpleNamespace(type="text", text="ok")],
+                           usage=SimpleNamespace(input_tokens=12, output_tokens=2))
+
+
+def test_the_probe_makes_one_small_call_on_the_index_route_and_says_what_it_cost():
+    first = llm.routes()["index"].models[0]
+    client = FakeMessages(_answered(first))
+    check = ready.check_probe(True, client_factory=lambda: client)
+    assert check.mark == "ok", check.detail
+    assert [r["model"] for r in client.asked] == [first]
+    assert client.asked[0]["max_tokens"] == ready.MODEL_PROBE_TOKENS
+    assert first in check.detail and "index route" in check.detail and "charged to today's spend" in check.detail
+
+
+def test_the_probe_names_the_accounts_own_usage_limit_with_its_date_and_the_lane_is_none():
+    h = _http()
+    refusal = anthropic.BadRequestError(
+        message="You have reached your specified API usage limits. You will regain access on 2026-12-01 at 00:00 UTC.",
+        response=h.Response(400, request=h.Request("POST", URL)), body=None)
+    check = ready.check_probe(True, client_factory=lambda: FakeMessages(refusal))
+    assert check.mark == "fail"
+    assert "usage limit is reached until 2026-12-01 at 00:00 UTC" in check.detail
+    assert "Anthropic console" in check.detail and "daily cap" in check.detail and "malformed" not in check.detail
+    passing = _checks("ok", "ok", "ok")
+    assert ready.lane(passing) == "full" and ready.lane([*passing, check]) == "none"
+
+
+def test_the_probe_waits_for_a_key_and_for_the_network(monkeypatch):
+    assert ready.check_probe(False).mark == "skip"
+    monkeypatch.setenv("OPENFERMENT_FIXTURES", "1")
+    monkeypatch.setattr(ready, "load_dotenv", lambda *a, **k: None)
+    rows = {c.name: c for c in ready.run(no_network=True, port=1, probe=True)}
+    assert rows["probe"].mark == "skip" and "--probe needs the network" in rows["probe"].detail
+    assert "probe" not in {c.name for c in ready.run(no_network=True, port=1)}
 
 
 # ── what is on disk ────────────────────────────────────────────────────
@@ -442,9 +526,12 @@ def test_roles_names_each_chain_and_todays_spend(monkeypatch):
         monkeypatch.delenv(name, raising=False)
     check = ready.check_roles(True, client_factory=lambda: FakeRolesClient())
     assert check.mark == "ok"
-    assert "index: claude-haiku-5-5 → claude-opus-5-5" in check.detail and "of the $25.00 daily cap" in check.detail
+    assert "index: claude-haiku-5-5;" in check.detail and "of the $25.00 daily cap" in check.detail
     check = ready.check_roles(True, client_factory=lambda: FakeRolesClient(missing={"claude-haiku-5-5"}))
-    assert check.mark == "warn" and "index work runs on the answer chain" in check.detail
+    assert check.mark == "warn" and "the index route names no other model it lists" in check.detail, check.detail
+    monkeypatch.setenv("OPENFERMENT_ROUTES", '{"index": {"models": ["claude-haiku-5-5", "claude-sonnet-5-5"]}}')
+    check = ready.check_roles(True, client_factory=lambda: FakeRolesClient(missing={"claude-haiku-5-5"}))
+    assert check.mark == "warn" and "index work runs on claude-sonnet-5-5" in check.detail, check.detail
     assert ready.check_roles(False).mark == "skip"
 
 

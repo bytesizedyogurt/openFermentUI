@@ -1,7 +1,7 @@
 // Home (OF-DES-001 §8.1) — orient any persona in five seconds: what is in the
 // corpus, where you left off, and what to do next. Three bands plus a rail.
 import { HomeStart } from '@/components/HomeStart';
-import React, { useMemo, useState, type ReactNode } from 'react';
+import React, { useEffect, useMemo, useState, type ReactNode } from 'react';
 import {
   AlertTriangle,
   ArrowUpRight,
@@ -30,7 +30,9 @@ import {
 } from 'lucide-react';
 import { useStore, provenanceOf } from '@/store';
 import { ProposalsCard } from '@/components/ProposalsCard';
-import { pinnedCard } from '@/lib/proforma';
+import { qualifies } from '@/lib/fermos';
+import { pinnedCard, stamp } from '@/lib/proforma';
+import { listComparisons, listRuns, listScenarios } from '@/lib/studies';
 import { href } from '@/router';
 import { RUNBOOK_STATUS_LABEL } from '@/data/labels';
 import { DESTINATIONS } from '@/data/nav';
@@ -234,8 +236,10 @@ const ACTIVITY_ICONS: Record<string, LucideIcon> = {
  *
  * Counted from the store's lists where there is something to count, and
  * stated as "nothing" where there is not. `built` drives the greying: a
- * destination with no code renders dimmed, because "I clicked fermOS and it
- * was empty" should be something Home told you first.
+ * destination with no code renders dimmed, so a person learns on Home that a
+ * page is empty before opening it. fermOS fits the runs deposited here, and
+ * keeps its fits, forecasts, simulations and vessel designs with the project
+ * (alpha 2.2 E.20).
  */
 interface Counted {
   records: number;
@@ -244,21 +248,52 @@ interface Counted {
   scenarios: number;
   runbooks: number;
   protocols: number;
-  modules: number;
+  lessons: number;
+  /** The deposited runs fermOS can fit: each with a biomass series of four readings or more (lib/fermos `qualifies`). */
+  fittable: number;
+  /** The project's studies as the service keeps them (GET /api/studies/scenarios, /api/runs, /api/studies/comparisons); null until read. */
+  studies: { scenarios: number; runs: number; comparisons: number } | null;
+}
+
+const plural = (n: number, one: string) => `${n} ${one}${n === 1 ? '' : 's'}`;
+
+/** Proforma's tile: its own scenarios and the studies' scenarios together, with the runs and comparisons the studies hold. */
+function proformaNow(n: Counted): string {
+  if (!n.studies) return plural(n.scenarios, 'scenario');
+  return `${plural(n.scenarios + n.studies.scenarios, 'scenario')} · ${plural(n.studies.runs, 'run')} · ${plural(n.studies.comparisons, 'comparison')}`;
+}
+
+/** The project's studies counted, read once per project; null while unread or when the service cannot answer. */
+function useStudiesCounted(projectId: string | null): Counted['studies'] {
+  const [counted, setCounted] = useState<Counted['studies']>(null);
+  useEffect(() => {
+    setCounted(null);
+    if (!projectId) return;
+    const ctrl = new AbortController();
+    Promise.all([listScenarios(ctrl.signal), listRuns(ctrl.signal), listComparisons(ctrl.signal)])
+      .then(([s, r, c]) => setCounted({ scenarios: s.length, runs: r.length, comparisons: c.length }))
+      .catch(() => undefined);
+    return () => ctrl.abort();
+  }, [projectId]);
+  return counted;
 }
 
 function stateOf(n: Counted): Record<string, { now: string; built: boolean }> {
   return {
-    Intake: { now: `${n.records} extraction records`, built: true },
-    BioRepo: { now: `${n.papers} papers · gold set not yet annotated`, built: true },
+    Intake: { now: `${n.records} extraction record${n.records === 1 ? '' : 's'}`, built: true },
+    BioRepo: { now: `${n.papers} paper${n.papers === 1 ? '' : 's'} · gold set not yet annotated`, built: true },
     Postdoc: { now: 'live through openferment-core, on the model it is configured with', built: true },
-    geneOS: { now: `${n.strains} hosts · no sequence tooling`, built: true },
-    fermOS: { now: 'empty — no kinetics, no transport, no scale-up', built: false },
+    geneOS: { now: `${n.strains} host${n.strains === 1 ? '' : 's'} · no sequence tooling`, built: true },
+    fermOS: {
+      now: `${n.fittable} deposited run${n.fittable === 1 ? '' : 's'} it can fit · fits, forecasts, simulations and vessel designs kept with the project`,
+      built: true,
+    },
     pureOS: { now: `${UNIT_OPERATIONS.length} unit operations · no process model`, built: true },
-    Proforma: { now: `${n.scenarios} scenarios`, built: true },
-    Runbooks: { now: `${n.runbooks} runbooks · ${n.protocols} protocols`, built: true },
-    Primer: { now: `${n.modules} modules`, built: true },
+    Proforma: { now: proformaNow(n), built: true },
+    Runbooks: { now: `${n.runbooks} runbook${n.runbooks === 1 ? '' : 's'} · ${n.protocols} protocol${n.protocols === 1 ? '' : 's'}`, built: true },
+    Primer: { now: `${n.lessons} lesson${n.lessons === 1 ? '' : 's'}`, built: true },
     Guild: { now: 'review queue and roles', built: true },
+    Catalogues: { now: 'kept on the service, each entry in its keeper’s name', built: true },
   };
 }
 
@@ -315,13 +350,16 @@ export default function Home() {
   const scenarios = useStore((s) => s.scenarios);
   const runbooks = useStore((s) => s.runbooks);
   const strains = useStore((s) => s.strains);
-  const modules = useStore((s) => s.modules);
+  const lessons = useStore((s) => s.lessons);
+  const depositions = useStore((s) => s.depositions);
   const liveConversations = useStore((s) => s.liveConversations);
   const activity = useStore((s) => s.activity);
   const runs = useStore((s) => s.runs);
   const activeRunId = useStore((s) => s.activeRunId);
   const reviewQueue = useStore((s) => s.reviewQueue);
   const reviewIndex = useStore((s) => s.reviewIndex);
+  const projectId = useStore((s) => s.projectId);
+  const studies = useStudiesCounted(projectId);
 
   const [showAllActivity, setShowAllActivity] = useState(false);
 
@@ -334,9 +372,11 @@ export default function Home() {
         scenarios: scenarios.length,
         runbooks: runbooks.length,
         protocols: protocols.length,
-        modules: modules.length,
+        lessons: lessons.length,
+        fittable: depositions.filter((d) => qualifies(d, runbooks.find((r) => r.id === d.runbookId))).length,
+        studies,
       }),
-    [records, papers, strains, scenarios, runbooks, protocols, modules],
+    [records, papers, strains, scenarios, runbooks, protocols, lessons, depositions, studies],
   );
 
   // ── band 1 numbers ───────────────────────────────────────────────────
@@ -377,7 +417,7 @@ export default function Home() {
     for (const p of protocols) {
       const v = p.versions.find((x) => x.version === p.currentVersion) ?? p.versions[0];
       if (!v) continue;
-      for (const m of v.materials) {
+      for (const m of (v.materials ?? [])) {
         const rec = m.sourceRecordId ? byId.get(m.sourceRecordId) : undefined;
         provs.push(rec ? (provenanceOf(rec) as ProvKind) : 'assumed');
       }
@@ -417,7 +457,7 @@ export default function Home() {
       activeProtocol.versions[activeProtocol.versions.length - 1])
     : null;
   const runDone = activeRun ? Object.keys(activeRun.completed).length : 0;
-  const runTotal = activeVersion ? activeVersion.steps.length : 0;
+  const runTotal = activeVersion ? (activeVersion.steps ?? []).length : 0;
 
   const unverifiedCount = status.unverified;
   const queueRemaining = Math.max(0, reviewQueue.length - reviewIndex);
@@ -569,8 +609,8 @@ export default function Home() {
           </div>
         </section>
 
-        {/* ── Band 1b · Catalogue (OF-BLD-005) ───────────────────────── */}
-        <section aria-labelledby="home-catalogue" className="mb-7">
+        {/* ── Band 1b · Runbooks (OF-BLD-005) ────────────────────────── */}
+        <section aria-labelledby="home-runbooks" className="mb-7">
           <SectionTitle
             right={
               <Explain label="Why this is a separate band">
@@ -581,7 +621,7 @@ export default function Home() {
               </Explain>
             }
           >
-            <span id="home-catalogue">Catalogue</span>
+            <span id="home-runbooks">Runbooks</span>
           </SectionTitle>
 
           <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
@@ -634,7 +674,7 @@ export default function Home() {
                     <>
                       <span className="font-num">{lastLive.turns.length}</span>{' '}
                       {lastLive.turns.length === 1 ? 'question' : 'questions'} ·{' '}
-                      <span className="font-num">{lastLive.startedAt}</span>
+                      <span className="font-num">{stamp(lastLive.startedAt)}</span>
                     </>
                   }
                 />
@@ -873,7 +913,7 @@ export default function Home() {
         <Card className="overflow-hidden">
           {activity.length === 0 ? (
             <EmptyState
-              title="Nothing has happened in this browser yet"
+              title="Nothing has happened since this page opened"
               body={
                 <>
                   What a person does here is listed as it happens: a paper fetched, a record

@@ -3,16 +3,26 @@
 A scenario names a plant on the library shelf (a `biorefineries` plant or
 an openFerment flowsheet), its configuration, and the values it sets: each a
 parameter's key and a quantity in the parameter's own unit, whose origin is
-a named person's assumption or a model's estimate (the model's id in `by`).
+a named person's assumption or a model's estimate (the model's id in `by`),
+or a reading a person deposited at the bench (a `measurement`, its `ref`
+`<deposition id>/<entry id>`, its value and unit the reading's own).
 Every other parameter keeps the library's own default. A scenario is checked
 against the plant's parameters when it is made, so a key the plant does not
 read back, a unit it does not use or a value of the wrong kind is refused
-before anything runs.
+before anything runs; a reading is looked up in the project's depositions
+(basis.resolved: held, confirmed, the one that stands for its measure, its
+own value and unit, in a unit that converts into the parameter's), and
+kept with its depositor and the time it was taken filled from the rows.
 
-Running a scenario is an engine run (engine/runs.py): each value becomes an
-`Override` of the plant's scope with its origin, the run's basis names each
-value's author, and a run resting on any of them is `assumed`. The scenario
-keeps the ids of its runs, oldest first.
+Running a scenario is an engine run on the biosteam engine's one path for a
+library plant (engine/biosteam.py `run_plant`, the one POST
+/api/library/{plant}/run takes): each value is the typed input it was made
+with, checked against the plant's parameters and converted by
+basis.override_of into the `Override` of the plant's scope with its origin
+(a reading looked up again, so one corrected since is refused), the run's
+basis names each value's author or reading, and a run resting on any
+person's or model's value is `assumed`, on readings and records alone
+`measured`. The scenario keeps the ids of its runs, oldest first.
 
 A scenario is a row of `scenarios` with kind `engine`; its id is `ssc-` and
 the first twelve hex of the sha256 of its plant, configuration and values,
@@ -30,10 +40,11 @@ import json
 from datetime import datetime, timezone
 
 from .. import db, projects
+from ..basis import InputRefused, resolved
 from ..db import models as t
 from ..db import rows
-from ..engine import library, runs
-from ..models import Override, RunReport, ScenarioCreate, StudyScenario
+from ..engine import EngineRefused, biosteam, library, runs
+from ..models import EngineInput, RunReport, ScenarioCreate, ScenarioValue, StudyScenario
 
 KIND = "engine"
 PREFIX = "ssc-"
@@ -60,11 +71,16 @@ def scenario_id(plant: str, configuration: str | None, values: list) -> str:
     return PREFIX + hashlib.sha256(text.encode("utf-8")).hexdigest()[:12]
 
 
-def _checked(asked: ScenarioCreate) -> None:
+def _checked(asked: ScenarioCreate) -> list[ScenarioValue]:
     """The plant, the configuration and each value against what the plant
-    reads back: its key, its unit and its kind."""
+    reads back, in the configuration its run runs in (the one named, else
+    its default: engine/biosteam.py `default_configuration`): its key, its
+    unit and its kind; a deposition's reading looked up in the project's
+    depositions (basis.resolved), its unit one that converts into the
+    parameter's. The values as the scenario keeps them: each as asked, a
+    reading's depositor and time filled from the rows."""
     try:
-        params = library.parameters(asked.plant, asked.configuration)
+        params = library.parameters(asked.plant, biosteam.default_configuration(asked.plant, asked.configuration))
     except library.PlantNotFound as e:
         raise ScenarioRefused(str(e).strip("'\"")) from None
     except library.LibraryRefused as e:
@@ -74,14 +90,30 @@ def _checked(asked: ScenarioCreate) -> None:
     twice = sorted({k for k in keys if keys.count(k) > 1})
     if twice:
         raise ScenarioRefused(f"a scenario sets each parameter once; {', '.join(twice)} twice")
+    kept: list[ScenarioValue] = []
     for v in asked.values:
         spec = specs.get(v.key)
         if spec is None:
             raise ScenarioRefused(f"{asked.plant} reads back no parameter {v.key}")
         if spec.dimension == "words":
             raise ScenarioRefused(f"{v.key} is read back in words and never set")
-        if v.quantity.unit != spec.unit:
-            raise ScenarioRefused(f"{v.key} is in {spec.unit or 'no unit'}; the scenario gives {v.quantity.unit or 'none'}")
+        q = v.quantity
+        if q.origin is not None and q.origin.kind == "measurement":
+            try:
+                reading = resolved(EngineInput(name=v.key, quantity=q), spec.unit).quantity.origin
+            except InputRefused as e:
+                raise ScenarioRefused(str(e)) from None
+            assert reading is not None  # the lookup answers the reading's origin
+            kept.append(v.model_copy(update={"quantity": q.model_copy(update={"origin": q.origin.model_copy(
+                update={"by": reading.by, "at": reading.at})})}))
+            continue
+        if q.unit != spec.unit:
+            raise ScenarioRefused(f"{v.key} is in {spec.unit or 'no unit'}; the scenario gives {q.unit or 'none'}")
+        if q.basis is not None:
+            raise ScenarioRefused(f"{v.key}: a library plant's parameter is set in its own unit, which says what it "
+                                  f"is reckoned on; the scenario's value also carries the basis {q.basis!r}")
+        kept.append(v)
+    return kept
 
 
 async def _put(project_id: str, scenario: StudyScenario, by: str) -> None:
@@ -108,14 +140,16 @@ async def _listed(project_id: str) -> list[StudyScenario]:
 def make(asked: ScenarioCreate) -> StudyScenario:
     """A scenario checked against its plant and kept; the same plant,
     configuration and values kept already are that scenario, its title and
-    note brought up to date."""
-    _checked(asked)
+    note brought up to date. A reading's value is kept with its depositor
+    and the time it was taken, filled from the rows, so a value that names
+    them and one that leaves them out are one scenario."""
+    values = _checked(asked)
     who = (asked.by or "").strip() or "this browser"
-    sid = scenario_id(asked.plant, asked.configuration, asked.values)
+    sid = scenario_id(asked.plant, asked.configuration, values)
     project_id = projects.current()
     held = db.run(_get(project_id, sid))
     scenario = StudyScenario(id=sid, title=asked.title.strip(), plant=asked.plant, configuration=asked.configuration,
-                             values=asked.values, note=asked.note, runIds=held.runIds if held else [],
+                             values=values, note=asked.note, runIds=held.runIds if held else [],
                              by=held.by if held else who, at=held.at if held else _now())
     db.run(_put(project_id, scenario, who))
     return scenario
@@ -133,26 +167,30 @@ def listed() -> list[StudyScenario]:
     return db.run(_listed(projects.current()))
 
 
-def overrides(scenario: StudyScenario) -> list[Override]:
-    """The scenario's values as Overrides of its plant's scope, each with its
-    origin, its author, the moment it was set and what it rests on."""
-    scope = library.scope(scenario.plant, scenario.configuration)
-    return [Override(scope=scope, key=v.key, value=float(v.quantity.value), by=v.quantity.origin.by,
-                     at=v.quantity.origin.at, note=v.quantity.origin.note, origin=v.quantity.origin.kind)
-            for v in scenario.values]
+def inputs(scenario: StudyScenario) -> list[EngineInput]:
+    """The scenario's values as the typed inputs a run of its plant takes,
+    each a parameter's key and its quantity with its origin, its author, the
+    moment it was set and what it rests on; a reading as its reading's own
+    value and unit, which the run looks up again."""
+    return [EngineInput(name=v.key, quantity=v.quantity) for v in scenario.values]
 
 
 def run(sid: str, *, by: str = "") -> RunReport:
-    """The scenario run as an engine run, and the run's id kept with it. A
-    plant's refusal is the run's receipt (engine/runs.py) and refused here
-    in the plant's words."""
+    """The scenario run as an engine run on the biosteam engine's one path
+    for a library plant (engine/biosteam.py `run_plant`), and the run's id
+    kept with it. A plant's refusal is the run's receipt (engine/runs.py)
+    and refused here in the plant's words; a value its plant's parameters
+    refuse before anything runs keeps nothing and is refused in words."""
     scenario = get(sid)
     who = (by or "").strip() or "this browser"
     try:
-        report = runs.run(scenario.plant, scenario.configuration, overrides(scenario), by=who, scenario_id=scenario.id)
+        report = biosteam.run_plant(scenario.plant, scenario.configuration, inputs(scenario), by=who,
+                                    scenario_id=scenario.id)
     except runs.RunRefused as e:
         _kept(scenario, e.run_id, who)
         raise
+    except EngineRefused as e:
+        raise ScenarioRefused(str(e)) from None
     _kept(scenario, report.run.id, who)
     return report
 

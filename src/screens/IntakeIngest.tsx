@@ -9,7 +9,7 @@
 // simulated, and with the service down the board says so and offers nothing.
 import { useMemo } from 'react';
 import { CheckCircle2, Loader2, Sparkles } from 'lucide-react';
-import type { Candidate } from '@/data/types';
+import type { Candidate } from '@/lib/review';
 import { useStore } from '@/store';
 import { href } from '@/router';
 import { START_COMMAND } from '@/lib/postdoc';
@@ -17,7 +17,7 @@ import { fetchSourceName, licenceWords } from '@/lib/intake';
 import { OwnerTabs } from '@/components/OwnerTabs';
 import { CollectCard } from '@/components/CollectCard';
 import { INTAKE_TABS } from '@/data/tabs';
-import { Button, Callout, Card, EmptyState, LinkButton, PageHeader, SectionTitle } from '@/components/ui';
+import { Button, Callout, Card, EmptyState, PageHeader, SectionTitle } from '@/components/ui';
 
 const NO_CANDIDATES: Candidate[] = [];
 
@@ -29,14 +29,15 @@ export default function IntakeIngest() {
   const serviceUp = useStore((s) => s.serviceUp);
   const overlayProblem = useStore((s) => s.overlayProblem);
 
-  const held = useMemo(() => papers.filter((p) => p.held), [papers]);
+  // Every paper the store keeps is a document the project holds (ADR-002).
+  const held = papers;
   const extracted = useMemo(() => {
     const counts = new Map<string, number>();
     for (const c of candidates) counts.set(c.paperId, (counts.get(c.paperId) ?? 0) + 1);
     return counts;
   }, [candidates]);
   const running = (paperId: string) =>
-    jobs.some((j) => j.status === 'running' && j.title === `Extract ${paperId}`);
+    jobs.some((j) => j.status === 'running' && j.kind === 'ingest' && j.subject === paperId);
 
   return (
     <>
@@ -51,7 +52,6 @@ export default function IntakeIngest() {
             record&rsquo;s quote can anchor to the document&rsquo;s own words.
           </>
         }
-        actions={<LinkButton to="/biorepo">Back to BioRepo</LinkButton>}
       />
       <OwnerTabs tabs={INTAKE_TABS} />
 
@@ -59,8 +59,7 @@ export default function IntakeIngest() {
         <div className="mb-4">
           <Callout kind="warn" title="Offline — nothing can be collected or extracted">
             The Intake service is not running. Start it with{' '}
-            <span className="font-num">{START_COMMAND}</span> from <span className="font-num">core/</span>{' '}
-            and reload.
+            <span className="font-num">{START_COMMAND}</span> from the repository root and reload.
           </Callout>
         </div>
       )}
@@ -106,7 +105,7 @@ export default function IntakeIngest() {
                         {p.title}
                       </a>
                       <div className="text-caption text-ink-soft">
-                        {fetchSourceName(p.fetchedFrom)}
+                        {fetchSourceName(p.source)}
                         {p.year ? ` · ${p.year}` : ''} · <span className="font-num">{p.sections.length}</span>{' '}
                         passage{p.sections.length === 1 ? '' : 's'}
                         {p.licenceClass ? ` · ${licenceWords(p.licenceClass)}` : ''}

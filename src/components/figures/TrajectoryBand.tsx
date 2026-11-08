@@ -3,7 +3,8 @@
 // (computed), and a forecast as a band for readings with its median. One
 // panel per series. The table twin lists every reading with its residual
 // from the fit, and every forecast time.
-import type { Band, ComputedBasis, Provenance } from '@/data/types';
+import type { Band } from '@/lib/fermos';
+import type { ComputedBasis, Provenance } from '@/lib/studies';
 import { fmt } from '@/engine/units';
 import { DASH_ARRAY, ENCODING, markColor } from './encoding';
 import { FigureFrame, Mark, lineStroke, type FigureTable } from './FigureFrame';

@@ -17,8 +17,7 @@ export interface paths {
         put?: never;
         /**
          * Ask
-         * @description One question in, one AnswerPlan out: the bounded loop of tools
-         *     (OF-BLD-014 §5.2), kept as a turn of its conversation.
+         * @description One question in, one AnswerPlan out: the bounded loop of tools, kept as a turn of its conversation.
          *
          *     Every failure below returns a plan with `declined` set rather than an HTTP
          *     error, because a declined plan is a thing the UI already knows how to
@@ -44,7 +43,7 @@ export interface paths {
         put?: never;
         /**
          * Ask Stream
-         * @description The loop's steps as they complete (OF-BLD-014 §5.3), as server-sent
+         * @description The loop's steps as they complete, as server-sent
          *     events: `turn` (the conversation and the turn the service keeps the
          *     question as), each `step` (a TraceStep), then `plan` (the validated
          *     AnswerPlan), or `error` when the service itself failed. A declined plan
@@ -67,7 +66,24 @@ export interface paths {
         };
         /**
          * Audit Read
-         * @description The newest rows of the project's audit log, newest last.
+         * @description The project's newest `limit` rows of its audit log, newest last:
+         *     `limit` is held to 1 to 500 (200 by default), a larger one read as 500.
+         *     `action`, `target` and `who` narrow the rows to those that name each one
+         *     given exactly as the row names it, the newest `limit` of them served, so
+         *     a write of any age is found by what it was:
+         *     `?action=catalogue_write&target=skill/<id>&who=<name>/<version>` reads
+         *     the rows of one catalogue entry an assistant kept. Each row carries its `id`, the
+         *     id the answer of the write that made it names in `auditIds`, and leaves
+         *     its null fields out, as an answer over MCP leaves them out: a row with no
+         *     target, ask or effort holds no such key. `at` is ISO 8601 in UTC
+         *     (`2026-11-04T09:00:00.123456+00:00`), as a catalogue entry's `at` is;
+         *     `agent` is `model` for a model's or an assistant's write and `person` for
+         *     a named person's, and `who` names it (an MCP client by its
+         *     `<name>/<version>`). A row of the model's lane names the door its write
+         *     came in by in `detail.via`: `postdoc` for Postdoc's loop, with the
+         *     `effort` its model ran at and, from an ask, its `askId`; `mcp` for the
+         *     MCP server in its own process and `http` for the tool door's assistant
+         *     header, with no effort and no ask.
          */
         get: operations["audit_read_api_audit_get"];
         put?: never;
@@ -87,7 +103,10 @@ export interface paths {
         };
         /**
          * Artifacts List
-         * @description Every value this service computed and kept, newest first.
+         * @description Every value this service computed and kept, newest first; with
+         *     `?tool=` (repeated for several), those of the tools named alone, read by
+         *     the table's tool column (the reference page lists the runs a person kept
+         *     from the shelf's retired reference entries so, alpha 2.2 D8).
          */
         get: operations["artifacts_list_api_biorepo_artifacts_get"];
         put?: never;
@@ -115,6 +134,31 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/biorepo/artifacts/{artifact_id}/checks": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Artifacts Checks
+         * @description A run's checks against its package's own test (`proforma.checks_of`,
+         *     ADR-013): each of the test's values beside what the run computed, with
+         *     whether it holds within the test's tolerance. A library plant's run and a
+         *     run kept from a retired reference entry hold them; a Proforma scenario's
+         *     run, and a run of a plant whose package test asserts no values, answer an
+         *     empty list. A read: it computes nothing and starts no simulator.
+         */
+        get: operations["artifacts_checks_api_biorepo_artifacts__artifact_id__checks_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/biorepo/artifacts/{artifact_id}/replay": {
         parameters: {
             query?: never;
@@ -127,9 +171,35 @@ export interface paths {
         /**
          * Artifacts Replay
          * @description Recompute and compare. 404 for an unknown id; 409 when the tool that
-         *     made it is not registered in this service, which cannot replay it.
+         *     made it is not registered in this service, which cannot replay it. The
+         *     engines are read first, so a run of any of them registers its tool.
          */
         post: operations["artifacts_replay_api_biorepo_artifacts__artifact_id__replay_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/biorepo/artifacts/{artifact_id}/tables": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Artifacts Tables
+         * @description A run's tables as every reader reads them (`proforma.tables_of`): the
+         *     flowsheet it ran, what made the tables, the base case's TEA, streams,
+         *     units and utility duties, its diagram or the words for why it has none,
+         *     and its units in run order. A run kept before runs carried their tables
+         *     reads with empty ones. A read: it computes nothing and starts no
+         *     simulator.
+         */
+        get: operations["artifacts_tables_api_biorepo_artifacts__artifact_id__tables_get"];
+        put?: never;
+        post?: never;
         delete?: never;
         options?: never;
         head?: never;
@@ -147,7 +217,7 @@ export interface paths {
         put?: never;
         /**
          * Biorepo Check
-         * @description Would `biorepo.write` keep this decision? (OF-BLD-012.1 F1.5)
+         * @description Would `biorepo.write` keep this decision?
          *
          *     Every rule of §2.3 runs; nothing is written. A refusal is an ANSWER, not
          *     an error, so it comes back 200 with the rule and the reason — the browser
@@ -220,15 +290,21 @@ export interface paths {
         };
         /**
          * Catalogue Listed
-         * @description The open project's entries of one catalogue (strain, product, skill, lesson), by id.
+         * @description The open project's entries of one catalogue (strain, product, skill, lesson), by id. Each names who kept
+         *     it (`by`), in which lane (`agent`: a person's keep or a model's write), through which door a model's write
+         *     came (`via`: postdoc, mcp or http) and where it came from (`source`).
          */
         get: operations["catalogue_listed_api_catalogues__kind__get"];
         put?: never;
         /**
          * Catalogue Keep
          * @description One entry kept in the open project's catalogue of `kind`, in the name of
-         *     `by`; an entry already held under its id is replaced. 422 in words for an
-         *     entry the kind does not take.
+         *     `by`, as a person's keep (`agent: person`), audited as `keep_catalogue`
+         *     under the module that reads the kind; an entry already held under its id
+         *     is replaced, whoever kept it. The entry names its kind, the
+         *     catalogue's own: the catalogues screen sends an entry as the catalogue
+         *     answers one. 422 in words for an entry the kind does not take, for an
+         *     entry of another kind, and for a keep that names nobody (`by` empty).
          */
         post: operations["catalogue_keep_api_catalogues__kind__post"];
         delete?: never;
@@ -244,7 +320,12 @@ export interface paths {
             path?: never;
             cookie?: never;
         };
-        /** Catalogue Entry */
+        /**
+         * Catalogue Entry
+         * @description One entry of the open project's catalogue of `kind`, with who kept it (`by`, `agent`, and for a model's
+         *     entry the door it came in by, `via`), when (`at`, ISO 8601 in UTC, as the audit writes its rows' times) and
+         *     where it came from (`source`).
+         */
         get: operations["catalogue_entry_api_catalogues__kind___entry_id__get"];
         put?: never;
         post?: never;
@@ -312,6 +393,100 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/depositions/readings": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Deposition Readings
+         * @description The project's readings a run may take as measurements, the latest
+         *     taken first: each entry of its depositions a person confirmed that
+         *     stands for its measure, with the runbook and the measure it was
+         *     recorded against, the person who deposited it and the time it was
+         *     taken. With `unit`, the readings whose unit is that unit or converts
+         *     into it, each with its value in that unit and the conversion in words
+         *     (an empty `unit` asks for the readings a unitless parameter takes): the
+         *     lookup's own rules decide (measurements.py), so a reading listed is one
+         *     a scenario's value may name by its `ref`.
+         */
+        get: operations["deposition_readings_api_depositions_readings_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/engines": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Engines List
+         * @description Every engine registered here (docs/api/engines.md): its version, worker,
+         *     things and last conformance verdict, or the error that keeps it from use.
+         */
+        get: operations["engines_list_api_engines_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/engines/{name}/parameters": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Engine Parameters
+         * @description What one of an engine's things takes, each default with its origin.
+         *     A contract engine's thing and configuration are resolved as a run of it
+         *     resolves them (`runs.thing_of`): no configuration named reads the
+         *     thing's default.
+         */
+        get: operations["engine_parameters_api_engines__name__parameters_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/engines/{name}/run": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Engine Run
+         * @description One of an engine's things run with the values a person or a model sets,
+         *     kept as a runs row; a refused run is kept as a receipt and 422 in words.
+         *     An engine that answers outside its contract keeps no run and is 503.
+         */
+        post: operations["engine_run_api_engines__name__run_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/events": {
         parameters: {
             query?: never;
@@ -345,16 +520,17 @@ export interface paths {
         /**
          * Fermos Bind
          * @description A family's parameters bound for a strain, product and sugar
-         *     (`FermosBinding`, OF-BLD-020 §3.2, D6): each from the fit a person chose
+         *     (`FermosBinding`): each from the fit a person chose
          *     (`?fit=`), the records of the evidence pool through the aggregate gate, a kept simulation (`?startFrom=simulation:<id>`), or the
          *     spec's convention, with its source; what waits, each named with the field
-         *     that would bind it; and notes saying what bound from where. `?overrides=`
-         *     (a JSON list of the person's overrides of `fermos:family:<family>`, as
-         *     the simulation would carry them; OF-BLD-020 §3.3) lays them on, so
-         *     `waiting` is what Simulate would refuse for. Starts no integration and
-         *     keeps nothing. 404 for a family no one declared; 422 in words for a fit
-         *     or simulation not on file, a fit of another family, a sugar or id that is
-         *     not one, or an override of another scope.
+         *     that would bind it; and notes saying what bound from where. `?inputs=`
+         *     (a JSON list of the values a person sets on `fermos:family:<family>`,
+         *     each a typed quantity with its origin, as the simulation would carry
+         *     them; alpha 2.2 D2) lays them on, so `waiting` is what
+         *     Simulate would refuse for. Starts no integration and keeps nothing. 404
+         *     for a family no one declared; 422 in words for a fit or simulation not
+         *     on file, a fit of another family, a sugar or id that is not one, or a
+         *     value set that cannot stand.
          */
         get: operations["fermos_bind_api_fermos_bind_get"];
         put?: never;
@@ -437,9 +613,8 @@ export interface paths {
         /**
          * Fermos Fits
          * @description The kinetic fits, forecasts and simulations fermOS keeps (a
-         *     simulation since OF-BLD-020 §3.3), newest first, each with what it can
-         *     feed a shelf flowsheet's titre, yield and productivity and why not
-         *     (OF-BLD-019 §5.1, D10). A person picks one on the scenario page;
+         *     simulation among them), newest first, each with what it can
+         *     feed a shelf flowsheet's titre, yield and productivity and why not. A person picks one on the scenario page;
          *     a read: it keeps nothing. A flowsheet a scenario cannot run is a 422.
          */
         get: operations["fermos_fits_api_fermos_fits_get"];
@@ -462,8 +637,13 @@ export interface paths {
         put?: never;
         /**
          * Fermos Forecast
-         * @description A band for the next run from a fit (§7.3). A refusal says which
-         *     parameter the run did not identify, and what run would.
+         * @description A band for the next run from a fit (§7.3), from the fitted run's own
+         *     start values and length or the ones the request sets, each a typed
+         *     quantity with its origin keyed as the scope `fermos:forecast:<fit id>`
+         *     names it. A forecast of a kept fit is kept as a run of the kinetics
+         *     engine, in the name of the request's `by`. A refusal says which
+         *     parameter the run did not identify, and what run would, or why a value
+         *     set cannot stand.
          */
         post: operations["fermos_forecast_api_fermos_forecast_post"];
         delete?: never;
@@ -481,13 +661,12 @@ export interface paths {
         };
         /**
          * Fermos Harvest
-         * @description A kept simulation's broth at an hour (`FermosHarvest`, OF-BLD-020
-         *     §6.2, D10): its own harvest hour, or `?hour=`, a person's (the hour the
+         * @description A kept simulation's broth at an hour (`FermosHarvest`): its own harvest hour, or `?hour=`, a person's (the hour the
          *     Builder's inlet scope holds under their name; a model never sends one),
          *     read from the series the artifact keeps, each state with its unit, the
          *     hour's source and how it was read. A read: nothing is integrated again
          *     and nothing is kept. 404 for a simulation not on file, 409 for one
-         *     damaged on disk, 422 in words for an hour outside the simulated span, a
+         *     damaged in its row, 422 in words for an hour outside the simulated span, a
          *     simulation that keeps no product in the broth, and another artifact.
          */
         get: operations["fermos_harvest_api_fermos_harvest_get"];
@@ -512,10 +691,12 @@ export interface paths {
          * Fermos Simulate
          * @description Simulate a model family (`SimulationResult`) and keep it as one
          *     `fermos.simulation` artifact. Each parameter resolves with its source: a
-         *     person's override (an assumption by name, so the result is `assumed`), else
-         *     the family's stated convention. 422 in words for a parameter that waits
-         *     (named with what would bind it), the light socket, a bad override, or a
-         *     run that cannot end.
+         *     value the request sets (a typed quantity with its origin: a person's
+         *     assumption or a model's estimate by name, so the result is `assumed`, or
+         *     a deposition's reading, looked up in the project's depositions), else the
+         *     family's stated convention. 422 in words for a parameter that waits
+         *     (named with what would bind it), the light socket, a value set that
+         *     cannot stand, a reading the lookup refuses, or a run that cannot end.
          */
         post: operations["fermos_simulate_api_fermos_simulate_post"];
         delete?: never;
@@ -558,11 +739,12 @@ export interface paths {
          * Fermos Vessel
          * @description Design the vessel a simulation (or, anaerobic only, a fit) needs, in
          *     the Proforma worker on BioSTEAM: one `fermos.vessel` artifact, computed
-         *     or returned as kept for the same basis. 422 in words for a design that
-         *     cannot be made as asked (no plant scale and no batch volume, a fit asked
-         *     for an aerobic design, an artifact not on file, an override that cannot
-         *     stand, BioSTEAM's own refusal); 409 for a file damaged on disk; 503 when
-         *     the worker cannot answer.
+         *     or returned as kept for the same basis. Each value the request sets is a
+         *     typed quantity with its origin, keyed as the design's scope names it. 422
+         *     in words for a design that cannot be made as asked (no plant scale and no
+         *     batch volume, a fit asked for an aerobic design, an artifact not on file,
+         *     a value set that cannot stand, BioSTEAM's own refusal); 409 for a file
+         *     damaged in its row; 503 when the worker cannot answer.
          */
         post: operations["fermos_vessel_api_fermos_vessel_post"];
         delete?: never;
@@ -651,8 +833,13 @@ export interface paths {
         /**
          * Flowsheets Export
          * @description A kept run's base case written as an SFF file by the toolkit in the
-         *     worker, checked, drawn and kept with origin `run`. 404 for a run the
-         *     project does not hold; 422 for an artifact that is not a run.
+         *     worker, checked, drawn and kept with origin `run`: a shelf run, a
+         *     library run or a pureOS train run. 404 for a run the project does not
+         *     hold; 422 for an artifact that is not a run, and for a run kept from a
+         *     retired reference entry, whose file the library plant's run writes; 409
+         *     in the worker's words for a base case that cannot be built or a file the
+         *     toolkit cannot write (a train run's, while its schema requires a TEA
+         *     year: docs/api/sff.md).
          */
         post: operations["flowsheets_export_api_flowsheets_export_post"];
         delete?: never;
@@ -678,6 +865,41 @@ export interface paths {
          *     an SFF flowsheet.
          */
         post: operations["flowsheets_import_api_flowsheets_import_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/flowsheets/import-url": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Flowsheets Import Url
+         * @description An SFF file fetched from the public https address a person names, the
+         *     one door that fetches a flowsheet by its address (alpha 2.2 D10 and its
+         *     amendment at C.6), the way Intake fetches a document
+         *     (literature/collectors.py `fetch_file`: its User-Agent, its throttle, a
+         *     timeout, the network refused in fixture mode). Before each request, the
+         *     first and each redirect's, the host is resolved and every address it
+         *     names must be public; the request goes to a checked address, and the
+         *     whole exchange is held to a deadline. The body is streamed under the
+         *     size an import takes; then read, checked by the toolkit in the worker,
+         *     drawn and kept as an uploaded file is, its hash kept and the address its
+         *     source (engine/sff.py `import_url`). 413 past the size; 422 for an
+         *     address that is not https, one outside the public internet (a redirect
+         *     to either included) and a file that is not an SFF flowsheet; 502 when
+         *     the host name could not be found, the host could not be reached or read
+         *     in time, or it answered an error; 503 when the worker could not check
+         *     the file.
+         */
+        post: operations["flowsheets_import_url_api_flowsheets_import_url_post"];
         delete?: never;
         options?: never;
         head?: never;
@@ -1082,6 +1304,7 @@ export interface paths {
          *     `hasKey` lets the UI tell "the service is down" from "the service is up but
          *     has no key" — two different problems with two different fixes, and a single
          *     "unavailable" would send somebody to restart a process that is running fine.
+         *     The models are the plan route's, the one Postdoc's loop answers on.
          */
         get: operations["health_api_health_get"];
         put?: never;
@@ -1104,8 +1327,9 @@ export interface paths {
         /**
          * Catalogue Intake
          * @description A file of catalogue entries of one kind, JSON or CSV, taken in: every
-         *     row that is an entry kept with the file as its source, every other row
-         *     refused with its reason.
+         *     row that is an entry kept with the file as its source, each audited as
+         *     `keep_catalogue` naming the file, every other row refused with its
+         *     reason.
          */
         post: operations["catalogue_intake_api_intake_catalogue_post"];
         delete?: never;
@@ -1237,7 +1461,10 @@ export interface paths {
         /**
          * Library Parameters
          * @description A plant's parameters as the package builds it, each read back from a
-         *     fresh build in the worker with origin `library-default`.
+         *     fresh build in the worker with origin `library-default`, in the
+         *     configuration a run of it runs in: the one named, else, for a plant that
+         *     takes configurations, its default (engine/biosteam.py
+         *     `default_configuration`), which the answer names.
          */
         get: operations["library_parameters_api_library__plant__parameters_get"];
         put?: never;
@@ -1283,8 +1510,12 @@ export interface paths {
          * @description One engine run of a library plant or an openFerment flowsheet, built
          *     afresh with the values set for it, priced, read back and written as an
          *     SFF file, kept in the project's runs (engine/runs.py): the run, its
-         *     `library.run` artifact and its SFF record. A basis already run answers
-         *     from its row; values the plant refuses are kept as a receipt and
+         *     `library.run` artifact and its SFF record. The run takes the biosteam
+         *     engine's own path (engine/biosteam.py `run_plant`): a plant that takes a
+         *     configuration, asked with none, runs in its default, and each value is
+         *     checked against the plant's parameters before the plant is built, a
+         *     value refused keeping nothing (422 in words). A basis already run
+         *     answers from its row; values the plant refuses are kept as a receipt and
          *     answered 422 in the plant's words.
          */
         post: operations["library_run_api_library__plant__run_post"];
@@ -1370,7 +1601,9 @@ export interface paths {
         /**
          * Literature Stats
          * @description The project's documents and chunks in the kit, by source, licence class
-         *     and embedding version; the concept graph's size is the instance's.
+         *     and embedding version, and its concept graph's entities and relationships,
+         *     the ones its own passages name and hold, and 0 communities, the community
+         *     layer staying off (ADR-002, Implementation F).
          */
         get: operations["literature_stats_api_literature_stats_get"];
         put?: never;
@@ -1397,10 +1630,9 @@ export interface paths {
          *     bind as `/api/proforma/bind` does. Binding only: it starts no worker,
          *     integrates nothing and keeps nothing. `fermos:vessel:<id>` (with
          *     `?vesselType=`) reads its class's defaults through the Proforma worker,
-         *     which a read starts when it is cold (OF-BLD-020 §4.1). `fermos:family:<id>`
+         *     which a read starts when it is cold. `fermos:family:<id>`
          *     binds as GET /api/fermos/bind does, from `?strain=`, `?product=`,
-         *     `?sugar=`, `?fit=`, `?startFrom=` and `?durationPreset=` (OF-BLD-020
-         *     §3.2). `pureos:unit:<train>:<unit>` takes
+         *     `?sugar=`, `?fit=`, `?startFrom=` and `?durationPreset=`. `pureos:unit:<train>:<unit>` takes
          *     the unit's catalogue type as `?unitType=` and reads its class's defaults
          *     through the Proforma worker as the vessel's do (§5.1); with no type it is
          *     a 404 in words. With `?train=` (the whole TrainSpec, JSON, §5.2) the unit is
@@ -1408,10 +1640,10 @@ export interface paths {
          *     chemicals and its records bound from the evidence pool by each parameter's field, and
          *     `pureos:unit:<train>:inlet` is the train's inlet. A `proforma:` scope on
          *     `custom_train_v1` names its vessel design and train run (`?vessel=`,
-         *     `?trainRun=`; OF-BLD-020 §6.1) and serves the group Finance, read from
+         *     `?trainRun=`) and serves the group Finance, read from
          *     the installed package with no worker. 404 for a scope no provider here
          *     knows; 422 in words for a malformed one or a refused binding; 409 for an
-         *     artifact the scope names that is damaged on disk, as the vessel's own route
+         *     artifact the scope names that is damaged in its row, as the vessel's own route
          *     answers it (§2.R, finding 17); 503 when the worker cannot answer.
          */
         get: operations["params_scope_api_params__scope__get"];
@@ -1434,14 +1666,16 @@ export interface paths {
         put?: never;
         /**
          * Params Resolve
-         * @description A person's overrides laid on a scope's values (`ParamResolveResult`):
-         *     each override an `assumption` by the person it names, the basis inputs
-         *     the overrides would add to a run, and every value outside its bounds in
-         *     words (kept, never clamped). The basis inputs are the ones a run of the
-         *     scope writes for those overrides (§2.R). Runs nothing and keeps nothing:
-         *     the service keeps no override (D3). 404, 422, 409 and 503 as the GET
-         *     answers them; a `fermos:vessel:` scope may start the worker as the GET
-         *     may.
+         * @description The values a person or a model sets laid on a scope's values
+         *     (`ParamResolveResult`): each a typed quantity with its origin, converted
+         *     into an override of the scope the route names (in its parameter's unit)
+         *     and laid on as an `assumption` by the person or an estimate by the model
+         *     it names, the basis inputs those would add to a run, and every value
+         *     outside its bounds in words (kept, never clamped). The basis inputs are
+         *     the ones a run of the scope writes for them (§2.R). Runs nothing and
+         *     keeps nothing: the service keeps no override (D3). 404, 422, 409 and 503
+         *     as the GET answers them; a `fermos:vessel:` scope may start the worker as
+         *     the GET may.
          */
         post: operations["params_resolve_api_params__scope__resolve_post"];
         delete?: never;
@@ -1528,31 +1762,6 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
-    "/api/proforma/benchmark": {
-        parameters: {
-            query?: never;
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        /**
-         * Proforma Benchmark
-         * @description The benchmark this installation reproduced (§8.2), or none yet. A read:
-         *     it starts nothing. POST runs it.
-         */
-        get: operations["proforma_benchmark_api_proforma_benchmark_get"];
-        put?: never;
-        /**
-         * Proforma Benchmark Run
-         * @description Run the published corn stover biorefinery and keep its price (§8.2).
-         */
-        post: operations["proforma_benchmark_run_api_proforma_benchmark_post"];
-        delete?: never;
-        options?: never;
-        head?: never;
-        patch?: never;
-        trace?: never;
-    };
     "/api/proforma/bind": {
         parameters: {
             query?: never;
@@ -1563,17 +1772,18 @@ export interface paths {
         /**
          * Proforma Bind
          * @description A shelf flowsheet's inputs bound, as a scenario not yet saved to the
-         *     project shows them (OF-BLD-019 §2.3, D6), id and name empty; `?fits=`
+         *     project shows them, id and name empty; `?fits=`
          *     lays on the fermOS fits a person chose (§5.1), a JSON object of input
-         *     key to artifact id, and `?overrides=` a person's overrides of one
-         *     scenario's scope over both (OF-BLD-020 D3), a JSON list. A flowsheet
-         *     built from kept artifacts (`custom_train_v1`, OF-BLD-020 §6.1) names its
-         *     vessel design and its train run (`?vessel=`, `?trainRun=`). A reference
-         *     biorefinery, the toy, an unknown id, a fit that cannot feed its input,
-         *     an override that cannot stand, or a composite's part that cannot
-         *     (missing, another tool's, damaged, of another chemical set) is a 422 in
-         *     words. A read:
-         *     it starts no simulator.
+         *     key to artifact id, and `?inputs=` the values a person sets over both
+         *     (alpha 2.2 D2), a JSON list of typed quantities, each
+         *     converted at Proforma's door into the Override of the flowsheet's own
+         *     scope, `proforma:<flowsheet id>`, as a run converts its values. A
+         *     flowsheet built from kept artifacts (`custom_train_v1`)
+         *     names its vessel design and its train run (`?vessel=`, `?trainRun=`).
+         *     The toy, an unknown id, a fit that cannot feed its input, a value that
+         *     cannot stand, or a composite's part that cannot (missing, another tool's,
+         *     damaged, of another chemical set) is a 422 in words, and so is the
+         *     retired `?overrides=`. A read: it starts no simulator.
          */
         get: operations["proforma_bind_api_proforma_bind_get"];
         put?: never;
@@ -1594,47 +1804,18 @@ export interface paths {
         /**
          * Proforma Ceiling Check
          * @description A scenario's fermenter yield read against the newest stored geneOS
-         *     ceiling of each shelf model of its organism, on its flowsheet's sugar
-         *     (OF-BLD-019 §5.2, D11): `CeilingCheck`. A scenario the project keeps by
+         *     ceiling of each shelf model of its organism, on its flowsheet's sugar: `CeilingCheck`. A scenario the project keeps by
          *     its id, one not yet saved by the flowsheet it names; `?fits=` and
-         *     `?overrides=` (JSON; OF-BLD-020 D3) bind its yield as its page binds it,
-         *     and `?assumptions=`, the older field, is read as overrides for one
-         *     release. A yield above a ceiling is flagged, never clamped. A read: it
-         *     keeps nothing, starts no worker and changes no binding or run. Refused
-         *     in words (422) as the binding is.
+         *     `?inputs=` (JSON; alpha 2.2 D2: the values a person sets,
+         *     each a typed quantity converted at Proforma's door into the Override of
+         *     the scenario's scope) bind its yield as its page binds it. A yield above
+         *     a ceiling is flagged and kept as bound. A read: it keeps nothing, starts
+         *     no worker and changes no binding or run. Refused in words (422) as the
+         *     binding is, and so are the retired `?overrides=` and `?assumptions=`.
          */
         get: operations["proforma_ceiling_check_api_proforma_ceiling_check_get"];
         put?: never;
         post?: never;
-        delete?: never;
-        options?: never;
-        head?: never;
-        patch?: never;
-        trace?: never;
-    };
-    "/api/proforma/reference/{flowsheet_id}": {
-        parameters: {
-            query?: never;
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        /**
-         * Proforma Reference
-         * @description A reference biorefinery on the shelf (OF-BLD-019 §2.2): its entry, the
-         *     newest stored run or none, its package test's values, the simulator's
-         *     status. A read: it starts nothing. 404 for an id that is not a
-         *     reference biorefinery on the shelf.
-         */
-        get: operations["proforma_reference_api_proforma_reference__flowsheet_id__get"];
-        put?: never;
-        /**
-         * Proforma Reference Run
-         * @description Run a reference biorefinery whole on its package's defaults and keep
-         *     it as one `proforma.reference` artifact (a basis already run returns its
-         *     stored artifact).
-         */
-        post: operations["proforma_reference_run_api_proforma_reference__flowsheet_id__post"];
         delete?: never;
         options?: never;
         head?: never;
@@ -1653,8 +1834,12 @@ export interface paths {
         /**
          * Proforma Run
          * @description Run a scenario the project keeps by its id, or one not yet saved by
-         *     the shelf flowsheet it names (OF-BLD-019 §2.3, d): 422 in words for any
-         *     other case, and listing every input waiting for a source.
+         *     the shelf flowsheet it names (d), with the values a
+         *     person or a model sets as typed inputs, and keep it as one run of the
+         *     biosteam engine (GET /api/runs/{id}, its id the artifact's) with its SFF
+         *     file: 422 in words for any other case, listing every input waiting for a
+         *     source; a refusal inside the run is kept as its receipt and 422 in the
+         *     worker's words.
          */
         post: operations["proforma_run_api_proforma_run_post"];
         delete?: never;
@@ -1672,7 +1857,7 @@ export interface paths {
         };
         /**
          * Proforma Runs
-         * @description A scenario's newest run on this service (OF-BLD-019 §3.R): the newest
+         * @description A scenario's newest run on this service: the newest
          *     stored `proforma.run` whose basis names the scenario (`latest_run`, the
          *     one pureOS and selling_price read), or none. A read: it runs nothing and
          *     starts no simulator. The scenario is named by id, and a link opens what
@@ -1696,8 +1881,11 @@ export interface paths {
         };
         /**
          * Proforma Scenarios
-         * @description The project's BioSTEAM scenarios with their inputs bound to records
-         *     (§8.3; OF-BLD-019 §2.3). A read: it starts no simulator.
+         * @description Every BioSTEAM scenario the project keeps, with its inputs bound to
+         *     records (§8.3; alpha 2.2 D9): a scenario on
+         *     custom_train_v1 binds with the vessel design and the train run it names,
+         *     and one whose binding is refused is listed with the words (`refused`).
+         *     A read: it starts no simulator.
          */
         get: operations["proforma_scenarios_api_proforma_scenarios_get"];
         put?: never;
@@ -1717,7 +1905,7 @@ export interface paths {
         };
         /**
          * Proforma Shelf
-         * @description The shelf of flowsheets (OF-BLD-019 §2.1, D2): pure data, read with no
+         * @description The shelf of flowsheets: pure data, read with no
          *     simulator.
          */
         get: operations["proforma_shelf_api_proforma_shelf_get"];
@@ -1849,6 +2037,76 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/protocols": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Protocols Listed
+         * @description The open project's protocols, by id, each whole: its own fields and every version as it was kept, each
+         *     version with who kept it (`by`) and when (`at`, ISO 8601 in UTC), the current one named by `currentVersion`.
+         */
+        get: operations["protocols_listed_api_protocols_get"];
+        put?: never;
+        /**
+         * Protocol Make
+         * @description A protocol made in the open project in the name of `by`, with every version it holds, the protocol whole as
+         *     kept: the service writes each version's keeper and time (`by`, `at`) over what it sends, and audits the keep.
+         *     A protocol is made once under its id; a new version of it is kept at `/api/protocols/{id}/versions`. Every
+         *     skill a step names is one the project's skill catalogue holds (`/api/catalogues/skill`).
+         */
+        post: operations["protocol_make_api_protocols_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/protocols/{protocol_id}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Protocol Read
+         * @description One of the open project's protocols, whole; 404 in words when the project keeps none of that id.
+         */
+        get: operations["protocol_read_api_protocols__protocol_id__get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/protocols/{protocol_id}/versions": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Protocol Version
+         * @description A new version of one of the open project's protocols, kept in the name of `by` and made its current version:
+         *     the protocol whole, as it now stands. Every version kept before stays as it was kept, and the keep is audited.
+         *     404 in words when the project keeps no protocol of that id.
+         */
+        post: operations["protocol_version_api_protocols__protocol_id__versions_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/protparam": {
         parameters: {
             query?: never;
@@ -1871,7 +2129,7 @@ export interface paths {
          *     `protparam` artifact computed here or returned as stored. 404 for a
          *     product with no sequence (the words say the entry carries none) or no
          *     such product; 422 for a sequence ProtParam cannot read, in words naming
-         *     each letter and its positions; 409 for an answer damaged on disk.
+         *     each letter and its positions; 409 for an answer damaged in its row.
          */
         post: operations["protparam_compute_api_protparam_post"];
         delete?: never;
@@ -1948,7 +2206,7 @@ export interface paths {
          *     product neither the products catalogue nor thermo.CHEMICALS holds; 422 in
          *     words for a refusal (an unknown host, an inlet that is not one, a sequence
          *     ProtParam cannot read, a chemical the library lacks); 409 for a property
-         *     answer damaged on disk; 503 when the worker cannot answer a volatility
+         *     answer damaged in its row; 503 when the worker cannot answer a volatility
          *     question.
          */
         post: operations["pureos_propose_api_pureos_propose_post"];
@@ -1967,8 +2225,7 @@ export interface paths {
         };
         /**
          * Pureos Train Runs
-         * @description Every kept pureOS train run (`TrainSummary`), newest first (OF-BLD-020
-         *     §5.2). A read: it starts no simulator.
+         * @description Every kept pureOS train run (`TrainSummary`), newest first. A read: it starts no simulator.
          */
         get: operations["pureos_train_runs_api_pureos_train_runs_get"];
         put?: never;
@@ -1992,11 +2249,12 @@ export interface paths {
          * Pureos Train Check
          * @description Everything a run of the train would refuse, at once, in the run's
          *     words, each by the place it belongs to (`TrainValidation`: a unit's id,
-         *     `inlet`, or `train`): the validation's refusals, a value that waits naming
-         *     what would bind it, a unit's needs (OF-BLD-020 §5.3). Runs no train and
-         *     keeps nothing; it reads what the scopes read (the program's chemicals,
-         *     each class's defaults), which a cold worker starts for. 409 for an
-         *     artifact the train names that is damaged on disk; 503 when the worker
+         *     `inlet`, or `train`): an input that names no place or no parameter, a
+         *     key set twice, a value its parameter cannot take, then the validation's
+         *     refusals, a value that waits naming what would bind it, a unit's needs. Runs no
+         *     train and keeps nothing; it reads what the scopes read (the program's
+         *     chemicals, each class's defaults), which a cold worker starts for. 409 for
+         *     an artifact the train names that is damaged in its row; 503 when the worker
          *     cannot answer.
          */
         post: operations["pureos_train_check_api_pureos_train_check_post"];
@@ -2017,14 +2275,13 @@ export interface paths {
         put?: never;
         /**
          * Pureos Train From Run
-         * @description A kept run's units read into a train (`TrainFromRun`, OF-BLD-020
-         *     §5.3): every unit on the product's path whose class is a catalogue
+         * @description A kept run's units read into a train (`TrainFromRun`): every unit on the product's path whose class is a catalogue
          *     type, in run order, its outlets routed as the run routed them, its values
          *     read from the package's own unit when the run is of a shelf flowsheet;
          *     the units it does not take and why; the train's structural refusals.
          *     Keeps nothing and starts no simulator. 404 for an artifact not on file;
          *     422 in words for one that is no run or that no train is read from; 409
-         *     for one damaged on disk.
+         *     for one damaged in its row.
          */
         post: operations["pureos_train_from_run_api_pureos_train_from_run_post"];
         delete?: never;
@@ -2044,13 +2301,20 @@ export interface paths {
         put?: never;
         /**
          * Pureos Train Run
-         * @description Run a train (`TrainRun`): every value resolved with its source, the
-         *     train built and run in the Proforma worker, one `pureos.train_run`
-         *     artifact kept (or the one kept for the same basis returned). 422 in words
-         *     for every refusal (the validation's, a value that waits naming what would
-         *     bind it, a unit's needs, a unit that does not converge, with BioSTEAM's
-         *     words); 409 for an artifact the train names that is damaged on disk; 503
-         *     when the worker cannot answer (OF-BLD-020 §5.2).
+         * @description Run a train (`TrainRun`): every value resolved with its source, each
+         *     value the request sets (`inputs`, each named `<unit id>.<key>` or
+         *     `inlet.<key>`) laid on, the train built and run in the Proforma worker,
+         *     one `pureos.train_run` artifact kept with its run of the engine `train`
+         *     (one `runs` row created by `by`, keeping its SFF file or the toolkit's
+         *     words for why it has none; `GET /api/runs/{id}` serves it), or the one
+         *     kept for the same basis returned.
+         *     422 in words for every refusal, all of them at once (an input that names
+         *     no place or no parameter, a key set twice, a value its parameter cannot
+         *     take, the validation's, a value that waits naming what would bind it, a
+         *     unit's needs, and, kept as a receipt the same request is answered from, a
+         *     unit that does not converge, with BioSTEAM's words); 409 for an artifact
+         *     the train names that is damaged in its row; 503 when the worker cannot
+         *     answer.
          */
         post: operations["pureos_train_run_api_pureos_train_run_post"];
         delete?: never;
@@ -2073,7 +2337,7 @@ export interface paths {
          * @description Every refusal of a train at once, in words (`TrainValidation`): a type
          *     not in the catalogue, an outlet its type does not have, a recycle that is
          *     not to an earlier unit, a key its unit does not declare, no unit, two
-         *     outlets on, a duplicate id. Runs nothing (OF-BLD-020 §5.2, D9).
+         *     outlets on, a duplicate id. Runs nothing.
          */
         post: operations["pureos_train_validate_api_pureos_train_validate_post"];
         delete?: never;
@@ -2092,7 +2356,7 @@ export interface paths {
         /**
          * Pureos Train
          * @description One train: the newest run of the scenario `key` names, the newest run
-         *     of the pureOS train it names (OF-BLD-020 §5.2), or the run whose artifact
+         *     of the pureOS train it names, or the run whose artifact
          *     id it is. 404 says how a run gets there; a deep link opens what it
          *     names.
          */
@@ -2138,7 +2402,7 @@ export interface paths {
          * Pureos Trains Kept
          * @description The trains a model built with `pureos_build` or `pureos_write`
          *     (`KeptTrain`: the train as data, `madeBy` the model, `at` and
-         *     `updatedAt`), the most recently changed first (OF-BLD-020 §5.4). A
+         *     `updatedAt`), the most recently changed first. A
          *     person's trains are the project's rows (`GET /api/state`). A read: it
          *     writes nothing and starts no simulator.
          */
@@ -2160,7 +2424,7 @@ export interface paths {
         };
         /**
          * Runs List
-         * @description The project's engine runs, newest first.
+         * @description The project's engine runs, newest first; with `engine`, the runs that engine made.
          */
         get: operations["runs_list_api_runs_get"];
         put?: never;
@@ -2200,7 +2464,11 @@ export interface paths {
         };
         /**
          * State Load
-         * @description Everything the project keeps of its pages, keyed as the page keeps it.
+         * @description Everything the project keeps of its pages, keyed as the page keeps it
+         *     (project_state.state): each row read as its kind's model and served as
+         *     kept, a field the page left out staying out of the answer, and each row
+         *     that does not read named in `refused` with why. A Live conversation is
+         *     served whole.
          */
         get: operations["state_load_api_state_get"];
         put?: never;
@@ -2219,10 +2487,17 @@ export interface paths {
             cookie?: never;
         };
         get?: never;
-        /** State Put */
+        /**
+         * State Put
+         * @description One row kept whole, read as its kind's model first (project_state.py).
+         */
         put: operations["state_put_api_state__kind___item_id__put"];
         post?: never;
-        /** State Remove */
+        /**
+         * State Remove
+         * @description One row taken back, a person's own undo; a deposition, a measurement,
+         *     a lock and a conversation stay as they were made.
+         */
         delete: operations["state_remove_api_state__kind___item_id__delete"];
         options?: never;
         head?: never;
@@ -2374,7 +2649,13 @@ export interface paths {
          * Study Scenario Make
          * @description A scenario on a library plant or an openFerment flowsheet, checked
          *     against the plant's parameters and kept; each value a person's
-         *     assumption or a model's estimate (ADR-006).
+         *     assumption, a model's estimate (ADR-006) or a deposition's reading
+         *     (`{"kind": "measurement", "ref": "<deposition id>/<entry id>"}`), which
+         *     the service looks up in the project's depositions and keeps with its
+         *     depositor and time. A reading the project does not hold, one no person
+         *     confirmed, one corrected since, a value or unit other than the
+         *     reading's own, or a unit the parameter cannot be denominated in is a 422
+         *     in words, and nothing is kept.
          */
         post: operations["study_scenario_make_api_studies_scenarios_post"];
         delete?: never;
@@ -2412,7 +2693,10 @@ export interface paths {
         /**
          * Study Scenario Run
          * @description The scenario run as an engine run (its report); values the plant
-         *     refuses are kept as a receipt with the scenario and answered 422.
+         *     refuses are kept as a receipt with the scenario and answered 422. A kept
+         *     value its plant's parameters refuse before anything runs (a key the
+         *     plant no longer reads, a unit it no longer uses) is a 422 in words, and
+         *     keeps nothing.
          */
         post: operations["study_scenario_run_api_studies_scenarios__scenario_id__run_post"];
         delete?: never;
@@ -2430,19 +2714,21 @@ export interface paths {
         };
         /**
          * Thermo Props Stored
-         * @description The answer stored for the same question, as `{"artifact": …}`, or
-         *     `{"artifact": null}` when it has not been asked here: a read, which
-         *     starts no simulator. The same 404, 409 and 422 as the POST.
+         * @description The answer stored for the same question (`ThermoPropsStored`): its
+         *     artifact beside what the artifact holds, read as `ThermoProps`, or both
+         *     null when it has not been asked here: a read, which starts no simulator.
+         *     The same 404, 409 and 422 as the POST.
          */
         get: operations["thermo_props_stored_api_thermo_props_get"];
         put?: never;
         /**
          * Thermo Props
          * @description thermosteam's density, heat capacity, viscosity and bubble and dew
-         *     points for a run's stream, or a preset: one `thermo_props` artifact,
-         *     computed in the Proforma worker or returned as stored. 404 for a run,
+         *     points for a run's stream, or a preset (`ThermoPropsAnswer`): one
+         *     `thermo_props` artifact, computed in the Proforma worker or returned as
+         *     stored, beside what it holds, read as `ThermoProps`. 404 for a run,
          *     stream or record not on file; 409 for a run or an answer whose file is
-         *     damaged on disk; 422 for a question that cannot be asked, a chemical the
+         *     damaged in its row; 422 for a question that cannot be asked, a chemical the
          *     library lacks among them, in words; 503 when the worker cannot answer.
          */
         post: operations["thermo_props_api_thermo_props_post"];
@@ -2474,7 +2760,7 @@ export interface paths {
          *     equilibrium gives the pair a minimum-boiling azeotrope, one `volatility`
          *     artifact computed in the Proforma worker or returned as stored. 404 for a
          *     product that names no chemical of the library here; 422 for a chemical
-         *     the library lacks, in words naming it; 409 for an answer damaged on disk;
+         *     the library lacks, in words naming it; 409 for an answer damaged in its row;
          *     503 when the worker cannot answer.
          */
         post: operations["thermo_volatility_api_thermo_volatility_post"];
@@ -2518,8 +2804,22 @@ export interface paths {
          * @description Run one tool through the registry, the same path Postdoc's loop and
          *     the MCP server take, in the request's project. A refusal is a result
          *     with `error` set; an unknown tool is a 404. The body is the tool's
-         *     input; `?by=` names the person calling, who is the author of any
-         *     quantity the input types (ADR-006) and of any study write it makes.
+         *     input. The caller is named one of two ways, each name read as the tool
+         *     door reads one (its control, format and surrogate characters dropped,
+         *     its whitespace collapsed, at most 200 characters), and a call naming
+         *     both is a 422 in words. `?by=` names a person, who is the author of any
+         *     quantity the input types (ADR-006) and of any write it makes: the audit
+         *     row, a proposal and what the write keeps are marked as that person's,
+         *     and a store that holds a model's work alone (pureOS's kept trains)
+         *     refuses the write in its words. `X-OpenFerment-Assistant` names an
+         *     outside assistant, and the call runs in the model's lane under that
+         *     name, through this door (`via: http`): a number it types is that name's
+         *     estimate, a write is marked with that name (`by`), its audit row names
+         *     it as `who` with agent `model`, `via` http in its detail and no effort,
+         *     and a catalogue entry's source reads "<name>/<version>, at the HTTP
+         *     endpoint". A tool that writes (`writes` in docs/TOOLS.md) is run only for
+         *     a caller named so: a call that names nobody is a 422 in words, and
+         *     nothing runs.
          */
         post: operations["tools_run_api_tools__name__post"];
         delete?: never;
@@ -2556,24 +2856,24 @@ export interface components {
         /** AnswerPlan */
         AnswerPlan: {
             /** Claims */
-            claims?: components["schemas"]["Claim"][];
+            claims: components["schemas"]["Claim"][];
             /** Conversationid */
-            conversationId?: string | null;
-            coverage?: components["schemas"]["CoverageMap"] | null;
+            conversationId: string | null;
+            coverage: components["schemas"]["CoverageMap"] | null;
             /**
              * Declined
              * @description Set when the corpus cannot support an answer. Says what is missing.
              */
-            declined?: string | null;
+            declined: string | null;
             /** Evidence */
-            evidence?: components["schemas"]["Evidence"][];
+            evidence: components["schemas"]["Evidence"][];
             /**
              * Gaps
              * @description What evidence is missing.
              */
-            gaps?: string[];
+            gaps: string[];
             /** Passages */
-            passages?: components["schemas"]["Passage"][];
+            passages: components["schemas"]["Passage"][];
             /** Question */
             question: string;
             /**
@@ -2582,10 +2882,10 @@ export interface components {
              */
             rejected: number;
             /** Rejectionreasons */
-            rejectionReasons?: string[];
+            rejectionReasons: string[];
             /** Rows */
-            rows?: components["schemas"]["ModuleRow"][];
-            runbookDraft?: components["schemas"]["RunbookDraft"] | null;
+            rows: components["schemas"]["ModuleRow"][];
+            runbookDraft: components["schemas"]["RunbookDraft"] | null;
             /**
              * Stopped
              * @default done
@@ -2593,10 +2893,10 @@ export interface components {
              */
             stopped: "done" | "rounds" | "calls" | "cost" | "time";
             /** Trace */
-            trace?: components["schemas"]["TraceStep"][];
+            trace: components["schemas"]["TraceStep"][];
             /** Turnid */
-            turnId?: string | null;
-            usage?: components["schemas"]["Usage"];
+            turnId: string | null;
+            usage: components["schemas"]["Usage"];
         };
         /**
          * Artifact
@@ -2623,7 +2923,7 @@ export interface components {
              */
             provenance: "measured" | "gold" | "verified" | "curated" | "computed" | "unverified" | "user" | "industry-estimate" | "assumed";
             /** Seed */
-            seed?: number | null;
+            seed: number | null;
             /** Tool */
             tool: string;
             /** Toolversion */
@@ -2646,41 +2946,6 @@ export interface components {
             turnId?: string | null;
         };
         /**
-         * AuditEntry
-         * @description One row of the audit table (OF-BLD-015 §7.3): a write a model
-         *     made, or a proposal a person carried out or dismissed.
-         */
-        AuditEntry: {
-            /** Action */
-            action: string;
-            /**
-             * Agent
-             * @enum {string}
-             */
-            agent: "model" | "person";
-            /** Askid */
-            askId?: string | null;
-            /** At */
-            at: string;
-            /** Detail */
-            detail?: {
-                [key: string]: unknown;
-            };
-            /** Effort */
-            effort?: string | null;
-            /**
-             * Module
-             * @enum {string}
-             */
-            module: "runbooks" | "geneos" | "fermos" | "pureos" | "proforma" | "biorepo" | "guild" | "primer" | "intake" | "home";
-            /** State */
-            state: string;
-            /** Target */
-            target?: string | null;
-            /** Who */
-            who: string;
-        };
-        /**
          * AuditEvent
          * @description One entry in a record's audit trail. Mirrors the browser's AuditEvent.
          */
@@ -2690,9 +2955,65 @@ export interface components {
             /** At */
             at: string;
             /** From */
-            from?: unknown | null;
+            from: unknown | null;
             /** To */
-            to?: unknown | null;
+            to: unknown | null;
+            /** Who */
+            who: string;
+        };
+        /**
+         * AuditRow
+         * @description One row of the project's audit log as `GET /api/audit` serves it: the
+         *     entry its write left, under the row's own id, its null fields left out as
+         *     an answer over MCP leaves them out.
+         */
+        AuditRow: {
+            /** Action */
+            action: string;
+            /**
+             * Agent
+             * @enum {string}
+             */
+            agent: "model" | "person";
+            /**
+             * Askid
+             * @description The ask of Postdoc's the write was part of; left out for a write from outside an ask.
+             */
+            askId?: string | null;
+            /**
+             * At
+             * @description When the row was written, ISO 8601 in UTC (`+00:00`).
+             */
+            at: string;
+            /**
+             * Detail
+             * @description What the write was, in the action's own names: the tool and the kind of what it kept, the ids it made, and the note its call carried, where the call takes one (a module write, a catalogue entry, a study scenario, an engine run, a flowsheet import); a gated write's row names its proposal (`proposalId`) and gate, and the proposal keeps the call's note. For a write of the model's lane, the door it came in by (`via`: postdoc, mcp or http).
+             */
+            detail: {
+                [key: string]: unknown;
+            };
+            /**
+             * Effort
+             * @description The effort the service's model ran at, for a write of Postdoc's; left out for a person's write and for an outside assistant's, since no model of the service ran for it.
+             */
+            effort?: string | null;
+            /**
+             * Id
+             * @description The row's id, a string of digits, the id the answer of the write that made it names (a tool's `auditIds`).
+             */
+            id: string;
+            /**
+             * Module
+             * @enum {string}
+             */
+            module: "runbooks" | "geneos" | "fermos" | "pureos" | "proforma" | "biorepo" | "guild" | "primer" | "intake" | "home";
+            /** State */
+            state: string;
+            /**
+             * Target
+             * @description What the write was on, by its id (a catalogue entry's as `<kind>/<id>`); left out for a write that names none.
+             */
+            target?: string | null;
             /** Who */
             who: string;
         };
@@ -2715,6 +3036,19 @@ export interface components {
             /** Unit */
             unit: string;
         };
+        /**
+         * BaseBatch
+         * @description The batch a version's amounts are written for: its size, its unit and
+         *     what it is called.
+         */
+        BaseBatch: {
+            /** Label */
+            label: string;
+            /** Unit */
+            unit: string;
+            /** Value */
+            value: number;
+        };
         /** BasisInput */
         BasisInput: {
             /** Name */
@@ -2728,16 +3062,16 @@ export interface components {
         /** BasisSource */
         BasisSource: {
             /** By */
-            by?: string | null;
+            by: string | null;
             /** Id */
-            id?: string | null;
+            id: string | null;
             /**
              * Kind
              * @enum {string}
              */
             kind: "record" | "deposition" | "artifact" | "model" | "convention" | "assumption" | "model-estimate";
             /** Note */
-            note?: string | null;
+            note: string | null;
         };
         /** Body_catalogue_intake_api_intake_catalogue_post */
         Body_catalogue_intake_api_intake_catalogue_post: {
@@ -2782,6 +3116,27 @@ export interface components {
              */
             title: string;
         };
+        /**
+         * BoundRecord
+         * @description One record an input was bound to, in the input's unit.
+         */
+        BoundRecord: {
+            /** Carbonsource */
+            carbonSource: string | null;
+            /** Id */
+            id: string;
+            /** Organism */
+            organism: string | null;
+            /** Paperid */
+            paperId: string;
+            /**
+             * Provenance
+             * @enum {string}
+             */
+            provenance: "measured" | "gold" | "verified" | "curated" | "computed" | "unverified" | "user" | "industry-estimate" | "assumed";
+            /** Value */
+            value: number;
+        };
         /** BriefRequest */
         BriefRequest: {
             /** By */
@@ -2799,20 +3154,20 @@ export interface components {
          */
         Candidate: {
             /** Carbonsource */
-            carbonSource?: string | null;
+            carbonSource: string | null;
             /** Citesrecordid */
-            citesRecordId?: string | null;
+            citesRecordId: string | null;
             /** Comparativebaseline */
-            comparativeBaseline?: string | null;
+            comparativeBaseline: string | null;
             /** Componenttag */
-            componentTag?: string | null;
+            componentTag: string | null;
             /**
              * Confidence
              * @default 0
              */
             confidence: number;
             /** Curationref */
-            curationRef?: string | null;
+            curationRef: string | null;
             /**
              * Extractorrun
              * @default claude-1
@@ -2822,7 +3177,7 @@ export interface components {
             /** Field */
             field: string;
             /** Goldonly */
-            goldOnly?: boolean | null;
+            goldOnly: boolean | null;
             /** Id */
             id: string;
             /**
@@ -2831,15 +3186,15 @@ export interface components {
              */
             isPrimary: boolean;
             /** Method */
-            method?: string | null;
+            method: string | null;
             /** Negativeresult */
-            negativeResult?: boolean | null;
+            negativeResult: boolean | null;
             /** Numbering */
-            numbering?: string | null;
+            numbering: string | null;
             /** Organism */
-            organism?: string | null;
+            organism: string | null;
             /** Organismtext */
-            organismText?: string | null;
+            organismText: string | null;
             /** Paperid */
             paperId: string;
             /**
@@ -2850,12 +3205,12 @@ export interface components {
             provenance: "measured" | "gold" | "verified" | "curated" | "computed" | "unverified" | "user" | "industry-estimate" | "assumed";
             /** Quote */
             quote: string;
-            range?: components["schemas"]["Range"] | null;
+            range: components["schemas"]["Range"] | null;
             /** Rejectreason */
-            rejectReason?: string | null;
+            rejectReason: string | null;
             /** Sectionid */
             sectionId: string;
-            si: components["schemas"]["Quantity-Output"];
+            si: components["schemas"]["Quantity"];
             /**
              * Status
              * @default unverified
@@ -2867,11 +3222,98 @@ export interface components {
             /** Value */
             value: number | string;
             /** Valuebasis */
-            valueBasis?: ("exact" | "converted" | "range-midpoint" | "range-low" | "range-high" | "negation") | null;
+            valueBasis: ("exact" | "converted" | "range-midpoint" | "range-low" | "range-high" | "negation") | null;
+        };
+        /**
+         * CatalogueEntry
+         * @description One entry of a project's catalogue; the fields a kind does not use stay empty.
+         */
+        CatalogueEntry: {
+            /** Agent */
+            agent?: ("model" | "person") | null;
+            /** Aliases */
+            aliases?: string[];
+            /**
+             * At
+             * @default
+             */
+            at: string;
+            /** Blocks */
+            blocks?: (components["schemas"]["LessonProse"] | components["schemas"]["LessonEmbed"])[];
+            /**
+             * By
+             * @default
+             */
+            by: string;
+            /** Category */
+            category?: ("molecular_biology_enzyme" | "diagnostic" | "research_protein" | "food_protein" | "sweet_protein" | "structural_protein" | "industrial_enzyme" | "therapeutic_protein" | "hmo" | "terpene" | "glycoside" | "biopolymer") | null;
+            /** Checkpoint */
+            checkpoint?: components["schemas"]["CheckpointQuestion"][];
+            /** Criticality */
+            criticality?: ("routine" | "critical") | null;
+            /** Family */
+            family?: string | null;
+            /** Id */
+            id: string;
+            /**
+             * Kind
+             * @enum {string}
+             */
+            kind: "strain" | "product" | "skill" | "lesson";
+            /** Location */
+            location?: ("secreted" | "intracellular") | null;
+            /** Mastery */
+            mastery?: string[];
+            /** Minutes */
+            minutes?: number | null;
+            /** Name */
+            name: string;
+            /** Note */
+            note?: string | null;
+            /** Prerequisites */
+            prerequisites?: string[];
+            /** Program */
+            program?: string | null;
+            /** Recencydays */
+            recencyDays?: number | null;
+            /** Sequence */
+            sequence?: string | null;
+            /** Sequencesource */
+            sequenceSource?: string | null;
+            /** Skills */
+            skills?: string[];
+            /** Source */
+            source?: string | null;
+            /** Species */
+            species?: string | null;
+            /** Summary */
+            summary?: string | null;
+            /** Supervisedruns */
+            supervisedRuns?: number | null;
+            /** Via */
+            via?: ("postdoc" | "mcp" | "http") | null;
+        };
+        /**
+         * CatalogueIntake
+         * @description What a file of entries came to: the ids kept, and each row refused with why.
+         */
+        CatalogueIntake: {
+            /** Kept */
+            kept: string[];
+            /**
+             * Kind
+             * @enum {string}
+             */
+            kind: "strain" | "product" | "skill" | "lesson";
+            /** Refused */
+            refused: string[];
         };
         /**
          * CatalogueKeep
-         * @description POST /api/catalogues/{kind}: one entry and who keeps it.
+         * @description POST /api/catalogues/{kind}: one entry of the catalogue's kind, written
+         *     as the catalogue answers one, and who keeps it. The service writes the
+         *     entry's keeper, lane, door and time (`by`, `agent`, `via`, `at`) over
+         *     whatever the entry sends.
          */
         CatalogueKeep: {
             /**
@@ -2879,10 +3321,72 @@ export interface components {
              * @default
              */
             by: string;
-            /** Entry */
-            entry: {
-                [key: string]: unknown;
-            };
+            entry: components["schemas"]["CatalogueEntry"];
+        };
+        /**
+         * CeilingCheck
+         * @description GET /api/proforma/ceiling-check: one scenario's fermenter yield beside
+         *     every stored ceiling of its organism's shelf models on its sugar.
+         */
+        CeilingCheck: {
+            /** Computeat */
+            computeAt: string;
+            /** Empty */
+            empty: string | null;
+            /**
+             * Flagged
+             * @default false
+             */
+            flagged: boolean;
+            /** Flowsheet */
+            flowsheet: string;
+            /** Host */
+            host: string | null;
+            /** Models */
+            models: string[];
+            /** Notes */
+            notes: string[];
+            /** Organismwords */
+            organismWords: string;
+            /** Othersugars */
+            otherSugars: string[];
+            /** Product */
+            product: string;
+            /** Rows */
+            rows: components["schemas"]["CeilingRow"][];
+            /** Scenarioid */
+            scenarioId: string;
+            /** Species */
+            species: string[];
+            /** Strains */
+            strains: string[];
+            /** Substrate */
+            substrate: string;
+            /** Sugarwords */
+            sugarWords: string;
+            /**
+             * Yieldbinding
+             * @enum {string}
+             */
+            yieldBinding: "records" | "assumption" | "artifact" | "waiting";
+            /** Yieldhigh */
+            yieldHigh: number | null;
+            /** Yieldlow */
+            yieldLow: number | null;
+            /**
+             * Yieldrecords
+             * @default 0
+             */
+            yieldRecords: number;
+            yieldSource: components["schemas"]["BasisSource"] | null;
+            /** Yieldtool */
+            yieldTool: string | null;
+            /** Yieldunit */
+            yieldUnit: string;
+            /** Yieldvalue */
+            yieldValue: number | null;
+            /** Yieldwords */
+            yieldWords: string;
         };
         /** CeilingRequest */
         CeilingRequest: {
@@ -2896,19 +3400,82 @@ export interface components {
             /** Substrate */
             substrate: string;
         };
+        /**
+         * CeilingRow
+         * @description One stored ceiling beside the scenario's yield, both on the ceiling's
+         *     own footing, grams of product per gram of sugar and mol per mol.
+         */
+        CeilingRow: {
+            /** Artifactid */
+            artifactId: string;
+            /** Ceilinggperg */
+            ceilingGPerG: number;
+            /** Ceilingmolpermol */
+            ceilingMolPerMol: number | null;
+            /** Conventions */
+            conventions: string[];
+            /** Createdat */
+            createdAt: string;
+            /**
+             * Flag
+             * @enum {string}
+             */
+            flag: "above" | "within" | "no-yield";
+            /** Host */
+            host: string | null;
+            /**
+             * Match
+             * @enum {string}
+             */
+            match: "strain" | "species";
+            /** Matchwords */
+            matchWords: string;
+            /** Modelbasis */
+            modelBasis: string;
+            /** Modelid */
+            modelId: string;
+            /** Modelname */
+            modelName: string;
+            /**
+             * Older
+             * @default 0
+             */
+            older: number;
+            /** Product */
+            product: string;
+            /**
+             * Provenance
+             * @enum {string}
+             */
+            provenance: "measured" | "gold" | "verified" | "curated" | "computed" | "unverified" | "user" | "industry-estimate" | "assumed";
+            /** Recordsabove */
+            recordsAbove: string[];
+            /** Substrate */
+            substrate: string;
+            /** Words */
+            words: string;
+            /** Yieldgperg */
+            yieldGPerG: number | null;
+            /** Yieldhighgperg */
+            yieldHighGPerG: number | null;
+            /** Yieldlowgperg */
+            yieldLowGPerG: number | null;
+            /** Yieldmolpermol */
+            yieldMolPerMol: number | null;
+        };
         /** Check */
         Check: {
             /** Assessorid */
-            assessorId?: string | null;
-            brief?: components["schemas"]["CheckBrief"] | null;
+            assessorId: string | null;
+            brief: components["schemas"]["CheckBrief"] | null;
             /** Closedat */
-            closedAt?: string | null;
+            closedAt: string | null;
             /** Dismissreason */
-            dismissReason?: string | null;
+            dismissReason: string | null;
             /** Dismissedby */
-            dismissedBy?: string | null;
+            dismissedBy: string | null;
             /** Evidenceids */
-            evidenceIds?: string[];
+            evidenceIds: string[];
             /** Id */
             id: string;
             /** Personid */
@@ -2916,13 +3483,13 @@ export interface components {
             /** Proposedat */
             proposedAt: string;
             /** Proposedby */
-            proposedBy?: string | null;
+            proposedBy: string | null;
             /** Reasons */
-            reasons?: components["schemas"]["CheckReason"][];
+            reasons: components["schemas"]["CheckReason"][];
             /** Results */
-            results?: components["schemas"]["CheckResult"][];
+            results: components["schemas"]["CheckResult"][];
             /** Scheduledfor */
-            scheduledFor?: string | null;
+            scheduledFor: string | null;
             /**
              * Score
              * @default 0
@@ -2944,16 +3511,16 @@ export interface components {
          */
         CheckBrief: {
             /** Criteria */
-            criteria?: components["schemas"]["CheckCriterion"][];
+            criteria: components["schemas"]["CheckCriterion"][];
             /** Draftedat */
             draftedAt: string;
             /** Model */
             model: string;
             /** Questions */
-            questions?: string[];
+            questions: string[];
             /** Steps */
-            steps?: components["schemas"]["PracticeStepRef"][];
-            usage?: components["schemas"]["Usage"];
+            steps: components["schemas"]["PracticeStepRef"][];
+            usage: components["schemas"]["Usage"];
         };
         /**
          * CheckCriterion
@@ -3048,12 +3615,56 @@ export interface components {
             scheduledFor: string;
         };
         /**
+         * CheckpointAnswer
+         * @description A numeric question's answer as the lesson's author writes it: a value,
+         *     its unit (empty for a pure number, else one the unit converter reads, so
+         *     an answer in any unit of its family grades), and how far from the value an
+         *     answer may stand, in percent of it.
+         */
+        CheckpointAnswer: {
+            /** Tolerancepct */
+            tolerancePct: number;
+            /** Unit */
+            unit: string;
+            /** Value */
+            value: number;
+        };
+        /**
+         * CheckpointQuestion
+         * @description One question of a lesson's checkpoint: a multiple-choice question names
+         *     its options and the one that answers it (`answerIndex`, from 0); a
+         *     numeric one holds its answer.
+         */
+        CheckpointQuestion: {
+            answer?: components["schemas"]["CheckpointAnswer"] | null;
+            /** Answerindex */
+            answerIndex?: number | null;
+            /** Evidencechip */
+            evidenceChip?: string | null;
+            /**
+             * Explanation
+             * @default
+             */
+            explanation: string;
+            /** Id */
+            id: string;
+            /**
+             * Kind
+             * @enum {string}
+             */
+            kind: "mc" | "numeric";
+            /** Options */
+            options?: string[];
+            /** Prompt */
+            prompt: string;
+        };
+        /**
          * Checks
          * @description A project's checks — every check proposed, asked for, run or dismissed.
          */
         Checks: {
             /** Checks */
-            checks?: components["schemas"]["Check"][];
+            checks: components["schemas"]["Check"][];
             /**
              * Version
              * @default 1
@@ -3067,15 +3678,15 @@ export interface components {
          */
         Claim: {
             /** Evidenceids */
-            evidenceIds?: string[];
+            evidenceIds: string[];
             /** Id */
             id: string;
             /** Modulerefs */
-            moduleRefs?: string[];
+            moduleRefs: string[];
             /** Paperids */
-            paperIds?: string[];
+            paperIds: string[];
             /** Passages */
-            passages?: components["schemas"]["PassageRef"][];
+            passages: components["schemas"]["PassageRef"][];
             /**
              * Provenance
              * @default unverified
@@ -3083,7 +3694,7 @@ export interface components {
              */
             provenance: "measured" | "gold" | "verified" | "curated" | "computed" | "unverified" | "user" | "industry-estimate" | "assumed";
             /** Recordids */
-            recordIds?: string[];
+            recordIds: string[];
             /**
              * Support
              * @default direct
@@ -3096,7 +3707,7 @@ export interface components {
              */
             text: string;
             /** Values */
-            values?: components["schemas"]["ClaimValue"][];
+            values: components["schemas"]["ClaimValue"][];
         };
         /**
          * ClaimValue
@@ -3110,9 +3721,9 @@ export interface components {
         ClaimValue: {
             /** Label */
             label: string;
-            quantity: components["schemas"]["Quantity-Output"];
+            quantity: components["schemas"]["Quantity"];
             /** Source */
-            source?: string | null;
+            source: string | null;
         };
         /**
          * CollectOutcome
@@ -3131,14 +3742,14 @@ export interface components {
             /** Collector */
             collector: string;
             /** Documentid */
-            documentId?: string | null;
+            documentId: string | null;
             /** Identifier */
             identifier: string;
-            licence?: components["schemas"]["FetchLicense"] | null;
+            licence: components["schemas"]["FetchLicense"] | null;
             /** Licenceclass */
             licenceClass: string;
             /** Reason */
-            reason?: string | null;
+            reason: string | null;
             /**
              * Sections
              * @default 0
@@ -3214,7 +3825,7 @@ export interface components {
             /** Inputs */
             inputs: components["schemas"]["BasisInput"][];
             /** Seed */
-            seed?: number | null;
+            seed: number | null;
             /** Tool */
             tool: string;
             /** Toolversion */
@@ -3245,14 +3856,14 @@ export interface components {
          */
         CoverageMap: {
             /** Entities */
-            entities?: string[];
+            entities: string[];
             /**
              * Found
              * @default 0
              */
             found: number;
             /** Modules */
-            modules?: components["schemas"]["ModuleCoverage"][];
+            modules: components["schemas"]["ModuleCoverage"][];
             /**
              * Searched
              * @default 0
@@ -3261,18 +3872,153 @@ export interface components {
         };
         /**
          * DecisionCheck
-         * @description What `POST /api/biorepo/check` answers (OF-BLD-012.1 F1.5): whether
+         * @description What `POST /api/biorepo/check` answers: whether
          *     `biorepo.write` would store this decision, and the rule it would refuse
-         *     it under. The browser asks before the reviewer presses the key, so the
-         *     screen says what the service would say rather than a mirror of it.
+         *     it under, with why (both null when it would store it). The browser asks
+         *     before the reviewer presses the key, so the screen says what the service
+         *     would say.
          */
         DecisionCheck: {
             /** Ok */
             ok: boolean;
             /** Rule */
-            rule?: string | null;
+            rule: ("record" | "reviewer" | "fulltext" | "quote" | "paper" | "unit" | "status" | "estimate") | null;
             /** Why */
-            why?: string | null;
+            why: string | null;
+        };
+        /**
+         * Deposition
+         * @description The bench's record of a run against a runbook (the browser's
+         *     `Deposition`, src/lib/studies.ts): its readings and observations,
+         *     appended as they are taken, its state from staged to running to closed,
+         *     and its reconciliation. A write to one the project keeps is held to what
+         *     the bench does (`project_state.deposition_refusal`).
+         */
+        Deposition: {
+            /** Closedat */
+            closedAt: string | null;
+            /** Entries */
+            entries: components["schemas"]["DepositionEntry"][];
+            /** Id */
+            id: string;
+            /** Observations */
+            observations: components["schemas"]["DepositionObservation"][];
+            /** Operatorid */
+            operatorId: string | null;
+            /** Protocolid */
+            protocolId: string | null;
+            reconciliation: components["schemas"]["Reconciliation"] | null;
+            /** Runbookid */
+            runbookId: string;
+            /** Sampletimes */
+            sampleTimes?: {
+                [key: string]: number;
+            };
+            /** Seriesroles */
+            seriesRoles?: {
+                [key: string]: "biomass" | "product" | "substrate";
+            };
+            /** Startedat */
+            startedAt: string;
+            /**
+             * State
+             * @enum {string}
+             */
+            state: "staged" | "running" | "closed";
+        } & {
+            [key: string]: unknown;
+        };
+        /**
+         * DepositionEntry
+         * @description One reading taken at the bench against a runbook's measure (the
+         *     browser's `DepositionEntry`, src/lib/studies.ts): the words the operator
+         *     said or typed (`raw`), the number read from them, and whether a person
+         *     read it back. A correction is a new entry on the same measure, keeping
+         *     the `at` of the reading it corrects and saying when it was typed
+         *     (`correctedAt`).
+         */
+        DepositionEntry: {
+            /** At */
+            at: string;
+            /** Confirmed */
+            confirmed: boolean;
+            /** Correctedat */
+            correctedAt?: string | null;
+            /** Id */
+            id: string;
+            /** Measureid */
+            measureId: string;
+            /** Raw */
+            raw: string;
+            /** Stepid */
+            stepId: string;
+            /** Unit */
+            unit: string;
+            /** Value */
+            value: number;
+        } & {
+            [key: string]: unknown;
+        };
+        /**
+         * DepositionObservation
+         * @description Something the operator reported that fits no measure (one of a
+         *     deposition's `observations`): the words kept as they were said,
+         *     and a structured reading of them, None until a person adds one.
+         */
+        DepositionObservation: {
+            /** At */
+            at: string;
+            /** Id */
+            id: string;
+            /** Raw */
+            raw: string;
+            /** Stepid */
+            stepId: string;
+            /** Structured */
+            structured: string | null;
+        } & {
+            [key: string]: unknown;
+        };
+        /**
+         * DepositionReading
+         * @description GET /api/depositions/readings: one reading a run may take as a
+         *     measurement (measurements.py): an entry of one of the project's
+         *     depositions that a person confirmed and that stands for its measure,
+         *     with the runbook and the measure it was recorded against, the person
+         *     who deposited it and the time it was taken. Asked with a unit, a reading
+         *     whose unit is that unit or converts into it, its value in that unit
+         *     beside its own. A scenario's value names it as `{"value": value, "unit":
+         *     unit, "origin": {"kind": "measurement", "ref": ref}}`.
+         */
+        DepositionReading: {
+            /** At */
+            at: string;
+            /** By */
+            by: string;
+            /** Depositionid */
+            depositionId: string;
+            /** Entryid */
+            entryId: string;
+            /** Hours */
+            hours: number | null;
+            /** Inunit */
+            inUnit: number | null;
+            /** Measure */
+            measure: string | null;
+            /** Measureid */
+            measureId: string;
+            /** Note */
+            note: string | null;
+            /** Ref */
+            ref: string;
+            /** Runbook */
+            runbook: string | null;
+            /** Runbookid */
+            runbookId: string | null;
+            /** Unit */
+            unit: string;
+            /** Value */
+            value: number;
         };
         /**
          * DroppedCandidate
@@ -3303,7 +4049,175 @@ export interface components {
              */
             unit: string;
             /** Value */
-            value?: number | string | null;
+            value: number | string | null;
+        };
+        /**
+         * EngineCheck
+         * @description One conformance check (docs/api/engines.md, Conformance).
+         */
+        EngineCheck: {
+            /** Check */
+            check: string;
+            /** Number */
+            number: number;
+            /** Ok */
+            ok: boolean;
+            /** Said */
+            said: string;
+        };
+        /**
+         * EngineConformance
+         * @description An engine's last conformance verdict, at the version it was checked.
+         */
+        EngineConformance: {
+            /** At */
+            at: string;
+            /** By */
+            by: string;
+            /** Checks */
+            checks: components["schemas"]["EngineCheck"][];
+            /** Engine */
+            engine: string;
+            /** Ok */
+            ok: boolean;
+            /** Version */
+            version: string;
+        };
+        /**
+         * EngineInfo
+         * @description GET /api/engines: one engine as the service found it.
+         */
+        EngineInfo: {
+            conformance: components["schemas"]["EngineConformance"] | null;
+            /** Entrypoint */
+            entryPoint: string;
+            /** Error */
+            error: string | null;
+            /** Heavy */
+            heavy: string[];
+            /** Name */
+            name: string;
+            /** Things */
+            things: components["schemas"]["EngineThing"][];
+            /** Thingsare */
+            thingsAre: string | null;
+            /** Version */
+            version: {
+                [key: string]: string;
+            };
+            /** Worker */
+            worker: string | null;
+            /**
+             * Workerstatus
+             * @default cold
+             */
+            workerStatus: string;
+        };
+        /**
+         * EngineInput
+         * @description A value a run sets: a parameter's key and a typed quantity in that
+         *     parameter's unit (the shape a run's inputs have), carrying the person or
+         *     the model that set it and the day it was set (`origin.at`), as an
+         *     Override and a scenario's value carry theirs; or a reading a person
+         *     deposited at the bench (a `measurement`, its `ref` the reading's
+         *     `<deposition id>/<entry id>`), its value and unit the reading's own,
+         *     which the service looks up in the project's depositions before anything
+         *     runs, filling the reading's time and its depositor where the request
+         *     leaves them out (measurements.py). It holds those fields alone, and a
+         *     value, low or high that is true or false is refused, as an Override
+         *     refuses one.
+         */
+        EngineInput: {
+            /** Name */
+            name: string;
+            quantity: components["schemas"]["Quantity"];
+        };
+        /**
+         * EngineParameter
+         * @description One parameter a thing takes: a `ParameterSpec` (the panel's shape,
+         *     its bounds with their written reason) with its default value and where
+         *     the default comes from, `library-default` naming the package it was read
+         *     from or a `convention` saying what the setting is. A thing the project
+         *     holds (the train engine's trains) has defaults the project holds too: a
+         *     `record` naming the records that bound it, an `artifact` naming the
+         *     run, simulation or design it was read from, or a `person-assumption`
+         *     naming the person who typed it into the thing. A parameter with no
+         *     default has `value` and `origin` null: a run sets it, the engine binds it
+         *     from what the project holds (the kinetics engine binds a family's
+         *     parameter from the project's records), or the thing fills it itself when
+         *     a run leaves it unset, which its `note` then says with the reason (the
+         *     train engine's: a value the unit's class decides at run time, a component
+         *     the inlet does not carry, a split left to the class). A run that leaves
+         *     unset a parameter none of these gives is refused in words, keeping
+         *     nothing. The panel's fields an
+         *     engine may leave unset default here; `sourceRule` is the rule entry the
+         *     origin's kind stands for (`assumption` for a person's), and `assumption`
+         *     (a run's value) for a parameter with no default; a record's default
+         *     names its field in the rule (`record:<field id>`).
+         */
+        EngineParameter: {
+            /** Boundsreason */
+            boundsReason: string;
+            /** Choices */
+            choices: string[] | null;
+            /** Convention */
+            convention: number | string | null;
+            /**
+             * Dimension
+             * @default
+             */
+            dimension: string;
+            /**
+             * Gloss
+             * @default
+             */
+            gloss: string;
+            /**
+             * Group
+             * @default parameters
+             */
+            group: string;
+            /** Key */
+            key: string;
+            /** Label */
+            label: string;
+            /** Max */
+            max: number | null;
+            /** Min */
+            min: number | null;
+            /** Note */
+            note: string | null;
+            origin: components["schemas"]["Origin"] | null;
+            /**
+             * Scale
+             * @default linear
+             * @enum {string}
+             */
+            scale: "linear" | "log";
+            /** Sourcerule */
+            sourceRule: string[];
+            /** Step */
+            step: number | null;
+            /**
+             * Symbol
+             * @default
+             */
+            symbol: string;
+            /** Unit */
+            unit: string;
+            /** Value */
+            value: number | string | null;
+        };
+        /**
+         * EnginePrecision
+         * @description How near a replayed output must come to the run's: within
+         *     `atol + rtol·|stored|`.
+         */
+        EnginePrecision: {
+            /** Atol */
+            atol: number;
+            /** Rtol */
+            rtol: number;
         };
         /**
          * EngineRun
@@ -3311,34 +4225,41 @@ export interface components {
          */
         EngineRun: {
             /** Artifactid */
-            artifactId?: string | null;
+            artifactId: string | null;
             /** At */
             at: string;
             /** By */
             by: string;
             /** Configuration */
-            configuration?: string | null;
+            configuration: string | null;
+            /** Diagnostics */
+            diagnostics: components["schemas"]["RunDiagnostic"][];
             /** Durationms */
-            durationMs?: number | null;
+            durationMs: number | null;
+            /**
+             * Engine
+             * @default biosteam
+             */
+            engine: string;
             /** Id */
             id: string;
             /** Inputs */
             inputs: components["schemas"]["RunInput"][];
             /** Outputs */
-            outputs?: {
+            outputs: {
                 [key: string]: unknown;
             };
             /** Plant */
             plant: string;
             /** Provenance */
-            provenance?: ("measured" | "gold" | "verified" | "curated" | "computed" | "unverified" | "user" | "industry-estimate" | "assumed") | null;
+            provenance: ("measured" | "gold" | "verified" | "curated" | "computed" | "unverified" | "user" | "industry-estimate" | "assumed") | null;
             /** Refused */
-            refused?: string | null;
+            refused: string | null;
             /** Scenarioid */
-            scenarioId?: string | null;
-            sff?: components["schemas"]["RunSFF"] | null;
+            scenarioId: string | null;
+            sff: components["schemas"]["RunSFF"] | null;
             /** Sffrefused */
-            sffRefused?: string | null;
+            sffRefused: string | null;
             /**
              * Status
              * @enum {string}
@@ -3349,9 +4270,63 @@ export interface components {
             /** Toolversion */
             toolVersion: string;
             /** Versions */
-            versions?: {
+            versions: {
                 [key: string]: string;
             };
+        };
+        /**
+         * EngineRunRequest
+         * @description POST /api/engines/{name}/run: one thing, in one configuration, with
+         *     the values a person or a model sets, and nothing beside: a field it does
+         *     not name, a stray number among them, is refused.
+         */
+        EngineRunRequest: {
+            /**
+             * By
+             * @default
+             */
+            by: string;
+            /** Configuration */
+            configuration?: string | null;
+            /** Inputs */
+            inputs?: components["schemas"]["EngineInput"][];
+            /** Thing */
+            thing: string;
+        };
+        /**
+         * EngineThing
+         * @description One thing an engine can run, with the configurations it runs in and,
+         *     where the engine gives them, the words a person reads for each.
+         */
+        EngineThing: {
+            /**
+             * Configurationtitles
+             * @description Words a person reads for a configuration, by its name: each key one of `configurations`, each title 1 to 200 characters. A configuration with no title is read by its name; `{}` when the engine gives none.
+             */
+            configurationTitles: {
+                [key: string]: string;
+            };
+            /** Configurations */
+            configurations: string[];
+            /** Defaultconfiguration */
+            defaultConfiguration: string | null;
+            /** Id */
+            id: string;
+            /** Kind */
+            kind: string | null;
+            precision: components["schemas"]["EnginePrecision"];
+            /** Title */
+            title: string;
+        };
+        /**
+         * EstMinutes
+         * @description How long a run of the version takes, hands on and in all, in minutes.
+         */
+        EstMinutes: {
+            /** Active */
+            active: number;
+            /** Total */
+            total: number;
         };
         /**
          * Evidence
@@ -3360,10 +4335,10 @@ export interface components {
         Evidence: {
             basis: components["schemas"]["ComputedBasis"];
             /** Figure */
-            figure?: string | null;
+            figure: string | null;
             /** Id */
             id: string;
-            interval?: components["schemas"]["Range"] | null;
+            interval: components["schemas"]["Range"] | null;
             /** Label */
             label: string;
             /**
@@ -3375,6 +4350,21 @@ export interface components {
             unit: string;
             /** Value */
             value: number | string;
+        };
+        /**
+         * EvidenceCheck
+         * @description What `POST /api/guild/check` answers: whether `guild.write_evidence`
+         *     would keep this entry, and the rule it would refuse it under, with why
+         *     (both null when it would keep it). The sign-off sheet asks before anyone
+         *     signs, so it says what the service would say.
+         */
+        EvidenceCheck: {
+            /** Ok */
+            ok: boolean;
+            /** Rule */
+            rule: ("name" | "role" | "added" | "duplicate" | "person" | "skill" | "source" | "observer" | "authority" | "outcome" | "note" | "date" | "evidence" | "policy") | null;
+            /** Why */
+            why: string | null;
         };
         /**
          * EvidenceSource
@@ -3406,24 +4396,24 @@ export interface components {
          */
         ExtractResponse: {
             /** Audit */
-            audit?: components["schemas"]["AuditEvent"][];
+            audit: components["schemas"]["AuditEvent"][];
             /**
              * Calls
              * @default 1
              */
             calls: number;
             /** Candidates */
-            candidates?: components["schemas"]["Candidate"][];
+            candidates: components["schemas"]["Candidate"][];
             /** Dropped */
-            dropped?: components["schemas"]["DroppedCandidate"][];
+            dropped: components["schemas"]["DroppedCandidate"][];
             /** Extractedat */
             extractedAt: string;
             /** Fielddrops */
-            fieldDrops?: {
+            fieldDrops: {
                 [key: string]: number;
             };
             /** Notes */
-            notes?: string[];
+            notes: string[];
             /** Paperid */
             paperId: string;
             /**
@@ -3432,9 +4422,9 @@ export interface components {
              */
             rejected: number;
             /** Rejectiondetails */
-            rejectionDetails?: string[];
+            rejectionDetails: string[];
             /** Rejectionreasons */
-            rejectionReasons?: {
+            rejectionReasons: {
                 [key: string]: number;
             };
             /**
@@ -3444,8 +4434,8 @@ export interface components {
              */
             run: "claude-1";
             /** Truncatedsections */
-            truncatedSections?: string[];
-            usage?: components["schemas"]["Usage"];
+            truncatedSections: string[];
+            usage: components["schemas"]["Usage"];
         };
         /**
          * ExtractRun
@@ -3453,11 +4443,11 @@ export interface components {
          */
         ExtractRun: {
             /** Falsepositives */
-            falsePositives?: components["schemas"]["ExtractRunFalsePositive"][];
+            falsePositives: components["schemas"]["ExtractRunFalsePositive"][];
             /** Models */
-            models?: string[];
+            models: string[];
             /** Results */
-            results?: components["schemas"]["ExtractRunResult"][];
+            results: components["schemas"]["ExtractRunResult"][];
             /**
              * Run
              * @constant
@@ -3469,7 +4459,7 @@ export interface components {
          * @description A candidate a reviewer rejected — the only way one gets here (§6.2).
          */
         ExtractRunFalsePositive: {
-            extracted: components["schemas"]["Quantity-Output"];
+            extracted: components["schemas"]["Quantity"];
             /** Field */
             field: string;
             /** Id */
@@ -3484,7 +4474,7 @@ export interface components {
          * @description One reference, a value a reviewer typed, scored against a run (§6.2).
          */
         ExtractRunResult: {
-            extracted?: components["schemas"]["Quantity-Output"] | null;
+            extracted: components["schemas"]["Quantity"] | null;
             /** Goldrecordid */
             goldRecordId: string;
             /**
@@ -3505,9 +4495,90 @@ export interface components {
             /** Kept */
             kept: number;
             /** Models */
-            models?: string[];
+            models: string[];
             /** Refused */
             refused: number;
+        };
+        /**
+         * FamilyInfo
+         * @description GET /api/fermos/families: a model family as the panel shows it.
+         */
+        FamilyInfo: {
+            /** Equations */
+            equations: string;
+            /** Groups */
+            groups: string[];
+            /** Id */
+            id: string;
+            /** Socket */
+            socket: boolean;
+            /** Specs */
+            specs: components["schemas"]["ParameterSpec"][];
+            /** Stateunits */
+            stateUnits: {
+                [key: string]: string;
+            };
+            /** States */
+            states: string[];
+            /** Title */
+            title: string;
+            /** What */
+            what: string;
+        };
+        /**
+         * FermosBinding
+         * @description GET /api/fermos/bind: a family's parameters bound
+         *     for a strain, product and sugar from a fit, the records, a kept
+         *     simulation and the conventions, starting no integration.
+         */
+        FermosBinding: {
+            /** Notes */
+            notes: string[];
+            /** Refused */
+            refused: string | null;
+            /** Values */
+            values: components["schemas"]["ParameterValue"][];
+            /** Waiting */
+            waiting: string[];
+        };
+        /**
+         * FermosFitInfo
+         * @description A kinetic fit or a forecast fermOS keeps, and what it can feed one
+         *     shelf flowsheet (GET /api/fermos/fits). A person picks it; a model never
+         *     does.
+         */
+        FermosFitInfo: {
+            /** Artifactid */
+            artifactId: string;
+            /** Batchtimeh */
+            batchTimeH: number | null;
+            /** Batchtimenote */
+            batchTimeNote: string | null;
+            /** Createdat */
+            createdAt: string;
+            /** Depositionid */
+            depositionId: string | null;
+            /** Feeds */
+            feeds: components["schemas"]["FitFeed"][];
+            /** Fitartifactid */
+            fitArtifactId: string | null;
+            /** Flags */
+            flags: string[];
+            /** Flowsheet */
+            flowsheet: string;
+            /** Productseries */
+            productSeries: string | null;
+            /**
+             * Provenance
+             * @enum {string}
+             */
+            provenance: "measured" | "gold" | "verified" | "curated" | "computed" | "unverified" | "user" | "industry-estimate" | "assumed";
+            /** Refused */
+            refused: string | null;
+            /** Substrateseries */
+            substrateSeries: string | null;
+            /** Tool */
+            tool: string;
         };
         /** FermosFitRequest */
         FermosFitRequest: {
@@ -3532,19 +4603,63 @@ export interface components {
             confirmedShare: number;
             /** Depositionid */
             depositionId: string;
-            growth?: components["schemas"]["GrowthFit"] | null;
+            growth: components["schemas"]["GrowthFit"] | null;
             /** Growthartifactid */
-            growthArtifactId?: string | null;
-            kinetic?: components["schemas"]["KineticFit"] | null;
+            growthArtifactId: string | null;
+            kinetic: components["schemas"]["KineticFit"] | null;
             /** Kineticartifactid */
-            kineticArtifactId?: string | null;
+            kineticArtifactId: string | null;
             /** Notes */
-            notes?: string[];
+            notes: string[];
             /**
              * Sample
              * @default false
              */
             sample: boolean;
+        };
+        /**
+         * FermosHarvest
+         * @description GET /api/fermos/harvest: a kept simulation's broth at an hour.
+         */
+        FermosHarvest: {
+            /** Absent */
+            absent: string;
+            /** Artifactid */
+            artifactId: string;
+            /** Asked */
+            asked: number;
+            /** Exact */
+            exact: boolean;
+            /** Family */
+            family: string;
+            /** Harvesth */
+            harvestH: number;
+            /** Hour */
+            hour: number;
+            /**
+             * Hoursource
+             * @enum {string}
+             */
+            hourSource: "the simulation's harvest hour" | "a person's hour";
+            /** How */
+            how: string;
+            /** Product */
+            product: string | null;
+            /**
+             * Provenance
+             * @enum {string}
+             */
+            provenance: "measured" | "gold" | "verified" | "curated" | "computed" | "unverified" | "user" | "industry-estimate" | "assumed";
+            /** Read */
+            read: string;
+            /** Runendh */
+            runEndH: number;
+            /** States */
+            states: components["schemas"]["HarvestState"][];
+            /** Strain */
+            strain: string | null;
+            /** Sugar */
+            sugar: string | null;
         };
         /** FermosPoint */
         FermosPoint: {
@@ -3585,13 +4700,13 @@ export interface components {
          */
         FetchLicense: {
             /** Href */
-            href?: string | null;
+            href: string | null;
             /** Text */
-            text?: string | null;
+            text: string | null;
         };
         /**
          * FetchedSection
-         * @description One section of a paper's own text. Same shape as PaperSection.
+         * @description One section of a paper's own text.
          */
         FetchedSection: {
             /** Heading */
@@ -3600,6 +4715,28 @@ export interface components {
             id: string;
             /** Text */
             text: string;
+        };
+        /**
+         * FitFeed
+         * @description What one fermOS artifact gives one input of a flowsheet: the value in
+         *     the input's unit, with the 5th and 95th percentile of the forecast's band
+         *     for readings, or why it gives nothing, in words naming the parameter.
+         */
+        FitFeed: {
+            /** Derivation */
+            derivation: string;
+            /** High */
+            high: number | null;
+            /** Key */
+            key: string;
+            /** Low */
+            low: number | null;
+            /** Refused */
+            refused: string | null;
+            /** Unit */
+            unit: string;
+            /** Value */
+            value: number | null;
         };
         /**
          * FitParam
@@ -3623,37 +4760,100 @@ export interface components {
             /** Value */
             value: number;
         };
-        /** ForecastRequest */
+        /** FlowsheetInfo */
+        FlowsheetInfo: {
+            /** Brothstream */
+            brothStream: string | null;
+            /** Builtfrom */
+            builtFrom: string[];
+            /** Description */
+            description: string;
+            /** Gridinputs */
+            gridInputs: string[];
+            /** Id */
+            id: string;
+            /** Inputs */
+            inputs: components["schemas"]["FlowsheetInput"][];
+            /** Leavesout */
+            leavesOut: string[];
+            /** Outputs */
+            outputs: string[];
+            /** Pricebasis */
+            priceBasis: string | null;
+            /** Priceoutput */
+            priceOutput: string | null;
+            /** Program */
+            program: string | null;
+            /** Source */
+            source: string;
+            /** Title */
+            title: string;
+        };
+        /**
+         * FlowsheetInput
+         * @description One input a shelf flowsheet takes. It names the ontology fields whose
+         *     records bind it; with none, a named person's assumption or a stated
+         *     convention sets it. The file of the flowsheet holds no value for it.
+         */
+        FlowsheetInput: {
+            /** Dimension */
+            dimension: string;
+            /** Fields */
+            fields: string[];
+            /** Key */
+            key: string;
+            /**
+             * Kind
+             * @enum {string}
+             */
+            kind: "process" | "economic" | "convention";
+            /** Name */
+            name: string;
+            /** Note */
+            note: string;
+            /** Unit */
+            unit: string;
+        };
+        /**
+         * ForecastRequest
+         * @description POST /api/fermos/forecast: a band for the next run, drawn from a fit.
+         *     Its start values and length are the values of the forecast's scope
+         *     `fermos:forecast:<fit id>`, each keyed as the scope names it (x0, s0, p0
+         *     and t_end, fermos.FORECAST_KEYS) and typed as a quantity with its
+         *     origin, the person or the model that set it and the day it was set;
+         *     the ones left unset are the fitted run's own. It holds these fields and
+         *     no other: a field it does not name is refused.
+         */
         ForecastRequest: {
-            /** Changedby */
-            changedBy?: string | null;
-            /** Durationby */
-            durationBy?: string | null;
-            /** Durationh */
-            durationH?: number | null;
+            /**
+             * By
+             * @default
+             */
+            by: string;
             fit?: components["schemas"]["KineticFit"] | null;
             /** Fitartifactid */
             fitArtifactId?: string | null;
+            /** Inputs */
+            inputs?: components["schemas"]["EngineInput"][];
             /**
              * Sample
              * @default false
              */
             sample: boolean;
-            start?: components["schemas"]["StartValues"];
         };
         /** ForecastResult */
         ForecastResult: {
             /** Artifactid */
-            artifactId?: string | null;
+            artifactId: string | null;
             /** Bands */
             bands: components["schemas"]["Band"][];
             /** Draws */
             draws: number;
-            evidence?: components["schemas"]["Evidence"] | null;
+            evidence: components["schemas"]["Evidence"] | null;
             /** Finals */
             finals: components["schemas"]["Interval"][];
             /** Notes */
-            notes?: string[];
+            notes: string[];
             /**
              * Sample
              * @default false
@@ -3662,10 +4862,10 @@ export interface components {
             /** Seed */
             seed: number;
             /** Substraterunsouth */
-            substrateRunsOutH?: number | null;
+            substrateRunsOutH: number | null;
             /** Times */
             times: number[];
-            yieldInterval?: components["schemas"]["Interval"] | null;
+            yieldInterval: components["schemas"]["Interval"] | null;
         };
         /**
          * GeneosModelInfo
@@ -3675,7 +4875,7 @@ export interface components {
             /** Feed */
             feed: string;
             /** Host */
-            host?: string | null;
+            host: string | null;
             /** Id */
             id: string;
             /** Licence */
@@ -3683,11 +4883,11 @@ export interface components {
             /** Name */
             name: string;
             /** Notes */
-            notes?: string[];
+            notes: string[];
             /** Product */
             product: string;
             /** Products */
-            products?: string[];
+            products: string[];
             /** Route */
             route: string;
             /** Scope */
@@ -3695,7 +4895,7 @@ export interface components {
             /** Source */
             source: string;
             /** Unavailable */
-            unavailable?: string | null;
+            unavailable: string | null;
         };
         /**
          * GeneosResult
@@ -3704,10 +4904,10 @@ export interface components {
          */
         GeneosResult: {
             /** Artifactid */
-            artifactId?: string | null;
-            evidence?: components["schemas"]["Evidence"] | null;
+            artifactId: string | null;
+            evidence: components["schemas"]["Evidence"] | null;
             /** Finding */
-            finding?: string | null;
+            finding: string | null;
             /**
              * Kind
              * @enum {string}
@@ -3716,7 +4916,7 @@ export interface components {
             /** Modelid */
             modelId: string;
             /** Output */
-            output?: {
+            output: {
                 [key: string]: unknown;
             };
             /** Product */
@@ -3725,28 +4925,39 @@ export interface components {
             substrates: string[];
         };
         /**
+         * GridDim
+         * @description One axis of a run's grid: the input it walks, by key, and the values
+         *     it takes, in the input's unit.
+         */
+        GridDim: {
+            /** Key */
+            key: string;
+            /** Values */
+            values: number[];
+        };
+        /**
          * GrowthFit
          * @description ln X against t over the best window of four or more readings.
          */
         GrowthFit: {
             /** Doublingtimeh */
-            doublingTimeH?: number | null;
+            doublingTimeH: number | null;
             /** Measureid */
             measureId: string;
-            mu?: components["schemas"]["FitParam"] | null;
+            mu: components["schemas"]["FitParam"] | null;
             /**
              * Points
              * @default 0
              */
             points: number;
             /** R2 */
-            r2?: number | null;
+            r2: number | null;
             /** Reason */
-            reason?: string | null;
+            reason: string | null;
             /** Unit */
             unit: string;
             /** Window */
-            window?: number[];
+            window: number[];
         };
         /**
          * Guild
@@ -3754,10 +4965,10 @@ export interface components {
          */
         Guild: {
             /** Evidence */
-            evidence?: components["schemas"]["GuildEvidence"][];
+            evidence: components["schemas"]["GuildEvidence"][];
             /** People */
-            people?: components["schemas"]["GuildPerson"][];
-            policy?: components["schemas"]["GuildPolicy"];
+            people: components["schemas"]["GuildPerson"][];
+            policy: components["schemas"]["GuildPolicy"];
             /**
              * Version
              * @default 1
@@ -3843,7 +5054,7 @@ export interface components {
         };
         /**
          * GuildPolicy
-         * @description The lead's choices for the team (OF-BLD-013 §5.1). In advise mode the
+         * @description The lead's choices for the team. In advise mode the
          *     run-mode gate warns and records a deviation; in enforce mode it holds the
          *     step until a cosigner is recorded, or someone qualified takes over. Set
          *     per criticality: a routine skill and a critical one can differ.
@@ -3890,22 +5101,54 @@ export interface components {
             /** Detail */
             detail?: components["schemas"]["ValidationError"][];
         };
-        /** InputAssumption */
-        InputAssumption: {
-            /** At */
-            at: string;
-            /** By */
-            by: string;
-            /** High */
-            high: number;
-            /** Key */
-            key: string;
-            /** Low */
-            low: number;
-            /** Note */
-            note?: string | null;
+        /**
+         * HarvestState
+         * @description One state of the simulation at the hour read, in the unit it keeps.
+         */
+        HarvestState: {
+            /** State */
+            state: string;
+            /** Unit */
+            unit: string;
             /** Value */
             value: number;
+        };
+        /**
+         * Health
+         * @description GET /api/health: the service answering, the plan route's models
+         *     (the first a Postdoc answer starts on, and those it falls back to, in
+         *     order), and whether it holds a key, so a page can say the service is up
+         *     with no key to call a model with.
+         */
+        Health: {
+            /** Fallbackmodel */
+            fallbackModel: string;
+            /** Haskey */
+            hasKey: boolean;
+            /** Model */
+            model: string;
+            /** Ok */
+            ok: boolean;
+            /** Service */
+            service: string;
+        };
+        /** HistogramBin */
+        HistogramBin: {
+            /** Count */
+            count: number;
+            /** High */
+            high: number;
+            /** Low */
+            low: number;
+        };
+        /** InputSensitivity */
+        InputSensitivity: {
+            /** Key */
+            key: string;
+            /** Rho */
+            rho: number;
+            /** Sourcekind */
+            sourceKind: string;
         };
         /** Interval */
         Interval: {
@@ -3921,10 +5164,34 @@ export interface components {
             unit: string;
         };
         /**
+         * KeptTrain
+         * @description A train a model built with `pureos_build` or `pureos_write`, kept by
+         *     the service with who made it and when: the train as data (D9). Its runs
+         *     are `pureos.train_run` artifacts, found by the train's id.
+         */
+        KeptTrain: {
+            /**
+             * Agent
+             * @default model
+             * @constant
+             */
+            agent: "model";
+            /** Askid */
+            askId: string | null;
+            /** At */
+            at: string;
+            /** Effort */
+            effort: string | null;
+            /** Madeby */
+            madeBy: string;
+            spec: components["schemas"]["TrainSpec"];
+            /** Updatedat */
+            updatedAt: string;
+        };
+        /**
          * KineticFit
          * @description Logistic growth, Luedeking–Piret production and the substrate balance
-         *     (`logistic_v0`), or a kinetics family fitted to the same series
-         *     (OF-BLD-020 §3.1).
+         *     (`logistic_v0`), or a kinetics family fitted to the same series.
          */
         KineticFit: {
             /** Covariance */
@@ -3946,6 +5213,39 @@ export interface components {
             series?: components["schemas"]["FermosSeries"][];
         };
         /**
+         * LessonEmbed
+         * @description One of the embeds a lesson's page draws, with what it is drawn on when
+         *     it takes one: a paper's id, a record's, a field's, a protocol's, a
+         *     scenario's or a skill's, or a question to ask.
+         */
+        LessonEmbed: {
+            /** Arg */
+            arg?: string | null;
+            /**
+             * Embed
+             * @enum {string}
+             */
+            embed: "chip-demo" | "record-card" | "mini-queue" | "metrics-tiles" | "strip-plot" | "protocol-card" | "ask-prompt" | "scenario-widget" | "skill-steps";
+            /**
+             * @description discriminator enum property added by openapi-typescript
+             * @enum {string}
+             */
+            kind: "embed";
+        };
+        /**
+         * LessonProse
+         * @description A run of a lesson's prose, in Markdown.
+         */
+        LessonProse: {
+            /**
+             * @description discriminator enum property added by openapi-typescript
+             * @enum {string}
+             */
+            kind: "prose";
+            /** Md */
+            md: string;
+        };
+        /**
          * LibraryBuild
          * @description Whether a plant built here in one configuration (None: its own), as
          *     the discovery command found when it built each: its units and whether a
@@ -3953,15 +5253,15 @@ export interface components {
          */
         LibraryBuild: {
             /** Configuration */
-            configuration?: string | null;
+            configuration: string | null;
             /** Error */
-            error?: string | null;
+            error: string | null;
             /** Ok */
             ok: boolean;
             /** Priced */
-            priced?: boolean | null;
+            priced: boolean | null;
             /** Units */
-            units?: number | null;
+            units: number | null;
         };
         /**
          * LibraryCompat
@@ -3980,7 +5280,7 @@ export interface components {
          */
         LibraryEntryParameter: {
             /** Default */
-            default?: unknown;
+            default: unknown;
             /** Kind */
             kind: string;
             /** Name */
@@ -3997,9 +5297,9 @@ export interface components {
          */
         LibraryParameters: {
             /** Configuration */
-            configuration?: string | null;
+            configuration: string | null;
             /** Found */
-            found?: {
+            found: {
                 [key: string]: string;
             };
             /** Package */
@@ -4011,9 +5311,9 @@ export interface components {
             /** Simulator */
             simulator: string;
             /** Specs */
-            specs?: components["schemas"]["ParameterSpec"][];
+            specs: components["schemas"]["ParameterSpec"][];
             /** Values */
-            values?: components["schemas"]["ParameterValue"][];
+            values: components["schemas"]["ParameterValue"][];
         };
         /**
          * LibraryPlant
@@ -4025,23 +5325,23 @@ export interface components {
          */
         LibraryPlant: {
             /** Builds */
-            builds?: components["schemas"]["LibraryBuild"][];
+            builds: components["schemas"]["LibraryBuild"][];
             /** Compat */
-            compat?: components["schemas"]["LibraryCompat"][];
+            compat: components["schemas"]["LibraryCompat"][];
             /** Composedfrom */
-            composedFrom?: string | null;
+            composedFrom: string | null;
             /** Configurations */
-            configurations?: string[];
+            configurations: string[];
             /** Configurationsfrom */
-            configurationsFrom?: string | null;
+            configurationsFrom: string | null;
             /** Defaultconfiguration */
-            defaultConfiguration?: string | null;
+            defaultConfiguration: string | null;
             /** Entry */
-            entry?: string | null;
+            entry: string | null;
             /** Error */
-            error?: string | null;
+            error: string | null;
             /** Factories */
-            factories?: string[];
+            factories: string[];
             /** Id */
             id: string;
             /**
@@ -4052,42 +5352,43 @@ export interface components {
             /** Module */
             module: string;
             /** Parameters */
-            parameters?: components["schemas"]["LibraryEntryParameter"][];
+            parameters: components["schemas"]["LibraryEntryParameter"][];
             /**
              * Processmodel
              * @default false
              */
             processModel: boolean;
             /** Readme */
-            readme?: string | null;
+            readme: string | null;
             /** Recipe */
-            recipe?: string | null;
+            recipe: string | null;
             /**
              * Requiresconfiguration
              * @default false
              */
             requiresConfiguration: boolean;
             /** Scenario */
-            scenario?: components["schemas"]["LibraryScenarioField"][];
+            scenario: components["schemas"]["LibraryScenarioField"][];
             /**
              * Takescache
              * @default false
              */
             takesCache: boolean;
             /** Testnames */
-            testNames?: {
+            testNames: {
                 [key: string]: unknown;
             } | null;
             /** Tests */
-            tests?: string[];
+            tests: string[];
             /** Title */
-            title?: string | null;
+            title: string | null;
         };
         /**
          * LibraryRunRequest
          * @description POST /api/library/{plant}/run: the configuration (None: the plant's
-         *     own), the values set for the run, each an Override of the plant's scope
-         *     (a person's assumption or a model's estimate), and who asks for the run.
+         *     default, as the biosteam engine names it), the values set for the run,
+         *     and who asks for the run. It holds these fields alone: a field it does
+         *     not name is refused.
          */
         LibraryRunRequest: {
             /**
@@ -4097,8 +5398,8 @@ export interface components {
             by: string;
             /** Configuration */
             configuration?: string | null;
-            /** Overrides */
-            overrides?: components["schemas"]["Override"][];
+            /** Inputs */
+            inputs?: components["schemas"]["EngineInput"][];
         };
         /**
          * LibraryScenarioField
@@ -4106,11 +5407,11 @@ export interface components {
          */
         LibraryScenarioField: {
             /** Default */
-            default?: unknown;
+            default: unknown;
             /** Name */
             name: string;
             /** Type */
-            type?: string | null;
+            type: string | null;
         };
         /**
          * LibraryShelf
@@ -4120,13 +5421,13 @@ export interface components {
             /** Package */
             package: string;
             /** Plants */
-            plants?: components["schemas"]["LibraryPlant"][];
+            plants: components["schemas"]["LibraryPlant"][];
             /** Simulator */
             simulator: string;
             /** Testfile */
             testFile: string;
             /** Testtables */
-            testTables?: {
+            testTables: {
                 [key: string]: unknown;
             };
             /** Thermosteam */
@@ -4138,19 +5439,19 @@ export interface components {
          */
         LiteratureDocument: {
             /** Authors */
-            authors?: string[];
+            authors: string[];
             /** Chunks */
             chunks: number;
             /** Citation */
-            citation?: string | null;
+            citation: string | null;
             /** Collector */
-            collector?: string | null;
+            collector: string | null;
             /** Documentid */
             documentId: string;
             /** Doi */
-            doi?: string | null;
+            doi: string | null;
             /** Journal */
-            journal?: string | null;
+            journal: string | null;
             /** Licenceclass */
             licenceClass: string;
             /** Linkedat */
@@ -4158,17 +5459,17 @@ export interface components {
             /** Linkedby */
             linkedBy: string;
             /** Selection */
-            selection?: {
+            selection: {
                 [key: string]: unknown;
             };
             /** Source */
             source: string;
             /** Sourceref */
-            sourceRef?: string | null;
+            sourceRef: string | null;
             /** Title */
             title: string;
             /** Year */
-            year?: number | null;
+            year: number | null;
         };
         /**
          * LiteratureQuestion
@@ -4185,9 +5486,43 @@ export interface components {
             topK: number;
         };
         /**
+         * LiteratureStats
+         * @description GET /api/literature/stats, in the kit's own names: the project's
+         *     documents, their chunks and their citations, counted by licence class,
+         *     source and embedding version, and the project's concept graph, the
+         *     entities its passages name and the relationships they hold
+         *     (literature/graph.py). Communities stay unbuilt, so they count 0.
+         */
+        LiteratureStats: {
+            /** Chunks */
+            chunks: number;
+            /** Citations */
+            citations: number;
+            /** Communities */
+            communities: number;
+            /** Documents */
+            documents: number;
+            /** Embedding Versions */
+            embedding_versions: {
+                [key: string]: number;
+            };
+            /** Entities */
+            entities: number;
+            /** License Classes */
+            license_classes: {
+                [key: string]: number;
+            };
+            /** Relationships */
+            relationships: number;
+            /** Sources */
+            sources: {
+                [key: string]: number;
+            };
+        };
+        /**
          * LiveConversation
-         * @description A Postdoc conversation, its turns oldest first (mirrors
-         *     `LiveConversation` in src/data/types.ts; GET /api/conversations/{id}).
+         * @description A Postdoc conversation, its turns oldest first (the browser's
+         *     `LiveConversation`, src/lib/postdoc.ts; GET /api/conversations/{id}).
          */
         LiveConversation: {
             /** Id */
@@ -4197,12 +5532,12 @@ export interface components {
             /** Title */
             title: string;
             /** Turns */
-            turns?: components["schemas"]["LiveTurn"][];
+            turns: components["schemas"]["LiveTurn"][];
         };
         /**
          * LiveTurn
-         * @description One turn of a Postdoc conversation (mirrors `LiveTurn` in
-         *     src/data/types.ts): the question, its loop's steps, the validated plan or
+         * @description One turn of a Postdoc conversation (the browser's `LiveTurn`,
+         *     src/lib/postdoc.ts): the question, its loop's steps, the validated plan or
          *     the failure in words, and its status. The service keeps it
          *     (postdoc/conversations.py) with who asked and the artifacts its tool calls
          *     produced; a turn the service was answering when it stopped reads
@@ -4210,15 +5545,15 @@ export interface components {
          */
         LiveTurn: {
             /** Artifactids */
-            artifactIds?: string[];
+            artifactIds: string[];
             /** Askedat */
             askedAt: string;
             /** By */
-            by?: string | null;
-            error?: components["schemas"]["TurnError"] | null;
+            by: string | null;
+            error: components["schemas"]["TurnError"] | null;
             /** Id */
             id: string;
-            plan?: components["schemas"]["AnswerPlan"] | null;
+            plan: components["schemas"]["AnswerPlan"] | null;
             /** Question */
             question: string;
             /**
@@ -4227,11 +5562,55 @@ export interface components {
              */
             status: "running" | "answered" | "failed" | "stopped" | "interrupted";
             /** Steps */
-            steps?: components["schemas"]["TraceStep"][];
+            steps: components["schemas"]["TraceStep"][];
+        };
+        /** MassBalance */
+        MassBalance: {
+            /** Closure */
+            closure: number;
+            /** Note */
+            note: string;
+            /** Ok */
+            ok: boolean;
+        };
+        /**
+         * Material
+         * @description One material of a version, its amount written for the base batch.
+         */
+        Material: {
+            /** Amount */
+            amount: number;
+            /** Name */
+            name: string;
+            /** Precision */
+            precision: number;
+            /**
+             * Scaling
+             * @enum {string}
+             */
+            scaling: "per_batch_volume" | "fixed" | "per_unit_biomass";
+            /** Sourcerecordid */
+            sourceRecordId?: string | null;
+            stock?: components["schemas"]["MaterialStock"] | null;
+            /** Unit */
+            unit: string;
+        };
+        /**
+         * MaterialStock
+         * @description The stock solution a material is drawn from: how much of the material
+         *     one of `unit` of stock holds, in the material's own unit.
+         */
+        MaterialStock: {
+            /** Conc */
+            conc: number;
+            /** Unit */
+            unit: string;
         };
         /**
          * Measure
-         * @description Mirrors `Measure` in src/data/types.ts.
+         * @description What the bench measures for a runbook: a labelled reading in its unit
+         *     at its timepoint, and the prediction it tests where it tests one (the
+         *     browser's `Measure`, src/lib/studies.ts).
          */
         Measure: {
             /** Id */
@@ -4244,6 +5623,61 @@ export interface components {
             timepoint: string;
             /** Unit */
             unit: string;
+        };
+        /**
+         * MeasuredConditions
+         * @description What a measured value was true under: the protocol it was run under
+         *     (None for readings taken with no protocol's steps), the scale and the
+         *     strain the runbook names.
+         */
+        MeasuredConditions: {
+            /** Protocolid */
+            protocolId: string | null;
+            /** Scale */
+            scale: number;
+            /** Strainid */
+            strainId: string | null;
+        } & {
+            [key: string]: unknown;
+        };
+        /**
+         * MeasuredEvidence
+         * @description A measured value a reconciliation released (the browser's
+         *     `MeasuredEvidence`, src/lib/studies.ts): evidence about the run that
+         *     produced it, kept with its conditions and the run's deviations, and
+         *     linked to the prediction it tests.
+         */
+        MeasuredEvidence: {
+            /** At */
+            at: string;
+            conditions: components["schemas"]["MeasuredConditions"];
+            /** Confirmed */
+            confirmed: boolean;
+            /** Depositionid */
+            depositionId: string;
+            /** Deviations */
+            deviations: string[];
+            /** Id */
+            id: string;
+            /** Label */
+            label: string;
+            /** Predictionid */
+            predictionId: string;
+            /** Productid */
+            productId: string | null;
+            /**
+             * Provenance
+             * @enum {string}
+             */
+            provenance: "measured" | "gold" | "verified" | "curated" | "computed" | "unverified" | "user" | "industry-estimate" | "assumed";
+            /** Runbookid */
+            runbookId: string;
+            /** Unit */
+            unit: string;
+            /** Value */
+            value: number;
+        } & {
+            [key: string]: unknown;
         };
         /** MixRequest */
         MixRequest: {
@@ -4270,9 +5704,9 @@ export interface components {
              */
             count: number;
             /** Error */
-            error?: string | null;
+            error: string | null;
             /** Hits */
-            hits?: components["schemas"]["CoverageHit"][];
+            hits: components["schemas"]["CoverageHit"][];
             /** Label */
             label: string;
             /**
@@ -4286,16 +5720,19 @@ export interface components {
              */
             named: boolean;
             /** Partial */
-            partial?: string | null;
+            partial: string | null;
         };
         /**
          * ModuleRow
-         * @description One row a module's read tool returns (OF-BLD-015 §7.2): what the
+         * @description One row a module's read tool returns: what the
          *     module holds, where it stands, and how it is marked.
          */
         ModuleRow: {
-            /** Detail */
-            detail?: {
+            /**
+             * Detail
+             * @description A few named fields of the row, each text cut at 300 characters and each list at its first ten. Each kind's fields are its own, named kind by kind in docs/TOOLS.md (Module reads; module_stores.DETAIL).
+             */
+            detail: {
                 [key: string]: unknown;
             };
             /** Id */
@@ -4310,7 +5747,7 @@ export interface components {
              */
             module: "runbooks" | "geneos" | "fermos" | "pureos" | "proforma" | "biorepo" | "guild" | "primer" | "intake" | "home";
             /** Provenance */
-            provenance?: ("measured" | "gold" | "verified" | "curated" | "computed" | "unverified" | "user" | "industry-estimate" | "assumed") | null;
+            provenance: ("measured" | "gold" | "verified" | "curated" | "computed" | "unverified" | "user" | "industry-estimate" | "assumed") | null;
             /** Ref */
             ref: string;
             /**
@@ -4320,6 +5757,17 @@ export interface components {
             state: "open" | "fenced" | "approved" | "locked" | "proposed" | "retired";
             /** Status */
             status: string;
+        };
+        /**
+         * NotOffered
+         * @description A parameter the class's constructor takes that the panel does not
+         *     offer, and why, in words.
+         */
+        NotOffered: {
+            /** Name */
+            name: string;
+            /** Why */
+            why: string;
         };
         /**
          * Origin
@@ -4334,7 +5782,7 @@ export interface components {
              * Kind
              * @enum {string}
              */
-            kind: "record" | "artifact" | "person-assumption" | "model-estimate" | "library-default" | "convention";
+            kind: "record" | "artifact" | "person-assumption" | "model-estimate" | "measurement" | "library-default" | "convention";
             /** Note */
             note?: string | null;
             /** Ref */
@@ -4350,7 +5798,7 @@ export interface components {
          *     values reviewers typed by `witness.py` (§6.2); `records` from the
          *     project's decisions (§7).
          *
-         *     `candidates` and `runs` are a LIST OR NULL (OF-BLD-012.1 F3). The service
+         *     `candidates` and `runs` are a LIST OR NULL. The service
          *     always sends the full list, so an empty list means the extractor produced
          *     nothing and the store drops what it had. `None` means "not supplied" and
          *     the store keeps what it had — nothing here sends it, and it exists so that
@@ -4358,17 +5806,17 @@ export interface components {
          */
         Overlay: {
             /** Candidates */
-            candidates?: components["schemas"]["Candidate"][] | null;
+            candidates: components["schemas"]["Candidate"][] | null;
             /** Papers */
-            papers?: {
+            papers: {
                 [key: string]: components["schemas"]["OverlayPaper"];
             };
             /** Records */
-            records?: {
-                [key: string]: components["schemas"]["ReviewDecision-Output"];
+            records: {
+                [key: string]: components["schemas"]["ReviewDecision"];
             };
             /** Runs */
-            runs?: components["schemas"]["ExtractRun"][] | null;
+            runs: components["schemas"]["ExtractRun"][] | null;
         };
         /**
          * OverlayPaper
@@ -4380,26 +5828,26 @@ export interface components {
          */
         OverlayPaper: {
             /** Authors */
-            authors?: string[];
+            authors: string[];
             /** Doi */
-            doi?: string | null;
-            extraction?: components["schemas"]["ExtractionSummary"] | null;
+            doi: string | null;
+            extraction: components["schemas"]["ExtractionSummary"] | null;
             /** Fetchedat */
-            fetchedAt?: string | null;
+            fetchedAt: string | null;
             /** Ingest */
             ingest: string;
             /** Journal */
-            journal?: string | null;
+            journal: string | null;
             /** Licenceclass */
-            licenceClass?: string | null;
+            licenceClass: string | null;
             /** License */
-            license?: string | null;
+            license: string | null;
             /** Pmcid */
-            pmcid?: string | null;
+            pmcid: string | null;
             /** Reason */
-            reason?: string | null;
+            reason: string | null;
             /** Sections */
-            sections?: components["schemas"]["FetchedSection"][];
+            sections: components["schemas"]["FetchedSection"][];
             /**
              * Source
              * @default europepmc
@@ -4412,23 +5860,36 @@ export interface components {
              */
             textSource: "full-text";
             /** Title */
-            title?: string | null;
+            title: string | null;
             /** Url */
-            url?: string | null;
+            url: string | null;
             /** Year */
-            year?: number | null;
+            year: number | null;
         };
         /**
          * Override
          * @description A change to one parameter of one scope for a run (D3): a named
-         *     person's assumption, or a model's estimate (ADR-006), `by` naming the
-         *     person or the model.
+         *     person's assumption, a model's estimate (ADR-006), `by` naming the
+         *     person or the model, or a deposition's reading (a measurement), `by` the
+         *     person who deposited it, `at` the time it was taken and `ref` the
+         *     reading, `<deposition id>/<entry id>`.
+         *
+         *     Its value is in its parameter's own unit, as a person's assumption, a
+         *     model's estimate and every Override a resolver takes are, and `unit`
+         *     stays empty. A reading a page keeps (a Proforma scenario's parameter
+         *     panel) names its own unit: its value and `unit` are the reading's as
+         *     deposited, which the door it is sent to sets in the parameter's unit
+         *     (measurements.py), the conversion stated in the value's note. It names
+         *     the person who chose it for the parameter in `chosenBy`, the row's maker
+         *     (project_state.py), `by` staying its depositor.
          */
         Override: {
             /** At */
             at: string;
             /** By */
             by: string;
+            /** Chosenby */
+            chosenBy?: string | null;
             /** High */
             high?: number | null;
             /** Key */
@@ -4442,16 +5903,39 @@ export interface components {
              * @default person-assumption
              * @enum {string}
              */
-            origin: "person-assumption" | "model-estimate";
+            origin: "person-assumption" | "model-estimate" | "measurement";
+            /** Ref */
+            ref?: string | null;
             /** Scope */
             scope: string;
+            /** Unit */
+            unit?: string | null;
             /** Value */
             value: number | string;
         };
         /**
+         * OxygenUptake
+         * @description OUR(t) = qO2·X on the time course's hours, and its peak read on the
+         *     solver's own steps.
+         */
+        OxygenUptake: {
+            /** Note */
+            note: string | null;
+            /** Peak */
+            peak: number;
+            /** Peakh */
+            peakH: number | null;
+            /** T */
+            t: number[];
+            /** Unit */
+            unit: string;
+            /** Value */
+            value: number[];
+        };
+        /**
          * PackageRegression
-         * @description A reference biorefinery's regression values, read from the package's
-         *     installed test file: which package, which file, which test.
+         * @description A plant's regression values, read from its package's installed test
+         *     file: which package, which file, which test.
          */
         PackageRegression: {
             /** File */
@@ -4461,11 +5945,12 @@ export interface components {
             /** Test */
             test: string;
             /** Values */
-            values?: components["schemas"]["RegressionValue"][];
+            values: components["schemas"]["RegressionValue"][];
         };
         /**
          * ParamResolveRequest
-         * @description POST /api/params/{scope}/resolve. Runs nothing.
+         * @description POST /api/params/{scope}/resolve. Runs nothing. It holds these
+         *     fields alone: a field it does not name is refused.
          */
         ParamResolveRequest: {
             /** Durationpreset */
@@ -4480,8 +5965,8 @@ export interface components {
             flowsheet?: string | null;
             /** Host */
             host?: string | null;
-            /** Overrides */
-            overrides?: components["schemas"]["Override"][];
+            /** Inputs */
+            inputs?: components["schemas"]["EngineInput"][];
             /** Product */
             product?: string | null;
             /** Startfrom */
@@ -4500,6 +5985,21 @@ export interface components {
             /** Vesseltype */
             vesselType?: ("stirred-tank" | "bubble-column") | null;
         };
+        /** ParamResolveResult */
+        ParamResolveResult: {
+            /** Basisinputs */
+            basisInputs: components["schemas"]["BasisInput"][];
+            /** Notes */
+            notes: string[];
+            /** Scope */
+            scope: string;
+            /** Values */
+            values: components["schemas"]["ParameterValue"][];
+            /** Waiting */
+            waiting: string[];
+            /** Warnings */
+            warnings: string[];
+        };
         /**
          * ParamScope
          * @description GET /api/params/{scope}: a scope's specs with their current values.
@@ -4511,7 +6011,7 @@ export interface components {
              */
             kind: "fermos-family" | "fermos-vessel" | "fermos-forecast" | "pureos-unit" | "proforma" | "library";
             /** Notes */
-            notes?: string[];
+            notes: string[];
             /** Scope */
             scope: string;
             /** Specs */
@@ -4533,9 +6033,9 @@ export interface components {
             /** Boundsreason */
             boundsReason: string;
             /** Choices */
-            choices?: string[] | null;
+            choices: string[] | null;
             /** Convention */
-            convention?: number | string | null;
+            convention: number | string | null;
             /** Dimension */
             dimension: string;
             /** Gloss */
@@ -4547,11 +6047,11 @@ export interface components {
             /** Label */
             label: string;
             /** Max */
-            max?: number | null;
+            max: number | null;
             /** Min */
-            min?: number | null;
+            min: number | null;
             /** Note */
-            note?: string | null;
+            note: string | null;
             /**
              * Scale
              * @default linear
@@ -4561,7 +6061,7 @@ export interface components {
             /** Sourcerule */
             sourceRule: string[];
             /** Step */
-            step?: number | null;
+            step: number | null;
             /** Symbol */
             symbol: string;
             /** Unit */
@@ -4573,28 +6073,28 @@ export interface components {
          */
         ParameterValue: {
             /** Detail */
-            detail?: string | null;
+            detail: string | null;
             /** High */
-            high?: number | null;
+            high: number | null;
             /** Identified */
-            identified?: boolean | null;
+            identified: boolean | null;
             /** Key */
             key: string;
             /** Librarydefault */
-            libraryDefault?: number | string | null;
+            libraryDefault: number | string | null;
             /** Low */
-            low?: number | null;
+            low: number | null;
             /**
              * Origin
              * @enum {string}
              */
-            origin: "fit" | "record" | "artifact" | "simulation" | "assumption" | "model-estimate" | "convention" | "library-default" | "waiting" | "not-read";
+            origin: "fit" | "record" | "artifact" | "simulation" | "assumption" | "model-estimate" | "measurement" | "convention" | "library-default" | "waiting" | "not-read";
             /** Outofbounds */
-            outOfBounds?: string | null;
+            outOfBounds: string | null;
             /** Overriddenby */
-            overriddenBy?: string | null;
+            overriddenBy: string | null;
             /** Recordids */
-            recordIds?: string[];
+            recordIds: string[];
             source: components["schemas"]["BasisSource"] | null;
             /** Value */
             value: number | string | null;
@@ -4673,9 +6173,9 @@ export interface components {
          */
         Practice: {
             /** Scenarios */
-            scenarios?: components["schemas"]["PracticeScenario"][];
+            scenarios: components["schemas"]["PracticeScenario"][];
             /** Sessions */
-            sessions?: components["schemas"]["PracticeSession"][];
+            sessions: components["schemas"]["PracticeSession"][];
             /**
              * Version
              * @default 1
@@ -4748,7 +6248,7 @@ export interface components {
          */
         PracticeObservation: {
             /** Steps */
-            steps?: components["schemas"]["PracticeStepRef"][];
+            steps: components["schemas"]["PracticeStepRef"][];
             /** Text */
             text: string;
         };
@@ -4762,9 +6262,9 @@ export interface components {
             /** Createdat */
             createdAt: string;
             /** Depositionids */
-            depositionIds?: string[];
+            depositionIds: string[];
             /** Evidence */
-            evidence?: components["schemas"]["PracticeValue"][];
+            evidence: components["schemas"]["PracticeValue"][];
             /** Id */
             id: string;
             /** Model */
@@ -4776,25 +6276,25 @@ export interface components {
             /** Skillid */
             skillId: string;
             /** Steps */
-            steps?: components["schemas"]["PracticeStepRef"][];
+            steps: components["schemas"]["PracticeStepRef"][];
             /** Title */
             title: string;
-            usage?: components["schemas"]["Usage"];
+            usage: components["schemas"]["Usage"];
             /** Watchfor */
-            watchFor?: string[];
+            watchFor: string[];
         };
         /** PracticeSession */
         PracticeSession: {
             /** Closedat */
-            closedAt?: string | null;
+            closedAt: string | null;
             /** Evidenceid */
-            evidenceId?: string | null;
+            evidenceId: string | null;
             /** Id */
             id: string;
             /** Observed */
-            observed?: components["schemas"]["PracticeObservation"][];
+            observed: components["schemas"]["PracticeObservation"][];
             /** Personid */
-            personId?: string | null;
+            personId: string | null;
             /** Scenarioid */
             scenarioId: string;
             /** Skillid */
@@ -4802,8 +6302,8 @@ export interface components {
             /** Startedat */
             startedAt: string;
             /** Turns */
-            turns?: components["schemas"]["PracticeTurn"][];
-            usage?: components["schemas"]["Usage"];
+            turns: components["schemas"]["PracticeTurn"][];
+            usage: components["schemas"]["Usage"];
         };
         /**
          * PracticeSource
@@ -4812,20 +6312,20 @@ export interface components {
          */
         PracticeSource: {
             /** Depositionid */
-            depositionId?: string | null;
+            depositionId: string | null;
             /** Itemid */
-            itemId?: string | null;
+            itemId: string | null;
             /**
              * Kind
              * @enum {string}
              */
             kind: "step" | "material" | "entry" | "observation";
             /** Material */
-            material?: string | null;
+            material: string | null;
             /** Protocolid */
-            protocolId?: string | null;
+            protocolId: string | null;
             /** Stepid */
-            stepId?: string | null;
+            stepId: string | null;
         };
         /** PracticeStepRef */
         PracticeStepRef: {
@@ -4839,14 +6339,14 @@ export interface components {
             /** At */
             at: string;
             /** Move */
-            move?: ("why" | "change" | "next" | "close") | null;
+            move: ("why" | "change" | "next" | "close") | null;
             /**
              * Role
              * @enum {string}
              */
             role: "trainee" | "tutor";
             /** Steps */
-            steps?: components["schemas"]["PracticeStepRef"][];
+            steps: components["schemas"]["PracticeStepRef"][];
             /** Text */
             text: string;
         };
@@ -4869,28 +6369,29 @@ export interface components {
          */
         PracticeValue: {
             /** At */
-            at?: string | null;
+            at: string | null;
             /** Basis */
-            basis?: string | null;
+            basis: string | null;
             /** Id */
             id: string;
             /** Label */
             label: string;
             /** Measure */
-            measure?: string | null;
+            measure: string | null;
             source: components["schemas"]["PracticeSource"];
             /** Text */
             text: string;
             /** Unit */
-            unit?: string | null;
+            unit: string | null;
             /** Value */
-            value?: number | null;
+            value: number | null;
         };
         /**
          * PredictedOutput
-         * @description One output of an engine run a runbook predicts: its key in the run's
-         *     artifact (`outputs.<key>` of a flowsheet's outputs, `price.<key>` of the
-         *     price) and what the bench calls it.
+         * @description One output of an engine run a runbook predicts: its key (`values.<name>`
+         *     of the run's outputs.values, for a run of any engine; for a library run
+         *     `outputs.<key>` of a flowsheet's outputs or `price.<key>` of the price as
+         *     well) and what the bench calls it.
          */
         PredictedOutput: {
             /** Label */
@@ -4900,7 +6401,9 @@ export interface components {
         };
         /**
          * Prediction
-         * @description Mirrors `Prediction` in src/data/types.ts (§9.1).
+         * @description What a runbook predicts before the run: a labelled value in its unit,
+         *     with its confidence and its basis (§9.1; the browser's `Prediction`,
+         *     src/lib/studies.ts).
          */
         Prediction: {
             /** Artifactid */
@@ -4953,10 +6456,30 @@ export interface components {
             /** Product */
             product: string;
         };
-        /** ProformaRunRequest */
+        /** ProformaGrid */
+        ProformaGrid: {
+            /** Costlines */
+            costLines: {
+                [key: string]: (number | null)[];
+            };
+            /** Dims */
+            dims: components["schemas"]["GridDim"][];
+            /** Infeasible */
+            infeasible: number;
+            /** Msp */
+            msp: (number | null)[];
+        };
+        /**
+         * ProformaRunRequest
+         * @description POST /api/proforma/run. It holds these fields alone: a field it does
+         *     not name is refused.
+         */
         ProformaRunRequest: {
-            /** Assumptions */
-            assumptions?: components["schemas"]["InputAssumption"][];
+            /**
+             * By
+             * @default
+             */
+            by: string;
             /** Fits */
             fits?: {
                 [key: string]: string;
@@ -4965,8 +6488,8 @@ export interface components {
             flowsheet?: string | null;
             /** Host */
             host?: string | null;
-            /** Overrides */
-            overrides?: components["schemas"]["Override"][];
+            /** Inputs */
+            inputs?: components["schemas"]["EngineInput"][];
             /**
              * Samples
              * @default 500
@@ -4983,6 +6506,166 @@ export interface components {
             trainRun?: string | null;
             /** Vessel */
             vessel?: string | null;
+        };
+        /** ProformaRunResult */
+        ProformaRunResult: {
+            /** Artifactid */
+            artifactId: string;
+            /** Basecostlines */
+            baseCostLines: {
+                [key: string]: number;
+            } | null;
+            /** Baseinfeasible */
+            baseInfeasible: string | null;
+            /** Baseprice */
+            basePrice: number | null;
+            /** Diagram */
+            diagram: string | null;
+            /** Diagramnote */
+            diagramNote: string | null;
+            evidence: components["schemas"]["Evidence"];
+            /** Feasible */
+            feasible: number;
+            /** Flowsheet */
+            flowsheet: string | null;
+            grid: components["schemas"]["ProformaGrid"];
+            /** Histogram */
+            histogram: components["schemas"]["HistogramBin"][];
+            /** Infeasible */
+            infeasible: {
+                [key: string]: number;
+            };
+            /** Inputs */
+            inputs: components["schemas"]["ScenarioInput"][];
+            /** Leavesout */
+            leavesOut: string[];
+            /** Pricebasis */
+            priceBasis: string;
+            /**
+             * Provenance
+             * @enum {string}
+             */
+            provenance: "measured" | "gold" | "verified" | "curated" | "computed" | "unverified" | "user" | "industry-estimate" | "assumed";
+            /** Quantiles */
+            quantiles: {
+                [key: string]: number;
+            };
+            /** Readback */
+            readBack: {
+                [key: string]: number;
+            };
+            /** Samples */
+            samples: number;
+            /** Scenarioid */
+            scenarioId: string;
+            /** Sensitivity */
+            sensitivity: components["schemas"]["InputSensitivity"][];
+            /** Streams */
+            streams: components["schemas"]["StreamRow"][];
+            /** Tableunits */
+            tableUnits: {
+                [key: string]: string;
+            };
+            /** Tablessource */
+            tablesSource: string | null;
+            tea: components["schemas"]["TeaBreakdown"] | null;
+            /** Unitorder */
+            unitOrder: string[];
+            /** Units */
+            units: components["schemas"]["UnitRow"][];
+            utilities: components["schemas"]["UtilityDuties"] | null;
+        };
+        /**
+         * ProformaScenario
+         * @description A scenario a person made in Proforma (the browser's `Scenario`,
+         *     src/lib/proforma.ts): the shelf flowsheet it runs (`modelId`), its name,
+         *     whether it is pinned, and, on `custom_train_v1`, the kept vessel design
+         *     and train run it is built from. A row an earlier page wrote keeps the
+         *     fields it carried beside these, alpha 1.0's `dims`, `point` and
+         *     `assumptions` among them.
+         */
+        ProformaScenario: {
+            /** Createdat */
+            createdAt?: string | null;
+            /** Description */
+            description: string;
+            /** Flowsheetid */
+            flowsheetId?: string | null;
+            /** Id */
+            id: string;
+            /**
+             * Kind
+             * @constant
+             */
+            kind: "biosteam";
+            /** Lastrunid */
+            lastRunId?: string | null;
+            /** Modelid */
+            modelId: string;
+            /** Name */
+            name: string;
+            /** Pinned */
+            pinned: boolean;
+            /** Product */
+            product: string;
+            /** Trainrun */
+            trainRun?: string | null;
+            /** Vessel */
+            vessel?: string | null;
+        } & {
+            [key: string]: unknown;
+        };
+        /** ProformaScenarioInfo */
+        ProformaScenarioInfo: {
+            /** Flowsheet */
+            flowsheet: string;
+            /** Host */
+            host: string | null;
+            /** Hosts */
+            hosts: string[];
+            /** Id */
+            id: string;
+            /** Inputs */
+            inputs: components["schemas"]["ScenarioInput"][];
+            /** Leavesout */
+            leavesOut: string[];
+            /** Name */
+            name: string;
+            /** Pricebasis */
+            priceBasis: string;
+            /** Product */
+            product: string;
+            /** Refused */
+            refused: string | null;
+            /** Waiting */
+            waiting: string[];
+        };
+        /**
+         * ProformaTables
+         * @description What a reader takes from a `proforma.run` artifact (proforma.tables_of):
+         *     the flowsheet, what made the tables, and the tables themselves.
+         */
+        ProformaTables: {
+            /** Diagram */
+            diagram: string | null;
+            /** Diagramnote */
+            diagramNote: string | null;
+            /** Flowsheet */
+            flowsheet: string | null;
+            /** Streams */
+            streams: components["schemas"]["StreamRow"][];
+            /** Tableunits */
+            tableUnits: {
+                [key: string]: string;
+            };
+            /** Tablessource */
+            tablesSource: string | null;
+            tea: components["schemas"]["TeaBreakdown"] | null;
+            /** Unitorder */
+            unitOrder: string[];
+            /** Units */
+            units: components["schemas"]["UnitRow"][];
+            utilities: components["schemas"]["UtilityDuties"] | null;
         };
         /**
          * Project
@@ -5023,25 +6706,68 @@ export interface components {
             name: string;
         };
         /**
+         * ProjectState
+         * @description GET /api/state: everything the project keeps of the work done in its
+         *     pages, keyed as the page keeps it (src/lib/projectState.ts), each row read
+         *     as its kind's model. A row that does not read is named in `refused` with
+         *     why, and every other row is served beside it.
+         */
+        ProjectState: {
+            /** Conversations */
+            conversations: components["schemas"]["LiveConversation"][];
+            /** Depositedby */
+            depositedBy: {
+                [key: string]: string;
+            };
+            /** Depositions */
+            depositions: components["schemas"]["Deposition"][];
+            /** Fits */
+            fits: {
+                [key: string]: {
+                    [key: string]: string;
+                };
+            };
+            /** Measuredevidence */
+            measuredEvidence: components["schemas"]["MeasuredEvidence"][];
+            /** Overrides */
+            overrides: {
+                [key: string]: components["schemas"]["Override"][];
+            };
+            /** Refused */
+            refused: components["schemas"]["RefusedRow"][];
+            /** Runbooklocks */
+            runbookLocks: {
+                [key: string]: components["schemas"]["RunbookLock"];
+            };
+            /** Runbooks */
+            runbooks: components["schemas"]["Runbook"][];
+            /** Scenarios */
+            scenarios: components["schemas"]["ProformaScenario"][];
+            /** Trains */
+            trains: {
+                [key: string]: components["schemas"]["TrainMade"];
+            };
+        };
+        /**
          * Proposal
-         * @description What a model asked for at a gate (OF-BLD-015 §7.4), until a person
+         * @description What a model asked for at a gate, until a person
          *     carries it out or dismisses it on Home.
          */
         Proposal: {
             /** Action */
             action: string;
             /** Askid */
-            askId?: string | null;
+            askId: string | null;
             /** At */
             at: string;
             /** By */
             by: string;
             /** Carriedoutat */
-            carriedOutAt?: string | null;
+            carriedOutAt: string | null;
             /** Carriedoutby */
-            carriedOutBy?: string | null;
+            carriedOutBy: string | null;
             /** Fields */
-            fields?: {
+            fields: {
                 [key: string]: string;
             };
             /** Gate */
@@ -5061,9 +6787,9 @@ export interface components {
              */
             note: string;
             /** Result */
-            result?: string | null;
+            result: string | null;
             /** Route */
-            route?: string | null;
+            route: string | null;
             /**
              * Server
              * @default false
@@ -5076,7 +6802,7 @@ export interface components {
              */
             state: "proposed" | "done" | "dismissed";
             /** Target */
-            target?: string | null;
+            target: string | null;
             /** Title */
             title: string;
             /** Why */
@@ -5098,6 +6824,34 @@ export interface components {
             reason: string;
         };
         /**
+         * ProposalMissing
+         * @description A property the rules needed and nothing holds, and why.
+         */
+        ProposalMissing: {
+            /** Property */
+            property: string;
+            /** Why */
+            why: string;
+        };
+        /**
+         * ProposalReason
+         * @description Why one unit of a proposal is there: the rule, the property it read,
+         *     the artifact that holds that property (None when the products
+         *     catalogue states it), and the words, which carry no number.
+         */
+        ProposalReason: {
+            /** Artifactid */
+            artifactId: string | null;
+            /** Property */
+            property: string;
+            /** Rule */
+            rule: string;
+            /** Unitid */
+            unitId: string;
+            /** Words */
+            words: string;
+        };
+        /**
          * ProposeRequest
          * @description POST /api/pureos/propose: ids and words, never a number.
          */
@@ -5110,13 +6864,125 @@ export interface components {
             product: string;
         };
         /**
+         * Protocol
+         * @description A protocol a project keeps (the browser's `Protocol`,
+         *     src/lib/protocols.ts): its own fields, written when it is made, and its
+         *     versions, the current one named by `currentVersion`.
+         */
+        Protocol: {
+            /**
+             * Bsl
+             * @enum {integer}
+             */
+            bsl: 1 | 2;
+            /**
+             * Category
+             * @enum {string}
+             */
+            category: "media" | "culture" | "analytics" | "harvest" | "fermentation" | "sop";
+            /** Currentversion */
+            currentVersion: string;
+            /** Id */
+            id: string;
+            /** Organisms */
+            organisms?: string[];
+            /**
+             * Provenancenote
+             * @default
+             */
+            provenanceNote: string;
+            /**
+             * Purpose
+             * @default
+             */
+            purpose: string;
+            /** Title */
+            title: string;
+            /** Versions */
+            versions: components["schemas"]["ProtocolVersion"][];
+        };
+        /**
+         * ProtocolKeep
+         * @description POST /api/protocols: a protocol the project does not keep yet, with its
+         *     versions, and the name of the person who keeps it.
+         */
+        ProtocolKeep: {
+            /**
+             * By
+             * @default
+             */
+            by: string;
+            protocol: components["schemas"]["Protocol"];
+        };
+        /**
+         * ProtocolReference
+         * @description A paper or a record the version rests on, by id, with what it gives.
+         */
+        ProtocolReference: {
+            /** Note */
+            note?: string | null;
+            /** Paperid */
+            paperId?: string | null;
+            /** Recordid */
+            recordId?: string | null;
+        };
+        /**
+         * ProtocolVersion
+         * @description One version of a protocol, kept as it was kept: its base batch, its
+         *     materials, equipment and safety notes, its steps, the minutes a run takes
+         *     and what it rests on. The service writes who kept it (`by`) and when
+         *     (`at`, ISO 8601 in UTC) over what a version sends.
+         */
+        ProtocolVersion: {
+            /**
+             * At
+             * @default
+             */
+            at: string;
+            baseBatch: components["schemas"]["BaseBatch"];
+            /**
+             * By
+             * @default
+             */
+            by: string;
+            /** Changelog */
+            changelog?: string | null;
+            /** Equipment */
+            equipment?: string[];
+            estMinutes: components["schemas"]["EstMinutes"];
+            /** Materials */
+            materials?: components["schemas"]["Material"][];
+            /** References */
+            references?: components["schemas"]["ProtocolReference"][];
+            /** Safety */
+            safety?: string[];
+            /** Steps */
+            steps?: components["schemas"]["Step"][];
+            /** Version */
+            version: string;
+        };
+        /**
+         * ProtocolVersionKeep
+         * @description POST /api/protocols/{id}/versions: a new version of a protocol the
+         *     project keeps, under a version of its own, and the name of the person who
+         *     keeps it; it becomes the protocol's current version.
+         */
+        ProtocolVersionKeep: {
+            /**
+             * By
+             * @default
+             */
+            by: string;
+            version: components["schemas"]["ProtocolVersion"];
+        };
+        /**
          * Quantity
          * @description A value and its unit; a categorical field carries a string value. A
          *     number a model, a person or a library supplies carries its origin
          *     (ADR-006); a value code derives from another (the SI form of a record's
          *     value) carries none, the thing it was derived from being its source.
          */
-        "Quantity-Input": {
+        Quantity: {
             /** Basis */
             basis?: string | null;
             /** High */
@@ -5129,13 +6995,96 @@ export interface components {
             /** Value */
             value: number | string;
         };
-        "Quantity-Output": unknown;
         /** Range */
         Range: {
             /** High */
             high: number;
             /** Low */
             low: number;
+        };
+        /**
+         * Reconciliation
+         * @description A deposition's readings set beside the runbook's predictions (a
+         *     deposition's `reconciliation`), made once and kept as it was made.
+         */
+        Reconciliation: {
+            /** At */
+            at: string;
+            /** Deltas */
+            deltas: components["schemas"]["ReconciliationDelta"][];
+            /** Note */
+            note: string;
+            /**
+             * Outcome
+             * @enum {string}
+             */
+            outcome: "confirmed" | "refuted" | "inconclusive";
+        } & {
+            [key: string]: unknown;
+        };
+        /**
+         * ReconciliationDelta
+         * @description One prediction of a runbook beside the reading that tests it, in the
+         *     measure's unit, and the change in percent.
+         */
+        ReconciliationDelta: {
+            /** Observed */
+            observed: number;
+            /** Pctdelta */
+            pctDelta: number;
+            /** Predicted */
+            predicted: number;
+            /** Predictionid */
+            predictionId: string;
+            /** Unit */
+            unit: string;
+        } & {
+            [key: string]: unknown;
+        };
+        /**
+         * Refusal
+         * @description The body of a refusal the service answers in words: a 404 for what is
+         *     not here, a 422 for what cannot be run, a 503 for an engine or a worker
+         *     that cannot answer (the engine routes declare each).
+         */
+        Refusal: {
+            /** Detail */
+            detail: string;
+        };
+        /**
+         * RefusedRow
+         * @description A row the project keeps that does not read as its kind: the kind, the
+         *     id the page wrote it under, and why, in words.
+         */
+        RefusedRow: {
+            /** Id */
+            id: string;
+            /** Kind */
+            kind: string;
+            /** Why */
+            why: string;
+        };
+        /**
+         * RegressionCheck
+         * @description One of the package test's values beside what this installation computed.
+         */
+        RegressionCheck: {
+            /** Expression */
+            expression: string;
+            /** Label */
+            label: string;
+            /** Measured */
+            measured: number | null;
+            /** Package */
+            package: number;
+            /** Reldiff */
+            relDiff: number | null;
+            /** Rtol */
+            rtol: number;
+            /** Unit */
+            unit: string;
+            /** Within */
+            within: boolean;
         };
         /**
          * RegressionValue
@@ -5161,16 +7110,16 @@ export interface components {
             /** Path */
             path: string;
             /** Replayed */
-            replayed?: unknown;
+            replayed: unknown;
             /** Stored */
-            stored?: unknown;
+            stored: unknown;
         };
         /** ReplayResult */
         ReplayResult: {
             /** Artifactid */
             artifactId: string;
             /** Differences */
-            differences?: components["schemas"]["ReplayDifference"][];
+            differences: components["schemas"]["ReplayDifference"][];
             /** Durationms */
             durationMs: number;
             /** Identical */
@@ -5179,7 +7128,7 @@ export interface components {
             replayedHash: string;
             /** Storedhash */
             storedHash: string;
-            tolerance?: components["schemas"]["ReplayTolerance"] | null;
+            tolerance: components["schemas"]["ReplayTolerance"] | null;
             /**
              * Withintolerance
              * @default false
@@ -5210,11 +7159,11 @@ export interface components {
          *     record, when, and, for a decision that re-anchors the record to another
          *     sentence of the paper, the replacement span.
          */
-        "ReviewDecision-Input": {
+        ReviewDecision: {
             /** At */
             at: string;
-            corrected?: components["schemas"]["Quantity-Input"] | null;
-            gold?: components["schemas"]["Quantity-Input"] | null;
+            corrected?: components["schemas"]["Quantity"] | null;
+            gold?: components["schemas"]["Quantity"] | null;
             /**
              * Provenance
              * @enum {string}
@@ -5237,40 +7186,21 @@ export interface components {
             status: "unverified" | "verified" | "rejected";
         };
         /**
-         * ReviewDecision
-         * @description What a reviewer decided about one record (§7.1).
-         *
-         *     The first six fields are exactly the browser's DurableReviewDecision — the
-         *     shape the Durable tier already persists — so a decision made offline and a
-         *     decision posted to the service are the same object. The rest say which
-         *     record, when, and, for a decision that re-anchors the record to another
-         *     sentence of the paper, the replacement span.
+         * RunDiagnostic
+         * @description A value a run's computation reports about itself, the time it took or
+         *     the iterations it made, as a contract engine's worker answers it beside
+         *     its outputs (docs/api/workers.md, `run`): a name, a finite number or
+         *     words, and a unit. The run keeps it beside its outputs; its artifact,
+         *     its replay and every reader of `outputs.values` leave it out, so a
+         *     replay compares the outputs alone.
          */
-        "ReviewDecision-Output": {
-            /** At */
-            at: string;
-            corrected?: components["schemas"]["Quantity-Output"] | null;
-            gold?: components["schemas"]["Quantity-Output"] | null;
-            /**
-             * Provenance
-             * @enum {string}
-             */
-            provenance: "measured" | "gold" | "verified" | "curated" | "computed" | "unverified" | "user" | "industry-estimate" | "assumed";
-            /** Quote */
-            quote?: string | null;
-            /** Recordid */
-            recordId: string;
-            /** Rejectreason */
-            rejectReason?: string | null;
-            /** Reviewer */
-            reviewer?: string | null;
-            /** Sectionid */
-            sectionId?: string | null;
-            /**
-             * Status
-             * @enum {string}
-             */
-            status: "unverified" | "verified" | "rejected";
+        RunDiagnostic: {
+            /** Name */
+            name: string;
+            /** Unit */
+            unit: string;
+            /** Value */
+            value: number | string;
         };
         /**
          * RunInput
@@ -5280,7 +7210,7 @@ export interface components {
         RunInput: {
             /** Name */
             name: string;
-            quantity: components["schemas"]["Quantity-Output"];
+            quantity: components["schemas"]["Quantity"];
         };
         /**
          * RunReport
@@ -5289,9 +7219,9 @@ export interface components {
          *     with its origin; None for a refused run).
          */
         RunReport: {
-            artifact?: components["schemas"]["Artifact"] | null;
-            flowsheet?: components["schemas"]["SFFFlowsheet"] | null;
-            parameters?: components["schemas"]["ParamScope"] | null;
+            artifact: components["schemas"]["Artifact"] | null;
+            flowsheet: components["schemas"]["SFFFlowsheet"] | null;
+            parameters: components["schemas"]["ParamScope"] | null;
             run: components["schemas"]["EngineRun"];
         };
         /**
@@ -5303,18 +7233,18 @@ export interface components {
             /** Recordid */
             recordId: string;
             /** Score */
-            score?: number | null;
+            score: number | null;
             /** Tags */
-            tags?: string[];
+            tags: string[];
             /** Valid */
             valid: boolean;
         };
         /**
          * Runbook
-         * @description Mirrors `Runbook` in src/data/types.ts: a row of the project's
-         *     `runbooks`, a person's or a study's (studies/runbooks.py). It is read
-         *     and written with `exclude_unset`, so a row comes back as it was kept:
-         *     the lock's digest reads a prediction's absent field and a null one
+         * @description A row of the project's `runbooks`, a person's or a study's
+         *     (studies/runbooks.py; the browser's `Runbook`, src/lib/studies.ts). It is
+         *     read and written with `exclude_unset`, so a row comes back as it was
+         *     kept: the lock's digest reads a prediction's absent field and a null one
          *     differently (runbook_lock.py).
          */
         Runbook: {
@@ -5401,8 +7331,20 @@ export interface components {
             title: string;
         };
         /**
+         * RunbookLock
+         * @description A runbook's lock as the project keeps it: when its predictions and
+         *     measures were frozen, and their digest (runbook_lock.py).
+         */
+        RunbookLock: {
+            /** Lockhash */
+            lockHash: string;
+            /** Lockedat */
+            lockedAt: string;
+        };
+        /**
          * RunbookStage
-         * @description Mirrors `RunbookStage` in src/data/types.ts.
+         * @description One stage of a runbook and where it stands (the browser's
+         *     `RunbookStage`, src/lib/studies.ts).
          */
         RunbookStage: {
             /** Detail */
@@ -5427,11 +7369,11 @@ export interface components {
             /** Id */
             id: string;
             /** Massflow */
-            massFlow?: number | null;
+            massFlow: number | null;
             /** Name */
-            name?: string | null;
+            name: string | null;
             /** Price */
-            price?: number | null;
+            price: number | null;
             /** Unit */
             unit: string;
         };
@@ -5444,17 +7386,17 @@ export interface components {
          */
         SFFCompleteness: {
             /** Categories */
-            categories?: {
+            categories: {
                 [key: string]: number | null;
             };
             /** Criteria */
-            criteria?: components["schemas"]["SFFCriterion"][];
+            criteria: components["schemas"]["SFFCriterion"][];
             /** Criticalities */
-            criticalities?: {
+            criticalities: {
                 [key: string]: number | null;
             };
             /** Recipe */
-            recipe?: {
+            recipe: {
                 [key: string]: unknown;
             };
             /**
@@ -5463,11 +7405,11 @@ export interface components {
              */
             report: string;
             /** Representablescore */
-            representableScore?: number | null;
+            representableScore: number | null;
             /** Score */
-            score?: number | null;
+            score: number | null;
             /** Sffversion */
-            sffVersion?: string | null;
+            sffVersion: string | null;
         };
         /**
          * SFFCriterion
@@ -5483,11 +7425,11 @@ export interface components {
             /** Message */
             message: string;
             /** Missing */
-            missing?: string[];
+            missing: string[];
             /** Representable */
             representable: boolean;
             /** Score */
-            score?: number | null;
+            score: number | null;
             /** Status */
             status: string;
             /** Weight */
@@ -5501,7 +7443,7 @@ export interface components {
             /** Id */
             id: string;
             /** Massflow */
-            massFlow?: number | null;
+            massFlow: number | null;
             /** Sink */
             sink: string;
             /** Source */
@@ -5545,7 +7487,9 @@ export interface components {
          *     reference flowsheets at the pinned commit, whichever door it came
          *     through; `imported` for any other file. `sffVersion` is what the file
          *     declares; `validation.schemaVersion` is the schema it was checked
-         *     against. `graph` is left out of a listing.
+         *     against. `url` is the https address a file fetched by its address came
+         *     from (POST /api/flowsheets/import-url), None for every other door.
+         *     `graph` is left out of a listing.
          */
         SFFFlowsheet: {
             /** Bytes */
@@ -5555,30 +7499,30 @@ export interface components {
             createdAt: string;
             /** Createdby */
             createdBy: string;
-            graph?: components["schemas"]["SFFGraph"] | null;
+            graph: components["schemas"]["SFFGraph"] | null;
             /** Id */
             id: string;
             /** Libraryid */
-            libraryId?: string | null;
+            libraryId: string | null;
             /**
              * Origin
              * @enum {string}
              */
             origin: "run" | "library" | "imported";
             /** Runartifactid */
-            runArtifactId?: string | null;
+            runArtifactId: string | null;
             /** Sffversion */
-            sffVersion?: string | null;
+            sffVersion: string | null;
             /** Sha256 */
             sha256: string;
             /** Simulator */
-            simulator?: string | null;
+            simulator: string | null;
             /** Source */
             source: string;
             /** Streams */
             streams: number;
             /** Tags */
-            tags?: {
+            tags: {
                 [key: string]: components["schemas"]["SFFTag"];
             };
             /** Title */
@@ -5587,6 +7531,8 @@ export interface components {
             toolkit: string;
             /** Units */
             units: number;
+            /** Url */
+            url: string | null;
             validation: components["schemas"]["SFFValidation"];
         };
         /**
@@ -5597,20 +7543,20 @@ export interface components {
          */
         SFFGraph: {
             /** Dangling */
-            dangling?: string[];
+            dangling: string[];
             /** Edges */
-            edges?: components["schemas"]["SFFEdge"][];
+            edges: components["schemas"]["SFFEdge"][];
             /** Feeds */
-            feeds?: components["schemas"]["SFFBoundary"][];
+            feeds: components["schemas"]["SFFBoundary"][];
             /**
              * Massflowunit
              * @default kg/hr
              */
             massFlowUnit: string;
             /** Nodes */
-            nodes?: components["schemas"]["SFFNode"][];
+            nodes: components["schemas"]["SFFNode"][];
             /** Products */
-            products?: components["schemas"]["SFFBoundary"][];
+            products: components["schemas"]["SFFBoundary"][];
         };
         /**
          * SFFLibraryEntry
@@ -5626,9 +7572,9 @@ export interface components {
             /** Id */
             id: string;
             /** Model */
-            model?: string | null;
+            model: string | null;
             /** Sffversion */
-            sffVersion?: string | null;
+            sffVersion: string | null;
             /** Sha256 */
             sha256: string;
             /** Title */
@@ -5654,7 +7600,7 @@ export interface components {
             /** Id */
             id: string;
             /** Method */
-            method?: string | null;
+            method: string | null;
             /** Rank */
             rank: number;
             /** Type */
@@ -5668,11 +7614,23 @@ export interface components {
          */
         SFFTag: {
             /** Blocking */
-            blocking?: string[];
+            blocking: string[];
             /** Declared */
             declared: boolean;
             /** Earned */
-            earned?: boolean | null;
+            earned: boolean | null;
+        };
+        /**
+         * SFFUrlImport
+         * @description POST /api/flowsheets/import-url: the public https address of an SFF
+         *     file to fetch and keep in the project, kept whole as the record's
+         *     source, query included, and the person who names it.
+         */
+        SFFUrlImport: {
+            /** By */
+            by: string;
+            /** Url */
+            url: string;
         };
         /**
          * SFFValidation
@@ -5682,11 +7640,11 @@ export interface components {
          */
         SFFValidation: {
             /** Findings */
-            findings?: components["schemas"]["SFFFinding"][];
+            findings: components["schemas"]["SFFFinding"][];
             /** Schemaversion */
             schemaVersion: string;
             /** Summary */
-            summary?: {
+            summary: {
                 [key: string]: {
                     [key: string]: number;
                 };
@@ -5713,29 +7671,71 @@ export interface components {
             /** Title */
             title: string;
             /** Values */
-            values?: components["schemas"]["ScenarioValue-Input"][];
+            values?: components["schemas"]["ScenarioValue"][];
+        };
+        /** ScenarioInput */
+        ScenarioInput: {
+            /**
+             * Binding
+             * @enum {string}
+             */
+            binding: "records" | "assumption" | "artifact" | "waiting";
+            /** Flags */
+            flags: string[];
+            /** High */
+            high: number | null;
+            /** Key */
+            key: string;
+            /** Label */
+            label: string;
+            /**
+             * Leftoutnocarbon
+             * @default 0
+             */
+            leftOutNoCarbon: number;
+            /**
+             * Leftoutothercarbon
+             * @default 0
+             */
+            leftOutOtherCarbon: number;
+            /** Low */
+            low: number | null;
+            /** Recordids */
+            recordIds: string[];
+            /** Records */
+            records: components["schemas"]["BoundRecord"][];
+            /** Sampling */
+            sampling: ("triangular" | "uniform" | "fixed") | null;
+            source: components["schemas"]["BasisSource"] | null;
+            /** Unit */
+            unit: string;
+            /** Value */
+            value: number | null;
+        };
+        /**
+         * ScenarioRunsResponse
+         * @description GET /api/proforma/runs: a scenario's newest run on this service, or
+         *     None when it has none.
+         */
+        ScenarioRunsResponse: {
+            artifact: components["schemas"]["Artifact"] | null;
+            /** Scenarioid */
+            scenarioId: string;
         };
         /**
          * ScenarioValue
          * @description One value a scenario sets on its plant: the parameter's key, and the
-         *     value as a quantity whose origin is a named person's assumption or a
-         *     model's estimate (ADR-006).
+         *     value as a quantity whose origin is a named person's assumption, a
+         *     model's estimate (ADR-006), or a reading a person deposited at the bench
+         *     (a `measurement`: `{"kind": "measurement", "ref": "<deposition id>/<entry
+         *     id>"}`, its value and unit the reading's own, which the service looks up
+         *     in the project's depositions, filling the reading's time and its
+         *     depositor where the value leaves them out, measurements.py).
          */
-        "ScenarioValue-Input": {
+        ScenarioValue: {
             /** Key */
             key: string;
-            quantity: components["schemas"]["Quantity-Input"];
-        };
-        /**
-         * ScenarioValue
-         * @description One value a scenario sets on its plant: the parameter's key, and the
-         *     value as a quantity whose origin is a named person's assumption or a
-         *     model's estimate (ADR-006).
-         */
-        "ScenarioValue-Output": {
-            /** Key */
-            key: string;
-            quantity: components["schemas"]["Quantity-Output"];
+            quantity: components["schemas"]["Quantity"];
         };
         /**
          * SearchHit
@@ -5745,7 +7745,7 @@ export interface components {
          */
         SearchHit: {
             /** Citation */
-            citation?: string | null;
+            citation: string | null;
             /** Documentid */
             documentId: string;
             /**
@@ -5754,7 +7754,7 @@ export interface components {
              */
             isTable: boolean;
             /** Layers */
-            layers?: string[];
+            layers: string[];
             /** Licenceclass */
             licenceClass: string;
             /** Passageid */
@@ -5762,13 +7762,13 @@ export interface components {
             /** Score */
             score: number;
             /** Sectionpath */
-            sectionPath?: string | null;
+            sectionPath: string | null;
             /** Text */
             text: string;
             /** Title */
             title: string;
             /** Year */
-            year?: number | null;
+            year: number | null;
         };
         /**
          * SearchResponse
@@ -5777,9 +7777,9 @@ export interface components {
          */
         SearchResponse: {
             /** Degradedstages */
-            degradedStages?: string[];
+            degradedStages: string[];
             /** Hits */
-            hits?: components["schemas"]["SearchHit"][];
+            hits: components["schemas"]["SearchHit"][];
             /** Profile */
             profile: string;
             /** Query */
@@ -5801,11 +7801,72 @@ export interface components {
             /** Scatter */
             scatter: number;
         };
+        /** SimulationCeiling */
+        SimulationCeiling: {
+            /** Computeat */
+            computeAt: string;
+            /** Empty */
+            empty: string | null;
+            /**
+             * Flagged
+             * @default false
+             */
+            flagged: boolean;
+            /** Product */
+            product: string;
+            /** Rows */
+            rows: components["schemas"]["SimulationCeilingRow"][];
+            /** Strain */
+            strain: string;
+            /** Sugar */
+            sugar: string;
+        };
+        /**
+         * SimulationCeilingRow
+         * @description Yp/s beside the newest stored geneOS ceiling of one host model on
+         *     the sugar, read and never clamped.
+         */
+        SimulationCeilingRow: {
+            /** Above */
+            above: boolean;
+            /** Artifactid */
+            artifactId: string;
+            /** Ceilinggperg */
+            ceilingGPerG: number;
+            /**
+             * Match
+             * @enum {string}
+             */
+            match: "strain" | "species";
+            /** Matchwords */
+            matchWords: string;
+            /** Modelid */
+            modelId: string;
+            /** Modelname */
+            modelName: string;
+            /**
+             * Provenance
+             * @enum {string}
+             */
+            provenance: "measured" | "gold" | "verified" | "curated" | "computed" | "unverified" | "user" | "industry-estimate" | "assumed";
+            /** Words */
+            words: string;
+            /** Yieldachievedgperg */
+            yieldAchievedGPerG: number | null;
+            /** Ypsgperg */
+            ypsGPerG: number | null;
+        };
         /**
          * SimulationRequest
-         * @description POST /api/fermos/simulate.
+         * @description POST /api/fermos/simulate. It holds these fields alone: a field it
+         *     does not name is refused.
          */
         SimulationRequest: {
+            /**
+             * By
+             * @default
+             */
+            by: string;
             /**
              * Durationpreset
              * @default until-sugar-runs-out
@@ -5816,8 +7877,8 @@ export interface components {
             family: string;
             /** Fitartifact */
             fitArtifact?: string | null;
-            /** Overrides */
-            overrides?: components["schemas"]["Override"][];
+            /** Inputs */
+            inputs?: components["schemas"]["EngineInput"][];
             /** Product */
             product?: string | null;
             /** Recordsbyparam */
@@ -5835,16 +7896,133 @@ export interface components {
             sugar?: string | null;
         };
         /**
-         * StartValues
-         * @description A forecast's starting values; unset ones are the fitted run's own.
+         * SimulationResult
+         * @description One kept `fermos.simulation` artifact as every reader reads it.
          */
-        StartValues: {
-            /** P0 */
-            P0?: number | null;
-            /** S0 */
-            S0?: number | null;
-            /** X0 */
-            X0?: number | null;
+        SimulationResult: {
+            /** Aerobic */
+            aerobic: boolean;
+            /** Artifactid */
+            artifactId: string;
+            basis: components["schemas"]["ComputedBasis"];
+            ceiling: components["schemas"]["SimulationCeiling"] | null;
+            /** End */
+            end: {
+                [key: string]: number;
+            };
+            /** Family */
+            family: string;
+            /** Finaltitre */
+            finalTitre: number | null;
+            /** Flags */
+            flags: string[];
+            /** Harvesth */
+            harvestH: number;
+            massBalance: components["schemas"]["MassBalance"];
+            /** Notes */
+            notes: string[];
+            our: components["schemas"]["OxygenUptake"];
+            /** Parameters */
+            parameters: components["schemas"]["ParameterValue"][];
+            /** Product */
+            product: string | null;
+            /** Productivity */
+            productivity: number | null;
+            /**
+             * Provenance
+             * @enum {string}
+             */
+            provenance: "measured" | "gold" | "verified" | "curated" | "computed" | "unverified" | "user" | "industry-estimate" | "assumed";
+            /** Series */
+            series: {
+                [key: string]: number[];
+            };
+            /** Start */
+            start: components["schemas"]["ParameterValue"][];
+            steadyState: components["schemas"]["SteadyState"] | null;
+            /** Strain */
+            strain: string | null;
+            /** Sugar */
+            sugar: string | null;
+            /** Sugarrunsouth */
+            sugarRunsOutH: number | null;
+            /** Title */
+            title: string;
+            /** Units */
+            units: {
+                [key: string]: string;
+            };
+            /** Yieldachieved */
+            yieldAchieved: number | null;
+        };
+        /**
+         * SimulationSummary
+         * @description GET /api/fermos/simulations: one kept simulation, newest first.
+         */
+        SimulationSummary: {
+            /** Artifactid */
+            artifactId: string;
+            /** Createdat */
+            createdAt: string;
+            /** Family */
+            family: string;
+            /** Finaltitre */
+            finalTitre: number | null;
+            /** Harvesth */
+            harvestH: number | null;
+            /** Product */
+            product: string | null;
+            /**
+             * Provenance
+             * @enum {string}
+             */
+            provenance: "measured" | "gold" | "verified" | "curated" | "computed" | "unverified" | "user" | "industry-estimate" | "assumed";
+            /** Strain */
+            strain: string | null;
+            /** Sugar */
+            sugar: string | null;
+            /** Title */
+            title: string;
+        };
+        /**
+         * SimulatorStatus
+         * @description GET /api/proforma/status: where the Proforma worker is (cold,
+         *     starting, ready or failed), and the words of a start that failed.
+         */
+        SimulatorStatus: {
+            /** Error */
+            error: string | null;
+            /**
+             * Status
+             * @enum {string}
+             */
+            status: "cold" | "starting" | "ready" | "failed";
+        };
+        /**
+         * StateKept
+         * @description PUT /api/state/{kind}/{id}: the row the project keeps now, as the page
+         *     sent it, under its kind and id.
+         */
+        StateKept: {
+            /** Id */
+            id: string;
+            /** Kind */
+            kind: string;
+            /** Value */
+            value: unknown;
+        };
+        /**
+         * StateTakenBack
+         * @description DELETE /api/state/{kind}/{id}: the row a person took back, by its kind
+         *     and id; `removed` says the project holds no such row now.
+         */
+        StateTakenBack: {
+            /** Id */
+            id: string;
+            /** Kind */
+            kind: string;
+            /** Removed */
+            removed: boolean;
         };
         /**
          * StateWrite
@@ -5858,6 +8036,119 @@ export interface components {
             by: string;
             /** Value */
             value: unknown;
+        };
+        /**
+         * SteadyState
+         * @description chemostat_v1's steady state and washout (D5 as built, 6).
+         */
+        SteadyState: {
+            /** P */
+            P: number;
+            /** S */
+            S: number;
+            /** X */
+            X: number;
+            /**
+             * Bistable
+             * @default false
+             */
+            bistable: boolean;
+            /** Dwashout */
+            dWashout: number;
+            /** Dwashoutd5 */
+            dWashoutD5: number;
+            /** Dwashoutmax */
+            dWashoutMax: number | null;
+            /** Dilutionrate */
+            dilutionRate: number;
+            /** Productivity */
+            productivity: number | null;
+            /** Reached */
+            reached: ("culture" | "washout") | null;
+            /** Washout */
+            washout: boolean;
+            /** Words */
+            words: string;
+        };
+        /**
+         * Step
+         * @description One step of a version: what the person does, with `{{qty:<material>}}`
+         *     where a material's amount stands and `{{stock:<material>}}` where the
+         *     volume of its stock does, each at the batch's scale.
+         */
+        Step: {
+            /** Id */
+            id: string;
+            /** Multicheck */
+            multiCheck?: string[];
+            /** Note */
+            note?: string | null;
+            /** Refs */
+            refs?: string[];
+            /** Skills */
+            skills?: string[];
+            /** Text */
+            text: string;
+            /** Timerlabel */
+            timerLabel?: string | null;
+            /** Timersec */
+            timerSec?: number | null;
+        };
+        /**
+         * StoredAnswer
+         * @description GET /api/protparam and GET /api/thermo/volatility: the answer stored
+         *     for the same product, or None when it has not been asked here.
+         */
+        StoredAnswer: {
+            artifact: components["schemas"]["Artifact"] | null;
+        };
+        /** StreamImpurity */
+        StreamImpurity: {
+            /** Chemical */
+            chemical: string;
+            /** Massfraction */
+            massFraction: number;
+        };
+        /**
+         * StreamPurity
+         * @description One stream of a train run: the product's share of its mass, and its
+         *     largest other components by mass, read from the stream table.
+         */
+        StreamPurity: {
+            /** Impurities */
+            impurities: components["schemas"]["StreamImpurity"][];
+            /** Massflow */
+            massFlow: number;
+            /** Productfraction */
+            productFraction: number | null;
+            /** Stream */
+            stream: string;
+        };
+        /**
+         * StreamRow
+         * @description One stream of the base case, as BioSTEAM holds it after the run.
+         */
+        StreamRow: {
+            /** P */
+            P: number;
+            /** T */
+            T: number;
+            /** Id */
+            id: string;
+            /** Massflow */
+            massFlow: number;
+            /** Massflows */
+            massFlows: {
+                [key: string]: number;
+            };
+            /** Phase */
+            phase: string;
+            /** Price */
+            price: number | null;
+            /** Sink */
+            sink: string | null;
+            /** Source */
+            source: string | null;
         };
         /**
          * StudyComparison
@@ -5905,7 +8196,7 @@ export interface components {
             /** By */
             by: string;
             /** Configuration */
-            configuration?: string | null;
+            configuration: string | null;
             /** Id */
             id: string;
             /**
@@ -5915,15 +8206,157 @@ export interface components {
              */
             kind: "engine";
             /** Note */
-            note?: string | null;
+            note: string | null;
             /** Plant */
             plant: string;
             /** Runids */
-            runIds?: string[];
+            runIds: string[];
             /** Title */
             title: string;
             /** Values */
-            values: components["schemas"]["ScenarioValue-Output"][];
+            values: components["schemas"]["ScenarioValue"][];
+        };
+        /**
+         * TeaBreakdown
+         * @description The TEA object's own numbers for the base case, read through its
+         *     attributes and methods, never recomputed.
+         */
+        TeaBreakdown: {
+            /** Fci */
+            FCI: number;
+            /** Foc */
+            FOC: number;
+            /** Irr */
+            IRR: number | null;
+            /** Tci */
+            TCI: number;
+            /** Basis */
+            basis: string | null;
+            /** Basisflow */
+            basisFlow: number | null;
+            /** Capitalrecovery */
+            capitalRecovery: number;
+            /** Coproductcredits */
+            coproductCredits: number;
+            /** Feedstock */
+            feedstock: string | null;
+            /** Feedstockcost */
+            feedstockCost: number | null;
+            /** Incometax */
+            incomeTax: number | null;
+            /** Installedequipmentcost */
+            installedEquipmentCost: number;
+            /** Laborcost */
+            laborCost: number | null;
+            /** Lines */
+            lines: components["schemas"]["TeaLine"][];
+            /** Materialcost */
+            materialCost: number;
+            /** Operatinghours */
+            operatingHours: number;
+            /** Othermaterialcost */
+            otherMaterialCost: number;
+            /** Product */
+            product: string;
+            /** Productprice */
+            productPrice: number | null;
+            /** Purchasecost */
+            purchaseCost: number;
+            /** Sales */
+            sales: number;
+            /** Teaclass */
+            teaClass: string;
+            /** Utilitycost */
+            utilityCost: number;
+        };
+        /**
+         * TeaLine
+         * @description One line of the price, per year and per unit of the price's basis.
+         *     The lines sum to the main product's revenue by construction.
+         */
+        TeaLine: {
+            /**
+             * Key
+             * @enum {string}
+             */
+            key: "feedstock" | "otherMaterials" | "utilities" | "otherVariable" | "fixedOperating" | "capitalRecovery" | "coproductCredits";
+            /** Label */
+            label: string;
+            /** Perunit */
+            perUnit: number | null;
+            /** Reads */
+            reads: string;
+            /** Usdperyear */
+            usdPerYear: number;
+        };
+        /**
+         * ThermoProps
+         * @description What a `thermo_props` artifact holds (its `output`): thermosteam's
+         *     answer for one mixture, every number the library's, in its units.
+         */
+        ThermoProps: {
+            /** Cp */
+            Cp: number | null;
+            /** P */
+            P: number;
+            /** Psource */
+            PSource: string;
+            /** T */
+            T: number;
+            /** Tsource */
+            TSource: string;
+            /** Bubblepoint */
+            bubblePoint: number | null;
+            /** Density */
+            density: number | null;
+            /** Dewpoint */
+            dewPoint: number | null;
+            /** Kind */
+            kind: string;
+            /** Library */
+            library: string;
+            /** Massfractions */
+            massFractions: {
+                [key: string]: number;
+            };
+            /** Notes */
+            notes: string[];
+            /** Phase */
+            phase: string;
+            /** Preset */
+            preset: string | null;
+            /** Recordid */
+            recordId: string | null;
+            /** Runartifactid */
+            runArtifactId: string | null;
+            /** Solved */
+            solved: {
+                [key: string]: unknown;
+            } | null;
+            /** Streamid */
+            streamId: string | null;
+            /** Subject */
+            subject: string;
+            /** Units */
+            units: {
+                [key: string]: string;
+            };
+            /** Vapouratbubble */
+            vapourAtBubble: {
+                [key: string]: number;
+            } | null;
+            /** Viscosity */
+            viscosity: number | null;
+        };
+        /**
+         * ThermoPropsAnswer
+         * @description POST /api/thermo/props: thermosteam's answer to the question, its
+         *     artifact beside what the artifact holds, read as `ThermoProps`, the same
+         *     pair a later GET reads back as `ThermoPropsStored`.
+         */
+        ThermoPropsAnswer: {
+            artifact: components["schemas"]["Artifact"];
+            props: components["schemas"]["ThermoProps"];
         };
         /**
          * ThermoPropsRequest
@@ -5941,6 +8374,16 @@ export interface components {
             streamId?: string | null;
         };
         /**
+         * ThermoPropsStored
+         * @description GET /api/thermo/props: the answer stored for the same question, its
+         *     artifact with what the artifact holds, or both None when nobody has
+         *     asked it here.
+         */
+        ThermoPropsStored: {
+            artifact: components["schemas"]["Artifact"] | null;
+            props: components["schemas"]["ThermoProps"] | null;
+        };
+        /**
          * ToolCallRecord
          * @description One tool call a turn made (GET /api/conversations/{id}/turns/{turn}/calls):
          *     the tool, what it was asked, what it answered the model, and what it
@@ -5948,27 +8391,27 @@ export interface components {
          */
         ToolCallRecord: {
             /** Artifactids */
-            artifactIds?: string[];
+            artifactIds: string[];
             /** At */
             at: string;
             /** By */
             by: string;
             /** Error */
-            error?: string | null;
+            error: string | null;
             /** Evidenceids */
-            evidenceIds?: string[];
+            evidenceIds: string[];
             /** Input */
             input: {
                 [key: string]: unknown;
             };
             /** Passageids */
-            passageIds?: string[];
+            passageIds: string[];
             /** Recordids */
-            recordIds?: string[];
+            recordIds: string[];
             /** Seq */
             seq: number;
             /** Summary */
-            summary?: {
+            summary: {
                 [key: string]: unknown;
             };
             /** Tool */
@@ -5996,34 +8439,39 @@ export interface components {
          *     endpoint or the MCP server (E.6).
          */
         ToolResult: {
+            /**
+             * Auditids
+             * @description The audit rows the call wrote, oldest first, each by the id `GET /api/audit` serves it under: the row of each thing a write kept, and of the proposal a gated write made. A read writes none.
+             */
+            auditIds: string[];
             /** Data */
-            data?: {
+            data: {
                 [key: string]: unknown;
             } | null;
-            draft?: components["schemas"]["RunbookDraft"] | null;
+            draft: components["schemas"]["RunbookDraft"] | null;
             /** Error */
-            error?: string | null;
+            error: string | null;
             /** Evidence */
-            evidence?: components["schemas"]["Evidence"][];
+            evidence: components["schemas"]["Evidence"][];
             /** Passages */
-            passages?: components["schemas"]["Passage"][];
+            passages: components["schemas"]["Passage"][];
             /** Recordids */
-            recordIds?: string[];
+            recordIds: string[];
             /** Rows */
-            rows?: components["schemas"]["ModuleRow"][];
+            rows: components["schemas"]["ModuleRow"][];
             /** Summary */
-            summary?: {
+            summary: {
                 [key: string]: unknown;
             };
-            usage?: components["schemas"]["Usage"];
+            usage: components["schemas"]["Usage"];
         };
         /**
          * TraceStep
-         * @description One step of Postdoc's loop, as the browser shows it (OF-BLD-014 §5.1).
+         * @description One step of Postdoc's loop, as the browser shows it.
          */
         TraceStep: {
             /** Input */
-            input?: {
+            input: {
                 [key: string]: unknown;
             } | null;
             /**
@@ -6040,11 +8488,90 @@ export interface components {
             /** Summary */
             summary: string;
             /** Tool */
-            tool?: string | null;
+            tool: string | null;
+        };
+        /**
+         * Train
+         * @description A run's train as pureOS reads it, for `/pureos/train/:scenarioId`
+         *     and `pureos_read`.
+         */
+        Train: {
+            /** Artifactid */
+            artifactId: string;
+            /** Createdat */
+            createdAt: string;
+            /** Flowsheet */
+            flowsheet: string | null;
+            /** Note */
+            note: string | null;
+            /** Overallrecovery */
+            overallRecovery: number | null;
+            /** Product */
+            product: string | null;
+            /** Productbasis */
+            productBasis: string;
+            /** Productlost */
+            productLost: number | null;
+            /** Productout */
+            productOut: number | null;
+            /** Productstream */
+            productStream: string | null;
+            /** Program */
+            program: string | null;
+            /**
+             * Provenance
+             * @enum {string}
+             */
+            provenance: "measured" | "gold" | "verified" | "curated" | "computed" | "unverified" | "user" | "industry-estimate" | "assumed";
+            /**
+             * Runs
+             * @default 1
+             */
+            runs: number;
+            /** Scenarioid */
+            scenarioId: string | null;
+            /** Scenarioname */
+            scenarioName: string | null;
+            /** Streams */
+            streams: components["schemas"]["StreamRow"][];
+            /** Tableunits */
+            tableUnits: {
+                [key: string]: string;
+            };
+            /** Tablessource */
+            tablesSource: string | null;
+            /**
+             * Tool
+             * @default proforma.run
+             */
+            tool: string;
+            /** Trainid */
+            trainId: string | null;
+            /** Trainname */
+            trainName: string | null;
+            /** Units */
+            units: components["schemas"]["TrainUnit"][];
+        };
+        /**
+         * TrainFromRun
+         * @description A run's train as data: every unit on the product's path whose class is
+         *     a catalogue type, in run order, each outlet routed as the run routed it;
+         *     the units it does not take; what it says of itself; and the refusals
+         *     its structure meets (validate's), which a person settles in the
+         *     Builder.
+         */
+        TrainFromRun: {
+            /** Notes */
+            notes: string[];
+            /** Refusals */
+            refusals: string[];
+            train: components["schemas"]["TrainSpec"];
+            /** Unmapped */
+            unmapped: components["schemas"]["TrainUnmapped"][];
         };
         /**
          * TrainFromRunRequest
-         * @description POST /api/pureos/train/from-run (OF-BLD-020 §5.3): a run's units read
+         * @description POST /api/pureos/train/from-run: a run's units read
          *     into a train, each by its class.
          */
         TrainFromRunRequest: {
@@ -6077,6 +8604,68 @@ export interface components {
             vessel?: string | null;
         };
         /**
+         * TrainInletRead
+         * @description What a train run's inlet was and where it came from (D10).
+         */
+        TrainInletRead: {
+            /** P */
+            P: number;
+            /** T */
+            T: number;
+            /** Absent */
+            absent: string | null;
+            /** Brothflow */
+            brothFlow: number | null;
+            /** Chemicals */
+            chemicals: string[];
+            /** Concentrations */
+            concentrations: {
+                [key: string]: number;
+            } | null;
+            /** Flows */
+            flows: {
+                [key: string]: number;
+            };
+            /** Harvesthour */
+            harvestHour: number | null;
+            /**
+             * Kind
+             * @enum {string}
+             */
+            kind: "simulation" | "run-stream" | "typed";
+            /** Notes */
+            notes: string[];
+            /** Phase */
+            phase: string;
+            /** Ref */
+            ref: string | null;
+            /** Reftool */
+            refTool: string | null;
+            /** Streamid */
+            streamId: string | null;
+            /** Vessel */
+            vessel: string | null;
+            /** Water */
+            water: number | null;
+            /** Waternote */
+            waterNote: string | null;
+        };
+        /**
+         * TrainMade
+         * @description A train a person built in pureOS's Builder and saved (the browser
+         *     reads it as `TrainMade`, src/lib/durable.ts): the train as data, when it
+         *     was saved, and the name it was saved under.
+         */
+        TrainMade: {
+            /** By */
+            by: string;
+            /** Savedat */
+            savedAt: string;
+            train: components["schemas"]["TrainSpec"];
+        } & {
+            [key: string]: unknown;
+        };
+        /**
          * TrainParam
          * @description A value a person typed for one parameter of a train's unit or inlet:
          *     an Override without its scope and key, which its place in the train
@@ -6097,14 +8686,95 @@ export interface components {
             value: number | string;
         };
         /**
+         * TrainProposal
+         * @description POST /api/pureos/propose: a train proposed by the written rules, or
+         *     none, with what is missing. (Named apart from `Proposal`, a write a
+         *     model proposed at a gate)
+         */
+        TrainProposal: {
+            /** Artifacts */
+            artifacts: string[];
+            /** Host */
+            host: string;
+            /** Missing */
+            missing: components["schemas"]["ProposalMissing"][];
+            /** Notes */
+            notes: string[];
+            /** Product */
+            product: string;
+            /** Productclass */
+            productClass: string | null;
+            /** Program */
+            program: string | null;
+            /** Reasons */
+            reasons: components["schemas"]["ProposalReason"][];
+            train: components["schemas"]["TrainSpec"] | null;
+        };
+        /** TrainPurity */
+        TrainPurity: {
+            /** Impuritiesshown */
+            impuritiesShown: number;
+            /** Note */
+            note: string;
+            /** Product */
+            product: string;
+            /** Productfraction */
+            productFraction: number | null;
+            /** Productstream */
+            productStream: string | null;
+            /** Streams */
+            streams: components["schemas"]["StreamPurity"][];
+        };
+        /**
+         * TrainRun
+         * @description POST /api/pureos/train/run: the one `pureos.train_run` artifact, read.
+         */
+        TrainRun: {
+            /** Artifactid */
+            artifactId: string;
+            basis: components["schemas"]["ComputedBasis"];
+            /** Costs */
+            costs: components["schemas"]["TrainUnitCost"][];
+            /** Createdat */
+            createdAt: string;
+            /** Diagram */
+            diagram: string | null;
+            /** Diagramnote */
+            diagramNote: string | null;
+            /** Flags */
+            flags: string[];
+            inlet: components["schemas"]["TrainInletRead"];
+            /** Notes */
+            notes: string[];
+            /** Parameters */
+            parameters: components["schemas"]["TrainUnitParameters"][];
+            /**
+             * Provenance
+             * @enum {string}
+             */
+            provenance: "measured" | "gold" | "verified" | "curated" | "computed" | "unverified" | "user" | "industry-estimate" | "assumed";
+            purity: components["schemas"]["TrainPurity"];
+            spec: components["schemas"]["TrainSpec"];
+            train: components["schemas"]["Train"];
+            /** Unitorder */
+            unitOrder: string[];
+            /** Units */
+            units: components["schemas"]["UnitRow"][];
+            utilities: components["schemas"]["UtilityDuties"] | null;
+        };
+        /**
          * TrainRunRequest
-         * @description POST /api/pureos/train/run.
+         * @description POST /api/pureos/train/run and POST /api/pureos/train/check. It holds
+         *     these fields alone: a field it does not name is refused.
          */
         TrainRunRequest: {
-            /** By */
-            by?: string | null;
-            /** Overrides */
-            overrides?: components["schemas"]["Override"][];
+            /**
+             * By
+             * @default
+             */
+            by: string;
+            /** Inputs */
+            inputs?: components["schemas"]["EngineInput"][];
             train: components["schemas"]["TrainSpec"];
         };
         /**
@@ -6125,6 +8795,131 @@ export interface components {
             program: string;
             /** Units */
             units?: components["schemas"]["TrainUnitSpec"][];
+        };
+        /**
+         * TrainSummary
+         * @description One train on file, for pureOS's index: the newest run of a scenario.
+         */
+        TrainSummary: {
+            /** Artifactid */
+            artifactId: string;
+            /** Createdat */
+            createdAt: string;
+            /** Flowsheet */
+            flowsheet: string | null;
+            /** Note */
+            note: string | null;
+            /** Overallrecovery */
+            overallRecovery: number | null;
+            /** Product */
+            product: string | null;
+            /** Program */
+            program: string | null;
+            /**
+             * Provenance
+             * @enum {string}
+             */
+            provenance: "measured" | "gold" | "verified" | "curated" | "computed" | "unverified" | "user" | "industry-estimate" | "assumed";
+            /**
+             * Runs
+             * @default 1
+             */
+            runs: number;
+            /** Scenarioid */
+            scenarioId: string | null;
+            /** Scenarioname */
+            scenarioName: string | null;
+            /**
+             * Tool
+             * @default proforma.run
+             */
+            tool: string;
+            /** Trainid */
+            trainId: string | null;
+            /** Trainname */
+            trainName: string | null;
+            /** Unitcount */
+            unitCount: number;
+        };
+        /**
+         * TrainUnit
+         * @description One unit of a run's train, in run order, with the product's flow
+         *     through it as the stream table states it.
+         */
+        TrainUnit: {
+            /** Cumulative */
+            cumulative: number | null;
+            /** Id */
+            id: string;
+            /** Ins */
+            ins: string[];
+            /** Line */
+            line: string | null;
+            /** Lostto */
+            lostTo: string[];
+            /** Massin */
+            massIn: number;
+            /** Massout */
+            massOut: number;
+            /** Note */
+            note: string | null;
+            /** Onpath */
+            onPath: boolean;
+            /** Order */
+            order: number;
+            /** Outs */
+            outs: string[];
+            /** Productin */
+            productIn: number | null;
+            /** Productlost */
+            productLost: number | null;
+            /** Productonward */
+            productOnward: number | null;
+            /** Productout */
+            productOut: number | null;
+            /** Recovery */
+            recovery: number | null;
+            /** Unitclass */
+            unitClass: string;
+        };
+        /**
+         * TrainUnitCost
+         * @description One unit's cost as BioSTEAM gives it, or why there is none.
+         */
+        TrainUnitCost: {
+            /** Costmodel */
+            costModel: boolean;
+            /** Installedcost */
+            installedCost: number | null;
+            /** Items */
+            items: {
+                [key: string]: number;
+            };
+            /** Note */
+            note: string | null;
+            /** Purchasecost */
+            purchaseCost: number | null;
+            /** Type */
+            type: string;
+            /** Unit */
+            unit: string;
+            /** Unitclass */
+            unitClass: string;
+        };
+        /**
+         * TrainUnitParameters
+         * @description One unit's parameters as its run's basis holds them, each with its
+         *     source.
+         */
+        TrainUnitParameters: {
+            /** Type */
+            type: string;
+            /** Unit */
+            unit: string;
+            /** Unitclass */
+            unitClass: string;
+            /** Values */
+            values: components["schemas"]["ParameterValue"][];
         };
         /**
          * TrainUnitReadFrom
@@ -6161,12 +8956,211 @@ export interface components {
             /** Type */
             type: string;
         };
+        /**
+         * TrainUnmapped
+         * @description A unit of the run the train does not take, and why, in words.
+         */
+        TrainUnmapped: {
+            /** Unitclass */
+            unitClass: string;
+            /** Unitid */
+            unitId: string;
+            /** Why */
+            why: string;
+        };
+        /**
+         * TrainValidation
+         * @description POST /api/pureos/train/validate: every refusal at once, in words;
+         *     runs nothing. POST /api/pureos/train/check answers in the same shape
+         *     with everything the run would refuse.
+         */
+        TrainValidation: {
+            /** Ok */
+            ok: boolean;
+            /** Places */
+            places: {
+                [key: string]: string[];
+            };
+            /** Refusals */
+            refusals: string[];
+        };
         /** TurnError */
         TurnError: {
             /** Message */
             message: string;
             /** Remedy */
             remedy: string;
+        };
+        /**
+         * UnitDefault
+         * @description A parameter's default as the class gives it, read from its code in
+         *     the worker, and where it was read; None when the class gives none or
+         *     decides at run time.
+         */
+        UnitDefault: {
+            /** Key */
+            key: string;
+            /** Readfrom */
+            readFrom: string;
+            /** Value */
+            value: number | string | null;
+        };
+        /**
+         * UnitNeed
+         * @description What a unit needs set before it runs: one of `alternatives`, each a
+         *     list of keys that must all hold a value.
+         */
+        UnitNeed: {
+            /** Alternatives */
+            alternatives: string[][];
+            /** Why */
+            why: string;
+        };
+        /**
+         * UnitParamMap
+         * @description How one spec reaches the class: under which of the class's own names,
+         *     as a constructor argument or an attribute set after construction, and
+         *     whether its key is a template expanded per component or per effect
+         *     (`split` → `split.<chemical>`, `P` → `P.<effect>`).
+         */
+        UnitParamMap: {
+            /** How */
+            how: string | null;
+            /** Key */
+            key: string;
+            /** Name */
+            name: string;
+            /** Per */
+            per: ("component" | "effect") | null;
+            /**
+             * Via
+             * @enum {string}
+             */
+            via: "argument" | "attribute";
+        };
+        /**
+         * UnitPort
+         * @description One inlet or outlet of a catalogue unit, in words.
+         */
+        UnitPort: {
+            /** Index */
+            index: number;
+            /**
+             * Many
+             * @default false
+             */
+            many: boolean;
+            /** Name */
+            name: string;
+            /**
+             * Onward
+             * @default false
+             */
+            onward: boolean;
+            /**
+             * Side
+             * @enum {string}
+             */
+            side: "in" | "out";
+            /** Source */
+            source: ("upstream" | "side" | "unit") | null;
+            /** What */
+            what: string;
+        };
+        /**
+         * UnitRow
+         * @description One unit operation, in run order.
+         */
+        UnitRow: {
+            /** Coolingduty */
+            coolingDuty: number | null;
+            /** Heatingduty */
+            heatingDuty: number | null;
+            /** Id */
+            id: string;
+            /** Ins */
+            ins: string[];
+            /** Installedcost */
+            installedCost: number;
+            /** Line */
+            line: string | null;
+            /** Order */
+            order: number;
+            /** Outs */
+            outs: string[];
+            /** Power */
+            power: number | null;
+            /** Purchasecost */
+            purchaseCost: number;
+            /** Unitclass */
+            unitClass: string;
+        };
+        /**
+         * UnitSpecs
+         * @description GET /api/pureos/catalogue/{id}/specs: an entry's ParameterSpecs with
+         *     the choices and bounds the class gives, each parameter's default read
+         *     from the class, and how each reaches it.
+         */
+        UnitSpecs: {
+            /** Biosteamclass */
+            biosteamClass: string | null;
+            /** Chemicals */
+            chemicals: string[];
+            /** Defaults */
+            defaults: components["schemas"]["UnitDefault"][];
+            /** Id */
+            id: string;
+            /** Inhouseclass */
+            inhouseClass: string | null;
+            /** Needs */
+            needs: components["schemas"]["UnitNeed"][];
+            /** Notoffered */
+            notOffered: components["schemas"]["NotOffered"][];
+            /** Notes */
+            notes: string[];
+            /** Params */
+            params: components["schemas"]["UnitParamMap"][];
+            /** Specs */
+            specs: components["schemas"]["ParameterSpec"][];
+            /** Versions */
+            versions: {
+                [key: string]: string;
+            };
+        };
+        /**
+         * UnitType
+         * @description A catalogue entry without its specs (GET /api/pureos/catalogue).
+         */
+        UnitType: {
+            /** Biosteamclass */
+            biosteamClass: string | null;
+            /** Costmodel */
+            costModel: boolean;
+            /** Id */
+            id: string;
+            /** Inhouseclass */
+            inhouseClass: string | null;
+            /** Insouts */
+            insOuts: components["schemas"]["UnitPort"][];
+            /** Line */
+            line: string;
+            /** Maps */
+            maps: string[];
+            /** Name */
+            name: string;
+            /** Needs */
+            needs: components["schemas"]["UnitNeed"][];
+            /** Notoffered */
+            notOffered: components["schemas"]["NotOffered"][];
+            /** Notes */
+            notes: string[];
+            /** Speccount */
+            specCount: number;
+            /**
+             * Stage
+             * @enum {string}
+             */
+            stage: "harvest" | "disruption" | "clarification" | "concentration" | "capture" | "polish" | "formulation" | "drying" | "utility";
         };
         /** Usage */
         Usage: {
@@ -6191,12 +9185,37 @@ export interface components {
              */
             inputTokens: number;
             /** Models */
-            models?: string[];
+            models: string[];
             /**
              * Outputtokens
              * @default 0
              */
             outputTokens: number;
+        };
+        /**
+         * UtilityDuties
+         * @description BioSTEAM's UnitGroup over the plant's units: each total with the unit
+         *     the UnitGroup states for it.
+         */
+        UtilityDuties: {
+            /** Cooling */
+            cooling: number;
+            /** Coolingunit */
+            coolingUnit: string;
+            /** Electricityconsumption */
+            electricityConsumption: number;
+            /** Electricityconsumptionunit */
+            electricityConsumptionUnit: string;
+            /** Electricityproduction */
+            electricityProduction: number;
+            /** Electricityproductionunit */
+            electricityProductionUnit: string;
+            /** Group */
+            group: string;
+            /** Heating */
+            heating: number;
+            /** Heatingunit */
+            heatingUnit: string;
         };
         /** ValidationError */
         ValidationError: {
@@ -6223,7 +9242,7 @@ export interface components {
             /** Costindex */
             costIndex: number;
             /** Costindexyear */
-            costIndexYear?: number | null;
+            costIndexYear: number | null;
             /** Installed */
             installed: number;
             /** Note */
@@ -6256,11 +9275,11 @@ export interface components {
             design: components["schemas"]["VesselDesignRow"][];
             evidence: components["schemas"]["Evidence"];
             /** Flags */
-            flags?: string[];
+            flags: string[];
             heat: components["schemas"]["VesselHeat"];
-            oxygen?: components["schemas"]["VesselOxygen"] | null;
+            oxygen: components["schemas"]["VesselOxygen"] | null;
             /** Oxygennote */
-            oxygenNote?: string | null;
+            oxygenNote: string | null;
             /** Parameters */
             parameters: components["schemas"]["ParameterValue"][];
             /**
@@ -6293,7 +9312,7 @@ export interface components {
                 [key: string]: string;
             };
             /** Vesseltype */
-            vesselType?: string | null;
+            vesselType: string | null;
         };
         /**
          * VesselDesignRow
@@ -6318,17 +9337,17 @@ export interface components {
             /** Bst */
             bst: number;
             /** Consumedkmolperh */
-            consumedKmolPerH?: number | null;
+            consumedKmolPerH: number | null;
             /** Convention */
-            convention?: number | null;
+            convention: number | null;
             /** Conventionnote */
             conventionNote: string;
             /** Dutynote */
-            dutyNote?: string | null;
+            dutyNote: string | null;
             /** Method */
-            method?: string | null;
+            method: string | null;
             /** Oxygenkmolperh */
-            oxygenKmolPerH?: number | null;
+            oxygenKmolPerH: number | null;
             /**
              * Unit
              * @default kJ/hr
@@ -6344,15 +9363,15 @@ export interface components {
             /** Aerated */
             aerated: boolean;
             /** Balanceduptake */
-            balancedUptake?: number | null;
+            balancedUptake: number | null;
             /** Cl */
-            cL?: number | null;
+            cL: number | null;
             /** Cstar */
-            cStar?: number | null;
+            cStar: number | null;
             /** Drivingforce */
-            drivingForce?: number | null;
+            drivingForce: number | null;
             /** Floorkmolperh */
-            floorKmolPerH?: number | null;
+            floorKmolPerH: number | null;
             /** Kla */
             kLa: number | null;
             /** Klaneededatpeak */
@@ -6366,41 +9385,76 @@ export interface components {
             /** Our */
             our: number[];
             /** Oxygenbasis */
-            oxygenBasis?: string | null;
+            oxygenBasis: string | null;
             /** Reactiono2Kmolperh */
-            reactionO2KmolPerH?: number | null;
+            reactionO2KmolPerH: number | null;
             /** Scale */
             scale: number;
             /** Scaledo2Kmolperh */
-            scaledO2KmolPerH?: number | null;
+            scaledO2KmolPerH: number | null;
             /** Short */
             short: number[][];
             /** Simulatedo2Kmolperh */
-            simulatedO2KmolPerH?: number | null;
+            simulatedO2KmolPerH: number | null;
             /** Sized */
-            sized?: number | null;
+            sized: number | null;
             /** T */
             t: number[];
             /** Targetuptake */
-            targetUptake?: number | null;
+            targetUptake: number | null;
             /** Unit */
             unit: string;
         };
         /**
          * VesselRequest
-         * @description POST /api/fermos/vessel. Exactly one of `simulation` and `fit`.
+         * @description POST /api/fermos/vessel. Exactly one of `simulation` and `fit`. It
+         *     holds these fields alone: a field it does not name is refused.
          */
         VesselRequest: {
+            /**
+             * By
+             * @default
+             */
+            by: string;
             /** Fit */
             fit?: string | null;
+            /** Inputs */
+            inputs?: components["schemas"]["EngineInput"][];
             /** Klamethod */
             klaMethod?: string | null;
-            /** Overrides */
-            overrides?: components["schemas"]["Override"][];
             /** Simulation */
             simulation?: string | null;
             /** Vesseltype */
             vesselType?: ("stirred-tank" | "bubble-column") | null;
+        };
+        /**
+         * VesselSummary
+         * @description GET /api/fermos/vessels: one kept `fermos.vessel` artifact.
+         */
+        VesselSummary: {
+            /** Artifactid */
+            artifactId: string;
+            /** Createdat */
+            createdAt: string;
+            /** Installed */
+            installed: number | null;
+            /**
+             * Provenance
+             * @enum {string}
+             */
+            provenance: "measured" | "gold" | "verified" | "curated" | "computed" | "unverified" | "user" | "industry-estimate" | "assumed";
+            /** Source */
+            source: string;
+            /** Sourcetool */
+            sourceTool: string;
+            /** Unitclass */
+            unitClass: string;
+            /** Vesseltype */
+            vesselType: string | null;
+            /** Vessels */
+            vessels: number | null;
+            /** Volume */
+            volume: number | null;
         };
     };
     responses: never;
@@ -6413,7 +9467,10 @@ export type $defs = Record<string, never>;
 export interface operations {
     ask_api_ask_post: {
         parameters: {
-            query?: never;
+            query?: {
+                /** @description The project the request acts in, where a header cannot be sent (an EventSource); the X-OpenFerment-Project header in its place. */
+                project?: string;
+            };
             header?: {
                 /** @description The project the request acts in; ?project= in its place. */
                 "X-OpenFerment-Project"?: string;
@@ -6436,6 +9493,15 @@ export interface operations {
                     "application/json": components["schemas"]["AnswerPlan"];
                 };
             };
+            /** @description The project the request names is one the database does not hold, in words. */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Refusal"];
+                };
+            };
             /** @description Validation Error */
             422: {
                 headers: {
@@ -6449,7 +9515,10 @@ export interface operations {
     };
     ask_stream_api_ask_stream_post: {
         parameters: {
-            query?: never;
+            query?: {
+                /** @description The project the request acts in, where a header cannot be sent (an EventSource); the X-OpenFerment-Project header in its place. */
+                project?: string;
+            };
             header?: {
                 /** @description The project the request acts in; ?project= in its place. */
                 "X-OpenFerment-Project"?: string;
@@ -6463,13 +9532,22 @@ export interface operations {
             };
         };
         responses: {
-            /** @description Successful Response */
+            /** @description Server-sent events: `turn`, each `step`, then `plan`, or `error`. */
             200: {
                 headers: {
                     [name: string]: unknown;
                 };
                 content: {
-                    "application/json": unknown;
+                    "text/event-stream": string;
+                };
+            };
+            /** @description The project the request names is one the database does not hold, in words. */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Refusal"];
                 };
             };
             /** @description Validation Error */
@@ -6487,6 +9565,14 @@ export interface operations {
         parameters: {
             query?: {
                 limit?: number;
+                /** @description Only the rows of this action (`catalogue_write`). */
+                action?: string;
+                /** @description Only the rows on this target, as a row names it (`skill/<id>` for a catalogue entry). */
+                target?: string;
+                /** @description Only the rows this caller made, as a row names it (an assistant's `<name>/<version>`, a person's name). */
+                who?: string;
+                /** @description The project the request acts in, where a header cannot be sent (an EventSource); the X-OpenFerment-Project header in its place. */
+                project?: string;
             };
             header?: {
                 /** @description The project the request acts in; ?project= in its place. */
@@ -6503,7 +9589,16 @@ export interface operations {
                     [name: string]: unknown;
                 };
                 content: {
-                    "application/json": components["schemas"]["AuditEntry"][];
+                    "application/json": components["schemas"]["AuditRow"][];
+                };
+            };
+            /** @description The project the request names is one the database does not hold, in words. */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Refusal"];
                 };
             };
             /** @description Validation Error */
@@ -6519,7 +9614,11 @@ export interface operations {
     };
     artifacts_list_api_biorepo_artifacts_get: {
         parameters: {
-            query?: never;
+            query?: {
+                tool?: string[];
+                /** @description The project the request acts in, where a header cannot be sent (an EventSource); the X-OpenFerment-Project header in its place. */
+                project?: string;
+            };
             header?: {
                 /** @description The project the request acts in; ?project= in its place. */
                 "X-OpenFerment-Project"?: string;
@@ -6538,11 +9637,32 @@ export interface operations {
                     "application/json": components["schemas"]["Artifact"][];
                 };
             };
+            /** @description The project the request names is one the database does not hold, in words. */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Refusal"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
         };
     };
     artifacts_read_api_biorepo_artifacts__artifact_id__get: {
         parameters: {
-            query?: never;
+            query?: {
+                /** @description The project the request acts in, where a header cannot be sent (an EventSource); the X-OpenFerment-Project header in its place. */
+                project?: string;
+            };
             header?: {
                 /** @description The project the request acts in; ?project= in its place. */
                 "X-OpenFerment-Project"?: string;
@@ -6563,6 +9683,15 @@ export interface operations {
                     "application/json": components["schemas"]["Artifact"];
                 };
             };
+            /** @description The project the request names is one the database does not hold, in words. */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Refusal"];
+                };
+            };
             /** @description Validation Error */
             422: {
                 headers: {
@@ -6574,9 +9703,67 @@ export interface operations {
             };
         };
     };
+    artifacts_checks_api_biorepo_artifacts__artifact_id__checks_get: {
+        parameters: {
+            query?: {
+                /** @description The project the request acts in, where a header cannot be sent (an EventSource); the X-OpenFerment-Project header in its place. */
+                project?: string;
+            };
+            header?: {
+                /** @description The project the request acts in; ?project= in its place. */
+                "X-OpenFerment-Project"?: string;
+            };
+            path: {
+                artifact_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["RegressionCheck"][];
+                };
+            };
+            /** @description The project holds no artifact of that id, in words. A project the request names that the database does not hold is a 404 too, in words. */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Refusal"];
+                };
+            };
+            /** @description The stored artifact is damaged, in words. */
+            409: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Refusal"];
+                };
+            };
+            /** @description The artifact is of a tool whose artifacts hold no run's tables, in words naming the tools that hold them. */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Refusal"];
+                };
+            };
+        };
+    };
     artifacts_replay_api_biorepo_artifacts__artifact_id__replay_post: {
         parameters: {
-            query?: never;
+            query?: {
+                /** @description The project the request acts in, where a header cannot be sent (an EventSource); the X-OpenFerment-Project header in its place. */
+                project?: string;
+            };
             header?: {
                 /** @description The project the request acts in; ?project= in its place. */
                 "X-OpenFerment-Project"?: string;
@@ -6597,6 +9784,24 @@ export interface operations {
                     "application/json": components["schemas"]["ReplayResult"];
                 };
             };
+            /** @description The project holds no artifact of that id, in words. A project the request names that the database does not hold is a 404 too, in words. */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Refusal"];
+                };
+            };
+            /** @description The tool that made it is not registered in this service, or the stored artifact is damaged, in words. */
+            409: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Refusal"];
+                };
+            };
             /** @description Validation Error */
             422: {
                 headers: {
@@ -6608,9 +9813,67 @@ export interface operations {
             };
         };
     };
+    artifacts_tables_api_biorepo_artifacts__artifact_id__tables_get: {
+        parameters: {
+            query?: {
+                /** @description The project the request acts in, where a header cannot be sent (an EventSource); the X-OpenFerment-Project header in its place. */
+                project?: string;
+            };
+            header?: {
+                /** @description The project the request acts in; ?project= in its place. */
+                "X-OpenFerment-Project"?: string;
+            };
+            path: {
+                artifact_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ProformaTables"];
+                };
+            };
+            /** @description The project holds no artifact of that id, in words. A project the request names that the database does not hold is a 404 too, in words. */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Refusal"];
+                };
+            };
+            /** @description The stored artifact is damaged, in words. */
+            409: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Refusal"];
+                };
+            };
+            /** @description The artifact is of a tool whose artifacts hold no run's tables, in words naming the tools that hold them. */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Refusal"];
+                };
+            };
+        };
+    };
     biorepo_check_api_biorepo_check_post: {
         parameters: {
-            query?: never;
+            query?: {
+                /** @description The project the request acts in, where a header cannot be sent (an EventSource); the X-OpenFerment-Project header in its place. */
+                project?: string;
+            };
             header?: {
                 /** @description The project the request acts in; ?project= in its place. */
                 "X-OpenFerment-Project"?: string;
@@ -6620,7 +9883,7 @@ export interface operations {
         };
         requestBody: {
             content: {
-                "application/json": components["schemas"]["ReviewDecision-Input"];
+                "application/json": components["schemas"]["ReviewDecision"];
             };
         };
         responses: {
@@ -6631,6 +9894,15 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["DecisionCheck"];
+                };
+            };
+            /** @description The project the request names is one the database does not hold, in words. */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Refusal"];
                 };
             };
             /** @description Validation Error */
@@ -6646,7 +9918,10 @@ export interface operations {
     };
     biorepo_decisions_api_biorepo_decisions_post: {
         parameters: {
-            query?: never;
+            query?: {
+                /** @description The project the request acts in, where a header cannot be sent (an EventSource); the X-OpenFerment-Project header in its place. */
+                project?: string;
+            };
             header?: {
                 /** @description The project the request acts in; ?project= in its place. */
                 "X-OpenFerment-Project"?: string;
@@ -6656,7 +9931,7 @@ export interface operations {
         };
         requestBody: {
             content: {
-                "application/json": components["schemas"]["ReviewDecision-Input"];
+                "application/json": components["schemas"]["ReviewDecision"];
             };
         };
         responses: {
@@ -6666,7 +9941,16 @@ export interface operations {
                     [name: string]: unknown;
                 };
                 content: {
-                    "application/json": components["schemas"]["ReviewDecision-Output"];
+                    "application/json": components["schemas"]["ReviewDecision"];
+                };
+            };
+            /** @description The project the request names is one the database does not hold, in words. */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Refusal"];
                 };
             };
             /** @description Validation Error */
@@ -6682,7 +9966,10 @@ export interface operations {
     };
     biorepo_overlay_api_biorepo_overlay_get: {
         parameters: {
-            query?: never;
+            query?: {
+                /** @description The project the request acts in, where a header cannot be sent (an EventSource); the X-OpenFerment-Project header in its place. */
+                project?: string;
+            };
             header?: {
                 /** @description The project the request acts in; ?project= in its place. */
                 "X-OpenFerment-Project"?: string;
@@ -6701,11 +9988,23 @@ export interface operations {
                     "application/json": components["schemas"]["Overlay"];
                 };
             };
+            /** @description The project the request names is one the database does not hold, in words. */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Refusal"];
+                };
+            };
         };
     };
     catalogue_listed_api_catalogues__kind__get: {
         parameters: {
-            query?: never;
+            query?: {
+                /** @description The project the request acts in, where a header cannot be sent (an EventSource); the X-OpenFerment-Project header in its place. */
+                project?: string;
+            };
             header?: {
                 /** @description The project the request acts in; ?project= in its place. */
                 "X-OpenFerment-Project"?: string;
@@ -6723,9 +10022,16 @@ export interface operations {
                     [name: string]: unknown;
                 };
                 content: {
-                    "application/json": {
-                        [key: string]: unknown;
-                    }[];
+                    "application/json": components["schemas"]["CatalogueEntry"][];
+                };
+            };
+            /** @description There is no catalogue of that kind, in words. A project the request names that the database does not hold is a 404 too, in words. */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Refusal"];
                 };
             };
             /** @description Validation Error */
@@ -6741,7 +10047,10 @@ export interface operations {
     };
     catalogue_keep_api_catalogues__kind__post: {
         parameters: {
-            query?: never;
+            query?: {
+                /** @description The project the request acts in, where a header cannot be sent (an EventSource); the X-OpenFerment-Project header in its place. */
+                project?: string;
+            };
             header?: {
                 /** @description The project the request acts in; ?project= in its place. */
                 "X-OpenFerment-Project"?: string;
@@ -6763,25 +10072,35 @@ export interface operations {
                     [name: string]: unknown;
                 };
                 content: {
-                    "application/json": {
-                        [key: string]: unknown;
-                    };
+                    "application/json": components["schemas"]["CatalogueEntry"];
                 };
             };
-            /** @description Validation Error */
+            /** @description There is no catalogue of that kind, in words. A project the request names that the database does not hold is a 404 too, in words. */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Refusal"];
+                };
+            };
+            /** @description An entry the kind does not take, an entry of another kind, or a keep that names nobody, in words: a list of field errors, each with its place and why, for an entry whose own fields its kind refuses (a sequence on a strain, a category outside the classes pureOS's proposer reads, a skill's policy with a part left out), and the service's words for the rest. */
             422: {
                 headers: {
                     [name: string]: unknown;
                 };
                 content: {
-                    "application/json": components["schemas"]["HTTPValidationError"];
+                    "application/json": components["schemas"]["Refusal"] | components["schemas"]["HTTPValidationError"];
                 };
             };
         };
     };
     catalogue_entry_api_catalogues__kind___entry_id__get: {
         parameters: {
-            query?: never;
+            query?: {
+                /** @description The project the request acts in, where a header cannot be sent (an EventSource); the X-OpenFerment-Project header in its place. */
+                project?: string;
+            };
             header?: {
                 /** @description The project the request acts in; ?project= in its place. */
                 "X-OpenFerment-Project"?: string;
@@ -6800,9 +10119,16 @@ export interface operations {
                     [name: string]: unknown;
                 };
                 content: {
-                    "application/json": {
-                        [key: string]: unknown;
-                    };
+                    "application/json": components["schemas"]["CatalogueEntry"];
+                };
+            };
+            /** @description There is no catalogue of that kind, or the project's catalogue holds no entry of that id, in words. A project the request names that the database does not hold is a 404 too, in words. */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Refusal"];
                 };
             };
             /** @description Validation Error */
@@ -6818,7 +10144,10 @@ export interface operations {
     };
     conversations_listed_api_conversations_get: {
         parameters: {
-            query?: never;
+            query?: {
+                /** @description The project the request acts in, where a header cannot be sent (an EventSource); the X-OpenFerment-Project header in its place. */
+                project?: string;
+            };
             header?: {
                 /** @description The project the request acts in; ?project= in its place. */
                 "X-OpenFerment-Project"?: string;
@@ -6837,11 +10166,23 @@ export interface operations {
                     "application/json": components["schemas"]["LiveConversation"][];
                 };
             };
+            /** @description The project the request names is one the database does not hold, in words. */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Refusal"];
+                };
+            };
         };
     };
     conversation_api_conversations__conversation_id__get: {
         parameters: {
-            query?: never;
+            query?: {
+                /** @description The project the request acts in, where a header cannot be sent (an EventSource); the X-OpenFerment-Project header in its place. */
+                project?: string;
+            };
             header?: {
                 /** @description The project the request acts in; ?project= in its place. */
                 "X-OpenFerment-Project"?: string;
@@ -6862,6 +10203,15 @@ export interface operations {
                     "application/json": components["schemas"]["LiveConversation"];
                 };
             };
+            /** @description The project the request names is one the database does not hold, in words. */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Refusal"];
+                };
+            };
             /** @description Validation Error */
             422: {
                 headers: {
@@ -6875,7 +10225,10 @@ export interface operations {
     };
     conversation_calls_api_conversations__conversation_id__turns__turn_id__calls_get: {
         parameters: {
-            query?: never;
+            query?: {
+                /** @description The project the request acts in, where a header cannot be sent (an EventSource); the X-OpenFerment-Project header in its place. */
+                project?: string;
+            };
             header?: {
                 /** @description The project the request acts in; ?project= in its place. */
                 "X-OpenFerment-Project"?: string;
@@ -6897,6 +10250,15 @@ export interface operations {
                     "application/json": components["schemas"]["ToolCallRecord"][];
                 };
             };
+            /** @description The project the request names is one the database does not hold, in words. */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Refusal"];
+                };
+            };
             /** @description Validation Error */
             422: {
                 headers: {
@@ -6908,10 +10270,12 @@ export interface operations {
             };
         };
     };
-    project_events_api_events_get: {
+    deposition_readings_api_depositions_readings_get: {
         parameters: {
             query?: {
-                after?: number | null;
+                unit?: string | null;
+                /** @description The project the request acts in, where a header cannot be sent (an EventSource); the X-OpenFerment-Project header in its place. */
+                project?: string;
             };
             header?: {
                 /** @description The project the request acts in; ?project= in its place. */
@@ -6928,7 +10292,212 @@ export interface operations {
                     [name: string]: unknown;
                 };
                 content: {
-                    "application/json": unknown;
+                    "application/json": components["schemas"]["DepositionReading"][];
+                };
+            };
+            /** @description The project the request names is one the database does not hold, in words. */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Refusal"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    engines_list_api_engines_get: {
+        parameters: {
+            query?: {
+                /** @description The project the request acts in, where a header cannot be sent (an EventSource); the X-OpenFerment-Project header in its place. */
+                project?: string;
+            };
+            header?: {
+                /** @description The project the request acts in; ?project= in its place. */
+                "X-OpenFerment-Project"?: string;
+            };
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["EngineInfo"][];
+                };
+            };
+            /** @description The project the request names is one the database does not hold, in words. */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Refusal"];
+                };
+            };
+        };
+    };
+    engine_parameters_api_engines__name__parameters_get: {
+        parameters: {
+            query: {
+                thing: string;
+                configuration?: string | null;
+                /** @description The project the request acts in, where a header cannot be sent (an EventSource); the X-OpenFerment-Project header in its place. */
+                project?: string;
+            };
+            header?: {
+                /** @description The project the request acts in; ?project= in its place. */
+                "X-OpenFerment-Project"?: string;
+            };
+            path: {
+                name: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["EngineParameter"][];
+                };
+            };
+            /** @description No engine of that name is registered here, or BioSTEAM's shelf holds no plant of that id: in words, naming what is here. A project the request names that the database does not hold is a 404 too, in words. */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Refusal"];
+                };
+            };
+            /** @description The thing refused in words: one the engine does not run, or a configuration it does not take (a list of field errors when the request's own fields are refused). */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Refusal"] | components["schemas"]["HTTPValidationError"];
+                };
+            };
+            /** @description The engine cannot be used (it failed to load or to declare what it must), its worker could not answer, or it answered outside the protocol: in words, with no run kept. */
+            503: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Refusal"];
+                };
+            };
+        };
+    };
+    engine_run_api_engines__name__run_post: {
+        parameters: {
+            query?: {
+                /** @description The project the request acts in, where a header cannot be sent (an EventSource); the X-OpenFerment-Project header in its place. */
+                project?: string;
+            };
+            header?: {
+                /** @description The project the request acts in; ?project= in its place. */
+                "X-OpenFerment-Project"?: string;
+            };
+            path: {
+                name: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["EngineRunRequest"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["RunReport"];
+                };
+            };
+            /** @description No engine of that name is registered here, or BioSTEAM's shelf holds no plant of that id: in words, naming what is here. A project the request names that the database does not hold is a 404 too, in words. */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Refusal"];
+                };
+            };
+            /** @description The request refused in words: a field it does not hold, a bare number, a thing or a configuration the engine does not run, a value its parameters refuse, or a run the engine refused, kept as a receipt (a list of field errors when the request's own fields are refused). */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Refusal"] | components["schemas"]["HTTPValidationError"];
+                };
+            };
+            /** @description The engine cannot be used (it failed to load or to declare what it must), its worker could not answer, or it answered outside the protocol: in words, with no run kept. */
+            503: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Refusal"];
+                };
+            };
+        };
+    };
+    project_events_api_events_get: {
+        parameters: {
+            query?: {
+                after?: number | null;
+                /** @description The project the request acts in, where a header cannot be sent (an EventSource); the X-OpenFerment-Project header in its place. */
+                project?: string;
+            };
+            header?: {
+                /** @description The project the request acts in; ?project= in its place. */
+                "X-OpenFerment-Project"?: string;
+            };
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Server-sent events: `job.*`, `tool.call`, `tool.result`, `artifact.kept` and `turn.*`, each with its id. */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "text/event-stream": string;
+                };
+            };
+            /** @description The project the request names is one the database does not hold, in words. */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Refusal"];
                 };
             };
             /** @description Validation Error */
@@ -6952,7 +10521,9 @@ export interface operations {
                 fit?: string | null;
                 startFrom?: string;
                 durationPreset?: string;
-                overrides?: string | null;
+                inputs?: string | null;
+                /** @description The project the request acts in, where a header cannot be sent (an EventSource); the X-OpenFerment-Project header in its place. */
+                project?: string;
             };
             header?: {
                 /** @description The project the request acts in; ?project= in its place. */
@@ -6969,9 +10540,16 @@ export interface operations {
                     [name: string]: unknown;
                 };
                 content: {
-                    "application/json": {
-                        [key: string]: unknown;
-                    };
+                    "application/json": components["schemas"]["FermosBinding"];
+                };
+            };
+            /** @description The project the request names is one the database does not hold, in words. */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Refusal"];
                 };
             };
             /** @description Validation Error */
@@ -6987,7 +10565,10 @@ export interface operations {
     };
     fermos_families_api_fermos_families_get: {
         parameters: {
-            query?: never;
+            query?: {
+                /** @description The project the request acts in, where a header cannot be sent (an EventSource); the X-OpenFerment-Project header in its place. */
+                project?: string;
+            };
             header?: {
                 /** @description The project the request acts in; ?project= in its place. */
                 "X-OpenFerment-Project"?: string;
@@ -7003,16 +10584,26 @@ export interface operations {
                     [name: string]: unknown;
                 };
                 content: {
-                    "application/json": {
-                        [key: string]: unknown;
-                    }[];
+                    "application/json": components["schemas"]["FamilyInfo"][];
+                };
+            };
+            /** @description The project the request names is one the database does not hold, in words. */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Refusal"];
                 };
             };
         };
     };
     fermos_family_api_fermos_families__family_id__get: {
         parameters: {
-            query?: never;
+            query?: {
+                /** @description The project the request acts in, where a header cannot be sent (an EventSource); the X-OpenFerment-Project header in its place. */
+                project?: string;
+            };
             header?: {
                 /** @description The project the request acts in; ?project= in its place. */
                 "X-OpenFerment-Project"?: string;
@@ -7030,9 +10621,16 @@ export interface operations {
                     [name: string]: unknown;
                 };
                 content: {
-                    "application/json": {
-                        [key: string]: unknown;
-                    };
+                    "application/json": components["schemas"]["FamilyInfo"];
+                };
+            };
+            /** @description The project the request names is one the database does not hold, in words. */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Refusal"];
                 };
             };
             /** @description Validation Error */
@@ -7048,7 +10646,10 @@ export interface operations {
     };
     fermos_fit_api_fermos_fit_post: {
         parameters: {
-            query?: never;
+            query?: {
+                /** @description The project the request acts in, where a header cannot be sent (an EventSource); the X-OpenFerment-Project header in its place. */
+                project?: string;
+            };
             header?: {
                 /** @description The project the request acts in; ?project= in its place. */
                 "X-OpenFerment-Project"?: string;
@@ -7071,6 +10672,15 @@ export interface operations {
                     "application/json": components["schemas"]["FermosFitResponse"];
                 };
             };
+            /** @description The project the request names is one the database does not hold, in words. */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Refusal"];
+                };
+            };
             /** @description Validation Error */
             422: {
                 headers: {
@@ -7086,6 +10696,8 @@ export interface operations {
         parameters: {
             query: {
                 flowsheet: string;
+                /** @description The project the request acts in, where a header cannot be sent (an EventSource); the X-OpenFerment-Project header in its place. */
+                project?: string;
             };
             header?: {
                 /** @description The project the request acts in; ?project= in its place. */
@@ -7102,9 +10714,16 @@ export interface operations {
                     [name: string]: unknown;
                 };
                 content: {
-                    "application/json": {
-                        [key: string]: unknown;
-                    }[];
+                    "application/json": components["schemas"]["FermosFitInfo"][];
+                };
+            };
+            /** @description The project the request names is one the database does not hold, in words. */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Refusal"];
                 };
             };
             /** @description Validation Error */
@@ -7120,7 +10739,10 @@ export interface operations {
     };
     fermos_forecast_api_fermos_forecast_post: {
         parameters: {
-            query?: never;
+            query?: {
+                /** @description The project the request acts in, where a header cannot be sent (an EventSource); the X-OpenFerment-Project header in its place. */
+                project?: string;
+            };
             header?: {
                 /** @description The project the request acts in; ?project= in its place. */
                 "X-OpenFerment-Project"?: string;
@@ -7143,6 +10765,15 @@ export interface operations {
                     "application/json": components["schemas"]["ForecastResult"];
                 };
             };
+            /** @description The project the request names is one the database does not hold, in words. */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Refusal"];
+                };
+            };
             /** @description Validation Error */
             422: {
                 headers: {
@@ -7159,6 +10790,8 @@ export interface operations {
             query: {
                 simulation: string;
                 hour?: number | null;
+                /** @description The project the request acts in, where a header cannot be sent (an EventSource); the X-OpenFerment-Project header in its place. */
+                project?: string;
             };
             header?: {
                 /** @description The project the request acts in; ?project= in its place. */
@@ -7175,9 +10808,16 @@ export interface operations {
                     [name: string]: unknown;
                 };
                 content: {
-                    "application/json": {
-                        [key: string]: unknown;
-                    };
+                    "application/json": components["schemas"]["FermosHarvest"];
+                };
+            };
+            /** @description The project the request names is one the database does not hold, in words. */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Refusal"];
                 };
             };
             /** @description Validation Error */
@@ -7193,7 +10833,10 @@ export interface operations {
     };
     fermos_simulate_api_fermos_simulate_post: {
         parameters: {
-            query?: never;
+            query?: {
+                /** @description The project the request acts in, where a header cannot be sent (an EventSource); the X-OpenFerment-Project header in its place. */
+                project?: string;
+            };
             header?: {
                 /** @description The project the request acts in; ?project= in its place. */
                 "X-OpenFerment-Project"?: string;
@@ -7213,9 +10856,16 @@ export interface operations {
                     [name: string]: unknown;
                 };
                 content: {
-                    "application/json": {
-                        [key: string]: unknown;
-                    };
+                    "application/json": components["schemas"]["SimulationResult"];
+                };
+            };
+            /** @description The project the request names is one the database does not hold, in words. */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Refusal"];
                 };
             };
             /** @description Validation Error */
@@ -7231,7 +10881,10 @@ export interface operations {
     };
     fermos_simulations_api_fermos_simulations_get: {
         parameters: {
-            query?: never;
+            query?: {
+                /** @description The project the request acts in, where a header cannot be sent (an EventSource); the X-OpenFerment-Project header in its place. */
+                project?: string;
+            };
             header?: {
                 /** @description The project the request acts in; ?project= in its place. */
                 "X-OpenFerment-Project"?: string;
@@ -7247,16 +10900,26 @@ export interface operations {
                     [name: string]: unknown;
                 };
                 content: {
-                    "application/json": {
-                        [key: string]: unknown;
-                    }[];
+                    "application/json": components["schemas"]["SimulationSummary"][];
+                };
+            };
+            /** @description The project the request names is one the database does not hold, in words. */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Refusal"];
                 };
             };
         };
     };
     fermos_vessel_api_fermos_vessel_post: {
         parameters: {
-            query?: never;
+            query?: {
+                /** @description The project the request acts in, where a header cannot be sent (an EventSource); the X-OpenFerment-Project header in its place. */
+                project?: string;
+            };
             header?: {
                 /** @description The project the request acts in; ?project= in its place. */
                 "X-OpenFerment-Project"?: string;
@@ -7279,6 +10942,15 @@ export interface operations {
                     "application/json": components["schemas"]["VesselDesign"];
                 };
             };
+            /** @description The project the request names is one the database does not hold, in words. */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Refusal"];
+                };
+            };
             /** @description Validation Error */
             422: {
                 headers: {
@@ -7296,6 +10968,8 @@ export interface operations {
                 simulation?: string | null;
                 fit?: string | null;
                 vesselType?: string | null;
+                /** @description The project the request acts in, where a header cannot be sent (an EventSource); the X-OpenFerment-Project header in its place. */
+                project?: string;
             };
             header?: {
                 /** @description The project the request acts in; ?project= in its place. */
@@ -7312,9 +10986,16 @@ export interface operations {
                     [name: string]: unknown;
                 };
                 content: {
-                    "application/json": {
-                        [key: string]: unknown;
-                    };
+                    "application/json": components["schemas"]["ParamScope"];
+                };
+            };
+            /** @description The project the request names is one the database does not hold, in words. */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Refusal"];
                 };
             };
             /** @description Validation Error */
@@ -7330,7 +11011,10 @@ export interface operations {
     };
     fermos_vessels_api_fermos_vessels_get: {
         parameters: {
-            query?: never;
+            query?: {
+                /** @description The project the request acts in, where a header cannot be sent (an EventSource); the X-OpenFerment-Project header in its place. */
+                project?: string;
+            };
             header?: {
                 /** @description The project the request acts in; ?project= in its place. */
                 "X-OpenFerment-Project"?: string;
@@ -7346,16 +11030,26 @@ export interface operations {
                     [name: string]: unknown;
                 };
                 content: {
-                    "application/json": {
-                        [key: string]: unknown;
-                    }[];
+                    "application/json": components["schemas"]["VesselSummary"][];
+                };
+            };
+            /** @description The project the request names is one the database does not hold, in words. */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Refusal"];
                 };
             };
         };
     };
     flowsheets_listed_api_flowsheets_get: {
         parameters: {
-            query?: never;
+            query?: {
+                /** @description The project the request acts in, where a header cannot be sent (an EventSource); the X-OpenFerment-Project header in its place. */
+                project?: string;
+            };
             header?: {
                 /** @description The project the request acts in; ?project= in its place. */
                 "X-OpenFerment-Project"?: string;
@@ -7374,11 +11068,23 @@ export interface operations {
                     "application/json": components["schemas"]["SFFFlowsheet"][];
                 };
             };
+            /** @description The project the request names is one the database does not hold, in words. */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Refusal"];
+                };
+            };
         };
     };
     flowsheets_export_api_flowsheets_export_post: {
         parameters: {
-            query?: never;
+            query?: {
+                /** @description The project the request acts in, where a header cannot be sent (an EventSource); the X-OpenFerment-Project header in its place. */
+                project?: string;
+            };
             header?: {
                 /** @description The project the request acts in; ?project= in its place. */
                 "X-OpenFerment-Project"?: string;
@@ -7401,6 +11107,15 @@ export interface operations {
                     "application/json": components["schemas"]["SFFFlowsheet"];
                 };
             };
+            /** @description The project the request names is one the database does not hold, in words. */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Refusal"];
+                };
+            };
             /** @description Validation Error */
             422: {
                 headers: {
@@ -7414,7 +11129,10 @@ export interface operations {
     };
     flowsheets_import_api_flowsheets_import_post: {
         parameters: {
-            query?: never;
+            query?: {
+                /** @description The project the request acts in, where a header cannot be sent (an EventSource); the X-OpenFerment-Project header in its place. */
+                project?: string;
+            };
             header?: {
                 /** @description The project the request acts in; ?project= in its place. */
                 "X-OpenFerment-Project"?: string;
@@ -7437,6 +11155,15 @@ export interface operations {
                     "application/json": components["schemas"]["SFFFlowsheet"];
                 };
             };
+            /** @description The project the request names is one the database does not hold, in words. */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Refusal"];
+                };
+            };
             /** @description Validation Error */
             422: {
                 headers: {
@@ -7448,9 +11175,87 @@ export interface operations {
             };
         };
     };
+    flowsheets_import_url_api_flowsheets_import_url_post: {
+        parameters: {
+            query?: {
+                /** @description The project the request acts in, where a header cannot be sent (an EventSource); the X-OpenFerment-Project header in its place. */
+                project?: string;
+            };
+            header?: {
+                /** @description The project the request acts in; ?project= in its place. */
+                "X-OpenFerment-Project"?: string;
+            };
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["SFFUrlImport"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["SFFFlowsheet"];
+                };
+            };
+            /** @description The project the request names is one the database does not hold, in words. */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Refusal"];
+                };
+            };
+            /** @description The file the address serves is larger than an import takes: in words, nothing kept. */
+            413: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Refusal"];
+                };
+            };
+            /** @description An address that is not https, that names a user or a password, or whose host is or resolves to an address outside the public internet (loopback, private, link-local, multicast, reserved or unspecified), a redirect to any of these, the network refused in fixture mode, or a file that is not an SFF flowsheet: in words, nothing kept (a list of field errors when the request's own fields are refused). */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Refusal"] | components["schemas"]["HTTPValidationError"];
+                };
+            };
+            /** @description The host name could not be found, the host could not be reached or read in time, or it answered an error: in words, nothing kept. */
+            502: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Refusal"];
+                };
+            };
+            /** @description The Proforma simulator could not check the file: in words, nothing kept. */
+            503: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Refusal"];
+                };
+            };
+        };
+    };
     flowsheets_library_api_flowsheets_library_get: {
         parameters: {
-            query?: never;
+            query?: {
+                /** @description The project the request acts in, where a header cannot be sent (an EventSource); the X-OpenFerment-Project header in its place. */
+                project?: string;
+            };
             header?: {
                 /** @description The project the request acts in; ?project= in its place. */
                 "X-OpenFerment-Project"?: string;
@@ -7469,11 +11274,23 @@ export interface operations {
                     "application/json": components["schemas"]["SFFLibraryEntry"][];
                 };
             };
+            /** @description The project the request names is one the database does not hold, in words. */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Refusal"];
+                };
+            };
         };
     };
     flowsheets_library_import_api_flowsheets_library__file_id__post: {
         parameters: {
-            query?: never;
+            query?: {
+                /** @description The project the request acts in, where a header cannot be sent (an EventSource); the X-OpenFerment-Project header in its place. */
+                project?: string;
+            };
             header?: {
                 /** @description The project the request acts in; ?project= in its place. */
                 "X-OpenFerment-Project"?: string;
@@ -7498,6 +11315,15 @@ export interface operations {
                     "application/json": components["schemas"]["SFFFlowsheet"];
                 };
             };
+            /** @description The project the request names is one the database does not hold, in words. */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Refusal"];
+                };
+            };
             /** @description Validation Error */
             422: {
                 headers: {
@@ -7511,7 +11337,10 @@ export interface operations {
     };
     flowsheets_record_api_flowsheets__record_id__get: {
         parameters: {
-            query?: never;
+            query?: {
+                /** @description The project the request acts in, where a header cannot be sent (an EventSource); the X-OpenFerment-Project header in its place. */
+                project?: string;
+            };
             header?: {
                 /** @description The project the request acts in; ?project= in its place. */
                 "X-OpenFerment-Project"?: string;
@@ -7532,6 +11361,15 @@ export interface operations {
                     "application/json": components["schemas"]["SFFFlowsheet"];
                 };
             };
+            /** @description The project the request names is one the database does not hold, in words. */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Refusal"];
+                };
+            };
             /** @description Validation Error */
             422: {
                 headers: {
@@ -7545,7 +11383,10 @@ export interface operations {
     };
     flowsheets_file_api_flowsheets__record_id__file_get: {
         parameters: {
-            query?: never;
+            query?: {
+                /** @description The project the request acts in, where a header cannot be sent (an EventSource); the X-OpenFerment-Project header in its place. */
+                project?: string;
+            };
             header?: {
                 /** @description The project the request acts in; ?project= in its place. */
                 "X-OpenFerment-Project"?: string;
@@ -7566,6 +11407,15 @@ export interface operations {
                     "application/json": unknown;
                 };
             };
+            /** @description The project the request names is one the database does not hold, in words. */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Refusal"];
+                };
+            };
             /** @description Validation Error */
             422: {
                 headers: {
@@ -7579,7 +11429,10 @@ export interface operations {
     };
     geneos_ceiling_api_geneos_ceiling_post: {
         parameters: {
-            query?: never;
+            query?: {
+                /** @description The project the request acts in, where a header cannot be sent (an EventSource); the X-OpenFerment-Project header in its place. */
+                project?: string;
+            };
             header?: {
                 /** @description The project the request acts in; ?project= in its place. */
                 "X-OpenFerment-Project"?: string;
@@ -7600,6 +11453,15 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["GeneosResult"];
+                };
+            };
+            /** @description The project the request names is one the database does not hold, in words. */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Refusal"];
                 };
             };
             /** @description Validation Error */
@@ -7615,7 +11477,10 @@ export interface operations {
     };
     geneos_frontier_api_geneos_frontier_post: {
         parameters: {
-            query?: never;
+            query?: {
+                /** @description The project the request acts in, where a header cannot be sent (an EventSource); the X-OpenFerment-Project header in its place. */
+                project?: string;
+            };
             header?: {
                 /** @description The project the request acts in; ?project= in its place. */
                 "X-OpenFerment-Project"?: string;
@@ -7638,6 +11503,15 @@ export interface operations {
                     "application/json": components["schemas"]["GeneosResult"];
                 };
             };
+            /** @description The project the request names is one the database does not hold, in words. */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Refusal"];
+                };
+            };
             /** @description Validation Error */
             422: {
                 headers: {
@@ -7651,7 +11525,10 @@ export interface operations {
     };
     geneos_mix_api_geneos_mix_post: {
         parameters: {
-            query?: never;
+            query?: {
+                /** @description The project the request acts in, where a header cannot be sent (an EventSource); the X-OpenFerment-Project header in its place. */
+                project?: string;
+            };
             header?: {
                 /** @description The project the request acts in; ?project= in its place. */
                 "X-OpenFerment-Project"?: string;
@@ -7674,6 +11551,15 @@ export interface operations {
                     "application/json": components["schemas"]["GeneosResult"];
                 };
             };
+            /** @description The project the request names is one the database does not hold, in words. */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Refusal"];
+                };
+            };
             /** @description Validation Error */
             422: {
                 headers: {
@@ -7687,7 +11573,10 @@ export interface operations {
     };
     geneos_models_api_geneos_models_get: {
         parameters: {
-            query?: never;
+            query?: {
+                /** @description The project the request acts in, where a header cannot be sent (an EventSource); the X-OpenFerment-Project header in its place. */
+                project?: string;
+            };
             header?: {
                 /** @description The project the request acts in; ?project= in its place. */
                 "X-OpenFerment-Project"?: string;
@@ -7706,11 +11595,23 @@ export interface operations {
                     "application/json": components["schemas"]["GeneosModelInfo"][];
                 };
             };
+            /** @description The project the request names is one the database does not hold, in words. */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Refusal"];
+                };
+            };
         };
     };
     guild_ledger_api_guild_get: {
         parameters: {
-            query?: never;
+            query?: {
+                /** @description The project the request acts in, where a header cannot be sent (an EventSource); the X-OpenFerment-Project header in its place. */
+                project?: string;
+            };
             header?: {
                 /** @description The project the request acts in; ?project= in its place. */
                 "X-OpenFerment-Project"?: string;
@@ -7729,11 +11630,23 @@ export interface operations {
                     "application/json": components["schemas"]["Guild"];
                 };
             };
+            /** @description The project the request names is one the database does not hold, in words. */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Refusal"];
+                };
+            };
         };
     };
     guild_check_api_guild_check_post: {
         parameters: {
-            query?: never;
+            query?: {
+                /** @description The project the request acts in, where a header cannot be sent (an EventSource); the X-OpenFerment-Project header in its place. */
+                project?: string;
+            };
             header?: {
                 /** @description The project the request acts in; ?project= in its place. */
                 "X-OpenFerment-Project"?: string;
@@ -7753,7 +11666,16 @@ export interface operations {
                     [name: string]: unknown;
                 };
                 content: {
-                    "application/json": components["schemas"]["DecisionCheck"];
+                    "application/json": components["schemas"]["EvidenceCheck"];
+                };
+            };
+            /** @description The project the request names is one the database does not hold, in words. */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Refusal"];
                 };
             };
             /** @description Validation Error */
@@ -7769,7 +11691,10 @@ export interface operations {
     };
     checks_read_api_guild_checks_get: {
         parameters: {
-            query?: never;
+            query?: {
+                /** @description The project the request acts in, where a header cannot be sent (an EventSource); the X-OpenFerment-Project header in its place. */
+                project?: string;
+            };
             header?: {
                 /** @description The project the request acts in; ?project= in its place. */
                 "X-OpenFerment-Project"?: string;
@@ -7788,11 +11713,23 @@ export interface operations {
                     "application/json": components["schemas"]["Checks"];
                 };
             };
+            /** @description The project the request names is one the database does not hold, in words. */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Refusal"];
+                };
+            };
         };
     };
     checks_propose_api_guild_checks_propose_post: {
         parameters: {
-            query?: never;
+            query?: {
+                /** @description The project the request acts in, where a header cannot be sent (an EventSource); the X-OpenFerment-Project header in its place. */
+                project?: string;
+            };
             header?: {
                 /** @description The project the request acts in; ?project= in its place. */
                 "X-OpenFerment-Project"?: string;
@@ -7815,6 +11752,15 @@ export interface operations {
                     "application/json": components["schemas"]["Check"][];
                 };
             };
+            /** @description The project the request names is one the database does not hold, in words. */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Refusal"];
+                };
+            };
             /** @description Validation Error */
             422: {
                 headers: {
@@ -7828,7 +11774,10 @@ export interface operations {
     };
     checks_request_api_guild_checks_request_post: {
         parameters: {
-            query?: never;
+            query?: {
+                /** @description The project the request acts in, where a header cannot be sent (an EventSource); the X-OpenFerment-Project header in its place. */
+                project?: string;
+            };
             header?: {
                 /** @description The project the request acts in; ?project= in its place. */
                 "X-OpenFerment-Project"?: string;
@@ -7851,6 +11800,15 @@ export interface operations {
                     "application/json": components["schemas"]["Check"];
                 };
             };
+            /** @description The project the request names is one the database does not hold, in words. */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Refusal"];
+                };
+            };
             /** @description Validation Error */
             422: {
                 headers: {
@@ -7864,7 +11822,10 @@ export interface operations {
     };
     checks_brief_api_guild_checks__check_id__brief_post: {
         parameters: {
-            query?: never;
+            query?: {
+                /** @description The project the request acts in, where a header cannot be sent (an EventSource); the X-OpenFerment-Project header in its place. */
+                project?: string;
+            };
             header?: {
                 /** @description The project the request acts in; ?project= in its place. */
                 "X-OpenFerment-Project"?: string;
@@ -7889,6 +11850,15 @@ export interface operations {
                     "application/json": components["schemas"]["Check"];
                 };
             };
+            /** @description The project the request names is one the database does not hold, in words. */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Refusal"];
+                };
+            };
             /** @description Validation Error */
             422: {
                 headers: {
@@ -7902,7 +11872,10 @@ export interface operations {
     };
     checks_dismiss_api_guild_checks__check_id__dismiss_post: {
         parameters: {
-            query?: never;
+            query?: {
+                /** @description The project the request acts in, where a header cannot be sent (an EventSource); the X-OpenFerment-Project header in its place. */
+                project?: string;
+            };
             header?: {
                 /** @description The project the request acts in; ?project= in its place. */
                 "X-OpenFerment-Project"?: string;
@@ -7927,6 +11900,15 @@ export interface operations {
                     "application/json": components["schemas"]["Check"];
                 };
             };
+            /** @description The project the request names is one the database does not hold, in words. */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Refusal"];
+                };
+            };
             /** @description Validation Error */
             422: {
                 headers: {
@@ -7940,7 +11922,10 @@ export interface operations {
     };
     checks_record_api_guild_checks__check_id__record_post: {
         parameters: {
-            query?: never;
+            query?: {
+                /** @description The project the request acts in, where a header cannot be sent (an EventSource); the X-OpenFerment-Project header in its place. */
+                project?: string;
+            };
             header?: {
                 /** @description The project the request acts in; ?project= in its place. */
                 "X-OpenFerment-Project"?: string;
@@ -7965,6 +11950,15 @@ export interface operations {
                     "application/json": components["schemas"]["Check"];
                 };
             };
+            /** @description The project the request names is one the database does not hold, in words. */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Refusal"];
+                };
+            };
             /** @description Validation Error */
             422: {
                 headers: {
@@ -7978,7 +11972,10 @@ export interface operations {
     };
     checks_schedule_api_guild_checks__check_id__schedule_post: {
         parameters: {
-            query?: never;
+            query?: {
+                /** @description The project the request acts in, where a header cannot be sent (an EventSource); the X-OpenFerment-Project header in its place. */
+                project?: string;
+            };
             header?: {
                 /** @description The project the request acts in; ?project= in its place. */
                 "X-OpenFerment-Project"?: string;
@@ -8003,6 +12000,15 @@ export interface operations {
                     "application/json": components["schemas"]["Check"];
                 };
             };
+            /** @description The project the request names is one the database does not hold, in words. */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Refusal"];
+                };
+            };
             /** @description Validation Error */
             422: {
                 headers: {
@@ -8016,7 +12022,10 @@ export interface operations {
     };
     guild_evidence_api_guild_evidence_post: {
         parameters: {
-            query?: never;
+            query?: {
+                /** @description The project the request acts in, where a header cannot be sent (an EventSource); the X-OpenFerment-Project header in its place. */
+                project?: string;
+            };
             header?: {
                 /** @description The project the request acts in; ?project= in its place. */
                 "X-OpenFerment-Project"?: string;
@@ -8039,6 +12048,15 @@ export interface operations {
                     "application/json": components["schemas"]["GuildEvidence"];
                 };
             };
+            /** @description The project the request names is one the database does not hold, in words. */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Refusal"];
+                };
+            };
             /** @description Validation Error */
             422: {
                 headers: {
@@ -8052,7 +12070,10 @@ export interface operations {
     };
     guild_people_api_guild_people_post: {
         parameters: {
-            query?: never;
+            query?: {
+                /** @description The project the request acts in, where a header cannot be sent (an EventSource); the X-OpenFerment-Project header in its place. */
+                project?: string;
+            };
             header?: {
                 /** @description The project the request acts in; ?project= in its place. */
                 "X-OpenFerment-Project"?: string;
@@ -8075,6 +12096,15 @@ export interface operations {
                     "application/json": components["schemas"]["GuildPerson"];
                 };
             };
+            /** @description The project the request names is one the database does not hold, in words. */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Refusal"];
+                };
+            };
             /** @description Validation Error */
             422: {
                 headers: {
@@ -8088,7 +12118,10 @@ export interface operations {
     };
     guild_policy_api_guild_policy_post: {
         parameters: {
-            query?: never;
+            query?: {
+                /** @description The project the request acts in, where a header cannot be sent (an EventSource); the X-OpenFerment-Project header in its place. */
+                project?: string;
+            };
             header?: {
                 /** @description The project the request acts in; ?project= in its place. */
                 "X-OpenFerment-Project"?: string;
@@ -8111,6 +12144,15 @@ export interface operations {
                     "application/json": components["schemas"]["GuildPolicy"];
                 };
             };
+            /** @description The project the request names is one the database does not hold, in words. */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Refusal"];
+                };
+            };
             /** @description Validation Error */
             422: {
                 headers: {
@@ -8124,7 +12166,10 @@ export interface operations {
     };
     guild_withdraw_api_guild_withdraw_post: {
         parameters: {
-            query?: never;
+            query?: {
+                /** @description The project the request acts in, where a header cannot be sent (an EventSource); the X-OpenFerment-Project header in its place. */
+                project?: string;
+            };
             header?: {
                 /** @description The project the request acts in; ?project= in its place. */
                 "X-OpenFerment-Project"?: string;
@@ -8145,6 +12190,15 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["GuildEvidence"];
+                };
+            };
+            /** @description The project the request names is one the database does not hold, in words. */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Refusal"];
                 };
             };
             /** @description Validation Error */
@@ -8173,16 +12227,17 @@ export interface operations {
                     [name: string]: unknown;
                 };
                 content: {
-                    "application/json": {
-                        [key: string]: unknown;
-                    };
+                    "application/json": components["schemas"]["Health"];
                 };
             };
         };
     };
     catalogue_intake_api_intake_catalogue_post: {
         parameters: {
-            query?: never;
+            query?: {
+                /** @description The project the request acts in, where a header cannot be sent (an EventSource); the X-OpenFerment-Project header in its place. */
+                project?: string;
+            };
             header?: {
                 /** @description The project the request acts in; ?project= in its place. */
                 "X-OpenFerment-Project"?: string;
@@ -8202,9 +12257,16 @@ export interface operations {
                     [name: string]: unknown;
                 };
                 content: {
-                    "application/json": {
-                        [key: string]: unknown;
-                    };
+                    "application/json": components["schemas"]["CatalogueIntake"];
+                };
+            };
+            /** @description The project the request names is one the database does not hold, in words. */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Refusal"];
                 };
             };
             /** @description Validation Error */
@@ -8220,7 +12282,10 @@ export interface operations {
     };
     intake_collect_api_intake_collect_post: {
         parameters: {
-            query?: never;
+            query?: {
+                /** @description The project the request acts in, where a header cannot be sent (an EventSource); the X-OpenFerment-Project header in its place. */
+                project?: string;
+            };
             header?: {
                 /** @description The project the request acts in; ?project= in its place. */
                 "X-OpenFerment-Project"?: string;
@@ -8243,6 +12308,15 @@ export interface operations {
                     "application/json": components["schemas"]["CollectOutcome"];
                 };
             };
+            /** @description The project the request names is one the database does not hold, in words. */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Refusal"];
+                };
+            };
             /** @description Validation Error */
             422: {
                 headers: {
@@ -8256,7 +12330,10 @@ export interface operations {
     };
     intake_paste_api_intake_paste_post: {
         parameters: {
-            query?: never;
+            query?: {
+                /** @description The project the request acts in, where a header cannot be sent (an EventSource); the X-OpenFerment-Project header in its place. */
+                project?: string;
+            };
             header?: {
                 /** @description The project the request acts in; ?project= in its place. */
                 "X-OpenFerment-Project"?: string;
@@ -8279,6 +12356,15 @@ export interface operations {
                     "application/json": components["schemas"]["CollectOutcome"];
                 };
             };
+            /** @description The project the request names is one the database does not hold, in words. */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Refusal"];
+                };
+            };
             /** @description Validation Error */
             422: {
                 headers: {
@@ -8292,7 +12378,10 @@ export interface operations {
     };
     intake_upload_api_intake_upload_post: {
         parameters: {
-            query?: never;
+            query?: {
+                /** @description The project the request acts in, where a header cannot be sent (an EventSource); the X-OpenFerment-Project header in its place. */
+                project?: string;
+            };
             header?: {
                 /** @description The project the request acts in; ?project= in its place. */
                 "X-OpenFerment-Project"?: string;
@@ -8315,6 +12404,15 @@ export interface operations {
                     "application/json": components["schemas"]["CollectOutcome"];
                 };
             };
+            /** @description The project the request names is one the database does not hold, in words. */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Refusal"];
+                };
+            };
             /** @description Validation Error */
             422: {
                 headers: {
@@ -8330,6 +12428,8 @@ export interface operations {
         parameters: {
             query?: {
                 force?: boolean;
+                /** @description The project the request acts in, where a header cannot be sent (an EventSource); the X-OpenFerment-Project header in its place. */
+                project?: string;
             };
             header?: {
                 /** @description The project the request acts in; ?project= in its place. */
@@ -8351,6 +12451,15 @@ export interface operations {
                     "application/json": components["schemas"]["ExtractResponse"];
                 };
             };
+            /** @description The project the request names is one the database does not hold, in words. */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Refusal"];
+                };
+            };
             /** @description Validation Error */
             422: {
                 headers: {
@@ -8364,7 +12473,10 @@ export interface operations {
     };
     library_shelf_api_library_get: {
         parameters: {
-            query?: never;
+            query?: {
+                /** @description The project the request acts in, where a header cannot be sent (an EventSource); the X-OpenFerment-Project header in its place. */
+                project?: string;
+            };
             header?: {
                 /** @description The project the request acts in; ?project= in its place. */
                 "X-OpenFerment-Project"?: string;
@@ -8383,12 +12495,23 @@ export interface operations {
                     "application/json": components["schemas"]["LibraryShelf"];
                 };
             };
+            /** @description The project the request names is one the database does not hold, in words. */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Refusal"];
+                };
+            };
         };
     };
     library_parameters_api_library__plant__parameters_get: {
         parameters: {
             query?: {
                 configuration?: string | null;
+                /** @description The project the request acts in, where a header cannot be sent (an EventSource); the X-OpenFerment-Project header in its place. */
+                project?: string;
             };
             header?: {
                 /** @description The project the request acts in; ?project= in its place. */
@@ -8410,6 +12533,15 @@ export interface operations {
                     "application/json": components["schemas"]["LibraryParameters"];
                 };
             };
+            /** @description The project the request names is one the database does not hold, in words. */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Refusal"];
+                };
+            };
             /** @description Validation Error */
             422: {
                 headers: {
@@ -8425,6 +12557,8 @@ export interface operations {
         parameters: {
             query?: {
                 configuration?: string | null;
+                /** @description The project the request acts in, where a header cannot be sent (an EventSource); the X-OpenFerment-Project header in its place. */
+                project?: string;
             };
             header?: {
                 /** @description The project the request acts in; ?project= in its place. */
@@ -8446,6 +12580,15 @@ export interface operations {
                     "application/json": components["schemas"]["PackageRegression"] | null;
                 };
             };
+            /** @description The project the request names is one the database does not hold, in words. */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Refusal"];
+                };
+            };
             /** @description Validation Error */
             422: {
                 headers: {
@@ -8459,7 +12602,10 @@ export interface operations {
     };
     library_run_api_library__plant__run_post: {
         parameters: {
-            query?: never;
+            query?: {
+                /** @description The project the request acts in, where a header cannot be sent (an EventSource); the X-OpenFerment-Project header in its place. */
+                project?: string;
+            };
             header?: {
                 /** @description The project the request acts in; ?project= in its place. */
                 "X-OpenFerment-Project"?: string;
@@ -8484,20 +12630,41 @@ export interface operations {
                     "application/json": components["schemas"]["RunReport"];
                 };
             };
-            /** @description Validation Error */
+            /** @description The library's shelf holds no plant of that id: in words, naming what it holds. A project the request names that the database does not hold is a 404 too, in words. */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Refusal"];
+                };
+            };
+            /** @description A value refused before anything runs, nothing kept; or values the plant refused, in its words, the receipt kept. */
             422: {
                 headers: {
                     [name: string]: unknown;
                 };
                 content: {
-                    "application/json": components["schemas"]["HTTPValidationError"];
+                    "application/json": components["schemas"]["Refusal"];
+                };
+            };
+            /** @description The Proforma simulator could not run the plant: in words, with no run kept. */
+            503: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Refusal"];
                 };
             };
         };
     };
     literature_answer_api_literature_answer_post: {
         parameters: {
-            query?: never;
+            query?: {
+                /** @description The project the request acts in, where a header cannot be sent (an EventSource); the X-OpenFerment-Project header in its place. */
+                project?: string;
+            };
             header?: {
                 /** @description The project the request acts in; ?project= in its place. */
                 "X-OpenFerment-Project"?: string;
@@ -8511,13 +12678,22 @@ export interface operations {
             };
         };
         responses: {
-            /** @description Successful Response */
+            /** @description Server-sent events: `delta`, `citations`, `done`, or `error`. */
             200: {
                 headers: {
                     [name: string]: unknown;
                 };
                 content: {
-                    "application/json": unknown;
+                    "text/event-stream": string;
+                };
+            };
+            /** @description The project the request names is one the database does not hold, in words. */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Refusal"];
                 };
             };
             /** @description Validation Error */
@@ -8533,7 +12709,10 @@ export interface operations {
     };
     literature_documents_api_literature_documents_get: {
         parameters: {
-            query?: never;
+            query?: {
+                /** @description The project the request acts in, where a header cannot be sent (an EventSource); the X-OpenFerment-Project header in its place. */
+                project?: string;
+            };
             header?: {
                 /** @description The project the request acts in; ?project= in its place. */
                 "X-OpenFerment-Project"?: string;
@@ -8552,6 +12731,15 @@ export interface operations {
                     "application/json": components["schemas"]["LiteratureDocument"][];
                 };
             };
+            /** @description The project the request names is one the database does not hold, in words. */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Refusal"];
+                };
+            };
         };
     };
     literature_search_api_literature_search_get: {
@@ -8560,6 +12748,8 @@ export interface operations {
                 q: string;
                 topK?: number;
                 profile?: string;
+                /** @description The project the request acts in, where a header cannot be sent (an EventSource); the X-OpenFerment-Project header in its place. */
+                project?: string;
             };
             header?: {
                 /** @description The project the request acts in; ?project= in its place. */
@@ -8579,6 +12769,15 @@ export interface operations {
                     "application/json": components["schemas"]["SearchResponse"];
                 };
             };
+            /** @description The project the request names is one the database does not hold, in words. */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Refusal"];
+                };
+            };
             /** @description Validation Error */
             422: {
                 headers: {
@@ -8592,7 +12791,10 @@ export interface operations {
     };
     literature_stats_api_literature_stats_get: {
         parameters: {
-            query?: never;
+            query?: {
+                /** @description The project the request acts in, where a header cannot be sent (an EventSource); the X-OpenFerment-Project header in its place. */
+                project?: string;
+            };
             header?: {
                 /** @description The project the request acts in; ?project= in its place. */
                 "X-OpenFerment-Project"?: string;
@@ -8608,9 +12810,16 @@ export interface operations {
                     [name: string]: unknown;
                 };
                 content: {
-                    "application/json": {
-                        [key: string]: unknown;
-                    };
+                    "application/json": components["schemas"]["LiteratureStats"];
+                };
+            };
+            /** @description The project the request names is one the database does not hold, in words. */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Refusal"];
                 };
             };
         };
@@ -8632,6 +12841,8 @@ export interface operations {
                 train?: string | null;
                 vessel?: string | null;
                 trainRun?: string | null;
+                /** @description The project the request acts in, where a header cannot be sent (an EventSource); the X-OpenFerment-Project header in its place. */
+                project?: string;
             };
             header?: {
                 /** @description The project the request acts in; ?project= in its place. */
@@ -8650,9 +12861,16 @@ export interface operations {
                     [name: string]: unknown;
                 };
                 content: {
-                    "application/json": {
-                        [key: string]: unknown;
-                    };
+                    "application/json": components["schemas"]["ParamScope"];
+                };
+            };
+            /** @description The project the request names is one the database does not hold, in words. */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Refusal"];
                 };
             };
             /** @description Validation Error */
@@ -8668,7 +12886,10 @@ export interface operations {
     };
     params_resolve_api_params__scope__resolve_post: {
         parameters: {
-            query?: never;
+            query?: {
+                /** @description The project the request acts in, where a header cannot be sent (an EventSource); the X-OpenFerment-Project header in its place. */
+                project?: string;
+            };
             header?: {
                 /** @description The project the request acts in; ?project= in its place. */
                 "X-OpenFerment-Project"?: string;
@@ -8690,9 +12911,16 @@ export interface operations {
                     [name: string]: unknown;
                 };
                 content: {
-                    "application/json": {
-                        [key: string]: unknown;
-                    };
+                    "application/json": components["schemas"]["ParamResolveResult"];
+                };
+            };
+            /** @description The project the request names is one the database does not hold, in words. */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Refusal"];
                 };
             };
             /** @description Validation Error */
@@ -8708,7 +12936,10 @@ export interface operations {
     };
     practice_read_api_practice_get: {
         parameters: {
-            query?: never;
+            query?: {
+                /** @description The project the request acts in, where a header cannot be sent (an EventSource); the X-OpenFerment-Project header in its place. */
+                project?: string;
+            };
             header?: {
                 /** @description The project the request acts in; ?project= in its place. */
                 "X-OpenFerment-Project"?: string;
@@ -8727,11 +12958,23 @@ export interface operations {
                     "application/json": components["schemas"]["Practice"];
                 };
             };
+            /** @description The project the request names is one the database does not hold, in words. */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Refusal"];
+                };
+            };
         };
     };
     practice_draft_api_practice_draft_post: {
         parameters: {
-            query?: never;
+            query?: {
+                /** @description The project the request acts in, where a header cannot be sent (an EventSource); the X-OpenFerment-Project header in its place. */
+                project?: string;
+            };
             header?: {
                 /** @description The project the request acts in; ?project= in its place. */
                 "X-OpenFerment-Project"?: string;
@@ -8754,6 +12997,15 @@ export interface operations {
                     "application/json": components["schemas"]["PracticeScenario"];
                 };
             };
+            /** @description The project the request names is one the database does not hold, in words. */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Refusal"];
+                };
+            };
             /** @description Validation Error */
             422: {
                 headers: {
@@ -8767,7 +13019,10 @@ export interface operations {
     };
     practice_record_api_practice_record_post: {
         parameters: {
-            query?: never;
+            query?: {
+                /** @description The project the request acts in, where a header cannot be sent (an EventSource); the X-OpenFerment-Project header in its place. */
+                project?: string;
+            };
             header?: {
                 /** @description The project the request acts in; ?project= in its place. */
                 "X-OpenFerment-Project"?: string;
@@ -8790,6 +13045,15 @@ export interface operations {
                     "application/json": components["schemas"]["PracticeSession"];
                 };
             };
+            /** @description The project the request names is one the database does not hold, in words. */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Refusal"];
+                };
+            };
             /** @description Validation Error */
             422: {
                 headers: {
@@ -8803,7 +13067,10 @@ export interface operations {
     };
     practice_turn_api_practice_turn_post: {
         parameters: {
-            query?: never;
+            query?: {
+                /** @description The project the request acts in, where a header cannot be sent (an EventSource); the X-OpenFerment-Project header in its place. */
+                project?: string;
+            };
             header?: {
                 /** @description The project the request acts in; ?project= in its place. */
                 "X-OpenFerment-Project"?: string;
@@ -8826,6 +13093,15 @@ export interface operations {
                     "application/json": components["schemas"]["PracticeSession"];
                 };
             };
+            /** @description The project the request names is one the database does not hold, in words. */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Refusal"];
+                };
+            };
             /** @description Validation Error */
             422: {
                 headers: {
@@ -8837,65 +13113,17 @@ export interface operations {
             };
         };
     };
-    proforma_benchmark_api_proforma_benchmark_get: {
-        parameters: {
-            query?: never;
-            header?: {
-                /** @description The project the request acts in; ?project= in its place. */
-                "X-OpenFerment-Project"?: string;
-            };
-            path?: never;
-            cookie?: never;
-        };
-        requestBody?: never;
-        responses: {
-            /** @description Successful Response */
-            200: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": {
-                        [key: string]: unknown;
-                    };
-                };
-            };
-        };
-    };
-    proforma_benchmark_run_api_proforma_benchmark_post: {
-        parameters: {
-            query?: never;
-            header?: {
-                /** @description The project the request acts in; ?project= in its place. */
-                "X-OpenFerment-Project"?: string;
-            };
-            path?: never;
-            cookie?: never;
-        };
-        requestBody?: never;
-        responses: {
-            /** @description Successful Response */
-            200: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": {
-                        [key: string]: unknown;
-                    };
-                };
-            };
-        };
-    };
     proforma_bind_api_proforma_bind_get: {
         parameters: {
             query: {
                 flowsheet: string;
                 host?: string | null;
                 fits?: string | null;
-                overrides?: string | null;
+                inputs?: string | null;
                 vessel?: string | null;
                 trainRun?: string | null;
+                /** @description The project the request acts in, where a header cannot be sent (an EventSource); the X-OpenFerment-Project header in its place. */
+                project?: string;
             };
             header?: {
                 /** @description The project the request acts in; ?project= in its place. */
@@ -8912,9 +13140,16 @@ export interface operations {
                     [name: string]: unknown;
                 };
                 content: {
-                    "application/json": {
-                        [key: string]: unknown;
-                    };
+                    "application/json": components["schemas"]["ProformaScenarioInfo"];
+                };
+            };
+            /** @description The project the request names is one the database does not hold, in words. */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Refusal"];
                 };
             };
             /** @description Validation Error */
@@ -8935,8 +13170,9 @@ export interface operations {
                 flowsheet?: string | null;
                 host?: string | null;
                 fits?: string | null;
-                assumptions?: string | null;
-                overrides?: string | null;
+                inputs?: string | null;
+                /** @description The project the request acts in, where a header cannot be sent (an EventSource); the X-OpenFerment-Project header in its place. */
+                project?: string;
             };
             header?: {
                 /** @description The project the request acts in; ?project= in its place. */
@@ -8953,81 +13189,16 @@ export interface operations {
                     [name: string]: unknown;
                 };
                 content: {
-                    "application/json": {
-                        [key: string]: unknown;
-                    };
+                    "application/json": components["schemas"]["CeilingCheck"];
                 };
             };
-            /** @description Validation Error */
-            422: {
+            /** @description The project the request names is one the database does not hold, in words. */
+            404: {
                 headers: {
                     [name: string]: unknown;
                 };
                 content: {
-                    "application/json": components["schemas"]["HTTPValidationError"];
-                };
-            };
-        };
-    };
-    proforma_reference_api_proforma_reference__flowsheet_id__get: {
-        parameters: {
-            query?: never;
-            header?: {
-                /** @description The project the request acts in; ?project= in its place. */
-                "X-OpenFerment-Project"?: string;
-            };
-            path: {
-                flowsheet_id: string;
-            };
-            cookie?: never;
-        };
-        requestBody?: never;
-        responses: {
-            /** @description Successful Response */
-            200: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": {
-                        [key: string]: unknown;
-                    };
-                };
-            };
-            /** @description Validation Error */
-            422: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["HTTPValidationError"];
-                };
-            };
-        };
-    };
-    proforma_reference_run_api_proforma_reference__flowsheet_id__post: {
-        parameters: {
-            query?: never;
-            header?: {
-                /** @description The project the request acts in; ?project= in its place. */
-                "X-OpenFerment-Project"?: string;
-            };
-            path: {
-                flowsheet_id: string;
-            };
-            cookie?: never;
-        };
-        requestBody?: never;
-        responses: {
-            /** @description Successful Response */
-            200: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": {
-                        [key: string]: unknown;
-                    };
+                    "application/json": components["schemas"]["Refusal"];
                 };
             };
             /** @description Validation Error */
@@ -9043,7 +13214,10 @@ export interface operations {
     };
     proforma_run_api_proforma_run_post: {
         parameters: {
-            query?: never;
+            query?: {
+                /** @description The project the request acts in, where a header cannot be sent (an EventSource); the X-OpenFerment-Project header in its place. */
+                project?: string;
+            };
             header?: {
                 /** @description The project the request acts in; ?project= in its place. */
                 "X-OpenFerment-Project"?: string;
@@ -9063,18 +13237,34 @@ export interface operations {
                     [name: string]: unknown;
                 };
                 content: {
-                    "application/json": {
-                        [key: string]: unknown;
-                    };
+                    "application/json": components["schemas"]["ProformaRunResult"];
                 };
             };
-            /** @description Validation Error */
+            /** @description The project the request names is one the database does not hold, in words. */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Refusal"];
+                };
+            };
+            /** @description The scenario cannot run as asked, in words (a list of field errors when the request's own fields are refused): an input that waits for a source, a value its input cannot take, or a refusal inside the run, its receipt kept. */
             422: {
                 headers: {
                     [name: string]: unknown;
                 };
                 content: {
-                    "application/json": components["schemas"]["HTTPValidationError"];
+                    "application/json": components["schemas"]["Refusal"] | components["schemas"]["HTTPValidationError"];
+                };
+            };
+            /** @description The Proforma simulator could not run the scenario: in words, with no run kept. */
+            503: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Refusal"];
                 };
             };
         };
@@ -9083,6 +13273,8 @@ export interface operations {
         parameters: {
             query?: {
                 scenarioId?: string;
+                /** @description The project the request acts in, where a header cannot be sent (an EventSource); the X-OpenFerment-Project header in its place. */
+                project?: string;
             };
             header?: {
                 /** @description The project the request acts in; ?project= in its place. */
@@ -9099,9 +13291,16 @@ export interface operations {
                     [name: string]: unknown;
                 };
                 content: {
-                    "application/json": {
-                        [key: string]: unknown;
-                    };
+                    "application/json": components["schemas"]["ScenarioRunsResponse"];
+                };
+            };
+            /** @description The project the request names is one the database does not hold, in words. */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Refusal"];
                 };
             };
             /** @description Validation Error */
@@ -9119,6 +13318,8 @@ export interface operations {
         parameters: {
             query?: {
                 host?: string | null;
+                /** @description The project the request acts in, where a header cannot be sent (an EventSource); the X-OpenFerment-Project header in its place. */
+                project?: string;
             };
             header?: {
                 /** @description The project the request acts in; ?project= in its place. */
@@ -9135,9 +13336,16 @@ export interface operations {
                     [name: string]: unknown;
                 };
                 content: {
-                    "application/json": {
-                        [key: string]: unknown;
-                    }[];
+                    "application/json": components["schemas"]["ProformaScenarioInfo"][];
+                };
+            };
+            /** @description The project the request names is one the database does not hold, in words. */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Refusal"];
                 };
             };
             /** @description Validation Error */
@@ -9153,7 +13361,10 @@ export interface operations {
     };
     proforma_shelf_api_proforma_shelf_get: {
         parameters: {
-            query?: never;
+            query?: {
+                /** @description The project the request acts in, where a header cannot be sent (an EventSource); the X-OpenFerment-Project header in its place. */
+                project?: string;
+            };
             header?: {
                 /** @description The project the request acts in; ?project= in its place. */
                 "X-OpenFerment-Project"?: string;
@@ -9169,16 +13380,26 @@ export interface operations {
                     [name: string]: unknown;
                 };
                 content: {
-                    "application/json": {
-                        [key: string]: unknown;
-                    }[];
+                    "application/json": components["schemas"]["FlowsheetInfo"][];
+                };
+            };
+            /** @description The project the request names is one the database does not hold, in words. */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Refusal"];
                 };
             };
         };
     };
     proforma_status_api_proforma_status_get: {
         parameters: {
-            query?: never;
+            query?: {
+                /** @description The project the request acts in, where a header cannot be sent (an EventSource); the X-OpenFerment-Project header in its place. */
+                project?: string;
+            };
             header?: {
                 /** @description The project the request acts in; ?project= in its place. */
                 "X-OpenFerment-Project"?: string;
@@ -9194,9 +13415,16 @@ export interface operations {
                     [name: string]: unknown;
                 };
                 content: {
-                    "application/json": {
-                        [key: string]: unknown;
-                    };
+                    "application/json": components["schemas"]["SimulatorStatus"];
+                };
+            };
+            /** @description The project the request names is one the database does not hold, in words. */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Refusal"];
                 };
             };
         };
@@ -9289,6 +13517,8 @@ export interface operations {
         parameters: {
             query?: {
                 state?: string | null;
+                /** @description The project the request acts in, where a header cannot be sent (an EventSource); the X-OpenFerment-Project header in its place. */
+                project?: string;
             };
             header?: {
                 /** @description The project the request acts in; ?project= in its place. */
@@ -9308,6 +13538,15 @@ export interface operations {
                     "application/json": components["schemas"]["Proposal"][];
                 };
             };
+            /** @description The project the request names is one the database does not hold, in words. */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Refusal"];
+                };
+            };
             /** @description Validation Error */
             422: {
                 headers: {
@@ -9321,7 +13560,10 @@ export interface operations {
     };
     proposals_carry_out_api_proposals__proposal_id__carry_out_post: {
         parameters: {
-            query?: never;
+            query?: {
+                /** @description The project the request acts in, where a header cannot be sent (an EventSource); the X-OpenFerment-Project header in its place. */
+                project?: string;
+            };
             header?: {
                 /** @description The project the request acts in; ?project= in its place. */
                 "X-OpenFerment-Project"?: string;
@@ -9344,6 +13586,15 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["Proposal"];
+                };
+            };
+            /** @description The project the request names is one the database does not hold, in words. */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Refusal"];
                 };
             };
             /** @description Validation Error */
@@ -9359,7 +13610,10 @@ export interface operations {
     };
     proposals_dismiss_api_proposals__proposal_id__dismiss_post: {
         parameters: {
-            query?: never;
+            query?: {
+                /** @description The project the request acts in, where a header cannot be sent (an EventSource); the X-OpenFerment-Project header in its place. */
+                project?: string;
+            };
             header?: {
                 /** @description The project the request acts in; ?project= in its place. */
                 "X-OpenFerment-Project"?: string;
@@ -9384,6 +13638,15 @@ export interface operations {
                     "application/json": components["schemas"]["Proposal"];
                 };
             };
+            /** @description The project the request names is one the database does not hold, in words. */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Refusal"];
+                };
+            };
             /** @description Validation Error */
             422: {
                 headers: {
@@ -9395,10 +13658,11 @@ export interface operations {
             };
         };
     };
-    protparam_stored_api_protparam_get: {
+    protocols_listed_api_protocols_get: {
         parameters: {
             query?: {
-                product?: string;
+                /** @description The project the request acts in, where a header cannot be sent (an EventSource); the X-OpenFerment-Project header in its place. */
+                project?: string;
             };
             header?: {
                 /** @description The project the request acts in; ?project= in its place. */
@@ -9415,9 +13679,196 @@ export interface operations {
                     [name: string]: unknown;
                 };
                 content: {
-                    "application/json": {
-                        [key: string]: unknown;
-                    };
+                    "application/json": components["schemas"]["Protocol"][];
+                };
+            };
+            /** @description The project the request names is one the database does not hold, in words. */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Refusal"];
+                };
+            };
+        };
+    };
+    protocol_make_api_protocols_post: {
+        parameters: {
+            query?: {
+                /** @description The project the request acts in, where a header cannot be sent (an EventSource); the X-OpenFerment-Project header in its place. */
+                project?: string;
+            };
+            header?: {
+                /** @description The project the request acts in; ?project= in its place. */
+                "X-OpenFerment-Project"?: string;
+            };
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["ProtocolKeep"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Protocol"];
+                };
+            };
+            /** @description The project the request names is one the database does not hold, in words. */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Refusal"];
+                };
+            };
+            /** @description A protocol the service will not keep, in words: a list of field errors, each with its place and why, for a protocol whose own fields refuse it (a step binding a material its version lacks, a stock asked of a material with none, a version held twice, a current version that is none of its versions, a number that is not finite); and the service's words for a protocol the project keeps already, a step needing a skill the skill catalogue does not hold, and a keep that names nobody. */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Refusal"] | components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    protocol_read_api_protocols__protocol_id__get: {
+        parameters: {
+            query?: {
+                /** @description The project the request acts in, where a header cannot be sent (an EventSource); the X-OpenFerment-Project header in its place. */
+                project?: string;
+            };
+            header?: {
+                /** @description The project the request acts in; ?project= in its place. */
+                "X-OpenFerment-Project"?: string;
+            };
+            path: {
+                protocol_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Protocol"];
+                };
+            };
+            /** @description The project keeps no protocol of that id, in words. A project the request names that the database does not hold is a 404 too, in words. */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Refusal"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    protocol_version_api_protocols__protocol_id__versions_post: {
+        parameters: {
+            query?: {
+                /** @description The project the request acts in, where a header cannot be sent (an EventSource); the X-OpenFerment-Project header in its place. */
+                project?: string;
+            };
+            header?: {
+                /** @description The project the request acts in; ?project= in its place. */
+                "X-OpenFerment-Project"?: string;
+            };
+            path: {
+                protocol_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["ProtocolVersionKeep"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Protocol"];
+                };
+            };
+            /** @description The project keeps no protocol of that id, in words. A project the request names that the database does not hold is a 404 too, in words. */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Refusal"];
+                };
+            };
+            /** @description A version the service will not keep, in words: a list of field errors for a version whose own fields refuse it, and the service's words for a version the protocol holds already (a kept version stays as it was kept), a step needing a skill the skill catalogue does not hold, and a keep that names nobody. */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Refusal"] | components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    protparam_stored_api_protparam_get: {
+        parameters: {
+            query?: {
+                product?: string;
+                /** @description The project the request acts in, where a header cannot be sent (an EventSource); the X-OpenFerment-Project header in its place. */
+                project?: string;
+            };
+            header?: {
+                /** @description The project the request acts in; ?project= in its place. */
+                "X-OpenFerment-Project"?: string;
+            };
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["StoredAnswer"];
+                };
+            };
+            /** @description The project the request names is one the database does not hold, in words. */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Refusal"];
                 };
             };
             /** @description Validation Error */
@@ -9433,7 +13884,10 @@ export interface operations {
     };
     protparam_compute_api_protparam_post: {
         parameters: {
-            query?: never;
+            query?: {
+                /** @description The project the request acts in, where a header cannot be sent (an EventSource); the X-OpenFerment-Project header in its place. */
+                project?: string;
+            };
             header?: {
                 /** @description The project the request acts in; ?project= in its place. */
                 "X-OpenFerment-Project"?: string;
@@ -9456,6 +13910,15 @@ export interface operations {
                     "application/json": components["schemas"]["Artifact"];
                 };
             };
+            /** @description The project the request names is one the database does not hold, in words. */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Refusal"];
+                };
+            };
             /** @description Validation Error */
             422: {
                 headers: {
@@ -9469,7 +13932,10 @@ export interface operations {
     };
     pureos_catalogue_api_pureos_catalogue_get: {
         parameters: {
-            query?: never;
+            query?: {
+                /** @description The project the request acts in, where a header cannot be sent (an EventSource); the X-OpenFerment-Project header in its place. */
+                project?: string;
+            };
             header?: {
                 /** @description The project the request acts in; ?project= in its place. */
                 "X-OpenFerment-Project"?: string;
@@ -9485,16 +13951,26 @@ export interface operations {
                     [name: string]: unknown;
                 };
                 content: {
-                    "application/json": {
-                        [key: string]: unknown;
-                    }[];
+                    "application/json": components["schemas"]["UnitType"][];
+                };
+            };
+            /** @description The project the request names is one the database does not hold, in words. */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Refusal"];
                 };
             };
         };
     };
     pureos_catalogue_specs_api_pureos_catalogue__type_id__specs_get: {
         parameters: {
-            query?: never;
+            query?: {
+                /** @description The project the request acts in, where a header cannot be sent (an EventSource); the X-OpenFerment-Project header in its place. */
+                project?: string;
+            };
             header?: {
                 /** @description The project the request acts in; ?project= in its place. */
                 "X-OpenFerment-Project"?: string;
@@ -9512,9 +13988,16 @@ export interface operations {
                     [name: string]: unknown;
                 };
                 content: {
-                    "application/json": {
-                        [key: string]: unknown;
-                    };
+                    "application/json": components["schemas"]["UnitSpecs"];
+                };
+            };
+            /** @description The project the request names is one the database does not hold, in words. */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Refusal"];
                 };
             };
             /** @description Validation Error */
@@ -9530,7 +14013,10 @@ export interface operations {
     };
     pureos_propose_api_pureos_propose_post: {
         parameters: {
-            query?: never;
+            query?: {
+                /** @description The project the request acts in, where a header cannot be sent (an EventSource); the X-OpenFerment-Project header in its place. */
+                project?: string;
+            };
             header?: {
                 /** @description The project the request acts in; ?project= in its place. */
                 "X-OpenFerment-Project"?: string;
@@ -9550,9 +14036,16 @@ export interface operations {
                     [name: string]: unknown;
                 };
                 content: {
-                    "application/json": {
-                        [key: string]: unknown;
-                    };
+                    "application/json": components["schemas"]["TrainProposal"];
+                };
+            };
+            /** @description The project the request names is one the database does not hold, in words. */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Refusal"];
                 };
             };
             /** @description Validation Error */
@@ -9568,7 +14061,10 @@ export interface operations {
     };
     pureos_train_runs_api_pureos_train_runs_get: {
         parameters: {
-            query?: never;
+            query?: {
+                /** @description The project the request acts in, where a header cannot be sent (an EventSource); the X-OpenFerment-Project header in its place. */
+                project?: string;
+            };
             header?: {
                 /** @description The project the request acts in; ?project= in its place. */
                 "X-OpenFerment-Project"?: string;
@@ -9584,16 +14080,26 @@ export interface operations {
                     [name: string]: unknown;
                 };
                 content: {
-                    "application/json": {
-                        [key: string]: unknown;
-                    }[];
+                    "application/json": components["schemas"]["TrainSummary"][];
+                };
+            };
+            /** @description The project the request names is one the database does not hold, in words. */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Refusal"];
                 };
             };
         };
     };
     pureos_train_check_api_pureos_train_check_post: {
         parameters: {
-            query?: never;
+            query?: {
+                /** @description The project the request acts in, where a header cannot be sent (an EventSource); the X-OpenFerment-Project header in its place. */
+                project?: string;
+            };
             header?: {
                 /** @description The project the request acts in; ?project= in its place. */
                 "X-OpenFerment-Project"?: string;
@@ -9613,9 +14119,16 @@ export interface operations {
                     [name: string]: unknown;
                 };
                 content: {
-                    "application/json": {
-                        [key: string]: unknown;
-                    };
+                    "application/json": components["schemas"]["TrainValidation"];
+                };
+            };
+            /** @description The project the request names is one the database does not hold, in words. */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Refusal"];
                 };
             };
             /** @description Validation Error */
@@ -9631,7 +14144,10 @@ export interface operations {
     };
     pureos_train_from_run_api_pureos_train_from_run_post: {
         parameters: {
-            query?: never;
+            query?: {
+                /** @description The project the request acts in, where a header cannot be sent (an EventSource); the X-OpenFerment-Project header in its place. */
+                project?: string;
+            };
             header?: {
                 /** @description The project the request acts in; ?project= in its place. */
                 "X-OpenFerment-Project"?: string;
@@ -9651,9 +14167,16 @@ export interface operations {
                     [name: string]: unknown;
                 };
                 content: {
-                    "application/json": {
-                        [key: string]: unknown;
-                    };
+                    "application/json": components["schemas"]["TrainFromRun"];
+                };
+            };
+            /** @description The project the request names is one the database does not hold, in words. */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Refusal"];
                 };
             };
             /** @description Validation Error */
@@ -9669,7 +14192,10 @@ export interface operations {
     };
     pureos_train_run_api_pureos_train_run_post: {
         parameters: {
-            query?: never;
+            query?: {
+                /** @description The project the request acts in, where a header cannot be sent (an EventSource); the X-OpenFerment-Project header in its place. */
+                project?: string;
+            };
             header?: {
                 /** @description The project the request acts in; ?project= in its place. */
                 "X-OpenFerment-Project"?: string;
@@ -9689,9 +14215,16 @@ export interface operations {
                     [name: string]: unknown;
                 };
                 content: {
-                    "application/json": {
-                        [key: string]: unknown;
-                    };
+                    "application/json": components["schemas"]["TrainRun"];
+                };
+            };
+            /** @description The project the request names is one the database does not hold, in words. */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Refusal"];
                 };
             };
             /** @description Validation Error */
@@ -9707,7 +14240,10 @@ export interface operations {
     };
     pureos_train_validate_api_pureos_train_validate_post: {
         parameters: {
-            query?: never;
+            query?: {
+                /** @description The project the request acts in, where a header cannot be sent (an EventSource); the X-OpenFerment-Project header in its place. */
+                project?: string;
+            };
             header?: {
                 /** @description The project the request acts in; ?project= in its place. */
                 "X-OpenFerment-Project"?: string;
@@ -9727,9 +14263,16 @@ export interface operations {
                     [name: string]: unknown;
                 };
                 content: {
-                    "application/json": {
-                        [key: string]: unknown;
-                    };
+                    "application/json": components["schemas"]["TrainValidation"];
+                };
+            };
+            /** @description The project the request names is one the database does not hold, in words. */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Refusal"];
                 };
             };
             /** @description Validation Error */
@@ -9745,7 +14288,10 @@ export interface operations {
     };
     pureos_train_api_pureos_train__key__get: {
         parameters: {
-            query?: never;
+            query?: {
+                /** @description The project the request acts in, where a header cannot be sent (an EventSource); the X-OpenFerment-Project header in its place. */
+                project?: string;
+            };
             header?: {
                 /** @description The project the request acts in; ?project= in its place. */
                 "X-OpenFerment-Project"?: string;
@@ -9763,9 +14309,16 @@ export interface operations {
                     [name: string]: unknown;
                 };
                 content: {
-                    "application/json": {
-                        [key: string]: unknown;
-                    };
+                    "application/json": components["schemas"]["Train"];
+                };
+            };
+            /** @description The project the request names is one the database does not hold, in words. */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Refusal"];
                 };
             };
             /** @description Validation Error */
@@ -9781,7 +14334,10 @@ export interface operations {
     };
     pureos_trains_api_pureos_trains_get: {
         parameters: {
-            query?: never;
+            query?: {
+                /** @description The project the request acts in, where a header cannot be sent (an EventSource); the X-OpenFerment-Project header in its place. */
+                project?: string;
+            };
             header?: {
                 /** @description The project the request acts in; ?project= in its place. */
                 "X-OpenFerment-Project"?: string;
@@ -9797,16 +14353,26 @@ export interface operations {
                     [name: string]: unknown;
                 };
                 content: {
-                    "application/json": {
-                        [key: string]: unknown;
-                    }[];
+                    "application/json": components["schemas"]["TrainSummary"][];
+                };
+            };
+            /** @description The project the request names is one the database does not hold, in words. */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Refusal"];
                 };
             };
         };
     };
     pureos_trains_kept_api_pureos_trains_kept_get: {
         parameters: {
-            query?: never;
+            query?: {
+                /** @description The project the request acts in, where a header cannot be sent (an EventSource); the X-OpenFerment-Project header in its place. */
+                project?: string;
+            };
             header?: {
                 /** @description The project the request acts in; ?project= in its place. */
                 "X-OpenFerment-Project"?: string;
@@ -9822,16 +14388,27 @@ export interface operations {
                     [name: string]: unknown;
                 };
                 content: {
-                    "application/json": {
-                        [key: string]: unknown;
-                    }[];
+                    "application/json": components["schemas"]["KeptTrain"][];
+                };
+            };
+            /** @description The project the request names is one the database does not hold, in words. */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Refusal"];
                 };
             };
         };
     };
     runs_list_api_runs_get: {
         parameters: {
-            query?: never;
+            query?: {
+                engine?: string | null;
+                /** @description The project the request acts in, where a header cannot be sent (an EventSource); the X-OpenFerment-Project header in its place. */
+                project?: string;
+            };
             header?: {
                 /** @description The project the request acts in; ?project= in its place. */
                 "X-OpenFerment-Project"?: string;
@@ -9850,11 +14427,32 @@ export interface operations {
                     "application/json": components["schemas"]["EngineRun"][];
                 };
             };
+            /** @description The project the request names is one the database does not hold, in words. */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Refusal"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
         };
     };
     runs_report_api_runs__run_id__get: {
         parameters: {
-            query?: never;
+            query?: {
+                /** @description The project the request acts in, where a header cannot be sent (an EventSource); the X-OpenFerment-Project header in its place. */
+                project?: string;
+            };
             header?: {
                 /** @description The project the request acts in; ?project= in its place. */
                 "X-OpenFerment-Project"?: string;
@@ -9875,6 +14473,15 @@ export interface operations {
                     "application/json": components["schemas"]["RunReport"];
                 };
             };
+            /** @description The project holds no run of that id, in words. A project the request names that the database does not hold is a 404 too, in words. */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Refusal"];
+                };
+            };
             /** @description Validation Error */
             422: {
                 headers: {
@@ -9888,7 +14495,10 @@ export interface operations {
     };
     state_load_api_state_get: {
         parameters: {
-            query?: never;
+            query?: {
+                /** @description The project the request acts in, where a header cannot be sent (an EventSource); the X-OpenFerment-Project header in its place. */
+                project?: string;
+            };
             header?: {
                 /** @description The project the request acts in; ?project= in its place. */
                 "X-OpenFerment-Project"?: string;
@@ -9904,16 +14514,26 @@ export interface operations {
                     [name: string]: unknown;
                 };
                 content: {
-                    "application/json": {
-                        [key: string]: unknown;
-                    };
+                    "application/json": components["schemas"]["ProjectState"];
+                };
+            };
+            /** @description The project the request names is one the database does not hold, in words. */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Refusal"];
                 };
             };
         };
     };
     state_put_api_state__kind___item_id__put: {
         parameters: {
-            query?: never;
+            query?: {
+                /** @description The project the request acts in, where a header cannot be sent (an EventSource); the X-OpenFerment-Project header in its place. */
+                project?: string;
+            };
             header?: {
                 /** @description The project the request acts in; ?project= in its place. */
                 "X-OpenFerment-Project"?: string;
@@ -9936,18 +14556,25 @@ export interface operations {
                     [name: string]: unknown;
                 };
                 content: {
-                    "application/json": {
-                        [key: string]: unknown;
-                    };
+                    "application/json": components["schemas"]["StateKept"];
                 };
             };
-            /** @description Validation Error */
+            /** @description The project the request names is one the database does not hold, in words. */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Refusal"];
+                };
+            };
+            /** @description A kind the project does not keep, an id of another shape, a row naming another id, a row that does not read as its kind's model or holds a number JSON cannot carry, a second lock, a locked runbook's predictions or measures changed, or a kept deposition rewritten: nothing kept, in words (a list of field errors when the request's own fields are refused). */
             422: {
                 headers: {
                     [name: string]: unknown;
                 };
                 content: {
-                    "application/json": components["schemas"]["HTTPValidationError"];
+                    "application/json": components["schemas"]["Refusal"] | components["schemas"]["HTTPValidationError"];
                 };
             };
         };
@@ -9956,6 +14583,8 @@ export interface operations {
         parameters: {
             query?: {
                 by?: string;
+                /** @description The project the request acts in, where a header cannot be sent (an EventSource); the X-OpenFerment-Project header in its place. */
+                project?: string;
             };
             header?: {
                 /** @description The project the request acts in; ?project= in its place. */
@@ -9975,25 +14604,35 @@ export interface operations {
                     [name: string]: unknown;
                 };
                 content: {
-                    "application/json": {
-                        [key: string]: unknown;
-                    };
+                    "application/json": components["schemas"]["StateTakenBack"];
                 };
             };
-            /** @description Validation Error */
+            /** @description The project the request names is one the database does not hold, in words. */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Refusal"];
+                };
+            };
+            /** @description A kind the project does not keep, an id of another shape, or a row kept as it was made (a deposition, a measurement, a lock, a conversation), in words (a list of field errors when the request's own fields are refused). */
             422: {
                 headers: {
                     [name: string]: unknown;
                 };
                 content: {
-                    "application/json": components["schemas"]["HTTPValidationError"];
+                    "application/json": components["schemas"]["Refusal"] | components["schemas"]["HTTPValidationError"];
                 };
             };
         };
     };
     study_comparisons_api_studies_comparisons_get: {
         parameters: {
-            query?: never;
+            query?: {
+                /** @description The project the request acts in, where a header cannot be sent (an EventSource); the X-OpenFerment-Project header in its place. */
+                project?: string;
+            };
             header?: {
                 /** @description The project the request acts in; ?project= in its place. */
                 "X-OpenFerment-Project"?: string;
@@ -10012,11 +14651,23 @@ export interface operations {
                     "application/json": components["schemas"]["StudyComparison"][];
                 };
             };
+            /** @description The project the request names is one the database does not hold, in words. */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Refusal"];
+                };
+            };
         };
     };
     study_comparison_make_api_studies_comparisons_post: {
         parameters: {
-            query?: never;
+            query?: {
+                /** @description The project the request acts in, where a header cannot be sent (an EventSource); the X-OpenFerment-Project header in its place. */
+                project?: string;
+            };
             header?: {
                 /** @description The project the request acts in; ?project= in its place. */
                 "X-OpenFerment-Project"?: string;
@@ -10039,6 +14690,15 @@ export interface operations {
                     "application/json": components["schemas"]["ComparisonReport"];
                 };
             };
+            /** @description The project the request names is one the database does not hold, in words. */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Refusal"];
+                };
+            };
             /** @description Validation Error */
             422: {
                 headers: {
@@ -10052,7 +14712,10 @@ export interface operations {
     };
     study_comparison_api_studies_comparisons__comparison_id__get: {
         parameters: {
-            query?: never;
+            query?: {
+                /** @description The project the request acts in, where a header cannot be sent (an EventSource); the X-OpenFerment-Project header in its place. */
+                project?: string;
+            };
             header?: {
                 /** @description The project the request acts in; ?project= in its place. */
                 "X-OpenFerment-Project"?: string;
@@ -10073,6 +14736,15 @@ export interface operations {
                     "application/json": components["schemas"]["ComparisonReport"];
                 };
             };
+            /** @description The project the request names is one the database does not hold, in words. */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Refusal"];
+                };
+            };
             /** @description Validation Error */
             422: {
                 headers: {
@@ -10088,6 +14760,8 @@ export interface operations {
         parameters: {
             query?: {
                 by?: string;
+                /** @description The project the request acts in, where a header cannot be sent (an EventSource); the X-OpenFerment-Project header in its place. */
+                project?: string;
             };
             header?: {
                 /** @description The project the request acts in; ?project= in its place. */
@@ -10105,6 +14779,15 @@ export interface operations {
                 };
                 content?: never;
             };
+            /** @description The project the request names is one the database does not hold, in words. */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Refusal"];
+                };
+            };
             /** @description Validation Error */
             422: {
                 headers: {
@@ -10118,7 +14801,10 @@ export interface operations {
     };
     study_runbooks_api_studies_runbooks_get: {
         parameters: {
-            query?: never;
+            query?: {
+                /** @description The project the request acts in, where a header cannot be sent (an EventSource); the X-OpenFerment-Project header in its place. */
+                project?: string;
+            };
             header?: {
                 /** @description The project the request acts in; ?project= in its place. */
                 "X-OpenFerment-Project"?: string;
@@ -10137,11 +14823,23 @@ export interface operations {
                     "application/json": components["schemas"]["Runbook"][];
                 };
             };
+            /** @description The project the request names is one the database does not hold, in words. */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Refusal"];
+                };
+            };
         };
     };
     study_runbook_make_api_studies_runbooks_post: {
         parameters: {
-            query?: never;
+            query?: {
+                /** @description The project the request acts in, where a header cannot be sent (an EventSource); the X-OpenFerment-Project header in its place. */
+                project?: string;
+            };
             header?: {
                 /** @description The project the request acts in; ?project= in its place. */
                 "X-OpenFerment-Project"?: string;
@@ -10164,6 +14862,15 @@ export interface operations {
                     "application/json": components["schemas"]["Runbook"];
                 };
             };
+            /** @description The project the request names is one the database does not hold, in words. */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Refusal"];
+                };
+            };
             /** @description Validation Error */
             422: {
                 headers: {
@@ -10177,7 +14884,10 @@ export interface operations {
     };
     study_runbook_api_studies_runbooks__runbook_id__get: {
         parameters: {
-            query?: never;
+            query?: {
+                /** @description The project the request acts in, where a header cannot be sent (an EventSource); the X-OpenFerment-Project header in its place. */
+                project?: string;
+            };
             header?: {
                 /** @description The project the request acts in; ?project= in its place. */
                 "X-OpenFerment-Project"?: string;
@@ -10198,6 +14908,15 @@ export interface operations {
                     "application/json": components["schemas"]["Runbook"];
                 };
             };
+            /** @description The project the request names is one the database does not hold, in words. */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Refusal"];
+                };
+            };
             /** @description Validation Error */
             422: {
                 headers: {
@@ -10211,7 +14930,10 @@ export interface operations {
     };
     study_runbook_lock_api_studies_runbooks__runbook_id__lock_post: {
         parameters: {
-            query?: never;
+            query?: {
+                /** @description The project the request acts in, where a header cannot be sent (an EventSource); the X-OpenFerment-Project header in its place. */
+                project?: string;
+            };
             header?: {
                 /** @description The project the request acts in; ?project= in its place. */
                 "X-OpenFerment-Project"?: string;
@@ -10236,6 +14958,15 @@ export interface operations {
                     "application/json": components["schemas"]["Runbook"];
                 };
             };
+            /** @description The project the request names is one the database does not hold, in words. */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Refusal"];
+                };
+            };
             /** @description Validation Error */
             422: {
                 headers: {
@@ -10249,7 +14980,10 @@ export interface operations {
     };
     study_scenarios_api_studies_scenarios_get: {
         parameters: {
-            query?: never;
+            query?: {
+                /** @description The project the request acts in, where a header cannot be sent (an EventSource); the X-OpenFerment-Project header in its place. */
+                project?: string;
+            };
             header?: {
                 /** @description The project the request acts in; ?project= in its place. */
                 "X-OpenFerment-Project"?: string;
@@ -10268,11 +15002,23 @@ export interface operations {
                     "application/json": components["schemas"]["StudyScenario"][];
                 };
             };
+            /** @description The project the request names is one the database does not hold, in words. */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Refusal"];
+                };
+            };
         };
     };
     study_scenario_make_api_studies_scenarios_post: {
         parameters: {
-            query?: never;
+            query?: {
+                /** @description The project the request acts in, where a header cannot be sent (an EventSource); the X-OpenFerment-Project header in its place. */
+                project?: string;
+            };
             header?: {
                 /** @description The project the request acts in; ?project= in its place. */
                 "X-OpenFerment-Project"?: string;
@@ -10295,6 +15041,15 @@ export interface operations {
                     "application/json": components["schemas"]["StudyScenario"];
                 };
             };
+            /** @description The project the request names is one the database does not hold, in words. */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Refusal"];
+                };
+            };
             /** @description Validation Error */
             422: {
                 headers: {
@@ -10308,7 +15063,10 @@ export interface operations {
     };
     study_scenario_api_studies_scenarios__scenario_id__get: {
         parameters: {
-            query?: never;
+            query?: {
+                /** @description The project the request acts in, where a header cannot be sent (an EventSource); the X-OpenFerment-Project header in its place. */
+                project?: string;
+            };
             header?: {
                 /** @description The project the request acts in; ?project= in its place. */
                 "X-OpenFerment-Project"?: string;
@@ -10329,6 +15087,15 @@ export interface operations {
                     "application/json": components["schemas"]["StudyScenario"];
                 };
             };
+            /** @description The project the request names is one the database does not hold, in words. */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Refusal"];
+                };
+            };
             /** @description Validation Error */
             422: {
                 headers: {
@@ -10342,7 +15109,10 @@ export interface operations {
     };
     study_scenario_run_api_studies_scenarios__scenario_id__run_post: {
         parameters: {
-            query?: never;
+            query?: {
+                /** @description The project the request acts in, where a header cannot be sent (an EventSource); the X-OpenFerment-Project header in its place. */
+                project?: string;
+            };
             header?: {
                 /** @description The project the request acts in; ?project= in its place. */
                 "X-OpenFerment-Project"?: string;
@@ -10367,6 +15137,15 @@ export interface operations {
                     "application/json": components["schemas"]["RunReport"];
                 };
             };
+            /** @description The project the request names is one the database does not hold, in words. */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Refusal"];
+                };
+            };
             /** @description Validation Error */
             422: {
                 headers: {
@@ -10385,6 +15164,8 @@ export interface operations {
                 streamId?: string | null;
                 preset?: string | null;
                 recordId?: string | null;
+                /** @description The project the request acts in, where a header cannot be sent (an EventSource); the X-OpenFerment-Project header in its place. */
+                project?: string;
             };
             header?: {
                 /** @description The project the request acts in; ?project= in its place. */
@@ -10401,9 +15182,16 @@ export interface operations {
                     [name: string]: unknown;
                 };
                 content: {
-                    "application/json": {
-                        [key: string]: unknown;
-                    };
+                    "application/json": components["schemas"]["ThermoPropsStored"];
+                };
+            };
+            /** @description The project the request names is one the database does not hold, in words. */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Refusal"];
                 };
             };
             /** @description Validation Error */
@@ -10419,7 +15207,10 @@ export interface operations {
     };
     thermo_props_api_thermo_props_post: {
         parameters: {
-            query?: never;
+            query?: {
+                /** @description The project the request acts in, where a header cannot be sent (an EventSource); the X-OpenFerment-Project header in its place. */
+                project?: string;
+            };
             header?: {
                 /** @description The project the request acts in; ?project= in its place. */
                 "X-OpenFerment-Project"?: string;
@@ -10439,7 +15230,16 @@ export interface operations {
                     [name: string]: unknown;
                 };
                 content: {
-                    "application/json": components["schemas"]["Artifact"];
+                    "application/json": components["schemas"]["ThermoPropsAnswer"];
+                };
+            };
+            /** @description The project the request names is one the database does not hold, in words. */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Refusal"];
                 };
             };
             /** @description Validation Error */
@@ -10457,6 +15257,8 @@ export interface operations {
         parameters: {
             query?: {
                 product?: string;
+                /** @description The project the request acts in, where a header cannot be sent (an EventSource); the X-OpenFerment-Project header in its place. */
+                project?: string;
             };
             header?: {
                 /** @description The project the request acts in; ?project= in its place. */
@@ -10473,9 +15275,16 @@ export interface operations {
                     [name: string]: unknown;
                 };
                 content: {
-                    "application/json": {
-                        [key: string]: unknown;
-                    };
+                    "application/json": components["schemas"]["StoredAnswer"];
+                };
+            };
+            /** @description The project the request names is one the database does not hold, in words. */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Refusal"];
                 };
             };
             /** @description Validation Error */
@@ -10491,7 +15300,10 @@ export interface operations {
     };
     thermo_volatility_api_thermo_volatility_post: {
         parameters: {
-            query?: never;
+            query?: {
+                /** @description The project the request acts in, where a header cannot be sent (an EventSource); the X-OpenFerment-Project header in its place. */
+                project?: string;
+            };
             header?: {
                 /** @description The project the request acts in; ?project= in its place. */
                 "X-OpenFerment-Project"?: string;
@@ -10514,6 +15326,15 @@ export interface operations {
                     "application/json": components["schemas"]["Artifact"];
                 };
             };
+            /** @description The project the request names is one the database does not hold, in words. */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Refusal"];
+                };
+            };
             /** @description Validation Error */
             422: {
                 headers: {
@@ -10527,7 +15348,10 @@ export interface operations {
     };
     tools_list_api_tools_get: {
         parameters: {
-            query?: never;
+            query?: {
+                /** @description The project the request acts in, where a header cannot be sent (an EventSource); the X-OpenFerment-Project header in its place. */
+                project?: string;
+            };
             header?: {
                 /** @description The project the request acts in; ?project= in its place. */
                 "X-OpenFerment-Project"?: string;
@@ -10546,14 +15370,27 @@ export interface operations {
                     "application/json": components["schemas"]["ToolInfo"][];
                 };
             };
+            /** @description The project the request names is one the database does not hold, in words. */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Refusal"];
+                };
+            };
         };
     };
     tools_run_api_tools__name__post: {
         parameters: {
             query?: {
                 by?: string;
+                /** @description The project the request acts in, where a header cannot be sent (an EventSource); the X-OpenFerment-Project header in its place. */
+                project?: string;
             };
             header?: {
+                /** @description The outside assistant calling, `<name>/<version>`, as UTF-8 text: the call runs in the model's lane under that name, its audit row's detail naming this door (`via: http`). The MCP server started with --service sends its client's declared name here. */
+                "X-OpenFerment-Assistant"?: string | null;
                 /** @description The project the request acts in; ?project= in its place. */
                 "X-OpenFerment-Project"?: string;
             };
@@ -10579,20 +15416,32 @@ export interface operations {
                     "application/json": components["schemas"]["ToolResult"];
                 };
             };
-            /** @description Validation Error */
+            /** @description No tool of that name is registered here, in words. A project the request names that the database does not hold is a 404 too, in words. */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Refusal"];
+                };
+            };
+            /** @description A tool that writes, called with neither ?by= naming the person calling nor X-OpenFerment-Assistant naming the assistant; a call naming both; an X-OpenFerment-Assistant that names nobody: each in words (a list of field errors when the body is no JSON object). */
             422: {
                 headers: {
                     [name: string]: unknown;
                 };
                 content: {
-                    "application/json": components["schemas"]["HTTPValidationError"];
+                    "application/json": components["schemas"]["Refusal"] | components["schemas"]["HTTPValidationError"];
                 };
             };
         };
     };
     witness_runs_api_witness_runs_get: {
         parameters: {
-            query?: never;
+            query?: {
+                /** @description The project the request acts in, where a header cannot be sent (an EventSource); the X-OpenFerment-Project header in its place. */
+                project?: string;
+            };
             header?: {
                 /** @description The project the request acts in; ?project= in its place. */
                 "X-OpenFerment-Project"?: string;
@@ -10609,6 +15458,15 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["ExtractRun"][];
+                };
+            };
+            /** @description The project the request names is one the database does not hold, in words. */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Refusal"];
                 };
             };
         };

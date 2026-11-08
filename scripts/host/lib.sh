@@ -1,4 +1,4 @@
-# Shared by install.sh and deploy.sh (OF-BLD-012 Appendix B). Sourced, never run,
+# Shared by install.sh, deploy.sh and nightly.sh (OF-BLD-012 Appendix B). Sourced, never run,
 # so its names are used by the scripts that source it.
 # shellcheck disable=SC2034
 # shellcheck shell=bash
@@ -93,33 +93,113 @@ has_key() {
 }
 
 # A setting from core/.env, by name, for the names that are not the key
-# (OPENFERMENT_DATABASE_URL, OPENFERMENT_PROJECT): the environment's value
-# when it has one, else the file's last line for it. Never reads the key.
+# (OPENFERMENT_DATABASE_URL, OPENFERMENT_PROJECT, OPENFERMENT_TEST_DATABASE_URL):
+# the environment's value as it stands when it has one, else the file's last
+# line for it, in the forms of python-dotenv these settings take: an `export`
+# before the name, blanks around `=`, one pair of quotes, a ` #` comment after
+# a bare value and a carriage return, each taken off. Three forms read here as
+# the line stands: a `${VAR}` stays as written, a quoted value ends at its next
+# quote (the quote of a `\"` inside it among them), and a quoted value running
+# onto a second line gives its first line. Empty when neither names it, and the
+# status 0 either way, so a caller under `set -e` may assign it. Never reads
+# the key.
 env_setting() {
-  local name="$1"
+  local name="$1" value=""
   if [ -n "${!name:-}" ]; then
-    printf '%s' "${!name}"
+    value="${!name}"
   elif [ -f "$REPO/core/.env" ]; then
-    grep -E "^$name=" "$REPO/core/.env" | tail -1 | cut -d= -f2-
+    value="$(grep -E "^[[:space:]]*(export[[:space:]]+)?${name}[[:space:]]*=" "$REPO/core/.env" | tail -1 | cut -d= -f2- | tr -d '\r')" || true
+    value="${value#"${value%%[![:space:]]*}"}"
+    case "$value" in
+      \"*) value="${value#\"}"; value="${value%%\"*}" ;;
+      \'*) value="${value#\'}"; value="${value%%\'*}" ;;
+      *) value="${value%%[[:space:]]#*}"; value="${value%"${value##*[![:space:]]}"}" ;;
+    esac
   fi
+  printf '%s' "$value"
 }
 
 # PostgreSQL, the one store (alpha 2.0, ADR-001): Homebrew's postgresql@17
 # with pgvector, answering on this Mac, a database named `openferment`, and
 # its address in core/.env. Makes what is missing and says what it made.
 ensure_database() {
-  command -v pg_isready >/dev/null ||
-    die "PostgreSQL is not installed. Run: brew install postgresql@17 pgvector && brew services start postgresql@17"
-  pg_isready -q -h 127.0.0.1 ||
-    die "PostgreSQL is not answering on 127.0.0.1. Run: brew services start postgresql@17"
-  if [ -n "$(env_setting OPENFERMENT_DATABASE_URL)" ]; then
-    echo "core/.env names the database."
-    return
+  # Homebrew keeps postgresql@17 keg-only: its tools live under its own prefix,
+  # which goes first on the path whenever the formula is installed.
+  local keg
+  if command -v brew >/dev/null && keg="$(brew --prefix --installed postgresql@17 2>/dev/null)"; then
+    PATH="$keg/bin:$PATH"
   fi
-  psql -h 127.0.0.1 -d postgres -tAc "SELECT 1 FROM pg_database WHERE datname = 'openferment'" | grep -q 1 ||
+  # `sudo brew services` starts it at power-on, as the server's LaunchDaemon
+  # starts, and --sudo-service-user runs it as the owner of its data directory.
+  local start
+  start="sudo brew services start --sudo-service-user=$(id -un) postgresql@17"
+  command -v pg_isready >/dev/null ||
+    die "PostgreSQL is not installed. Run: brew install postgresql@17 pgvector && $start"
+  pg_isready -q -h 127.0.0.1 ||
+    die "PostgreSQL is not answering on 127.0.0.1. Run: $start"
+  # Homebrew's LaunchAgent starts PostgreSQL at your login; an always-on host needs its LaunchDaemon.
+  if [ -f "$HOME/Library/LaunchAgents/homebrew.mxcl.postgresql@17.plist" ] &&
+    [ ! -f /Library/LaunchDaemons/homebrew.mxcl.postgresql@17.plist ]; then
+    echo "PostgreSQL here starts at your login, so after a power cut the service waits for a login to reach its database."
+    echo "For an always-on host: brew services stop postgresql@17 && $start"
+  fi
+  local named vector
+  named="$(env_setting OPENFERMENT_DATABASE_URL)"
+  case "$named" in
+    */openferment_dev | */openferment_dev\?* | *://openferment:openferment@*)
+      die "OPENFERMENT_DATABASE_URL names the developer's database of core/.env.example (role openferment, database openferment_dev), which this Mac's PostgreSQL lacks. Delete that line from core/.env and run this again: it then makes the live database, openferment, reached as $(id -un)" ;;
+    ?*)
+      echo "OPENFERMENT_DATABASE_URL names the database."
+      return ;;
+  esac
+  # The kit's migration makes the vector extension (kit_alembic/env.py): ask
+  # first, so a missing pgvector is named here in its own words.
+  vector="$(psql -X -h 127.0.0.1 -d postgres -tAc "SELECT 1 FROM pg_available_extensions WHERE name = 'vector'")" ||
+    die "psql could not ask PostgreSQL on 127.0.0.1 as $(id -un); the message above says why"
+  [ "$vector" = 1 ] || die "pgvector is not installed for this PostgreSQL. Run: brew install pgvector, then run this again"
+  psql -X -h 127.0.0.1 -d postgres -tAc "SELECT 1 FROM pg_database WHERE datname = 'openferment'" | grep -q 1 ||
     createdb -h 127.0.0.1 openferment || die "createdb openferment failed; the message above says why"
-  printf 'OPENFERMENT_DATABASE_URL=postgresql://%s@127.0.0.1:5432/openferment\n' "$(id -un)" >> "$REPO/core/.env"
+  # On a line of its own, whether or not the file's last line ends in one.
+  printf '\nOPENFERMENT_DATABASE_URL=postgresql://%s@127.0.0.1:5432/openferment\n' "$(id -un)" >> "$REPO/core/.env"
   chmod 600 "$REPO/core/.env"
   echo "Database openferment is ready, and its address is in core/.env."
 }
 
+# The night's dump (the alpha 2.2 prompt §3): `pg_dump openferment` on
+# 127.0.0.1, as the owner, into ~/openferment-backups/, one file a day named
+# by its date, the newest seven kept. The file is pg_dump's custom format,
+# which pg_restore reads back into a database of its own (the runbook's step
+# 7). The dump is written beside its name and moved into place once whole, so
+# a failed night keeps the seven as they were. Guild's ledger, personnel data,
+# is in every dump, so the folder and its files are the owner's alone.
+# Homebrew keeps postgresql@17 keg-only, so pg_dump comes from the keg's
+# prefix, else from the path.
+backup_database() {
+  local dir="$HOME/openferment-backups" keep=7 keg tool file past old
+  if command -v brew >/dev/null && keg="$(brew --prefix --installed postgresql@17 2>/dev/null)" &&
+    [ -x "$keg/bin/pg_dump" ]; then
+    tool="$keg/bin/pg_dump"
+  elif ! tool="$(command -v pg_dump)"; then
+    echo "no pg_dump on this Mac, so tonight's dump waits. Run: brew install postgresql@17" >&2
+    return 1
+  fi
+  mkdir -p "$dir" && chmod 700 "$dir" || return 1
+  file="$dir/openferment-$(date +%F).dump"
+  if ! (umask 077 && "$tool" -h 127.0.0.1 --format=custom --file="$file.part" openferment); then
+    rm -f "$file.part"
+    echo "pg_dump openferment failed, and the kept dumps stay as they were; the message above says why" >&2
+    return 1
+  fi
+  mv -f "$file.part" "$file" || return 1
+  echo "openferment dumped into $file"
+  # A file a day, named by its date, so the names sort as the days do; the
+  # words below run on macOS's /bin/bash, version 3.2, as launchd starts it.
+  past="$(printf '%s\n' "$dir"/openferment-[0-9][0-9][0-9][0-9]-[0-9][0-9]-[0-9][0-9].dump |
+    LC_ALL=C sort -r | tail -n +$((keep + 1)))"
+  while IFS= read -r old; do
+    if [ -n "$old" ]; then
+      rm -f "$old" && echo "${old##*/} removed: the newest $keep are kept"
+    fi
+  done <<< "$past"
+  return 0
+}

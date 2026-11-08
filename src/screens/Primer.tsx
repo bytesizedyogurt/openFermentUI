@@ -1,21 +1,28 @@
-// Module map (OF-DES-001 §8.14).
+// Primer's lessons (OF-DES-001 §8.14; alpha 2.2 E.12).
 //
-// The modules, their lessons and the lessons-complete count are the store's.
-// No module ships with the app (alpha 2.0, ADR-010): until the lab adds one,
-// the map says so.
-import { BookOpen, Check, Clock, Lock } from 'lucide-react';
+// The lessons are the project's lesson catalogue (lib/catalogues.ts), read
+// from GET /api/catalogues/lesson, each with the skills it counts toward and
+// its body (ADR-018). No lesson ships with the app (ADR-010): until the lab
+// keeps one at /catalogues/lessons, the page says so. A lesson shows passed
+// from Guild's ledger: passing its checkpoint writes a knowledge entry for
+// each skill it counts toward on the ledger of whoever is learning, and this
+// browser keeps no lesson of its own.
+import { BookOpen, Check, Clock } from 'lucide-react';
 import { useSkillById, useStore } from '@/store';
+import { lessonPassed } from '@/engine/path';
+import { ActingAs, useGuild } from '@/components/GuildBits';
 import { PageHeader, Card, EmptyState, LinkButton, cx } from '@/components/ui';
 import { OwnerTabs } from '@/components/OwnerTabs';
 import { PRIMER_TABS } from '@/data/tabs';
+import { href } from '@/router';
 
-/** Completion ring — session-scoped progress, no persistence (§9.5). */
+/** Completion ring: the lessons the learner has passed, from the ledger. */
 function Ring({ done, total }: { done: number; total: number }) {
   const r = 15;
   const c = 2 * Math.PI * r;
   const frac = total === 0 ? 0 : done / total;
   return (
-    <svg width="38" height="38" viewBox="0 0 38 38" aria-label={`${done} of ${total} lessons complete`}>
+    <svg width="38" height="38" viewBox="0 0 38 38" aria-label={`${done} of ${total} lessons passed`}>
       <circle cx="19" cy="19" r={r} fill="none" stroke="rgb(var(--line))" strokeWidth="3.5" />
       <circle
         cx="19"
@@ -38,137 +45,140 @@ function Ring({ done, total }: { done: number; total: number }) {
 
 export default function Primer() {
   const SKILL_BY_ID = useSkillById();
-  const modules = useStore((s) => s.modules);
-  const progress = useStore((s) => s.learnProgress);
+  const lessons = useStore((s) => s.lessons);
+  const read = useStore((s) => s.cataloguesRead);
+  const problem = useStore((s) => s.cataloguesProblem);
+  const ctx = useGuild();
+  const learner = ctx.acting && ctx.acting.active && ctx.acting.role !== 'auditor' ? ctx.acting : null;
 
-  const totalDone = modules.reduce(
-    (n, m) => n + m.lessons.filter((l) => progress[l.id]).length,
-    0,
-  );
-  const totalLessons = modules.reduce((n, m) => n + m.lessons.length, 0);
+  // A lesson toward no skill goes on no ledger, so only the others can show passed.
+  const counted = lessons.filter((l) => (l.skills ?? []).length > 0);
+  const passed = (id: string) => {
+    const lesson = lessons.find((l) => l.id === id);
+    return !!learner && !!lesson && lessonPassed(ctx.guild.evidence, learner.id, lesson);
+  };
+  const done = counted.filter((l) => passed(l.id)).length;
 
   return (
-    <div>
+    <div className="max-w-[760px]">
       <PageHeader
-        eyebrow="Learn the system"
-        title="Primer"
-        subtitle="Bioprocess taught through the live platform rather than beside it. Every embedded widget in these lessons is the real component, operating on the real session state."
+        eyebrow="Primer"
+        title="Lessons"
+        subtitle="Bioprocess taught through the live platform: the project's lessons, each with the skills it counts toward and its checkpoint."
         actions={
-          <span className="text-body text-ink-soft font-num">
-            {totalDone}/{totalLessons} lessons complete
-          </span>
+          learner && counted.length > 0 ? (
+            <span className="text-body text-ink-soft font-num">
+              {done}/{counted.length} passed by {learner.name}
+            </span>
+          ) : undefined
         }
       />
       <OwnerTabs tabs={PRIMER_TABS} />
 
-      <div className="max-w-[860px] space-y-4">
-        {modules.length === 0 && (
+      <div className="space-y-4">
+        {problem && (
+          <Card className="p-4 text-body" role="alert">
+            The project&rsquo;s lessons could not be read: {problem}
+          </Card>
+        )}
+        {lessons.length === 0 && !problem && (
           <Card>
             <EmptyState
               icon={<BookOpen size={22} />}
-              title="No modules yet"
+              title={read ? 'No lesson yet' : 'Reading the project’s lessons'}
               body={
                 <span data-testid="primer-empty">
-                  No module ships with the app. A module the lab adds appears here, with its lessons, the skills
-                  each counts toward and its checkpoints.
+                  {read ? (
+                    <>
+                      No lesson ships with the app. A lesson the lab keeps in the{' '}
+                      <a className="text-accent hover:underline" href={href('/catalogues/lessons')}>
+                        lesson catalogue
+                      </a>{' '}
+                      appears here, with the skills it counts toward and its checkpoint.
+                    </>
+                  ) : (
+                    'The lessons are read from the project’s lesson catalogue as the page opens.'
+                  )}
                 </span>
               }
             />
           </Card>
         )}
-        {modules.map((mod) => {
-          const done = mod.lessons.filter((l) => progress[l.id]).length;
-          const isFlagship = mod.lessons.length >= 4;
-          return (
-            <Card key={mod.id} className="p-4">
-              <div className="flex items-start gap-4">
-                <div className="shrink-0 pt-0.5">
-                  <Ring done={done} total={mod.lessons.length} />
-                </div>
-                <div className="flex-1 min-w-0">
-                  <div className="flex items-baseline gap-2 flex-wrap">
-                    <span className="font-num text-caption text-ink-soft">
-                      Module {mod.index}
-                    </span>
-                    {isFlagship && (
-                      <span className="chip text-accent border-accent/40 text-[11px] py-0">
-                        fully built
-                      </span>
-                    )}
-                  </div>
-                  <h2 className="font-serif text-section-title font-semibold leading-snug">
-                    {mod.title}
-                  </h2>
-                  <p className="text-body text-ink-soft mt-1">{mod.blurb}</p>
 
-                  <div className="mt-3 space-y-1.5">
-                    {mod.lessons.map((lesson) => {
-                      const complete = progress[lesson.id];
-                      return (
-                        <a
-                          key={lesson.id}
-                          href={`#/primer/${mod.id}/${lesson.id}`}
+        {lessons.length > 0 && (
+          <Card className="p-4">
+            <div className="flex items-start gap-4">
+              <div className="shrink-0 pt-0.5">
+                <Ring done={done} total={counted.length} />
+              </div>
+              <div className="flex-1 min-w-0">
+                <div className="flex flex-wrap items-center justify-between gap-2">
+                  <h2 className="font-serif text-section-title font-semibold leading-snug">The project&rsquo;s lessons</h2>
+                  {ctx.guild.people.length > 0 && <ActingAs id="primer-learning-as" label="Learning as" />}
+                </div>
+                <p className="text-body text-ink-soft mt-1">
+                  {learner
+                    ? `A lesson shows passed when ${learner.name}’s ledger holds its passing on every skill it counts toward.`
+                    : ctx.guild.people.length === 0
+                      ? 'Nobody is on Guild’s ledger yet, so no lesson shows as passed.'
+                      : 'Choose who is learning, and the lessons their ledger holds as passed show here.'}
+                </p>
+
+                <div className="mt-3 space-y-1.5">
+                  {lessons.map((lesson) => {
+                    const complete = passed(lesson.id);
+                    const counts = lesson.skills ?? [];
+                    const checks = (lesson.checkpoint ?? []).length;
+                    return (
+                      <a
+                        key={lesson.id}
+                        href={href(`/primer/${lesson.id}`)}
+                        className={cx(
+                          'flex items-center gap-2.5 px-2.5 py-2 rounded-btn border transition-colors',
+                          complete
+                            ? 'border-accent/35 bg-accent-wash'
+                            : 'border-line hover:border-accent/40 hover:bg-ink-soft/[0.04]',
+                        )}
+                      >
+                        <span
                           className={cx(
-                            'flex items-center gap-2.5 px-2.5 py-2 rounded-btn border transition-colors',
-                            complete
-                              ? 'border-accent/35 bg-accent-wash'
-                              : 'border-line hover:border-accent/40 hover:bg-ink-soft/[0.04]',
+                            'shrink-0 w-5 h-5 rounded-full grid place-items-center',
+                            complete ? 'bg-accent text-surface-1' : 'border border-line',
                           )}
                         >
-                          <span
-                            className={cx(
-                              'shrink-0 w-5 h-5 rounded-full grid place-items-center',
-                              complete ? 'bg-accent text-surface-1' : 'border border-line',
-                            )}
-                          >
-                            {complete ? <Check size={12} /> : <BookOpen size={11} className="text-ink-soft" />}
+                          {complete ? <Check size={12} /> : <BookOpen size={11} className="text-ink-soft" />}
+                        </span>
+                        <span className="flex-1 min-w-0">
+                          <span className="block text-body truncate">{lesson.name}</span>
+                          {lesson.summary && <span className="block text-caption text-ink truncate">{lesson.summary}</span>}
+                          <span className="block text-caption text-ink-soft truncate">
+                            {counts.length > 0
+                              ? `Counts toward ${counts.map((id) => SKILL_BY_ID[id]?.name ?? id).join(', ')}`
+                              : 'Counts toward no skill, so passing it goes on no ledger'}
                           </span>
-                          <span className="flex-1 min-w-0">
-                            <span className="block text-body truncate">{lesson.title}</span>
-                            {(lesson.skills ?? []).length > 0 && (
-                              <span className="block text-caption text-ink-soft truncate">
-                                Counts toward {(lesson.skills ?? []).map((id) => SKILL_BY_ID[id]?.name ?? id).join(', ')}
-                              </span>
-                            )}
-                          </span>
+                        </span>
+                        {lesson.minutes != null && (
                           <span className="text-caption text-ink-soft font-num shrink-0 flex items-center gap-1">
                             <Clock size={11} /> {lesson.minutes} min
                           </span>
-                          <span className="text-caption text-ink-soft shrink-0 hidden sm:inline font-num">
-                            {lesson.checkpoint.length} checks
-                          </span>
-                        </a>
-                      );
-                    })}
+                        )}
+                        <span className="text-caption text-ink-soft shrink-0 hidden sm:inline font-num">
+                          {checks === 0 ? 'no checkpoint' : `${checks} checkpoint question${checks === 1 ? '' : 's'}`}
+                        </span>
+                      </a>
+                    );
+                  })}
+                </div>
 
-                    {mod.outline?.map((item) => (
-                      <div
-                        key={item}
-                        className="flex items-center gap-2.5 px-2.5 py-2 rounded-btn border border-dashed border-line text-ink-soft"
-                      >
-                        <Lock size={12} className="shrink-0" />
-                        <span className="flex-1 text-body truncate">{item}</span>
-                        <span className="text-caption shrink-0">outlined, not yet written</span>
-                      </div>
-                    ))}
-                  </div>
-
-                  {mod.lessons.length > 0 && (
-                    <div className="mt-3">
-                      <LinkButton
-                        to={`/primer/${mod.id}/${mod.lessons[0].id}`}
-                        variant={isFlagship ? 'primary' : 'default'}
-                        size="sm"
-                      >
-                        {done > 0 ? 'Continue module' : 'Start module'}
-                      </LinkButton>
-                    </div>
-                  )}
+                <div className="mt-3">
+                  <LinkButton to={`/primer/${(lessons.find((l) => !passed(l.id)) ?? lessons[0]).id}`} variant="primary" size="sm">
+                    {done > 0 ? 'Continue' : 'Start the first lesson'}
+                  </LinkButton>
                 </div>
               </div>
-            </Card>
-          );
-        })}
+            </div>
+          </Card>
+        )}
       </div>
     </div>
   );

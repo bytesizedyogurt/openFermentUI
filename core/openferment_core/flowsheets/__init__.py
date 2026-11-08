@@ -1,4 +1,4 @@
-"""Proforma's flowsheets (OF-BLD-014 §8.1; the shelf, OF-BLD-019 §2.1).
+"""Proforma's flowsheets (the shelf).
 
 The flowsheet modules are imported by the Proforma worker alone: `biosteam`
 is imported in them and in workers/proforma_worker.py and nowhere else in
@@ -21,21 +21,14 @@ module in KNOWN that is evaluated case by case exposes:
               of the product stream), `basis_flow` (kg/hr the price is per)
               and `basis` (what that flow is, in words)
 
-A reference biorefinery (cornstover_benchmark, corn_drygrind) runs a
-published model whole; the worker refuses to evaluate it case by case. For
-its reference run (OF-BLD-019 §2.2, the worker's `reference` op) it exposes:
-
-    load()          the package's plant, built afresh with every default its
-                    own; the worker calls it inside `package_defaults()`
-    parts(built)    as above, with `price` None: the package's own price
-    outputs(built)  the package's result, its `package` and `references`
-    read_back(built)  (optional) every input the shelf lists, read back
-
-and cornstover_benchmark keeps `run()`, the benchmark's own (§8.2).
+The published plants of the `biorefineries` package are the library
+shelf's (engine/library.py), run whole on their package's own defaults; the
+two runs kept from the shelf's retired reference entries replay through
+workers/kept_references.py (alpha 2.2 D8).
 
 `vessel.py` is not a flowsheet on the shelf (it is not in KNOWN): it is
 fermOS's one vessel, designed afresh by the Proforma worker's `vessel_specs`
-and `vessel_design` ops (OF-BLD-020 §4.1), here because BioSTEAM is. Nor is
+and `vessel_design` ops, here because BioSTEAM is. Nor is
 `train.py`, pureOS's train (§5.2).
 
 A flowsheet built from a structure (OF-BLD-020 §6.1: `custom_train_v1`, a
@@ -48,7 +41,7 @@ per structure; `evaluate` and `parts` are as above.
 A scenario flowsheet prices every case on BioSTEAM's own default utility
 prices and plant cost index, set at the start of the case
 (`bst.process_tools.default_utilities()` and `default_CEPCI()`), and reads
-them back with `utility_settings(units)` (OF-BLD-019 §2.R): what its utility
+them back with `utility_settings(units)`: what its utility
 lines and every equipment cost rest on, never what an earlier plant left in
 the worker.
 """
@@ -73,7 +66,7 @@ def utility_settings(units: Any) -> dict[str, float]:
     """The plant cost index, the electricity price (USD per kWh), and for
     each heating or cooling agent a unit used in the case, its regeneration
     price (USD per kmol), heat transfer price (USD per kJ) and temperature
-    (K), read from BioSTEAM as the case left them (OF-BLD-019 §2.R). Called
+    (K), read from BioSTEAM as the case left them. Called
     by a flowsheet's `read_back`, in the Proforma worker alone: BioSTEAM is
     imported here only when it is called."""
     import biosteam as bst

@@ -6,8 +6,9 @@
 // figure says what would fill it and which screen produces that (rule 6).
 import { useState, type ReactNode } from 'react';
 import { Download, Table2 } from 'lucide-react';
-import type { ComputedBasis, Provenance } from '@/data/types';
+import type { ComputedBasis, Provenance } from '@/lib/studies';
 import { exportCSV } from '@/lib/csv';
+import { plainNote } from '@/lib/proforma';
 import { href } from '@/router';
 import { cx } from '@/components/ui';
 import { DASH_ARRAY, ENCODING, LINE_WIDTH, markColor } from './encoding';
@@ -17,7 +18,7 @@ export interface FigureTable {
   rows: (string | number)[][];
 }
 
-export interface FigureFrameProps {
+interface FigureFrameProps {
   /** The question the figure answers. */
   title: string;
   /** One line: what is drawn. */
@@ -104,7 +105,7 @@ export function FigureFrame({ title, drawn, axes, table, csvName, sources, basis
                     <li key={`${i.name}-${i.source.kind}-${i.source.id ?? ''}`} className="text-ink-soft">
                       {i.name}: <span className="font-num text-ink">{String(i.value)} {i.unit}</span> — {i.source.kind}
                       {i.source.id ? ` ${i.source.id}` : ''}
-                      {i.source.note ? ` (${i.source.note})` : ''}
+                      {i.source.note ? ` (${plainNote(i.source.note)})` : ''}
                     </li>
                   ))}
                 </ul>

@@ -1,0 +1,18 @@
+[build-system]
+requires = ["setuptools>=70"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "openferment-engine-mirror"
+version = "0.1.0"
+description = "A placeholder engine for openFerment's engine contract: it returns the typed quantities a run gives it"
+requires-python = ">=3.12"
+
+[project.entry-points."openferment.engines"]
+mirror = "openferment_engine_mirror.engine:ENGINE"
+
+[tool.setuptools]
+packages = ["openferment_engine_mirror"]
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]

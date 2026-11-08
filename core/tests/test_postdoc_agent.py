@@ -219,6 +219,36 @@ def test_each_turn_is_asked_with_the_ceiling_its_budget_allows(pool, monkeypatch
     assert [c["max_tokens"] for c in script.calls] == [postdoc_agent.MIN_TOKENS]
 
 
+def test_the_plan_routes_effort_sets_the_ceiling_a_turn_may_write_to():
+    # Alpha 2.2 F.2g: on Opus at effort max, four answers in four ran out of
+    # room at 32,000 tokens after their 24 tool calls.
+    from openferment_core.postdoc import plan as plan_module
+    for level in ("low", "medium", "high"):
+        assert plan_module.ceiling(level) == plan_module.MAX_TOKENS == 32_000, level
+    assert plan_module.ceiling("xhigh") == 64_000
+    assert plan_module.ceiling("max") == 128_000
+    assert plan_module.MIN_TOKENS < plan_module.MAX_TOKENS < plan_module.ceiling("xhigh") < plan_module.ceiling("max")
+
+
+def test_at_effort_max_each_turn_and_the_answer_after_a_stop_may_write_to_the_larger_ceiling(pool, monkeypatch):  # noqa: F811
+    monkeypatch.setenv("OPENFERMENT_ASK_BUDGET_USD", "8")
+    monkeypatch.setenv("OPENFERMENT_ROUTES", '{"plan": {"effort": "max"}}')
+    monkeypatch.setattr(postdoc_agent, "MAX_TOOL_CALLS", 1)
+    script = Script([records()], plan())
+    out = ask(script, pool)
+    assert out.stopped == "calls", out.stopped
+    assert [c["max_tokens"] for c in script.calls] == [128_000] * 2, "the tool turn and the answer after the stop"
+    monkeypatch.setenv("OPENFERMENT_ROUTES", '{"plan": {"effort": "high"}}')
+    script = Script([records()], plan())
+    ask(script, pool)
+    assert [c["max_tokens"] for c in script.calls] == [postdoc_agent.MAX_TOKENS] * 2
+    monkeypatch.setenv("OPENFERMENT_ROUTES", '{"plan": {"effort": "max"}}')
+    monkeypatch.setenv("OPENFERMENT_ASK_BUDGET_USD", "0.003")
+    script = Script(plan())
+    ask(script, pool)
+    assert [c["max_tokens"] for c in script.calls] == [postdoc_agent.MIN_TOKENS], "the budget still bounds a turn"
+
+
 def test_wall_time_ends_the_loop(pool):  # noqa: F811
     ticks = iter(range(0, 10_000, 100))
     script = Script([records()], [records("b")], plan())
@@ -463,21 +493,29 @@ def test_one_run_sweeps_first_offers_every_tool_and_opens_with_the_earlier_turns
 # ── a flowsheet run is cited like any computed value (OF-BLD-019 §6.1) ──
 
 
+def _scenario_run(scenario_id: str):
+    """A scenario run of the ethanol flowsheet on the stand-in evaluator, every input a fixture's STAND-IN
+    assumption (test_proforma's); none is a result."""
+    from openferment_core import proforma
+    from test_proforma import ETHANOL_STANDIN, assume
+
+    a = [assume(k, v, v, v, by="openFerment test fixture") for k, v in ETHANOL_STANDIN.items()]
+    return proforma.run_flowsheet(proforma.ETHANOL, a, samples=4, seed=0, scenario_id=scenario_id)
+
+
 def test_a_claim_citing_the_run_the_loops_stream_table_returned_is_kept_and_one_never_returned_is_dropped(
         proforma_store):  # noqa: F811
-    from openferment_core import proforma
-
-    # Two reference runs are kept; the loop reads one of them, and no tool returns the other.
-    aid = proforma.run_reference("corn_drygrind").id
-    other = proforma.run_reference("cornstover_benchmark").id
+    # Two scenario runs are kept; the loop reads one of them, and no tool returns the other.
+    aid = _scenario_run("sc-test-one").id
+    other = _scenario_run("sc-test-two").id
     script = Script(
         [("stream_table", {"artifactId": aid})],
-        plan(claim("c1", text="The reference corn plant's run prices its ethanol on the package's own defaults.",
+        plan(claim("c1", text="The scenario's run prices its ethanol on a fixture's stand-in assumptions.",
                    evidence=[aid]),
-             claim("c2", text="The reference stover plant prices its ethanol on the package's own defaults.",
+             claim("c2", text="Another scenario's run prices its ethanol on a fixture's stand-in assumptions.",
                    evidence=[other])),
     )
-    out = postdoc_agent.ask("What does the reference corn plant's run price its ethanol at?", converse=script,
+    out = postdoc_agent.ask("What does the scenario's run price its ethanol at?", converse=script,
                             ctx=tools.ToolContext(pool_factory=lambda: proforma_store))
     [kept] = out.claims
     assert kept.id == "c1" and kept.evidenceIds == [aid]
@@ -488,14 +526,12 @@ def test_a_claim_citing_the_run_the_loops_stream_table_returned_is_kept_and_one_
 
 
 def test_a_claim_citing_a_run_stream_table_read_is_kept(proforma_store, monkeypatch):  # noqa: F811
-    from openferment_core import proforma
-
-    art = proforma.run_reference("corn_drygrind")
+    art = _scenario_run("sc-test-one")
     script = Script(
         [("stream_table", {"artifactId": art.id})],
-        plan(claim("c1", text="The reference corn plant prices its ethanol on the package's own defaults.", evidence=[art.id])),
+        plan(claim("c1", text="The scenario's run prices its ethanol on a fixture's stand-in assumptions.", evidence=[art.id])),
     )
-    out = postdoc_agent.ask("What does the dry-grind corn reference plant price its ethanol at?", converse=script,
+    out = postdoc_agent.ask("What does the scenario's run price its ethanol at?", converse=script,
                             ctx=tools.ToolContext(pool_factory=lambda: proforma_store))
     [kept] = out.claims
     assert kept.evidenceIds == [art.id] and kept.provenance == art.provenance and out.rejected == 0
@@ -510,7 +546,7 @@ def test_a_stand_in_run_asks_for_a_simulation_cites_its_artifact_and_a_claim_sta
         fermos_store):  # noqa: F811
     from openferment_core import fermos
     from openferment_core.models import SimulationRequest
-    from test_fermos_bind import TYPED, pool_of, typed
+    from test_fermos_bind import TYPED, pool_of, typed_in
     from test_tools import _kept_start, _sim
 
     start = _kept_start(fermos_store)
@@ -519,7 +555,7 @@ def test_a_stand_in_run_asks_for_a_simulation_cites_its_artifact_and_a_claim_sta
     aid = tools.run("fermos_simulate", _sim(start), tools.ToolContext(pool_factory=lambda: fermos_store)).summary[
         "artifactId"]
     other = fermos.simulate(SimulationRequest(family="batch_v1", product="ethanol", sugar="glucose",
-                                              overrides=typed(ks=0.2, yxs=0.12, yps=0.45, mu_max=0.3, s0=50.0,
+                                              inputs=typed_in(ks=0.2, yxs=0.12, yps=0.45, mu_max=0.3, s0=50.0,
                                                               **TYPED)), by_pool=pool_of()).artifactId
     script = Script(
         [("fermos_simulate", _sim(start))],

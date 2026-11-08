@@ -39,9 +39,10 @@
 // the person's override; the CSVs export the artifact's own numbers. No
 // numeric control is rendered here: every parameter is the panel's (E.1‴).
 import { useEffect, useMemo, useState } from 'react';
-import type { FamilyInfo, FermosBinding, FermosFitInfo, ParameterSpec, ParameterValue, ParamScope, SimulationResult, SimulationSummary, SteadyState } from '@/data/types';
+import type { FermosFitInfo } from '@/lib/proforma';
 import { overridesFor, useStore } from '@/store';
 import { href, useRoute } from '@/router';
+import { EngineRunLink } from '@/components/EngineRunLink';
 import { Button, Callout, SectionTitle } from '@/components/ui';
 import { ProvenanceBadge } from '@/components/Provenance';
 import { ParameterPanel } from '@/components/ParameterPanel';
@@ -49,8 +50,9 @@ import { SourceChip, shown } from '@/components/ParameterRow';
 import { TimeCourse } from '@/components/figures';
 import { CARBON_SOURCES } from '@/data/vocabulary';
 import { PRODUCT_WORDS, productWords } from '@/lib/geneos';
-import { paramScope } from '@/lib/params';
-import { FIT_TOOL_WORDS, fermosFits, proformaShelf } from '@/lib/proforma';
+import { strainWords } from '@/lib/catalogues';
+import { paramScope, type ParameterSpec, type ParameterValue, type ParamScope } from '@/lib/params';
+import { FIT_TOOL_WORDS, fermosFits, plainNote, proformaShelf } from '@/lib/proforma';
 import { exportCSV } from '@/lib/csv';
 import { fmt } from '@/engine/units';
 import {
@@ -67,13 +69,18 @@ import {
   paramAskOf,
   timeCourseOf,
   vesselPath,
+  type FamilyInfo,
+  type FermosBinding,
   type SimulateAsk,
+  type SimulationResult,
+  type SimulationSummary,
+  type SteadyState,
 } from '@/lib/fermos';
 import { builderInletPath } from '@/lib/pureos';
 import { SendToProforma } from './FermOSForecast';
 
 /** The panel's groups, in the order Appendix 2 §A lists them. */
-export const SIMULATE_GROUPS = ['Growth', 'Product', 'Substrate', 'Inhibition', 'Oxygen', 'Feed', 'Dilution', 'Storage', 'Start values', 'Run length'];
+const SIMULATE_GROUPS = ['Growth', 'Product', 'Substrate', 'Inhibition', 'Oxygen', 'Feed', 'Dilution', 'Storage', 'Start values', 'Run length'];
 /** How long the screen waits after a change before asking what waits. */
 const BIND_AFTER_MS = 350;
 type Start = 'records' | 'fit' | 'simulation';
@@ -83,6 +90,8 @@ const problemOf = (e: unknown) =>
 
 /** Each origin in words, for the card that says what a simulation was built from. */
 function originWords(v: ParameterValue): string {
+  if (v.origin === 'measurement') return `readings deposited by ${v.overriddenBy ?? 'nobody named'}`;
+  if (v.origin === 'model-estimate') return `estimates by ${v.overriddenBy ?? 'no model named'}`;
   if (v.overriddenBy) return `values typed by ${v.overriddenBy}`;
   switch (v.origin) {
     case 'record':
@@ -153,7 +162,7 @@ function BuiltFrom({ r }: { r: SimulationResult }) {
         <a className="font-num hover:text-accent underline underline-offset-2" href={href(`/biorepo/artifacts/${r.artifactId}`)}>
           {r.artifactId}
         </a>
-        .
+        ; <EngineRunLink artifactId={r.artifactId} engine="kinetics" />.
       </p>
       <ul className="text-caption mt-1 space-y-0.5">
         {[...groups.entries()].map(([w, keys]) => (
@@ -229,14 +238,14 @@ function EndState({ r }: { r: SimulationResult }) {
           ; harvested at <span className="font-num">{fmt(r.harvestH, 4)}</span> h.
         </li>
       </ul>
-      <p className={`text-caption mt-1 ${r.massBalance.ok ? 'text-ink-soft' : 'text-signal-warn'}`}>{r.massBalance.note}</p>
+      <p className={`text-caption mt-1 ${r.massBalance.ok ? 'text-ink-soft' : 'text-signal-warn'}`}>{plainNote(r.massBalance.note)}</p>
       {r.steadyState && <SteadyStateCard ss={r.steadyState} units={u} />}
       {r.flags.map((f) => (
         <p key={f} className="text-caption text-signal-warn" data-testid="simulation-flag">
           {f}
         </p>
       ))}
-      {r.our.note && <p className="text-caption text-ink-soft mt-1">{r.our.note}</p>}
+      {r.our.note && <p className="text-caption text-ink-soft mt-1">{plainNote(r.our.note)}</p>}
     </section>
   );
 }
@@ -415,6 +424,9 @@ export default function FermOSSimulate() {
   const scope = chosen ? familyScope(chosen.id) : '';
   const overrides = useStore(overridesFor(scope));
   const overridesKey = JSON.stringify(overrides);
+  const reviewer = useStore((s) => s.reviewer).trim();
+  // The family's own specs name the unit each override is sent in (lib/params.ts, `inputsOf`).
+  const specs = chosen?.specs ?? [];
 
   // The fits and kept simulations to start from, asked when that start is chosen.
   useEffect(() => {
@@ -426,7 +438,7 @@ export default function FermOSSimulate() {
         ? proformaShelf(ctrl.signal).then((shelf) => {
             // The fits list is read for a flowsheet (what each can feed it):
             // the first one a scenario can name; the fits are the same for any.
-            const flowsheet = shelf.find((f) => !f.reference);
+            const flowsheet = shelf[0];
             if (!flowsheet) throw new FermosRefused(422, 'No flowsheet a scenario can name is on the shelf, so the fits list cannot be read.');
             return fermosFits(flowsheet.id, ctrl.signal).then((all) => setFits(all.filter((x) => x.tool !== 'fermos.simulation')));
           })
@@ -458,7 +470,7 @@ export default function FermOSSimulate() {
     if (!ask || !ready) return;
     const ctrl = new AbortController();
     const timer = window.setTimeout(() => {
-      fermosBind(ask, overrides, ctrl.signal)
+      fermosBind(ask, overrides, specs, ctrl.signal)
         .then(setBinding)
         .catch((e: unknown) => !ctrl.signal.aborted && setBindProblem(problemOf(e)));
     }, BIND_AFTER_MS);
@@ -469,7 +481,6 @@ export default function FermOSSimulate() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [askKey, overridesKey, ready]);
 
-  const specs = chosen?.specs ?? [];
   const label = (key: string) => specs.find((s) => s.key === key)?.label ?? key;
   const waiting = binding?.waiting ?? [];
   // §8.R (findings 12, 14): what the family would refuse though nothing
@@ -481,7 +492,7 @@ export default function FermOSSimulate() {
     if (!ask || !canRun) return;
     setBusy(true);
     setRunProblem(null);
-    fermosSimulate(ask, overrides)
+    fermosSimulate(ask, overrides, specs, reviewer)
       .then(setResult)
       .catch((e: unknown) => {
         setResult(null);
@@ -492,7 +503,7 @@ export default function FermOSSimulate() {
 
   const strainLabel = (id: string) => {
     const s = strains.find((x) => x.id === id);
-    return s ? `${s.binomial} ${s.designation}`.trim() : id;
+    return s ? strainWords(s) : id;
   };
 
   return (
@@ -614,7 +625,7 @@ export default function FermOSSimulate() {
           {binding && binding.notes.length > 0 && (
             <ul className="text-caption text-ink-soft space-y-0.5 mt-2" data-testid="simulate-notes">
               {binding.notes.map((n) => (
-                <li key={n}>{n}</li>
+                <li key={n} title={n}>{plainNote(n)}</li>
               ))}
             </ul>
           )}
@@ -633,7 +644,7 @@ export default function FermOSSimulate() {
               <ul className="ml-3 list-disc">
                 {waiting.map((k) => (
                   <li key={k}>
-                    <span className="font-num">{k}</span> ({label(k)}): {binding.values.find((v) => v.key === k)?.detail ?? 'no source yet'}
+                    <span className="font-num">{k}</span> ({label(k)}): {plainNote(binding.values.find((v) => v.key === k)?.detail ?? 'no source yet')}
                   </li>
                 ))}
               </ul>

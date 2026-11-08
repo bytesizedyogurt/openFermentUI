@@ -52,6 +52,16 @@ def _sha256(path: Path) -> str:
     return hashlib.sha256(path.read_bytes()).hexdigest()
 
 
+def metadata_required() -> list[str]:
+    """The metadata fields the schema the toolkit ships requires of every
+    file, read from its own schema file (`pisces_sff.SCHEMA_FILE`): at
+    e236e32, `TEA_year` among them, which its exporter reads from the
+    system's TEA (`tea.duration[0]`, export/_export.py)."""
+    schema = json.loads(Path(pisces_sff.SCHEMA_FILE).read_text(encoding="utf-8"))
+    metadata = (schema.get("properties") or {}).get("metadata") or {}
+    return [str(k) for k in metadata.get("required") or []]
+
+
 def validation(path: str | Path) -> dict[str, Any]:
     """The toolkit's verdict on one file: valid unless the schema gate or
     an error-severity check fails; every result counted by severity and

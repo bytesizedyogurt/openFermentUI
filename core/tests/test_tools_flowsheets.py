@@ -1,6 +1,8 @@
 """Postdoc's SFF tools (alpha 2.1 stage B; ADR-003): the toolkit's reference
 files listed, one imported into the project and marked as the caller's, a
-kept record read back with what its graph counts as evidence.
+kept record read back with what its graph counts as evidence. The tool
+takes a reference file's id alone: an address is a person's to name, at
+POST /api/flowsheets/import-url (alpha 2.2 D10, its amendment at C.6).
 
 Asked live to import a reference file and say what plant it describes,
 Postdoc had no tool for it. The toolkit is test_sff's stand-in and the
@@ -13,6 +15,7 @@ from openferment_core import audit, llm, tools
 from openferment_core.engine import sff
 
 from test_sff import PROJECT, corpus, toolkit  # noqa: F401
+from test_sff_url import ADDRESS, host  # noqa: F401
 
 MODEL = llm.DEFAULT_PRIMARY
 
@@ -53,3 +56,12 @@ def test_what_cannot_be_imported_or_read_is_refused_in_words(toolkit, corpus):  
     assert registry.error and "registry" in registry.error
     unknown = tools.run("flowsheet_read", {"record": "nonesuch"}, as_model())
     assert unknown.error and "holds no flowsheet nonesuch" in unknown.error
+
+
+def test_the_import_tool_takes_no_address_so_no_model_has_the_service_fetch_one(toolkit, host):  # noqa: F811
+    schema = tools.REGISTRY["flowsheet_import"].input_model.model_json_schema()
+    assert set(schema["properties"]) == {"file", "note"}, "the tool names a reference file, never an address"
+    asked = tools.run("flowsheet_import", {"url": ADDRESS, "note": "a colleague's plant"}, as_model())
+    assert asked.error and "file" in asked.error, asked.error
+    assert host.asked == [] and host.resolved == [] and toolkit.calls == [], "nothing was resolved, fetched or kept"
+    assert sff.listed(project_id=PROJECT) == []

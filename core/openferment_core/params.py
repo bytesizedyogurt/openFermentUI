@@ -1,8 +1,8 @@
-"""One parameter panel, declared in Python (OF-BLD-020 Phase 2, D2–D4).
+"""One parameter panel, declared in Python.
 
 Every model family, vessel design, catalogue unit and shelf flowsheet
-declares its parameters once, as `ParameterSpec`s (models.py, mirrored in
-src/data/types.ts through PAIRS). This module resolves them to
+declares its parameters once, as `ParameterSpec`s (models.py; the browser
+reads the generated twin, src/lib/params.ts). This module resolves them to
 `ParameterValue`s, each naming where its value came from, and turns a
 person's change into a named assumption. The browser renders what it is
 served; no screen writes a form for a parameter of its own.
@@ -13,6 +13,14 @@ served; no screen writes a form for a parameter of its own.
                                 fermos:forecast:<kinetic fit artifact id>
                                 pureos:unit:<train id>:<unit id>
                                 proforma:<scenario id>
+    overrides_of(scope, inputs, units)
+                              the values a request sets, each a typed
+                              quantity with its origin (an EngineInput), as
+                              the Overrides of the scope a resolver takes
+                              (basis.override_of), each in its parameter's
+                              unit, a deposition's reading looked up in the
+                              project's depositions first (basis.resolved);
+                              refused in words where one cannot stand
     resolve(specs, sources, overrides, by=None)
                               each spec's value: an Override for its key wins
                               over everything (an `assumption` by the person)
@@ -31,7 +39,9 @@ served; no screen writes a form for a parameter of its own.
                               one BasisInput per value with its source; an
                               override is an `assumption` naming the person
                               and what it rests on, so `basis_provenance`
-                              makes the artifact `assumed` (E.2‴)
+                              makes the artifact `assumed` (E.2‴), or a
+                              `deposition` naming the reading it is, so a run
+                              resting on readings and records is `measured`
     register(kind, provider, static=None)
                               a scope kind's provider: given the scope's ids
                               and the resolve request it returns
@@ -40,7 +50,10 @@ served; no screen writes a form for a parameter of its own.
                               `check()`
     scope(name, req) / resolve_scope(name, req)
                               GET /api/params/{scope} and
-                              POST /api/params/{scope}/resolve: they integrate
+                              POST /api/params/{scope}/resolve, whose values
+                              arrive as typed quantities with their origins,
+                              each laid on as an Override of the scope the
+                              route names: they integrate
                               nothing and keep nothing. A `proforma:` scope
                               binds only and starts no worker; a
                               `fermos:vessel:` scope reads BioSTEAM's defaults
@@ -50,7 +63,7 @@ served; no screen writes a form for a parameter of its own.
                               boundsReason (D4); test_params holds it
 
 This module registers the `proforma` provider; vessel.py registers
-`fermos-vessel` (OF-BLD-020 §4.1), imported on first need
+`fermos-vessel`, imported on first need
 (`PROVIDER_MODULES`). The vessel scope's values are BioSTEAM's own defaults,
 read in the Proforma worker, so a read of it starts the worker when it is
 cold (and keeps its answer for the process's life). Its scope is
@@ -86,6 +99,7 @@ from typing import Any, Callable, Iterable, Mapping, NamedTuple
 from .models import (
     BasisInput,
     BasisSource,
+    EngineInput,
     FlowsheetInfo,
     FlowsheetInput,
     Override,
@@ -120,6 +134,11 @@ _FORMS: tuple[tuple[str, re.Pattern[str]], ...] = (
 )
 SCOPE_WORDS = ("fermos:family:<family id>, fermos:vessel:<simulation artifact id>, "
                "fermos:forecast:<kinetic fit artifact id>, pureos:unit:<train id>:<unit id> or proforma:<scenario id>")
+# The scope kinds whose panel offers a deposition's reading on a row (alpha
+# 2.2 E.17; ADR-006's note): their waiting values name a reading among what
+# would bind them (`_waiting_words`).
+READINGS_OFFERED = ("proforma",)
+
 KIND_WORDS = {
     "fermos-family": "fermOS's model families",
     "fermos-vessel": "fermOS's vessel designs",
@@ -160,7 +179,7 @@ class Provided(NamedTuple):
     says why nothing bound. `basis`, when a provider gives it, is what a run
     of the scope adds to its basis for the request's overrides, built by the
     function the run builds them with (OF-BLD-020 §2.R: Proforma's run writes
-    every override's low and high and the line saying it read overrides);
+    every override's value, low and high and the line saying it set values);
     without it the resolve takes `basis_inputs` over the overridden values,
     which is how the vessel builds its own."""
 
@@ -228,7 +247,7 @@ def _provided(scope: str, req: ParamResolveRequest) -> tuple[str, Provided]:
 def _not_read(got: Provided, values: list[ParameterValue]) -> list[ParameterValue]:
     """The values with each waiting one the others leave unread served as
     `not-read`, saying why, so a panel never marks it waiting while a run
-    would not refuse for it (OF-BLD-020 §3.R, finding 16)."""
+    would not refuse for it."""
     if got.unread is None:
         return values
     unread = got.unread(values)
@@ -239,22 +258,24 @@ def _not_read(got: Provided, values: list[ParameterValue]) -> list[ParameterValu
 def scope(name: str, req: ParamResolveRequest | None = None) -> ParamScope:
     """GET /api/params/{scope}: the scope's specs and their values as the
     service binds them now, with no override (the service keeps none)."""
-    req = (req or ParamResolveRequest()).model_copy(update={"overrides": []})
+    req = (req or ParamResolveRequest()).model_copy(update={"inputs": []})
     kind, got = _provided(name, req)
-    values = _not_read(got, resolve(got.specs, got.sources, []))
+    values = _not_read(got, resolve(got.specs, got.sources, [], readings=kind in READINGS_OFFERED))
     return ParamScope(scope=name, kind=kind, title=got.title, specs=got.specs, values=values,
                       waiting=[v.key for v in values if v.origin == "waiting"], notes=got.notes)
 
 
 def resolve_scope(name: str, req: ParamResolveRequest) -> ParamResolveResult:
-    """POST /api/params/{scope}/resolve: the values with a person's overrides
-    laid on, what those overrides would add to a run's basis, and every
-    value outside its bounds, in words. Runs nothing and keeps nothing."""
-    stray = sorted({o.scope for o in req.overrides if o.scope != name})
-    if stray:
-        raise ParamRefused(f"an override names the scope it changes, and these were sent to {name}: {', '.join(stray)}")
-    _, got = _provided(name, req)
-    values = _not_read(got, resolve(got.specs, got.sources, req.overrides))
+    """POST /api/params/{scope}/resolve: the values with the ones a person
+    or a model sets laid on, each the Override of this scope its typed
+    quantity converts to (`overrides_of`, in its parameter's unit), what
+    those would add to a run's basis, and every value outside its bounds,
+    in words. A provider that binds on the values set converts them at its
+    own door, with its own units, as a run of the scope does. Runs nothing
+    and keeps nothing."""
+    kind, got = _provided(name, req)
+    overrides = overrides_of(name, req.inputs, units_of(got.specs))
+    values = _not_read(got, resolve(got.specs, got.sources, overrides, readings=kind in READINGS_OFFERED))
     why = got.refuses(values) if got.refuses is not None else None
     if why:
         raise ParamRefused(why)
@@ -265,6 +286,33 @@ def resolve_scope(name: str, req: ParamResolveRequest) -> ParamResolveResult:
 
 
 # ── resolution ─────────────────────────────────────────────────────────
+
+
+def units_of(specs: Iterable[ParameterSpec]) -> dict[str, str]:
+    """Each parameter's unit, by its key: what a value set for it is typed in."""
+    return {s.key: s.unit for s in specs}
+
+
+def overrides_of(scope: str, inputs: Iterable[EngineInput], units: Mapping[str, str]) -> list[Override]:
+    """The values a request sets, each the Override of `scope` its resolver
+    takes (basis.override_of), in the unit of the parameter its name keys
+    (`units`, key to unit), a deposition's reading looked up in the
+    project's depositions and set in that unit (basis.resolved). A name the
+    scope has no parameter for, a value its parameter cannot take as an
+    Override and a reading the lookup refuses are refused in words
+    (ParamRefused); `checked` holds what is left to every rule a person's
+    value meets."""
+    from .basis import InputRefused, override_of
+
+    out: list[Override] = []
+    for i in inputs:
+        if i.name not in units:
+            raise ParamRefused(f"there is no parameter {i.name} here; the parameters are {', '.join(units) or 'none'}")
+        try:
+            out.append(override_of(scope, i, units[i.name]))
+        except InputRefused as e:
+            raise ParamRefused(str(e)) from None
+    return out
 
 
 def _num(x: float) -> str:
@@ -300,7 +348,14 @@ def bounds_check(spec: ParameterSpec, value: Any, low: float | None = None, high
             "it is kept as given and the basis records it")
 
 
-def _waiting_words(spec: ParameterSpec) -> str:
+def _waiting_words(spec: ParameterSpec, *, readings: bool = False) -> str:
+    """What would bind a value that waits, in words. `readings` for a panel
+    that offers a deposition's reading on the row (a Proforma scenario's,
+    alpha 2.2 E.17): its rule's entry for a value set for the run names a
+    model's estimate and a reading beside a person's assumption, as
+    ParameterRow's `ruleWords` names them. Every other panel's words stand
+    as they were, held in the outputs a kinetics run keeps
+    (`core/tests/test_engine_pins.py`)."""
     parts = []
     fields = [e.split(":", 1)[1] for e in spec.sourceRule if e.startswith("record:")]
     if "fit" in spec.sourceRule:
@@ -312,7 +367,8 @@ def _waiting_words(spec: ParameterSpec) -> str:
     if "simulation" in spec.sourceRule:
         parts.append("a kept simulation")
     if "assumption" in spec.sourceRule:
-        parts.append("a named person's assumption")
+        parts.append("a named person's assumption, a model's estimate or a reading deposited at the bench" if readings
+                     else "a named person's assumption")
     if "convention" in spec.sourceRule:
         parts.append("a stated convention")
     if "library-default" in spec.sourceRule:
@@ -328,8 +384,7 @@ def unstamped(o: Override) -> str | None:
 
 
 def held(value: Any, low: float | None, high: float | None) -> tuple[float | None, float | None]:
-    """An override's interval as every reader takes it (OF-BLD-020 §2.R,
-    findings 1 and 14): one end typed and the other left empty, the empty
+    """An override's interval as every reader takes it: one end typed and the other left empty, the empty
     end is the value itself, so the range runs from the end typed to the
     value; with neither end typed the value is held at itself and both stay
     empty (a run then holds it fixed, both ends the value). The resolve, the
@@ -354,7 +409,9 @@ def _takes_no_person(spec: ParameterSpec) -> str:
 
 def _checked(spec: ParameterSpec, o: Override, by: str | None) -> Override:
     """An override that can stand, with the person named and its interval
-    as `held` reads it, or the refusal."""
+    as `held` reads it, or the refusal. A deposition's reading stands where
+    a person's value does, a value this run sets (basis.is_set), named by
+    the person who deposited it."""
     from .biorepo import reviewer_refusal
 
     if "assumption" not in spec.sourceRule:
@@ -365,6 +422,18 @@ def _checked(spec: ParameterSpec, o: Override, by: str | None) -> Override:
         name = (o.by or "").strip()
         if not name or any(not ch.isprintable() for ch in name):
             raise ParamRefused(f"the estimate of {spec.key} names the model that made it, on one line")
+    elif o.origin == "measurement":
+        # A reading names the person who deposited it, as its deposition's
+        # row keeps them (measurements.py), a person's name held as a
+        # person's assumption holds one; the person who sends the run names
+        # someone else.
+        from .measurements import unnamed
+
+        name = (o.by or "").strip()
+        why = unnamed(name) if name and all(ch.isprintable() for ch in name) else "names nobody on one line"
+        if why:
+            raise ParamRefused(f"the measurement of {spec.key} names the person who deposited its reading: its "
+                               f"reading {why}")
     else:
         name = (o.by or "").strip() or (by or "").strip()
         why = reviewer_refusal(name)
@@ -391,16 +460,22 @@ def _checked(spec: ParameterSpec, o: Override, by: str | None) -> Override:
 
 
 def _from_override(spec: ParameterSpec, o: Override) -> ParameterValue:
+    """The value an override sets, with its source (basis.override_source):
+    a person's assumption, a model's estimate or a deposition's reading."""
     from .basis import override_source
 
-    estimate = o.origin == "model-estimate"
+    origin = {"model-estimate": "model-estimate", "measurement": "measurement"}.get(o.origin, "assumption")
+    if origin == "measurement":
+        detail = f"reading {o.ref}, deposited by {o.by.strip()} and taken at {o.at}"
+    else:
+        detail = f"{'estimated' if origin == 'model-estimate' else 'typed'} by {o.by.strip()} on {o.at}"
     return ParameterValue(
         key=spec.key, value=o.value, low=o.low, high=o.high, source=override_source(o),
-        origin="model-estimate" if estimate else "assumption", overriddenBy=o.by.strip(),
-        detail=f"{'estimated' if estimate else 'typed'} by {o.by.strip()} on {o.at}" + (f": {o.note}" if o.note else ""))
+        origin=origin, overriddenBy=o.by.strip(),  # type: ignore[arg-type]
+        detail=detail + (f": {o.note}" if o.note else ""))
 
 
-def _first(spec: ParameterSpec, cands: Mapping[str, ParameterValue | None]) -> ParameterValue:
+def _first(spec: ParameterSpec, cands: Mapping[str, ParameterValue | None], *, readings: bool = False) -> ParameterValue:
     for entry in spec.sourceRule:
         found = cands.get(entry)
         if found is None and entry == "convention" and spec.convention is not None:
@@ -412,7 +487,7 @@ def _first(spec: ParameterSpec, cands: Mapping[str, ParameterValue | None]) -> P
         return found.model_copy(update={"key": spec.key, "origin": origin, "overriddenBy": None,
                                         "identified": found.identified if origin == "fit" else None})
     why = cands.get("waiting")
-    detail = _waiting_words(spec) + (f". {why.detail}" if why is not None and why.detail else "")
+    detail = _waiting_words(spec, readings=readings) + (f". {why.detail}" if why is not None and why.detail else "")
     return ParameterValue(key=spec.key, value=None, source=None, origin="waiting", detail=detail)
 
 
@@ -440,20 +515,21 @@ def checked(specs: list[ParameterSpec], overrides: Iterable[Override] | None, by
 
 
 def resolve(specs: list[ParameterSpec], sources: Mapping[str, Mapping[str, ParameterValue | None]],
-            overrides: Iterable[Override] | None, by: str | None = None) -> list[ParameterValue]:
+            overrides: Iterable[Override] | None, by: str | None = None, *, readings: bool = False) -> list[ParameterValue]:
     """Each spec's value. An Override for its key wins over every source and
     becomes an `assumption` by the person it names (or by `by`, when it names
     nobody; with neither it is refused), where the spec's rule takes a named
     person's value (`checked`). Otherwise the first entry of the spec's
     `sourceRule` with a candidate in `sources` wins, its origin the entry's;
     "convention" falls back on the spec's stated convention, with its note as
-    the reason. With none, the value waits and says what would bind it.
+    the reason. With none, the value waits and says what would bind it
+    (`readings` for a panel that offers a reading, `_waiting_words`).
     Every value outside the bounds is kept and flagged."""
     given = checked(specs, overrides, by)
     out = []
     for spec in specs:
         cands = sources.get(spec.key) or {}
-        v = _from_override(spec, given[spec.key]) if spec.key in given else _first(spec, cands)
+        v = _from_override(spec, given[spec.key]) if spec.key in given else _first(spec, cands, readings=readings)
         lib = cands.get("library-default")
         if lib is not None:
             v.libraryDefault = lib.value
@@ -466,8 +542,11 @@ def basis_inputs(specs: list[ParameterSpec], values: Iterable[ParameterValue]) -
     """What a run's basis takes from these values (E.2‴): one input a value,
     named by its key, in its spec's unit, with its source; `<key> low` and
     `<key> high` beside it when it has an interval. An override's source is
-    an `assumption` naming the person and what it rests on, so
-    `basis_provenance` makes the artifact `assumed`. A value bound to records
+    the one its origin names (basis.override_source): an `assumption` naming
+    the person and what it rests on, or a model's estimate, either of which
+    makes the artifact `assumed` (`basis_provenance`); or a deposition's
+    reading naming the reading and who deposited it, which makes an artifact
+    resting on no assumption `measured`. A value bound to records
     is the statistic of those records (a `convention`), with one
     `<key> record` input per record naming it as its `record` source, so the
     records' own provenance enters. A waiting value adds nothing."""
@@ -500,9 +579,6 @@ _GROUPS = {"process": "Process", "economic": "Economics", "convention": "Convent
 def _bounds(info: FlowsheetInfo, fi: FlowsheetInput, convention: Any) -> tuple[float | None, float | None, str]:
     """A flowsheet input's bounds and their reason (D4): a physical limit. A
     record field carries no range (alpha 2.0, ADR-010)."""
-    if info.reference:
-        return None, None, ("the package's own default, read back after the run: a reference biorefinery runs whole on "
-                            "its package's defaults and takes no value here, so no range is offered")
     if fi.kind == "convention" and convention is not None and not _is_number(convention):
         return None, None, "a convention stated in words: it takes no number, so it has no bounds"
     if fi.dimension == "fraction":
@@ -526,18 +602,14 @@ def flowsheet_specs(info: FlowsheetInfo) -> list[ParameterSpec]:
     titre, yield and productivity (it replaces the records, as
     `proforma.apply_fits` binds it), the records of each field in order, then
     a named person's assumption. A convention takes the value every run's
-    basis states. A reference biorefinery's inputs are its package's own
-    defaults, read back after the run."""
+    basis states."""
     from . import proforma
 
     stated = _stated(info.id)
     out = []
     for fi in info.inputs:
         convention = None
-        if info.reference:
-            rule = ["library-default"]
-            group = "Package defaults"
-        elif fi.kind == "convention":
+        if fi.kind == "convention":
             rule = ["convention"]
             convention = stated.get(fi.name)
             group = _GROUPS[fi.kind]
@@ -643,12 +715,14 @@ def _proforma(ids: tuple[str, ...], req: ParamResolveRequest) -> Provided:
         # laid on as the run lays them on (`proforma.named_values`): each wins
         # over the records and any fit for its input (`bound` takes no fit
         # there), and a fit's productivity beside a titre a person typed is
-        # refused in the run's own words.
-        given = checked(specs + finance, req.overrides)
+        # refused in the run's own words. The values set arrive typed, each
+        # converted into its parameter's unit as the run converts them.
+        given = checked(specs + finance, overrides_of(scope_name("proforma", scenario_id), req.inputs,
+                                                      units_of(specs + finance)))
         mine = {sp.key for sp in finance}
-        typed, read = proforma.named_values(scenario_id, [o for k, o in given.items() if k not in mine])
-        if finance and not read and any(k in mine for k in given):
-            read = proforma.READ_WORDS[(True, False)]
+        typed = proforma.named_values(scenario_id, [o for k, o in given.items() if k not in mine])
+        # A run that sets a value writes the panel's line in its basis (proforma.values_read).
+        sets = bool(typed) or (bool(finance) and any(k in mine for k in given))
         proforma._check_keys(info, typed)
         pool = evidence_pool.load()
         bound = proforma.bound(flowsheet, scenario_id=scenario_id, name=held.get(scenario_id, {}).get("name") or "",
@@ -660,8 +734,9 @@ def _proforma(ids: tuple[str, ...], req: ParamResolveRequest) -> Provided:
     sources = {inp.key: _input_sources(inp, pool, feed) for inp in bound.inputs}
     sources.update(composite.finance_sources() if finance else {})
     # What a run adds to its basis for these overrides, by the run's own
-    # functions: each overridden input's value, low and high, then the line
-    # saying the run read overrides (§2.R, findings 3 and 19).
+    # functions: each overridden input's value, low and high, each Finance
+    # value a person set, then the line saying the run set values
+    # (§2.R, findings 3 and 19).
     added = [b for inp in bound.inputs if inp.binding == "assumption" for b in proforma.assumption_inputs(inp)]
     if finance:
         fin = resolve(finance, composite.finance_sources(), [o for k, o in given.items() if k in mine])
@@ -673,16 +748,16 @@ def _proforma(ids: tuple[str, ...], req: ParamResolveRequest) -> Provided:
         "pool that pass the aggregate gate" + (f" and name {feed} as their carbon source" if flowsheet in proforma.FEED_CARBON else "")
         + ", converted into the input's unit; a fermOS fit a person chose replaces them for titre, yield and productivity.",
         "A person's override wins over the records and any fit for its input, here and in the run, which carries the "
-        "overrides and names the person in its basis (OF-BLD-020 D3).",
+        "overrides and names the person in its basis.",
     ]
     if finance:
-        notes.append(f"Built from vessel design {req.vessel} and train run {req.trainRun} (OF-BLD-020 §6.1): the "
+        notes.append(f"Built from vessel design {req.vessel} and train run {req.trainRun}: the "
                      "fermenter is that design's, every design parameter as the design holds it, and the train's units "
                      "follow it with their values as that run held them; the train's own inlet is not an input, the "
                      "fermenter's beer is. Finance is the dry-grind corn plant's TEA: each parameter the package's own "
                      "default until a person sets one, held at its value across the run's samples.")
     return Provided(title=title, specs=specs + finance, sources=sources, notes=notes,
-                    basis=added + proforma.assumptions_read(read),
+                    basis=added + proforma.values_read(sets),
                     refuses=(composite.finance_refusal if finance else None))
 
 
@@ -719,8 +794,8 @@ register("fermos-family", _fermos_family, _fermos_family_static)
 #
 # OF-BLD-020 §3.3: a forecast of a logistic_v0 fit starts from the fitted
 # run's own start values and runs its own length; a person's other values are
-# this scope's overrides (fermos.forecast_provided), so FermOSForecast.tsx
-# renders no number box of its own (E.1‴).
+# the values set on this scope (fermos.forecast_provided), so
+# FermOSForecast.tsx renders no number box of its own (E.1‴).
 
 
 def _fermos_forecast(ids: tuple[str, ...], req: ParamResolveRequest) -> Provided:
@@ -760,7 +835,7 @@ def check() -> tuple[int, list[str]]:
             for spec in specs:
                 n += 1
                 if not (spec.boundsReason or "").strip():
-                    problems.append(f"{label}: {spec.key} has no boundsReason (OF-BLD-020 D4)")
+                    problems.append(f"{label}: {spec.key} has no boundsReason")
                 if spec.min is not None and spec.max is not None and spec.min > spec.max:
                     problems.append(f"{label}: {spec.key} has min above max")
                 if spec.key in keys:

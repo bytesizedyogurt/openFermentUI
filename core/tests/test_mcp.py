@@ -76,11 +76,12 @@ def test_u1_ask_postdoc_declines_in_words_when_the_loop_fails(monkeypatch):
     from openferment_core import postdoc_agent
 
     def boom(question, **kw):
-        raise FileNotFoundError("corpus.json not found. Generate it with `pnpm export:corpus`")
+        raise RuntimeError("the loop failed")
 
     monkeypatch.setattr(postdoc_agent, "ask", boom)
-    out = _text(asyncio.run(mcp_server.build().call_tool("ask_postdoc", {"question": "What PHB yields?"})))
-    assert out["declined"].startswith("Postdoc could not run") and "export:corpus" in out["declined"]
+    out = _text(asyncio.run(mcp_server.build().call_tool(
+        "ask_postdoc", {"question": "What does the reference cellulosic ethanol plant cost to run?"})))
+    assert out["declined"].startswith("Postdoc could not run") and "the loop failed" in out["declined"]
 
 
 # ── OF-BLD-015 §7.5: the same registry, the reads and the writes, the gates ──
@@ -117,6 +118,7 @@ def test_a_gated_write_through_the_server_is_a_proposal_not_a_write(store, monke
     assert not (store / "guild.json").exists() and len(proposals.open_ones()) == 1
     [line] = audit.read()
     assert line.agent == "model" and line.askId is None  # no ask owns a call from outside the app
+    assert out["auditIds"] == [line.id], "the answer over MCP names the row its proposal left"
     refused = _text(asyncio.run(server.call_tool("pureos_write", {"action": "add", "target": "", "fields": {}, "note": ""})))
     assert "no write function" in refused["error"]
 
@@ -183,7 +185,9 @@ def test_the_server_offers_pureos_propose_as_the_registry_does(store):
 
 def test_the_server_acts_in_the_project_it_was_started_in(monkeypatch):
     from openferment_core import projects
+    from openferment_core.models import ProjectCreate
 
+    projects.create(ProjectCreate(name="Another project", id="another-project", by="test"))
     monkeypatch.setattr(intake, "held", lambda project_id=None: {"doc-1": {"title": projects.current()}})
     out = _text(asyncio.run(mcp_server.build("another-project").call_tool("literature_sources", {})))
     assert out["summary"]["documents"] == [{"documentId": "doc-1", "title": "another-project"}]
@@ -202,6 +206,35 @@ def test_a_server_started_in_no_project_says_how_to_start_it_in_one(monkeypatch)
     assert "--project" in _text(asyncio.run(server.call_tool("get_artifact", {"id": "0000000000000000"})))["error"]
 
 
+def test_a_project_its_store_does_not_hold_is_said_at_every_call(monkeypatch):
+    """Alpha 2.2 D.0 (B5): in its own process the server checks the project
+    at its first call, and while the database lacks it every call says so,
+    naming the project, with nothing read or made."""
+    from openferment_core import catalogues, projects
+    from openferment_core.models import ProjectCreate
+
+    server = mcp_server.build("no-such-project")
+    for name, args, field in (("catalogue_write", {"kind": "skill", "id": "s-1", "name": "S"}, "error"),
+                              ("ask_postdoc", {"question": "q?"}, "declined"),
+                              ("get_artifact", {"id": "0000000000000000"}, "error")):
+        said = _text(asyncio.run(server.call_tool(name, args)))[field]
+        assert "holds no project named 'no-such-project'" in said and "--service <origin>" in said, said
+    assert catalogues.listed("skill") == []
+    projects.create(ProjectCreate(name="Now held", id="no-such-project", by="test"))
+    asked: list[str] = []
+    held = projects.held
+
+    async def counted(project_id: str) -> bool:
+        asked.append(project_id)
+        return await held(project_id)
+
+    monkeypatch.setattr(projects, "held", counted)
+    for _ in range(2):
+        out = _text(asyncio.run(server.call_tool("catalogue_read", {"kind": "skill"})))
+        assert "error" not in out and out["summary"]["matched"] == 0
+    assert asked == ["no-such-project"], "a project held is checked once"
+
+
 def test_an_outside_assistants_numbers_are_its_estimates(monkeypatch):
     from openferment_core.engine import library, simulator
     from test_tools_study import Priced, dearer_cane
@@ -211,3 +244,48 @@ def test_an_outside_assistants_numbers_are_its_estimates(monkeypatch):
     out = _text(asyncio.run(mcp_server.build().call_tool("study_scenario", dearer_cane())))
     (value,) = out["summary"]["values"]
     assert (value["origin"], value["by"]) == ("model-estimate", mcp_server.AUTHOR)
+
+
+def test_a_clients_writes_are_marked_with_the_name_it_declares(monkeypatch):
+    """Appendix B of the alpha 2.2 prompt: a client acts under its own name,
+    and the entry it keeps and the audit line name it."""
+    from mcp import Client
+    from mcp.types import Implementation
+
+    from openferment_core import audit, catalogues, projects
+
+    TEST_PROJECT = projects.current()
+    entry = {"kind": "strain", "id": "placeholder-strain", "name": "A placeholder strain", "note": "a placeholder"}
+
+    async def write(info):
+        async with Client(mcp_server.build(TEST_PROJECT), client_info=info) as client:
+            return _text(await client.call_tool("catalogue_write", entry))
+
+    kept = asyncio.run(write(Implementation(name="example-agent", version="0.1")))
+    assert kept["summary"]["by"] == "example-agent/0.1"
+    with projects.using(TEST_PROJECT):
+        (row,) = [e for e in catalogues.listed("strain") if e.id == "placeholder-strain"]
+        line = next(a for a in audit.read() if a.target == "strain/placeholder-strain")
+    assert row.by == "example-agent/0.1" and "over MCP" in (row.source or "") and row.agent == "model"
+    assert (line.agent, line.who) == ("model", "example-agent/0.1")
+    # Alpha 2.2 D.0: another caller's write leaves this entry as it is, in words naming who kept it.
+    taken = asyncio.run(write(None))["error"]
+    assert taken.startswith("catalogue_write refused:") and "kept by example-agent/0.1" in taken
+    entry = {**entry, "id": "placeholder-strain-2"}
+    assert asyncio.run(write(None))["summary"]["by"] == mcp_server.AUTHOR, "the SDK's default is no name"
+
+
+def test_a_declared_name_is_read_as_name_and_version():
+    class Info:
+        def __init__(self, name, version):
+            self.name, self.version = name, version
+
+    def ctx(info):
+        session = type("S", (), {"client_params": type("P", (), {"client_info": info})()})()
+        return type("C", (), {"request_context": type("R", (), {"session": session})()})()
+
+    assert mcp_server.caller(ctx(Info("example-agent", "0.1"))) == "example-agent/0.1"
+    assert mcp_server.caller(ctx(Info("example-agent/0.1", "0.1"))) == "example-agent/0.1"
+    assert mcp_server.caller(ctx(Info("  ", "0.1"))) == mcp_server.AUTHOR
+    assert mcp_server.caller(ctx(Info("mcp", "0.1.0"))) == mcp_server.AUTHOR
+    assert mcp_server.caller(object()) == mcp_server.AUTHOR

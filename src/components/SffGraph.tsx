@@ -5,7 +5,7 @@
 // runs back, dashed. Feeds enter from the left edge and products leave by the
 // right, each named as the file's metadata names it. Nothing is laid out from
 // a number this page computes beyond the drawing itself.
-import type { SFFGraph } from '@/data/types';
+import type { SFFGraph } from '@/lib/studies';
 
 const BOX_W = 132;
 const BOX_H = 34;
@@ -21,6 +21,9 @@ const EDGE_CHARS = 20;
 const GAP_CHARS = 10;
 // One line of a name's text.
 const LINE = 11;
+
+/** A count with its noun, the noun plural for any count but one: "1 feed", "2 products". */
+const counted = (n: number, noun: string) => `${n} ${n === 1 ? noun : `${noun}s`}`;
 
 function short(text: string, n = 18): string {
   return text.length > n ? `${text.slice(0, n - 1)}…` : text;
@@ -52,10 +55,12 @@ export function SffGraph({ graph, title = 'The flowsheet' }: { graph: SFFGraph; 
   return (
     <figure className="m-0" data-testid="sff-graph" data-units={graph.nodes.length} data-streams={graph.edges.length}>
       <figcaption className="text-caption text-ink-soft mb-1.5">
-        {title}: {graph.nodes.length} units, {graph.edges.length} streams between them, {graph.feeds.length} feeds and{' '}
-        {graph.products.length} products at the boundary
-        {graph.dangling.length > 0 ? `; ${graph.dangling.length} streams name a unit the file does not list` : ''}. A
-        dashed stream closes a recycle.
+        {title}: {counted(graph.nodes.length, 'unit')}, {counted(graph.edges.length, 'stream')} between them, {counted(graph.feeds.length, 'feed')} and{' '}
+        {counted(graph.products.length, 'product')} at the boundary
+        {graph.dangling.length > 0
+          ? `; ${counted(graph.dangling.length, 'stream')} ${graph.dangling.length === 1 ? 'names' : 'name'} a unit the file does not list`
+          : ''}
+        . A dashed stream closes a recycle.
       </figcaption>
       <div className="overflow-auto border border-line rounded-md bg-surface-1" style={{ maxHeight: 520 }}>
         <svg

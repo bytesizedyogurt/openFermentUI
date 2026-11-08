@@ -12,14 +12,16 @@ catalogued here (`catalogue`).
 """
 from __future__ import annotations
 
+import json
 from types import SimpleNamespace
 
 import pytest
 from fastapi.testclient import TestClient
 
 from openferment_core import artifacts, fermos, geneos_models, intake, proforma
+from standins import assumed_inputs, inputs_json, proforma_units
 import standins  # test-only stand-ins, moved out of demo.py (alpha 2.0 stage 1)
-from openferment_core.models import FermosPoint, FermosSeries, InputAssumption, ProformaRunRequest
+from openferment_core.models import FermosPoint, FermosSeries, InputAssumption, Override, ProformaRunRequest
 
 ETHANOL = "ethanol_glucose_v0"
 BY = "openFerment test fixture"
@@ -29,6 +31,12 @@ HELD = "sc-held-1"  # a scenario the service holds by its id, as the `held` fixt
 LOWEST, MEDIAN, HIGHEST = 0.4, 0.45, 0.48
 # Stand-in ceilings, chosen here around those yields.
 OVER_ALL, BETWEEN, UNDER_ALL = 0.5, 0.46, 0.3
+
+
+def over(key, value, low, high, scenario=MADE_HERE) -> Override:
+    """A person's value of a scenario's input, as the parameter panel keeps it (an Override of its scope)."""
+    return Override(scope=f"proforma:{scenario}", key=key, value=value, low=low, high=high, by=BY, at="2026-10-20",
+                    note="a STAND-IN for a test")
 
 
 def assume(key, value, low=None, high=None):
@@ -113,7 +121,7 @@ def test_a_yield_under_the_ceiling_is_within_and_not_flagged(pool):
 
 def test_a_yield_above_the_ceiling_is_flagged_and_never_clamped(pool):
     before = proforma.bind_flowsheet(ETHANOL, pool=pool)
-    run_before = proforma.run(ProformaRunRequest(scenarioId=MADE_HERE, flowsheet=ETHANOL, assumptions=ASSUMED), pool=pool)
+    run_before = proforma.run(ProformaRunRequest(scenarioId=MADE_HERE, flowsheet=ETHANOL, inputs=assumed_inputs(ASSUMED)), pool=pool)
     ceiling(UNDER_ALL)
     c = check(pool)
     r = row(c)
@@ -126,7 +134,7 @@ def test_a_yield_above_the_ceiling_is_flagged_and_never_clamped(pool):
     # The binding and the run are unchanged by a ceiling on file.
     after = proforma.bind_flowsheet(ETHANOL, pool=pool)
     assert after.model_dump() == before.model_dump()
-    run_after = proforma.run(ProformaRunRequest(scenarioId=MADE_HERE, flowsheet=ETHANOL, assumptions=ASSUMED), pool=pool)
+    run_after = proforma.run(ProformaRunRequest(scenarioId=MADE_HERE, flowsheet=ETHANOL, inputs=assumed_inputs(ASSUMED)), pool=pool)
     assert run_after.artifactId == run_before.artifactId
     assert not any(i.name == "yield cap" for i in artifacts.get(run_after.artifactId).inputs)
     # And the check kept nothing: the store holds the ceiling and the run alone.
@@ -216,7 +224,7 @@ def test_a_host_filter_on_the_models_strain_maps_by_strain(pool):
 
 def test_a_yield_a_person_assumed_is_read_against_the_ceiling_with_its_range(pool):
     ceiling(BETWEEN)
-    c = check(pool, host="s-cerevisiae-s288c", assumptions=[assume("yield", 0.42, 0.4, 0.47)])
+    c = check(pool, host="s-cerevisiae-s288c", overrides=[over("yield", 0.42, 0.4, 0.47)])
     r = row(c)
     assert c.yieldBinding == "assumption" and c.yieldSource.by == BY
     assert r.flag == "above" and r.yieldHighGPerG == pytest.approx(0.47) and r.recordsAbove == []
@@ -249,9 +257,9 @@ def test_a_fermos_fit_feeds_the_yield_the_check_reads(pool):
 
 
 def test_it_is_refused_in_words_as_the_binding_is(pool, held):
-    with pytest.raises(proforma.ScenarioRefused, match="reference biorefinery"):
+    with pytest.raises(proforma.ScenarioRefused, match="there is no flowsheet corn_drygrind on the shelf"):
         check(pool, scenario=MADE_HERE, flowsheet="corn_drygrind")
-    with pytest.raises(proforma.ScenarioRefused, match="no held scenario"):
+    with pytest.raises(proforma.ScenarioRefused, match="no kept scenario"):
         check(pool, scenario=MADE_HERE, flowsheet=None)
     with pytest.raises(proforma.ScenarioRefused, match="runs ethanol_glucose_v0, not custom_train_v1"):
         check(pool, scenario=HELD, flowsheet="custom_train_v1")
@@ -271,12 +279,14 @@ def test_the_endpoint_answers_a_held_and_a_made_scenario_and_refuses_in_words(cl
     assert made.status_code == 200 and made.json()["scenarioId"] == MADE_HERE
     host = client.get("/api/proforma/ceiling-check", params={
         "scenarioId": HELD, "host": "s-cerevisiae-s288c",
-        "assumptions": f"[{assume('yield', 0.42, 0.4, 0.47).model_dump_json()}]"})
+        "inputs": json.dumps(inputs_json([over("yield", 0.42, 0.4, 0.47, scenario=HELD)], proforma_units(ETHANOL)))})
     assert host.status_code == 200, host.text
     assert host.json()["yieldBinding"] == "assumption" and host.json()["rows"][0]["match"] == "strain"
     for params, said in (({"scenarioId": HELD, "fits": "[1]"}, "fits is a JSON object"),
-                         ({"scenarioId": HELD, "assumptions": "{}"}, "assumptions is a JSON list"),
-                         ({"scenarioId": MADE_HERE, "flowsheet": "cornstover_benchmark"}, "reference biorefinery"),
+                         ({"scenarioId": HELD, "inputs": "{}"}, "inputs is a JSON list"),
+                         ({"scenarioId": HELD, "overrides": "[]"}, "overrides is retired"),
+                         ({"scenarioId": MADE_HERE, "flowsheet": "cornstover_benchmark"},
+                          "there is no flowsheet cornstover_benchmark on the shelf"),
                          ({"scenarioId": HELD, "fits": '{"yield": "0000000000000000"}'}, "no kept artifact")):
         r = client.get("/api/proforma/ceiling-check", params=params)
         assert r.status_code == 422 and said in r.json()["detail"], (params, r.text)

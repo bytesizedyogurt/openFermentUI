@@ -1,5 +1,5 @@
 """The geneOS worker: flux balance analysis, in a process of its own
-(OF-BLD-014 §6.2, Appendix 2).
+(Appendix 2).
 
 The only module in openferment_core that imports `cobra` (test_workers holds
 it to that). It loads the shelf's models on first use and keeps them warm,
@@ -330,7 +330,7 @@ def _model(args: dict[str, Any]) -> tuple[Model, str]:
     """A fresh copy of the loaded model for each request. The solver keeps
     its basis from the last solve, so a warm model's answer differed in the
     last digits with what it solved before, and a kept ceiling did not replay
-    identically (OF-BLD-014 §10.2, found by the nightly replay). The file is
+    identically (found by the nightly replay). The file is
     still read once; the copy starts the solver cold every time."""
     model_id = str(args.get("modelId", ""))
     return load(model_id, args.get("path")).copy(), model_id

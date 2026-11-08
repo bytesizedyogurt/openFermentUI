@@ -4,10 +4,25 @@
 // service computes and keeps each as an artifact; with it down this says so,
 // and nothing stands in for a result (E.2). Shares lib/http.ts's call, so the
 // two failures are the same two: down, or refused in words.
-import type { ExtractionRecord, FieldId, GeneosModelInfo, GeneosResult, ParameterDef } from '@/data/types';
-import { ONTOLOGY_BY_ID } from '@/data/ontology';
+//
+// Every shape the service answers is its own, generated from its models into
+// src/api/types.gen.ts (ADR-007). The hosts are the project's strains, as its
+// strain catalogue keeps them (lib/catalogues.ts, alpha 2.2 E.9); a scenario
+// names a strain by any of the names its entry keeps (`namesStrain`).
+import type { components } from '@/api/types.gen';
+import { ONTOLOGY_BY_ID, type FieldId, type ParameterDef } from '@/data/ontology';
 import { carbonSourceId } from '@/data/vocabulary';
+import type { Strain } from './catalogues';
+import type { Scenario } from './proforma';
+import type { ExtractionRecord } from './review';
 import { ServiceDown, ServiceRefused, call } from './http';
+
+type S = components['schemas'];
+
+/** One model on geneOS's shelf: its host, its scope and route, its licence, and why it cannot be loaded here, if so. */
+export type GeneosModelInfo = S['GeneosModelInfo'];
+/** A ceiling, a frontier or a sugar mix: an artifact and its evidence, or a finding in words with no number. */
+export type GeneosResult = S['GeneosResult'];
 
 export { ServiceDown as GeneosDown, ServiceRefused as GeneosRefused };
 
@@ -38,7 +53,7 @@ export const YIELD_FIELD: Record<string, FieldId> = {
 };
 
 /** How a view names each product: in the picker, in a title, on an axis. */
-export interface ProductWords {
+interface ProductWords {
   /** The picker's option. */
   option: string;
   /** In a sentence: "How much ethanol…". */
@@ -98,4 +113,18 @@ export function yieldsOnSugar(
   const yields = records.filter((r) => r.field === field);
   const on = yields.filter((r) => r.carbonSource && carbonSourceId(r.carbonSource) === sugar);
   return { on, elsewhere: yields.length - on.length };
+}
+
+/** The names a strain goes by: its name, its species and the other names papers give it, as its entry keeps them. */
+export const strainNames = (s: Pick<Strain, 'name' | 'species' | 'aliases'>): string[] =>
+  [s.name, s.species ?? '', ...(s.aliases ?? [])].filter(Boolean);
+
+/**
+ * Whether a scenario names a strain: one of `names` (`strainNames`), longer than two letters, in the scenario's name,
+ * description or product. The service binds a scenario's inputs to records each time it runs, and the scenario's row
+ * holds its name, its description and its product, so a strain links to a scenario by name.
+ */
+export function namesStrain(sc: Pick<Scenario, 'name' | 'description' | 'product'>, names: string[]): boolean {
+  const text = `${sc.name} ${sc.description} ${sc.product}`.toLowerCase();
+  return names.some((n) => n.length > 2 && text.includes(n.toLowerCase()));
 }

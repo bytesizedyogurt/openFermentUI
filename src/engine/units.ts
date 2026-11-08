@@ -8,7 +8,7 @@
 // fixed set of inputs, and test_units.py asserts the service answers the same
 // on every pair. A disagreement fails the test and names the pair.
 
-export interface UnitDef {
+interface UnitDef {
   family: string;
   factor: number; // multiply by this to get family base
   offset?: number; // affine (temperature): base = value * factor + offset
@@ -161,7 +161,7 @@ export const REFUSALS: { a: string; b: string; because: string }[] = [
       'Currency conversion needs an exchange rate with a date attached. The engine will not invent one — record the rate and the date as an explicit assumption.',
   },
   {
-    // OF-BLD-014 §2.1: a PHA content and a PHA titre.
+    // A product's content and its titre.
     a: 'percentCdw',
     b: 'massConc',
     because:
@@ -205,7 +205,7 @@ export function explainRefusal(fromUnit: string, toUnit: string): string | null 
 }
 
 // The SI/canonical display unit chosen per family for the "SI twin".
-export const SI_UNIT: Record<string, string> = {
+const SI_UNIT: Record<string, string> = {
   proteinShare: '% TSP',
   stoichiometry: 'mol mol⁻¹',
   fold: '×',
@@ -240,7 +240,7 @@ export const SI_UNIT: Record<string, string> = {
 };
 
 // Alias normalization: accept human/ASCII notations.
-export const ALIASES: Record<string, string> = {
+const ALIASES: Record<string, string> = {
   '1/h': 'h⁻¹',
   'h-1': 'h⁻¹',
   '/h': 'h⁻¹',
@@ -315,7 +315,7 @@ export const ALIASES: Record<string, string> = {
   '%tsp': '% TSP',
   '%tcp': '% TCP',
   // OF-BLD-014 §2.1. '%CDW' reaches the first through the lower-cased lookup;
-  // 'wt%' and '% (w/w)' are how PHA papers write a polymer's share of the
+  // 'wt%' and '% (w/w)' are how papers write a product's share of the
   // dry cells.
   '%cdw': '% CDW',
   '% cdw': '% CDW',
@@ -437,6 +437,16 @@ export function parseQuantity(text: string): { value: number; unit: string } | n
   return { value, unit };
 }
 
+const SUPERSCRIPT: Record<string, string> = { '-': '⁻', '0': '⁰', '1': '¹', '2': '²', '3': '³', '4': '⁴', '5': '⁵', '6': '⁶', '7': '⁷', '8': '⁸', '9': '⁹' };
+
+/** An integer exponent as superscript digits: 7 → ⁷, −6 → ⁻⁶. */
+function superscript(n: number): string {
+  return String(n)
+    .split('')
+    .map((c) => SUPERSCRIPT[c] ?? c)
+    .join('');
+}
+
 /** Format a number for display: sensible significant digits, no trailing noise. */
 /**
  * Format a value for display. Categorical records (kinase_identity,
@@ -449,7 +459,8 @@ export function fmt(value: number | string, maxDecimals = 3): string {
   if (value === 0) return '0';
   const abs = Math.abs(value);
   if (abs >= 10000 || abs < 0.001) {
-    return value.toExponential(2).replace('e', '×10^').replace('×10^+', '×10^');
+    const [mantissa, exponent] = value.toExponential(2).split('e');
+    return `${mantissa}×10${superscript(Number(exponent))}`;
   }
   let decimals = maxDecimals;
   if (abs >= 100) decimals = Math.min(1, maxDecimals);

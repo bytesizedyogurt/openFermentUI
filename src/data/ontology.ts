@@ -1,7 +1,7 @@
 // The record fields (alpha 2.0): what an extracted record may hold, in four
 // families. `core/openferment_core/schema/fields.yaml` is the source; this
-// file mirrors it until stage 7 serves the fields from the API, and
-// core/tests/test_schema.py holds the two equal through the fixture
+// file mirrors it and declares the types the mirror is written in (alpha 2.2
+// E.4), and core/tests/test_schema.py holds the two equal through the fixture
 // `pnpm export:unit-fixtures` writes. A field carries no range and no example
 // value: a definition states what a number means and never what one is
 // (ADR-010).
@@ -14,7 +14,75 @@
 //   Rule 2 — `expression_pct_tsp` and the titer fields are NOT
 //   interconvertible without cell density and total-protein fraction. The unit
 //   engine refuses and says why (see engine/units.ts `explainRefusal`).
-import type { FieldId, ParameterDef, ParameterFamily } from './types';
+
+type ParameterFamily =
+  | 'expression'
+  | 'cultivation'
+  | 'downstream'
+  | 'kinetics';
+
+/**
+ * The record fields (`core/openferment_core/schema/fields.yaml`, mirrored in
+ * ONTOLOGY below): thirty-four fields in four families.
+ */
+export type FieldId =
+  // Expression performance
+  | 'expression_pct_tsp'
+  | 'titer_intracellular'
+  | 'titer_secreted'
+  | 'secreted_fraction'
+  | 'fold_improvement'
+  | 'transformation_efficiency'
+  | 'time_to_colony'
+  // Cultivation
+  | 'growth_rate_mu'
+  | 'final_biomass_density'
+  | 'volumetric_productivity'
+  | 'medium_component_conc'
+  // Downstream & economics
+  | 'disruption_protein_yield'
+  | 'disruption_energy'
+  | 'minimum_selling_price'
+  | 'step_recovery'
+  | 'product_purity'
+  | 'partition_coefficient'
+  | 'sieving_coefficient'
+  | 'cake_moisture'
+  // Growth and product kinetics
+  | 'monod_ks'
+  | 'biomass_yield_substrate'
+  | 'ethanol_yield_substrate'
+  | 'ethanol_titre'
+  | 'ethanol_productivity'
+  | 'ethanol_inhibition_ki'
+  | 'ethanol_max_conc'
+  | 'substrate_inhibition_ki'
+  | 'ethanol_lp_alpha'
+  | 'ethanol_lp_beta'
+  | 'ethanol_mesp'
+  | 'maintenance_coefficient'
+  | 'biomass_yield_oxygen'
+  | 'specific_oxygen_uptake'
+  | 'kla_measured';
+
+export interface ParameterDef {
+  id: FieldId;
+  family: ParameterFamily;
+  name: string;
+  definition: string;
+  /** '' for categorical fields (kinase_identity, glycan_species). */
+  canonicalUnit: string;
+  /** A categorical field holds a string value. */
+  categorical?: boolean;
+  /** OF-COR-001 §17 Rule 1: a value without its method is not interpretable. */
+  requiresMethod?: boolean;
+  /**
+   * Unit families this field must NOT be auto-converted into, with the reason.
+   * OF-COR-001 §17 Rule 2: %TSP and g/L are not interconvertible without cell
+   * density and total-protein fraction. The engine refuses and says why.
+   */
+  refuseConversionTo?: { field: FieldId; because: string }[];
+}
 
 export const FAMILY_LABEL: Record<ParameterFamily, string> = {
   expression: 'Expression performance',
@@ -143,7 +211,7 @@ export const ONTOLOGY: ParameterDef[] = [
     family: 'downstream',
     name: 'Step recovery',
     definition:
-      'The share of the product entering one named downstream step that leaves it in the stream carried on, by mass: a centrifuge, a filter, a membrane or a column. Not an overall yield over several steps, not a purity (product_purity), and not a yield on substrate.',
+      'The share of the product entering one named downstream step that leaves it in the stream carried on, by mass: a centrifuge, a filter, a membrane or a column. It covers one step; a yield over several steps and a yield on substrate are other quantities, and the product\'s share of what a step delivers is product_purity.',
     canonicalUnit: '%',
   },
   {
@@ -151,7 +219,7 @@ export const ONTOLOGY: ParameterDef[] = [
     family: 'downstream',
     name: 'Product purity',
     definition:
-      'The product\'s share of what a step delivers, by the measure the paper names (of total protein, or of dry matter). Not a recovery (step_recovery), and not a concentration such as a titre.',
+      'The product\'s share of what a step delivers, by the measure the paper names (of total protein, or of dry matter). A step\'s recovery is step_recovery, and a concentration such as a titre is another quantity.',
     canonicalUnit: '%',
   },
   {
@@ -159,7 +227,7 @@ export const ONTOLOGY: ParameterDef[] = [
     family: 'downstream',
     name: 'Partition coefficient',
     definition:
-      'A solute\'s concentration in the extract phase over its concentration in the raffinate phase at equilibrium, for a named solvent system: a ratio with no unit. Not a recovery over a step (step_recovery), and not a sieving coefficient (sieving_coefficient), which is a membrane\'s.',
+      'A solute\'s concentration in the extract phase over its concentration in the raffinate phase at equilibrium, for a named solvent system: a ratio with no unit. A step\'s recovery is step_recovery, and a membrane\'s passage of a solute is sieving_coefficient.',
     canonicalUnit: '',
   },
   {
@@ -167,7 +235,7 @@ export const ONTOLOGY: ParameterDef[] = [
     family: 'downstream',
     name: 'Sieving coefficient',
     definition:
-      'The share of a solute\'s concentration that passes a named membrane into the permeate, permeate over retentate concentration: one less the rejection, a ratio with no unit. Not a recovery over a whole step (step_recovery), and not a partition coefficient (partition_coefficient).',
+      'The share of a solute\'s concentration that passes a named membrane into the permeate, permeate over retentate concentration: one less the rejection, a ratio with no unit. A whole step\'s recovery is step_recovery, and a solute\'s split between two liquid phases is partition_coefficient.',
     canonicalUnit: '',
   },
   {
@@ -175,7 +243,7 @@ export const ONTOLOGY: ParameterDef[] = [
     family: 'downstream',
     name: 'Cake moisture',
     definition:
-      'Water as a share of a filter or centrifuge cake\'s mass as it is discharged, wet basis. Not a dried product\'s moisture, and not the solids content of a broth.',
+      'Water as a share of a filter or centrifuge cake\'s mass as it is discharged, wet basis. A dried product\'s moisture and a broth\'s solids content are other quantities.',
     canonicalUnit: '%',
   },
   // ── Growth and product kinetics ───────────────────────────────────────
@@ -184,7 +252,7 @@ export const ONTOLOGY: ParameterDef[] = [
     family: 'kinetics',
     name: 'Substrate saturation constant (Ks)',
     definition:
-      'The substrate concentration at which the specific growth rate is half its maximum in a Monod-type growth model, as a mass concentration of the limiting substrate. A fitted or reported model parameter: not a substrate concentration supplied to or measured in the medium (medium_component_conc), and not the constant of a substrate-inhibition term (substrate_inhibition_ki).',
+      'The substrate concentration at which the specific growth rate is half its maximum in a Monod-type growth model, as a mass concentration of the limiting substrate. A fitted or reported model parameter: a substrate concentration supplied to or measured in the medium is medium_component_conc, and the constant of a substrate-inhibition term is substrate_inhibition_ki.',
     canonicalUnit: 'g L⁻¹',
   },
   {
@@ -192,7 +260,7 @@ export const ONTOLOGY: ParameterDef[] = [
     family: 'kinetics',
     name: 'Biomass yield on substrate (Yx/s)',
     definition:
-      'Grams of dry biomass formed per gram of substrate consumed, over the phase or run the quote states, whether observed or fitted as a model parameter. Not a yield on oxygen or on a product, and not a yield per mole or per C-mole, which belongs to no field.',
+      'Grams of dry biomass formed per gram of substrate consumed, over the phase or run the quote states, whether observed or fitted as a model parameter. A yield on oxygen is biomass_yield_oxygen; a yield on a product, and a yield per mole or per C-mole, belong to no field.',
     canonicalUnit: 'g g⁻¹',
   },
   {
@@ -208,7 +276,7 @@ export const ONTOLOGY: ParameterDef[] = [
     family: 'kinetics',
     name: 'Ethanol titre',
     definition:
-      'Ethanol concentration in the broth, as mass per volume, at the time the quote states — commonly the final or peak concentration of a run. A measured concentration, not the model parameter at which ethanol stops growth (ethanol_max_conc). A concentration given as a percentage by volume needs the density of ethanol to become a mass, and belongs to no field.',
+      'Ethanol concentration in the broth, as mass per volume, at the time the quote states — commonly the final or peak concentration of a run. A measured concentration; the model parameter at which ethanol stops growth is ethanol_max_conc. A concentration given as a percentage by volume needs the density of ethanol to become a mass, and belongs to no field.',
     canonicalUnit: 'g L⁻¹',
   },
   {
@@ -216,7 +284,7 @@ export const ONTOLOGY: ParameterDef[] = [
     family: 'kinetics',
     name: 'Ethanol volumetric productivity',
     definition:
-      'Ethanol formed per litre of broth per hour, over the period the quote states. Use it rather than volumetric_productivity when the product is ethanol. Not a specific rate per gram of biomass, which belongs to no field.',
+      'Ethanol formed per litre of broth per hour, over the period the quote states. When the product is ethanol its volumetric productivity goes here, and volumetric_productivity holds every other product\'s. A specific rate per gram of biomass belongs to no field.',
     canonicalUnit: 'g L⁻¹ h⁻¹',
   },
   {
@@ -240,7 +308,7 @@ export const ONTOLOGY: ParameterDef[] = [
     family: 'kinetics',
     name: 'Substrate inhibition constant (KiS)',
     definition:
-      'The substrate concentration constant of a substrate-inhibition term in an Andrews- or Haldane-type growth model, the term that lowers the specific growth rate as substrate accumulates. Not the saturation constant (monod_ks), and not an ethanol constant.',
+      'The substrate concentration constant of a substrate-inhibition term in an Andrews- or Haldane-type growth model, the term that lowers the specific growth rate as substrate accumulates. The saturation constant is monod_ks, and a constant of ethanol\'s is another quantity.',
     canonicalUnit: 'g L⁻¹',
   },
   {
@@ -248,7 +316,7 @@ export const ONTOLOGY: ParameterDef[] = [
     family: 'kinetics',
     name: 'Luedeking–Piret growth-associated coefficient (α)',
     definition:
-      'The growth-associated coefficient α of the Luedeking–Piret model dP/dt = α dX/dt + β X, where P is ethanol and X is biomass: grams of ethanol formed per gram of biomass formed. A fitted model coefficient, not a yield on substrate.',
+      'The growth-associated coefficient α of the Luedeking–Piret model dP/dt = α dX/dt + β X, where P is ethanol and X is biomass: grams of ethanol formed per gram of biomass formed. A fitted model coefficient; a yield on substrate is another quantity.',
     canonicalUnit: 'g g⁻¹',
   },
   {
@@ -280,7 +348,7 @@ export const ONTOLOGY: ParameterDef[] = [
     family: 'kinetics',
     name: 'Maintenance coefficient (m)',
     definition:
-      'Grams of substrate consumed per gram of dry biomass per hour to keep the cells alive rather than to grow, as the maintenance term of a Pirt-type substrate balance, whether fitted or reported. A model parameter: not a specific substrate uptake rate measured in a run, not an oxygen maintenance coefficient, and not a yield on substrate (biomass_yield_substrate).',
+      'Grams of substrate consumed per gram of dry biomass per hour to keep the cells alive, beside what growth takes, as the maintenance term of a Pirt-type substrate balance, whether fitted or reported. A model parameter: a specific substrate uptake rate measured in a run and an oxygen maintenance coefficient are other quantities, and a yield on substrate is biomass_yield_substrate.',
     canonicalUnit: 'g g⁻¹ h⁻¹',
   },
   {
@@ -288,7 +356,7 @@ export const ONTOLOGY: ParameterDef[] = [
     family: 'kinetics',
     name: 'Biomass yield on oxygen (Yx/o)',
     definition:
-      'Grams of dry biomass formed per gram of oxygen consumed, over the phase or run the quote states, whether observed or fitted as a model parameter. Not a yield on substrate (biomass_yield_substrate), and not a yield per mole of oxygen or a respiratory quotient, which belong to no field.',
+      'Grams of dry biomass formed per gram of oxygen consumed, over the phase or run the quote states, whether observed or fitted as a model parameter. A yield on substrate is biomass_yield_substrate; a yield per mole of oxygen and a respiratory quotient belong to no field.',
     canonicalUnit: 'g g⁻¹',
   },
   {
@@ -296,7 +364,7 @@ export const ONTOLOGY: ParameterDef[] = [
     family: 'kinetics',
     name: 'Specific oxygen uptake rate (qO2)',
     definition:
-      'Oxygen consumed per gram of dry biomass per hour, in moles, as measured in a run or fitted as a model parameter. Not a volumetric oxygen uptake or transfer rate per litre of broth, and not a mass-transfer coefficient (kla_measured).',
+      'Oxygen consumed per gram of dry biomass per hour, in moles, as measured in a run or fitted as a model parameter. A rate per gram of biomass: a volumetric uptake or transfer rate per litre of broth is another quantity, and the mass-transfer coefficient is kla_measured.',
     canonicalUnit: 'mmol g⁻¹ h⁻¹',
   },
   {
@@ -304,7 +372,7 @@ export const ONTOLOGY: ParameterDef[] = [
     family: 'kinetics',
     name: 'Volumetric oxygen mass-transfer coefficient (kLa)',
     definition:
-      'The volumetric mass-transfer coefficient of oxygen from gas to liquid that a paper measured or reports for its vessel and conditions, per unit time. A property of the vessel, the broth and how it is stirred and aerated, not of the cells: not an oxygen uptake rate (specific_oxygen_uptake) and not a transfer rate per litre of broth.',
+      'The volumetric mass-transfer coefficient of oxygen from gas to liquid that a paper measured or reports for its vessel and conditions, per unit time. A property of the vessel, the broth and how it is stirred and aerated: the cells\' oxygen uptake is specific_oxygen_uptake, and a transfer rate per litre of broth is another quantity.',
     canonicalUnit: 'h⁻¹',
   },
 ];
@@ -313,8 +381,18 @@ export const ONTOLOGY_BY_ID: Record<FieldId, ParameterDef> = Object.fromEntries(
   ONTOLOGY.map((d) => [d.id, d]),
 ) as Record<FieldId, ParameterDef>;
 
-export function fieldName(id: FieldId): string {
-  return ONTOLOGY_BY_ID[id]?.name ?? id;
+/**
+ * Whether the service's field id is one this list names (alpha 2.2 E.4). The
+ * service writes a record's field as a string; the store keeps a record whose
+ * field passes, and every reader indexes the ontology by it.
+ */
+export function isFieldId(id: string): id is FieldId {
+  return Object.prototype.hasOwnProperty.call(ONTOLOGY_BY_ID, id);
+}
+
+/** A field's name, or its id when this list names no such field (a run's false positive keeps the service's string). */
+export function fieldName(id: string): string {
+  return isFieldId(id) ? ONTOLOGY_BY_ID[id].name : id;
 }
 
 /** Fields where a value without its analytical method is not interpretable. */

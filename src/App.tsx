@@ -3,6 +3,7 @@
 import { ProjectHome } from '@/screens/ProjectHome';
 import { FlowsheetPage } from '@/screens/FlowsheetPage';
 import Flowsheets from '@/screens/Flowsheets';
+import Catalogues from '@/screens/Catalogues';
 import { Component, useEffect, useRef, useState, type ReactNode } from 'react';
 import {
   FlaskConical,
@@ -18,7 +19,7 @@ import {
   PanelLeftOpen,
 } from 'lucide-react';
 import { useStore } from '@/store';
-import { useRoute, navigate } from '@/router';
+import { useRoute, navigate, href } from '@/router';
 import { cx, Popover, Toasts, Sheet } from '@/components/ui';
 import { CommandPalette } from '@/components/CommandPalette';
 import { JobsPanel } from '@/components/JobsTray';
@@ -48,7 +49,7 @@ import RunbookDetail from '@/screens/RunbookDetail';
 import Protocols from '@/screens/Protocols';
 import ProtocolDetail from '@/screens/ProtocolDetail';
 import ProtocolEditor from '@/screens/ProtocolEditor';
-import Deposition from '@/screens/Deposition';
+import Deposition, { DepositionBench } from '@/screens/Deposition';
 import DepositionDetail from '@/screens/DepositionDetail';
 import Proforma from '@/screens/Proforma';
 import ProformaScenario from '@/screens/ProformaScenario';
@@ -94,7 +95,7 @@ function SignedIn() {
   const reviewer = useStore((s) => s.reviewer.trim());
   return (
     <a
-      href="#/settings/corpus"
+      href={href('/settings/corpus')}
       className={cx('text-caption truncate max-w-[12rem] hover:underline', reviewer ? 'text-ink' : 'text-signal-warn')}
       title={reviewer ? `Decisions and assumptions are signed ${reviewer}. Change it in Settings.` : 'Set your reviewer name in Settings'}
       data-testid="signed-in"
@@ -172,6 +173,9 @@ function Screen() {
   if (route.project && !a) return <ProjectHome project={route.project} />;
   if (!a) return <Home />;
   if (a === 'flowsheets') return b ? <FlowsheetPage recordId={b} /> : <Flowsheets />;
+  // alpha 2.2 E.8 — the project's catalogues, a tab a kind: /catalogues (the strains), /catalogues/products,
+  // /catalogues/skills, /catalogues/lessons.
+  if (a === 'catalogues') return <Catalogues view={b} />;
   switch (a) {
     case 'intake':
       if (b === 'ingest') return <IntakeIngest />;
@@ -218,12 +222,12 @@ function Screen() {
     case 'proforma':
       if (b === 'scenario' && c) return <ProformaScenario scenarioId={c} />;
       // OF-BLD-019 §3.3 — 'reference' is a reserved second segment: a
-      // reference biorefinery's page by its shelf id; with no id, the index,
-      // whose Reference runs row lists them.
+      // reference plant's page by its id on the library shelf (alpha 2.2 D8);
+      // with no id, the index, whose Reference runs row lists them.
       // Keyed by id (OF-BLD-019 §3.R, findings 13, 24): a run still in flight
       // when the reader moves to the other reference lands on the page that
       // asked, never on this one.
-      if (b === 'reference') return c ? <ProformaReference key={c} flowsheetId={c} /> : <Proforma />;
+      if (b === 'reference') return c ? <ProformaReference key={c} plantId={c} /> : <Proforma />;
       // Execution prompt §9.1 step 5 — 'studies', 'runs' and 'comparisons' are
       // reserved too: the project's studies, an engine run by its id, a
       // comparison by its artifact's id. Keyed by id, so one page opened over
@@ -240,23 +244,24 @@ function Screen() {
         if (c && d === 'edit') return <ProtocolEditor protocolId={c} />;
         return c ? <ProtocolDetail protocolId={c} /> : <Protocols />;
       }
-      if (b === 'depositions') return c ? <DepositionDetail depositionId={c} /> : <Depositions />;
+      // A deposition's /bench records the readings alone, a full-screen takeover like a protocol's run (alpha 2.2 C.5).
+      if (b === 'depositions') {
+        if (c && d === 'bench') return <DepositionBench key={c} depositionId={c} />;
+        return c ? <DepositionDetail depositionId={c} /> : <Depositions />;
+      }
       // OF-BLD-014 §9.3 — 'ledger' is reserved too: a runbook with that id would be unreachable.
       if (b === 'ledger') return <RunbookLedger />;
       return b ? <RunbookDetail runbookId={b} /> : <Runbooks />;
     case 'primer':
-      // Lesson ids are globally unique, so /primer/l0-1 addresses a lesson on
-      // its own. /primer/m0/l0-1 still resolves — an old deep link should not
-      // need a redirect when the id it carries is enough. 'path' and
-      // 'practice' are reserved before the lesson lookup (OF-BLD-013 §3.3,
-      // §4.3), so a lesson that took either as an id would be unreachable.
+      // A lesson is an entry of the project's lesson catalogue (alpha 2.2 E.12),
+      // addressed by its id alone: /primer/<lesson>. An address of the module
+      // era, /primer/<module>/<lesson>, still reaches the lesson its last part
+      // names. 'path' and 'practice' are reserved before the lesson lookup
+      // (OF-BLD-013 §3.3, §4.3), so a lesson that took either as an id would be
+      // unreachable.
       if (b === 'path') return <PrimerPath />;
       if (b === 'practice') return <PrimerPractice id={c} />;
-      if (b && c) return <PrimerLesson moduleId={b} lessonId={c} />;
-      if (b) {
-        const owner = useStore.getState().modules.find((m) => m.lessons.some((l) => l.id === b));
-        if (owner) return <PrimerLesson moduleId={owner.id} lessonId={b} />;
-      }
+      if (b) return <PrimerLesson key={c ?? b} lessonId={c ?? b} />;
       return <Primer />;
     case 'guild':
       // OF-BLD-013 §1.4. 'matrix', 'people', 'skills' and 'checks' are
@@ -343,14 +348,16 @@ export default function App() {
   const hydrateOverlay = useStore((s) => s.hydrateOverlay);
   const loadProjects = useStore((s) => s.loadProjects);
   const hydrateProjectState = useStore((s) => s.hydrateProjectState);
+  const hydrateCatalogues = useStore((s) => s.hydrateCatalogues);
+  const hydrateProtocols = useStore((s) => s.hydrateProtocols);
   const route = useRoute();
   const [gPressed, setGPressed] = useState(false);
   const lastFrame = useRef(performance.now());
 
   const inDeposition =
     route.segments[0] === 'runbooks' &&
-    route.segments[1] === 'protocols' &&
-    route.segments[3] === 'run';
+    ((route.segments[1] === 'protocols' && route.segments[3] === 'run') ||
+      (route.segments[1] === 'depositions' && route.segments[3] === 'bench'));
   // A witnessed check at the bench (OF-BLD-013 §5.4) takes the screen the same way.
   const inBenchCheck = route.segments[0] === 'guild' && route.segments[1] === 'checks' && route.segments[3] === 'run';
 
@@ -360,12 +367,16 @@ export default function App() {
   useEffect(() => {
     // alpha 2.0 (ADR-005) — the projects first, so every later call to the
     // service names the open one; then the service's overlay, applied when
-    // the service answers and silent when it does not; then, with what this
-    // browser still owes the service read, the open project's rows.
+    // the service answers and silent when it does not, the project's strains,
+    // products, skills and lessons from its catalogues (alpha 2.2 E.9, E.12)
+    // and its protocols (ADR-017); then, with what this browser still owes the
+    // service read, the open project's rows.
     const projects = loadProjects();
     void projects.then(() => hydrateOverlay());
+    void projects.then(() => hydrateCatalogues());
+    void projects.then(() => hydrateProtocols());
     void Promise.all([hydrateDurable(), projects]).then(() => hydrateProjectState());
-  }, [hydrateDurable, hydrateOverlay, loadProjects, hydrateProjectState]);
+  }, [hydrateDurable, hydrateOverlay, loadProjects, hydrateProjectState, hydrateCatalogues, hydrateProtocols]);
 
   // Theme / density / motion applied at the document root.
   useEffect(() => {
@@ -503,7 +514,7 @@ export default function App() {
               return (
                 <a
                   key={item.to}
-                  href={`#${item.to}`}
+                  href={href(item.to)}
                   className={cx(
                     'flex items-start gap-2.5 rounded-btn px-2 py-1.5 text-body transition-colors',
                     active
@@ -525,9 +536,9 @@ export default function App() {
                       {/* §7 — the gloss. Eight invented words with no
                           explanation is friction the names have not earned
                           yet, and this is the cheapest possible fix. */}
-                      {/* Wraps to two lines rather than truncating. Eleven
-                          entries at two lines still fit the shortest rail
-                          this ships on. */}
+                      {/* Wraps to two lines, so a gloss reads whole. The
+                          rail scrolls when its twelve entries run past the
+                          window's height. */}
                       <span
                         className={cx(
                           'block text-caption leading-tight',
@@ -545,7 +556,7 @@ export default function App() {
 
           <div className="border-t border-line px-2 py-2 space-y-0.5">
             <a
-              href="#/settings/appearance"
+              href={href('/settings/appearance')}
               className={cx(
                 'flex items-center gap-2.5 rounded-btn px-2 py-1.5 text-body text-ink-soft hover:text-ink hover:bg-ink-soft/[0.06]',
                 ui.railCollapsed && 'justify-center px-0',
@@ -646,7 +657,7 @@ export default function App() {
             <SignedIn />
           </header>
 
-          <main id="of-main" className="flex-1 overflow-y-auto of-grid">
+          <main id="of-main" className="relative flex-1 overflow-y-auto of-grid">
             <div className="p-5 max-w-[1600px]">
               <ProjectNeeded />
               <ScreenBoundary key={route.segments[0] ?? 'home'}>

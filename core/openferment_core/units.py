@@ -1,4 +1,4 @@
-"""Units — the engine's tables and the record fields (OF-BLD-012 §5.3).
+"""Units — the engine's tables and the record fields.
 
 The four tables — the unit definitions, the alias map, the per-family SI
 twin, and the refusals that carry a reason — live in `schema/units.json`, and

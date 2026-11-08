@@ -78,9 +78,9 @@ determinism after `empty_recycles()` and `tea._sales = 0`.
   a `sim` test). The library run draws no Graphviz diagram: its SFF file's graph is its drawing.
 - Not yet: the shelf's two hand-written reference entries (`cornstover_benchmark`,
   `corn_drygrind`) still serve the reference run and its screen beside the library plants
-  `cornstover` and `corn`; they retire when the UI reads the library shelf (stage 7). A scenario of
-  a ProcessModel (cellulosic's feedstock, gas_fermentation's carbon source) is not offered: a
-  plant runs on its default scenario.
+  `cornstover` and `corn`; they retire when the UI reads the library shelf (stage 7; they retired
+  at alpha 2.2 C.6, below). A scenario of a ProcessModel (cellulosic's feedstock,
+  gas_fermentation's carbon source) is not offered: a plant runs on its default scenario.
 
 ### 4.3 (2026-10-30)
 
@@ -198,9 +198,37 @@ determinism after `empty_recycles()` and `tea._sales = 0`.
   3.6e-5 and the installed cost 2e-9 (measured), and every number it moves is outside; the TEA's
   sales guess kept alone moves nothing.
 
+### Alpha 2.2 (2026-11-03): the adapter is the `biosteam` engine
+
+- The revisit condition below, a second engine, is met by alpha 2.2, and ADR-015 records the
+  contract every engine keeps. `engine/biosteam.py` puts this adapter behind the `Engine` protocol,
+  registered by `core/pyproject.toml`'s entry point of the group `openferment.engines`; the
+  library runner, the composed flowsheet and every number and gate above stand as they are.
+
+### Alpha 2.2 (2026-11-04): the shelf's two reference entries retire (D8)
+
+- `cornstover_benchmark` and `corn_drygrind` leave Proforma's shelf, with their flowsheet modules,
+  the routes `/api/proforma/benchmark` and `/api/proforma/reference/{id}`, and the live code
+  that ran them. The reference run and its screen read the library shelf's `cornstover` and
+  `corn` (`GET /api/library`, the project's runs, `POST /api/library/{plant}/run`), each held to
+  its package's own test as every library run is (ADR-013); `selling_price` reads a library
+  plant's newest run on its package's own values by the plant's id, and Proforma's module read
+  lists library runs.
+- `proforma.reference` and `proforma_benchmark` stay registered, so an artifact a person kept
+  replays: the code that computed each lives on in `workers/kept_references.py`, which the
+  Proforma worker's `replay_reference` and `replay_benchmark` alone reach, and the package test's
+  values are the library plant's. A kept run's tables read as any run's, and a train standing on
+  one reads its streams; its SFF file is the library plant's run to write.
+- What the library path gives the retired entries gave: the plant's tables, its stream table
+  (`stream_table`), a train's inlet and a train read from its run (`STREAM_TOOLS`, `RUN_TOOLS`),
+  and the plant drawn from its SFF file's graph. Not yet given: the benchmark's price per gallon
+  (the library run prices its product per kilogram, and reading the package's own density per
+  gallon waits for a library run to read it), a Graphviz drawing of a library plant (its SFF
+  graph draws it), and pureOS → Train's page for a library run (`pureos.TABLE_RUNS`).
+
 ## Revisit condition
 
-A second engine; NSKinetics once a kinetic model exists.
+A second engine (met in alpha 2.2: ADR-015); NSKinetics once a kinetic model exists.
 
 ## Evidence
 

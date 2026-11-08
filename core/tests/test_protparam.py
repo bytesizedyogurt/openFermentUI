@@ -239,7 +239,7 @@ def test_a_damaged_answer_is_a_409_in_words(store, seed, client):
     plant_damaged(art.id)
     for r in (client.get("/api/protparam", params={"product": "insulin-b-chain"}),
               client.post("/api/protparam", json={"product": "insulin-b-chain"})):
-        assert r.status_code == 409 and f"{art.id} is damaged on disk" in r.json()["detail"], r.text
+        assert r.status_code == 409 and f"{art.id} is damaged in its row" in r.json()["detail"], r.text
 
 
 def test_both_tools_are_registered_when_the_service_starts_and_biopython_waits():

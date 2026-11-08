@@ -10,7 +10,7 @@
 // says exactly why and what would make the conversion possible, rather than
 // throwing. A stage that halts on a number with no source is the same shape of
 // event: not an error, a guardrail, with two honest ways forward.
-import { useMemo, useState } from 'react';
+import { useState } from 'react';
 import {
   ArrowRight,
   CircleDollarSign,
@@ -24,11 +24,10 @@ import {
   Link2,
   Wallet,
 } from 'lucide-react';
-import type { Runbook } from '@/data/types';
+import { measuresOf, outputsOf, predictionsOf, stagesOf, type Runbook } from '@/lib/studies';
 import { useStore } from '@/store';
 import { href, navigate } from '@/router';
 import { RUNBOOK_STATUS_LABEL, RUNBOOK_STATUS_NOTE } from '@/data/labels';
-import { enumerationFunnel, funnelSummary, funnelWidest } from '@/engine/geneos/enumeration';
 import { lockIntact } from '@/engine/lock';
 import { ledgerRows } from '@/engine/ledger';
 import { IntervalLedger } from '@/components/figures';
@@ -43,7 +42,6 @@ import {
   Callout,
   Card,
   EmptyState,
-  Explain,
   LinkButton,
   Modal,
   PageHeader,
@@ -52,11 +50,10 @@ import {
 } from '@/components/ui';
 
 /**
- * A stage `value` is free text on purpose — stages produce titres, CAPEX
- * figures, candidate counts and clearance verdicts, and forcing one shape
- * would lose most of them. This spots the ones written as vocabulary ids so an
- * unresolved term can be labelled rather than printed as though it were a
- * finding.
+ * A stage `value` is free text on purpose: a stage may answer with a titre, a
+ * cost figure or a count, and free text holds each of them. This spots a value
+ * written as a vocabulary id, so the page marks it as a term no vocabulary of
+ * this build carries.
  */
 function looksLikeVocabularyId(value: string): boolean {
   return /^[a-z]+(-[a-z]+)+$/.test(value);
@@ -70,8 +67,9 @@ function StatePanel({ runbook }: { runbook: Runbook }) {
   const resolveReview = useStore((s) => s.resolveRunbookReview);
   const promote = useStore((s) => s.promoteRunbook);
 
-  const blockedStage = runbook.stages.find((s) => s.status === 'blocked');
-  const reviewStage = runbook.stages.find((s) => s.status === 'review');
+  const stages = stagesOf(runbook);
+  const blockedStage = stages.find((s) => s.status === 'blocked');
+  const reviewStage = stages.find((s) => s.status === 'review');
 
   if (runbook.status === 'blocked_unverified') {
     return (
@@ -112,18 +110,18 @@ function StatePanel({ runbook }: { runbook: Runbook }) {
           Priced, not authorised
         </div>
         <h2 className="font-serif text-section-title font-semibold leading-snug">
-          {runbook.estCostUsd === null
+          {runbook.estCostUsd == null
             ? 'This run has not been priced.'
             : `Running this costs about $${runbook.estCostUsd} of compute.`}
         </h2>
         <p className="text-body text-ink-soft mt-1.5 max-w-3xl">
-          Enumeration is the one input somebody authorises before it is spent, so the board has a
-          state for it rather than a footnote. Nothing runs until you say yes.
+          A person authorises a runbook&rsquo;s compute before it is spent, and the board groups
+          the runbooks waiting on that in a column of their own. Nothing runs until you say yes.
         </p>
         <div className="flex flex-wrap gap-2 mt-3">
           <Button variant="primary" onClick={() => authorise(runbook.id)}>
             <Wallet size={14} /> Authorise
-            {runbook.estCostUsd === null ? '' : ` $${runbook.estCostUsd}`}
+            {runbook.estCostUsd == null ? '' : ` $${runbook.estCostUsd}`}
           </Button>
         </div>
       </Card>
@@ -172,7 +170,7 @@ function StatePanel({ runbook }: { runbook: Runbook }) {
         </div>
         <h2 className="font-serif text-section-title font-semibold leading-snug">
           A prior run already answered this, for{' '}
-          {runbook.estCostUsd === null ? 'nothing' : `$${runbook.estCostUsd.toFixed(2)}`}.
+          {runbook.estCostUsd == null ? 'nothing' : `$${runbook.estCostUsd.toFixed(2)}`}.
         </h2>
         <p className="text-body text-ink-soft mt-1.5 max-w-3xl">
           {runbook.note} Caching artifacts rather than answers is what makes the second question
@@ -193,9 +191,9 @@ function StatePanel({ runbook }: { runbook: Runbook }) {
           A research runbook that finds something becomes an industrial one in a single action.
         </h2>
         <p className="text-body text-ink-soft mt-1.5 max-w-3xl">
-          Promotion carries the finding across rather than restarting the work: the clearance
-          reading becomes the industrial runbook&rsquo;s first stage, already done, and the host
-          and molecule come with it.
+          Promotion carries the finding across: what this runbook&rsquo;s finished stages found
+          becomes the industrial runbook&rsquo;s first stage, already done, and its host, its
+          product, its predictions and its measures come with it.
         </p>
         <div className="flex flex-wrap gap-2 mt-3">
           <Button
@@ -217,7 +215,7 @@ function StatePanel({ runbook }: { runbook: Runbook }) {
       <Card className="p-4">
         <div className="text-caption uppercase tracking-wide text-ink-soft mb-1">Scoped only</div>
         <h2 className="font-serif text-section-title font-semibold leading-snug">
-          {runbook.stages[0]?.detail ?? 'Nothing has been run yet.'}
+          {stages[0]?.detail ?? 'Nothing has been run yet.'}
         </h2>
         <p className="text-body text-ink-soft mt-1.5 max-w-3xl">{runbook.note}</p>
       </Card>
@@ -240,10 +238,12 @@ function PredictionPanel({ runbook }: { runbook: Runbook }) {
   const revise = useStore((st) => st.reviseRunbookPrediction);
   const supersede = useStore((st) => st.supersedeRunbook);
   const intact = lockIntact(runbook);
-  const locked = runbook.lockedAt !== null;
-  const measuresFor = (predictionId: string) =>
-    runbook.measurementSchema.filter((m) => m.predictionId === predictionId);
-  const unpredicted = runbook.measurementSchema.filter((m) => m.predictionId === null);
+  // A row served as kept leaves out a field it never set: a runbook with no lock time is unlocked, and a measure
+  // that names no prediction is context nobody predicted.
+  const locked = runbook.lockedAt != null;
+  const predictions = predictionsOf(runbook);
+  const measuresFor = (predictionId: string) => measuresOf(runbook).filter((m) => m.predictionId === predictionId);
+  const unpredicted = measuresOf(runbook).filter((m) => m.predictionId == null);
 
   return (
     <Card className="p-4">
@@ -273,14 +273,14 @@ function PredictionPanel({ runbook }: { runbook: Runbook }) {
         )}
       </div>
 
-      {runbook.predictions.length === 0 ? (
+      {predictions.length === 0 ? (
         <EmptyState
           title="Nothing predicted yet"
           body="This runbook is scoped but has not committed to a number. Until it does there is nothing for a bench result to confirm or refute."
         />
       ) : (
         <ul className="space-y-3">
-          {runbook.predictions.map((p) => {
+          {predictions.map((p) => {
             const tests = measuresFor(p.id);
             return (
               <li key={p.id}>
@@ -382,12 +382,12 @@ function PredictionPanel({ runbook }: { runbook: Runbook }) {
             <Button
               variant="primary"
               onClick={() => lock(runbook.id)}
-              disabled={runbook.predictions.length === 0}
+              disabled={predictions.length === 0}
             >
               <Lock size={14} /> Lock predictions
             </Button>
             <span className="text-caption text-ink-soft">
-              {runbook.predictions.length === 0
+              {predictions.length === 0
                 ? 'Nothing to freeze yet.'
                 : 'Editable until frozen. After that the runbook is superseded, never rewritten.'}
             </span>
@@ -405,94 +405,29 @@ function PredictionPanel({ runbook }: { runbook: Runbook }) {
   );
 }
 
-// ── the enumeration funnel (research runbooks only) ────────────────────
-
-function EnumerationFunnel({ runbook }: { runbook: Runbook }) {
-  const funnel = useMemo(() => enumerationFunnel(runbook), [runbook]);
-  const widest = funnelWidest(funnel);
-  const summary = funnelSummary(funnel);
-
-  return (
-    <Card className="p-4">
-      <div className="flex items-baseline justify-between gap-3 mb-2">
-        <div className="text-caption uppercase tracking-wide text-ink-soft">
-          Enumeration funnel
-        </div>
-        <Explain label="How the funnel is derived">
-          Read back out of the stages rather than authored beside them, so the two cannot
-          disagree. A number counts as a population only when the stage&rsquo;s own words say what
-          it counts &mdash; a strain designation and a buffer percentage both contain digits and
-          neither is a candidate. Stages that have produced no count are listed, not interpolated.
-        </Explain>
-      </div>
-
-      {funnel.steps.length === 0 ? (
-        <EmptyState
-          title="Nothing quantified yet"
-          body="No stage has reported a candidate count. The funnel appears as soon as one does — it is derived from the stages, so there is nothing to draw until they say something."
-        />
-      ) : (
-        <ol className="space-y-2">
-          {funnel.steps.map((s, i) => (
-            <li key={`${s.stage.name}-${i}`}>
-              <div className="flex items-baseline justify-between gap-3">
-                <span className="text-body truncate">{s.stage.name}</span>
-                <span className="font-num text-body shrink-0">
-                  {s.count.toLocaleString()}{' '}
-                  <span className="text-ink-soft text-caption">{s.unit}</span>
-                </span>
-              </div>
-              <div className="mt-1 h-2 w-full rounded-full bg-ink-soft/12 overflow-hidden">
-                <div
-                  className="h-full rounded-full bg-accent"
-                  style={{ width: `${widest > 0 ? Math.max(1.5, (s.count / widest) * 100) : 0}%` }}
-                />
-              </div>
-            </li>
-          ))}
-        </ol>
-      )}
-
-      {summary && <p className="text-caption text-ink-soft mt-2">{summary}</p>}
-
-      {funnel.unquantified.length > 0 && (
-        <div className="mt-3 pt-3 border-t border-line">
-          <div className="text-caption uppercase tracking-wide text-ink-soft mb-1.5">
-            Not quantified
-          </div>
-          <ul className="space-y-1">
-            {funnel.unquantified.map((s, i) => (
-              <li key={`${s.name}-${i}`} className="flex items-start gap-2 text-caption">
-                <StageIcon status={s.status} size={13} />
-                <span className="text-ink-soft">
-                  <span className="text-ink">{s.name}</span> — {stageMeta(s.status).label}
-                  {s.status === 'blocked' && ' · the run stopped here'}
-                </span>
-              </li>
-            ))}
-          </ul>
-        </div>
-      )}
-    </Card>
-  );
-}
-
 /**
  * Launching a Deposition (OF-BLD-006 §4, COMPONENTS.md).
  *
  * Deposition is launched FROM a Runbook, not from a protocol: the runbook is
  * what supplies the predictions and the measurement schema, and without those
  * a run has nothing to be reconciled against. The protocol supplies the steps.
+ * The readings alone need no protocol (alpha 2.2 C.5): each of the runbook's
+ * measures is recorded at the bench DepositionBench serves, and a reading a
+ * person confirms there is one a scenario's value may name.
  */
 function StartDeposition({ runbook }: { runbook: Runbook }) {
   const protocols = useStore((s) => s.protocols);
   const depositions = useStore((s) => s.depositions);
   const openDeposition = useStore((s) => s.openDeposition);
+  // A reading names the person who took it (measurements.py), so the readings alone wait for a name.
+  const reviewer = useStore((s) => s.reviewer.trim());
   const [pick, setPick] = useState(false);
   const [scale, setScale] = useState(1);
 
   const mine = depositions.filter((d) => d.runbookId === runbook.id);
-  const blocked = runbook.lockedAt === null;
+  // A runbook with no lock time is unlocked, and a deposition waits for its predictions to freeze.
+  const blocked = runbook.lockedAt == null;
+  const measures = measuresOf(runbook);
 
   return (
     <Card className="p-4">
@@ -537,27 +472,55 @@ function StartDeposition({ runbook }: { runbook: Runbook }) {
         </ul>
       )}
 
-      <Modal open={pick} onClose={() => setPick(false)} title="Which protocol will you run?" width={520}>
+      <Modal open={pick} onClose={() => setPick(false)} title="How will you record it?" width={520}>
         <p className="text-body text-ink-soft mb-3">
-          The runbook supplies the predictions and the measurement schema. The protocol supplies the
+          The runbook supplies the predictions and the measurement schema. A protocol, where you run one, supplies the
           steps and the quantities.
         </p>
-        <label className="block text-caption uppercase tracking-wide text-ink-soft mb-1">
-          Scale versus the base batch
-        </label>
-        <input
-          className="input font-num mb-3"
-          type="number"
-          min={0.1}
-          step={0.1}
-          value={scale}
-          onChange={(e) => setScale(Math.max(0.1, Number(e.target.value) || 1))}
-          aria-label="Scale multiplier"
-        />
-        {protocols.length === 0 && (
-          <p className="text-body text-ink-soft mb-2" data-testid="no-protocols">
-            No protocol is on file yet, so none is offered here.
+        <button
+          className="w-full text-left card p-3 mb-2 hover:border-accent/45 hover:bg-accent-wash/40 disabled:opacity-60"
+          style={{ minHeight: 44 }}
+          data-testid="deposition-readings-alone"
+          disabled={!reviewer}
+          onClick={() => {
+            const started = openDeposition(runbook.id, null, scale);
+            setPick(false);
+            if (started) navigate(`/runbooks/depositions/${encodeURIComponent(started.depositionId)}/bench`);
+          }}
+        >
+          <div className="font-medium">The readings alone</div>
+          <div className="text-caption text-ink-soft">
+            Each of this runbook&rsquo;s {measures.length} measure{measures.length === 1 ? '' : 's'} recorded at the
+            bench, with no protocol&rsquo;s steps around them
+          </div>
+        </button>
+        {!reviewer && (
+          <p className="text-caption text-ink-soft mb-2" data-testid="deposition-needs-name">
+            A reading names the person who took it: set yours in Settings first.
           </p>
+        )}
+        {protocols.length === 0 ? (
+          <p className="text-body text-ink-soft mb-2" data-testid="no-protocols">
+            No protocol is on file yet; the runbook&rsquo;s measures can be recorded alone.
+          </p>
+        ) : (
+          <>
+            <div className="text-caption uppercase tracking-wide text-ink-soft mt-3 mb-1">With a protocol&rsquo;s steps</div>
+            <label className="block text-caption text-ink-soft mb-1" htmlFor="deposition-scale">
+              Scale versus the protocol&rsquo;s base batch
+            </label>
+            <input
+              id="deposition-scale"
+              className="input font-num mb-3"
+              style={{ minHeight: 44 }}
+              type="number"
+              min={0.1}
+              step={0.1}
+              value={scale}
+              onChange={(e) => setScale(Math.max(0.1, Number(e.target.value) || 1))}
+              aria-label="Scale multiplier"
+            />
+          </>
         )}
         <ul className="space-y-1.5 max-h-[320px] overflow-y-auto">
           {protocols.map((p) => (
@@ -593,11 +556,11 @@ function RunbookLedgerFigure({ runbook }: { runbook: Runbook }) {
     <div className="mb-4">
       <IntervalLedger
         title={`What does ${runbook.title} predict, and what was measured?`}
-        rows={runbook.predictions.map((p) => ({
+        rows={predictionsOf(runbook).map((p) => ({
           key: p.id,
           label: p.label,
           prediction: p,
-          lockedAt: runbook.lockedAt,
+          lockedAt: runbook.lockedAt ?? null,
           observed: tested.get(p.id)?.observed ?? null,
           held: tested.get(p.id)?.held ?? null,
         }))}
@@ -630,7 +593,7 @@ export default function RunbookDetail({ runbookId }: { runbookId: string }) {
           <EmptyState
             icon={<GitBranch size={22} aria-hidden />}
             title={`No runbook with the id “${runbookId}”`}
-            body="The board lists every runbook in this session, grouped by what it is waiting on."
+            body="The project keeps no runbook of that id; the link may be from another project. The board lists every runbook the project keeps, grouped by what it is waiting on."
             action={<LinkButton to="/runbooks">Back to the board</LinkButton>}
           />
         </Card>
@@ -638,7 +601,11 @@ export default function RunbookDetail({ runbookId }: { runbookId: string }) {
     );
   }
 
-  const done = runbook.stages.filter((s) => s.status === 'done').length;
+  const stages = stagesOf(runbook);
+  const outputs = outputsOf(runbook);
+  const done = stages.filter((s) => s.status === 'done').length;
+  // A row served as kept may leave out its progress, which then stands at none.
+  const progress = runbook.progressPct ?? 0;
 
   return (
     <>
@@ -670,7 +637,8 @@ export default function RunbookDetail({ runbookId }: { runbookId: string }) {
         {strain && (
           <a href={href(`/geneos/hosts/${strain.id}`)} className="chip text-ink-soft hover:border-accent/45">
             <FlaskConical size={12} aria-hidden />
-            <span className="italic">{strain.binomial}</span>
+            {strain.species && <span className="italic">{strain.species}</span>}
+            <span>{strain.name}</span>
           </a>
         )}
         <span className="chip text-ink-soft font-num">{runbook.id}</span>
@@ -681,10 +649,10 @@ export default function RunbookDetail({ runbookId }: { runbookId: string }) {
           <div className="min-w-[180px] flex-1">
             <div className="flex items-baseline justify-between gap-3 mb-1">
               <span className="text-caption uppercase tracking-wide text-ink-soft">Progress</span>
-              <span className="font-num text-body">{runbook.progressPct}%</span>
+              <span className="font-num text-body">{progress}%</span>
             </div>
             <Bar
-              value={runbook.progressPct}
+              value={progress}
               max={100}
               className={
                 runbook.status === 'blocked_unverified'
@@ -696,7 +664,7 @@ export default function RunbookDetail({ runbookId }: { runbookId: string }) {
             />
             <div className="text-caption text-ink-soft mt-1">
               <span className="font-num">{done}</span> of{' '}
-              <span className="font-num">{runbook.stages.length}</span> stages resolved
+              <span className="font-num">{stages.length}</span> stages resolved
             </div>
           </div>
           <div>
@@ -710,7 +678,7 @@ export default function RunbookDetail({ runbookId }: { runbookId: string }) {
               <CircleDollarSign size={12} aria-hidden /> Compute
             </div>
             <div className="font-num text-section-title">
-              {runbook.estCostUsd === null
+              {runbook.estCostUsd == null
                 ? 'unpriced'
                 : `$${runbook.estCostUsd < 1 ? runbook.estCostUsd.toFixed(2) : runbook.estCostUsd}`}
             </div>
@@ -728,7 +696,7 @@ export default function RunbookDetail({ runbookId }: { runbookId: string }) {
           <div className="text-caption uppercase tracking-wide text-ink-soft mb-1">
             Why this runbook is here
           </div>
-          <p className="font-serif text-reading">{runbook.note}</p>
+          <p className="font-serif text-reading">{runbook.note || 'This runbook keeps no note of why it is here.'}</p>
         </Tick>
       </Card>
 
@@ -736,9 +704,9 @@ export default function RunbookDetail({ runbookId }: { runbookId: string }) {
       <section className="mb-6" aria-labelledby="band-stages">
         <SectionTitle
           right={
-            runbook.outputs.length > 0 ? (
+            outputs.length > 0 ? (
               <span className="font-num text-caption text-ink-soft">
-                {runbook.outputs.length} outputs
+                {outputs.length} outputs
               </span>
             ) : undefined
           }
@@ -748,88 +716,85 @@ export default function RunbookDetail({ runbookId }: { runbookId: string }) {
         <div className="mb-2">
           <ComponentTag
             component="Runbook"
-            action={`${runbook.kind} claim · ${runbook.stages.length} stages`}
+            action={`${runbook.kind} claim · ${stages.length} stages`}
           />
         </div>
 
-        <div
-          className={cx(
-            'grid grid-cols-1 gap-4',
-            runbook.kind === 'research' ? 'lg:grid-cols-[minmax(0,1.3fr)_minmax(0,1fr)]' : '',
+        <Card className="p-4">
+          {stages.length === 0 && (
+            <p className="text-body text-ink-soft" data-testid="runbook-no-stages">
+              This runbook holds no stages: a runbook made from a study or drafted by Postdoc
+              starts with its predictions and the measures that test them, below.
+            </p>
           )}
-        >
-          <Card className="p-4">
-            <ol className="space-y-3">
-              {runbook.stages.map((s, i) => {
-                const meta = stageMeta(s.status);
-                return (
-                  <li key={`${s.name}-${i}`} className="flex items-start gap-2.5">
-                    <span className="mt-[3px]">
-                      <StageIcon status={s.status} />
-                    </span>
-                    <div className="min-w-0 flex-1">
-                      <div className="flex items-baseline justify-between gap-3">
-                        <span
-                          className={cx(
-                            'font-medium leading-snug',
-                            s.status === 'pending' && 'text-ink-soft',
-                          )}
-                        >
-                          {s.name}
-                        </span>
-                        <span className={cx('text-caption shrink-0', meta.color)}>{meta.label}</span>
-                      </div>
-                      {s.detail && (
-                        <div className="text-body text-ink-soft mt-0.5 leading-snug">{s.detail}</div>
-                      )}
-                      {s.value && (
-                        <div className="mt-1">
-                          {looksLikeVocabularyId(s.value) ? (
-                            // A hyphenated lowercase token that resolves to
-                            // nothing is a term this build does not carry, not
-                            // a finding. Showing it as one would dress an
-                            // unresolved reference up as an answer, so it is
-                            // labelled instead.
-                            <span
-                              className="chip text-ink-soft font-num text-[11px] py-0"
-                              title="This stage recorded a term that is in no vocabulary this build carries. It is shown as written."
-                            >
-                              {s.value} · not in the vocabulary
-                            </span>
-                          ) : (
-                            <span className="font-num text-body text-accent">{s.value}</span>
-                          )}
-                        </div>
-                      )}
+          <ol className="space-y-3">
+            {stages.map((s, i) => {
+              const meta = stageMeta(s.status);
+              return (
+                <li key={`${s.name}-${i}`} className="flex items-start gap-2.5">
+                  <span className="mt-[3px]">
+                    <StageIcon status={s.status} />
+                  </span>
+                  <div className="min-w-0 flex-1">
+                    <div className="flex items-baseline justify-between gap-3">
+                      <span
+                        className={cx(
+                          'font-medium leading-snug',
+                          s.status === 'pending' && 'text-ink-soft',
+                        )}
+                      >
+                        {s.name}
+                      </span>
+                      <span className={cx('text-caption shrink-0', meta.color)}>{meta.label}</span>
                     </div>
-                  </li>
-                );
-              })}
-            </ol>
+                    {s.detail && (
+                      <div className="text-body text-ink-soft mt-0.5 leading-snug">{s.detail}</div>
+                    )}
+                    {s.value && (
+                      <div className="mt-1">
+                        {looksLikeVocabularyId(s.value) ? (
+                          // A hyphenated lowercase token that resolves to
+                          // nothing is a term this build does not carry, not
+                          // a finding. Showing it as one would dress an
+                          // unresolved reference up as an answer, so it is
+                          // labelled instead.
+                          <span
+                            className="chip text-ink-soft font-num text-[11px] py-0"
+                            title="This stage recorded a term that is in no vocabulary this build carries. It is shown as written."
+                          >
+                            {s.value} · not in the vocabulary
+                          </span>
+                        ) : (
+                          <span className="font-num text-body text-accent">{s.value}</span>
+                        )}
+                      </div>
+                    )}
+                  </div>
+                </li>
+              );
+            })}
+          </ol>
 
-            {runbook.outputs.length > 0 && (
-              <div className="mt-4 pt-3 border-t border-line">
-                <div className="text-caption uppercase tracking-wide text-ink-soft mb-1.5">
-                  Outputs
-                </div>
-                <div className="flex flex-wrap gap-1.5">
-                  {runbook.outputs.map((o) => (
-                    <span key={o} className="chip text-accent border-accent/40">
-                      <FileCheck2 size={12} aria-hidden />
-                      {o}
-                    </span>
-                  ))}
-                </div>
-                <p className="text-caption text-ink-soft mt-2">
-                  Artifacts, not files. This build names what a finished runbook hands over; it
-                  does not generate the documents themselves.
-                </p>
+          {outputs.length > 0 && (
+            <div className="mt-4 pt-3 border-t border-line">
+              <div className="text-caption uppercase tracking-wide text-ink-soft mb-1.5">
+                Outputs
               </div>
-            )}
-          </Card>
-
-          {runbook.kind === 'research' && <EnumerationFunnel runbook={runbook} />}
-        </div>
+              <div className="flex flex-wrap gap-1.5">
+                {outputs.map((o) => (
+                  <span key={o} className="chip text-accent border-accent/40">
+                    <FileCheck2 size={12} aria-hidden />
+                    {o}
+                  </span>
+                ))}
+              </div>
+              <p className="text-caption text-ink-soft mt-2">
+                Artifacts, not files. This build names what a finished runbook hands over; it
+                does not generate the documents themselves.
+              </p>
+            </div>
+          )}
+        </Card>
       </section>
 
       {/* ── predictions ─────────────────────────────────────────────────── */}
@@ -842,7 +807,7 @@ export default function RunbookDetail({ runbookId }: { runbookId: string }) {
           run, and the measurements that will test them — frozen together, so the platform cannot
           quietly move a prediction toward a result it has already seen.
         </p>
-        {runbook.predictions.length > 0 && <RunbookLedgerFigure runbook={runbook} />}
+        {predictionsOf(runbook).length > 0 && <RunbookLedgerFigure runbook={runbook} />}
         <Dossier runbook={runbook} />
         <div className="grid grid-cols-1 lg:grid-cols-[minmax(0,1.4fr)_minmax(0,1fr)] gap-4">
           <PredictionPanel runbook={runbook} />
@@ -856,13 +821,13 @@ export default function RunbookDetail({ runbookId }: { runbookId: string }) {
           <span id="band-train">Process train</span>
         </SectionTitle>
         <Card className="p-4">
+          {/* A product's catalogue entry keeps its class, its location and its sequence; pureOS builds and proposes trains. */}
           <ProcessTrain
-            unitOperationIds={product?.unitOperationIds ?? []}
-            strainId={runbook.strainId ?? product?.defaultStrainId ?? null}
-            processCode={product?.processCode}
+            unitOperationIds={[]}
+            strainId={runbook.strainId ?? null}
             emptyBody={
               product
-                ? 'This product declares no unit operations, so there is no train to draw yet.'
+                ? `${product.name}'s catalogue entry keeps its class, where the cells leave it and its sequence. A train of unit operations is built in pureOS, unit by unit, or proposed there for a product and a host.`
                 : 'This runbook names no product, so it has no process train to draw.'
             }
           />

@@ -3,13 +3,14 @@
 // its provenance attached. This is the screen that makes the corpus auditable.
 import { useCallback, useMemo, useState } from 'react';
 import { ClipboardCheck, Download, Gauge, Table2 } from 'lucide-react';
-import type { ExtractionRecord } from '@/data/types';
+import type { ExtractionRecord } from '@/lib/review';
 import { fieldName } from '@/data/ontology';
 import { useStore, provenanceOf } from '@/store';
 import { href, navigate, useRoute } from '@/router';
 import { unitFamily } from '@/engine/units';
 import { DataTable, type Column, type FacetDef } from '@/components/DataTable';
 import { CitationChip } from '@/components/Chip';
+import { idTail, shortTitle } from '@/lib/cite';
 import { ProvenanceLegend, type ProvKind } from '@/components/Provenance';
 import { Quantity } from '@/components/QuantityField';
 import {
@@ -62,6 +63,7 @@ const FAMILY_LABEL: Record<string, string> = {
   rpm: 'Agitation (rpm)',
   length: 'Length (m)',
   costUSDVolume: 'Price per volume (USD gal⁻¹)',
+  fold: 'Fold change (×)',
   unrecognised: 'Unrecognised unit',
 };
 
@@ -270,11 +272,11 @@ export default function Intake() {
       render: ({ rec }) => (
         <a
           href={href(`/biorepo/paper/${rec.paperId}?span=${rec.id}`)}
-          className="font-num text-accent hover:underline"
+          className="font-num text-accent hover:underline whitespace-nowrap"
           title={`Open ${rec.id} anchored in ${rec.paperId}`}
           onClick={(e) => e.stopPropagation()}
         >
-          {rec.id}
+          {idTail(rec.id)}
         </a>
       ),
       value: ({ rec }) => rec.id,
@@ -309,17 +311,17 @@ export default function Intake() {
       width: '116px',
       priority: 1,
       render: ({ rec }) => (
-        <span className="font-num text-ink-soft">{(si ? rec.si.unit : rec.unit) || '—'}</span>
+        <span className="font-num text-ink-soft whitespace-nowrap">{(si ? rec.si.unit : rec.unit) || '—'}</span>
       ),
       value: ({ rec }) => (si ? rec.si.unit : rec.unit) || '—',
     },
     {
       key: 'paper',
       header: 'Source',
-      width: '92px',
+      width: '132px',
       priority: 1,
       render: ({ rec }) => (
-        <span onClick={(e) => e.stopPropagation()}>
+        <span className="whitespace-nowrap" onClick={(e) => e.stopPropagation()}>
           <CitationChip paperId={rec.paperId} />
         </span>
       ),
@@ -422,7 +424,12 @@ export default function Intake() {
       valuesOf: ({ rec }) => (rec.gold ? [rec.status, 'gold'] : [rec.status]),
       labelOf: (v) => STATUS_FACET_LABEL[v] ?? v,
     },
-    { key: 'paper', label: 'Paper', valuesOf: ({ rec }) => [rec.paperId] },
+    {
+      key: 'paper',
+      label: 'Paper',
+      valuesOf: ({ rec }) => [rec.paperId],
+      labelOf: (v) => shortTitle(papers.find((p) => p.id === v)?.title ?? v, 40),
+    },
     { key: 'band', label: 'Confidence', valuesOf: ({ band }) => [band] },
     {
       key: 'family',
@@ -473,7 +480,7 @@ export default function Intake() {
 
       {paperParam && (
         <span className="chip chip-active">
-          Scoped to <span className="font-num">{paperParam}</span>
+          Scoped to <span title={paperParam}>{scopedPaper ? shortTitle(scopedPaper.title, 40) : paperParam}</span>
           <button
             className="text-ink-soft hover:text-ink ml-1"
             onClick={() => navigate('/intake')}
@@ -532,7 +539,7 @@ export default function Intake() {
             body={
               paperParam
                 ? scopedPaper
-                  ? `${scopedPaper.title} is in the corpus but nothing has been extracted from it in this session. Run the extractor from the paper reader to stage candidate records.`
+                  ? `${scopedPaper.title} is in the corpus, and the project holds no record extracted from it yet. Run the extractor from the paper reader to stage candidate records.`
                   : `${paperParam} is not a document this project holds.`
                 : 'Documents arrive through Intake. Fetch a paper from the ingest queue, then run the extractor to stage candidate records here.'
             }
@@ -585,7 +592,7 @@ export default function Intake() {
 
       {scopedPaper && (
         <div className="mb-3">
-          <Callout kind="info" title={`Scoped to ${scopedPaper.id}`}>
+          <Callout kind="info" title={`Scoped to ${shortTitle(scopedPaper.title, 60)}`}>
             Showing only records extracted from{' '}
             <span className="font-serif">{scopedPaper.title}</span>. Facet counts below describe this
             subset.{' '}

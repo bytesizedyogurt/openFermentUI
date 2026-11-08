@@ -1,4 +1,4 @@
-"""geneOS's shelf of published reaction networks (OF-BLD-014 §6.2).
+"""geneOS's shelf of published reaction networks.
 
 Data alone: which models there are, where each file comes from, how a sugar
 enters each and the product leaves, and the add-on route to the product where

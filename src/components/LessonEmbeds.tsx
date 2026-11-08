@@ -9,8 +9,9 @@ import { useMemo, useState } from 'react';
 import { ArrowRight, Check, SkipForward, X } from 'lucide-react';
 import { useStore, provenanceOf, aggregateExclusion, isAggregatable, EXCLUSION_NOTE, useSkillById } from '@/store';
 import { href, navigate } from '@/router';
-import type { FieldId, LessonBlock } from '@/data/types';
-import { ONTOLOGY_BY_ID, fieldName } from '@/data/ontology';
+import type { FieldId } from '@/data/ontology';
+import type { LessonBlock } from '@/lib/catalogues';
+import { ONTOLOGY_BY_ID, fieldName, isFieldId } from '@/data/ontology';
 import { convert, fmt, asNumber } from '@/engine/units';
 import { computeRunMetrics } from '@/engine/metrics';
 import { renderStepText } from '@/engine/scale';
@@ -135,7 +136,7 @@ function MiniQueue() {
           <p className="text-body">
             {decided.length > 0
               ? `${decided.length} decision${decided.length === 1 ? '' : 's'} recorded — they are live, and the strain pages and validation metrics have already moved.`
-              : 'No unverified records left in this session.'}
+              : 'No unverified record waits for review.'}
           </p>
           <Button className="mt-3" onClick={() => navigate('/guild')}>
             Open the full review queue <ArrowRight size={13} />
@@ -238,7 +239,7 @@ function MetricsTiles() {
         </Tick>
       </div>
       <p className="text-caption text-ink-soft mt-2">
-        Computed from this session's gold set. TP {metrics.micro.tp} · FP {metrics.micro.fp} · FN{' '}
+        Computed from the project's gold set. TP {metrics.micro.tp} · FP {metrics.micro.fp} · FN{' '}
         {metrics.micro.fn}.{' '}
         <button className="text-accent hover:underline" onClick={() => navigate('/biorepo/witness')}>
           Open the full dashboard
@@ -275,7 +276,7 @@ function StripPlot({ field }: { field: FieldId }) {
   if (!def || points.length === 0) {
     return (
       <Frame label="Strip plot">
-        <p className="text-body text-ink-soft">No records for this parameter in this session.</p>
+        <p className="text-body text-ink-soft">The project holds no record of this parameter yet.</p>
       </Frame>
     );
   }
@@ -352,7 +353,7 @@ function ProtocolCard({ protocolId }: { protocolId: string }) {
         <div className="min-w-0">
           <div className="font-serif text-section-title font-semibold">{protocol.title}</div>
           <div className="text-caption text-ink-soft font-num">
-            {protocol.id} · v{protocol.currentVersion} · {v?.steps.length} steps ·{' '}
+            {protocol.id} · v{protocol.currentVersion} · {v?.steps?.length ?? 0} steps ·{' '}
             {v?.estMinutes.active} min active / {v?.estMinutes.total} min total
           </div>
           <p className="text-body text-ink-soft mt-1">{protocol.purpose}</p>
@@ -384,7 +385,7 @@ function SkillSteps({ skillId }: { skillId: string }) {
   }
   const uses = protocols.flatMap((p) => {
     const v = p.versions.find((x) => x.version === p.currentVersion) ?? p.versions[0];
-    return v.steps.filter((st) => st.skills?.includes(skillId)).map((st) => ({ p, v, st }));
+    return (v.steps ?? []).filter((st) => st.skills?.includes(skillId)).map((st) => ({ p, v, st }));
   });
   return (
     <Frame label={`Where ${skill.name} is used`}>
@@ -411,7 +412,7 @@ function SkillSteps({ skillId }: { skillId: string }) {
       <div className="mt-3 pt-2 border-t border-line">
         <div className="text-caption uppercase tracking-wide text-ink-soft mb-1">What an assessor watches for</div>
         <ul className="list-disc pl-5 space-y-0.5">
-          {skill.mastery.map((m) => (
+          {(skill.mastery ?? []).map((m) => (
             <li key={m} className="text-body">
               {m}
             </li>
@@ -482,7 +483,7 @@ export function LessonEmbed({ embed, arg }: { embed: EmbedKind; arg?: string }) 
     case 'metrics-tiles':
       return <MetricsTiles />;
     case 'strip-plot':
-      return <StripPlot field={(arg as FieldId) ?? 'growth_rate_mu'} />;
+      return <StripPlot field={arg && isFieldId(arg) ? arg : 'growth_rate_mu'} />;
     case 'protocol-card':
       return arg ? <ProtocolCard protocolId={arg} /> : <Unnamed label="Protocol" what="protocol" />;
     case 'ask-prompt':

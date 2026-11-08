@@ -7,6 +7,7 @@ the way the real one does, with a context manager whose final message has a
 """
 from __future__ import annotations
 
+import asyncio
 import json
 from types import SimpleNamespace
 
@@ -165,7 +166,7 @@ def test_opus_answers_as_json_by_schema():
     assert result.model == OPUS and not result.fell_back and client.asked == [OPUS]
     request = client.requests[0]
     assert "tool_choice" not in request and "tools" not in request, "forced tool use is a 400 on these models"
-    assert request["output_config"]["effort"] == "medium"
+    assert request["output_config"]["effort"] == "high", "explain's default effort"
     assert request["output_config"]["format"]["type"] == "json_schema"
     assert request["output_config"]["format"]["schema"]["additionalProperties"] is False
 
@@ -186,6 +187,7 @@ def test_a_refusal_on_opus_is_answered_by_sonnet_and_both_are_paid_for():
     assert client.asked == [OPUS, SONNET]
     assert result.model == SONNET and result.fell_back and result.data["candidates"][0]["value"] == 7
     assert result.usage.models == [OPUS, SONNET]
+    assert (result.tried, result.refused) == ([OPUS, SONNET], [OPUS]), "the model that declined, named apart"
     assert result.usage.costUsd == pytest.approx(2000 / 1e6 * 4 + 2000 / 1e6 * 2 + 800 / 1e6 * 10)
 
 
@@ -248,6 +250,7 @@ def test_opus_unavailable_falls_back_to_sonnet(error):
     client = FakeClient({OPUS: error(), SONNET: answer(SONNET)})
     result = run(client)
     assert client.asked == [OPUS, SONNET] and result.model == SONNET and result.fell_back
+    assert (result.tried, result.refused) == ([OPUS, SONNET], []), "passed over, and no refusal"
 
 
 def test_both_unavailable_is_unavailable():
@@ -306,7 +309,7 @@ def test_the_fallback_can_name_several_models_tried_in_order(monkeypatch):
     })
     result = run(client)
     assert client.asked == [OPUS, SONNET, third] and result.model == third
-    assert result.usage.models == [OPUS, SONNET, third]
+    assert result.usage.models == [OPUS, SONNET, third] and result.refused == [OPUS, SONNET]
 
 
 def test_no_key_is_unavailable(monkeypatch):
@@ -427,7 +430,7 @@ def test_the_request_the_sdk_sends_is_the_one_these_models_accept():
     # no temperature or top_p (a non-default value is a 400 on Sonnet 5.5).
     assert sorted(body) == ["max_tokens", "messages", "model", "output_config", "stream", "system"]
     assert body["stream"] is True
-    assert body["output_config"]["effort"] == "medium"
+    assert body["output_config"]["effort"] == "high", "explain's default effort"
     assert body["output_config"]["format"]["type"] == "json_schema"
     assert body["output_config"]["format"]["schema"]["additionalProperties"] is False
 
@@ -543,9 +546,9 @@ def test_haiku_5_5_has_both_tiers_on_file():
 
 def test_the_roles_name_their_chains(monkeypatch):
     assert llm.chain() == llm.chain("answer") == [OPUS, SONNET]
-    assert llm.chain("index") == [HAIKU, OPUS, SONNET]
+    assert llm.chain("index") == [HAIKU], "index runs on Haiku alone (ADR-008, Implementation 17)"
     monkeypatch.setenv("OPENFERMENT_INDEX_MODEL", SONNET)
-    assert llm.chain("index") == [SONNET, OPUS], "no model twice"
+    assert llm.chain("index") == [SONNET] and llm.chain("plan") == [OPUS, SONNET]
     with pytest.raises(ValueError):
         llm.chain("other")
 
@@ -603,10 +606,10 @@ def test_converse_builds_strict_tools_the_plan_schema_and_top_level_caching():
 def test_converse_returns_tool_calls_and_keeps_every_block_as_returned():
     blocks = [
         SimpleNamespace(type="thinking", thinking="…", signature="sig"),
-        SimpleNamespace(type="tool_use", id="tu_1", name="search_records", input={"query": "PHB"}),
+        SimpleNamespace(type="tool_use", id="tu_1", name="search_records", input={"query": "ethanol yield"}),
     ]
     turn = _converse(lambda r: _turn(blocks, stop="tool_use"))
-    assert [(c.id, c.name, c.input) for c in turn.toolCalls] == [("tu_1", "search_records", {"query": "PHB"})]
+    assert [(c.id, c.name, c.input) for c in turn.toolCalls] == [("tu_1", "search_records", {"query": "ethanol yield"})]
     assert turn.data is None and turn.stopReason == "tool_use"
     assert turn.content[0] == {"type": "thinking", "thinking": "…", "signature": "sig"}
     assert turn.content[1]["type"] == "tool_use"
@@ -679,15 +682,62 @@ def test_the_routing_table_names_each_familys_models_and_effort(monkeypatch):
     table = llm.routes()
     assert set(table) == set(llm.FAMILIES) == {"plan", "explain", "extract", "index", "judge"}
     assert table == llm.ROUTES, "with core/.env silent, the table is ROUTES"
-    assert table["plan"].models == (OPUS, SONNET) and table["index"].models == (HAIKU, OPUS, SONNET)
+    # The defaults the model comparison and its neighbours set (ADR-008, Implementation 17).
+    assert table == {"plan": llm.Route((OPUS, SONNET), "high"), "explain": llm.Route((OPUS, SONNET), "high"),
+                     "extract": llm.Route((OPUS, SONNET), "high"), "index": llm.Route((HAIKU,), "low"),
+                     "judge": llm.Route((OPUS, SONNET), "max")}
     assert {f: llm.SPEND_ROLES[f] for f in llm.FAMILIES} == {"plan": "answer", "explain": "answer", "extract": "answer",
                                                             "index": "index", "judge": "answer"}
     monkeypatch.setenv("OPENFERMENT_ROUTES", json.dumps({"judge": {"models": [f"anthropic:{SONNET}"], "effort": "low"},
                                                          "index": {"effort": "high"}}))
     table = llm.routes()
     assert table["judge"] == llm.Route((f"anthropic:{SONNET}",), "low")
-    assert table["index"] == llm.Route((HAIKU, OPUS, SONNET), "high") and table["plan"] == llm.ROUTES["plan"]
+    assert table["index"] == llm.Route((HAIKU,), "high") and table["plan"] == llm.ROUTES["plan"]
     assert llm.chain("judge") == [f"anthropic:{SONNET}"] and llm.chain("answer") == llm.chain("plan")
+
+
+def test_a_plain_setting_lays_over_the_families_it_covers_when_it_is_set(monkeypatch):
+    """alpha 2.2 F.2f: each family keeps its own default until the
+    environment names a plain setting; the answering chain and the effort
+    cover plan, explain and extract, the index model index's first place;
+    judge and index's effort move with OPENFERMENT_ROUTES alone, laid over
+    them after."""
+    assert llm.ANSWERING == ("plan", "explain", "extract")
+    for name in ("OPENFERMENT_MODEL", "OPENFERMENT_FALLBACK_MODEL", "OPENFERMENT_INDEX_MODEL", "OPENFERMENT_EFFORT"):
+        monkeypatch.setenv(name, "  ")
+    assert llm.routes() == llm.ROUTES, "a setting written empty is a setting left unset"
+    monkeypatch.setenv("OPENFERMENT_FALLBACK_MODEL", HAIKU)
+    table = llm.routes()
+    assert {f: table[f] for f in llm.ANSWERING} == {f: llm.Route((OPUS, HAIKU), llm.ROUTES[f].effort)
+                                                    for f in llm.ANSWERING}, "the fallback alone, the model's default before it"
+    monkeypatch.setenv("OPENFERMENT_FALLBACK_MODEL", "  ")
+    monkeypatch.setenv("OPENFERMENT_MODEL", HAIKU)
+    table = llm.routes()
+    assert {f: table[f] for f in llm.ANSWERING} == {f: llm.Route((HAIKU, SONNET), llm.ROUTES[f].effort)
+                                                    for f in llm.ANSWERING}, "the fallback's default behind it"
+    assert table["index"] == llm.ROUTES["index"] and table["judge"] == llm.ROUTES["judge"], "the grader keeps its route"
+    monkeypatch.setenv("OPENFERMENT_INDEX_MODEL", SONNET)
+    assert llm.routes()["index"] == llm.Route((SONNET,), "low")
+    monkeypatch.setenv("OPENFERMENT_EFFORT", "medium")
+    table = llm.routes()
+    assert {table[f].effort for f in llm.ANSWERING} == {"medium"}
+    assert (table["index"].effort, table["judge"]) == ("low", llm.ROUTES["judge"]), "index and judge keep their effort"
+    monkeypatch.setenv("OPENFERMENT_ROUTES", json.dumps({"plan": {"effort": "max"}, "judge": {"effort": "high"},
+                                                         "index": {"effort": "medium"}}))
+    table = llm.routes()
+    assert table["plan"] == llm.Route((HAIKU, SONNET), "max") and table["explain"] == llm.Route((HAIKU, SONNET), "medium")
+    assert table["judge"] == llm.Route((OPUS, SONNET), "high") and table["index"] == llm.Route((SONNET,), "medium")
+
+
+def test_the_runbooks_four_settings_leave_every_family_at_its_default(monkeypatch):
+    """alpha 2.2 F.2f: a host whose core/.env carries the live-host runbook's
+    model, fallback, index model and effort runs on `ROUTES` as it stands,
+    judge at max and index at low among it."""
+    monkeypatch.setenv("OPENFERMENT_MODEL", OPUS)
+    monkeypatch.setenv("OPENFERMENT_FALLBACK_MODEL", SONNET)
+    monkeypatch.setenv("OPENFERMENT_INDEX_MODEL", HAIKU)
+    monkeypatch.setenv("OPENFERMENT_EFFORT", "high")
+    assert llm.routes() == llm.ROUTES
 
 
 @pytest.mark.parametrize("raw, says", [
@@ -779,6 +829,30 @@ def test_an_account_past_its_usage_limit_is_said_so_and_never_called_malformed()
     assert "malformed" not in said
 
 
+def test_the_usage_limit_is_said_from_its_date_and_the_api_body_goes_to_the_log(caplog):
+    """Seen on the sweep: the refusal carried the SDK's whole message, its
+    Python dict and request id with it, onto the screen twice. The words name
+    the date alone; the raw message is kept in the log."""
+    import anthropic
+    import httpx
+
+    raw = ("Error code: 400 - {'type': 'error', 'error': {'type': 'invalid_request_error', 'message': '"
+           + USAGE_LIMIT_SAID + "'}, 'request_id': 'req_standin0001'}")
+    refusal = anthropic.BadRequestError(message=raw, response=httpx.Response(400, request=httpx.Request("POST", "https://x")),
+                                        body=None)
+
+    def ask(request):
+        raise refusal
+
+    with caplog.at_level("WARNING", logger="openferment.llm"), pytest.raises(llm.UsageLimitReached) as e:
+        _converse(ask)
+    said = str(e.value)
+    assert said.startswith("The Anthropic account's usage limit is reached until 2026-12-01 at 00:00 UTC, so no model "
+                           "can answer;")
+    assert "Error code" not in said and "req_standin0001" not in said and "{" not in said
+    assert any("req_standin0001" in r.getMessage() for r in caplog.records)
+
+
 def test_any_other_malformed_request_is_unavailable_as_before():
     import anthropic
     import httpx
@@ -820,9 +894,13 @@ def test_a_local_model_answers_a_single_call_through_the_kits_adapter_at_no_char
         return '{"candidates": []}'
 
     monkeypatch.setattr(llm, "_local_generate", generate)
-    got = llm.call(system="s", user="u", schema=SCHEMA, max_tokens=100, family="explain")
+    # The route's Anthropic model, behind the local one, is never asked: its client is a stand-in, so the test
+    # holds alone, with no key in the environment, as CI runs it.
+    unasked = FakeClient({OPUS: answer(OPUS)})
+    got = llm.call(system="s", user="u", schema=SCHEMA, max_tokens=100, client_factory=lambda: unasked, family="explain")
     assert (got.model, got.data, got.usage.costUsd, got.tried) == (LOCAL_MODEL, {"candidates": []}, 0.0, [LOCAL_MODEL])
     assert asked == [("qwen3-32b", {"system": "s", "user": "u", "max_tokens": 100, "json_mode": True})]
+    assert unasked.asked == []
 
     def down(model, **kw):
         raise ConnectionError("connection refused")
@@ -857,3 +935,161 @@ def test_postdocs_loop_passes_a_local_model_over_in_words(monkeypatch):
     with pytest.raises(llm.ModelUnavailable, match="answers a single call"):
         llm.converse(system="s", messages=[{"role": "user", "content": "q"}], tools=[], schema=None, max_tokens=10,
                      model=LOCAL_MODEL, tool_choice="auto")
+
+
+# ── a run's own count, and the kit's calls (alpha 2.2 F.5) ──────────────
+
+
+def test_a_tally_counts_each_call_with_the_model_that_answered():
+    """Each call made in a tally is counted with its route's family and
+    effort, the ceiling it asked, the model that answered, the models asked
+    and the one that declined, its tokens and USD and how it stopped; a call
+    made outside every tally is kept nowhere."""
+    run(FakeClient({OPUS: answer(OPUS)}))
+    fell = FakeClient({OPUS: answer(OPUS, stop="refusal", category="bio", tin=2000, tout=0),
+                       SONNET: answer(SONNET, tin=2000, tout=800)})
+    with llm.tally() as spent:
+        run(FakeClient({OPUS: answer(OPUS, tin=1000, tout=500)}))
+        llm.call(system="s", user="u", schema=None, max_tokens=300, client_factory=lambda: fell, family="judge")
+        run(FakeClient({OPUS: answer(OPUS, '{"candidates": [{"val', stop="max_tokens", tout=4000)}))
+    assert [(s.family, s.effort, s.max_tokens, s.outcome, s.model, s.tried, s.refused) for s in spent] == [
+        ("explain", "high", 4000, "answered", OPUS, (OPUS,), ()),
+        ("judge", "max", 300, "answered", SONNET, (OPUS, SONNET), (OPUS,)),
+        ("explain", "high", 4000, "answered", OPUS, (OPUS,), ()),
+    ]
+    first, second, cut = spent
+    assert (first.usage.inputTokens, first.usage.outputTokens, first.usage.models) == (1000, 500, [OPUS])
+    assert first.usage.costUsd == llm.cost_usd(OPUS, 1000, 500) and not first.fell_back
+    assert second.fell_back and second.usage.models == [OPUS, SONNET]
+    assert second.usage.costUsd == pytest.approx(llm.cost_usd(OPUS, 2000, 0) + llm.cost_usd(SONNET, 2000, 800)), \
+        "the refusal billed before the answer is counted with it"
+    assert [s.stop_reason for s in spent] == ["end_turn", "end_turn", "max_tokens"]
+    assert [s.truncated for s in spent] == [False, False, True] and cut.usage.outputTokens == 4000
+    assert all(s.failure is None for s in spent)
+    with llm.tally() as later:
+        pass
+    assert later == [], "no call made before it is carried in"
+
+
+def test_a_refused_and_an_unavailable_call_are_counted_in_words(monkeypatch):
+    """A call every model declines, one whose last model is down after a
+    billed refusal, and one with no key: each is counted with what it spent,
+    the models asked, and the failure in the words its caller was given."""
+    declined = FakeClient({OPUS: answer(OPUS, stop="refusal", category="bio", tin=3000, tout=0),
+                           SONNET: answer(SONNET, stop="refusal", category="bio", tin=3000, tout=0)})
+    down = FakeClient({OPUS: answer(OPUS, stop="refusal", category="bio", tin=3000, tout=0),
+                       SONNET: status_error(anthropic.APIStatusError, 529)})
+    monkeypatch.delenv("ANTHROPIC_API_KEY", raising=False)
+    with llm.tally() as spent:
+        with pytest.raises(llm.ModelRefused) as no:
+            run(declined)
+        with pytest.raises(llm.ModelUnavailable) as gone:
+            run(down)
+        with pytest.raises(llm.ModelUnavailable) as keyless:
+            llm.call(system="s", user="u", schema=None, max_tokens=10, family="index")
+    assert [s.outcome for s in spent] == ["refused", "unavailable", "unavailable"]
+    assert all(s.model is None and s.stop_reason is None and not s.fell_back for s in spent)
+    refused, outage, unkeyed = spent
+    assert refused.failure == str(no.value) and "declined by the safety classifier (bio)" in refused.failure
+    assert (refused.tried, refused.refused, refused.usage) == ((OPUS, SONNET), (OPUS, SONNET), no.value.usage)
+    assert refused.usage.costUsd == pytest.approx(llm.cost_usd(OPUS, 3000, 0) + llm.cost_usd(SONNET, 3000, 0))
+    assert outage.failure == str(gone.value) and "answered 529" in outage.failure
+    assert (outage.tried, outage.refused) == ((OPUS, SONNET), (OPUS,))
+    assert outage.usage.costUsd == pytest.approx(llm.cost_usd(OPUS, 3000, 0)), "what was spent before the outage"
+    assert (unkeyed.family, unkeyed.tried, unkeyed.usage) == ("index", (), Usage())
+    assert unkeyed.failure == str(keyless.value) and "ANTHROPIC_API_KEY is not set" in unkeyed.failure
+
+
+def test_a_call_the_daily_cap_refuses_is_counted_with_no_model_asked(monkeypatch):
+    from openferment_core import spend
+
+    monkeypatch.setenv("OPENFERMENT_DAILY_BUDGET_USD", "1.00")
+    monkeypatch.setattr(llm, "worst_case_usd", lambda *a, **k: 0.10)
+    spend.charge("answer", 0.95)
+    client = FakeClient({OPUS: answer(OPUS)})
+    with llm.tally() as spent, pytest.raises(llm.BudgetExhausted) as e:
+        run(client)
+    assert client.asked == []
+    assert [(s.outcome, s.tried, s.usage, s.failure) for s in spent] == [("unavailable", (), Usage(), str(e.value))]
+    assert "daily cap" in spent[0].failure
+
+
+def test_a_tally_inside_another_counts_its_calls_in_both():
+    client = FakeClient({OPUS: answer(OPUS)})
+    with llm.tally() as outer:
+        run(client)
+        with llm.tally() as inner:
+            run(client)
+        run(client)
+    assert (len(outer), len(inner)) == (3, 1) and inner[0] is outer[1]
+
+
+def test_a_tally_counts_the_calls_made_in_a_copy_of_its_context():
+    """The kit's calls arrive on a thread `asyncio.to_thread` starts, from
+    coroutines `db.run` hands to the database loop: each runs in a copy of
+    its caller's context, which carries the tally. A thread
+    `threading.Thread` starts begins with an empty context (Python 3.12 and
+    3.13), and no tally counts its call."""
+    import threading
+
+    from openferment_core import db
+
+    client = FakeClient({OPUS: answer(OPUS)})
+
+    async def on_the_database_loop():
+        assert db.on_database_thread()
+        await asyncio.to_thread(run, client)
+
+    with llm.tally() as spent:
+        db.run(on_the_database_loop())
+        plain = threading.Thread(target=run, args=(client,))
+        plain.start()
+        plain.join()
+    assert len(client.requests) == 2 and [s.model for s in spent] == [OPUS]
+
+
+def test_a_kit_call_has_room_for_its_thinking(monkeypatch):
+    """The kit sizes its calls for a model that writes its answer at once (a
+    judgement in 1,024 tokens, a graph batch in 8,192, HyDE's passage in 512),
+    and output tokens include thinking: a kit call asks the larger of the
+    kit's ceiling and the room its route's effort sets (`KIT_ROOM`). At max
+    the room is openFerment's own judge's (ADR-008, Implementations 15 and
+    18)."""
+    from openferment_core.postdoc import evaluate
+
+    assert llm.KIT_ROOM == {"low": 0, "medium": 4096, "high": 8192, "xhigh": 12000, "max": 32000}
+    assert set(llm.KIT_ROOM) == set(llm.EFFORTS)
+    assert llm.KIT_ROOM["max"] == evaluate.JUDGE_TOKENS
+    monkeypatch.setenv(llm.ROUTES_SETTING, json.dumps({
+        "judge": {"models": [OPUS, SONNET], "effort": "max"},
+        "explain": {"models": [OPUS, SONNET], "effort": "high"},
+        "index": {"models": [HAIKU], "effort": "low"},
+    }))
+    client = FakeClient({OPUS: answer(OPUS, "{}"), HAIKU: answer(HAIKU, "{}")})
+    monkeypatch.setattr(llm, "_default_client", lambda: client)
+
+    async def the_kit_asks():
+        await llm.kit_client("judge").generate_json("p", max_tokens=1024)
+        await llm.kit_client("answer").generate("p", max_tokens=2048)
+        await llm.kit_client("extraction").generate("p", max_tokens=512)
+        await llm.kit_client("extraction").generate_json("p", max_tokens=8192)
+        await llm.kit_client("answer").generate("p", max_tokens=12000)
+
+    with llm.tally() as spent:
+        asyncio.run(the_kit_asks())
+    assert [(r["model"], r["output_config"]["effort"], r["max_tokens"]) for r in client.requests] == [
+        (OPUS, "max", 32000), (OPUS, "high", 8192), (HAIKU, "low", 512), (HAIKU, "low", 8192), (OPUS, "high", 12000),
+    ], "the room at max and high; at low, and above the room, the kit's own ceiling"
+    assert [(s.family, s.max_tokens) for s in spent] == [
+        ("judge", 32000), ("explain", 8192), ("index", 512), ("index", 8192), ("explain", 12000)]
+    assert llm.KIT_ROLES == {"answer": "explain", "extraction": "index", "judge": "judge"}
+
+    # explain at medium and at xhigh: the rooms between.
+    for effort, room in (("medium", 4096), ("xhigh", 12000)):
+        monkeypatch.setenv(llm.ROUTES_SETTING, json.dumps({"explain": {"models": [OPUS, SONNET], "effort": effort}}))
+        client.requests.clear()
+        with llm.tally() as spent:
+            asyncio.run(llm.kit_client("answer").generate("p", max_tokens=2048))
+        assert [(r["model"], r["output_config"]["effort"], r["max_tokens"]) for r in client.requests] == [
+            (OPUS, effort, room)]
+        assert [(s.family, s.max_tokens) for s in spent] == [("explain", room)]

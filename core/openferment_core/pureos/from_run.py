@@ -1,8 +1,9 @@
-"""A run's train, read into the Builder (OF-BLD-020 §5.3, D9).
+"""A run's train, read into the Builder.
 
     from_run(artifact_id, train_id=None) -> TrainFromRun
 
-A kept run (a `proforma.run`, a `proforma.reference` or a `pureos.train_run`)
+A kept run (a `proforma.run`, a `pureos.train_run`, a library plant's
+`library.run`, or a `proforma.reference` kept from a retired reference entry)
 holds its stream and unit tables (`proforma.tables_of`). This reads them into
 a `TrainSpec` the Builder opens, as data, and never computes a quantity:
 
@@ -16,8 +17,21 @@ a `TrainSpec` the Builder opens, as data, and never computes a quantity:
                   other component), one whose class no type holds, or one whose
                   outlets the type's ports do not match one for one, is named in
                   `unmapped` with why, in words
-    the inlet     the run's own stream entering the first unit taken (its first
-                  inlet, BioSTEAM's feed), a `run-stream` inlet on that run
+    the inlet     the run's own stream carrying the most product into the
+                  train from outside it, a `run-stream` inlet on that run: a
+                  stream entering a unit taken comes from outside the train
+                  when it is a feed, or its source is no unit taken and no
+                  unit the train's own outlets reach going forward in run
+                  order (through units it leaves out, a recycle back to an
+                  earlier unit read as no part of the train); of those, the
+                  one whose product kg/hr the run's stream table holds
+                  highest (the earlier unit's, then the earlier inlet's, on a
+                  tie). The train starts at the unit it enters, a unit taken
+                  before that one is named in `unmapped`, and the notes name
+                  every other stream entering the train from outside it with
+                  its product kg/hr. A run whose streams from outside carry
+                  no product starts at the first unit taken, on its first
+                  inlet
     the outlets   each outlet routed as the run routed it, followed through the
                   units the train leaves out: on to the next unit taken (or, for
                   the last, to the product stream), back to an earlier one (a
@@ -26,8 +40,8 @@ a `TrainSpec` the Builder opens, as data, and never computes a quantity:
                   product goes on and the run's numbers say so (the product's
                   kg/hr as its stream table holds them, compared, never made)
     the values    a run of a shelf flowsheet the worker builds case by case
-                  (`proforma.run` on a non-reference entry) gives each unit taken
-                  `readFrom` that flowsheet's own unit of the same id: its values
+                  (`proforma.run`) gives each unit taken `readFrom` that
+                  flowsheet's own unit of the same id: its values
                   are the package's, read in the worker as `model` inputs naming
                   its version when the train runs (§5.2); a run of a flowsheet
                   built from parts (`custom_train_v1`, its shelf entry's
@@ -41,7 +55,9 @@ a `TrainSpec` the Builder opens, as data, and never computes a quantity:
                   the product id `thermo.CHEMICALS` names for it; a run whose
                   product no id names here, or that names no product, is refused
                   in words, as is one naming no chemical set, or with no unit
-                  to take
+                  to take; a library plant's run names its plant and no
+                  program of pureOS's, so its train names none and builds on
+                  the one chemical set pureOS holds
 
 The train's structure is held to `validate` and its refusals are returned
 beside it, for a person to settle in the Builder. Nothing is kept: the
@@ -52,7 +68,7 @@ read in the worker, a class's default, a record's or a person's.
 """
 from __future__ import annotations
 
-from typing import Any
+from typing import Any, NamedTuple
 
 from ..models import (
     Artifact,
@@ -66,11 +82,25 @@ from ..models import (
 from . import catalogue
 from .train_spec import ONWARD, RECYCLE, UNIT_ID, WASTE, TrainRefused, validate
 
-# The runs whose tables a train is read from.
+# The runs whose tables a train is read from: a library plant's run among
+# them (alpha 2.2 D8), so a train can stand on one.
 RUN = "proforma.run"
 REFERENCE = "proforma.reference"
 TRAIN_RUN = "pureos.train_run"
-RUN_TOOLS = (RUN, REFERENCE, TRAIN_RUN)
+LIBRARY_RUN = "library.run"
+RUN_TOOLS = (RUN, REFERENCE, TRAIN_RUN, LIBRARY_RUN)
+
+
+class Entering(NamedTuple):
+    """A stream entering a unit of the train from outside it: its product
+    flow, the unit's place among the units taken, the inlet's place among
+    the unit's, the stream and the unit."""
+
+    flow: float
+    place: int
+    inlet: int
+    stream: str
+    unit: Any
 
 
 class RunNotOnFile(LookupError):
@@ -112,6 +142,16 @@ def _read(art: Artifact) -> tuple[Any, str | None, str | None, str | None, str |
         sid, sname = scenario_of(art, scenarios) if art.tool == RUN else (None, None)
         program = program_of(art, sid, scenarios)
         label = sname or t.flowsheet or art.id
+    if art.tool == LIBRARY_RUN:
+        # A library plant's run names its plant and builds on the plant's own
+        # chemicals, which no program of pureOS's names: its train names no
+        # program, as a train made in the Builder names none, and builds on
+        # the one set pureOS holds (train_spec.chemical_set); a run of it
+        # refuses in words a chemical of the inlet that set does not hold.
+        plant = next((str(i.value) for i in art.inputs if i.name == "plant"), None)
+        configuration = next((str(i.value) for i in art.inputs if i.name == "configuration"), None)
+        program = ""
+        label = f"{plant} ({configuration})" if plant and configuration else plant or art.id
     if not chem or not stream_id:
         raise TrainRefused(f"run {art.id} names no product stream, so no train is read from it")
     if not pid:
@@ -119,16 +159,15 @@ def _read(art: Artifact) -> tuple[Any, str | None, str | None, str | None, str |
 
         raise TrainRefused(f"run {art.id} traces {chem}, which no product a train traces here is "
                            f"({', '.join(f'{k}: {v}' for k, v in thermo.CHEMICALS.items())})")
-    if not program:
+    if not program and art.tool != LIBRARY_RUN:
         raise TrainRefused(f"run {art.id} belongs to no program, and a train is one program's")
-    return t, stream_id, chem, pid, program, label
+    return t, stream_id, chem, pid, program or "", label
 
 
 def _reads_from(art: Artifact, flowsheet: str | None) -> str | None:
     """The shelf flowsheet whose own units a train read from this run takes
-    its values from: a run of one the worker builds case by case. A
-    reference runs whole, and the worker reads no unit of a flowsheet built
-    from parts (§5.R part a)."""
+    its values from: a run of one the worker builds case by case. The worker
+    reads no unit of a flowsheet built from parts (§5.R part a)."""
     from ..flowsheets import shelf
 
     if art.tool != RUN or not flowsheet:
@@ -137,7 +176,7 @@ def _reads_from(art: Artifact, flowsheet: str | None) -> str | None:
         info = shelf.info(flowsheet)
     except shelf.NotOnShelf:
         return None
-    return None if info.reference or info.builtFrom else info.id
+    return None if info.builtFrom else info.id
 
 
 def _parts_train(art: Artifact, flowsheet: str | None) -> tuple[str | None, TrainSpec | None, str | None]:
@@ -176,7 +215,7 @@ def from_run(artifact_id: str, train_id: str | None = None) -> TrainFromRun:
         art = artifacts.get(artifact_id)
     except artifacts.ArtifactNotFound:
         raise RunNotOnFile(f"there is no kept artifact {artifact_id} here: a train is read from a kept run (a Proforma "
-                           "run, a reference run or a pureOS train run)") from None
+                           "run, a library plant's run or a pureOS train run)") from None
     if art.tool not in RUN_TOOLS:
         raise TrainRefused(f"artifact {art.id} is a {art.tool} artifact; a train is read from a run ("
                            f"{', '.join(RUN_TOOLS)})")
@@ -224,8 +263,59 @@ def from_run(artifact_id: str, train_id: str | None = None) -> TrainFromRun:
         raise TrainRefused(f"no unit of run {art.id} that its product passes through is a unit type of pureOS's catalogue, "
                            "so no train is read from it: "
                            + "; ".join(f"{m.unitId} ({m.unitClass}): {m.why}" for m in unmapped))
-    ids = [u.id for u, _ in taken]
+    flow_unit = t.tableUnits.get("massFlow") or ""
+
+    def kg(value: float) -> str:
+        return f"{value:g} {flow_unit}".strip()
+
     units = {u.id: u for u in t.units}
+
+    def from_outside() -> list[Entering]:
+        """Each stream entering a unit taken from outside the train (module
+        docstring)."""
+        held = {u.id for u, _ in taken}
+        # The units the train's own outlets reach going forward in run order,
+        # through units it leaves out.
+        reached: set[str] = set()
+        stack = [units[uid] for uid in held]
+        while stack:
+            u = stack.pop()
+            for sid in u.outs:
+                row = streams.get(sid)
+                x = units.get(row.sink) if row is not None and row.sink else None
+                if x is not None and x.id not in held and x.id not in reached and x.order > u.order:
+                    reached.add(x.id)
+                    stack.append(x)
+        out = []
+        for k, (u, _) in enumerate(taken):
+            for n, sid in enumerate(u.ins):
+                row = streams.get(sid)
+                source = row.source if row is not None else None
+                if source is None or (source not in held and source not in reached):
+                    out.append(Entering(carries(sid), k, n, sid, u))
+        return out
+
+    # The train starts where the most product enters it from outside it
+    # (module docstring): the run's stream table compared, never made.
+    entering = from_outside()
+    best = max(entering, key=lambda x: (x.flow, -x.place, -x.inlet), default=None)
+    if best is not None and best.flow > EPS:
+        start, inlet_id = best.place, best.stream
+    else:
+        start = 0
+        first = taken[0][0]
+        if not first.ins:
+            raise TrainRefused(f"unit {first.id}, the first of run {art.id}'s train, has no inlet in its unit table")
+        inlet_id = first.ins[0]
+    first = taken[start][0]
+    for u, _ in taken[:start]:
+        took_in = sum(carries(s) for s in u.ins)
+        unmapped.append(TrainUnmapped(unitId=u.id, unitClass=u.unitClass, why=(
+            f"before {first.id}, where the train starts: {inlet_id} carries the most {chem} into the train from "
+            f"outside it ({kg(best.flow)} by the run's stream table) and enters {first.id}, and {kg(took_in)} of "
+            f"{chem} enters {u.id}")))
+    taken = taken[start:]
+    ids = [u.id for u, _ in taken]
     notes: list[str] = []
 
     def reaches(sid: str) -> tuple[set[str], bool]:
@@ -324,15 +414,19 @@ def from_run(artifact_id: str, train_id: str | None = None) -> TrainFromRun:
         spec_units.append(TrainUnitSpec(
             id=names[u.id], type=e.id, outlets=routes,
             readFrom=TrainUnitReadFrom(flowsheet=reads, unit=u.id) if reads else None))
-    first = taken[0][0]
-    if not first.ins:
-        raise TrainRefused(f"unit {first.id}, the first of run {art.id}'s train, has no inlet in its unit table")
-    inlet_id = first.ins[0]
-    if len(first.ins) > 1:
-        notes.append(f"The inlet is {inlet_id}, the first inlet of {first.id} in the run; "
-                     f"{', '.join(first.ins[1:])} also entered it there, which the train leaves out.")
+    others = [x for x in from_outside() if x.stream != inlet_id]
+    if best is not None and best.flow > EPS:
+        notes.append(f"The inlet is {inlet_id}, the stream carrying the most {chem} into the train from outside it "
+                     f"by the run's stream table ({kg(best.flow)}), entering {first.id}"
+                     + (f"; the train starts there, and the {start} unit{'s' if start != 1 else ''} taken before it "
+                        f"{'are' if start != 1 else 'is'} left out ("
+                        + ", ".join(m.unitId for m in unmapped[-start:]) + ")" if start else "") + ".")
     else:
-        notes.append(f"The inlet is {inlet_id}, the stream entering {first.id} in the run, as its stream table holds it.")
+        notes.append(f"The inlet is {inlet_id}, the first inlet of {first.id} in the run, as its stream table holds it: "
+                     f"no stream from outside the train carries {chem} into it there.")
+    if others:
+        notes.append("Also entering the train from outside it in the run, and left out of it: " + "; ".join(
+            f"{x.stream} into {x.unit.id} ({kg(x.flow)} of {chem})" for x in others) + ".")
     renamed = [f"{uid} as {names[uid]}" for uid in ids if names[uid] != uid]
     if renamed:
         notes.append(f"A unit id BioSTEAM would not take is renamed: {', '.join(renamed)}.")
