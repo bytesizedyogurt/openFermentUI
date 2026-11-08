@@ -6,8 +6,8 @@
 
 writes `com.umutuzo.openferment.plist` (the server) and
 `com.umutuzo.openferment.nightly.plist` (scripts/host/nightly.sh at 03:00: the
-night's extraction, the nightly checks, and Guild's check proposals with their
-briefs) into
+database's dump into ~/openferment-backups/, the night's extraction, the
+nightly checks, and Guild's check proposals with their briefs) into
 --out. `install.sh` calls this and copies both into /Library/LaunchDaemons.
 They are rendered here, by plistlib, so they are valid by construction and
 can be checked on any operating system (core/tests/test_host.py). `--read`

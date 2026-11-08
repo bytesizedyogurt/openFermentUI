@@ -26,13 +26,17 @@ session continues from this file and `git log` alone.
      family runs on `llm.ROUTES` (ADR-008, Implementation 17; `docs/api/postdoc.md`, the routing
      table): `plan`, `explain` and `extract` on Opus then Sonnet at high, `index` on Haiku at low,
      `judge` on Opus then Sonnet at max. A comparison names its table in `OPENFERMENT_ROUTES` on the
-     command line. A cloud session's own environment pins `OPENFERMENT_MODEL` and its three kin to
-     Haiku, and the service reads `core/.env` with `override=False`, so run every command with the
-     four unset (`env -u OPENFERMENT_MODEL -u OPENFERMENT_FALLBACK_MODEL -u OPENFERMENT_INDEX_MODEL -u
+     command line. A cloud session's own environment pins the three model settings
+     (`OPENFERMENT_MODEL`, `OPENFERMENT_FALLBACK_MODEL`, `OPENFERMENT_INDEX_MODEL`) to Haiku and
+     `OPENFERMENT_EFFORT` to medium, and carries the key as `OPENFERMENT_API_KEY`, which `bash
+     scripts/session-start.sh` writes into `core/.env`; the service reads `core/.env` with
+     `override=False`, so run every command with the four settings unset (`env -u OPENFERMENT_MODEL -u OPENFERMENT_FALLBACK_MODEL -u OPENFERMENT_INDEX_MODEL -u
      OPENFERMENT_EFFORT <command>`).
 3. First tests to run: `pnpm test:core`, then `pnpm test:sim`.
-4. **Where alpha 2.2 stands at its close** (Current stage; the Log). Stages A to E, G and H are done,
-   and stage F is done as far as the Anthropic account allowed. The base is sealed: `docs/api/engines.md`
+4. **Where alpha 2.2 stands at its close** (Current stage; the Log). Stages A to E and G are done,
+   stage F is done as far as the Anthropic account allowed, and stage H's steps 1 and 2 are done
+   (step 1's `pnpm prove --live` waiting on the account); step 3, the pull request with §9's report
+   and the tag `alpha-2.2` attempted once, comes next (item 7). The base is sealed: `docs/api/engines.md`
    and ADR-015 are the engine contract, `biosteam`, `kinetics` and `train` register through the
    entry-point group `openferment.engines`, each holds `conform`'s eight checks, and every run is one
    `runs` row of one shape (B, C); a reading deposited at the bench enters a scenario as a
@@ -55,10 +59,15 @@ session continues from this file and `git log` alone.
    or until the owner raises the limit in the Anthropic console (Settings, Limits). Then, in this order,
    from the repository's root, with the four settings of item 2 unset in a cloud session, the service
    and every live command run with `OPENFERMENT_DATA_DIR` on a copy of the fetched caches (Yeast9's and
-   iMM904's files and the toolkit's reference files, which live outside `core/data/` in this
-   container), and `OPENFERMENT_MAX` the opus-max table as one line of JSON, as
-   `docs/reports/model-routing-2026-11.md` writes it out under "To finish it". Each command spends,
-   under the day's cap of 150 USD:
+   iMM904's files and the toolkit's reference files). This session's copy is
+   `/tmp/claude-0/-home-user-openFermentUI/cfbc5c9f-640a-5002-a705-5ceaf850fdc6/scratchpad/f/data/`, in this session's own
+   scratchpad, and stays with this container. A fresh container leaves `OPENFERMENT_DATA_DIR` unset
+   and fills `core/data/` again: `pnpm geneos:fetch` for the genome-scale models, and `cd core && uv
+   run --frozen --all-extras python -m openferment_core.engine.sff fetch` for the toolkit's reference
+   files, as stage 4 fetched them. `OPENFERMENT_MAX` stands for the opus-max table as one line of
+   JSON, as `docs/reports/model-routing-2026-11.md` writes it out under the alpha 2.2 part's "To
+   finish it" ("Alpha 2.2, stage F: the comparison asked again (8 November 2026)", from line 491).
+   Each command spends, under the day's cap of 150 USD:
    - `pnpm ready --probe`, its probe row green;
    - the larger room's measure: `OPENFERMENT_PROJECT=ethanol OPENFERMENT_ROUTES="$OPENFERMENT_MAX" pnpm
      eval run --live --suite ethanol --tag opus-max-room --judge --only
@@ -77,29 +86,36 @@ session continues from this file and `git log` alone.
    - F.5's live run: `pnpm lit:graph --project ethanol --by <name>`, then `pnpm lit:report --project
      ethanol --by <name> --judge --render`.
 6. **What waits on the owner** (Blockers; Owner questions):
-   - the pull request from `claude/alpha-2-2-base` into `main`, and its merge;
+   - the merge of the pull request from `claude/alpha-2-2-base` into `main` (item 7 opens it);
    - after the merge, the live-host install on the Mini, `docs/runbooks/live-host-install.md` steps 0
      to 6 (Blockers), the owner's first install being the test of the host scripts on macOS (Known
      debts, open);
-   - where the database's nightly dump goes, then the nightly's step (Blockers);
+   - the nightly's dump, written to the place the prompt's §3 names (`~/openferment-backups/`, seven
+     daily files kept, `scripts/host/nightly.sh`): the owner's first install runs it, its first night
+     the first on macOS (Blockers);
    - the tag pushes the session's git relay refuses, from the owner's machine (Blockers);
    - owner questions 11, 12 and 13, each default standing in the tree; question 13 asks how `has_key`
      reads the key line (stage G), a change to how a key is read;
    - the review of the Ethanol project's 457 candidates in BioRepo;
    - the licence (ADR-012);
    - the account's limit, raised if the live steps of item 5 should run before 2026-12-01.
-7. Files in flight: none; stage H's commit holds the records and the runs of its step 1 (the Log, stage
-   H).
+7. Next: stage H's step 3, the pull request from `claude/alpha-2-2-base` into `main` with the
+   prompt's §9 completion report, and the tag `alpha-2.2` attempted once on the branch's head. Files in
+   flight: none; stage H's commits hold the records, the runs of its step 1 and the close review's
+   fixes (the Log, stage H).
 
 ## Current stage
 
-Alpha 2.2, stage H (2026-11-08, done): the close. H.0 swept every screen and the service on the final tree,
+Alpha 2.2, stage H (2026-11-08, steps 1 and 2 done; step 3, the pull request with §9's report and the tag
+`alpha-2.2` attempted once, comes next): the close. H.0 swept every screen and the service on the final tree,
 each finding confirmed against the code and fixed where it held, in five commits (the Log). Stage H ran `pnpm
 verify` on all sixteen stages and `pnpm build && pnpm prove` offline on the branch as it stood (Last green runs),
 wrote this file's Resume, Known debts (paid, open, left by decision), Blockers and Spend to the branch's end,
 brought `CLAUDE.md`'s alpha 2.2 lines to the tree, gave `README.md` five lines on alpha 2.2, and held
-`docs/BASE.md` to the tree. `pnpm prove --live` waits on the account (Blockers). The pull request into `main`
-and the tag `alpha-2.2` follow.
+`docs/BASE.md` to the tree. A close review read the commit, and its fixes followed: the nightly's dump in
+`scripts/host/nightly.sh` to the place the prompt's §3 names, with its tests on stand-ins, and the records' facts and
+words (the Log). `pnpm prove --live` waits on the account (Blockers). The pull request into `main` and the tag
+`alpha-2.2` follow.
 
 Alpha 2.2, stage G (2026-11-08, done): the live host's runbook and scripts held to the tree. A reader held
 `docs/runbooks/live-host-install.md` and `scripts/host/` to the code, five verifiers held its findings and its patch to
@@ -119,7 +135,7 @@ Implementation 17). F.5's commands were built with no model call (F.5.1 to F.5.4
 over a project's own passages, the graph tools on the `sci-rag` server, the report's project lanes; Implementation 18
 and ADR-002's Implementation F). They and stage E's E.17 to E.20 landed by cherry-pick on 8 November, the landing
 review's fixes after them. The account's usage limit has refused every model call since 8 November 04:28 UTC, until
-2026-12-01 (Blockers), and the live steps wait on it in Resume item 4's order.
+2026-12-01 (Blockers), and the live steps wait on it in Resume item 5's order.
 
 Alpha 2.2, stage E (2026-11-04 to 2026-11-05, done): the screens on the generated types, and the catalogues. E.0a and
 E.0b gave every JSON route its model, so a schema the service only writes lists every property as required and the
@@ -357,9 +373,12 @@ DOI or PMID. Each now reads the project's rows.
 | 2026-11-08 05:55 | The landing's final tree: `gen:api`, `gen:tools` and `gen:components` with each `--check`; `check:secrets`, `check:plan`, `check:state` (86 checks), `check:figures`, `check:guild` (146 checks), `check:tools`; `pnpm test:sim`; `pnpm test:lit`; `pnpm build`; `pnpm smoke` with no key, on its own service at 127.0.0.1:43339, stopped after; `pnpm prove`, offline, steps 1 to 10 | each file as the code writes it; every check green; 142 passed, 3071 deselected; 10 passed, 3203 deselected; built; 20 of 20 screens; 99 of 99 checks, the sci-rag server's graph tools in step 3 and no call in the proof's spend table | 4 min 55 s (sim); 7 s (lit); 18 s (build); 36 s (smoke); 195 s (the proof) | `adb9c8d` |
 | 2026-11-08 07:18 | The landing review: the changed tests with the tests of the code and the docs they read, with the database address empty, on Python 3.13 and on 3.12; `gen:api`, `gen:tools` and `gen:components` with each `--check`; `check:tools`, `check:secrets`, `typecheck`, `pnpm build`; `pnpm test:lit`; `pnpm prove --steps 3`, offline; `pnpm test:core` | 281 passed each way; each file as the code writes it; every check green; built; 10 passed, 3212 deselected; 19 of 19 checks, no model call; 3046 passed, 1 skipped, 175 deselected | 5 min 4 s (core); 40 s (the proof) | the landing review |
 | 2026-11-08 08:26 | F.5's offline part: `pnpm build`; the service restarted and `pnpm ready` (no probe); `pnpm lit:graph --project ethanol --dry-run` and `pnpm lit:report --project ethanol --configs interactive,vector_only,keyword_only --render`, no model call; `pnpm test:lit`; `pnpm test:core` | ready; the dry run 92 batches; the run 130 questions, 0 calls; 10 passed; 3064 passed, 1 skipped, 175 deselected | 2.8 s; 8.5 s; 8 s; 5 min 10 s | F.5 |
+| 2026-11-08 10:21 | H.0's first list (the screens the sweep walked): `pnpm test:core`; `pnpm test:sim`; the touched test files with the database address empty, on Python 3.12; `gen:api`, `gen:tools` and `gen:components` with `--check`; `check:licences`, `check:secrets`, `check:plan`, `check:figures`, `check:guild`, `check:state`, `check:tools`, `typecheck`; `pnpm build` and `pnpm smoke` on a port of its own | 3066 passed, 1 skipped, 175 deselected; 142 passed; 205 passed after the last edit; each file as the code writes it; every check green; 20 of 20 screens | 5 min 23 s (`test:core`, ended 10:16); 4 min 47 s (`test:sim`, ended 10:21) | `a024dfc` |
+| 2026-11-08 10:55 | H.0's second list (the screens, the notes a basis hashes, the remnants, the records): `pnpm test:core`; `pnpm test:sim`; `pnpm test:lit`; the touched test files and their neighbours with the database address empty, on Python 3.12; `gen:api`, `gen:tools` and `gen:components` with `--check`; `typecheck`, `check:state`, `check:figures`, `check:guild`, `check:plan`, `check:tools`, `check:secrets`; `pnpm build` and `pnpm smoke` on a port and a database of its own | 3057 passed, 1 skipped, 175 deselected (`validate_claims`' 20 tests gave way to eleven on `validate_plan`); 142 passed; 10 passed; 484 passed; each file as the code writes it; every check green; 20 of 20 screens | 5 min 34 s (`test:core`, ended 10:50); 5 min 6 s (`test:sim`, ended 10:55); 10 s (`test:lit`) | `9b6e5c7` |
 | 2026-11-08 11:10 | Stage H: `pnpm verify`, all sixteen stages, on `9b6e5c7` (H.0's last commit) | every stage green: `check:secrets`; `typecheck`; `gen:api --check` and `gen:components --check`; `check:plan`; `test:core` 3057 passed, 1 skipped, 175 deselected (5 min 22 s); `test:sim` 142 passed, 3091 deselected (4 min 56 s); `test:lit` 10 passed (10 s); `check:licences`; `check:tools`; `check:guild` 146 checks; `check:state` 95 checks; `check:figures` 13 checks; `build`; `smoke` 20 of 20 screens with no model key; `test:reconcile` | 12 min 11 s | `9b6e5c7` |
 | 2026-11-08 11:14 | Stage H: `pnpm build && pnpm prove`, offline, steps 1 to 10, on the same tree | built in 4.7 s; 99 of 99 checks, `conform` 8 of 8 on `biosteam`, `kinetics`, `mirror` and `train` in step 10, the proof's spend table 0 calls | 19 s (the build); 203 s (the proof) | `9b6e5c7` |
-| 2026-11-08 11:28 | Stage H's records on the final tree: `pnpm test:core`; `test_guidance.py` with the database address empty, on Python 3.12 and on 3.13 | 3057 passed, 1 skipped, 175 deselected; 6 passed each way | 5 min 59 s; 2 s | stage H |
+| 2026-11-08 11:21 | Stage H's records on the final tree: `pnpm test:core`; `test_guidance.py` with the database address empty, on Python 3.12 and on 3.13 | 3057 passed, 1 skipped, 175 deselected; 6 passed each way | 5 min 59 s; 2 s | stage H |
+| 2026-11-08 11:50 | The close review's fixes: `test_host.py` and `test_guidance.py` with the database address empty, on Python 3.12 and on 3.13; ShellCheck 0.11.0 and `bash -n` on the four host scripts; `pnpm test:core` | 58 passed each way; clean; 3060 passed, 1 skipped, 175 deselected | 3 s; 5 min 12 s | stage H, the close review |
 
 ## Spend (alpha 2.1)
 
@@ -375,8 +394,10 @@ cap for this work is 150 USD and an ask's 6 USD (`core/.env`).
 ## Spend (alpha 2.2)
 
 From the spend tables of every database on this server, read with SELECT alone at the close (8
-November: `openferment_dev`, `openferment_dev_alpha21`, and the test and conformance databases, which
-hold none); a proof reads its own before its database is dropped. The day's cap for this work is 150
+November: `openferment_dev`, `openferment_dev_alpha21`, and `check_tools_26521_a78452`, a database
+`check:tools` left on the server at 04:51 that day, its spend table empty, which the close review
+dropped with `python -m openferment_core.migrations drop`; `sci_rag_test`, the kit's own, holds no
+spend table); a proof reads its own before its database is dropped. The day's cap for this work is 150
 USD and an ask's 8 USD (`core/.env`, the prompt's §4).
 
 | Stage | Calls | USD | What |
@@ -531,9 +552,9 @@ USD and an ask's 8 USD (`core/.env`, the prompt's §4).
 
 | Since | Blocker | Next command |
 |---|---|---|
-| 2026-11-08 04:28 UTC | The Anthropic account's own usage limit: "You have reached your specified API usage limits. You will regain access on 2026-12-01 at 00:00 UTC." Every model call is refused, a limit apart from openFerment's daily cap (25.28 USD of 150 spent that day). It stops stage F's live steps where they stand: the opus-max table's other ten questions (eq-eth-05 to eq-eth-14), the second judge (Sonnet alone at max over every tag's newest runs), the measure of the plan's larger room (F.2g), the fourteen on the Postdoc screen on the final routes (F.3), `pnpm prove --live` (F.4) and the retrieval lanes that call a model (F.5: the concept graph, HyDE, the judge's grading and the answer lane) | The owner raises the limit in the Anthropic console (Settings, Limits), or waits for 2026-12-01; then the five steps `docs/reports/model-routing-2026-11.md` lists under "To finish it", in its order, `OPENFERMENT_MAX` standing for the opus-max table it writes out: `pnpm ready --probe`, its probe row green; the larger room's measure, `OPENFERMENT_PROJECT=ethanol OPENFERMENT_ROUTES="$OPENFERMENT_MAX" pnpm eval run --live --suite ethanol --tag opus-max-room --judge --only eq-eth-01,eq-eth-02,eq-eth-03,eq-eth-04`; the table's other ten on the same table and tag, `--only eq-eth-05,eq-eth-06,eq-eth-07,eq-eth-08,eq-eth-09,eq-eth-10,eq-eth-11,eq-eth-12,eq-eth-13,eq-eth-14`; the Sonnet pass, `OPENFERMENT_PROJECT=ethanol OPENFERMENT_ROUTES='{"judge":{"models":["claude-sonnet-5-5"],"effort":"max"}}' pnpm eval judge --suite ethanol`; and `OPENFERMENT_PROJECT=ethanol pnpm eval summary --suite ethanol --rows`. The tag `opus-max` keeps the old room's four answers. Then F.3, F.4 and F.5's live run, in Resume item 4's order |
-| 2026-10-30 | Owner action, before the first alpha 2.0 deploy on the live Mini: its records are files under `core/data/` until carried into a project. Nothing is lost by waiting: the service no longer writes them | Once alpha 2.2 is merged into `main` (until then `main` holds alpha 2.1, whose `install.sh` stops at step 3 with Homebrew's keg-only PostgreSQL off its PATH), on the Mini, in its checkout `~/openferment`, as `docs/runbooks/live-host-install.md` steps 0 to 5 give it, with no alpha 1.0 deploy first (alpha 1.0's `deploy.sh --keep-decisions` commits the decisions and pushes them to GitHub): `brew install postgresql@17 pgvector && sudo brew services start --sudo-service-user="$(id -un)" postgresql@17` (PostgreSQL from power-on; `brew services --help` lists the flag); alpha 1.0's own `scripts/host/install.sh --uninstall`, `[ -e ~/openferment-alpha-1.0-data ] || cp -Rp core/data ~/openferment-alpha-1.0-data` and `git pull --ff-only`; `core/.env` kept, or made from the example without its database line; `scripts/host/install.sh`, which makes the database `openferment`, names it in `core/.env` and stops at its deploy step while `core/data/biorepo.json` holds the Mini's decisions; then a copy of the file outside the checkout, `pnpm db:migrate && pnpm db:import-alpha1 --name "Alpha 1.0 records" --by "<your name>"`, `git checkout -- core/data/biorepo.json` and `scripts/host/install.sh` again; then `pnpm ready` (step 4) and `OPENFERMENT_PROJECT` as step 6 says |
-| 2026-10-31 | Owner decision: the live instance's PostgreSQL has no backup. `pnpm ready` used to say a git push "backs up" Guild's decisions, which stopped being true when they moved into the database at stage 2; the row is gone (8.5). Guild's ledger is personnel data and never enters git | Choose where a dump of the database goes, then add a step to the nightly (`scripts/host/nightly.sh`) in a commit on `main`, which the next deploy brings: `"$(brew --prefix postgresql@17)/bin/pg_dump" -h 127.0.0.1 openferment` to that place, the keg's full path, since Homebrew keeps `pg_dump` off the jobs' PATH. An edit made in the Mini's checkout stops each deploy at its check for uncommitted changes |
+| 2026-11-08 04:28 UTC | The Anthropic account's own usage limit: "You have reached your specified API usage limits. You will regain access on 2026-12-01 at 00:00 UTC." It refuses every model call; openFerment's daily cap stood at 25.28 USD of 150 that day. It stops stage F's live steps where they stand: the opus-max table's other ten questions (eq-eth-05 to eq-eth-14), the second judge (Sonnet alone at max over every tag's newest runs), the measure of the plan's larger room (F.2g), the fourteen on the Postdoc screen on the final routes (F.3), `pnpm prove --live` (F.4) and the retrieval lanes that call a model (F.5: the concept graph, HyDE, the judge's grading and the answer lane) | The owner raises the limit in the Anthropic console (Settings, Limits), or waits for 2026-12-01; then the five steps `docs/reports/model-routing-2026-11.md` lists under the alpha 2.2 part's "To finish it" (from line 491), in its order, `OPENFERMENT_MAX` standing for the opus-max table it writes out: `pnpm ready --probe`, its probe row green; the larger room's measure, `OPENFERMENT_PROJECT=ethanol OPENFERMENT_ROUTES="$OPENFERMENT_MAX" pnpm eval run --live --suite ethanol --tag opus-max-room --judge --only eq-eth-01,eq-eth-02,eq-eth-03,eq-eth-04`; the table's other ten on the same table and tag, `--only eq-eth-05,eq-eth-06,eq-eth-07,eq-eth-08,eq-eth-09,eq-eth-10,eq-eth-11,eq-eth-12,eq-eth-13,eq-eth-14`; the Sonnet pass, `OPENFERMENT_PROJECT=ethanol OPENFERMENT_ROUTES='{"judge":{"models":["claude-sonnet-5-5"],"effort":"max"}}' pnpm eval judge --suite ethanol`; and `OPENFERMENT_PROJECT=ethanol pnpm eval summary --suite ethanol --rows`. The tag `opus-max` keeps the old room's four answers. Then F.3, F.4 and F.5's live run, in Resume item 5's order |
+| 2026-10-30 | Owner action, before the first alpha 2.0 deploy on the live Mini: its records are files under `core/data/` until carried into a project. The files keep as they are while the owner waits: since stage 2 the service writes every record to the database | Once alpha 2.2 is merged into `main` (until then `main` holds alpha 2.1, whose `install.sh` stops at step 3 with Homebrew's keg-only PostgreSQL off its PATH), on the Mini, in its checkout `~/openferment`, as `docs/runbooks/live-host-install.md` steps 0 to 5 give it, with no alpha 1.0 deploy first (alpha 1.0's `deploy.sh --keep-decisions` commits the decisions and pushes them to GitHub): `brew install postgresql@17 pgvector && sudo brew services start --sudo-service-user="$(id -un)" postgresql@17` (PostgreSQL from power-on; `brew services --help` lists the flag); alpha 1.0's own `scripts/host/install.sh --uninstall`, `[ -e ~/openferment-alpha-1.0-data ] || cp -Rp core/data ~/openferment-alpha-1.0-data` and `git pull --ff-only`; `core/.env` kept, or made from the example without its database line; `scripts/host/install.sh`, which makes the database `openferment`, names it in `core/.env` and stops at its deploy step while `core/data/biorepo.json` holds the Mini's decisions; then a copy of the file outside the checkout, `pnpm db:migrate && pnpm db:import-alpha1 --name "Alpha 1.0 records" --by "<your name>"`, `git checkout -- core/data/biorepo.json` and `scripts/host/install.sh` again; then `pnpm ready` (step 4) and `OPENFERMENT_PROJECT` as step 6 says |
+| 2026-10-31, the step written 2026-11-08 | Owner action: the live instance's backup runs from the first night after the owner's first install. The place is the alpha 2.2 prompt's §3: `scripts/host/nightly.sh` dumps the database `openferment` first each night with the keg's `pg_dump` (`backup_database` in `scripts/host/lib.sh`) into `~/openferment-backups/openferment-<date>.dump`, the folder and its files the owner's alone, the newest seven kept, tested on stand-ins in `core/tests/test_host.py`. Guild's decisions live in the database since stage 2, and `pnpm ready`'s backup row left at 8.5. Guild's ledger is personnel data and never enters git | The live-host install (the row above), once alpha 2.2 is merged into `main`; the morning after its first night, `ls -l ~/openferment-backups/` names the night's dump, and `~/Library/Logs/openferment/nightly.log` says what the dump step did. `docs/runbooks/live-host-install.md` step 7 reads a dump back into a database of its own |
 | 2026-10-30, again 2026-11-02 (HTTP 403, twice) | The session's git relay refuses tag pushes (branch pushes work): `git push origin alpha-1.0 alpha-2.1` ends with "RPC failed; HTTP 403" and "unexpected disconnect while reading sideband packet". The tags `alpha-1.0` (`d19224f`) and `alpha-2.1` (`fa1b744`, #16's head) exist in this container only; both commits stay reachable from `main` | On the owner's machine, in any clone: `git fetch origin && git push origin d19224ff0b6eb809b21492d1b7a2e8fd895a0f44:refs/tags/alpha-1.0 fa1b7448a5b5e5a2b943b3fc9546f8a420a8ef10:refs/tags/alpha-2.1`, which runs the same in a clone that holds the tags already |
 | 2026-11-04 (11, 12), 2026-11-08 (13) | Owner questions 11 (the label of a run resting on a bench reading and a weaker record), 12 (an address a model names for the service to fetch an SFF file from) and 13 (how `has_key` reads the key line) are open; each default stands in the tree, and 12 and 13 each touch a stop condition (a widening of what the service reaches outbound; a change to how a key is read) | The owner answers each in the Owner questions table; a changed answer is one commit with its test: 11 in `basis.basis_provenance` (ADR-006), 12 at the import door (`POST /api/flowsheets/import-url`, `flowsheet_import`), 13 in `scripts/host/lib.sh` with `core/tests/test_host.py` |
 
@@ -586,13 +607,13 @@ the line that records the decision and the decision record it stands under.
 | Debt | Paid by |
 |---|---|
 | The retrieval lanes that ask a model, over the Ethanol project's own corpus: the concept graph (at most 2.3239 USD on `claude-haiku-5-5` by the dry run), `full_deep`, `no_graph` and `no_hyde`, the judge's grading, and the answer lane that `explain`'s default rests on (ADR-008, Implementations 17 and 18). Alpha 1.0 owed them as its paid lanes (Live owed, §4.5) | stage F's live run, once the account answers (Blockers): `pnpm lit:graph --project ethanol --by <name>`, then `pnpm lit:report --project ethanol --by <name> --judge --render` |
-| The host scripts' PostgreSQL steps (`ensure_database`, the migration in `deploy.sh`, the nightly's settings) have run as `bash -n`, under ShellCheck 0.11.0 and against stand-ins for Homebrew and the PostgreSQL tools on Linux's bash 5 (stage G; `core/tests/test_host.py`): the scripts were read against macOS's bash 3.2 and BSD tools, and the owner's first install runs them | the owner's first install on the Mini, once alpha 2.2 is merged into `main` (Blockers) |
+| The host scripts' PostgreSQL steps (`ensure_database`, the migration in `deploy.sh`, the nightly's settings and its dump) have run as `bash -n`, under ShellCheck 0.11.0 and against stand-ins for Homebrew and the PostgreSQL tools on Linux's bash 5 (stage G and the close review; `core/tests/test_host.py`): the scripts were read against macOS's bash 3.2 and BSD tools, and the owner's first install runs them | the owner's first install on the Mini, once alpha 2.2 is merged into `main` (Blockers) |
 | `pnpm db:up` (compose.yaml, `pgvector/pgvector:pg17`) has never run here: this container has no Docker daemon; CI runs the same image as a service | its first run on a machine with Docker, the owner's |
 | Component tests on fixtures recorded from the real service (`pnpm record:fixtures`, alpha 2.0 prompt §9.3) are unbuilt; the walk and the smoke run against the real service | a stage after alpha 2.2 that builds `pnpm record:fixtures` |
 | No offline test computes on a published genome-scale model (Yeast9 and iMM904 need their fetched files, caches kept outside git; Departures, §5.5 stage 2); a model add-on applied in the worker, and a metabolite-defined product's demand through the worker, are untested | a test under the marker `slow` or `live`, on a host that holds the fetched files |
 | `units.json` maps `wt%` and `% (w/w)` to `% CDW`, aliases written for the PHA program; changing them changes how a stored record converts | the vocabulary review, after alpha 2.2, with a migration for the records it converts |
 | RunbookDetail's held-for-review panel keeps words of Dominion's era: candidates near a claimed identity band, a ruling with legal consequences, and two rulings (a boundary accepted as mapped; candidates excluded pending counsel) that `store.resolveRunbookReview` writes into the held stage, with a boundary map among the runbook's outputs. No code in this build sets a runbook held for review, so the panel answers only a row kept in that state | the stage that lets a runbook be held for review, with that state's own words and rulings |
-| `fermos.forecast_run` keeps `duration_h`, a length the calling code sets as its own convention, which only the tests and their stand-ins pass (`standins.py`, `test_fermos.py`, `test_fermos_3r.py`, `test_proforma_fermos.py`, `test_proforma_ceiling.py`); the routes, the tools and the engine set a forecast's length as a typed `t_end` | the change that has those tests set a typed `t_end`, or reach `fermos.forecast()` through a helper of their own |
+| `fermos.forecast_run` keeps `duration_h`, a length the calling code sets as its own convention, which the tests and their stand-ins pass (`standins.py`, `test_fermos.py`, `test_fermos_3r.py`, `test_proforma_fermos.py`, `test_proforma_ceiling.py`); the routes, the tools and the engine set a forecast's length as a typed `t_end` | the change that has those tests set a typed `t_end`, or reach `fermos.forecast()` through a helper of their own |
 | The service holds a reading's unit to its parameter's alone: a runbook's measure names no parameter it may set, so a scenario may set any parameter in a unit that converts to any reading (the proof's walk pairs a placeholder by unit) | a later pass that ties a runbook's measure to the parameters it may set (ADR-016) |
 | A ProcessModel plant runs on its default scenario; its scenario fields (cellulosic's feedstock, milk's feed, gas_fermentation's carbon source) are read and kept off the parameters door (stage 4.3 composes the cellulosic plant's pretreatment and fermentation in openFerment's flowsheet) | a stage after alpha 2.2 that offers a plant's scenario fields as its configurations (ADR-004) |
 | A second organism's reaction set for the composed flowsheet: the package holds one | a package or a record that gives another |
@@ -601,8 +622,8 @@ the line that records the decision and the decision record it stands under.
 
 | Debt | Recorded at | Decision record | Returns when |
 |---|---|---|---|
-| `core/tests/standins.py` (27 test files use it) keeps stand-in records on real strain ids, a closed-form ethanol evaluator and `STANDIN_THEORETICAL`, the theoretical yield on glucose; `test_proforma.py` keeps the package's regression values to test the parser (the benchmark price this build once measured left the tree with the retired shelf entries, C.6). A4's `rg` clause finds them | Departures, §5.3 and A4 stage 8 | ADR-010 (the demo infrastructure deleted, its stand-ins kept as test material) | fixtures read from the library plants replace them |
-| Postdoc's scripted stand-in model and the test pool speak of PHB, casein and xylose hydrolysate (`test_tools.py`, `test_postdoc_agent.py` and the tests that import their fixtures); §5.3 wants them to speak only of library plants and the kit's demo corpus. The words are test material, and no value of them reaches the service; H.0 gave placeholders the PHB-era words in comments and the tests it touched | Departures, §5.2 (the fixtures that stand) | ADR-010 | with the stand-ins above |
+| `core/tests/standins.py` (39 test files import it) keeps stand-in records on real strain ids, a closed-form ethanol evaluator and `STANDIN_THEORETICAL`, the theoretical yield on glucose; `test_proforma.py` keeps the package's regression values to test the parser (the benchmark price this build once measured left the tree with the retired shelf entries, C.6). A4's `rg` clause finds them | Departures, §5.3 and A4 stage 8 | ADR-010 (the demo infrastructure deleted, its stand-ins kept as test material) | fixtures read from the library plants replace them |
+| Postdoc's scripted stand-in model and the test pool speak of PHB, casein and xylose hydrolysate (`test_tools.py`, `test_postdoc_agent.py` and the tests that import their fixtures); §5.3 asks them to speak of library plants and the kit's demo corpus. The words are test material, and their values stay in the tests; H.0 gave placeholders the PHB-era words in comments and the tests it touched | Departures, §5.2 (the fixtures that stand) | ADR-010 | with the stand-ins above |
 | pureOS's chemical-set key is called `program` (`TrainSpec.program` in `core/openferment_core/models.py`, and `FlowsheetInfo`, `Train`, `TrainSummary`, `TrainProposal`); kept trains and train runs validate on that name, and its texts ("the yeast program's chemicals", `PROGRAM_CHEMICALS`, `fermos.NAMED_NOTE`'s "program filter", the kinetics settings' notes, the shelf's description and price basis of `custom_train_v1`) are hashed into artifact ids, so renaming them shifts the id of every new train run and composite run. The refusals and descriptions of pureOS, the vessel and the shelf say "the yeast program" beside the key, and fermOS's note on every fit's deposition input ("the readings as the browser sent them; the service cannot see the deposition itself"), hashed the same way, is untrue since stage 2. The screens say "chemical set", and the shelf's comment does | the Log, stage H.0 ("Kept, with the reason"); Departures, alpha 2.2 D1 C.1 (the pins) | ADR-005 (projects replace programs; this key names a chemical set) and ADR-015 (a run's id is its engine's own artifact id) | one stage renames the key with a before-validator for stored rows and accepts the id shift |
 | `proforma._strain_labels`' per-program species map serves the vessel's organism check; with no catalogue it is empty in production, and its two notes are hashed into vessel designs | as the `program` key | ADR-005 and ADR-015 | with the `program` key |
 | `kinetics.py` keeps the storage machinery of the deleted `storage_v1` family (the N and Q states, `Mode.storing`, the N event, the Storage group); no family sets `has_N` or `has_Q`, so none of it runs. Dropping the state slots changes LSODA's finite-difference Jacobian, which a replay compares exactly | `CLAUDE.md`, Mission and scope (§11.5 keeps the kinetics families as they are) | ADR-015 (`kinetics` wraps fermOS as fermOS computes, its trajectories held bit for bit) | the next change to the kinetics families, with every family's trajectories held bit for bit |
@@ -3563,3 +3584,35 @@ F.2f on, on `llm.ROUTES`' defaults (ADR-008, Implementation 17);
 - H.5, the checks on the final tree: `pnpm test:core` 3057 passed, 1 skipped, 175 deselected (5 min 59 s);
   `test_guidance.py` 6 passed on Python 3.12 and on 3.13, `CLAUDE.md` at 148 lines. No model was called and nothing
   was spent.
+- H.6, the close review: an independent reader of `ae6f74c` gave 26 findings (5 errors of fact, 9 smaller gaps, 2
+  remnants, 10 places in the words); each was confirmed against the tree, the prompt, the logs or a SELECT before it
+  was fixed, and every one held.
+  - The backup in the nightly, in the place the prompt's §3 names: `scripts/host/nightly.sh` runs `backup_database`
+    (`scripts/host/lib.sh`) first each night, the keg's `pg_dump -h 127.0.0.1 --format=custom openferment` into
+    `~/openferment-backups/openferment-<date>.dump`, written beside its name and moved into place once whole, the folder
+    700 and its files 600, the newest seven kept, in words macOS's bash 3.2 reads. Three tests in
+    `core/tests/test_host.py` on stand-ins: the keg's tool called once, seven kept and a file of another name left as
+    it was; a failed dump keeping the kept files; the dump ahead of the night's work. ShellCheck 0.11.0 is clean over
+    the four host scripts. The runbook's steps 3, 6 and 7 and `launchd.py`'s docstring name it, step 7 with how to
+    read a dump back; Blockers row 3, Resume item 6 and the macOS debt row say the place is §3's and the owner's first
+    install runs it.
+  - Stage H: steps 1 and 2 done and step 3 next, the pull request with §9's report and the tag `alpha-2.2` attempted
+    once (Resume items 4, 6 and 7; Current stage).
+  - Facts: Resume item 5 for the live steps' order (stage F; Blockers row 1); the final Last-green row at 11:21, the
+    time its run ended; 39 test files import `standins.py`; Resume item 2 names the three model settings at Haiku and
+    the effort at medium; Resume item 5 names this session's copy of the fetched caches and what a fresh container
+    runs to fill `core/data/`, and the routing report's alpha 2.2 "To finish it"; H.0's two rows join Last green
+    runs; `CLAUDE.md` gives verify's measured range (nine to eighteen minutes) and CI's Python (the runner's, CPython
+    3.12.3 on the close's run), parts the catalogues line into the R line §1 item 4 and §6.5 name and a C line for
+    E.8 and E.9, and adds alpha 2.2's three engines to the scope line; `docs/BASE.md`'s Postdoc entry says what holds:
+    its doors, the base running with no key, and the two pieces of the `postdoc` package the base reads.
+  - The test database `check_tools_26521_a78452`, left by a `check:tools` run at 04:51: a SELECT read its one project
+    (`check-tools`, made by `check:tools`) and its empty spend table, and `python -m openferment_core.migrations drop`
+    dropped it; the Spend paragraph names it and `sci_rag_test`, the kit's.
+  - Words: Blockers rows 1 to 3, two debt rows, `CLAUDE.md`'s SFF, provenance, tool-result and estimate lines, and
+    `docs/BASE.md`'s opening, records row, software line and module line, each said positively.
+  - Kept as found: the A4 departure row's "27 test files use it", the record of stage 8's day.
+- Checks of the close review: `test_host.py` 52 passed (49 before) and `test_guidance.py` 6 passed, with the
+  database address empty, on Python 3.12 and on 3.13, `CLAUDE.md` at 149 lines; ShellCheck 0.11.0 and `bash -n` on
+  the host scripts; `pnpm test:core` 3060 passed, 1 skipped, 175 deselected (5 min 12 s). `test:sim` and `test:lit`
+  are not owed: neither the engines nor the literature layer moved. No model was called and nothing was spent.

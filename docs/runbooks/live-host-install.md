@@ -141,8 +141,8 @@ it there; runs `deploy.sh --no-pull --no-restart`, which installs the packages a
 and migrates both schemas (`openferment` and the kit's `sci_rag`), so step 2 is done again here and
 does no harm; sets the power settings an always-on machine needs (never sleep, restart after a
 power failure, wake for network access); installs two LaunchDaemons, the server (at power-on,
-before anyone logs in) and the 03:00 nightly job (the night's extraction, the nightly checks, and
-Guild's check proposals with their briefs); waits for `/api/health`; publishes the port to your own
+before anyone logs in) and the 03:00 nightly job (the database's dump into `~/openferment-backups/`,
+the night's extraction, the nightly checks, and Guild's check proposals with their briefs); waits for `/api/health`; publishes the port to your own
 devices with `tailscale serve`; and runs `pnpm ready` (step 4). The service binds `127.0.0.1` and
 nothing else; `tailscale serve` is how your phone and laptop reach it, and a request through
 Tailscale Funnel, from the public internet, changes nothing and may not name a key.
@@ -235,9 +235,9 @@ db:import-alpha1 --name "Alpha 1.0 records" --by "<your name>" --data ~/openferm
 
 On Home, make a project; its address ends in `#/p/<its id>`. Set `OPENFERMENT_PROJECT=<its id>` in
 `core/.env` for the project whose documents the nightly job extracts: the extraction waits while
-none is named, and once one is named the whole job (the extraction, the nightly checks, Guild's
-check proposals and their briefs) acts in that project alone; while none is named, the checks and
-proposals act in every project. On the project's Intake page collect the documents by identifier
+none is named, and once one is named the extraction, the nightly checks, Guild's check proposals
+and their briefs act in that project alone; while none is named, the checks and proposals act in
+every project. The night's dump holds the whole database. On the project's Intake page collect the documents by identifier
 (the ethanol sources are `docs/corpus/ethanol-sources.txt`), extract each from the documents list,
 and review the candidates in BioRepo. Studies runs the things of every engine registered here (the
 library's plants and the composed flowsheet on `biosteam`, and each other engine's) and lists every
@@ -257,7 +257,7 @@ done in a container.
 | Restart the service by hand, after a change to `core/.env` among other times | `sudo launchctl kickstart -k system/com.umutuzo.openferment`; the nightly job is `com.umutuzo.openferment.nightly`, and `scripts/host/nightly.sh` runs its work by hand |
 | Make `core/.venv` again, after it was removed | `cd ~/openferment/core && uv sync --frozen --all-extras --python 3.13 && bash ../scripts/engines-local.sh`, which installs each engine `core/engines.local` names beside the lock; a deploy's sync keeps the environment's Python, and one made with no `--python` takes the newest Python uv finds |
 | The service's log, and the nightly job's | `~/Library/Logs/openferment/server.log`, `~/Library/Logs/openferment/nightly.log` |
-| A backup | not set up: choose where a dump goes, then add a step to `scripts/host/nightly.sh` in a commit on `main`, which the next `scripts/host/deploy.sh` brings: `"$(brew --prefix postgresql@17)/bin/pg_dump" -h 127.0.0.1 openferment > <there>`, the keg's full path, since Homebrew keeps `pg_dump` off the jobs' PATH. An edit made in the Mini's checkout stops each deploy at its check for uncommitted changes (PROGRESS.md, Blockers) |
+| A backup | the nightly job's first step, in the place the alpha 2.2 prompt's §3 names: the keg's `pg_dump` (`backup_database` in `scripts/host/lib.sh`; Homebrew keeps `pg_dump` off the jobs' PATH) dumps the database `openferment` at 03:00 into `~/openferment-backups/openferment-<date>.dump`, in PostgreSQL's custom format, the folder and its files yours alone, and the newest seven are kept; `scripts/host/nightly.sh` makes one by hand. To read one back, into a database of its own: `bin="$(brew --prefix postgresql@17)/bin"; "$bin/createdb" -h 127.0.0.1 openferment_restored && "$bin/pg_restore" -h 127.0.0.1 -d openferment_restored ~/openferment-backups/openferment-<date>.dump`. The first night after the owner's first install runs the step on macOS for the first time (PROGRESS.md, Known debts) |
 | The tags alpha 1.0 and alpha 2.1 | once, from any clone: `git fetch origin && git push origin d19224ff0b6eb809b21492d1b7a2e8fd895a0f44:refs/tags/alpha-1.0 fa1b7448a5b5e5a2b943b3fc9546f8a420a8ef10:refs/tags/alpha-2.1`, which runs the same in a clone that holds the tags already (PROGRESS.md, Blockers) |
 
 ## What is not covered

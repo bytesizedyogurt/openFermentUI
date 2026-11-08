@@ -3,7 +3,7 @@
 openFerment is two layers. **The base** is the part that is finished and kept stable: a store,
 projects, records whose provenance the code computes, runs of one shape, flowsheet files,
 studies, the screens, and the ways in for programs and agents. **Modules** are what other
-people build on top of it, against written contracts, without editing the base.
+people build on top of it, against written contracts, the base kept as it is.
 
 This page is for a reader who has never spoken to the people who wrote openFerment. It says
 what the base is, what a module is, how to prove a module needs no edit to the base, and what
@@ -15,7 +15,7 @@ the base runs on.
 |---|---|---|
 | The store | PostgreSQL with pgvector, the one database: every row carries its project, who made it and when | `docs/decisions/ADR-001-postgresql.md` |
 | Projects | Everything a person keeps belongs to one project, named on every request by `X-OpenFerment-Project` | `docs/decisions/ADR-005-projects.md` |
-| Records | Values read from documents, each anchored to the verbatim quote it stands in; a reviewer's decisions; the candidates waiting; the catalogues of strains, products, skills and lessons; the depositions made at the bench. Provenance is computed by code from inputs and origins, and no person or model sets it | `docs/api/intake.md`, `docs/decisions/ADR-006-quantities-and-estimates.md` |
+| Records | Values read from documents, each anchored to the verbatim quote it stands in; a reviewer's decisions; the candidates waiting; the catalogues of strains, products, skills and lessons; the depositions made at the bench. Code alone computes provenance, from inputs and origins | `docs/api/intake.md`, `docs/decisions/ADR-006-quantities-and-estimates.md` |
 | Runs | One `runs` row per computation, of one shape whatever engine made it, each input a typed quantity with its origin (a reading deposited at the bench among them, as a `measurement`, which a run resting on readings and the package's defaults reads as `measured`), replayable within the precision the run states | `docs/api/runs.md`, `docs/api/engines.md` |
 | Flowsheets | SFF files: every run of a plant writes a validated, scored file, and files import as records | `docs/api/sff.md` |
 | Studies | Scenarios, comparisons, runbooks with locked predictions, and an export package that opens without the service | `docs/api/studies.md` |
@@ -25,13 +25,12 @@ the base runs on.
 The base works with no model key configured. Every screen of the base opens and works without
 one; the Postdoc screen says in words that it needs a key.
 
-The repository holds software alone. No composition, yield, price, titre, strain fact or a
-paper's finding is written into its code, seed or fixtures: science arrives at run time through
-documents, library plants, people and models, each value carrying where it came from.
+The repository holds software alone, in its code, seed and fixtures. Science arrives at run time
+through documents, library plants, people and models, each value carrying where it came from.
 
 ## What a module is
 
-A module adds capability through a contract and edits nothing in the base:
+A module adds capability through a contract, and the base stays as it is:
 
 - **An engine**: a Python package that registers one object under the entry-point group
   `openferment.engines`, runs its heavy computation in a worker process of its own, takes typed
@@ -52,8 +51,12 @@ A module adds capability through a contract and edits nothing in the base:
 - **The literature layer**: Sci RAG Kit, used as a library, with its REST under `/rag` and the
   `sci-rag` MCP server: the kit's tools and two graph tools of openFerment's, each reading the
   project's concept graph alone (`docs/decisions/ADR-002-sci-rag-kit.md`).
-- **Postdoc**: the first agent, which stays in the repository with its screen; nothing in the
-  base depends on it.
+- **Postdoc**: the first agent, which stays in the repository with its screen, its ask routes
+  and the `openferment` MCP server's `ask_postdoc` as its doors. The base runs, and every base
+  screen works, with no key. Beside those doors the base reads two pieces of the `postdoc`
+  package, and neither asks a model: a project's state reads its conversation store
+  (`postdoc/conversations.py`), and the `search_records` tool shapes its answer with its evidence
+  payload (`postdoc/plan.py`).
 - **Content**: Guild's protocols, kept as a project's protocols (`docs/api/studies.md`), and
   its skills and Primer's lessons, kept as catalogue entries of a project (`docs/api/intake.md`).
 

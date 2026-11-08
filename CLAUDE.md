@@ -10,16 +10,17 @@
 - R: Four components carry it: PostgreSQL is the one store, Sci RAG Kit the literature layer, BioSTEAM the first engine behind one engine contract, and SFF the flowsheet record (§1; ADR-001 to ADR-004; alpha 2.2 prompt §1, ADR-015).
 - R: The repository holds software alone: no composition, yield, price, titre, strain fact or paper's finding is typed in code or seed, and science arrives at run time through Intake and the library plants (§1 item 7; `core/tests/test_no_seed.py`, acceptance A4).
 - R: Versions, ports, tolerances, unit-conversion factors, file hashes and the library's own regression values read at run time count as software (§1 item 7).
-- R: Out of scope for alpha 2.0: accounts and multi-user access (a membership stub only), kinetic response models, optimization, bench execution, a public licence, engines beyond BioSTEAM, specialist or fine-tuned agents, a visual redesign (§1).
+- R: Out of scope for alpha 2.0: accounts and multi-user access (a membership stub only), kinetic response models, optimization, bench execution, a public licence, engines beyond BioSTEAM, specialist or fine-tuned agents, a visual redesign (§1). Alpha 2.2 registers `kinetics` and `train` beside BioSTEAM through the engine contract and holds the tree to these three scientific engines (alpha 2.2 prompt §1 item 1 and its scope).
 - R: Keep Guild, Primer, Deposition and the kinetics families as they are, beyond the store and type changes that reach them (§11.5).
-- R: A project's catalogues (strains with their aliases, products, Guild's skills, Primer's lessons) have a screen at `/catalogues` in the project's address, a tab a kind, and geneOS, Guild's protocol steps and Primer read the project's catalogue (alpha 2.2 prompt §1 item 4, §6.5).
+- R: A project's catalogues (strains with their aliases, products, Guild's skills, Primer's lessons) have a screen at `/catalogues`, Primer's lessons come from the lesson catalogue, and Guild's protocol steps name skills from the skill catalogue (alpha 2.2 prompt §1 item 4, §6.5).
+- C: The catalogues screen sits in the project's address with a tab a kind, and geneOS reads its strains and products from the project's catalogue (alpha 2.2 E.8, E.9; `docs/PROGRESS.md`).
 
 ## Run and test
 
-- C: Install: `pnpm install --frozen-lockfile`, then `cd core && uv sync --frozen --all-extras`; this container runs Python 3.13.17 and CI runs 3.12.
+- C: Install: `pnpm install --frozen-lockfile`, then `cd core && uv sync --frozen --all-extras`; this container runs Python 3.13.17, and CI the Python its runner holds (`setup-uv` names none; 3.12.3 at the close).
 - C: Database: PostgreSQL 16 or later with pgvector. `pnpm db:up` starts `compose.yaml`'s `pgvector/pgvector:pg17`, or `OPENFERMENT_DATABASE_URL` in `core/.env` names a local server (`core/.env.example` has the development address); then `pnpm db:migrate` migrates both schemas, `openferment` and the kit's `sci_rag` (ADR-001).
 - C: The tests make databases of their own on the server `OPENFERMENT_TEST_DATABASE_URL` names (default: the compose role on 127.0.0.1:5432) and drop them after; `pnpm db:reset openferment_dev` remakes the development database, and the command refuses the production database `openferment`.
-- C: `pnpm verify` is the gate: sixteen stages in ADR-011's order, `check:secrets` first, twelve to seventeen minutes here; CI runs it with a pgvector service, then `pnpm prove`.
+- C: `pnpm verify` is the gate: sixteen stages in ADR-011's order, `check:secrets` first, nine to eighteen minutes here, 12 min 11 s at the close; CI runs it with a pgvector service, then `pnpm prove`.
 - C: `pnpm test:core`: offline, no key, no network, about five to six minutes; it leaves out the markers `sim`, `lit`, `slow` and `live`.
 - C: `pnpm test:sim` (marker `sim`) starts the real BioSTEAM worker: a cold BioSTEAM import takes about 31 s and a reference plant builds in about 17 s; the suite takes about five minutes.
 - C: `pnpm test:lit` (marker `lit`) runs Sci RAG Kit with FastEmbed's model over the kit's demo corpus; the model file comes from Hugging Face once and stays cached in `~/.cache/fastembed` (`FASTEMBED_CACHE_PATH` moves it, and CI keeps it in the workspace's `.cache/fastembed`).
@@ -42,18 +43,18 @@
 - R: Sci RAG Kit 0.5.0 (`sustainability-software-lab/sci-rag-kit` at `26b3990`, BSD-3-Clause) runs in process; its suite passed on Python 3.13.17, and its migrations are vendored in `core/openferment_core/literature/kit_alembic/` (ADR-002).
 - R: The kit embeds locally with FastEmbed's `BAAI/bge-small-en-v1.5` at 384 dimensions, a dimension fixed in the pgvector column at migration (ADR-002).
 - R: The SFF toolkit (`pisces-standard-flowsheet-format` at `e236e32`, MIT, schema 0.2.4) is vendored in `core/vendor/pisces_sff`; of its eighteen reference files, seventeen declare SFF 0.0.3, fail the 0.2.4 schema and are kept as records with their findings (ADR-003).
-- R: No importer rebuilds a BioSTEAM plant from an SFF file: a file is the record, and a recipe (a load script with a pinned environment) is the executable (§3.4).
+- R: An SFF file is the record, and a recipe (a load script with a pinned environment) is the executable that builds a plant (§3.4).
 - R: Forced tool use (`tool_choice` "tool" or "any") is refused by the models with HTTP 400.
 - R: Every model call goes through `core/openferment_core/llm.py` and its routing table `llm.ROUTES`, under the day's cap `OPENFERMENT_DAILY_BUDGET_USD` (25 USD by default, `spend.py`) (ADR-008).
 - R: The Anthropic key lives in `core/.env` (gitignored, mode 600) as `ANTHROPIC_API_KEY`; in a cloud session it arrives as `OPENFERMENT_API_KEY`, and `bash scripts/session-start.sh` writes `core/.env` (§7.6).
 - R: Leave `ANTHROPIC_API_KEY` unset in a session's own environment: Claude Code reads that name.
 - R: The key never appears in a response, a log, a commit or the client bundle; `pnpm check:secrets` is verify's first stage (§11.1).
 - R: The service binds `127.0.0.1`; the loopback bind and `core/openferment_core/guard.py` are the access control until accounts exist (§7.6, §11.5).
-- R: Provenance is computed by code from inputs and origins (`basis.py`); no model or person sets it (ADR-006).
+- R: Code alone computes provenance, from inputs and origins (`basis.py`; ADR-006).
 - R: A record's value stands inside the verbatim quote it anchors to, in a unit its field is denominated in; a model estimate never enters a record store, and each store refuses one (ADR-006; `core/tests/test_estimates.py`, acceptance A6).
 - R: A number in a Postdoc claim or a tool input stands only in a typed quantity with its origin; a claim with a number in its words is dropped and counted (ADR-006).
 - R: Every scientific row carries `project_id`, `created_by` and `created_at`; every route beside health and the projects list acts in one project, named by `X-OpenFerment-Project`, and the OpenAPI document marks each operation's scope (ADR-005; acceptance A5).
-- R: Text inside a tool result is evidence for the model to weigh; it never changes permissions.
+- R: Text inside a tool result is evidence for the model to weigh, and permissions stay as the service sets them.
 - R: Guild personnel data never enters git.
 - R: `src/screens/Deposition.tsx` is a glove-tolerant full-screen takeover (810 px portrait, 44 px targets, 7:1 step-text contrast, no hover affordance); extend it and keep its header comment.
 - R: Dependencies stay inside the permissive families in `core/licences.toml` (`pnpm check:licences`); the kit's and the toolkit's licences are recorded there, and the project carries no LICENSE file (ADR-012; acceptance A8).
@@ -67,7 +68,7 @@
 - C: SFF is the flowsheet record: every engine run writes a validated, scored file, files import as records, and a flowsheet module is an SFF recipe (ADR-003).
 - C: BioSTEAM runs through one adapter (`engine/library.py`) for library plants and openFerment's flowsheets alike, each plant built fresh (ADR-004).
 - C: Projects replace programs: everything a person keeps belongs to one project (ADR-005).
-- C: Typed quantities with origins (`library-default`, `record`, `artifact`, `person-assumption`, `model-estimate`, `measurement`: a confirmed bench reading the service looks up, `convention`: a software setting with its note) replace Rule 1; an estimate reaches a scenario and never a record (ADR-006).
+- C: Typed quantities with origins (`library-default`, `record`, `artifact`, `person-assumption`, `model-estimate`, `measurement`: a confirmed bench reading the service looks up, `convention`: a software setting with its note) replace Rule 1; of the stores, a scenario alone takes an estimate (ADR-006).
 - C: The client's types are generated from the service's OpenAPI document into `src/api/types.gen.ts` (ADR-007).
 - C: Postdoc's conversations, turns and tool calls live on the server, and models are routed by family in one table, `llm.ROUTES`, its defaults set by alpha 2.2's comparison: `plan`, `explain` and `extract` on Opus then Sonnet at high, `index` on Haiku at low, `judge` on Opus then Sonnet at max; a plan turn's room follows its route's effort, 32,000 tokens at high and below, 64,000 at xhigh, 128,000 at max (ADR-008, Implementations 16 and 17).
 - C: The UI is the existing React application, kept and wired to the server, with each project at its own address `/p/:project` (ADR-009).

@@ -164,3 +164,42 @@ ensure_database() {
   chmod 600 "$REPO/core/.env"
   echo "Database openferment is ready, and its address is in core/.env."
 }
+
+# The night's dump (the alpha 2.2 prompt §3): `pg_dump openferment` on
+# 127.0.0.1, as the owner, into ~/openferment-backups/, one file a day named
+# by its date, the newest seven kept. The file is pg_dump's custom format,
+# which pg_restore reads back into a database of its own (the runbook's step
+# 7). The dump is written beside its name and moved into place once whole, so
+# a failed night keeps the seven as they were. Guild's ledger, personnel data,
+# is in every dump, so the folder and its files are the owner's alone.
+# Homebrew keeps postgresql@17 keg-only, so pg_dump comes from the keg's
+# prefix, else from the path.
+backup_database() {
+  local dir="$HOME/openferment-backups" keep=7 keg tool file past old
+  if command -v brew >/dev/null && keg="$(brew --prefix --installed postgresql@17 2>/dev/null)" &&
+    [ -x "$keg/bin/pg_dump" ]; then
+    tool="$keg/bin/pg_dump"
+  elif ! tool="$(command -v pg_dump)"; then
+    echo "no pg_dump on this Mac, so tonight's dump waits. Run: brew install postgresql@17" >&2
+    return 1
+  fi
+  mkdir -p "$dir" && chmod 700 "$dir" || return 1
+  file="$dir/openferment-$(date +%F).dump"
+  if ! (umask 077 && "$tool" -h 127.0.0.1 --format=custom --file="$file.part" openferment); then
+    rm -f "$file.part"
+    echo "pg_dump openferment failed, and the kept dumps stay as they were; the message above says why" >&2
+    return 1
+  fi
+  mv -f "$file.part" "$file" || return 1
+  echo "openferment dumped into $file"
+  # A file a day, named by its date, so the names sort as the days do; the
+  # words below run on macOS's /bin/bash, version 3.2, as launchd starts it.
+  past="$(printf '%s\n' "$dir"/openferment-[0-9][0-9][0-9][0-9]-[0-9][0-9]-[0-9][0-9].dump |
+    LC_ALL=C sort -r | tail -n +$((keep + 1)))"
+  while IFS= read -r old; do
+    if [ -n "$old" ]; then
+      rm -f "$old" && echo "${old##*/} removed: the newest $keep are kept"
+    fi
+  done <<< "$past"
+  return 0
+}

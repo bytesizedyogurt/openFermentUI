@@ -2,8 +2,9 @@
 
 The plists are rendered by scripts/host/launchd.py and parsed back here with
 plistlib, so their shape is checked on any operating system; the shell
-scripts are checked for syntax, and lib.sh's reading of core/.env and its
-database step run against stand-ins for Homebrew and the PostgreSQL tools.
+scripts are checked for syntax, and lib.sh's reading of core/.env, its
+database step and the night's dump run against stand-ins for Homebrew and the
+PostgreSQL tools.
 Running them for real needs macOS.
 """
 from __future__ import annotations
@@ -286,6 +287,67 @@ def test_a_missing_pgvector_and_a_login_started_postgresql_are_said(tmp_path):
     assert done.returncode == 1 and "pgvector is not installed for this PostgreSQL" in done.stderr
     assert "starts at your login" in done.stdout and "sudo brew services start --sudo-service-user=" in done.stdout
     assert "createdb" not in (tmp_path / "calls").read_text()
+
+
+# ── the night's dump, against stand-ins (the alpha 2.2 prompt §3) ──────────
+
+# Eight dumps of days long past, and a file of the owner's own in the folder.
+PAST_DAYS = [f"2000-01-0{d}" for d in range(1, 9)]
+
+
+def _dump_stand_ins(tmp_path: Path, *, fails: bool = False) -> tuple[str, Path]:
+    """The keg of `_postgres_stand_ins` with a pg_dump that writes its own
+    arguments into the file `--file=` names, or writes half of one and fails;
+    the backups folder holding PAST_DAYS's dumps and a note. The PATH to run
+    with, and the folder."""
+    stand_ins = _postgres_stand_ins(tmp_path)
+    tool = tmp_path / "keg" / "bin" / "pg_dump"
+    tool.write_text(
+        f'#!/bin/bash\necho "pg_dump $*" >> "{tmp_path / "calls"}"\n'
+        'for a in "$@"; do case "$a" in --file=*) out="${a#--file=}" ;; esac; done\n'
+        + ('printf half > "$out"\nexit 1\n' if fails else 'printf "%s\\n" "$*" > "$out"\n'))
+    tool.chmod(0o755)
+    backups = tmp_path / "home" / "openferment-backups"
+    backups.mkdir(parents=True)
+    for day in PAST_DAYS:
+        (backups / f"openferment-{day}.dump").write_text(day)
+    (backups / "notes.txt").write_text("the owner's own")
+    return f"{stand_ins}:/usr/bin:/bin", backups
+
+
+@pytest.mark.skipif(shutil.which("bash") is None, reason="no bash on this machine")
+def test_the_night_dumps_openferment_with_the_kegs_pg_dump_and_keeps_the_newest_seven(tmp_path):
+    path, backups = _dump_stand_ins(tmp_path)
+    done = _lib(tmp_path, "backup_database", {"PATH": path})
+    assert done.returncode == 0, done.stderr
+    today = subprocess.run(["date", "+%F"], capture_output=True, text=True, check=True).stdout.strip()
+    dump = backups / f"openferment-{today}.dump"
+    assert dump.read_text().split() == ["-h", "127.0.0.1", "--format=custom", f"--file={dump}.part", "openferment"]
+    assert [c for c in (tmp_path / "calls").read_text().splitlines() if c.startswith("pg_dump")] == [
+        f"pg_dump -h 127.0.0.1 --format=custom --file={dump}.part openferment"], "the keg's pg_dump, once"
+    kept = sorted(p.name for p in backups.glob("openferment-*.dump"))
+    assert kept == sorted([dump.name] + [f"openferment-{d}.dump" for d in PAST_DAYS[-6:]])
+    assert (backups / "notes.txt").read_text() == "the owner's own", "a file of another name is the owner's"
+    assert not list(backups.glob("*.part"))
+    assert oct(backups.stat().st_mode & 0o777) == "0o700" and oct(dump.stat().st_mode & 0o777) == "0o600"
+    assert "openferment-2000-01-02.dump removed: the newest 7 are kept" in done.stdout
+    again = _lib(tmp_path, "backup_database", {"PATH": path})
+    assert again.returncode == 0 and len(list(backups.glob("openferment-*.dump"))) == 7, "one file a day"
+
+
+@pytest.mark.skipif(shutil.which("bash") is None, reason="no bash on this machine")
+def test_a_failed_dump_keeps_the_kept_dumps_as_they_were(tmp_path):
+    path, backups = _dump_stand_ins(tmp_path, fails=True)
+    before = sorted(p.name for p in backups.iterdir())
+    done = _lib(tmp_path, "backup_database || echo status=$?", {"PATH": path})
+    assert "status=1" in done.stdout and "pg_dump openferment failed" in done.stderr
+    assert sorted(p.name for p in backups.iterdir()) == before, "no half file, and nothing rotated away"
+
+
+def test_the_nightly_dumps_before_the_nights_work_and_counts_a_failed_dump():
+    text = (HOST_DIR / "nightly.sh").read_text()
+    assert "backup_database || status=$?" in text
+    assert text.index("backup_database ||") < text.index("openferment_core.extract")
 
 
 # ── the engines a machine keeps beside core/uv.lock (alpha 2.2 D0.11) ────
