@@ -73,8 +73,10 @@ export const FERMOS_TABS: OwnerTab[] = [
 export const PUREOS_TABS: OwnerTab[] = [
   { label: 'Trains', to: '/pureos' },
   { label: 'Builder', to: '/pureos/build' },
-  { label: 'Train', to: '/pureos/train' },
 ];
+
+/** pureOS's tabs on one train's page: the two above and the train it shows, a tab only while its id is in the address. */
+export const pureosTrainTabs = (key: string): OwnerTab[] => [...PUREOS_TABS, { label: 'Train', to: `/pureos/train/${encodeURIComponent(key)}` }];
 
 // alpha 2.2 E.8 — the project's catalogues, one tab a kind: the strains (the
 // destination's own path), the products, Guild's skills and Primer's lessons.

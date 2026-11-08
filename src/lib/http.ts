@@ -15,7 +15,7 @@ export const NOT_RUNNING = 'The service is not running.';
 export class ServiceDown extends Error {
   constructor(
     message: string,
-    readonly remedy: string = `Start it with \`${START_COMMAND}\` from \`core/\`.`,
+    readonly remedy: string = `Start it with ${START_COMMAND} from the repository root.`,
   ) {
     super(message);
     this.name = 'ServiceDown';

@@ -123,7 +123,7 @@ export function GuildHeader({ title, subtitle }: { title: string; subtitle: Reac
   return (
     <>
       <PageHeader
-        eyebrow="Guild of Applied Life"
+        eyebrow="Guild"
         title={title}
         subtitle={subtitle}
         actions={
@@ -149,7 +149,7 @@ export function GuildHeader({ title, subtitle }: { title: string; subtitle: Reac
 
 // ── one ledger entry ───────────────────────────────────────────────────
 
-export const KIND_LABEL: Record<GuildEvidence['kind'], string> = {
+const KIND_LABEL: Record<GuildEvidence['kind'], string> = {
   knowledge: 'Training sign-off',
   supervised: 'Supervised run',
   witnessed: 'Witnessed check',
@@ -160,7 +160,7 @@ export const KIND_LABEL: Record<GuildEvidence['kind'], string> = {
 };
 
 /** What an entry is called: a lesson passed is knowledge nobody signed. */
-export function kindLabel(e: Pick<GuildEvidence, 'kind' | 'source'>): string {
+function kindLabel(e: Pick<GuildEvidence, 'kind' | 'source'>): string {
   return e.kind === 'knowledge' && e.source.kind === 'lesson' ? 'Lesson passed' : KIND_LABEL[e.kind];
 }
 
@@ -716,7 +716,7 @@ export function AddPersonForm({ onDone }: { onDone?: () => void }) {
 // ── export ─────────────────────────────────────────────────────────────
 
 /** One person's ledger as CSV, with a header that says what the file is. */
-export function exportLedger(ctx: GuildContext, personId: string) {
+function exportLedger(ctx: GuildContext, personId: string) {
   const person = ctx.personById.get(personId);
   if (!person) return;
   const esc = (v: unknown) => {

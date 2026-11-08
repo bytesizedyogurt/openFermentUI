@@ -463,15 +463,15 @@ export default function ProformaReference({ plantId }: { plantId: string }) {
                     Run{' '}
                     <a className="font-num hover:text-accent underline underline-offset-2" href={href(`/proforma/runs/${report.run.id}`)} data-testid="reference-run-page">
                       {report.run.id}
-                    </a>{' '}
-                    for {report.run.by}, computed <span className="font-num">{stamp(art.createdAt)}</span>
+                    </a>
+                    , kept by {report.run.by}, computed <span className="font-num">{stamp(art.createdAt)}</span>
                     {art.durationMs > 0 && (
                       <>
                         {' '}
                         in <span className="font-num">{fmt(art.durationMs / 1000, 1)}</span> s
                       </>
                     )}
-                    , by <span className="font-num">{art.toolVersion}</span>
+                    , with <span className="font-num">{art.toolVersion}</span>
                     {view?.tables.tablesSource && <> · tables from {view.tables.tablesSource}</>}
                     {report.flowsheet && (
                       <>

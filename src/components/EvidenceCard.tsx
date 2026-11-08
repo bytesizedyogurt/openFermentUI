@@ -66,7 +66,7 @@ export function EvidenceCard({ evidence }: { evidence: Evidence }) {
         </div>
         <details className="mt-0.5">
           <summary className="cursor-pointer text-caption text-ink-soft hover:text-accent">
-            Basis: {b.tool} {b.toolVersion}
+            Basis: <span title={b.tool}>{b.toolVersion}</span>
           </summary>
           <ul className="mt-1 space-y-0.5 text-caption">
             {b.inputs.map((i) => (

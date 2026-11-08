@@ -53,7 +53,7 @@ export const YIELD_FIELD: Record<string, FieldId> = {
 };
 
 /** How a view names each product: in the picker, in a title, on an axis. */
-export interface ProductWords {
+interface ProductWords {
   /** The picker's option. */
   option: string;
   /** In a sentence: "How much ethanol…". */

@@ -1222,7 +1222,7 @@ export default function StrainPage({ strainId }: { strainId: string }) {
                         <td className="py-1.5 pl-3">
                           <span className="inline-flex flex-wrap gap-1">
                             {c.points.slice(0, 3).map((p) => (
-                              <CitationChip key={p.rec.id} recordId={p.rec.id} label={p.rec.id} />
+                              <CitationChip key={p.rec.id} recordId={p.rec.id} />
                             ))}
                             {c.points.length > 3 && (
                               <span className="text-caption text-ink-soft font-num self-center">

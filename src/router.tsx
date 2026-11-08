@@ -41,7 +41,7 @@ function addressedProject(): string | null {
 }
 
 /** `to` inside the project the address names, when it is a plain app path. */
-export function inProject(to: string, project: string | null = addressedProject()): string {
+function inProject(to: string, project: string | null = addressedProject()): string {
   if (!project || !to.startsWith('/') || to.startsWith('/p/')) return to;
   return `/p/${encodeURIComponent(project)}${to === '/' ? '' : to}`;
 }

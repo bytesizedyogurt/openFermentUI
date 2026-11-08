@@ -51,13 +51,13 @@ interface ArtifactCard {
   since: number;
 }
 
-export type TraceCard = JobCard | TurnCard | ArtifactCard;
+type TraceCard = JobCard | TurnCard | ArtifactCard;
 
 const str = (v: unknown): string => (typeof v === 'string' ? v : '');
 const when = (e: ServiceEvent) => Date.parse(e.at) || Date.now();
 
 /** The cards after one event: a new card, or the card the event is about brought up to date. */
-export function withEvent(cards: TraceCard[], e: ServiceEvent): TraceCard[] {
+function withEvent(cards: TraceCard[], e: ServiceEvent): TraceCard[] {
   const d = e.data;
   const replace = (key: string, make: (old: TraceCard | undefined) => TraceCard | null): TraceCard[] => {
     const old = cards.find((c) => c.key === key);

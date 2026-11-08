@@ -341,7 +341,7 @@ function SkillReasons({ ctx, check: c }: { ctx: GuildContext; check: Check }) {
 }
 
 /** A step a brief names, as its protocol's current version words it. */
-export function stepWords(protocols: readonly Protocol[], protocolId: string, stepId: string): string {
+function stepWords(protocols: readonly Protocol[], protocolId: string, stepId: string): string {
   const p = protocols.find((x) => x.id === protocolId);
   const v = p?.versions.find((x) => x.version === p.currentVersion) ?? p?.versions[0];
   const st = v?.steps?.find((x) => x.id === stepId);

@@ -5,9 +5,9 @@
 // is written.
 
 /** The six trunk families. Working names until the skills content pass. */
-export type SkillFamilyId = 'contamination' | 'vessel' | 'monitoring' | 'qc' | 'records' | 'safety';
+type SkillFamilyId = 'contamination' | 'vessel' | 'monitoring' | 'qc' | 'records' | 'safety';
 
-export interface SkillFamily {
+interface SkillFamily {
   id: SkillFamilyId;
   name: string;
   /** Column-header form for the Matrix. */
@@ -23,17 +23,17 @@ export const FAMILIES: SkillFamily[] = [
   { id: 'safety', name: 'Safety and troubleshooting', short: 'Safety' },
 ];
 
-export const FAMILY_BY_ID: Record<string, SkillFamily> = Object.fromEntries(FAMILIES.map((f) => [f.id, f]));
+const FAMILY_BY_ID: Record<string, SkillFamily> = Object.fromEntries(FAMILIES.map((f) => [f.id, f]));
 
 /** A group the screens list skills under: one of the six families, or the skills naming another or none. */
-export interface FamilyGroup {
+interface FamilyGroup {
   id: string;
   name: string;
   short: string;
 }
 
 /** The group of skills whose entry names a family outside the six, or none. */
-export const OTHER_FAMILY: FamilyGroup = { id: '', name: 'Other skills', short: 'Other' };
+const OTHER_FAMILY: FamilyGroup = { id: '', name: 'Other skills', short: 'Other' };
 
 /** The group a skill is listed under: its family where it is one of the six, else the other skills. */
 export const familyOf = (s: { family?: string | null }): FamilyGroup => (s.family ? FAMILY_BY_ID[s.family] : undefined) ?? OTHER_FAMILY;

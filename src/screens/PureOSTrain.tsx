@@ -26,14 +26,14 @@
 // train by the service.
 import { useEffect, useMemo, useState } from 'react';
 import { ArrowLeft, Download, Filter } from 'lucide-react';
-import type { StreamRow } from '@/lib/proforma';
+import { stamp, type StreamRow } from '@/lib/proforma';
 import { trainSubjects } from '@/lib/thermo';
 import { PropertiesPanel } from '@/components/PropertiesPanel';
 import { operationForClass } from '@/data/vocabulary';
 import { PureosDown, PureosRefused, RUN_WORDS, builderFromRunPath, builderPath, productIn, pureosTrain, share, streamsOf, type Train, type TrainUnit } from '@/lib/pureos';
 import { useStore } from '@/store';
 import { OwnerTabs } from '@/components/OwnerTabs';
-import { PUREOS_TABS } from '@/data/tabs';
+import { pureosTrainTabs } from '@/data/tabs';
 import { exportCSV } from '@/lib/csv';
 import { fmt } from '@/engine/units';
 import { href, useRoute } from '@/router';
@@ -78,7 +78,7 @@ export default function PureOSTrain({ scenarioId }: { scenarioId: string }) {
         title={train ? (train.scenarioName ?? train.trainName ?? train.flowsheet ?? train.artifactId) : scenarioId}
         subtitle="The units of a run, in the order it ran them (a run Proforma priced, or a train built in pureOS): what enters and leaves each, how much of the product it passes on toward the product stream, and how much is still on the path after it."
       />
-      <OwnerTabs tabs={PUREOS_TABS} />
+      <OwnerTabs tabs={pureosTrainTabs(scenarioId)} />
 
       {problem?.kind === 'down' && (
         <Callout kind="warn" title="pureOS reads the train from the service">
@@ -91,11 +91,15 @@ export default function PureOSTrain({ scenarioId }: { scenarioId: string }) {
             {problem.text}
           </p>
           <p className="mt-1">
-            A train is read from a Proforma run. Open the scenario in{' '}
+            A train is read from a run: a study scenario&rsquo;s run from{' '}
+            <a className="text-accent hover:underline" href={href('/proforma/studies')}>
+              Studies
+            </a>
+            , or a Proforma scenario&rsquo;s run from{' '}
             <a className="text-accent hover:underline" href={href(`/proforma/scenario/${encodeURIComponent(scenarioId)}`)}>
               Proforma
             </a>
-            , give every input a source, and run it; its train shows here.
+            ; once it has run, its train shows here.
           </p>
         </Callout>
       )}
@@ -157,12 +161,15 @@ function TrainView({ train, unit, choose }: { train: Train; unit: TrainUnit | nu
             <a className="font-num text-ink hover:text-accent" href={href(`/biorepo/artifacts/${train.artifactId}`)}>
               {train.artifactId}
             </a>{' '}
-            · {train.flowsheet ?? 'flowsheet not named'} · {train.createdAt}
+            · {train.flowsheet ?? (train.tool === 'library.run' ? 'a library plant' : 'flowsheet not named')} · {stamp(train.createdAt)}
             {train.runs > 1 ? ` · the newest of ${train.runs} runs on file` : ''}
           </span>
           {train.scenarioId && (
-            <a className="chip" href={href(`/proforma/scenario/${encodeURIComponent(train.scenarioId)}`)}>
-              Open the scenario in Proforma
+            <a
+              className="chip"
+              href={href(train.tool === 'library.run' ? '/proforma/studies' : `/proforma/scenario/${encodeURIComponent(train.scenarioId)}`)}
+            >
+              {train.tool === 'library.run' ? 'Open the scenario in Studies' : 'Open the scenario in Proforma'}
             </a>
           )}
           <BuilderLink train={train} />

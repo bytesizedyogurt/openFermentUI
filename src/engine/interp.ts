@@ -7,7 +7,7 @@ export interface Grid {
   data: Float64Array | number[];
 }
 
-export function gridIndex(dims: { values: number[] }[], idx: number[]): number {
+function gridIndex(dims: { values: number[] }[], idx: number[]): number {
   let flat = 0;
   for (let d = 0; d < dims.length; d++) {
     flat = flat * dims[d].values.length + idx[d];

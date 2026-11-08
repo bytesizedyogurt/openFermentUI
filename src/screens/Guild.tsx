@@ -34,6 +34,7 @@ import { useRoute, href } from '@/router';
 import { checkDecision } from '@/lib/intake';
 import { fmt, toSI } from '@/engine/units';
 import { CitationChip } from '@/components/Chip';
+import { idTail } from '@/lib/cite';
 import { ProvenanceBadge, Tick, type ProvKind } from '@/components/Provenance';
 import { QuantityField, type QuantityValue } from '@/components/QuantityField';
 import {
@@ -544,7 +545,7 @@ export default function Guild() {
     return (
       <>
         <PageHeader
-          eyebrow="Who may verify"
+          eyebrow="Guild"
           title="Guild"
           subtitle="The Guild of Applied Life is who may verify. Accept, correct, or reject each extraction against the span it came from."
         />
@@ -680,7 +681,7 @@ export default function Guild() {
     return (
       <>
         <PageHeader
-          eyebrow="Who may verify"
+          eyebrow="Guild"
           title="Guild — queue complete"
           subtitle="Every record in this queue has been through the reviewer. The tallies below separate what you did from where the records ended up."
         />
@@ -902,7 +903,9 @@ export default function Guild() {
         {/* ── centre card ────────────────────────────────────────────── */}
         <Card className="p-4">
           <div className="flex flex-wrap items-center justify-between gap-2 mb-3">
-            <span className="font-num text-caption text-ink-soft">{record.id}</span>
+            <span className="font-num text-caption text-ink-soft" title={record.id}>
+              Record {idTail(record.id)}
+            </span>
             <ProvenanceBadge
               p={prov}
               confidence={record.status === 'unverified' ? record.confidence : undefined}
@@ -924,15 +927,17 @@ export default function Guild() {
                 {record.unit && <span className="text-section-title text-ink-soft ml-1">{record.unit}</span>}
               </div>
             </div>
-            <div className="rounded-card border border-line p-3">
-              <div className="text-caption uppercase tracking-wide text-ink-soft">SI twin</div>
-              <div className="font-num text-display leading-tight">
-                {fmt(record.si.value)}
-                {record.si.unit && (
-                  <span className="text-section-title text-ink-soft ml-1">{record.si.unit}</span>
-                )}
+            {record.si.unit !== record.unit && (
+              <div className="rounded-card border border-line p-3">
+                <div className="text-caption uppercase tracking-wide text-ink-soft">In the field&rsquo;s unit</div>
+                <div className="font-num text-display leading-tight">
+                  {fmt(record.si.value)}
+                  {record.si.unit && (
+                    <span className="text-section-title text-ink-soft ml-1">{record.si.unit}</span>
+                  )}
+                </div>
               </div>
-            </div>
+            )}
             <div className="rounded-card border border-line p-3">
               <div className="text-caption uppercase tracking-wide text-ink-soft">Confidence</div>
               <div className="font-num text-display leading-tight">

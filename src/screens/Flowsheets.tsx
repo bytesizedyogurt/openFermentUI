@@ -257,7 +257,7 @@ export default function Flowsheets() {
                       </td>
                       <td className="py-1 pr-2 font-num">{r.units}</td>
                       <td className="py-1 pr-2 font-num">{r.streams}</td>
-                      <td className="py-1 pr-2">{r.createdBy}</td>
+                      <td className="py-1 pr-2">{/^claude-/.test(r.createdBy) ? `Postdoc (${r.createdBy})` : r.createdBy}</td>
                       <td className="py-1 pr-2 font-num">{stamp(r.createdAt)}</td>
                     </tr>
                   ))}

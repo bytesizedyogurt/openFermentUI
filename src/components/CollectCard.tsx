@@ -9,6 +9,7 @@
 import { useCallback, useEffect, useState, type FormEvent } from 'react';
 import { ClipboardPaste, FileUp, Link2, Loader2 } from 'lucide-react';
 import { useStore } from '@/store';
+import { href } from '@/router';
 import { IntakeDown, licenceWords } from '@/lib/intake';
 import {
   LICENCE_CLASSES,
@@ -41,6 +42,9 @@ const COLLECTOR_NAMES: Record<string, string> = {
 function said(e: unknown): string {
   return e instanceof IntakeDown ? `${e.message} ${e.remedy}` : String(e instanceof Error ? e.message : e);
 }
+
+/** How many of the project's documents this card lists, newest first: the column beside it lists them all. */
+const NEWEST = 5;
 
 export function CollectCard() {
   const reviewer = useStore((s) => s.reviewer).trim();
@@ -127,7 +131,7 @@ export function CollectCard() {
       <p className="text-caption text-ink-soft mb-2">
         Collected text is split into passages, embedded on this machine and kept in the project&rsquo;s
         corpus, where search, answers and extraction read it. A paper another project holds already is
-        linked rather than stored twice.
+        linked to the copy that project holds.
       </p>
 
       {serviceUp === false && (
@@ -229,7 +233,7 @@ export function CollectCard() {
           </Button>
           {!reviewer && (
             <span className="text-caption text-ink-soft">
-              Type your name in <a href="#/settings">Settings</a> first: every addition is signed.
+              Type your name in <a href={href('/settings/corpus')}>Settings</a> first: every addition is signed.
             </span>
           )}
         </div>
@@ -256,8 +260,13 @@ export function CollectCard() {
         </div>
       )}
       {documents && documents.length > 0 && (
-        <ul className="mt-3 divide-y divide-line" aria-label="Documents in this project">
-          {documents.map((d) => (
+        <p className="mt-3 text-caption text-ink-soft">
+          The newest {Math.min(NEWEST, documents.length)} of the project&rsquo;s documents; the list beside this card holds every one.
+        </p>
+      )}
+      {documents && documents.length > 0 && (
+        <ul className="mt-1 divide-y divide-line" aria-label="The newest documents in this project">
+          {[...documents].sort((x, y) => y.linkedAt.localeCompare(x.linkedAt)).slice(0, NEWEST).map((d) => (
             <li key={d.documentId} className="py-2">
               <div className="text-body leading-snug">{d.title}</div>
               <div className="text-caption text-ink-soft">

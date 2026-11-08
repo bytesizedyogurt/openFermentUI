@@ -45,7 +45,7 @@ export function setOpenProjectId(id: string | null): void {
 }
 
 /** `init` with the open project named, unless the caller named one. */
-export function withProject(init: RequestInit = {}): RequestInit {
+function withProject(init: RequestInit = {}): RequestInit {
   if (!open) return init;
   const headers = new Headers(init.headers);
   if (!headers.has(PROJECT_HEADER)) headers.set(PROJECT_HEADER, open);

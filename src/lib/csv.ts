@@ -18,10 +18,10 @@ export const DISCLOSURE = [
   '#   verified          checked against the source document by a named reviewer',
   '#   curated           written by hand, as the vocabulary and the fields are',
   '#   computed          computed by a tool from its basis, which names every input it rests on',
-  '#   unverified        the extractor\'s reading, not reviewed — verify before citing',
-  '#   industry-estimate non-peer-reviewed market/vendor figure — not evidence',
-  '#   assumed           rests on an assumption or an estimate, not measured',
-  '# Simulation economics are illustrative models, not validated.',
+  '#   unverified        the extractor\'s reading, awaiting review: verify before citing',
+  '#   industry-estimate a market or vendor figure outside peer review, held out of the evidence',
+  '#   assumed           rests on an assumption or an estimate',
+  '# Simulation economics are illustrative models awaiting validation.',
 ];
 
 function esc(v: unknown): string {
@@ -29,7 +29,7 @@ function esc(v: unknown): string {
   return /[",\n]/.test(s) ? `"${s.replace(/"/g, '""')}"` : s;
 }
 
-export function toCSV(headers: string[], rows: unknown[][]): string {
+function toCSV(headers: string[], rows: unknown[][]): string {
   return [...DISCLOSURE, headers.map(esc).join(','), ...rows.map((r) => r.map(esc).join(','))].join(
     '\n',
   );

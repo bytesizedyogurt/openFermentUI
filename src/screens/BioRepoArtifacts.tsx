@@ -9,6 +9,8 @@ import { useEffect, useState } from 'react';
 import { Box, RotateCcw } from 'lucide-react';
 import type { Artifact, BasisSource } from '@/lib/studies';
 import { ArtifactRefused, ArtifactsDown, getArtifact, headline, listArtifacts, replayArtifact, type ReplayResult } from '@/lib/artifacts';
+import { listComparisons } from '@/lib/studies';
+import { stamp, stampsIn } from '@/lib/proforma';
 import { href, navigate } from '@/router';
 import { CitationChip } from '@/components/Chip';
 import { depositionPath } from '@/components/ReadingOrigin';
@@ -58,13 +60,36 @@ export default function BioRepoArtifacts({ artifactId }: { artifactId?: string }
   return artifactId ? <ArtifactPage id={artifactId} /> : <ArtifactList />;
 }
 
+/** The project's comparisons' titles, by id, as Studies keeps them: a comparison artifact is named by its title. */
+function useComparisonTitles(): Map<string, string> {
+  const [titles, setTitles] = useState<Map<string, string>>(new Map());
+  useEffect(() => {
+    const ctrl = new AbortController();
+    listComparisons(ctrl.signal).then(
+      (all) => setTitles(new Map(all.map((c) => [c.id, c.title]))),
+      () => undefined,
+    );
+    return () => ctrl.abort();
+  }, []);
+  return titles;
+}
+
+/** The page a kept run or comparison opens on, beside its artifact; null for an artifact of another tool. */
+function ownPage(a: Artifact): { to: string; words: string } | null {
+  if (a.tool === 'library.run' || a.tool.startsWith('proforma.')) return { to: `/proforma/runs/${a.id}`, words: 'The run’s page' };
+  if (a.tool === 'study.comparison') return { to: `/proforma/comparisons/${a.id}`, words: 'The comparison’s page' };
+  return null;
+}
+
 function ArtifactList() {
   // Every artifact the service lists.
   const load = useLoad((signal) => listArtifacts(signal), 'list');
   const shown = load.state === 'ok' ? load.data : [];
+  const titles = useComparisonTitles();
   return (
     <div>
       <PageHeader
+        eyebrow="BioRepo"
         title="Artifacts"
         subtitle="Values the service computed, each kept with the inputs it was computed from and the source of every input. None of them is a paper's number. Open one to see its basis or replay it."
       />
@@ -84,7 +109,7 @@ function ArtifactList() {
           <table className="w-full border-collapse text-body" data-testid="artifact-table">
             <thead>
               <tr className="border-b border-line text-caption text-ink-soft">
-                <th className="text-left font-medium px-3 py-2">Value</th>
+                <th className="text-left font-medium px-3 py-2">What it is</th>
                 <th className="text-left font-medium px-3 py-2">Tool</th>
                 <th className="text-left font-medium px-3 py-2">Provenance</th>
                 <th className="text-left font-medium px-3 py-2">Computed</th>
@@ -92,7 +117,7 @@ function ArtifactList() {
             </thead>
             <tbody>
               {shown.map((a) => {
-                const h = headline(a);
+                const h = headline(a, titles);
                 return (
                   <tr key={a.id} className="border-b border-line last:border-0">
                     <td className="px-3 py-2">
@@ -140,7 +165,7 @@ function SourceChip({ source }: { source: BasisSource }) {
       return (
         <span className="chip">
           estimated by {source.by ?? 'no model named'}
-          {source.note ? ` — ${source.note}` : ''}
+          {source.note ? ` — ${stampsIn(source.note.replace(/^estimated on /, 'on '))}` : ''}
         </span>
       );
     case 'assumption':
@@ -163,14 +188,15 @@ function SourceChip({ source }: { source: BasisSource }) {
       );
     }
     case 'model':
-      return <span className="chip font-mono">model {source.id ?? ''}</span>;
+      return <span className="chip font-mono">library {source.id ?? ''}</span>;
     case 'convention':
-      return <span className="chip">convention{source.note ? ` — ${source.note}` : ''}</span>;
+      return <span className="chip !whitespace-normal">convention{source.note ? ` — ${source.note}` : ''}</span>;
   }
 }
 
 function ArtifactPage({ id }: { id: string }) {
   const load = useLoad((signal) => getArtifact(id, signal), id);
+  const titles = useComparisonTitles();
   const [replay, setReplay] = useState<{ busy: boolean; result?: ReplayResult; error?: string }>({ busy: false });
 
   const run = async () => {
@@ -185,12 +211,20 @@ function ArtifactPage({ id }: { id: string }) {
   return (
     <div>
       <PageHeader
-        title={load.state === 'ok' ? (headline(load.data).label ?? `Artifact ${id}`) : `Artifact ${id}`}
+        eyebrow="BioRepo"
+        title={load.state === 'ok' ? (headline(load.data, titles).label ?? `Artifact ${id}`) : `Artifact ${id}`}
         subtitle="A value the service computed, with every input it was computed from."
         actions={
-          <Button onClick={() => navigate('/biorepo/artifacts')} size="sm">
-            All artifacts
-          </Button>
+          <>
+            {load.state === 'ok' && ownPage(load.data) && (
+              <a className="btn btn-sm" href={href(ownPage(load.data)!.to)}>
+                {ownPage(load.data)!.words}
+              </a>
+            )}
+            <Button onClick={() => navigate('/biorepo/artifacts')} size="sm">
+              All artifacts
+            </Button>
+          </>
         }
       />
       <OwnerTabs tabs={BIOREPO_TABS} />
@@ -236,7 +270,7 @@ function ArtifactBody({
           <dd className="font-mono break-all">{a.toolVersion}</dd>
           <dt className="text-ink-soft">Computed</dt>
           <dd className="font-num">
-            {a.createdAt} · {a.durationMs} ms
+            {stamp(a.createdAt)} · {a.durationMs} ms
           </dd>
           {a.seed !== null && (
             <>

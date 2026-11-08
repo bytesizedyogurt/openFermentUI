@@ -31,7 +31,7 @@ export interface Delta {
   held: boolean;
 }
 
-export type PredictionKind = NonNullable<Prediction['kind']>;
+type PredictionKind = NonNullable<Prediction['kind']>;
 
 export const kindOf = (p: Prediction): PredictionKind => p.kind ?? 'point';
 
@@ -53,7 +53,7 @@ function pointDelta(predicted: number, observed: number): number {
 }
 
 /** The signed percent a value lies from what held it: a point's value, or the nearer edge. */
-export function deltaOf(p: Prediction, observed: number): number {
+function deltaOf(p: Prediction, observed: number): number {
   const kind = kindOf(p);
   if (kind === 'interval' && p.interval) {
     if (observed < p.interval.low) return pointDelta(p.interval.low, observed);
@@ -117,7 +117,7 @@ export function unmeasured(deposition: Deposition, runbook: Runbook): Prediction
   return (runbook.predictions ?? []).filter((p) => !measured.has(p.id));
 }
 
-export interface OutcomeSuggestion {
+interface OutcomeSuggestion {
   outcome: NonNullable<Deposition['reconciliation']>['outcome'];
   /** Why, in one sentence, for the person who has to agree or disagree. */
   why: string;

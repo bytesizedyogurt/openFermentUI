@@ -7,20 +7,20 @@
 // on), each named in words by `stepChanges` and `materialChanges`.
 import type { ProtocolVersion, Step, Material } from '@/lib/protocols';
 
-export interface StepDiff {
+interface StepDiff {
   kind: 'unchanged' | 'modified' | 'added' | 'removed';
   a?: Step;
   b?: Step;
 }
 
-export interface MaterialDiff {
+interface MaterialDiff {
   kind: 'unchanged' | 'modified' | 'added' | 'removed';
   name: string;
   a?: Material;
   b?: Material;
 }
 
-export interface VersionDiff {
+interface VersionDiff {
   steps: StepDiff[];
   materials: MaterialDiff[];
   changelog?: string | null;

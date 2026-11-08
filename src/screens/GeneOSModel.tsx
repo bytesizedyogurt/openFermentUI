@@ -16,6 +16,12 @@
 // view opens on the first product the shelf computes for. When the shelf
 // names no product, the view says so.
 //
+// OPENING THE TAB KEEPS. Each computation the tab asks for (POST
+// /api/geneos/ceiling per model, /frontier and /mix) is kept as an artifact
+// (lib/geneos.ts), so a first open with a new product, sugar or model writes
+// artifacts to the project; an artifact is kept once per tool, version and
+// inputs, so a later open reads the same ones back. The tab says so.
+//
 // SCENARIOS ABOVE A CEILING (OF-BLD-019 §5.2, D11). Under the chosen model
 // and sugar, each Proforma scenario in view whose yield, as it binds it, is
 // above that model's newest stored ceiling is listed with a link to it. The
@@ -50,7 +56,7 @@ import { ceilingCheck, proformaShelf } from '@/lib/proforma';
 const UNIT = 'g g⁻¹';
 
 /** The one line the geneOS callout says, repeated where a ceiling is drawn. */
-export const NOT_A_VESSEL = 'Nothing on this screen predicts what a vessel will produce: a ceiling has no time axis and no vessel.';
+const NOT_A_VESSEL = 'Nothing on this screen predicts what a vessel will produce: a ceiling has no time axis and no vessel.';
 
 interface Loaded {
   ceilings: GeneosResult[];
@@ -223,7 +229,7 @@ export default function GeneOSModel() {
     // The shelf names no product to compute a ceiling for.
     return (
       <div className="space-y-4" data-testid="geneos-model">
-        <Callout kind="info" title="Stoichiometry, not a forecast">
+        <Callout kind="info" title="Stoichiometry: the cell's ceiling">
           {NOT_A_VESSEL}
         </Callout>
         <EmptyState
@@ -241,9 +247,14 @@ export default function GeneOSModel() {
 
   return (
     <div className="space-y-4" data-testid="geneos-model">
-      <Callout kind="info" title="Stoichiometry, not a forecast">
+      <Callout kind="info" title="Stoichiometry: the cell's ceiling">
         {NOT_A_VESSEL}
       </Callout>
+      <p className="text-caption text-ink-soft" data-testid="model-keeps">
+        Opening this tab asks the service for each model&rsquo;s ceiling and the chosen model&rsquo;s envelope and sugar mix, and
+        the service keeps each as an artifact of the project, once for each model, product and sugar; opening it again reads
+        the same artifacts back.
+      </p>
 
       <div className="flex flex-wrap items-end gap-3">
         <label className="text-caption text-ink-soft">

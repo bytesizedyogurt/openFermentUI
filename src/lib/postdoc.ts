@@ -31,7 +31,7 @@ export type PriorTurn = S['PriorTurn'];
 /** The validated answer (models.py `AnswerPlan`): claims whose words hold no number, each with what it rests on. */
 export type AnswerPlan = S['AnswerPlan'];
 /** The tokens a plan took, the share the prompt cache served, its cost and the models that answered. */
-export type AnswerPlanUsage = S['Usage'];
+type AnswerPlanUsage = S['Usage'];
 /** One claim, each number it states typed with its origin (`ClaimValue`), and each sentence it quotes from a passage (`PassageRef`). */
 export type Claim = S['Claim'];
 export type ClaimValue = S['ClaimValue'];
@@ -52,14 +52,14 @@ export type StopReason = AnswerPlan['stopped'];
 export type LiveConversation = S['LiveConversation'];
 export type LiveTurn = S['LiveTurn'];
 
-/** Exactly what to type, so the message is actionable rather than sympathetic. */
-export const START_COMMAND = 'uv run uvicorn openferment_core.api:app --reload';
+/** Exactly what to type to start the service and the app: the project's own command, run from the repository root. */
+export const START_COMMAND = 'pnpm prototype:up';
 
 export class PostdocDown extends Error {
   constructor(
     message: string,
     /** How to fix it, when there is a fix the reader can carry out. */
-    readonly remedy: string = `Start it with \`${START_COMMAND}\` from \`core/\`.`,
+    readonly remedy: string = `Start it with ${START_COMMAND} from the repository root.`,
   ) {
     super(message);
     this.name = 'PostdocDown';
@@ -88,7 +88,7 @@ export async function postdocHealth(signal?: AbortSignal): Promise<Health> {
 
 /** What a question names besides its words: the conversation and the turn the
  * service keeps it as (a follow-up's history is the conversation's), and who asked. */
-export interface AskOptions {
+interface AskOptions {
   signal?: AbortSignal;
   /** Earlier turns, for a question asked outside a conversation the service keeps. */
   history?: PriorTurn[];
@@ -149,7 +149,7 @@ async function post(path: string, question: string, opts: AskOptions): Promise<R
 }
 
 /** One server-sent event: its name and its parsed data. */
-export interface StreamEvent {
+interface StreamEvent {
   event: string;
   data: unknown;
 }

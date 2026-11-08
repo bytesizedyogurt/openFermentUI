@@ -50,7 +50,7 @@ interface ComparedValue {
 }
 
 /** The artifact's output as the comparison computed it (studies/comparisons.py `_compare`). */
-export function comparedOf(report: ComparisonReport): { runs: ComparedRun[]; rows: ComparedRow[]; values: ComparedValue[] } {
+function comparedOf(report: ComparisonReport): { runs: ComparedRun[]; rows: ComparedRow[]; values: ComparedValue[] } {
   const o = report.artifact.output as Record<string, unknown>;
   return {
     runs: Array.isArray(o.runs) ? (o.runs as ComparedRun[]) : [],
@@ -59,13 +59,41 @@ export function comparedOf(report: ComparisonReport): { runs: ComparedRun[]; row
   };
 }
 
+/**
+ * An output's name in words, by its key in the comparison (`price.<attribute>`, the run's price block, as
+ * core/openferment_core/tools/engine.py PRICE_WORDS says each; `outputs.<key>`, a flowsheet's outputs); the
+ * key itself for one this table does not name. The table below the figure keeps every key.
+ */
+const OUTPUT_WORDS: Record<string, string> = {
+  'price.solvedPrice': 'Selling price solved at the rate of return',
+  'price.packagePrice': 'Product price as the package sets it',
+  'price.IRR': 'Internal rate of return',
+  'price.NPV': 'Net present value',
+  'price.TCI': 'Total capital investment',
+  'price.FCI': 'Fixed capital investment',
+  'price.installed_equipment_cost': 'Installed equipment cost',
+  'price.sales': 'Yearly sales',
+  'price.material_cost': 'Yearly material cost',
+  'price.utility_cost': 'Yearly utility cost',
+  'price.FOC': 'Fixed operating cost',
+  'price.VOC': 'Variable operating cost',
+  'price.feedstockKgPerH': 'Feedstock flow',
+  'outputs.mespUsdPerKg': 'Minimum selling price per kg',
+  'outputs.mespUsdPerGal': 'Minimum selling price per gallon',
+  'outputs.ethanolKgPerH': 'Ethanol made per hour',
+  'outputs.dryFeedKgPerH': 'Dry feed per hour',
+  'outputs.ethanolKgPerKgDryFeed': 'Ethanol per kg of dry feed',
+  'outputs.ethanolDensityKgPerGal': 'Ethanol mass per gallon',
+};
+export const outputWords = (key: string) => OUTPUT_WORDS[key] ?? key;
+
 /** One Tornado row per output whose every later change is a number, in percent; the rest are said in the table alone. */
-export function changeRows(rows: ComparedRow[]): TornadoRow[] {
+function changeRows(rows: ComparedRow[]): TornadoRow[] {
   return rows.flatMap((r) => {
     const later = r.change.slice(1);
     // A run that holds no number for the output leaves its row to the table, which says its change as —.
     const changes = later.filter((c): c is number => typeof c === 'number' && Number.isFinite(c));
-    return later.length > 0 && changes.length === later.length ? [{ label: r.key, values: changes.map((c) => c * 100), tag: r.unit || undefined }] : [];
+    return later.length > 0 && changes.length === later.length ? [{ label: outputWords(r.key), values: changes.map((c) => c * 100), tag: r.unit || undefined }] : [];
   });
 }
 
@@ -98,8 +126,10 @@ export default function ProformaComparison({ comparisonId }: { comparisonId: str
   // (studies/comparisons.py), whose outputs each come in the unit their run's artifact states.
   const libraryOnly = report?.artifact.toolVersion === 'study comparison 1';
   const names = (out?.runs ?? []).map((_, i) => `Run ${i + 1}`);
-  const moved = out ? changeRows(out.rows) : [];
-  const still = moved.filter((r) => r.values.every((v) => v === 0));
+  // The outputs no later run moved take no row in the figure; the sentence under it names them.
+  const changed = out ? changeRows(out.rows) : [];
+  const still = changed.filter((r) => r.values.every((v) => v === 0));
+  const moved = changed.filter((r) => r.values.some((v) => v !== 0));
   const rowsHead = ['Output', 'Unit', ...names, ...names.slice(1).map((n) => `${n}: change`)];
   const rowsBody = (out?.rows ?? []).map((r) => [r.key, r.unit || '—', ...r.values.map(shown), ...r.change.slice(1).map(pct)]);
   const valuesHead = ['Value', ...names];
@@ -165,14 +195,14 @@ export default function ProformaComparison({ comparisonId }: { comparisonId: str
 
           <Tornado
             title="How far does each run move each output from the first?"
-            drawn={`One row per output whose every later change is a number, sorted by how far it moved; each bar is ${names.length > 2 ? 'a later run’s' : 'the second run’s'} change from run 1.`}
+            drawn={`One row per output that moved, every later change a number, sorted by how far it moved; each bar is ${names.length > 2 ? 'a later run’s' : 'the second run’s'} change from run 1.`}
             series={names.slice(1)}
             unit="% from run 1"
             rows={moved}
             provenance={c.provenance}
             csvName={`comparison-${c.id}-changes`}
             empty={{
-              what: 'each output here is a number in some of these runs alone.',
+              what: changed.length ? 'no later run moved an output from run 1.' : 'each output here is a number in some of these runs alone.',
               where: 'A bar is drawn for an output every run answers with a number; the table below holds every number, run by run.',
             }}
             notes={[

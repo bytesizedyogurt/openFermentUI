@@ -98,7 +98,7 @@ export function ComponentTag({
     <span
       className={cx(
         // No border and no background — that absence is the family marker.
-        'inline-flex items-baseline gap-1 font-num text-[11px] leading-tight text-ink-soft',
+        'relative inline-flex items-baseline gap-1 font-num text-[11px] leading-tight text-ink-soft',
         className,
       )}
       title={title ?? (component ? `${component} — ${COMPONENT_ROLE[component]}` : who)}

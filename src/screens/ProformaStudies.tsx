@@ -639,13 +639,13 @@ function Scenarios({ scenarios }: { scenarios: StudyScenario[] }) {
                   {s.values.map((v) => (
                     <tr key={v.key} className="border-b border-line/40 align-top" data-origin={v.quantity.origin?.kind}>
                       <td className="py-0.5 pr-2 font-num">{v.key}</td>
-                      <td className="py-0.5 pr-2 font-num">
+                      <td className="py-0.5 pr-2 font-num whitespace-nowrap">
                         {String(v.quantity.value)} {v.quantity.unit}
                       </td>
-                      <td className="py-0.5 pr-2">
+                      <td className="py-0.5 pr-2 whitespace-nowrap">
                         {v.quantity.origin?.kind === 'measurement' ? <ReadingOrigin origin={v.quantity.origin} /> : (ORIGIN_WORDS[v.quantity.origin?.kind ?? ''] ?? '—')}
                       </td>
-                      <td className="py-0.5 pr-2">{v.quantity.origin?.by ?? '—'}</td>
+                      <td className="py-0.5 pr-2 whitespace-nowrap">{v.quantity.origin?.by ?? '—'}</td>
                       <td className="py-0.5 pr-2 text-ink-soft">
                         {v.quantity.origin?.kind === 'measurement' ? readingNote(v.quantity.origin.note) : (v.quantity.origin?.note ?? '')}
                       </td>

@@ -10,6 +10,7 @@ import {
   Download,
   Info,
   KeyRound,
+  Layers,
   Moon,
   Palette,
   RotateCcw,
@@ -47,6 +48,7 @@ import { ONTOLOGY, ONTOLOGY_BY_ID, fieldName, isFieldId, type FieldId, type Para
 import type { GateMode, GuildPolicy } from '@/lib/guild';
 import { convert, fmt, toSI } from '@/engine/units';
 import { DISCLOSURE, exportCSV } from '@/lib/csv';
+import { href } from '@/router';
 
 const APP_VERSION = '0.1.0';
 
@@ -328,7 +330,7 @@ function AppearanceSection() {
             <div className="text-caption uppercase tracking-wide text-ink-soft px-1 pb-1">
               Live preview — real records
             </div>
-            <table className="w-full" style={{ fontSize: 'var(--table-fs)' }}>
+            <table className="w-full table-fixed" style={{ fontSize: 'var(--table-fs)' }}>
               <tbody>
                 {previewRecords.length === 0 ? (
                   <tr>
@@ -345,7 +347,9 @@ function AppearanceSection() {
                     <tr key={r.id} className="border-b border-line/70 last:border-0">
                       <td className="px-1" style={{ height: 'var(--row-h)' }}>
                         <Tick p={provenanceOf(r)}>
-                          <span className="font-num">{r.id}</span>
+                          <span className="block truncate" title={r.id}>
+                            {fieldName(r.field)}
+                          </span>
                         </Tick>
                       </td>
                       <td className="px-1 font-num text-right whitespace-nowrap">
@@ -911,8 +915,7 @@ function ExportSection() {
           disclosure header. It names the literature entries as real, then defines each provenance
           class that can appear in the file — including that an unverified row is the extractor&rsquo;s
           reading no reviewer has checked against its sentence, that an industry estimate
-          has no source document behind it, and that simulation outputs are modeled rather than
-          measured. The text and markdown exports — run logs, review sessions, materials
+          has no source document behind it, and that simulation outputs are marked as modeled. The text and markdown exports — run logs, review sessions, materials
           checklists, agent answers — carry their own headers saying the same thing in the shape
           their format allows. Nothing leaves here unweighted, so a file cannot quietly become
           evidence in someone else's analysis.
@@ -1081,13 +1084,13 @@ const FIDELITY_ROWS: { feature: string; fidelity: string; notes: string }[] = [
   {
     feature: 'Guided tour',
     fidelity: 'Full',
-    notes: 'Six stops that drive the actual screens rather than screenshots.',
+    notes: 'Six stops that drive the live screens.',
   },
   {
     feature: 'Jobs tray',
     fidelity: 'Full for fetches and extractions',
     notes:
-      'A fetch or an extraction moves only on the service\u2019s answer, and its failure is the service\u2019s reason. Any other job advances on stage durations set in the browser, not on work done.',
+      'A fetch or an extraction moves only on the service\u2019s answer, and its failure is the service\u2019s reason. Any other job advances on stage durations the browser sets.',
   },
   {
     feature: 'Authentication, API keys, sharing',
@@ -1109,7 +1112,8 @@ const FIDELITY_STYLE: Record<Fidelity, string> = {
 };
 
 function fidelityKind(f: string): Fidelity {
-  if (f.startsWith('Full')) return 'Full';
+  // A feature that runs for real (a model call, the service's own metrics) is Full, however its label begins.
+  if (f.startsWith('Full') || f.startsWith('Real')) return 'Full';
   if (f.startsWith('Authored')) return 'Authored';
   return 'Visual';
 }
@@ -1209,12 +1213,12 @@ function AboutSection() {
           </span>
           <span className="inline-flex items-center gap-1.5">
             <span className="chip text-signal-info border-signal-info/45">Authored</span>
-            is written into the build by hand, not computed —{' '}
+            is written into the build by hand —{' '}
             <span className="font-num">{counts.Authored}</span>
           </span>
           <span className="inline-flex items-center gap-1.5">
             <span className="chip text-signal-warn border-signal-warn/45">Visual</span>
-            the surface exists, the mechanism does not —{' '}
+            a surface with no mechanism behind it yet —{' '}
             <span className="font-num">{counts.Visual}</span>
           </span>
         </div>
@@ -1325,7 +1329,7 @@ export default function Settings({ section }: { section: string }) {
     <div>
       <PageHeader eyebrow="Settings" title={def.label} subtitle={def.blurb} />
 
-      <div className="grid grid-cols-1 gap-6 md:grid-cols-[184px_minmax(0,1fr)] items-start">
+      <div className="grid grid-cols-1 gap-6 md:grid-cols-[208px_minmax(0,1fr)] items-start">
         <nav aria-label="Settings sections" className="min-w-0">
           <ul className="flex md:flex-col gap-1 overflow-x-auto pb-1 md:pb-0">
             {SECTIONS.map((s) => {
@@ -1333,7 +1337,7 @@ export default function Settings({ section }: { section: string }) {
               return (
                 <li key={s.id}>
                   <a
-                    href={`#/settings/${s.id}`}
+                    href={href(`/settings/${s.id}`)}
                     aria-current={on ? 'page' : undefined}
                     className={cx(
                       'flex items-center gap-2 rounded-btn px-2.5 py-1.5 text-body whitespace-nowrap transition-colors',
@@ -1349,6 +1353,7 @@ export default function Settings({ section }: { section: string }) {
                     {s.id === 'figures' && <ChartScatter size={14} aria-hidden />}
                     {s.id === 'export' && <Download size={14} aria-hidden />}
                     {s.id === 'about' && <Moon size={14} aria-hidden />}
+                    {s.id === 'architecture' && <Layers size={14} aria-hidden />}
                     <span className="truncate">{s.label}</span>
                     {s.owner && (
                       <span className="text-[10px] uppercase tracking-wide text-ink-soft border border-line rounded-input px-1">

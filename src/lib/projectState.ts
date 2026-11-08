@@ -19,7 +19,7 @@ import type { LiveConversation } from './postdoc';
 import { ServiceDown, ServiceRefused, call } from './http';
 
 /** Each kind of row a project keeps of its pages: every field of `ProjectState` that holds rows. */
-export type StateKind = Exclude<keyof ProjectState, 'depositedBy' | 'refused'>;
+type StateKind = Exclude<keyof ProjectState, 'depositedBy' | 'refused'>;
 
 /** A row the service keeps that does not read as its kind, and why; the store says each in words. */
 export type RefusedRow = components['schemas']['RefusedRow'];
@@ -147,7 +147,7 @@ export function enqueue(outbox: OutboxEntry[], entries: OutboxEntry[]): OutboxEn
   return [...outbox.filter((e) => !later.has(key(e))), ...entries];
 }
 
-export interface Flushed {
+interface Flushed {
   /** What is still owed: everything from the first write the service did not answer. */
   left: OutboxEntry[];
   sent: number;

@@ -5,10 +5,11 @@
 import { useState, type FormEvent } from 'react';
 import { Check, FolderOpen } from 'lucide-react';
 import { useStore } from '@/store';
+import { href } from '@/router';
 import { Popover, cx } from './ui';
 
 /** The projects held, the open one marked, and the form for a new one. */
-export function ProjectChooser() {
+function ProjectChooser() {
   const projects = useStore((s) => s.projects);
   const problem = useStore((s) => s.projectsProblem);
   const projectId = useStore((s) => s.projectId);
@@ -83,7 +84,7 @@ export function ProjectChooser() {
         {!reviewer && (
           <p className="text-caption text-ink-soft">
             A project is made in a person&rsquo;s name: set your reviewer name in{' '}
-            <a className="underline" href="#/settings/corpus">
+            <a className="underline" href={href('/settings/corpus')}>
               Settings
             </a>{' '}
             first.

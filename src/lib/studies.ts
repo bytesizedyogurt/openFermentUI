@@ -131,7 +131,7 @@ export const titledConfiguration = (configuration: string, titles?: Record<strin
  * A configuration a thing of another engine is offered in on Studies' run card: its name, null for a thing that takes
  * none and runs in its own, and the words the card shows for it.
  */
-export interface OfferedConfiguration {
+interface OfferedConfiguration {
   configuration: string | null;
   words: string;
 }

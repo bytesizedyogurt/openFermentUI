@@ -79,7 +79,7 @@ export function NoFlowsheetLine() {
 }
 
 /** What a flowsheet built from kept artifacts is built from, in words. */
-export const BUILT_FROM_WORDS: Record<string, string> = {
+const BUILT_FROM_WORDS: Record<string, string> = {
   'fermos.vessel': 'a vessel design kept in fermOS',
   'pureos.train_run': 'a train run kept in pureOS',
 };

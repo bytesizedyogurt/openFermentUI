@@ -47,7 +47,7 @@ export function lessonPassed(evidence: readonly GuildEvidence[], personId: strin
 
 export type PathSection = 'next' | 'refresh' | 'bench' | 'held' | 'waiting';
 
-export type PathStep =
+type PathStep =
   | { kind: 'suspended' }
   | { kind: 'lapsed' }
   | { kind: 'lapsing' }

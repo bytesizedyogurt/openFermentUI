@@ -9,6 +9,7 @@
 import type { components } from '@/api/types.gen';
 import { overrideEnds, useStore } from '@/store';
 import { ServiceDown, ServiceRefused, call } from './http';
+import { fmt } from '@/engine/units';
 import { inputsOf, type Override, type ParameterSpec } from './params';
 import type { Artifact, BasisInput, BasisSource, ComputedBasis, EngineRun, Provenance } from './studies';
 
@@ -52,7 +53,7 @@ export type TrainSummary = S['TrainSummary'];
 /** The cost lines a run's grid holds, one slider reading each. */
 export type CostLine = 'capex' | 'media' | 'utilities' | 'labor' | 'downstream' | 'other';
 
-export interface SensitivityRow {
+interface SensitivityRow {
   assumption: string;
   lowPct: number;
   hiPct: number;
@@ -116,7 +117,7 @@ export const libraryRegression = (plant: string, signal?: AbortSignal) =>
 const SET_ORIGINS = new Set(['person-assumption', 'model-estimate', 'measurement']);
 
 /** Whether a kept engine run ran on its package's own values: it set no value of its own. */
-export const onOwnValues = (run: EngineRun): boolean => run.inputs.every((i) => !SET_ORIGINS.has(i.quantity.origin?.kind ?? ''));
+const onOwnValues = (run: EngineRun): boolean => run.inputs.every((i) => !SET_ORIGINS.has(i.quantity.origin?.kind ?? ''));
 
 /**
  * A library plant's reference run among the project's runs (newest first, as `GET /api/runs` lists them): its newest
@@ -148,7 +149,7 @@ export function referenceRunOf(plant: string, runs: EngineRun[], configuration: 
 export const RETIRED_PLANTS: Readonly<Record<string, string>> = { cornstover_benchmark: 'cornstover', corn_drygrind: 'corn' };
 
 /** The tools a run kept from a retired entry was kept under: a reference run, and the benchmark. */
-export const KEPT_REFERENCE_TOOLS: readonly string[] = ['proforma.reference', 'proforma_benchmark'];
+const KEPT_REFERENCE_TOOLS: readonly string[] = ['proforma.reference', 'proforma_benchmark'];
 
 /** The retired entry a kept run was made from: a reference run's flowsheet, the corn stover entry for the benchmark; null for any other artifact. */
 export function retiredEntryOf(a: Artifact): string | null {
@@ -203,6 +204,12 @@ export const newestRunId = (served: Artifact | null | undefined, kept: string | 
 /** A time the service wrote (ISO, in UTC), as a date and a minute that say they are UTC (§3.R, finding 4). */
 export const stamp = (iso: string) => `${iso.replace('T', ' ').slice(0, 16)} UTC`;
 
+/** Words with every ISO time in them written as `stamp` writes one: the day and the minute, UTC named where the time names it. */
+export const stampsIn = (words: string) =>
+  words.replace(/\b(\d{4}-\d{2}-\d{2})T(\d{2}:\d{2})(?::\d{2}(?:\.\d+)?)?(Z|[+-]00:00)?/g, (_m, day: string, hm: string, z?: string) =>
+    `${day} ${hm}${z ? ' UTC' : ''}`,
+  );
+
 /** A price read from a run, with the words that say per what. */
 export interface PriceRead {
   value: number;
@@ -239,13 +246,15 @@ export function libraryPrice(art: Artifact): PriceRead | null {
 const sig = (v: number | null | undefined, n = 5): string => {
   if (v == null || !Number.isFinite(v)) return '\u2014';
   if (Math.abs(v) >= 1000) return Math.round(v).toLocaleString('en-US');
+  // A share far below a thousandth reads as a power of ten (2.40×10⁻⁹), as every other figure on the page writes one.
+  if (v !== 0 && Math.abs(v) < 1e-3) return fmt(v);
   return String(Number(v.toPrecision(n)));
 };
 /** A share as a percentage, for the relative difference and the tolerance. */
 const pct = (v: number | null | undefined): string => (v == null || !Number.isFinite(v) ? '\u2014' : `${sig(v * 100, 2)} %`);
 
 /** One row of a package test held beside a run: the test's value, and what the run measured for its expression. */
-export interface RegressionRow {
+interface RegressionRow {
   expression: string;
   label: string;
   unit: string;
@@ -318,11 +327,11 @@ export function isReading(source: BasisSource | null | undefined): boolean {
  * What binds an input the service read from a kept artifact with no fit chosen for it, in words: the vessel design a
  * custom_train_v1 scenario names (its source's note says so, composite.py), else a kept artifact.
  */
-export function keptBindingWords(source: BasisSource | null | undefined): string {
+function keptBindingWords(source: BasisSource | null | undefined): string {
   return /vessel design/.test(source?.note ?? '') ? 'the vessel design' : 'a kept artifact';
 }
 
-export interface InputCounts {
+interface InputCounts {
   total: number;
   /** Bound to records by the service, or, with no binding to read, inputs that can bind to records. */
   records: number;
@@ -408,7 +417,7 @@ export function inputCounts(
 //       are a 422 listing them.
 
 /** What a binding is asked with: the host filter. */
-export interface BindAsk {
+interface BindAsk {
   host: string | null;
   /** The fermOS fits a person chose, by input key (OF-BLD-019 §5.1); sent to (c) alone. */
   fits?: Record<string, string>;
@@ -448,7 +457,7 @@ export async function proformaBind(flowsheet: string, ask: BindAsk, signal?: Abo
 }
 
 /** What the page posts to run a scenario: `ProformaRunRequest`, its flowsheet named. */
-export interface RunAsk {
+interface RunAsk {
   scenarioId: string;
   /** The scenario's flowsheet; the service holds a kept scenario to its own, and binds one not yet saved by it. */
   flowsheet?: string | null;
@@ -480,7 +489,7 @@ export interface RunAsk {
  * own, of the inputs its flowsheet takes; an override of an input the
  * flowsheet no longer takes stays with the project and is not sent.
  */
-export function runOverrides(scoped: Override[], keys: string[]): Override[] {
+function runOverrides(scoped: Override[], keys: string[]): Override[] {
   const takes = new Set(keys);
   return scoped.filter((o) => takes.has(o.key));
 }
@@ -591,7 +600,7 @@ export const sendFitPath = (scenarioId: string, artifactId: string) =>
 // number, and the binding and the run are untouched.
 
 /** What the check is asked with: the scenario as its page binds it. */
-export interface CeilingAsk {
+interface CeilingAsk {
   scenarioId: string;
   /** The scenario's flowsheet; the service holds a kept scenario to its own. */
   flowsheet?: string | null;
@@ -806,7 +815,7 @@ export interface RunInput {
  */
 const FIT_NAME = /^(\w+) (fit|vessel)(?: (low|high))?$/;
 /** What a composite run's basis carries of its parts (composite.PREFIXES): never an input of its own. */
-export const PART_PREFIXES = ['fermenter.', 'train.', 'finance.'];
+const PART_PREFIXES = ['fermenter.', 'train.', 'finance.'];
 
 /**
  * Each input the run's flowsheet takes, as the run's basis names it (D1):
@@ -942,7 +951,7 @@ export function asResultGrid(modelId: string, g: ProformaGrid): ResultGrid {
  * A flowsheet with no question of its own for an input asks where it should
  * come from.
  */
-export const QUESTIONS: Record<string, Record<string, string>> = {
+const QUESTIONS: Record<string, Record<string, string>> = {
   // OF-BLD-020 §6.1: a vessel and a train, priced. Its fermenter's inputs ask what the ethanol flowsheet's ask.
   custom_train_v1: {
     feed_glucose_conc:

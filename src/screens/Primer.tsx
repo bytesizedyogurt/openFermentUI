@@ -60,10 +60,10 @@ export default function Primer() {
   const done = counted.filter((l) => passed(l.id)).length;
 
   return (
-    <div>
+    <div className="max-w-[760px]">
       <PageHeader
-        eyebrow="Learn the system"
-        title="Primer"
+        eyebrow="Primer"
+        title="Lessons"
         subtitle="Bioprocess taught through the live platform: the project's lessons, each with the skills it counts toward and its checkpoint."
         actions={
           learner && counted.length > 0 ? (
@@ -75,7 +75,7 @@ export default function Primer() {
       />
       <OwnerTabs tabs={PRIMER_TABS} />
 
-      <div className="max-w-[860px] space-y-4">
+      <div className="space-y-4">
         {problem && (
           <Card className="p-4 text-body" role="alert">
             The project&rsquo;s lessons could not be read: {problem}

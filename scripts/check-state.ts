@@ -80,7 +80,10 @@ import {
   retiredEntryOf,
   runBody,
   runSpecs,
+  stampsIn,
 } from '../src/lib/proforma';
+import { idTail, shortCite } from '../src/lib/cite';
+import { fmt } from '../src/engine/units';
 import { interpolate } from '../src/engine/interp';
 import { awaitingReadBack, correctedBy, correctionOf } from '../src/engine/readings';
 import { lockIntact, runbookLockHash } from '../src/engine/lock';
@@ -904,6 +907,41 @@ async function callAgainst(answer: { status: number; body?: unknown }, healthy =
     !!none && /\bThe service keeps each conversation with the project\b/.test(none.text) && /\bevery page that opens the project\b/.test(none.text),
     none?.text ?? 'no live-conversations-none words in src/screens/Postdoc.tsx',
   );
+}
+
+// H.0, the sweep on the final tree: what a person reads where an address,
+// a time, a document or a number stood raw.
+{
+  // Every link inside a project keeps the project in its address (router.tsx `href`): a link written as a bare
+  // hash drops it. Home's own `#/`, and a link naming a project's address (`#/p/<id>`), are the plain ones.
+  const SRC = join(import.meta.dirname, '..', 'src');
+  const sourcesUnder = (dir: string): string[] =>
+    readdirSync(dir, { withFileTypes: true }).flatMap((d) => {
+      const path = join(dir, d.name);
+      if (d.isDirectory()) return sourcesUnder(path);
+      return /\.tsx?$/.test(d.name) && !d.name.endsWith('.gen.ts') ? [path] : [];
+    });
+  const bare: string[] = [];
+  for (const path of sourcesUnder(SRC)) {
+    const text = readFileSync(path, 'utf8');
+    text.split('\n').forEach((line, i) => {
+      if (/href=\{`#\$\{|href=\{`#\/(?!p\/)|href="#\/[^"]/.test(line)) bare.push(`${relative(join(SRC, '..'), path)}:${i + 1}`);
+    });
+  }
+  check('every link inside a project goes through the router, so the address keeps the project', bare.length === 0, bare.map((b) => `\n    ${b}`).join(''));
+  check(
+    'an ISO time in a basis note reads as the page writes a time, the day and the minute in UTC',
+    stampsIn('estimated on 2026-11-08T03:23:03.514708Z: a value') === 'estimated on 2026-11-08 03:23 UTC: a value' &&
+      stampsIn('no time here') === 'no time here',
+    stampsIn('estimated on 2026-11-08T03:23:03.514708Z: a value'),
+  );
+  const paper = { id: '2fc3d2a2a57446a6b9f1090a2a236bc6', title: 'A placeholder title', authors: ['Doe, Jane', 'Roe, Rick', 'Poe, Paul'], year: 2014 };
+  check(
+    'a document is named by its first author and year, and a long id by its last characters',
+    shortCite(paper) === 'Doe et al. 2014' && shortCite({ ...paper, authors: [] }) === 'A placeholder title 2014' && idTail(paper.id) === '…2a236bc6',
+    `${shortCite(paper)} · ${idTail(paper.id)}`,
+  );
+  check('a power of ten is written in superscript, never with a caret', fmt(88467389.96) === '8.85×10⁷' && fmt(6.88e-6) === '6.88×10⁻⁶', `${fmt(88467389.96)} · ${fmt(6.88e-6)}`);
 }
 
 console.log(fails ? `\n✗ ${fails} check(s) failed` : '\n✓ The project rows are sent as the page changes them, and kept until the service answers; a refusal is never an outage.');

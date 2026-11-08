@@ -119,6 +119,14 @@ The new `CLAUDE.md` (stage 8) carries only R, P and C lines, each labelled.
 - The new `CLAUDE.md` stays under 250 lines and labels every line R, P or C.
 - `STATE.md`'s open "Live owed" items fold into `docs/PROGRESS.md` at stage 8.
 
+## Implementation (alpha 2.2 H.0)
+
+- `prototype:up` stands re-classified C. Stage 8.3 rewrote `scripts/prototype-up.sh` as the
+  one-command live app: `session-start.sh`, the build, the service on `127.0.0.1:8000` and the app on
+  `127.0.0.1:4173`, both on loopback, every record in the database `core/.env` names. The demo set
+  and `shots` stay deleted as the row above says. `README.md` and Postdoc's service-down callout name
+  the command, and the script's header calls it the live app.
+
 ## Revisit condition
 
 Any rule may be re-classified when new evidence arrives; the change gets its own decision record.

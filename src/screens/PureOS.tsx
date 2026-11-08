@@ -67,7 +67,7 @@ import { ProposeTrain } from '@/screens/PureOSPropose';
 const PLANNED = [
   {
     what: 'Formulation and storage',
-    why: 'Which format a product survives in, and what that costs in stability rather than in dollars.',
+    why: 'Which format a product survives in, and what that format costs in stability.',
   },
   {
     what: 'Resin and consumable selection',
@@ -109,12 +109,16 @@ function TrainsOnFile() {
         <Card className="p-4" data-testid="pureos-trains-empty">
           <p className="text-body text-ink">No train is on file yet.</p>
           <p className="text-body text-ink-soft mt-1">
-            A train is read from a Proforma run: open a scenario in{' '}
+            A train is read from a run: a library plant&rsquo;s run or a scenario&rsquo;s run, from{' '}
+            <a className="text-accent hover:underline" href={href('/proforma/studies')}>
+              Studies
+            </a>{' '}
+            or{' '}
             <a className="text-accent hover:underline" href={href('/proforma')}>
               Proforma
             </a>
-            , give each input a source (records, or an assumption under your name), and run it. pureOS then reads the
-            run's units and streams here, with the recovery at each step.
+            , or a train built and run in the Builder. pureOS then reads the run&rsquo;s units and streams here, with the
+            recovery at each step.
           </p>
         </Card>
       )}
@@ -402,7 +406,7 @@ export default function PureOS() {
       <PageHeader
         eyebrow="Harvest, capture, recovery"
         title="pureOS"
-        subtitle="Everything after the fermenter: harvest, disruption, capture, polishing, recovery and storage. pureOS builds a train unit by unit from a catalogue of BioSTEAM's units and runs it, and reads the train a flowsheet ran from the run Proforma priced; Proforma prices a train, pureOS decides it — whether centrifugation or filtration suits a cell-wall-deficient host is a process question, not an economics one."
+        subtitle="Everything after the fermenter: harvest, disruption, capture, polishing, recovery and storage. pureOS builds a train unit by unit from a catalogue of BioSTEAM's units and runs it, and reads the train a flowsheet ran from the run Proforma priced; Proforma prices a train, pureOS decides it: whether centrifugation or filtration suits a cell-wall-deficient host is a process question."
       />
       <OwnerTabs tabs={PUREOS_TABS} />
 
@@ -425,13 +429,12 @@ export default function PureOS() {
           <a href={href('/fermos')} className="text-accent hover:underline">
             fermOS
           </a>{' '}
-          has to carry product location, not just a titre.
+          carries the product&rsquo;s location beside its titre.
         </p>
         <p className="text-ink mt-2">
           Properties flow downstream and are stored once. Thermostability is predicted in geneOS
           and consumed here, where it decides whether a heat step can replace most of the capture
-          chromatography — it is not a pureOS field, and duplicating it would create two answers
-          to one question.
+          chromatography. It stays a geneOS field, so one question keeps one answer.
         </p>
       </Callout>
 
@@ -455,11 +458,11 @@ export default function PureOS() {
       <ProposeTrain />
 
       <div className="mt-5">
-        <Callout kind="info" title="The vocabulary is names, not a process model">
+        <Callout kind="info" title="The vocabulary: names for the steps">
           Everything below is a name for a step and the stage it belongs to, with the BioSTEAM classes
           that perform it. A train above is built by a person in the Builder or read from a run somebody
-          made, and a proposed one is the service's rules, each naming the property it read; nothing here
-          knows whether a train is a good one — that is the piece that is not built.
+          made, and a proposed one is the service's rules, each naming the property it read. Judging whether a
+          train is a good one is the piece still to build.
           What exists is the shared language the rest of the platform describes a train in.
         </Callout>
       </div>

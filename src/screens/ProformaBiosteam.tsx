@@ -22,9 +22,9 @@ import { href } from '@/router';
 import { clampPoint, interpolate, type Grid } from '@/engine/interp';
 import { fmt } from '@/engine/units';
 import { exportCSV } from '@/lib/csv';
-import { Card } from '@/components/ui';
+import { Card, cx } from '@/components/ui';
 import { Tick } from '@/components/Provenance';
-import { CostWaterfall, Distribution, Tornado } from '@/components/figures';
+import { CostWaterfall, Distribution, Tornado, priceNote, waterfallTotal } from '@/components/figures';
 import {
   infeasibleWords,
   NO_DIAGRAM,
@@ -39,7 +39,7 @@ import {
 } from '@/lib/proforma';
 
 /** Where a sampled input came from, beside its tornado bar. */
-export const SOURCE_WORDS: Record<string, string> = {
+const SOURCE_WORDS: Record<string, string> = {
   record: 'records',
   assumption: 'assumption',
   'model-estimate': 'a model’s estimate',
@@ -89,14 +89,24 @@ function Section({
   );
 }
 
-function Table({ headers, rows, rowTestid }: { headers: string[]; rows: (string | number)[][]; rowTestid: string }) {
+/**
+ * A run's table: the first column its row's name, the rest numbers set right. `wide`, when given, names the one column
+ * that takes the free width and reads left (a stream's flows by component), and the name column keeps to its words.
+ */
+function Table({ headers, rows, rowTestid, wide }: { headers: string[]; rows: (string | number)[][]; rowTestid: string; wide?: number }) {
+  const at = (j: number, head: boolean) =>
+    j === 0
+      ? cx('text-left py-1 pr-2', head ? 'font-medium' : 'font-num', wide !== undefined && 'w-[1%] whitespace-nowrap')
+      : j === wide
+        ? cx('text-left py-1 px-1.5 min-w-[18rem]', head ? 'font-medium' : 'font-num')
+        : cx('text-right py-1 px-1.5', head ? 'font-medium' : 'font-num', wide !== undefined && 'whitespace-nowrap');
   return (
     <div className="overflow-x-auto">
       <table className="w-full text-caption">
         <thead>
           <tr className="border-b border-line text-ink-soft">
             {headers.map((h, i) => (
-              <th key={h} className={i === 0 ? 'text-left py-1 pr-2 font-medium' : 'text-right py-1 px-1.5 font-medium'}>
+              <th key={h} className={at(i, true)}>
                 {h}
               </th>
             ))}
@@ -106,7 +116,7 @@ function Table({ headers, rows, rowTestid }: { headers: string[]; rows: (string 
           {rows.map((r, i) => (
             <tr key={i} className="border-b border-line/50 align-top" data-testid={rowTestid}>
               {r.map((c, j) => (
-                <td key={j} className={j === 0 ? 'py-1 pr-2 font-num' : 'py-1 px-1.5 text-right font-num'}>
+                <td key={j} className={at(j, false)}>
                   {c}
                 </td>
               ))}
@@ -194,7 +204,7 @@ export function RunResult({ view, priceBasis, scenarioId }: { view: RunView; pri
 
 // ── Cost breakdown ──────────────────────────────────────────────────────
 
-export function CostBreakdown({
+function CostBreakdown({
   view,
   priceBasis,
   csvName,
@@ -207,18 +217,19 @@ export function CostBreakdown({
   totalLabel?: string;
 }) {
   const tea = view.tables.tea;
-  const note = costBreakdownNote(view);
+  const unit = tea?.basis ? `USD per ${tea.basis}` : priceBasis;
+  const notes = [priceNote(tea?.productPrice, view.basePrice, unit), costBreakdownNote(view)].filter((n): n is string => Boolean(n));
   return (
     <div data-testid="cost-breakdown">
       <CostWaterfall
         title="What is the price made of?"
         lines={tea?.lines ?? []}
-        total={view.basePrice != null ? { label: totalLabel, value: view.basePrice } : null}
-        unit={tea?.basis ? `USD per ${tea.basis}` : priceBasis}
+        total={waterfallTotal(tea?.productPrice, view.basePrice, totalLabel)}
+        unit={unit}
         annualUnit={u(view, 'annual', 'USD/yr')}
         provenance={view.provenance}
         basis={[view.basis]}
-        notes={note ? [note] : undefined}
+        notes={notes.length ? notes : undefined}
         empty={costBreakdownEmpty(view)}
         csvName={`${csvName}-cost-breakdown`}
       />
@@ -230,7 +241,7 @@ export function CostBreakdown({
  * The line under the cost breakdown (§3.R, finding 10): sales are a year's,
  * in the run's annual unit; the capital sums are one-off, in its cost unit.
  */
-export function costBreakdownNote(view: RunView): string | null {
+function costBreakdownNote(view: RunView): string | null {
   const tea = view.tables.tea;
   if (!tea) return null;
   return `Read from BioSTEAM's ${tea.teaClass} object for the base case: sales ${cell(tea.sales)} ${u(view, 'annual', 'USD/yr')}; installed equipment ${cell(tea.installedEquipmentCost)}, fixed capital ${cell(tea.FCI)} and total capital ${cell(tea.TCI)} ${u(view, 'cost', 'USD')}, once; over ${cell(tea.operatingHours)} operating hours a year.`;
@@ -241,7 +252,7 @@ export function costBreakdownNote(view: RunView): string | null {
  * run keeps no TEA, and running again gives the same case; only a run
  * stored before the tables is helped by running again.
  */
-export function costBreakdownEmpty(view: RunView): { what: string; where: string } {
+function costBreakdownEmpty(view: RunView): { what: string; where: string } {
   if (view.baseInfeasible)
     return {
       what: `the base case could not run: ${baseCaseRefusal(view.baseInfeasible)}.`,
@@ -268,7 +279,7 @@ export function Sensitivity({ view, labels, csvName }: { view: RunView; labels: 
   );
 }
 
-export function PriceDistribution({ view, priceBasis, csvName }: { view: RunView; priceBasis: string; csvName: string }) {
+function PriceDistribution({ view, priceBasis, csvName }: { view: RunView; priceBasis: string; csvName: string }) {
   return (
     <Distribution
       title="What would this plant's product cost, across the inputs' ranges?"
@@ -292,7 +303,7 @@ export function PriceDistribution({ view, priceBasis, csvName }: { view: RunView
  * which is not how the TEA breakdown above splits the same plant, so no line
  * here takes a word the waterfall uses for another quantity.
  */
-export const SLIDER_LINE_LABEL: Record<CostLine, string> = {
+const SLIDER_LINE_LABEL: Record<CostLine, string> = {
   capex: 'Capital: what the price leaves after the operating lines',
   media: 'Feed and other materials bought',
   utilities: 'Fermentation section\u2019s utilities',
@@ -317,7 +328,7 @@ function atPoint(grid: ResultGrid, point: Record<string, number>): { msp: number
 }
 
 /** Three inputs moved over the run's grid, interpolated between its cases (engine/interp). */
-export function Sliders({ view, labels, priceBasis, scenarioId }: { view: RunView; labels: Record<string, string>; priceBasis: string; scenarioId: string }) {
+function Sliders({ view, labels, priceBasis, scenarioId }: { view: RunView; labels: Record<string, string>; priceBasis: string; scenarioId: string }) {
   const g = view.grid;
   const grid = useMemo(() => (g ? asResultGrid(scenarioId, g) : null), [g, scenarioId]);
   const [point, setPoint] = useState<Record<string, number>>(() =>
@@ -375,7 +386,7 @@ export function Sliders({ view, labels, priceBasis, scenarioId }: { view: RunVie
 
 // ── Streams, equipment, utilities ───────────────────────────────────────
 
-export function streamsTable(view: RunView) {
+function streamsTable(view: RunView) {
   const headers = [
     'Stream',
     'From',
@@ -417,7 +428,7 @@ export function streamsTable(view: RunView) {
   return { headers, rows, csv };
 }
 
-export function StreamsTable({ view, csvName }: { view: RunView; csvName: string }) {
+function StreamsTable({ view, csvName }: { view: RunView; csvName: string }) {
   const t = streamsTable(view);
   return (
     <Section
@@ -426,12 +437,12 @@ export function StreamsTable({ view, csvName }: { view: RunView; csvName: string
       reads="Every stream of the base case as BioSTEAM holds it after the run: the unit it leaves (feed, for one that enters the plant) and the one it enters (out, for one that leaves it), its phase, temperature, pressure and mass flow, by component."
       csv={{ name: `${csvName}-streams`, ...t }}
     >
-      {t.rows.length ? <Table {...t} rowTestid="stream-row" /> : <p className="text-body text-ink-soft">This run kept no stream table.</p>}
+      {t.rows.length ? <Table {...t} rowTestid="stream-row" wide={7} /> : <p className="text-body text-ink-soft">This run kept no stream table.</p>}
     </Section>
   );
 }
 
-export function equipmentTable(view: RunView) {
+function equipmentTable(view: RunView) {
   const headers = [
     'Unit',
     'Class',
@@ -451,7 +462,7 @@ export function equipmentTable(view: RunView) {
   return { headers, rows, csv };
 }
 
-export function EquipmentTable({ view, csvName }: { view: RunView; csvName: string }) {
+function EquipmentTable({ view, csvName }: { view: RunView; csvName: string }) {
   const t = equipmentTable(view);
   return (
     <Section
@@ -465,7 +476,7 @@ export function EquipmentTable({ view, csvName }: { view: RunView; csvName: stri
   );
 }
 
-export function utilitiesTable(view: RunView) {
+function utilitiesTable(view: RunView) {
   const d = view.tables.utilities;
   const headers = ['Duty', 'Total', 'Unit'];
   const rows = d
@@ -487,7 +498,7 @@ export function utilitiesTable(view: RunView) {
   return { headers, rows, csv };
 }
 
-export function UtilitiesCard({ view, csvName }: { view: RunView; csvName: string }) {
+function UtilitiesCard({ view, csvName }: { view: RunView; csvName: string }) {
   const t = utilitiesTable(view);
   const d = view.tables.utilities;
   return (
@@ -510,7 +521,7 @@ export function UtilitiesCard({ view, csvName }: { view: RunView; csvName: strin
  * that and links the record (`sffRecord`) when the page knows it; the note a library run's artifact keeps names
  * Graphviz, and that cause holds for a scenario's run alone.
  */
-export function DiagramCard({ view, csvName, sffRecord = null }: { view: RunView; csvName: string; sffRecord?: string | null }) {
+function DiagramCard({ view, csvName, sffRecord = null }: { view: RunView; csvName: string; sffRecord?: string | null }) {
   const order = view.tables.unitOrder.length ? view.tables.unitOrder : [...view.tables.units].sort((a, b) => a.order - b.order).map((x) => x.id);
   const classOf = new Map(view.tables.units.map((x) => [x.id, x.unitClass]));
   const library = view.basis.tool === 'library.run';
@@ -593,7 +604,7 @@ const READ_BACK_GROUPS: { origin: ReadBackRow['origin']; title: string; reads: s
   },
 ];
 
-export function ReadBack({ view, flowsheet }: { view: RunView; flowsheet: FlowsheetInfo | null }) {
+function ReadBack({ view, flowsheet }: { view: RunView; flowsheet: FlowsheetInfo | null }) {
   const rows = readBackRows(view.readBack, flowsheet, view.basis?.inputs ?? []);
   if (!rows.length) return null;
   return (

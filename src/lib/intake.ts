@@ -55,7 +55,7 @@ export class IntakeDown extends Error {
   constructor(
     message: string,
     /** How to fix it, when there is a fix the reader can carry out. */
-    readonly remedy: string = `Start it with \`${START_COMMAND}\` from \`core/\`.`,
+    readonly remedy: string = `Start it with ${START_COMMAND} from the repository root.`,
   ) {
     super(message);
     this.name = 'IntakeDown';
@@ -189,7 +189,7 @@ export async function extractPaper(
 }
 
 /** What loading the overlay found: the overlay, no service to ask, or a running service's refusal in its words. */
-export type OverlayLoad = { overlay: Overlay } | { down: true } | { refused: string };
+type OverlayLoad = { overlay: Overlay } | { down: true } | { refused: string };
 
 /**
  * The overlay, or why there is none.

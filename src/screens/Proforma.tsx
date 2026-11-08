@@ -59,7 +59,7 @@ import {
   stamp,
 } from '@/lib/proforma';
 import { runnable, type LibraryPlant, type LibraryShelf } from '@/lib/library';
-import { StudiesRefused, libraryShelf, listRuns, runPlant } from '@/lib/studies';
+import { StudiesRefused, libraryShelf, listRuns, listScenarios, runPlant } from '@/lib/studies';
 
 const problemOf = (e: unknown) => (e instanceof ProformaDown ? `${e.message} ${e.remedy ?? ''}`.trim() : e instanceof Error ? e.message : String(e));
 
@@ -406,6 +406,16 @@ export default function Proforma() {
   const [kept, setKept] = useState<Artifact[]>([]);
   const [status, setStatus] = useState<SimulatorStatus | null>(null);
   const [ranAt, setRanAt] = useState(0);
+  // The studies' scenarios, counted: the empty state names them when the project holds no Proforma scenario.
+  const [studyScenarios, setStudyScenarios] = useState<number | null>(null);
+  useEffect(() => {
+    const ctrl = new AbortController();
+    listScenarios(ctrl.signal).then(
+      (all) => setStudyScenarios(all.length),
+      () => undefined,
+    );
+    return () => ctrl.abort();
+  }, []);
 
   useEffect(() => {
     const ctrl = new AbortController();
@@ -520,8 +530,8 @@ export default function Proforma() {
           <FlaskConical size={16} className="text-ink-soft" /> Flowsheets
         </h2>
         <p className="text-body text-ink-soft mb-3">
-          The flowsheets a scenario can run. None holds a process number of its own: records bind the process inputs,
-          and a named person types the rest.
+          The flowsheets a scenario can run. Records bind each flowsheet&rsquo;s process inputs, and a named person types the
+          rest.
         </p>
         {shelf && flowsheets.length === 0 && (
           <p className="text-body">
@@ -541,13 +551,24 @@ export default function Proforma() {
         </h2>
         {scenarios.length === 0 ? (
           <EmptyState
-            title="No scenario yet"
-            body="A scenario runs one flowsheet from the shelf above: New scenario picks the flowsheet, names it and opens it, with its inputs listed."
+            title={studyScenarios ? 'No Proforma scenario yet' : 'No scenario yet'}
+            body={
+              studyScenarios
+                ? `The project's studies hold ${studyScenarios} scenario${studyScenarios === 1 ? '' : 's'}, listed on Studies. A Proforma scenario runs one flowsheet from the shelf above: New scenario picks the flowsheet, names it and opens it, with its inputs listed.`
+                : 'A scenario runs one flowsheet from the shelf above: New scenario picks the flowsheet, names it and opens it, with its inputs listed.'
+            }
             icon={<LineChart size={28} />}
             action={
-              <Button variant="primary" onClick={() => openDialog(null)}>
-                <Plus size={14} /> New scenario
-              </Button>
+              <span className="flex flex-wrap gap-2 justify-center">
+                <Button variant="primary" onClick={() => openDialog(null)}>
+                  <Plus size={14} /> New scenario
+                </Button>
+                {studyScenarios ? (
+                  <LinkButton to="/proforma/studies">
+                    <BookOpen size={14} /> Studies
+                  </LinkButton>
+                ) : null}
+              </span>
             }
           />
         ) : (

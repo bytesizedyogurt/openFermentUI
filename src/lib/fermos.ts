@@ -67,7 +67,7 @@ const post = <T>(path: string, body: unknown, signal?: AbortSignal) =>
 
 /** The families a run's series can be fitted to (fermos.FIT_FAMILIES): the closed-form logistic, and the batch family. */
 export const FIT_FAMILIES = ['logistic_v0', 'batch_v1'] as const;
-export type FitFamily = (typeof FIT_FAMILIES)[number];
+type FitFamily = (typeof FIT_FAMILIES)[number];
 export const LOGISTIC = 'logistic_v0';
 /** What each fit family is, in words, for the Fits tab's chooser. */
 export const FIT_FAMILY_WORDS: Record<FitFamily, string> = {
@@ -236,7 +236,7 @@ export function qualifies(dep: Deposition, runbook: Runbook | undefined): boolea
 const value = (fit: KineticFit, name: string) => fit.params?.find((p) => p.name === name)?.value;
 
 /** The fitted closed form for one role at `t` hours, or null when the fit lacks it. */
-export function curveAt(fit: KineticFit, role: string, t: number): number | null {
+function curveAt(fit: KineticFit, role: string, t: number): number | null {
   const x0 = value(fit, 'X0');
   const mu = value(fit, 'mu');
   const xmax = value(fit, 'Xmax');
@@ -266,7 +266,7 @@ export function curve(fit: KineticFit, role: string, tmax: number, n = 60): { t:
 }
 
 /** A series that names the role it plays in the run. */
-export type RoledSeries = FermosSeries & { role: NonNullable<FermosSeries['role']> };
+type RoledSeries = FermosSeries & { role: NonNullable<FermosSeries['role']> };
 /** Whether a series names its role. */
 export const hasRole = (s: FermosSeries): s is RoledSeries => s.role != null;
 
@@ -300,10 +300,10 @@ export const VESSEL_FIT_FLOWSHEET = 'ethanol_glucose_v0';
 /** The vessel scope of a simulation or a fit: `fermos:vessel:<artifact id>`. */
 export const vesselScope = (sourceId: string) => `fermos:vessel:${sourceId}`;
 
-export type VesselType = NonNullable<VesselRequest['vesselType']>;
+type VesselType = NonNullable<VesselRequest['vesselType']>;
 
 /** BioSTEAM's word for each vessel type (the `design` parameter's choices), to the request's. */
-export const VESSEL_TYPE_OF_DESIGN: Record<string, VesselType> = { 'Stirred tank': 'stirred-tank', 'Bubble column': 'bubble-column' };
+const VESSEL_TYPE_OF_DESIGN: Record<string, VesselType> = { 'Stirred tank': 'stirred-tank', 'Bubble column': 'bubble-column' };
 
 /** The vessel type a person chose in the panel (their override of `design`), or null for BioSTEAM's own. */
 export function vesselTypeOf(overrides: Override[]): VesselType | null {

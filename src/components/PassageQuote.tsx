@@ -9,7 +9,7 @@ import type { Passage, PassageRef } from '@/lib/postdoc';
 import { useStore } from '@/store';
 import { href } from '@/router';
 
-export function passageReaderHref(passage: Passage, quote: string): string {
+function passageReaderHref(passage: Passage, quote: string): string {
   const q = new URLSearchParams({ section: passage.sectionId, quote });
   return href(`/biorepo/paper/${passage.paperId}?${q.toString()}`);
 }
@@ -25,8 +25,13 @@ export function PassageQuote({ cite, passage }: { cite: PassageRef; passage: Pas
       <figcaption className="mt-0.5 flex flex-wrap items-baseline gap-x-2 text-caption text-ink-soft">
         {passage ? (
           <>
-            <span className="font-num">{passage.paperId}</span>
-            {title && <span className="truncate max-w-[36ch]">{title}</span>}
+            {title ? (
+              <span className="truncate max-w-[56ch]" title={`${title} (${passage.paperId})`}>
+                {title}
+              </span>
+            ) : (
+              <span className="font-num">{passage.paperId}</span>
+            )}
             <span>· {passage.heading}</span>
             <a
               className="inline-flex items-center gap-1 hover:text-accent"

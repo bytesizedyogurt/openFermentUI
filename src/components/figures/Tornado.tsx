@@ -32,7 +32,7 @@ export interface TornadoProps {
 }
 
 /** The words for a sensitivity with no row: what a scenario's own Tornado says. */
-export const NOTHING_VARIES = {
+const NOTHING_VARIES = {
   what: 'nothing varies in this run.',
   where: 'An input with a range moves the price; a fixed input draws no bar.',
 };

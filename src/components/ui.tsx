@@ -4,7 +4,7 @@ import React, { useEffect, useRef, useState, type ReactNode } from 'react';
 import { createPortal } from 'react-dom';
 import { X, AlertTriangle, Info, CheckCircle2, XCircle } from 'lucide-react';
 import { useStore } from '@/store';
-import { navigate } from '@/router';
+import { navigate, href } from '@/router';
 
 export function cx(...parts: (string | false | null | undefined)[]): string {
   return parts.filter(Boolean).join(' ');
@@ -135,7 +135,7 @@ export function LinkButton({
 }) {
   return (
     <a
-      href={`#${to}`}
+      href={href(to)}
       className={cx('btn', variant === 'primary' && 'btn-primary', size === 'sm' && 'btn-sm', className)}
     >
       {children}
@@ -159,19 +159,26 @@ export function Popover({
   label?: string;
 }) {
   const [open, setOpen] = useState(false);
-  const [pos, setPos] = useState({ top: 0, left: 0 });
+  const [pos, setPos] = useState({ top: 0, left: 0, maxHeight: 0 });
   const ref = useRef<HTMLButtonElement>(null);
   const timer = useRef<number>();
   const panelRef = useRef<HTMLDivElement>(null);
 
+  // The panel opens below its trigger, or above it when the room above is the
+  // larger and the panel outgrows the room below; either way it stays 8 px
+  // inside the window and scrolls within the room it has.
   const place = () => {
     const r = ref.current?.getBoundingClientRect();
     if (!r) return;
-    const top = r.bottom + 6;
+    const below = r.bottom + 6;
     const left = Math.max(8, Math.min(window.innerWidth - width - 8, r.left));
-    const flipUp = top + 260 > window.innerHeight && r.top > 280;
-    setPos({ top: flipUp ? r.top - 6 : top, left });
-    if (flipUp && panelRef.current) panelRef.current.style.transform = 'translateY(-100%)';
+    const tall = panelRef.current?.scrollHeight ?? 260;
+    const roomBelow = window.innerHeight - below - 8;
+    const roomAbove = r.top - 6 - 8;
+    const flipUp = tall > roomBelow && roomAbove > roomBelow;
+    const room = Math.max(80, flipUp ? roomAbove : roomBelow);
+    const top = flipUp ? Math.max(8, r.top - 6 - Math.min(tall, room)) : below;
+    setPos({ top, left, maxHeight: room });
   };
 
   useEffect(() => {
@@ -216,7 +223,7 @@ export function Popover({
             role="dialog"
             aria-label={label}
             className="fixed z-50 overlay rounded-card p-3 anim-in text-body"
-            style={{ top: pos.top, left: pos.left, width }}
+            style={{ top: pos.top, left: pos.left, width, maxHeight: pos.maxHeight || undefined, overflowY: 'auto' }}
             onMouseEnter={() => window.clearTimeout(timer.current)}
             onMouseLeave={() => {
               if (!openOnHover) return;
@@ -456,11 +463,11 @@ export function Callout({
 }
 
 /** Explainer popover trigger — the ambient-pedagogy affordance (§4). */
-export function Explain({ children, label = 'What is this?' }: { children: ReactNode; label?: string }) {
+export function Explain({ children, label = 'What is this?', width = 320 }: { children: ReactNode; label?: string; width?: number }) {
   return (
     <Popover
       label={label}
-      width={320}
+      width={width}
       trigger={(p) => (
         <button
           {...p}

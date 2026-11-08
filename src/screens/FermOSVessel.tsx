@@ -68,7 +68,7 @@ import {
 } from '@/lib/fermos';
 
 /** The panel's groups, in Appendix 2 §C's order. */
-export const VESSEL_GROUPS = ['Scale', 'Vessel', 'Schedule', 'Aeration', 'Agitation', 'Heat'];
+const VESSEL_GROUPS = ['Scale', 'Vessel', 'Schedule', 'Aeration', 'Agitation', 'Heat'];
 
 /** What Price this in Proforma does, said beside it (OF-BLD-020 §6.1). */
 export const PRICE_WORDS =

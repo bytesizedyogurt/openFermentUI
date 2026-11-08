@@ -142,12 +142,12 @@ import { PUREOS_TABS } from '@/data/tabs';
 import { StreamTable } from './PureOSTrain';
 
 /** What Price this in Proforma does, said beside its choices (OF-BLD-020 §6.2). */
-export const PRICE_TRAIN_WORDS =
+const PRICE_TRAIN_WORDS =
   'Proforma prices this train as the train of custom_train_v1: a fermenter rebuilt from a fermOS vessel design, its beer through the units of the train run kept here, priced with the TEA the shelf flowsheets use. The scenario is the project’s, saved with its other scenarios, and opens on its page, where it binds and says what waits.';
 /** What it needs while no train run is kept on the page. */
-export const PRICE_NEEDS_RUN = 'A train run: Run this train first. Proforma prices a kept train run, and this page holds none yet.';
+const PRICE_NEEDS_RUN = 'A train run: Run this train first. Proforma prices a kept train run, and this page holds none yet.';
 /** What it needs while no vessel design is kept on the service, and how one is made. */
-export const PRICE_NEEDS_VESSEL =
+const PRICE_NEEDS_VESSEL =
   'A vessel design: none is kept on this service yet. fermOS → Vessel designs one for a kept simulation (fermOS → Simulate keeps one); it is then listed here.';
 
 /** How long the page waits after a change before asking the service what a run would refuse. */

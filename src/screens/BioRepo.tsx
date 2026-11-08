@@ -179,9 +179,10 @@ export default function BioRepo() {
           <a
             href={href(`/biorepo/paper/${r.paper.id}`)}
             className="font-num text-accent hover:underline"
+            title={r.paper.id}
             onClick={(e) => e.stopPropagation()}
           >
-            {r.paper.id}
+            {r.paper.id.slice(0, 8)}
           </a>
         </Tick>
       ),
@@ -213,7 +214,7 @@ export default function BioRepo() {
         <span
           className="text-ink-soft block truncate"
           style={{ maxWidth: 116 }}
-          title={r.paper.authors.join(', ')}
+          title={r.paper.authors.join('; ')}
         >
           {authorLabel(r.paper.authors)}
         </span>
@@ -226,7 +227,7 @@ export default function BioRepo() {
       width: '56px',
       numeric: true,
       priority: 2,
-      render: (r) => <span className="font-num">{r.paper.year}</span>,
+      render: (r) => <span className="font-num">{r.paper.year ?? '—'}</span>,
       value: (r) => r.paper.year ?? '',
     },
     {
@@ -242,7 +243,7 @@ export default function BioRepo() {
           <a
             href={href(`/intake?paper=${r.paper.id}`)}
             className="font-num text-accent hover:underline"
-            title={`Open Extract filtered to ${r.paper.id}`}
+            title={`Open Extract filtered to ${r.paper.title}`}
             onClick={(e) => e.stopPropagation()}
           >
             {r.extractions}
@@ -291,7 +292,7 @@ export default function BioRepo() {
   ];
 
   const facets: FacetDef<LibRow>[] = [
-    { key: 'year', label: 'Year', valuesOf: (r) => (r.paper.year === null ? [] : [String(r.paper.year)]) },
+    { key: 'year', label: 'Year', order: 'value-desc', valuesOf: (r) => (r.paper.year === null ? [] : [String(r.paper.year)]) },
     {
       key: 'ingest',
       label: 'Ingest status',
@@ -318,8 +319,8 @@ export default function BioRepo() {
   const header = (
     <>
     <PageHeader
-      eyebrow="Papers and records"
-      title="BioRepo"
+      eyebrow="BioRepo"
+      title="Papers"
       subtitle={
         <>
           Papers that arrived through Intake: <span className="font-num">{allRows.length}</span> paper{allRows.length === 1 ? '' : 's'} carrying{' '}
@@ -435,7 +436,7 @@ export default function BioRepo() {
           `${r.paper.id} ${r.paper.title} ${r.paper.authors.join(' ')}`
         }
         exportName="openferment-library"
-        exportNote="CSV exports carry the provenance disclosure header — the citations are real, and a per-class note says what each provenance value is worth."
+        exportNote="CSV exports carry the provenance disclosure header, with a note on each provenance class saying what its values are worth."
         emptyTitle="No papers match"
         emptyBody="Nothing in the corpus matches the current filters."
         bulkActions={(selected) => (

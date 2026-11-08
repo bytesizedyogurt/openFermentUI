@@ -56,7 +56,7 @@ import {
 import { NOT_RUNNING } from '@/lib/http';
 import { ParameterRow, type ChosenReading, type ParameterChange } from './ParameterRow';
 
-export interface ParameterPanelProps {
+interface ParameterPanelProps {
   /** The scope the specs and overrides belong to: `proforma:<id>`, `fermos:family:<id>`, `fermos:vessel:<id>`, `pureos:unit:<train>:<unit>`. */
   scope: string;
   /** The scope as the caller fetched it (`GET /api/params/{scope}`); null while it is asked or when it could not be. */
@@ -124,7 +124,7 @@ function asTyped(o: Override, served: ParameterValue | undefined, spec: Paramete
 }
 
 /** The groups in the caller's order, then any the caller did not name, in the specs' order. */
-export function groupOrder(specs: ParameterSpec[], groups: string[] = []): string[] {
+function groupOrder(specs: ParameterSpec[], groups: string[] = []): string[] {
   const present = [...new Set(specs.map((s) => s.group))];
   return [...groups.filter((g) => present.includes(g)), ...present.filter((g) => !groups.includes(g))];
 }

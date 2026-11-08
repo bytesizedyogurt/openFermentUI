@@ -53,7 +53,7 @@ export const CATEGORY_META: Record<
   sop: { label: 'SOP', Icon: ClipboardList, blurb: 'Standing operating procedure' },
 };
 
-export const CATEGORY_ORDER: ProtocolCategory[] = [
+const CATEGORY_ORDER: ProtocolCategory[] = [
   'media',
   'culture',
   'fermentation',
@@ -64,7 +64,7 @@ export const CATEGORY_ORDER: ProtocolCategory[] = [
 
 // ── Derived capabilities ───────────────────────────────────────────────
 
-export interface Capabilities {
+interface Capabilities {
   scalable: boolean;
   timed: boolean;
   calculator: boolean;
@@ -113,7 +113,7 @@ export function capabilitiesOf(version: ProtocolVersion): Capabilities {
   };
 }
 
-export type CapabilityKey = 'scalable' | 'timed' | 'calculator';
+type CapabilityKey = 'scalable' | 'timed' | 'calculator';
 
 export const CAPABILITY_META: Record<
   CapabilityKey,
@@ -837,13 +837,14 @@ export default function Protocols() {
   const header = (
     <>
     <PageHeader
+      eyebrow="Runbooks"
       title="Protocols"
       subtitle={
         <>
           Executable bench procedures whose quantities are bound to materials, so a batch-size change
           rewrites every number. <span className="font-num">{allRows.length}</span> protocol{allRows.length === 1 ? '' : 's'} across{' '}
-          <span className="font-num">{versionCount}</span> version{versionCount === 1 ? '' : 's'}. Capability icons are computed from
-          content, never declared.
+          <span className="font-num">{versionCount}</span> version{versionCount === 1 ? '' : 's'}. Each capability icon is computed from
+          the protocol&rsquo;s content.
         </>
       }
       actions={
@@ -894,7 +895,7 @@ export default function Protocols() {
               protocolsProblem
                 ? protocolsProblem
                 : protocolsRead
-                  ? 'No protocol ships with the app. A protocol enters the project in a person\u2019s name, begun here (or kept through POST /api/protocols), and appears with its steps, materials and the records its quantities cite.'
+                  ? 'A protocol enters the project in a person\u2019s name, begun here, and appears with its steps, materials and the records its quantities cite.'
                   : 'The protocols are read from the service as the page opens.'
             }
             icon={<ClipboardList size={22} />}

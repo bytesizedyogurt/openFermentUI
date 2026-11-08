@@ -19,7 +19,7 @@ import {
   PanelLeftOpen,
 } from 'lucide-react';
 import { useStore } from '@/store';
-import { useRoute, navigate } from '@/router';
+import { useRoute, navigate, href } from '@/router';
 import { cx, Popover, Toasts, Sheet } from '@/components/ui';
 import { CommandPalette } from '@/components/CommandPalette';
 import { JobsPanel } from '@/components/JobsTray';
@@ -95,7 +95,7 @@ function SignedIn() {
   const reviewer = useStore((s) => s.reviewer.trim());
   return (
     <a
-      href="#/settings/corpus"
+      href={href('/settings/corpus')}
       className={cx('text-caption truncate max-w-[12rem] hover:underline', reviewer ? 'text-ink' : 'text-signal-warn')}
       title={reviewer ? `Decisions and assumptions are signed ${reviewer}. Change it in Settings.` : 'Set your reviewer name in Settings'}
       data-testid="signed-in"
@@ -514,7 +514,7 @@ export default function App() {
               return (
                 <a
                   key={item.to}
-                  href={`#${item.to}`}
+                  href={href(item.to)}
                   className={cx(
                     'flex items-start gap-2.5 rounded-btn px-2 py-1.5 text-body transition-colors',
                     active
@@ -556,7 +556,7 @@ export default function App() {
 
           <div className="border-t border-line px-2 py-2 space-y-0.5">
             <a
-              href="#/settings/appearance"
+              href={href('/settings/appearance')}
               className={cx(
                 'flex items-center gap-2.5 rounded-btn px-2 py-1.5 text-body text-ink-soft hover:text-ink hover:bg-ink-soft/[0.06]',
                 ui.railCollapsed && 'justify-center px-0',
@@ -657,7 +657,7 @@ export default function App() {
             <SignedIn />
           </header>
 
-          <main id="of-main" className="flex-1 overflow-y-auto of-grid">
+          <main id="of-main" className="relative flex-1 overflow-y-auto of-grid">
             <div className="p-5 max-w-[1600px]">
               <ProjectNeeded />
               <ScreenBoundary key={route.segments[0] ?? 'home'}>

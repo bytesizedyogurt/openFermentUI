@@ -55,7 +55,7 @@ const WEIGHT: Record<CheckReason['kind'], number> = {
   requested: 0,
 };
 
-export interface RankedPair {
+interface RankedPair {
   personId: string;
   skillId: string;
   score: number;

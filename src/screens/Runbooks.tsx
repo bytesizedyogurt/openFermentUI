@@ -134,7 +134,7 @@ export default function Runbooks() {
 
   return (
     <>
-      <PageHeader eyebrow="Claims to be tested" title="Runbooks" subtitle={subtitle} />
+      <PageHeader eyebrow="Runbooks" title="Runbooks" subtitle={subtitle} />
       <OwnerTabs tabs={RUNBOOK_TABS} />
 
       <div className="flex flex-wrap items-center gap-x-5 gap-y-1.5 mb-4 text-caption text-ink-soft">
@@ -197,8 +197,13 @@ export default function Runbooks() {
           <EmptyState
             icon={<GitBranch size={22} aria-hidden />}
             title="The project keeps no runbook yet"
-            body="A runbook starts as a draft in Postdoc: ask it to draft one from the evidence, then press Turn into a runbook, and it lands here."
-            action={<LinkButton to="/postdoc">Draft a runbook in Postdoc</LinkButton>}
+            body="A runbook starts two ways: as a draft in Postdoc, which you ask to draft one from the evidence and then press Turn into a runbook; or from a run's numbers, on the run's page under A runbook from this run (Studies lists the runs). Either way it lands here."
+            action={
+              <div className="flex flex-wrap gap-2 justify-center">
+                <LinkButton to="/postdoc/new">Draft a runbook in Postdoc</LinkButton>
+                <LinkButton to="/proforma/studies">A run&rsquo;s runbook, from Studies</LinkButton>
+              </div>
+            }
           />
         </Card>
       )}

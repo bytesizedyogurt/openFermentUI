@@ -205,7 +205,7 @@ async function main(): Promise<void> {
       'Ethanol was recovered from the fermented broth by distillation, and the stillage was sent to the boiler.',
     );
     await page.getByRole('form', { name: 'Add a document' }).locator('button[type="submit"]').click();
-    const held = page.getByRole('list', { name: 'Documents in this project' }).getByText('A note the walk pasted');
+    const held = page.getByRole('list', { name: 'The newest documents in this project' }).getByText('A note the walk pasted');
     await held.first().waitFor({ timeout: 180_000 });
     return 'a pasted document taken into the project, split into passages and embedded, and listed among its documents';
   });

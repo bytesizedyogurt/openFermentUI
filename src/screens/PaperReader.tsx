@@ -32,7 +32,8 @@ import {
   cx,
 } from '@/components/ui';
 import { locateQuote, type ExtractionRecord, type Paper } from '@/lib/review';
-import { fetchSourceName } from '@/lib/intake';
+import { fetchSourceName, licenceWords } from '@/lib/intake';
+import { idTail, shortCite } from '@/lib/cite';
 
 const STAGE_KEYS = ['fetch', 'parse', 'chunk', 'embed', 'extract'] as const;
 const STAGE_LABELS = ['Fetch', 'Parse', 'Chunk', 'Embed', 'Extract'];
@@ -170,6 +171,13 @@ export default function PaperReader({
       });
   }, [paper, recs, sectionSpans]);
 
+  // Each anchored entry's place in the rail, the number its mark carries in the text.
+  const railNumber = useMemo(() => {
+    const m = new Map<string, number>();
+    railRecords.filter((x) => x.located).forEach((x, i) => m.set(x.record.id, i + 1));
+    return m;
+  }, [railRecords]);
+
   // Deep link to a sentence (OF-BLD-014 §4.4): where it sits in its section,
   // or null when the section's text does not hold it.
   const quoted = useMemo(() => {
@@ -185,30 +193,48 @@ export default function PaperReader({
     return () => window.clearTimeout(t);
   }, [quoted, paperId, behavior]);
 
+  // A deep link scrolls once, when what it names has drawn: on a fresh load
+  // the document's sections and its records arrive after the first render,
+  // so each scroll waits for its element and runs again as they arrive.
+  const drawn = (paper?.sections.length ?? 0) + recs.length;
+  const scrolledTo = useRef<string | null>(null);
+
   // Deep link to a section: scroll to its heading, nothing selected.
   useEffect(() => {
     if (!sectionId || spanId || quoted) return;
+    const key = `${paperId}#${sectionId}`;
+    if (scrolledTo.current === key) return;
     const t = window.setTimeout(() => {
-      sectionRefs.current[sectionId]?.scrollIntoView({ behavior, block: 'start' });
+      const el = sectionRefs.current[sectionId];
+      if (!el) return;
+      scrolledTo.current = key;
+      el.scrollIntoView({ behavior, block: 'start' });
     }, 60);
     return () => window.clearTimeout(t);
-  }, [sectionId, spanId, quoted, paperId, behavior]);
+  }, [sectionId, spanId, quoted, paperId, behavior, drawn]);
 
   // Deep link: select, scroll into view, pulse once.
   useEffect(() => {
     if (!spanId) return;
     setActiveId(spanId);
-    const t1 = window.setTimeout(() => {
-      spanRefs.current[spanId]?.scrollIntoView({ behavior, block: 'center' });
+    const key = `${paperId}?${spanId}`;
+    if (scrolledTo.current === key) return;
+    const t = window.setTimeout(() => {
+      const el = spanRefs.current[spanId];
+      if (!el) return;
+      scrolledTo.current = key;
+      el.scrollIntoView({ behavior, block: 'center' });
       rowRefs.current[spanId]?.scrollIntoView({ block: 'nearest' });
       setPulseId(spanId);
     }, 60);
-    const t2 = window.setTimeout(() => setPulseId(null), 1500);
-    return () => {
-      window.clearTimeout(t1);
-      window.clearTimeout(t2);
-    };
-  }, [spanId, paperId, behavior]);
+    return () => window.clearTimeout(t);
+  }, [spanId, paperId, behavior, drawn]);
+
+  useEffect(() => {
+    if (!pulseId) return;
+    const t = window.setTimeout(() => setPulseId(null), 1500);
+    return () => window.clearTimeout(t);
+  }, [pulseId]);
 
   const topField = useMemo(() => {
     const counts = new Map<FieldId, number>();
@@ -330,7 +356,7 @@ export default function PaperReader({
           }}
         >
           {text.slice(s.start, s.end)}
-          <sup>{r.id}</sup>
+          {railNumber.has(r.id) && <sup>{railNumber.get(r.id)}</sup>}
         </mark>,
       );
       cursor = s.end;
@@ -371,7 +397,9 @@ export default function PaperReader({
           <ArrowLeft size={12} /> Library
         </a>
         <span aria-hidden>/</span>
-        <span className="font-num">{paper.id}</span>
+        <span className="truncate" title={paper.id}>
+          {shortCite(paper, 40)}
+        </span>
       </div>
 
       <h1 className="font-serif text-page-title font-semibold leading-snug">{paper.title}</h1>
@@ -379,7 +407,7 @@ export default function PaperReader({
       {(paper.authors.length > 0 || paper.year || paper.journal) && (
         <div className="mt-2 text-body text-ink-soft">
           {[
-            paper.authors.length > 0 ? <span key="authors">{paper.authors.join(', ')}</span> : null,
+            paper.authors.length > 0 ? <span key="authors">{paper.authors.join('; ')}</span> : null,
             paper.year ? <span key="year" className="font-num">{paper.year}</span> : null,
             paper.journal ? <span key="journal" className="italic">{paper.journal}</span> : null,
           ]
@@ -393,7 +421,19 @@ export default function PaperReader({
           <span className="inline-block w-[3px] h-3 rounded-[1px] shrink-0 mt-[3px] bg-accent" aria-hidden />
           <span>
             {paper.source === 'paste' ? 'The full text as it was pasted' : `Full text from ${fetchSourceName(paper.source)}`}
-            {paper.license ? <> · licence <span className="font-num">{paper.license}</span></> : null}.
+            {' · '}
+            {licenceWords(paper.licenceClass ?? 'unknown')}
+            {paper.license && /^https?:\/\//.test(paper.license) ? (
+              <>
+                {' · '}
+                <a className="underline underline-offset-2" href={paper.license} target="_blank" rel="noreferrer">
+                  source page
+                </a>
+              </>
+            ) : paper.license ? (
+              <>: {paper.license.trim().replace(/\.+$/, '')}</>
+            ) : null}
+            .
             The sections below are the document&rsquo;s own words; a record whose quote is not found in
             them is listed in the rail as pending verification.
           </span>
@@ -536,7 +576,7 @@ export default function PaperReader({
             body={
               parseFailed
                 ? 'Nothing can be extracted until the paper parses into sections. Retry the ingest, or continue with abstract-only text from the ingest board.'
-                : 'Nothing has been pulled from this paper yet. Extraction runs through the service: Extract on the ingest board, or pnpm intake:extract.'
+                : 'Nothing has been pulled from this paper yet. Extract on the ingest board runs it through the service.'
             }
             action={
               <LinkButton to="/intake/ingest" size="sm">
@@ -580,8 +620,10 @@ export default function PaperReader({
                 >
                   <span className="sr-only">{`${provMeta(p).label}. `}</span>
                   <span className="flex items-baseline justify-between gap-2">
-                    <span className="truncate">{fieldName(r.field)}</span>
-                    <span className="font-num text-caption text-ink-soft shrink-0">{r.id}</span>
+                    <span className="min-w-0 flex-1 truncate">{fieldName(r.field)}</span>
+                    <span className="font-num text-caption text-ink-soft" title={r.id}>
+                      {idTail(r.id)}
+                    </span>
                   </span>
                   <span className="flex items-baseline justify-between gap-2 mt-0.5">
                     <Quantity value={r.value} unit={r.unit} si={r.si} mode={unitMode} />
@@ -640,8 +682,10 @@ export default function PaperReader({
                         title={`${r.id}: the quoted text was not found in this paper's sections`}
                       >
                         <span className="flex items-baseline justify-between gap-2">
-                          <span className="truncate">{fieldName(r.field)}</span>
-                          <span className="font-num text-caption text-ink-soft shrink-0">{r.id}</span>
+                          <span className="min-w-0 flex-1 truncate">{fieldName(r.field)}</span>
+                          <span className="font-num text-caption text-ink-soft" title={r.id}>
+                            {idTail(r.id)}
+                          </span>
                         </span>
                         <span className="flex items-baseline justify-between gap-2 mt-0.5">
                           <Quantity value={r.value} unit={r.unit} si={r.si} mode={unitMode} />
@@ -685,8 +729,7 @@ export default function PaperReader({
           </Button>
         </div>
         <p className="text-caption text-ink-soft mt-2">
-          Extraction runs through the service: Extract on the ingest board, or{' '}
-          <span className="font-mono">pnpm intake:extract</span>.
+          Extract on the ingest board runs extraction through the service.
         </p>
       </Card>
     </aside>

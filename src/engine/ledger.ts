@@ -13,7 +13,7 @@ import { holds } from './reconcile';
 /** The tested count below which a hit rate is not shown (the screen says so). */
 export const HIT_RATE_MIN_TESTED = 5;
 
-export interface LedgerRow {
+interface LedgerRow {
   runbookId: string;
   runbookTitle: string;
   lockedAt: string;

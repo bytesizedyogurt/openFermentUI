@@ -65,6 +65,7 @@ export default function BioRepoSearch() {
   return (
     <div>
       <PageHeader
+        eyebrow="BioRepo"
         title="Search the papers"
         subtitle="Passages of the project's documents, found for a question, each cited to its document and section."
       />

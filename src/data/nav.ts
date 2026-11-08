@@ -40,7 +40,7 @@ import {
 } from 'lucide-react';
 import type { ComponentName } from '@/components/ComponentTag';
 
-export interface NavSurface {
+interface NavSurface {
   /** The word a user reads. Also the component name, where it is one. */
   label: string;
   to: string;
@@ -265,7 +265,7 @@ export const SUB_VIEWS: (NavSurface & { owner: string })[] = [
     label: 'Hosts',
     to: '/geneos/hosts',
     descriptor: 'the strain catalogue — chassis and lineage',
-    aliases: ['organisms', 'strains', 'hosts', 'chassis', 'cw15'],
+    aliases: ['organisms', 'strains', 'hosts', 'chassis'],
     icon: Dna,
     owner: 'geneOS',
   },
@@ -273,7 +273,7 @@ export const SUB_VIEWS: (NavSurface & { owner: string })[] = [
     label: 'Pathway',
     to: '/geneos/pathway',
     descriptor: 'biosynthetic routes and their branch points',
-    aliases: ['pathway', 'pathways', 'route', 'precursor', 'mva', 'shikimate'],
+    aliases: ['pathway', 'pathways', 'route', 'precursor'],
     icon: Dna,
     owner: 'geneOS',
   },
@@ -322,10 +322,10 @@ export const SUB_VIEWS: (NavSurface & { owner: string })[] = [
     owner: 'pureOS',
   },
   {
-    // OF-BLD-019 §4.1 — 'train' is reserved under /pureos: /pureos/train/:scenarioId.
+    // 'train' is reserved under /pureos: /pureos/train/:id opens one train; the Trains page lists them.
     label: 'Train',
-    to: '/pureos/train',
-    descriptor: 'the units of the run Proforma priced, and what each passes on',
+    to: '/pureos',
+    descriptor: 'the trains read from runs, each with what every unit passes on',
     aliases: ['train', 'step recovery', 'recovery by unit', 'stream table', 'mass balance by unit'],
     icon: Filter,
     owner: 'pureOS',
@@ -491,7 +491,7 @@ export const SUB_VIEWS: (NavSurface & { owner: string })[] = [
   },
 ];
 
-export const ALL_SURFACES: NavSurface[] = [...RAIL, ...SUB_VIEWS];
+const ALL_SURFACES: NavSurface[] = [...RAIL, ...SUB_VIEWS];
 
 /** Descriptor by label, for screens that want to print their own gloss. */
 export const DESCRIPTOR: Record<string, string> = Object.fromEntries(
@@ -512,7 +512,7 @@ export const DESCRIPTOR: Record<string, string> = Object.fromEntries(
  * later changed. Nothing checks this at build time (ADR-011): keep each
  * entry pointing at a screen.
  */
-export const REDIRECTS: Record<string, string> = {
+const REDIRECTS: Record<string, string> = {
   // ── OF-BLD-011: the strain catalogue moved from fermOS to geneOS ────
   // Re-aimed rather than chained: '/organisms' used to land on
   // '/fermos/organisms', which is itself retired now, and a redirect whose
@@ -592,8 +592,8 @@ const PATTERN_REDIRECTS: [RegExp, string][] = [
  * itself retired. Trying progressively shorter prefixes makes the specific
  * rule beat the general one without anybody having to order the map by hand.
  *
- * The tail is preserved, so a deep link keeps its target: `/organisms/cw15`
- * reaches `/geneos/hosts/cw15` rather than dumping the reader at the top
+ * The tail is preserved, so a deep link keeps its target: `/organisms/<id>`
+ * reaches `/geneos/hosts/<id>` rather than dumping the reader at the top
  * of the catalogue to find their strain again.
  */
 export function redirectFor(path: string): string | null {

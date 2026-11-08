@@ -79,18 +79,18 @@ function StoichiometryToDynamics() {
         <p className="text-ink">
           geneOS is stoichiometry: what the engineered cell <em>can</em> do, at steady state, with
           no time axis and no vessel. A genome-scale model gives a yield ceiling. What a real
-          fermenter achieves over ninety hours is a different claim in a different discipline, and
-          it belongs to{' '}
+          fermenter achieves over ninety hours is a claim of another discipline, and it belongs
+          to{' '}
           <a href={href('/fermos')} className="text-accent hover:underline">
             fermOS
           </a>
           .
         </p>
         <p className="text-ink mt-2">
-          <strong>Titre is fermOS's output, not geneOS's.</strong> The gap between the ceiling here
-          and the titre achieved there is exactly what reconciliation measures against a
-          deposition — so nothing on this screen should ever be read as a prediction of what a
-          vessel will produce.
+          <strong>Titre is fermOS&rsquo;s output.</strong> The gap between the ceiling here and the
+          titre achieved there is what reconciliation measures against a deposition, so every
+          number on this screen reads as a ceiling of the cell, and a vessel&rsquo;s output is
+          fermOS&rsquo;s to predict.
         </p>
       </Callout>
     </div>
@@ -117,7 +117,7 @@ export default function GeneOS() {
       <PageHeader
         eyebrow="Host, construct, pathway, design"
         title="geneOS"
-        subtitle="The organism as an engineered system. Host choice, genetic parts, pathway assembly, the genome-scale model and strain design — everything that decides what a cell CAN do, before any vessel is involved."
+        subtitle="The organism as an engineered system. Host choice, genetic parts, pathway assembly, the genome-scale model and strain design — everything that decides what a cell can do, before any vessel is involved."
       />
 
       <OwnerTabs tabs={tabs} />
@@ -136,8 +136,7 @@ export default function GeneOS() {
             , and the extraction records anchored to it, as a project&rsquo;s records name them. Choosing a chassis is a genetic
             design decision — it sets
             whether the product is secreted, whether endotoxin clearance is mandatory, and what
-            the entire downstream train will have to be — which is why it lives here rather than
-            with the reactor.
+            the entire downstream train will have to be, which is why it lives with geneOS.
           </Callout>
           <div className="mt-5">
             <Organisms embedded />

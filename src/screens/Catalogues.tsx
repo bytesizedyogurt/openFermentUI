@@ -197,7 +197,7 @@ function SkillChoice({
       <legend>{label}</legend>
       {offered.length === 0 ? (
         <p className="mt-0.5">
-          The project keeps no skill to choose yet: add one on the <a className="underline underline-offset-2 hover:text-accent" href={href('/catalogues/skills')}>Skills</a> tab.
+          Keep this skill first; the skills kept after it can name it as a prerequisite.
         </p>
       ) : (
         <div className="mt-0.5 flex flex-wrap gap-x-4 gap-y-1">
@@ -273,7 +273,9 @@ function EntryForm({
       <p className="text-caption text-ink-soft mb-3">
         {editing
           ? `Keeping it replaces the entry under ${start.id} with what this form holds, in your name${start.agent === 'model' ? '; a model kept it, so keeping it makes it a person’s' : ''}.`
-          : `Names and words: a number a paper reports is a record, kept in BioRepo.`}
+          : kind === 'skill'
+            ? 'A skill and its policy, in words.'
+            : `Names and words: a number a paper reports is a record, kept in BioRepo.`}
       </p>
       <div className="grid gap-3 sm:grid-cols-2">
         {box('id', 'Id', editing ? 'An entry keeps its id.' : 'A letter or a digit first, then letters, digits, ".", "_", ":" or "-".')}
@@ -334,7 +336,7 @@ function EntryForm({
                 ))}
               </select>
             </Field>
-            <Field label="Days a qualification stands" hint="With nobody seeing the person perform it.">
+            <Field label="Days a qualification stands" hint="The days a qualification stands unobserved.">
               <input type="number" min={1} step={1} className="input text-body block mt-0.5 w-full" value={d.recencyDays} onChange={(e) => set('recencyDays', e.target.value)} aria-label="Days a qualification stands" data-testid="catalogue-field-recencyDays" />
             </Field>
             <Field label="Supervised runs before a check" hint="Cosigned runs before a witnessed check can qualify.">
@@ -365,7 +367,7 @@ function EntryForm({
       </div>
       {kind === 'skill' && (
         <p className="text-caption text-ink-soft mt-2">
-          A policy names its criticality, its days and its supervised runs together; with none, Guild rates nobody on the skill until one is written here.
+          A policy names its criticality, its days and its supervised runs together; Guild rates people on a skill once its policy is written here.
         </p>
       )}
       <div className="flex flex-wrap items-center gap-2 mt-3">
@@ -565,7 +567,7 @@ export default function Catalogues({ view }: { view?: string }) {
     <PageHeader
       eyebrow="The project's catalogues"
       title="Catalogues"
-      subtitle="The strains and the other names papers give them, the products, Guild's skills and Primer's lessons this project keeps, each entry in its keeper's name. Every entry stays: nothing here takes one out."
+      subtitle="The strains and the other names papers give them, the products, Guild's skills and Primer's lessons this project keeps, each entry in its keeper's name. Every entry stays once kept, and keeping a file under an entry's id replaces it."
     />
   );
   if (!kind) {

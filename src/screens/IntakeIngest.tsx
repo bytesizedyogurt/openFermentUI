@@ -60,8 +60,7 @@ export default function IntakeIngest() {
         <div className="mb-4">
           <Callout kind="warn" title="Offline — nothing can be collected or extracted">
             The Intake service is not running. Start it with{' '}
-            <span className="font-num">{START_COMMAND}</span> from <span className="font-num">core/</span>{' '}
-            and reload.
+            <span className="font-num">{START_COMMAND}</span> from the repository root and reload.
           </Callout>
         </div>
       )}

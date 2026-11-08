@@ -73,7 +73,7 @@ export type ParamAsk = Omit<ParamResolveRequest, 'inputs'>;
 const FERMOS_ASK = ['strain', 'product', 'sugar', 'fit', 'startFrom', 'durationPreset'] as const;
 
 /** A scope's path: each id between the colons encoded, the colons kept (`params.parse_scope`'s forms). */
-export const scopePath = (scope: string) => `/api/params/${scope.split(':').map(encodeURIComponent).join(':')}`;
+const scopePath = (scope: string) => `/api/params/${scope.split(':').map(encodeURIComponent).join(':')}`;
 
 const askQuery = (ask: ParamAsk) => {
   const q = new URLSearchParams();
@@ -131,7 +131,7 @@ export function inputsOf(overrides: Override[], specs: Pick<ParameterSpec, 'key'
 }
 
 /** The resolve request the panel posts: the scope's overrides as inputs in its specs' units, with what the caller binds by. */
-export function resolveRequest(overrides: Override[], specs: ParameterSpec[], ask: ParamAsk = {}): ParamResolveRequest {
+function resolveRequest(overrides: Override[], specs: ParameterSpec[], ask: ParamAsk = {}): ParamResolveRequest {
   return {
     inputs: inputsOf(overrides, specs),
     ...(ask.flowsheet ? { flowsheet: ask.flowsheet } : {}),
@@ -159,7 +159,7 @@ export const resolveParams = (scope: string, overrides: Override[], specs: Param
  * The readings a panel row's unit takes as the service listed them: `readings` null while it is asked, and `problem`
  * the service's words when it could not answer (alpha 2.2 E.17, ParameterRow's Readings).
  */
-export type ReadingsListed = { readings: { ref: string }[] | null; problem: string | null };
+type ReadingsListed = { readings: { ref: string }[] | null; problem: string | null };
 
 /**
  * Whether the reading a row is set to has left the readings the service lists for its unit: true only when the

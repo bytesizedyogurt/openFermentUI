@@ -25,7 +25,7 @@ export interface EvidenceStripProps {
   records: ExtractionRecord[];
   /** The axis unit; every record is converted to it or left out. */
   unit: string;
-  /** What the axis measures, e.g. "PHB yield on substrate". */
+  /** What the axis measures, e.g. "Ethanol yield on substrate". */
   quantity: string;
   groupBy: 'organism' | 'paper';
   rules?: StripRule[];
@@ -37,7 +37,7 @@ export interface EvidenceStripProps {
   empty?: { what: string; where: string };
 }
 
-export interface StripPoint {
+interface StripPoint {
   record: ExtractionRecord;
   group: string;
   value: number;

@@ -16,7 +16,7 @@ export type ReplayResult = components['schemas']['ReplayResult'];
 export class ArtifactsDown extends Error {
   constructor(
     message: string,
-    readonly remedy: string = `Start it with \`${START_COMMAND}\` from \`core/\`.`,
+    readonly remedy: string = `Start it with ${START_COMMAND} from the repository root.`,
   ) {
     super(message);
     this.name = 'ArtifactsDown';
@@ -75,11 +75,24 @@ export const replayArtifact = (id: string) =>
 /**
  * What a table shows for an artifact's value. A tool's output is its own
  * shape; by convention a tool puts the value a person reads first under
- * `label`, `value` and `unit`, and an output without them shows none.
+ * `label`, `value` and `unit`, and an output without them shows none. A
+ * library run is named by its plant and configuration, and a comparison by
+ * its title where `titles` (the project's comparisons, by id) holds one.
  */
-export function headline(a: Artifact): { label: string | null; value: string | null; unit: string } {
+export function headline(
+  a: Artifact,
+  titles?: ReadonlyMap<string, string>,
+): { label: string | null; value: string | null; unit: string } {
   const o = a.output ?? {};
-  const label = typeof o.label === 'string' ? o.label : null;
+  const named = typeof o.label === 'string' ? o.label : null;
+  const runs = Array.isArray(o.runs) ? o.runs.length : null;
+  const label =
+    named ??
+    (a.tool === 'library.run' && typeof o.plant === 'string'
+      ? `${o.plant}${typeof o.configuration === 'string' && o.configuration ? ` · ${o.configuration}` : ''}`
+      : a.tool === 'study.comparison'
+        ? (titles?.get(a.id) ?? (runs !== null ? `A comparison of ${runs} runs` : null))
+        : null);
   const v = o.value;
   const value = typeof v === 'number' || typeof v === 'string' ? String(v) : null;
   const unit = typeof o.unit === 'string' ? o.unit : '';

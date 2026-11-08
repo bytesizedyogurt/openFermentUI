@@ -543,7 +543,8 @@ prompt's §4).
 | `pnpm db:up` (compose.yaml, `pgvector/pgvector:pg17`) has never run here: this container has no Docker daemon; CI runs the same image as a service | the owner's machine |
 | Paid: fermOS's, pureOS's and Proforma's run requests take typed quantities with their origins, and their runs are rows of the engines `kinetics`, `train` and `biosteam` (alpha 2.2 C.2, C.3, C.4); every door of Proforma takes `inputs` (`?inputs=` on the binding and the ceiling check), and the library's door takes them on the biosteam engine's own path. Two shapes keep the resolvers' `Override` form, recorded in Departures (C.7) and the debt below | alpha 2.2, C.4 |
 | A train's own carried values (`TrainParam`) keep the resolvers' `Override` shape, a bare value with no unit, and the project's stored panel overrides (`PUT /api/state/overrides/{scope}`) keep it for a person's value and a model's estimate, a deposition's reading keeping its own value and unit since alpha 2.2 E.17 (`Override.unit`; Departures, E.17): a saved train cannot hold a measurement, and a value a person typed into a train is checked against its parameter's unit only as its parameter's own (Departures, C.7) | a train spec version that moves the train runs' ids, its values typed quantities with their origins; and accounts giving the Durable snapshot's pending writes a home on the service (ADR-014) |
-| Words stored in bases that a run's page shows: decision tags (`(D5)`, `(D9)`, `D8: …`, `(OF-BLD-020 §3.2 …)`, `(Appendix 2 §A)`, `(CARBON_RULE)`) and a doubled word in a train's input name and note (`T701 outlet outlet`, a port named `outlet` after the word). The run's page drops the tags as it shows a note (`ProformaRun.plainNote`), and the CSV keeps the words whole; editing them moves the pinned ids (D1) | the next change that may move ids: a train spec version, or a basis version of each tool |
+| Words stored in bases that a run's page shows: decision tags (`(D5)`, `(D9)`, `D8: …`, `(OF-BLD-020 §3.2 …)`, `(Appendix 2 §A)`, `(CARBON_RULE)`) and a doubled word in a train's input name and note (`T701 outlet outlet`, a port named `outlet` after the word). The run's page drops the tags as it shows a note (`ProformaRun.plainNote`), and the CSV keeps the words whole; editing them moves the pinned ids (D1) H.0 found three more of them: the precision convention's note a library run's basis carries (`engine/library.py`: "…and a replay compares the plant", its sentence unfinished, the chip on the artifact page now wrapping), and two flowsheet descriptions a Proforma run's basis carries as its `flowsheet` note (`flowsheets/shelf.py`: "no number is the flowsheet's" and "The train's own inlet is not an input"); the screens that do not hash them were restated | the next change that may move ids: a train spec version, or a basis version of each tool |
+| A library run's TEA breakdown is read at the product's set price (`workers/library_plants.py` `_Module.parts` passes no price), and a flowsheet's run reads it at the price it solved; where a library run's overrides move the solved price, the lines sum to the set price. The cost card draws the lines' own price as its last row and says the solved price beside it (`CostWaterfall.priceNote`, H.0). The same run's price block keeps the IRR's unit blank (`PRICE_UNITS`); its evidence names it `fraction` (`tools/engine.py` `BLANK_UNITS`). Either change to the run's output moves its tables or its output hash under `library run 2`, so a kept run would replay differently with nothing to say why | the next `library run` version, which moves every library run's id |
 | Conformance check 7 holds a hand-written engine (the core's three) to a refusal before any run alone (Departures, C.7) | a probe a hand-written engine declares, a request its own computation refuses, which check 7 asks twice: a kinetics family run whose integration refuses, a train the Proforma worker refuses, a scenario flowsheet's value past its bound |
 | A contract engine's run whose SFF step failed (a worker that crashed or broke the protocol in `sff_export`) keeps its artifact and no row, and the next ask keeps the row from that artifact with no diagnostics, since nothing computed for it (`runs.run_engine`; D0.1) | when an engine's diagnostics must outlive a failed file step: kept beside the artifact, or the row kept before the file |
 | A kept train (pureOS's, `pureos/kept.py`) is changed by any caller of the model's lane, an outside assistant's through MCP or the tool door's header among them, and keeps `madeBy` and its row's `created_by` as the model that made it; the audit row of each change names who changed it and its door (`detail.via`). A catalogue entry stays its keeper's by name and door (D.0's review) | when a kept train is to stay its maker's: the catalogue's rule of name and door applied to `kept.keep_train` |
@@ -3410,3 +3411,42 @@ F.2f on, on `llm.ROUTES`' defaults (ADR-008, Implementation 17);
     passed on Python 3.13 and on 3.12; `typecheck`; `check:secrets`; `pnpm build`; and `pnpm test:core` 3064
     passed, 1 skipped, 175 deselected (5 min 20 s). `test:sim` and `test:lit` are not owed: no worker, engine,
     flowsheet or literature code changed.
+
+### Alpha 2.2 — Stage H.0 — 2026-11-08
+
+- The sweep's findings on the final tree, each confirmed against the code first, fixed where they held:
+  - Links: `LinkButton`, the rail, Settings' sections and the remaining plain-hash links go through `router.href`, so a
+    click inside `/p/<project>/` stays in the address; the sr-only span of `ComponentTag` sits in a positioned parent
+    and `<main>` is positioned, so the window has one scroll.
+  - The cost card: its last row is the price the lines sum to, and a library run whose TEA solved another price says
+    so beside the figure (`check:figures` holds both); the breakdown at the solved price waits on a version (Debts).
+  - pureOS reads a library run as a train, keyed by the study scenario its runs row names, else by its own id
+    (`pureos.library_scenarios`; `test_pureos.py`); the train page links a study scenario to Studies.
+  - Words: the usage-limit refusal names the date alone and logs the API's message (`llm.regains`;
+    `test_llm.py`); Postdoc's trace names a document by its title, a scenario by its title and a catalogue read in
+    words; validate's two refusals, the inlet gloss, the shortcut column's line, three kinetics notes and fifteen
+    field definitions (`schema/fields.yaml` with `src/data/ontology.ts`) are stated positively; screens across
+    geneOS, pureOS, fermOS, Catalogues, Runbooks, Depositions, Witness, Settings, Provenance and Postdoc likewise.
+  - Ids and stamps: a document is named by its short cite or title where an id stood (`src/lib/cite.ts`: chips,
+    Intake's columns and facets, the reader's rail, crumb and marks, Guild's card, fermOS's titre select, BioRepo's
+    Papers); ISO times read as `stamp` writes them (`stampsIn`); exponents are superscripts.
+  - Screens that missed rows the service holds: Home's Proforma tile counts the studies, Proforma's empty state names
+    the study scenarios, BioRepo's Compare lists the kept comparisons, the run's header names its study scenario,
+    the artifact pages name runs and comparisons and link their pages, the flowsheet page lists the toolkit's
+    findings, the ceiling figure says the sugars its records name.
+  - Remnants: `--save-fixture` is gone from extraction and `core/tests/fixtures/extract/` is ignored; OF-BLD tags
+    leave the strings people read and the service's docstrings (generated docs regenerated), the hashed basis notes
+    kept (Debts); `damaged on disk` reads `damaged in its row`; `prototype:up` is recorded in ADR-000's implementation
+    note; the sim fixture names its maker; PHB-era words in tests and comments give way to placeholders; the three
+    subsystems Intake and BioRepo built leave the unbuilt shelf; `SET_KINDS`, `PRESETS`, toy's `OUTPUTS` and the
+    spend-lock test go; 143 names used in their own file alone lose `export`.
+- Kept as found, with the reason: the 'assumption' rule entry answers for an estimate (its words name a person's
+  assumption, a model's estimate and a reading); the Model tab's keeping is deliberate (`lib/geneos.ts`) and now said
+  on the tab; the overlay's size at this scale; `curated` in `PROVENANCE_ORDER` (check:plan); the paper reader's
+  repeated INTRODUCTION heading, unchecked against the kit's sectioning.
+- Checks: `pnpm test:core` 3066 passed, 1 skipped, 175 deselected (5 min 23 s); `pnpm test:sim` 142 passed (4 min
+  47 s); the touched test files on Python 3.12, 205 passed after the last edit (836 on the first pass); `gen:api`,
+  `gen:tools` and `gen:components` with `--check`, `check:licences` (THIRD_PARTY.md rewritten), `check:secrets`,
+  `check:plan`, `check:figures`, `check:guild`, `check:state` (four new checks: links keep the project, stamps,
+  short cites, superscripts), `check:tools`, `typecheck`, `pnpm build` and `pnpm smoke` on a port of its own (20 of 20
+  screens). `test:lit` is not owed: the literature layer did not move. No model was called and nothing was spent.

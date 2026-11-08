@@ -698,7 +698,11 @@ export default function Witness() {
         {sortedFields.length === 0 ? (
           <EmptyState
             title="No fields scored"
-            body="This run produced no results that map onto a gold record in the current session."
+            body={
+              metrics.goldSize === 0
+                ? 'Nothing is scored until a record is flagged for the gold set; the service keeps the gold set with the project.'
+                : 'This run produced no result that maps onto a record of the gold set.'
+            }
           />
         ) : (
           <table className="w-full border-collapse" style={{ fontSize: 'var(--table-fs)' }}>
@@ -828,8 +832,12 @@ export default function Witness() {
       <Card className="overflow-x-auto">
         {mismatches.length === 0 ? (
           <EmptyState
-            title="No mismatches in this run"
-            body="Every scored gold record matched and the run produced no spurious extractions. With a gold set this small that is a statement about the gold set, not about the extractor."
+            title={metrics.goldSize === 0 ? 'Nothing scored yet' : 'No mismatches in this run'}
+            body={
+              metrics.goldSize === 0
+                ? 'Nothing is scored until a record is flagged for the gold set; every candidate waits unscored until then.'
+                : 'Every scored gold record matched and the run produced no spurious extractions. With a gold set this small, that speaks of the gold set more than of the extractor.'
+            }
           />
         ) : visibleMismatches.length === 0 ? (
           <EmptyState

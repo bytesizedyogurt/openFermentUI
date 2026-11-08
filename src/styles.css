@@ -421,17 +421,21 @@ input[type='range'].touch-range::-moz-range-thumb {
   padding: 3px 8px;
   font-size: 12px;
 }
-.input {
-  border: 1px solid rgb(var(--line));
-  border-radius: 4px;
-  background: rgb(var(--surface-1));
-  color: rgb(var(--ink));
-  padding: 5px 8px;
-  font-size: 13px;
-  width: 100%;
-}
-.input:focus {
-  border-color: rgb(var(--accent));
+/* In the components layer, so a utility on an input (`pl-7` beside an icon,
+   `w-[220px]`) sets its padding and width over these. */
+@layer components {
+  .input {
+    border: 1px solid rgb(var(--line));
+    border-radius: 4px;
+    background: rgb(var(--surface-1));
+    color: rgb(var(--ink));
+    padding: 5px 8px;
+    font-size: 13px;
+    width: 100%;
+  }
+  .input:focus {
+    border-color: rgb(var(--accent));
+  }
 }
 .chip {
   display: inline-flex;

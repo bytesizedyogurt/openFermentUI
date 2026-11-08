@@ -62,6 +62,7 @@ import { TrajectoryBand } from '@/components/figures';
 import { FERMOS_TABS } from '@/data/tabs';
 import { stubsFor } from '@/data/subsystems';
 import { fmt } from '@/engine/units';
+import { shortTitle } from '@/lib/cite';
 import {
   FIT_FAMILIES,
   FIT_FAMILY_WORDS,
@@ -314,6 +315,7 @@ function Fits() {
 
 function BrothProperties() {
   const records = useStore((s) => s.records);
+  const papers = useStore((s) => s.papers);
   const titres = useMemo(
     () =>
       records.flatMap((r) => (r.field === TITRE_FIELD && typeof r.value === 'number' && r.status !== 'rejected' ? [{ ...r, value: r.value }] : [])),
@@ -331,8 +333,8 @@ function BrothProperties() {
               <select className="input" aria-label="Titre record" value={picked} onChange={(e) => setPicked(e.target.value)}>
                 <option value="">pick one</option>
                 {titres.map((r) => (
-                  <option key={r.id} value={r.id}>
-                    {r.id} · {fmt(r.value)} {r.unit} · {r.paperId}
+                  <option key={r.id} value={r.id} title={r.id}>
+                    {fmt(r.value)} {r.unit} · {shortTitle(papers.find((p) => p.id === r.paperId)?.title ?? r.paperId, 40)}
                   </option>
                 ))}
               </select>
@@ -428,7 +430,7 @@ export default function FermOS() {
             is the harvest step, and it carries a decision made back in geneOS:{' '}
             <strong>secreted or intracellular</strong>. A secreted product starts at centrifuge
             and filter; an intracellular one starts at lysis and inherits every problem after it.
-            The handoff has to carry product location, not just a titre.
+            The handoff carries the product&rsquo;s location beside its titre.
           </p>
         </Callout>
       </div>
@@ -436,7 +438,10 @@ export default function FermOS() {
       <SubsystemShelf owner="fermOS" />
 
       <div className="mt-5">
-        <ComponentTag component="fermOS" action={`kinetics, operating modes, transport and scale live; ${stubs.length} subsystems named and not built`} />
+        <ComponentTag
+          component="fermOS"
+          action={`kinetics, operating modes, transport and scale live; ${stubs.length} subsystem${stubs.length === 1 ? '' : 's'} named and unbuilt`}
+        />
       </div>
     </>
   );

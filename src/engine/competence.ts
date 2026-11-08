@@ -119,7 +119,7 @@ export function localToday(now: Date = new Date()): string {
 const NOT_YET_RECORDED = '\uffff';
 
 /** Ledger order: by the day it happened, then by when it was recorded, then id. */
-export function byWhen(a: GuildEvidence, b: GuildEvidence): number {
+function byWhen(a: GuildEvidence, b: GuildEvidence): number {
   const da = a.at.slice(0, 10);
   const db = b.at.slice(0, 10);
   if (da !== db) return da < db ? -1 : 1;
@@ -280,7 +280,7 @@ export function mayCosign(map: StatusMap, personId: string, skillIds: string[]):
 
 // ── the gate (OF-BLD-013 §2) ───────────────────────────────────────────
 
-export type GateState = 'none' | 'clear' | 'cosign' | 'blocked';
+type GateState = 'none' | 'clear' | 'cosign' | 'blocked';
 
 /**
  * What a step asks of this person. `none`: the step needs no skill. `clear`:
@@ -320,7 +320,7 @@ export function policyOf(ledger: Pick<Ledger, 'policy'>): GuildPolicy {
 }
 
 /** Whether the gate holds or only warns on this skill. */
-export function modeFor(skill: Pick<Skill, 'criticality'> | undefined, policy: GuildPolicy): GateMode {
+function modeFor(skill: Pick<Skill, 'criticality'> | undefined, policy: GuildPolicy): GateMode {
   return skill?.criticality === 'critical' ? policy.criticalGate : policy.routineGate;
 }
 

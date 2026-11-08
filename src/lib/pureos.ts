@@ -217,7 +217,7 @@ export function ranWhat(
  * **Use as a train's inlet**) or a scenario's newest run, whose broth its
  * flowsheet names (`scenario:<scenario id>`).
  */
-export type InletFrom = { kind: 'simulation' | 'scenario'; id: string };
+type InletFrom = { kind: 'simulation' | 'scenario'; id: string };
 export const builderInletPath = (from: InletFrom) => `/pureos/build/${NEW_TRAIN}?inlet=${from.kind}:${encodeURIComponent(from.id)}`;
 
 /** The inlet a `?inlet=` names, as a train holds it; null for anything else. */
@@ -279,7 +279,7 @@ function canonical(v: unknown): unknown {
 }
 
 /** One train as text whatever wrote it (the browser, or the service echoing it), an absent optional field the same as null. */
-export const trainText = (t: TrainSpec): string =>
+const trainText = (t: TrainSpec): string =>
   JSON.stringify(
     canonical({
       ...t,
@@ -321,7 +321,7 @@ export const routeWords = (route: string) =>
   route === 'onward' ? 'on to the next unit' : route === 'waste' ? 'to waste' : route.startsWith('recycle:') ? `back to ${route.slice('recycle:'.length)}` : route;
 
 /** The streams a kept run's table holds, as its artifact keeps them (a Proforma run's, a reference's): read, never made. */
-export function streamsOfArtifact(a: Artifact | null | undefined): StreamRow[] {
+function streamsOfArtifact(a: Artifact | null | undefined): StreamRow[] {
   const s = (a?.output as Record<string, unknown> | undefined)?.streams;
   return Array.isArray(s) ? (s as StreamRow[]) : [];
 }
@@ -346,7 +346,7 @@ export interface RunChoice {
 }
 
 /** The flowsheet a kept run names: its output's, else its basis's. */
-export function flowsheetOfRun(a: Artifact): string | null {
+function flowsheetOfRun(a: Artifact): string | null {
   const o = (a.output as Record<string, unknown> | undefined)?.flowsheet;
   if (typeof o === 'string' && o) return o;
   const i = a.inputs.find((x) => x.name === 'flowsheet');

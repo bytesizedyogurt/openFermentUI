@@ -17,7 +17,7 @@
 import type { ComponentName } from '@/components/ComponentTag';
 
 /** The destinations on the rail. Home is not one of them. */
-export type Destination =
+type Destination =
   | 'Intake'
   | 'BioRepo'
   | 'Postdoc'
@@ -30,7 +30,7 @@ export type Destination =
   | 'Guild'
   | 'Catalogues';
 
-export type ComponentLayer =
+type ComponentLayer =
   | 'The agent'
   | 'Evidence in'
   | 'Computing'
@@ -65,7 +65,7 @@ export interface ComponentDef {
 export const LAYERS: { id: ComponentLayer; blurb: string }[] = [
   {
     id: 'The agent',
-    blurb: 'The thing you talk to. It plans, retrieves, and shows its working rather than handing back a paragraph you have to trust.',
+    blurb: 'The thing you talk to. It plans, retrieves, and shows its working with every answer.',
   },
   {
     id: 'Evidence in',

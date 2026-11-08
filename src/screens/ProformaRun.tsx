@@ -62,9 +62,9 @@ import type { Quantity, RunReport as EngineRunReport } from '@/lib/studies';
 import { href, navigate } from '@/router';
 import { useStore } from '@/store';
 import { exportCSV } from '@/lib/csv';
-import { RUN_TOOL, baseCaseRefusal, proformaShelf, regressionTable, runViewOfArtifact, runViewOfRun, stamp } from '@/lib/proforma';
+import { RUN_TOOL, baseCaseRefusal, proformaShelf, regressionTable, runViewOfArtifact, runViewOfRun, stamp, stampsIn } from '@/lib/proforma';
 import { trainOfRun } from '@/lib/pureos';
-import { StudiesDown, downloadFlowsheet, makeRunbook, predictable, runReport } from '@/lib/studies';
+import { StudiesDown, downloadFlowsheet, listScenarios, makeRunbook, predictable, runReport } from '@/lib/studies';
 import { Button, Callout, Card, LinkButton, PageHeader, cx } from '@/components/ui';
 import { ProvenanceBadge } from '@/components/Provenance';
 import { ParameterPanel } from '@/components/ParameterPanel';
@@ -141,7 +141,9 @@ const fileWaitsOnToolkit = (run: EngineRunReport['run']) => run.tool === 'pureos
 const FOLDED_OUTPUTS = new Set(['library.run', RUN_TOOL]);
 
 /** A value as a page shows it: a number to a few significant digits (its full value in the title and the CSV), words as they are. */
-const shown = (v: unknown) => (typeof v === 'number' ? fmt(v) : String(v));
+/** A number as this page writes every one: grouped from a thousand up, as the TEA's sentence writes it, else `fmt`. */
+const shown = (v: unknown) =>
+  typeof v === 'number' ? (Number.isFinite(v) && Math.abs(v) >= 1000 ? Math.round(v).toLocaleString('en-US') : fmt(v)) : String(v);
 
 /**
  * A basis note as the page shows it, the build's own decision tags dropped: a leading `D8: `, and a trailing
@@ -151,7 +153,7 @@ const shown = (v: unknown) => (typeof v === 'number' ? fmt(v) : String(v));
  */
 const LEADING_TAG = /^D\d+:\s+/;
 const TRAILING_TAG = /\s*\((?:D\d+\b[^)]*|OF-[A-Z]+-\d+[^)]*|Appendix \d+[^)]*|[A-Z][A-Z0-9]*_[A-Z0-9_]+)\)\s*$/;
-export const plainNote = (note: string) => note.replace(LEADING_TAG, '').replace(TRAILING_TAG, '').trim();
+const plainNote = (note: string) => stampsIn(note.replace(LEADING_TAG, '').replace(TRAILING_TAG, '').trim());
 
 /** A run's time in words: milliseconds under a tenth of a second, seconds above. */
 const took = (ms: number) => (ms < 100 ? `${Math.round(ms)} ms` : `${(ms / 1000).toFixed(1)} s`);
@@ -572,7 +574,7 @@ function MakeRunbook({ report }: { report: EngineRunReport }) {
               <span className="font-num">{n.output}</span>
             </label>
             <span className="font-num text-ink-soft">
-              {String(n.value)} {n.unit}
+              {shown(n.value)} {n.unit}
             </span>
             {n.output in chosen && (
               <input
@@ -624,6 +626,19 @@ export default function ProformaRun({ runId }: { runId: string }) {
   }, [isScenarioRun]);
   const proformaScenarios = useStore((s) => s.scenarios);
   const ownScenario = run?.scenarioId ? (proformaScenarios.find((s) => s.id === run.scenarioId) ?? null) : null;
+  // A study scenario's run names it by its title, from the project's studies.
+  const [studyTitle, setStudyTitle] = useState<string | null>(null);
+  const studyId = run?.scenarioId && !ownScenario ? run.scenarioId : null;
+  useEffect(() => {
+    setStudyTitle(null);
+    if (!studyId) return;
+    const ctrl = new AbortController();
+    listScenarios(ctrl.signal).then(
+      (all) => setStudyTitle(all.find((s) => s.id === studyId)?.title ?? null),
+      () => undefined,
+    );
+    return () => ctrl.abort();
+  }, [studyId]);
   const flowsheetInfo = isScenarioRun ? (shelf?.find((f) => f.id === run?.plant) ?? null) : null;
   // A library run reads as one case; a Proforma scenario's run as the scenario's page reads it, with its samples.
   const view = art ? (runViewOfRun(art) ?? runViewOfArtifact(art)) : null;
@@ -667,7 +682,10 @@ export default function ProformaRun({ runId }: { runId: string }) {
                 {run.scenarioId && !ownScenario && (
                   <>
                     {' '}
-                    · asked for by scenario <span className="font-num">{run.scenarioId}</span>
+                    · asked for by scenario{' '}
+                    <a className="underline underline-offset-2 hover:text-accent" href={href('/proforma/studies')} title={run.scenarioId}>
+                      {studyTitle ?? <span className="font-num">{run.scenarioId}</span>}
+                    </a>
                   </>
                 )}
                 .

@@ -14,7 +14,7 @@ import type { Deposition, DepositionEntry, Measure, Runbook, SeriesRole } from '
 import { matchToSchema } from './capture';
 import { convert } from './units';
 
-export interface SeriesPoint {
+interface SeriesPoint {
   t: number;
   value: number;
   entryId: string;
@@ -57,7 +57,7 @@ export function seriesOf(dep: Deposition, runbook: Pick<Runbook, 'measurementSch
   return out;
 }
 
-export interface CsvRow {
+interface CsvRow {
   line: string;
   time: number;
   measure: string;
@@ -65,7 +65,7 @@ export interface CsvRow {
   unit: string;
 }
 
-export interface ParsedCsv {
+interface ParsedCsv {
   rows: CsvRow[];
   /** Lines that are not a row of four fields with a time and a value. */
   unreadable: string[];

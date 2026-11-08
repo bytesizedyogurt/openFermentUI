@@ -48,11 +48,13 @@ export function FiguresSection() {
     const substrate = String(ceiling.output.substrate ?? inputOf(ceiling, 'substrate') ?? '');
     const model = String(ceiling.output.modelId ?? inputOf(ceiling, 'model') ?? 'model');
     const words = productWords(product);
+    const found = yieldsOnSugar(records, substrate, product);
     return {
       product,
       substrate,
       words,
-      on: yieldsOnSugar(records, substrate, product).on,
+      on: found.on,
+      elsewhere: found.elsewhere,
       ceilings: [{ value: ceiling.output.gPerG as number, model: `${model} ceiling`, provenance: ceiling.provenance }],
     };
   }, [ceiling, records]);
@@ -97,6 +99,7 @@ export function FiguresSection() {
           unit={UNIT}
           quantity={ceilingFigure.words.quantity}
           ceilings={ceilingFigure.ceilings}
+          sugar={{ name: ceilingFigure.substrate, elsewhere: ceilingFigure.elsewhere }}
           csvName={`ceiling-gap-${ceilingFigure.product}-${ceilingFigure.substrate}`}
         />
       )}

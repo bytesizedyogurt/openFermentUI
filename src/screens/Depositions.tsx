@@ -39,7 +39,7 @@ export default function Depositions() {
       <PageHeader
         eyebrow="Runbooks"
         title="Depositions"
-        subtitle="What actually happened at the bench, against what a runbook predicted. A deposition is opened from the runbook it tests and closed by reconciling its measurements against that runbook's predictions."
+        subtitle="What happened at the bench, beside what a runbook predicted. A deposition starts from a locked runbook, on one of its protocols or on its measures alone, and closes when its readings are reconciled with the runbook's predictions."
       />
       <OwnerTabs tabs={RUNBOOK_TABS} />
 
@@ -48,10 +48,11 @@ export default function Depositions() {
           <EmptyState
             icon={<ClipboardList size={22} />}
             title="No depositions in this project yet"
-            body="Depositions are written at the bench and kept with the project on the service; one written while the service is away waits in this browser until it is sent. Open a locked runbook and start a deposition, against one of its protocols or against its measures alone, and the record appears here. With no runbook on the board yet, ask Postdoc to draft one and turn it into a runbook."
+            body="Depositions are written at the bench and kept with the project on the service; one written while the service is away waits in this browser until it is sent. Open a locked runbook and start a deposition, against one of its protocols or against its measures alone, and the record appears here. With no runbook on the board yet, ask Postdoc to draft one and turn it into a runbook, or make one from a run's numbers on its page (Studies lists the runs)."
             action={
               <div className="flex flex-wrap gap-2 justify-center">
-                <LinkButton to="/postdoc">Draft a runbook in Postdoc</LinkButton>
+                <LinkButton to="/postdoc/new">Draft a runbook in Postdoc</LinkButton>
+                <LinkButton to="/proforma/studies">A run&rsquo;s runbook, from Studies</LinkButton>
                 <LinkButton to="/runbooks">Open the runbook board</LinkButton>
               </div>
             }

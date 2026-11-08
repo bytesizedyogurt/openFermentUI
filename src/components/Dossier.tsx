@@ -14,17 +14,17 @@ import { productOfBasis, productWords, yieldsOnSugar } from '@/lib/geneos';
 import { INFEASIBLE_WORDS, LIBRARY_RUN_TOOL, RUN_TOOL, runViewOfRun, type HistogramBin } from '@/lib/proforma';
 import type { Band } from '@/lib/fermos';
 import type { Artifact, ComputedBasis, Runbook } from '@/lib/studies';
-import { CeilingGap, CostWaterfall, Distribution, TrajectoryBand } from '@/components/figures';
+import { CeilingGap, CostWaterfall, Distribution, TrajectoryBand, priceNote, waterfallTotal } from '@/components/figures';
 import { Card } from './ui';
 
 /** The order of the chain, by the tool that kept each artifact. */
-export const DOSSIER_ORDER = ['geneos.ceiling', 'growth_forecast', RUN_TOOL, LIBRARY_RUN_TOOL] as const;
+const DOSSIER_ORDER = ['geneos.ceiling', 'growth_forecast', RUN_TOOL, LIBRARY_RUN_TOOL] as const;
 
 /** The tools whose artifact prices the plant's product: a scenario's sampled run, an engine run. */
 const PRICE_TOOLS: readonly string[] = [RUN_TOOL, LIBRARY_RUN_TOOL];
 
 /** The seams, in the words fermOS's page already uses. */
-export const SEAMS = {
+const SEAMS = {
   afterCeiling:
     'Upstream, geneOS is stoichiometry: a genome-scale model gives a yield ceiling with no time axis. fermOS is dynamics: the curve in a specific vessel.',
   afterForecast:
@@ -115,12 +115,15 @@ function Figure({ link }: { link: Link }) {
     // draws it, from the TEA breakdown the run kept.
     const view = runViewOfRun(a);
     const tea = view?.tables.tea;
+    const unit = tea?.basis ? `USD per ${tea.basis}` : 'USD kg-1';
+    const said = priceNote(tea?.productPrice, view?.basePrice, unit);
     return (
       <CostWaterfall
         title="What is the price made of?"
         lines={tea?.lines ?? []}
-        total={view?.basePrice != null ? { label: 'Base-case price', value: view.basePrice } : null}
-        unit={tea?.basis ? `USD per ${tea.basis}` : 'USD kg-1'}
+        total={waterfallTotal(tea?.productPrice, view?.basePrice)}
+        unit={unit}
+        notes={said ? [said] : undefined}
         annualUnit={view?.tables.tableUnits.annual ?? 'USD/yr'}
         provenance={a.provenance}
         basis={[basisOf(a)]}

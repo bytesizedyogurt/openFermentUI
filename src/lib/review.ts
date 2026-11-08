@@ -29,7 +29,7 @@ export type ExtractorRun = Candidate['extractorRun'];
  * One line of a record's audit trail, as the page writes it: who did what and
  * when, with the value before and after when a value changed.
  */
-export type AuditLine = Omit<S['AuditEvent'], 'from' | 'to'> & Partial<Pick<S['AuditEvent'], 'from' | 'to'>>;
+type AuditLine = Omit<S['AuditEvent'], 'from' | 'to'> & Partial<Pick<S['AuditEvent'], 'from' | 'to'>>;
 /** One extractor run as witness.py scores it against the values reviewers typed (§6.2). */
 export type RunOutput = S['ExtractRun'];
 /** GET /api/biorepo/overlay: the documents the project holds, its decisions, its candidates and its runs. */
@@ -91,7 +91,7 @@ const DASHES = /[−‐‑‒–—―⁻]/g;
 const SUP_ANY = new RegExp(`[${SUP}]`, 'g');
 
 /** Rule 2's normalisation of a quote or a section, character for character with the service. */
-export function normalizeText(text: string): string {
+function normalizeText(text: string): string {
   let out = text.replace(/­/g, '');
   out = out.replace(POWER, (_m, d: string, minus: string, digits: string) => `${d}^${minus ? '-' : ''}${foldSup(digits)}`);
   out = out.replace(UNIT_EXP, (_m, digits: string) => `-${foldSup(digits)}`);
@@ -203,7 +203,7 @@ export function locateQuote(text: string, quote: string): { start: number; end: 
   return { start, end: last + 1 };
 }
 
-export function paperFetched(paper: Paper | undefined): paper is Paper {
+function paperFetched(paper: Paper | undefined): paper is Paper {
   return !!paper && paper.textSource === 'full-text' && paper.sections.length > 0;
 }
 
@@ -226,7 +226,7 @@ export type ReviewAction = 'accept' | 'reject' | 'gold';
  * two mean the action cannot be taken at all until something changes.
  */
 /** The rules `biorepo.write` refuses under (§2.3; models.DecisionRule). The service names one; the fallback below can only see three of them. */
-export type RefusalRule = NonNullable<DecisionCheck['rule']>;
+type RefusalRule = NonNullable<DecisionCheck['rule']>;
 
 export interface Refusal {
   rule: RefusalRule;

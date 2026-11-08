@@ -11,7 +11,8 @@ import Postdoc from './Postdoc';
 const VIEWS: { label: string; to: string }[] = [
   { label: 'Literature', to: '/intake' },
   { label: 'Records', to: '/biorepo' },
-  { label: 'Flowsheets', to: '/proforma' },
+  { label: 'Proforma', to: '/proforma' },
+  { label: 'SFF flowsheets', to: '/flowsheets' },
   { label: 'Runs and studies', to: '/proforma/studies' },
   { label: 'fermOS', to: '/fermos' },
   { label: 'pureOS', to: '/pureos' },
@@ -19,6 +20,7 @@ const VIEWS: { label: string; to: string }[] = [
   { label: 'Runbooks', to: '/runbooks' },
   { label: 'Guild', to: '/guild' },
   { label: 'Primer', to: '/primer' },
+  { label: 'Catalogues', to: '/catalogues' },
   { label: 'Settings', to: '/settings' },
 ];
 

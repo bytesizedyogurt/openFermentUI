@@ -91,7 +91,7 @@ export type Theme = 'bench' | 'night';
 export type Density = 'comfortable' | 'dense';
 export type UnitMode = 'published' | 'si';
 
-export interface Toast {
+interface Toast {
   id: string;
   text: string;
   kind: 'info' | 'success' | 'warn' | 'error';
@@ -103,7 +103,7 @@ export interface Toast {
  * A line of this page's recent activity, as Home lists it, newest first (`logActivity`): when it happened, the icon
  * it draws with, its words, the page it links to, and the provenance its tick shows.
  */
-export interface ActivityEvent {
+interface ActivityEvent {
   at: string;
   icon: string;
   text: string;
@@ -111,7 +111,7 @@ export interface ActivityEvent {
   provenance: Provenance;
 }
 
-export interface JobStage {
+interface JobStage {
   label: string;
   ms: number;
 }
@@ -183,7 +183,7 @@ export interface RunState {
 }
 
 /** A countdown a step's timer started, as the bench shows it. */
-export interface TimerState {
+interface TimerState {
   id: string;
   stepId: string;
   label: string;
@@ -202,7 +202,7 @@ interface UndoFrame {
 }
 
 let seq = 0;
-export const nextId = (prefix: string) => `${prefix}-${++seq}`;
+const nextId = (prefix: string) => `${prefix}-${++seq}`;
 
 /** An id that stays unique across reloads: the time, and a counter for ties. */
 export const timeId = (prefix: string) => `${prefix}-${Date.now().toString(36)}-${++seq}`;
@@ -344,7 +344,7 @@ function sameDecision(a: ExtractionRecord, b: ExtractionRecord): boolean {
   );
 }
 
-export interface OFState {
+interface OFState {
   // ── the project's data, from the service (session-mutable) ───────────
   papers: Paper[];
   records: ExtractionRecord[];
@@ -3236,7 +3236,8 @@ export const useStore = create<OFState>()((set, get) => ({
           return;
       for (const w of s.guildPendingWithdrawals)
         if (!(await attempt(`withdrawal of ${w.evidenceId}`, () => postWithdrawal(w)))) return;
-      const fresh = (await loadGuild()) ?? server;
+      // Read again only when this sync sent something: with nothing posted the first read is the ledger.
+      const fresh = posted > 0 ? ((await loadGuild()) ?? server) : server;
       // The service's ledger is the truth for everything this sync sent.
       // Anything made while it ran, and anything it did not send, stays.
       const sent = new Set(s.guildPending);
@@ -3442,7 +3443,7 @@ export function overridesFor(scope: string): (s: Pick<OFState, 'parameterOverrid
  * finding 10: kept, they held every later value to the old one, and the
  * service refused it as outside its own low and high).
  */
-export function overrideOfAssumption(scenarioId: string, a: ScenarioAssumption): Override {
+function overrideOfAssumption(scenarioId: string, a: ScenarioAssumption): Override {
   const fixed = a.low === a.value && a.high === a.value;
   return {
     scope: proformaScope(scenarioId),
@@ -3496,7 +3497,7 @@ export function assumptionsFromOverrides(overrides: Record<string, Override[]>):
  * `proforma:<id>` for every scenario whose scope the snapshot holds no entry
  * for (D3: a snapshot written before the panel carries only the old field).
  */
-export function overridesOfSnapshot(snap: Pick<DurableSnapshot, 'parameterOverrides' | 'proformaAssumptions'>): Record<string, Override[]> {
+function overridesOfSnapshot(snap: Pick<DurableSnapshot, 'parameterOverrides' | 'proformaAssumptions'>): Record<string, Override[]> {
   const out: Record<string, Override[]> = { ...(snap.parameterOverrides ?? {}) };
   for (const [id, typed] of Object.entries(snap.proformaAssumptions ?? {})) {
     const scope = proformaScope(id);
@@ -3505,7 +3506,7 @@ export function overridesOfSnapshot(snap: Pick<DurableSnapshot, 'parameterOverri
   return out;
 }
 
-export function snapshotOf(s: OFState): DurableSnapshot {
+function snapshotOf(s: OFState): DurableSnapshot {
   const reviewDecisions: DurableSnapshot['reviewDecisions'] = {};
   for (const r of s.records) {
     // Only records a reviewer has actually touched.
@@ -3680,7 +3681,7 @@ if (durableAvailable()) {
  * OF-BLD-020 §5.R — what pureOS's Builder showed of one train this session
  * (`builderShown`): each part absent until the page has shown it.
  */
-export interface BuilderShown {
+interface BuilderShown {
   /** The newest run made on the page, as the service returned it. */
   run?: TrainRun | null;
   /** What the service said reading the train from a kept run's units. */
@@ -3702,7 +3703,7 @@ export function useSkills(): Skill[] {
 }
 
 /** Where a screen's protocol stands: read and held, still being read, kept by no one under the id, or unreadable. */
-export interface HeldProtocol {
+interface HeldProtocol {
   protocol: Protocol | undefined;
   /** `reading` until the project's protocols (or this one) are read; `problem` names why they could not be. */
   state: 'held' | 'reading' | 'missing' | 'problem';
@@ -3772,7 +3773,7 @@ export function provenanceOf(r: ExtractionRecord): Provenance {
  * to the statistic only: the records stay visible in per-record tables and
  * plots, because they are real values, just not independent evidence.
  */
-export type AggregateExclusion = 'rejected' | 'industry-estimate' | 'computed' | 'assumed' | 'not-primary';
+type AggregateExclusion = 'rejected' | 'industry-estimate' | 'computed' | 'assumed' | 'not-primary';
 
 export function aggregateExclusion(r: Pick<ExtractionRecord, 'provenance' | 'status' | 'isPrimary'>): AggregateExclusion | null {
   if (r.status === 'rejected') return 'rejected';

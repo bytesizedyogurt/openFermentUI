@@ -348,7 +348,7 @@ export default function Deposition({ protocolId, runId }: { protocolId: string; 
             {runbook && (
               <>
                 {' · against '}
-                <a className="text-accent hover:underline" href={`#/runbooks/${runbook.id}`}>
+                <a className="text-accent hover:underline" href={href(`/runbooks/${runbook.id}`)}>
                   {runbook.title}
                 </a>
               </>
@@ -1076,7 +1076,7 @@ export default function Deposition({ protocolId, runId }: { protocolId: string; 
 }
 
 /** The step id the readings alone are recorded at: they stand against the runbook's measures, with no protocol's step. */
-export const BENCH_STEP = 'readings';
+const BENCH_STEP = 'readings';
 
 /**
  * The bench for the readings alone (alpha 2.2 C.5): a deposition opened from a

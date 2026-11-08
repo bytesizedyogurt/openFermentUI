@@ -32,6 +32,7 @@ import { readingLeftTheList, type Override, type ParameterSpec, type ParameterVa
 import { StudiesDown, depositionReadings, type DepositionReading } from '@/lib/studies';
 import { href } from '@/router';
 import { fmt } from '@/engine/units';
+import { stampsIn } from '@/lib/proforma';
 import { CitationChip } from './Chip';
 import { ReadingChoice, depositionPath, minute, readingOf } from './ReadingOrigin';
 import { Button, cx } from './ui';
@@ -59,7 +60,7 @@ export interface ParameterChange {
 /** A deposition's reading a person chose for a row, as the service listed it: the panel keeps its own value and unit. */
 export type ChosenReading = Pick<DepositionReading, 'ref' | 'value' | 'unit' | 'by' | 'at'>;
 
-export interface ParameterRowProps {
+interface ParameterRowProps {
   spec: ParameterSpec;
   /** The value as the service served or resolved it, or as the person's override gives it while the service has not answered. */
   value: ParameterValue | null;
@@ -84,7 +85,7 @@ export interface ParameterRowProps {
 }
 
 /** Where the settings that hold the reviewer name live. */
-export const REVIEWER_SETTINGS = '/settings/corpus';
+const REVIEWER_SETTINGS = '/settings/corpus';
 
 /**
  * A citation chip inside the panel as a bench-sized touch target
@@ -97,7 +98,7 @@ export const TOUCH_CHIP = 'min-h-[44px] inline-flex items-center';
 export const shown = (v: number | string | null | undefined, digits = 4): string => (v == null ? '—' : typeof v === 'number' ? fmt(v, digits) : v);
 
 /** A unit as the row prints it: a share has none of its own. */
-export const unitWords = (spec: ParameterSpec): string => spec.unit || (spec.dimension === 'fraction' ? 'share' : '');
+const unitWords = (spec: ParameterSpec): string => spec.unit || (spec.dimension === 'fraction' ? 'share' : '');
 
 /** One entry of a source rule, in words. */
 export function ruleWords(entry: string, spec: ParameterSpec): string {
@@ -131,7 +132,7 @@ export function answered(entry: string, spec: ParameterSpec, value: ParameterVal
 }
 
 /** The bounds in words, as the spec states them. */
-export function boundsWords(spec: ParameterSpec): string {
+function boundsWords(spec: ParameterSpec): string {
   const u = unitWords(spec);
   const unit = u && u !== 'share' ? ` ${u}` : '';
   if (spec.min != null && spec.max != null) return `${shown(spec.min, 6)} to ${shown(spec.max, 6)}${unit}`;
@@ -191,7 +192,7 @@ export function SourceChip({ value, records }: { value: ParameterValue | null; r
           </summary>
           <div className="flex flex-col gap-1 mt-1">
             {records ??
-              value.recordIds.map((rid) => <CitationChip key={rid} recordId={rid} label={rid} className={TOUCH_CHIP} />)}
+              value.recordIds.map((rid) => <CitationChip key={rid} recordId={rid} className={TOUCH_CHIP} />)}
           </div>
         </details>
       );
@@ -284,7 +285,13 @@ function Why({ spec, value }: { spec: ParameterSpec; value: ParameterValue | nul
                 basis names the reading.
               </p>
             )}
-            {value?.overriddenBy && value.origin !== 'measurement' && (
+            {value?.overriddenBy && value.origin === 'model-estimate' && (
+              <p className="text-ink-soft mt-0.5">
+                A value set for the run wins over every source: this one is an estimate by {value.overriddenBy}, a model&rsquo;s, and a
+                run&rsquo;s basis names it as one.
+              </p>
+            )}
+            {value?.overriddenBy && value.origin !== 'measurement' && value.origin !== 'model-estimate' && (
               <p className="text-ink-soft mt-0.5">
                 A person&rsquo;s change wins over every source: this value is {value.overriddenBy}&rsquo;s assumption, and a run&rsquo;s basis
                 names it.
@@ -317,7 +324,7 @@ function Why({ spec, value }: { spec: ParameterSpec; value: ParameterValue | nul
         {value?.detail && (
           <div>
             <dt className="font-medium">What the service says of this value</dt>
-            <dd className="text-ink-soft">{value.detail}</dd>
+            <dd className="text-ink-soft">{stampsIn(value.detail)}</dd>
           </div>
         )}
       </dl>

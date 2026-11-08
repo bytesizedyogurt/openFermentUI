@@ -80,7 +80,7 @@ import { builderInletPath } from '@/lib/pureos';
 import { SendToProforma } from './FermOSForecast';
 
 /** The panel's groups, in the order Appendix 2 §A lists them. */
-export const SIMULATE_GROUPS = ['Growth', 'Product', 'Substrate', 'Inhibition', 'Oxygen', 'Feed', 'Dilution', 'Storage', 'Start values', 'Run length'];
+const SIMULATE_GROUPS = ['Growth', 'Product', 'Substrate', 'Inhibition', 'Oxygen', 'Feed', 'Dilution', 'Storage', 'Start values', 'Run length'];
 /** How long the screen waits after a change before asking what waits. */
 const BIND_AFTER_MS = 350;
 type Start = 'records' | 'fit' | 'simulation';

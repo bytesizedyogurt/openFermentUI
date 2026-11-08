@@ -410,7 +410,9 @@ export default function Postdoc({ sessionId, initialQuery }: { sessionId?: strin
                   c.id === conversation?.id ? 'bg-accent-wash' : 'hover:bg-ink-soft/[0.06]',
                 )}
               >
-                <div className="text-body truncate">{c.title}</div>
+                <div className="text-body truncate" title={c.title}>
+                  {c.title}
+                </div>
                 <div className="text-caption text-ink-soft">
                   <span className="font-num">{shownAt(c.startedAt)}</span> · <span className="font-num">{c.turns.length}</span>{' '}
                   {c.turns.length === 1 ? 'question' : 'questions'}
