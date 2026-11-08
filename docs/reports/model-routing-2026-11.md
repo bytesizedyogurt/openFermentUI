@@ -54,11 +54,11 @@ askings of all twelve on the Opus table, judged by hand against what each questi
 in `docs/reports/live-questions-2026-11.md` (eleven of twelve as expected, the twelfth short in
 coverage; 0.21 to 0.82 USD and 27 to 107 seconds an answer).
 
-The judge's own words, cut short:
+The judge's words, cut short, and haiku's Q3 put in words of what the judge found:
 
-- haiku, Q3: "reads moisture, glucan share, flow and price back from a run, labels each as the
-  package's own value, and checks the moisture and glucan values against the design report, with
-  honest gaps. It overstates the mo[isture]…"
+- haiku, Q3: read four of the feedstock's values back from a run, each labelled the package's own,
+  set two of them beside a design report the answer named in words, and kept honest gaps; the judge
+  found one statement overstated.
 - haiku, Q4: "The cost lines, selling prices and package-set input prices are well cited and add
   up correctly… The part on which inputs a person could change…" is the weaker half.
 - sonnet, Q1: "names three documents with record-backed titres, but conditions are given only

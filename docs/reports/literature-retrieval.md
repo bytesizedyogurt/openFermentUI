@@ -98,12 +98,13 @@ seconds in the table. The command:
     pnpm lit:report --project ethanol --by "Claude Code (build session)" --configs interactive,vector_only,keyword_only --render
 
 Its run whole stays in the service's data folder, outside git. Its ground truth is built by code from the candidates the
-project keeps (`report.truth`): 130 questions from the 457 candidates of its 22 documents, extracted on 5 November, one
+project keeps (`report.truth`): 130 questions from the 457 candidates its 22 documents hold, 20 of them with candidates, extracted on 5 November, one
 question a group by document, passage and field. Each question was asked of the retriever inside the project's scope in
 the three configurations that ask no model: `interactive` (vectors and keywords together, as BioRepo → Search runs),
 `vector_only` and `keyword_only`. Each configuration's top ten was scored under both relevance rules: the kit's rule (a
 passage of the question's document, or one holding a quote of its candidates) and the passage rule (the candidates' own
-passage).
+passage). `keyword_only` returned no passage for 102 of the 130 questions, one for 22, four for one and ten for five, the
+same under both rules; `interactive` and `vector_only` returned ten for every question.
 
 ### What waits on the account
 
