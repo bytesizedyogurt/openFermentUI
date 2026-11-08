@@ -101,7 +101,7 @@
 - C: The live instance is one Mac mini serving its owner on loopback (`scripts/host/`); accounts wait as a membership stub (ADR-005).
 - C: Anthropic is the served provider, beside a local model behind an OpenAI-compatible endpoint `core/.env` names (`OPENFERMENT_LOCAL_BASE_URL`), which answers single calls through the kit's adapter; a route naming another provider's model is passed over in words (ADR-008, Implementations 6.3 and 11).
 - C: A library plant carries its package's own numbers; a person's value or a model's estimate enters as an override with its origin (ADR-004, ADR-006).
-- C: The local embedder serves a project's corpus at this scale; `pnpm lit:report` measures retrieval against the kit's seed questions (ADR-002).
+- C: The local embedder serves a project's corpus at this scale; `pnpm lit:report` measures retrieval against the kit's seed questions, and with `--project` over a project's corpus, its questions built by code from its kept candidates, its model lanes counted in a tally; `pnpm lit:graph --project` builds the project's concept graph (ADR-002, Implementation F).
 - C: Every screen, component and `src/lib` module reads the generated `src/api/types.gen.ts`, each lib naming the schemas it answers, and the browser's own types live with their owners; `check:plan` holds the provenance ranking, `PROVENANCE_RANK` in `src/store.ts` in models.py's `PROVENANCE_ORDER` (ADR-007, ADR-011).
 - C: A review decision keeps alpha 1.0's shape; BioRepo computes its provenance from what it decides (`biorepo.provenance_of`: gold, verified or unverified) and refuses `assumed` and any estimate (ADR-006).
 

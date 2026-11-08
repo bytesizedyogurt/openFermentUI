@@ -257,6 +257,16 @@ def test_a_build_stops_in_words_when_no_model_answers(tmp_path):
     assert len(_pending(HERE)) == 3, "the chunks the build had yet to read wait for the next one"
 
 
+def test_a_dry_runs_prompts_are_the_prompts_a_build_sends(tmp_path):
+    tag = _tag()
+    _store(tmp_path, HERE, tag, f"The organism-{tag} grew.", f"The organism-{tag} was fed.",
+           f"The organism-{tag} was harvested.")
+    rows = _pending(HERE)
+    model = Reader({f"organism-{tag}": Named("Organism")})
+    _build(HERE, model, batch_size=2)
+    assert graph.prompts(rows, batch_size=2) == model.prompts and len(model.prompts) == 2
+
+
 def test_the_kits_batch_step_is_the_one_this_build_calls(tmp_path, monkeypatch):
     assert graph._extract_with_recovery is extractor._extract_with_recovery
     step = inspect.signature(extractor._extract_with_recovery).parameters

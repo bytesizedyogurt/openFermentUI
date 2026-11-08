@@ -55,6 +55,26 @@ project held it before) or `failed` with the `reason` in words, and `transient` 
 that was the network's condition. A failure is an answer the Intake board renders: the route
 raises no 5xx for a document it could not collect.
 
+## A project's concept graph and its retrieval lanes (alpha 2.2 F.5)
+
+Two commands run the literature layer's lanes that call a model over one project
+(`core/openferment_core/literature_live.py`; ADR-002, Implementation F). Each reads `core/.env` as
+`python -m openferment_core.extract` does, counts its calls in a tally, stops in words at the first
+call no model answers (no key, the account's usage limit, the day's cap), and is audited under the
+person `--by` names (module `intake`).
+
+| Command | Does |
+|---|---|
+| `pnpm lit:graph --project <id> --by <name> [--limit N] [--rebuild]` | Builds the concept graph over the project's passages that no build has read, ten to a batch on the `index` route; a passage of a document two projects hold is read once. Audited as `literature_graph` |
+| `pnpm lit:graph --project <id> --dry-run` | The batches, the prompts' characters, the kit's token estimate, and what the input and the most a build could cost come to on the route's first model; no model is called |
+| `pnpm lit:report --project <id> --by <name> [--judge] [--limit N] [--configs a,b] [--render]` | The ground truth built by code from the project's kept candidates (one question a document, passage and field), retrieval in `interactive`, `vector_only`, `keyword_only`, `full_deep`, `no_graph` and `no_hyde` under the kit's rule and the passage rule, and with `--judge` the judge route's grades of each question's top ten in `interactive` and `full_deep` and the kit's answers through both, graded for grounding. The run whole goes to `<data folder>/literature/<project>-<UTC time>.json`, outside git; `--render` sets its numbers alone in `docs/reports/literature-retrieval.md` and `.json`. Audited as `literature_report` |
+| `pnpm lit:report --project <id> --render --from <file>` | A kept run's numbers rendered into the report; nothing is asked |
+| `pnpm lit:report` | The kit's demo corpus, offline, in a database of its own (stage 3) |
+
+The `sci-rag` MCP server serves the kit's `search_entities` and `get_entity_relationships` over the
+project's graph alone, by the rule `literature/graph.py` states, and refuses both in words for a
+project no build has read (`docs/TOOLS.md`, the sci-rag server).
+
 ## A project's catalogues (alpha 2.1; alpha 2.2 E.8 and E.12a)
 
 The strains and their other names, the products, Guild's skills and Primer's lessons are kinds of

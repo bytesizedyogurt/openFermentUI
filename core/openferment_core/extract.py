@@ -745,10 +745,16 @@ def _print_table(results: list[ExtractResponse]) -> None:
     print(f"\n{len(results)} papers · {kept} candidates anchored · {rejected} rejected · ${total_cost:.4f}")
 
 
-def main(argv: list[str]) -> int:
+def load_env(path: Path | None = None) -> None:
+    """core/.env read into the environment for a command, a setting the
+    environment holds standing (`override=False`)."""
     from dotenv import load_dotenv
 
-    load_dotenv(Path(__file__).parent.parent / ".env", override=False)
+    load_dotenv(path or Path(__file__).parent.parent / ".env", override=False)
+
+
+def main(argv: list[str]) -> int:
+    load_env()
     global SAVE_RESPONSES
     force = "--force" in argv
     SAVE_RESPONSES = "--save-fixture" in argv

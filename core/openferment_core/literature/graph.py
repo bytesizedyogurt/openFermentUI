@@ -51,7 +51,7 @@ from dataclasses import dataclass
 from typing import Any
 
 from sci_rag.db.models import Chunk, Document
-from sci_rag.graph.extractor import ExtractionStats, _extract_with_recovery
+from sci_rag.graph.extractor import _MAX_PASSAGE_CHARS, ExtractionStats, _extract_with_recovery
 from sci_rag.llm.client import LLMClient
 from sqlalchemy import Row, String, bindparam, select, text
 from sqlalchemy.dialects.postgresql import ARRAY
@@ -70,6 +70,8 @@ DESCRIPTION_WITHHELD = ("Withheld: this entity is also named in documents this p
 EVIDENCE_WITHHELD = "Withheld: the quote's words do not stand in the passage this edge cites."
 #: The most entities one read lists, as the kit's own tool bounds it.
 MOST = 100
+#: The ceiling the kit's batch step asks for a batch's answer (`_extract_batch`).
+ANSWER_TOKENS = 8192
 
 
 def no_graph(project_id: str) -> str:
@@ -149,6 +151,21 @@ async def build(project_id: str, *, llm: LLMClient, batch_size: int = 10, limit:
         if rate_limit_s and start + batch_size < len(rows):
             await asyncio.sleep(rate_limit_s)
     return built
+
+
+def prompts(rows: Sequence[Row[tuple[str, str, str]]], *, batch_size: int = 10) -> list[str]:
+    """The prompt the kit's batch step writes for each batch of `rows`, as
+    `_extract_batch` renders it (each passage cut at the kit's length): what
+    a dry run measures, with no model asked."""
+    domain = kit.service().domain
+    out = []
+    for start in range(0, len(rows), batch_size):
+        passages = "\n\n".join(f"{i}. {content[:_MAX_PASSAGE_CHARS]}"
+                                for i, (_, _, content) in enumerate(rows[start:start + batch_size], start=1))
+        out.append(domain.render_prompt("entity_extraction", DOMAIN_NAME=domain.name,
+                                        ENTITY_TYPES=domain.entity_types_block(),
+                                        RELATION_TYPES=domain.relation_types_block(), PASSAGES=passages))
+    return out
 
 
 # ── the reads ──────────────────────────────────────────────────────────────

@@ -449,6 +449,25 @@ room under the tag `opus-max-room` (eq-eth-01 to eq-eth-04 first, Implementation
 the order the report's "To finish it" lists; a default the second judge reverses returns here with
 its numbers.
 
+## Implementation 18 (alpha 2.2 F.5: a run's own count, and the kit's room)
+
+- **A run counts its own calls.** `llm.tally()` opens a count: within it every `llm.call` adds one
+  `llm.Spent`, an answer, a refusal and an outage alike, with its family and effort, the ceiling it
+  asked, the model that answered, the models asked and those the safety classifier declined, its
+  tokens and USD, how it stopped, and a failure in the words its caller was given. Tallies nest
+  and reach a copy of their context (a thread `asyncio.to_thread` starts, a coroutine `db.run`
+  hands to the database loop); outside every tally nothing is kept, and the day's spend is charged
+  to `spend.py` either way. The literature lanes read it (`literature_live.py`): each answer and
+  each judgement is counted under its own tally, and the command's stop is the first call in its
+  tally that no model answered.
+- **A kit call has room for its thinking.** The kit sizes each call for a model that writes its
+  answer at once (a judgement in 1,024 tokens, HyDE's passage in 512), and output tokens include
+  thinking. `llm.KIT_ROOM` sets the room by the route's effort (low 0, medium 4,096, high 8,192,
+  xhigh 12,000, max 16,000), and a kit call asks the larger of the kit's ceiling and that room; the
+  live Search answer's call is one of them. The kit's roles stay three (`answer` on `explain`,
+  `extraction` on `index`, `judge` on `judge`): the report builds its questions by code, so the
+  kit's question drafter has no role here.
+
 ## Evidence
 
 - `postdoc_agent.py`, `llm.py`, `spend.py`, `tools/__init__.py` at `alpha-1.0`.

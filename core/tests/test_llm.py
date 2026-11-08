@@ -1026,15 +1026,14 @@ def test_a_tally_counts_the_calls_made_in_a_copy_of_its_context():
 
 def test_a_kit_call_has_room_for_its_thinking(monkeypatch):
     """The kit sizes its calls for a model that writes its answer at once (a
-    judgement in 1,024 tokens, a drafted set in 4,096, HyDE's passage in 512),
+    judgement in 1,024 tokens, a graph batch in 8,192, HyDE's passage in 512),
     and output tokens include thinking: a kit call asks the larger of the
     kit's ceiling and the room its route's effort sets (`KIT_ROOM`)."""
     assert llm.KIT_ROOM == {"low": 0, "medium": 4096, "high": 8192, "xhigh": 12000, "max": 16000}
     assert set(llm.KIT_ROOM) == set(llm.EFFORTS)
     monkeypatch.setenv(llm.ROUTES_SETTING, json.dumps({
         "judge": {"models": [OPUS, SONNET], "effort": "max"},
-        "extract": {"models": [OPUS, SONNET], "effort": "high"},
-        "explain": {"models": [OPUS, SONNET], "effort": "medium"},
+        "explain": {"models": [OPUS, SONNET], "effort": "high"},
         "index": {"models": [HAIKU], "effort": "low"},
     }))
     client = FakeClient({OPUS: answer(OPUS, "{}"), HAIKU: answer(HAIKU, "{}")})
@@ -1042,35 +1041,16 @@ def test_a_kit_call_has_room_for_its_thinking(monkeypatch):
 
     async def the_kit_asks():
         await llm.kit_client("judge").generate_json("p", max_tokens=1024)
-        await llm.kit_client("draft").generate("p", max_tokens=4096, json_mode=True)
+        await llm.kit_client("answer").generate("p", max_tokens=2048)
         await llm.kit_client("extraction").generate("p", max_tokens=512)
         await llm.kit_client("extraction").generate_json("p", max_tokens=8192)
-        await llm.kit_client("answer").generate("p", max_tokens=2048)
+        await llm.kit_client("answer").generate("p", max_tokens=12000)
 
     with llm.tally() as spent:
         asyncio.run(the_kit_asks())
     assert [(r["model"], r["output_config"]["effort"], r["max_tokens"]) for r in client.requests] == [
-        (OPUS, "max", 16000), (OPUS, "high", 8192), (HAIKU, "low", 512), (HAIKU, "low", 8192), (OPUS, "medium", 4096),
-    ], "the room at max, high and medium; at low, and above the room, the kit's own ceiling"
+        (OPUS, "max", 16000), (OPUS, "high", 8192), (HAIKU, "low", 512), (HAIKU, "low", 8192), (OPUS, "high", 12000),
+    ], "the room at max and high; at low, and above the room, the kit's own ceiling"
     assert [(s.family, s.max_tokens) for s in spent] == [
-        ("judge", 16000), ("extract", 8192), ("index", 512), ("index", 8192), ("explain", 4096)]
-
-
-def test_the_draft_role_reads_the_extract_route(monkeypatch):
-    """The kit's drafter of seed questions runs on the kit's answer role;
-    openFerment names it `draft` and routes it on `extract`, as a document
-    read into candidates is routed, charged to that route's spend role."""
-    from openferment_core import spend
-
-    assert llm.KIT_ROLES == {"answer": "explain", "extraction": "index", "judge": "judge", "draft": "extract"}
-    monkeypatch.setenv(llm.ROUTES_SETTING, json.dumps({"extract": {"models": [SONNET], "effort": "high"}}))
-    client = FakeClient({SONNET: answer(SONNET, '{"questions": []}')})
-    monkeypatch.setattr(llm, "_default_client", lambda: client)
-    drafter = llm.kit_client("draft")
-    assert drafter.model == SONNET and drafter.describe() == SONNET
-    with llm.tally() as spent:
-        said = asyncio.run(drafter.generate("p", system="sys", max_tokens=4096, json_mode=True))
-    assert said == '{"questions": []}' and client.asked == [SONNET]
-    assert client.requests[0]["output_config"]["effort"] == "high" and client.requests[0]["system"] == "sys"
-    assert [(s.family, s.effort, s.model, s.outcome) for s in spent] == [("extract", "high", SONNET, "answered")]
-    assert spend.state()["byRole"]["answer"] == llm.cost_usd(SONNET, 1000, 500)
+        ("judge", 16000), ("explain", 8192), ("index", 512), ("index", 8192), ("explain", 12000)]
+    assert llm.KIT_ROLES == {"answer": "explain", "extraction": "index", "judge": "judge"}

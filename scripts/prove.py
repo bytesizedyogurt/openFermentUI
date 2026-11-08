@@ -41,7 +41,9 @@ packages stay installed while the kept service runs, each said with the command 
        candidate extracted through the service and anchored to the stored text, its second,
        quoting words the document does not hold, refused; a decision carrying a model's estimate
        refused at the record store; a person's decision accepting the candidate, and the record in
-       BioRepo with its status, provenance and reviewer
+       BioRepo with its status, provenance and reviewer; the kit's own MCP server over stdio in the
+       project: its tools listed, the two graph tools among them, a graph tool refused in words
+       (no build has read the project's passages), and the corpus counted as the project's
     4  the library's plants listed; the cellulosic ethanol reference plant (the package's
        cornstover) run and held to the package's own test within its tolerance, the two values
        the package's own test fails on this installation each held to what the package's code
@@ -221,6 +223,9 @@ IN_PROJECT = ("train",)
 WRITE_PLACEHOLDERS = ("import importlib, sys; getattr(importlib.import_module(sys.argv[1]), sys.argv[2])"
                       "(sys.argv[3], by=sys.argv[4], at=sys.argv[5])")
 RUN_TIMEOUT_S = 1800.0
+# How long step 3's call on the sci-rag server over stdio may take: its start, a cold kit import among it, and
+# three calls that read the store.
+SCI_RAG_TIMEOUT_S = 180.0
 
 # The engine packages a builder keeps in the repository (stage D's), each a directory holding a pyproject.toml,
 # installed into core's environment before the service starts; and the group each registers its engines under.
@@ -773,6 +778,47 @@ def step_3(proof: Proof) -> None:
                 f"{asked_with['rule']}")
     accept(proof, record_id, words)
     proof.made["documents"] = sorted(d["documentId"] for d in docs.values())
+    sci_rag_server(proof)
+
+
+def sci_rag_server(proof: Proof) -> None:
+    """The kit's own MCP server over stdio, as `.mcp.json` starts it, acting in the proof's project: its tools
+    listed with the two graph tools among them, a graph tool refused in words (no build has read the proof's
+    passages), and the corpus counted as the project's. It reads the store alone and asks no model."""
+    import asyncio
+
+    from mcp import ClientSession, StdioServerParameters
+    from mcp.client.stdio import stdio_client
+    from mcp.types import Implementation
+    from openferment_core.literature import graph
+
+    env = environment(proof, 0)  # the service's: the proof's database, and offline no model key
+    env.pop("VIRTUAL_ENV", None)
+    params = StdioServerParameters(command=sys.executable, cwd=str(CORE), env=env,
+                                   args=["-m", "openferment_core.literature_mcp", "--project", proof.project])
+
+    async def ask() -> tuple[list[str], Any, Any]:
+        async with stdio_client(params) as (read, write):
+            async with ClientSession(read, write, client_info=Implementation(name="openferment-proof",
+                                                                              version="1")) as session:
+                await session.initialize()
+                listed = await session.list_tools()
+                refused = await session.call_tool("search_entities", {"name_contains": ""})
+                counted = await session.call_tool("corpus_stats", {})
+                return [t.name for t in listed.tools], refused, counted
+
+    names, refused, counted = asyncio.run(asyncio.wait_for(ask(), SCI_RAG_TIMEOUT_S))
+    proof.check({"search_entities", "get_entity_relationships", "search_corpus", "corpus_stats"} <= set(names),
+                f"the sci-rag server over stdio lists {len(names)} tools, search_entities and "
+                "get_entity_relationships among them")
+    said = refused.content[0].text if refused.content else ""
+    proof.check(bool(refused.is_error) and graph.no_graph(proof.project) in said,
+                "search_entities in the proof's project, whose passages no build has read, refused in words naming "
+                "the command that builds its graph")
+    stats = json.loads(counted.content[0].text) if counted.content and not counted.is_error else {}
+    proof.check(stats.get("documents") == len(proof.made["documents"]) and stats.get("entities") == 0,
+                f"corpus_stats there: the project's {stats.get('documents')} documents and {stats.get('chunks')} "
+                f"passages, {stats.get('entities')} entities")
 
 
 def step_4(proof: Proof) -> None:

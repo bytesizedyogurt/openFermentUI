@@ -55,6 +55,7 @@ core/data/artifacts/
 core/data/index/
 core/data/rageval/
 core/data/live/
+core/data/literature/
 core/data/demo/
 core/data/identifiers-proposed.tsv
 core/data/guild.json

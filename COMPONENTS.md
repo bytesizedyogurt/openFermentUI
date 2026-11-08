@@ -100,7 +100,7 @@ The literature layer: Sci RAG Kit, used as a library (ADR-002).
 | `fastembed.py` | A local embedder for Sci RAG Kit: FastEmbed (ADR-002; execution prompt §8.2). |
 | `graph.py` | The concept graph over a project's passages: the build, and the reads a project makes of it (ADR-002). |
 | `kit.py` | Sci RAG Kit as openFerment runs it (ADR-002; execution prompt §8.2). |
-| `report.py` | `python -m openferment_core.literature.report` — the retrieval report (ADR-002; execution prompt §8.2): Sci RAG Kit's own evaluation harness run over its demo corpus, as openFerment runs the kit. |
+| `report.py` | `python -m openferment_core.literature.report` — the retrieval report (ADR-002; execution prompt §8.2), and the lanes `literature_live.py` runs over a project's own corpus (alpha 2.2 F.5; ADR-002, Implementation F). |
 
 ### `postdoc/`
 
@@ -213,6 +213,7 @@ Heavy libraries run in workers (OF-BLD-014 §3.4, E.6).
 | `import_alpha1.py` | Carry an alpha 1.0 data directory into a new project (stage 2; ADR-001). |
 | `intake.py` | Intake: what a project reads, collected into Sci RAG Kit (ADR-002; OF-BLD-012 §5). |
 | `kinetics.py` | fermOS's model families (OF-BLD-020 §3.1, D5): code written once, each integrated on scipy's `solve_ivp` and fitted on `least_squares`. |
+| `literature_live.py` | `python -m openferment_core.literature_live` — the literature lanes that call a model, over one project (alpha 2.2 F.5; ADR-002, Implementation F). |
 | `literature_mcp.py` | Sci RAG Kit's MCP server, over stdio, for one project (ADR-002). |
 | `llm.py` | The one place openFerment calls a Claude model (Postdoc, Extract). |
 | `mcp_server.py` | openFerment's tools for assistants outside the app (OF-BLD-014 §10.1). |

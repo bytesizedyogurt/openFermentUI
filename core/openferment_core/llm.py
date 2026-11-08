@@ -1092,16 +1092,13 @@ def _converse_once(request: dict[str, Any], ask: Callable[[dict[str, Any]], Any]
 
 #: The kit's roles, as our families: its answers with citations explain, its
 #: high-volume extraction (a document's graph, HyDE's passage, a question's
-#: entity names) is an index chore, and its judge judges. `draft` is a role
-#: openFerment names for the kit's drafter of seed questions, which the kit
-#: runs on its answer role; it reads the extract route, as a document read
-#: into candidates does (alpha 2.2 F.5).
-KIT_ROLES = {"answer": "explain", "extraction": "index", "judge": "judge", "draft": "extract"}
+#: entity names) is an index chore, and its judge judges.
+KIT_ROLES = {"answer": "explain", "extraction": "index", "judge": "judge"}
 
 #: The room a kit call has for thinking, in output tokens, by its route's
 #: effort. The kit sizes each call for a model that writes its answer at
-#: once (a judgement in 1,024 tokens, a drafted set of questions in 4,096,
-#: HyDE's passage in 512), and a model's output tokens include its thinking,
+#: once (a judgement in 1,024 tokens, a graph batch in 8,192, HyDE's
+#: passage in 512), and a model's output tokens include its thinking,
 #: so at a high effort the thinking may spend the ceiling before the answer
 #: is written. A kit call asks the larger of the kit's ceiling and this room;
 #: at effort low the kit's ceiling stands. openFerment's own judge asks
@@ -1112,12 +1109,12 @@ KIT_ROOM = {"low": 0, "medium": 4096, "high": 8192, "xhigh": 12000, "max": 16000
 def kit_client(kit_role: str = "answer") -> Any:
     """The model client Sci RAG Kit generates with, for one of its roles
     (`KIT_ROLES`): answers with citations, HyDE's hypothetical passage, a
-    question's entity names, a document's graph, a judgement, a drafted set
-    of questions. Every call goes through `call` here, so the kit's calls are
-    capped by the day's spend, read the key in this one place, fall back
-    along the role's route like any other, and are counted by each tally open
-    around them; each asks at least the room its route's effort sets for
-    thinking (`KIT_ROOM`). Built on demand: the kit is the `lit` extra."""
+    question's entity names, a document's graph, a judgement. Every call
+    goes through `call` here, so the kit's calls are capped by the day's
+    spend, read the key in this one place, fall back along the role's route
+    like any other, and are counted by each tally open around them; each
+    asks at least the room its route's effort sets for thinking
+    (`KIT_ROOM`). Built on demand: the kit is the `lit` extra."""
     import asyncio
 
     from sci_rag.llm.client import LLMClient

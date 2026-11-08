@@ -186,6 +186,30 @@ refusal with no project and, with one, the connection's failure, each in words
   refused in `NO_GRAPH`'s words. `docs/TOOLS.md` lists the server's tools from its own listing
   (`tools/reference.py`, over `literature_mcp.Unopened`, a service that opens nothing).
   Implementation 8's debt is paid.
+- **The report's project lanes (F.5.4).** `pnpm lit:report --project <id>` runs
+  `literature_live.py report` (the demo corpus stays `pnpm lit:report` alone, offline). Its ground
+  truth is built by code from the project's kept candidates at run time (`report.truth`): a
+  candidate counts when its passage is the project's, its quote stands in that passage
+  (whitespace aside) and its field is the ontology's; one question a group by document, passage
+  and field, its words the field's name with the organism and feed the group names, its evidence
+  the group's quotes, its relevant passage their chunk, tagged `from-candidates` (a model's
+  extraction no person has reviewed). No model writes or reads a question, so the kit's question
+  drafter stays unused and openFerment names no role for it. Retrieval runs in `interactive`,
+  `vector_only`, `keyword_only`, `full_deep`, `no_graph` and `no_hyde`, each question scored under
+  the kit's rule and under the passage rule (the candidates' own chunk), with the graph and HyDE
+  stages' statuses counted; `no_retracted` and `with_citations` are refused by name, since the
+  first carries a scope of its own and the second follows citations outside the project. With
+  `--judge`, the `judge` route grades each question's top ten in `interactive` and `full_deep`, 0
+  to 2, and the kit's answer through each, on `explain`, is graded blind for grounding by the
+  `judge` route; each answer and each judgement is counted under its own tally (`llm.tally`,
+  handed in by the command), so it carries the model that gave it. No migration and no table: the
+  run whole goes to a file under the service's data folder, outside git, and `report.public` keeps
+  its numbers alone (scores with their intervals, counts, question ids, model ids, USD, seconds),
+  which `--render` sets beside the demo in `docs/reports/literature-retrieval.md` and `.json`. The
+  command reads `core/.env` through `extract.load_env` (`override=False`), installs
+  `llm.kit_client`, reads its stop from its own tally (the first call no model answered) and
+  audits each build and run. `pnpm prove` step 3 lists the sci-rag server's tools over stdio in
+  the proof's project and reads a graph tool's refusal, offline.
 
 ## Revisit condition
 
