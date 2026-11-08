@@ -2119,7 +2119,8 @@ def literature_documents() -> list[LiteratureDocument]:
 @app.get("/api/literature/stats", response_model=LiteratureStats)
 def literature_stats() -> LiteratureStats:
     """The project's documents and chunks in the kit, by source, licence class
-    and embedding version; the concept graph's size is the instance's."""
+    and embedding version, and its concept graph's entities and relationships,
+    the ones its own passages name and hold."""
     return LiteratureStats.model_validate(kit.stats(projects.current()))
 
 

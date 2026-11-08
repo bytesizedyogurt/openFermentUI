@@ -19,10 +19,11 @@ sources as `exclude_document_ids` (`visible`). A project that holds nothing
 sees nothing; the kit denies an empty allowlist outright.
 
 `ProjectService` is the kit's own `RagService` with that narrowing applied to
-every read, so the calls below, the kit's REST app at /rag (`rest_app`) and
-its MCP server (`mcp.py`) answer alike for one project. A request to /rag
-names its project as every /api request does (api.py); the MCP server acts in
-OPENFERMENT_PROJECT.
+every read, the concept graph's among them (`graph.py`), so the calls below,
+the kit's REST app at /rag (`rest_app`) and its MCP server
+(`openferment_core/literature_mcp.py`) answer alike for one project. A request
+to /rag names its project as every /api request does (api.py); the MCP server
+acts in the project its `--project` names, else OPENFERMENT_PROJECT.
 
 TWO KINDS OF ENGINE. asyncpg ties a connection to the event loop that opened
 it. The calls openFerment makes run on the database loop (`db.run`) through a
@@ -65,7 +66,7 @@ from sqlalchemy.ext.asyncio import AsyncEngine, async_sessionmaker
 
 from .. import db, projects
 from ..db import models as t
-from . import DOMAIN_DIR, EMBEDDING_CACHE, EMBEDDING_DIM, EMBEDDING_MODEL, HERE
+from . import DOMAIN_DIR, EMBEDDING_CACHE, EMBEDDING_DIM, EMBEDDING_MODEL, HERE, graph
 from .fastembed import FastEmbedProvider
 
 T = TypeVar("T")
@@ -493,17 +494,40 @@ class ProjectService(RagService):
         found["cited_by"] = [c for c in found["cited_by"] if c["document_id"] in mine]
         return found
 
+    async def search_entities(self, name_contains: str, entity_type: str | None = None,
+                              limit: int = 20) -> dict[str, Any]:
+        """The kit's `search_entities` over the project's concept graph: the
+        entities the project's passages name whose name holds `name_contains`
+        (`graph.entities`, under graph.py's rule)."""
+        project = _project()
+        seen = await _on_db(visible(project))
+        return await graph.entities(self.session_factory, seen.documents, project=project,
+                                    name_contains=name_contains, entity_type=entity_type, limit=limit)
+
+    async def entity_relationships(self, entity_name: str) -> dict[str, Any]:
+        """The kit's `get_entity_relationships` over the project's concept
+        graph: each relationship of the entity named `entity_name` whose
+        evidence the project holds, with the passage it stands in
+        (`graph.relationships`, under graph.py's rule)."""
+        project = _project()
+        seen = await _on_db(visible(project))
+        return await graph.relationships(self.session_factory, seen.documents, entity_name, project=project)
+
     async def stats(self) -> dict[str, Any]:
-        """The project's documents and chunks. The concept graph (entities,
-        relationships, communities) is the instance's, counted whole."""
-        counts = await super().stats()
+        """The project's documents, their chunks and their citations, counted
+        by licence class, source and embedding version, and its concept graph:
+        the entities its passages name and the relationships they hold
+        (graph.py's rule). Communities stay unbuilt, since the kit reads none
+        under a scope, so they count 0."""
         ids = (await _on_db(visible(_project()))).documents
+        shape = await graph.counts(self.session_factory, ids)
+        counts: dict[str, Any] = {"documents": len(ids)}
         async with self.session_factory() as session:
-            counts["documents"] = len(ids)
             counts["chunks"] = int(await session.scalar(
                 select(func.count(Chunk.id)).where(Chunk.document_id.in_(ids))) or 0)
             counts["citations"] = int(await session.scalar(
                 select(func.count(DocumentCitation.id)).where(DocumentCitation.citing_document_id.in_(ids))) or 0)
+            counts.update(entities=shape["entities"], relationships=shape["relationships"], communities=0)
             counts["license_classes"] = dict((await session.execute(
                 select(Document.license_class, func.count(Document.id)).where(Document.id.in_(ids))
                 .group_by(Document.license_class))).all())
@@ -516,6 +540,31 @@ class ProjectService(RagService):
                     .group_by(Chunk.embedding_version))).all()
             }
         return counts
+
+    async def fingerprint(self) -> dict[str, Any]:
+        """The project's corpus as a report states it: the kit's fingerprint
+        (`sci_rag.evals.report.corpus_fingerprint`: documents, chunks, the
+        graph's entities, relationships and communities, the latest ingestion,
+        the embedding versions) counted over the documents the project holds,
+        with the kit's token count of their chunks (`tokens`, its estimate of
+        four characters a token where tiktoken is absent) and the concept
+        graph's counts (`graph`, `graph.counts`)."""
+        project = _project()
+        ids = (await _on_db(visible(project))).documents
+        async with self.session_factory() as session:
+            chunks, tokens = (await session.execute(
+                select(func.count(Chunk.id), func.coalesce(func.sum(Chunk.token_count), 0))
+                .where(Chunk.document_id.in_(ids)))).one()
+            latest = await session.scalar(select(func.max(Document.ingested_at)).where(Document.id.in_(ids)))
+            versions = sorted(v for v in (await session.execute(
+                select(Chunk.embedding_version).where(Chunk.document_id.in_(ids)).distinct())).scalars() if v)
+        shape = await graph.counts(self.session_factory, ids)
+        return {
+            "project": project, "documents": len(ids), "chunks": int(chunks), "tokens": int(tokens),
+            "entities": shape["entities"], "relationships": shape["relationships"], "communities": 0,
+            "latest_ingested_at": latest.isoformat() if latest else None, "embedding_versions": versions,
+            "graph": shape,
+        }
 
 
 # ── what openFerment calls ─────────────────────────────────────────────────
@@ -683,6 +732,14 @@ def stats(project_id: str) -> dict[str, Any]:
     return db.run(go())
 
 
+async def fingerprint(project_id: str) -> dict[str, Any]:
+    """`ProjectService.fingerprint` for `project_id`, awaited on the database
+    loop: a report's coroutine, handed to `db.run`, awaits it beside the
+    kit's own evaluation."""
+    with projects.using(project_id):
+        return await service().fingerprint()
+
+
 @dataclass(frozen=True)
 class Hit:
     """One passage a search found, with where it stands and how it was found."""
@@ -784,7 +841,7 @@ def answer(query: str, *, project_id: str, top_k: int = 8, profile: str = "inter
 def rest_app() -> Any:
     """The kit's REST app, for /rag: its routes, its key check and its error
     shape over `service('free')`. Its MCP endpoint is left out; the MCP
-    server runs on its own (`python -m openferment_core.literature.mcp`)."""
+    server runs on its own (`python -m openferment_core.literature_mcp`)."""
     from sci_rag.server.app import create_app
     from starlette.routing import Mount
 

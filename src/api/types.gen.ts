@@ -1604,7 +1604,8 @@ export interface paths {
         /**
          * Literature Stats
          * @description The project's documents and chunks in the kit, by source, licence class
-         *     and embedding version; the concept graph's size is the instance's.
+         *     and embedding version, and its concept graph's entities and relationships,
+         *     the ones its own passages name and hold.
          */
         get: operations["literature_stats_api_literature_stats_get"];
         put?: never;
@@ -5496,8 +5497,9 @@ export interface components {
          * LiteratureStats
          * @description GET /api/literature/stats, in the kit's own names: the project's
          *     documents, their chunks and their citations, counted by licence class,
-         *     source and embedding version; the concept graph's entities,
-         *     relationships and communities are the instance's, counted whole.
+         *     source and embedding version, and the project's concept graph, the
+         *     entities its passages name and the relationships they hold
+         *     (literature/graph.py). Communities stay unbuilt, so they count 0.
          */
         LiteratureStats: {
             /** Chunks */

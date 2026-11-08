@@ -614,8 +614,9 @@ class SearchResponse(BaseModel):
 class LiteratureStats(BaseModel):
     """GET /api/literature/stats, in the kit's own names: the project's
     documents, their chunks and their citations, counted by licence class,
-    source and embedding version; the concept graph's entities,
-    relationships and communities are the instance's, counted whole."""
+    source and embedding version, and the project's concept graph, the
+    entities its passages name and the relationships they hold
+    (literature/graph.py). Communities stay unbuilt, so they count 0."""
 
     documents: int
     chunks: int

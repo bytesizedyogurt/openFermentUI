@@ -26,14 +26,15 @@ FastAPI app; its MCP server is listed in `.mcp.json`. The bespoke stack is delet
 Generation runs on the kit's `anthropic:` and `openai-compatible:` model specs so a person's own
 key or a local model serves it, configured from `llm.ROUTES` (ADR-008).
 
-Two adaptations, both offered upstream:
+Two adaptations, both meant to be offered upstream:
 
 1. A local embedder on FastEmbed (already the project's `rag` extra). The kit's settings accept
    `embedding_provider` in `{"google", "local-hash"}` only, and its `Retriever` takes an
    `embedder` argument. openFerment therefore builds its `FastEmbedProvider` and passes it to every
    kit object it constructs, and installs it as the kit's `get_embedder` answer inside the
-   openFerment process. The upstream pull request (kept under `docs/upstream/sci-rag-kit/`) adds
-   `fastembed` to the setting and to `get_embedder`, with its contract test.
+   openFerment process. The upstream pull request would add `fastembed` to the setting and to
+   `get_embedder`, with its contract test; no draft of it was ever committed to this tree (its
+   history holds no `docs/upstream/`, read 2026-11-05).
 2. A corpus collector turning openFerment's fetchers (Europe PMC JATS, OSTI PDFs, SGD entries,
    uploads, pasted text) into the kit's `CorpusEntry` rows; project scope is written into
    `CorpusEntry.source` as `project:<id>:<collector>` and passed as the `sources` filter.
@@ -69,9 +70,10 @@ Two adaptations, both offered upstream:
   embedder and model client for any kit path that asks them. The model client is
   `llm.kit_client`, installed by the composition root (`api.py`, `literature_mcp.py`): every
   generation the kit makes (answers, HyDE, a document's graph) is a call through `llm.call`, under
-  the day's cap, with the key read in one place. The kit's `extraction` role is our `index` role;
-  `answer` and `judge` are `answer`. A model key of a caller's own (the kit's `byo_llm`) is
-  refused everywhere.
+  the day's cap, with the key read in one place. The kit's roles read our routes by family
+  (`llm.KIT_ROLES`, since ADR-008's 6.3): `answer` reads `explain`, `extraction` reads `index`
+  and `judge` reads `judge`. A model key of a caller's own (the kit's `byo_llm`) is refused
+  everywhere.
 - **The project is the scope.** A document is stored once (the kit's content hash) with source
   `project:<id>:<collector>`; `documents_link` holds a row per project that holds it, with the
   selection (collector, identifier, licence as stated, reason, who). `kit.ProjectService`, the
@@ -80,8 +82,10 @@ Two adaptations, both offered upstream:
   as its `sources` allowlist and the other documents of those sources as
   `exclude_document_ids`, so a shared document is visible to each project that linked it and to
   no other. Which documents a project holds is read through openFerment's own session, the one
-  a test's transaction binds. The concept graph's entities and communities are the instance's;
-  the community layer is off for every scoped request, as the kit makes it.
+  a test's transaction binds. The kit keeps one concept graph for the instance, one entity row a
+  name; a project builds it over its own passages and reads it through `literature/graph.py`
+  (Implementation F), and the community layer is off for every scoped request, as the kit makes
+  it.
 - **Engines.** asyncpg ties a connection to its loop. The calls openFerment makes run on the
   database loop through a pooled engine whose connections put `sci_rag, public` on the search
   path; it is installed as the kit's own engine, so `ingest_entries` uses it. `/rag` and the MCP
@@ -145,6 +149,35 @@ database: with no project, a refusal in words; with `--project`, the project's 5
 chunks, a search with its hits, an unknown document refused in words; with the database down, the
 refusal with no project and, with one, the connection's failure, each in words
 (`test_literature_mcp.py`).
+
+## Implementation F (alpha 2.2 F.5: the concept graph a project builds and reads)
+
+- **The build reads the project's chunks alone.** The kit's `extract_graph` reads every chunk of
+  the store that no build has read, with no document filter. `literature/graph.py`'s `build`
+  selects the project's unread chunks in the kit's order (the document's content hash, then the
+  chunk's index) and hands each batch of ten to the kit's own batch step
+  (`sci_rag.graph.extractor._extract_with_recovery`, underscore-private in 0.5.0, its signature
+  pinned by a test): one call on the client the caller hands in, the kit's `extraction` role and
+  so the `index` route, an answer it cannot read halved down to one chunk, a batch that fails left
+  unstamped for the next build. A chunk of a document two projects hold is read once and serves
+  both. `stop`, read after each batch, ends the build in its words (no key, the account's usage
+  limit, the day's cap). `literature/` imports no `llm`: the command hands in the client and the
+  stop.
+- **A scoped read shows what the project's own passages prove**, by the rule the kit's retrieval
+  seeds its graph walk by under a scope (`retrieve/stages/graph.py`: a name and a passage compared
+  in lower case, each run of other characters one space). An entity is the project's when one of
+  its evidence chunks is a passage of a document the project holds and that passage names it; a
+  name the kit holds as an alias finds nothing. A description stands where every document the
+  entity is named in is the project's, and is withheld with a note otherwise, since the kit keeps
+  the first description a model wrote for the name. An edge is the project's when its evidence
+  chunk is the project's and both its ends are entities of the project, with its document and
+  passage id; its quote is withheld with a note where its words do not stand in that passage. A
+  count counts the project's passages alone. `ProjectService.search_entities` and
+  `entity_relationships` read so; `stats` counts the project's entities and relationships and 0
+  communities; `fingerprint` states the project's corpus for a report. A read of a project no build
+  has read says which command builds its graph (`graph.NO_GRAPH`).
+- **Communities and entity resolution stay off.** The kit reads no community under a scope, and
+  resolution merges rows every project reads.
 
 ## Revisit condition
 

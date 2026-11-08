@@ -45,7 +45,7 @@ and `created_by`, the person who asked.
 | `POST /api/intake/upload` | multipart `file`, `by`, `title`, `licenceClass`, `licence`, `reason` |
 | `POST /api/intake/paste` | `{title, text, by, url, licenceClass, licence, reason}` |
 | `GET /api/literature/documents` | every document the project holds, with its chunk count and selection |
-| `GET /api/literature/stats` | documents and chunks by source, licence class and embedding version |
+| `GET /api/literature/stats` | documents and chunks by source, licence class and embedding version, and the concept graph's entities and relationships the project's own passages name and hold (`literature/graph.py`) |
 | `GET /api/literature/search?q=` | passages best first, each with its document, passage id and citation |
 | `POST /api/intake/{documentId}/extract` | candidates anchored to the document's stored passages (`extract.py`) |
 

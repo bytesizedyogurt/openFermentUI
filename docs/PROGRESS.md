@@ -3115,3 +3115,19 @@ The live work (the prompt's §6.7 and §7), on the routes of its §4 as `core/.e
   Python 3.13 and on 3.12, 333 passed each way; `gen:api`, `gen:tools` and `gen:components --check`, each file as
   it was; `pnpm test:core` 2973 passed, 1 skipped, 175 deselected (6 min 8 s); `pnpm test:lit` not owed
   (literature/ unchanged, and its tests hand the kit its own `MockLLM`).
+- F.5.2. The concept graph a project builds and reads (the F.5 plan's §3 items 2, 3 and 12; its decisions 1 and 2;
+  ADR-002, Implementation F). `literature/graph.py` builds the graph over the project's unread chunks alone, in the
+  kit's order, ten to a batch through the kit's own batch step (`_extract_with_recovery`, its signature pinned), on
+  the client the caller hands in, with `stop` read after each batch; a chunk of a document two projects hold is read
+  once. Its reads show what the project's own passages prove: an entity where a passage of the project names it
+  (aliases left out), its description where every document naming it is the project's, an edge where its evidence
+  passage is the project's and both ends are its entities, with its document and passage id, its quote where its
+  words stand in that passage, and counts over the project's passages alone; a project no build has read is told
+  the command that builds it. `ProjectService` gains `search_entities`, `entity_relationships` and `fingerprint`;
+  `stats` counts the project's graph and 0 communities (the stats route's words, `docs/api/intake.md`). The
+  orchestrator's narrowing (8 November) leaves the kit's question drafter out, so ADR-002 names three kit roles.
+  Tests: `test_literature_graph.py` (16 new: two projects, neither reading the other's entities, edges or
+  descriptions), `test_literature_kit.py` (1 new, 1 changed). Checks: the twenty files the change reaches, with the
+  database address empty, on Python 3.13 and on 3.12, 435 passed and 1 skipped each way; `gen:api`, `gen:tools` and
+  `gen:components --check`, each file as written; `pnpm test:lit` 10 passed; `pnpm test:core` 2990 passed, 1
+  skipped, 175 deselected (5 min 39 s, on this Python tree as committed).

@@ -98,6 +98,7 @@ The literature layer: Sci RAG Kit, used as a library (ADR-002).
 |---|---|
 | `collectors.py` | The collectors: what openFerment fetches or is given, as Sci RAG Kit's corpus entries (ADR-002; execution prompt §8.2). |
 | `fastembed.py` | A local embedder for Sci RAG Kit: FastEmbed (ADR-002; execution prompt §8.2). |
+| `graph.py` | The concept graph over a project's passages: the build, and the reads a project makes of it (ADR-002). |
 | `kit.py` | Sci RAG Kit as openFerment runs it (ADR-002; execution prompt §8.2). |
 | `report.py` | `python -m openferment_core.literature.report` — the retrieval report (ADR-002; execution prompt §8.2): Sci RAG Kit's own evaluation harness run over its demo corpus, as openFerment runs the kit. |
 
