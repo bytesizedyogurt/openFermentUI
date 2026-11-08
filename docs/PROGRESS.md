@@ -26,33 +26,41 @@ session continues from this file and `git log` alone.
      OPENFERMENT_MODEL -u OPENFERMENT_FALLBACK_MODEL -u OPENFERMENT_INDEX_MODEL -u
      OPENFERMENT_EFFORT <command>`).
 3. First tests to run: `pnpm test:core`, then `pnpm test:sim`.
-4. **Stage F, the live work, is under way** (the prompt's §6.7 and §7; the Log). F.0 and F.1 are done: `pnpm ready
-   --probe` answered at 08:26 UTC on 5 November, and the Ethanol project stands rebuilt in this container's fresh
-   `openferment_dev` from Home and `docs/corpus/ethanol-sources.txt` through Intake, its 22 documents held and extracted
-   on the `extract` route, 457 candidates waiting for the owner's review (5.38 USD; the section of 5 November in
-   `docs/reports/live-questions-2026-11.md`). Next is F.2, the model comparison on four route tables with two judges,
-   which sets the routing defaults; then F.3, the fourteen questions on the Postdoc screen on the final routes; F.4,
-   `pnpm prove --live`; and the paid retrieval lanes. The service and every live command run with
-   `OPENFERMENT_DATA_DIR` on a copy of the fetched caches (Yeast9's and iMM904's files and the toolkit's reference
-   files), which live outside `core/data/` in this container. Alpha 2.1's Ethanol project is kept whole in
-   `openferment_dev_alpha21`, the name F.1 gave alpha 2.1's development database, and read there with SELECT alone. A
-   fresh container makes the project again on Home from the sources file through Intake (four minutes of collecting),
-   then extracts (fourteen minutes).
+4. **Stage F, the live work, stands where the Anthropic account's usage limit stopped it** (the prompt's §6.7 and §7;
+   the Log; Blockers). F.0 and F.1 are done: `pnpm ready --probe` answered at 08:26 UTC on 5 November, and the Ethanol
+   project stands rebuilt in this container's fresh `openferment_dev` from Home and `docs/corpus/ethanol-sources.txt`
+   through Intake, its 22 documents held and extracted on the `extract` route, 457 candidates waiting for the owner's
+   review (5.38 USD; the section of 5 November in `docs/reports/live-questions-2026-11.md`). F.2 is done as far as the
+   account allowed: the evaluation the comparison reads (F.2a and its review); the judge's room at 32,000 tokens (F.2c,
+   ADR-008 Implementation 15); the haiku, sonnet and opus-high tables asked and judged, fourteen of fourteen each, and
+   opus-max's first four; the plan's room set by the route's effort (F.2g, Implementation 16); and the report written to
+   its end with the routing defaults set in `llm.ROUTES` (F.2e and F.2f, Implementation 17;
+   `docs/reports/model-routing-2026-11.md`). F.5's commands stand on the branch, built with no model call: a run's own
+   count and the kit's room for its thinking (F.5.1, Implementation 18), the concept graph over a project's own passages
+   (F.5.2), the kit's two graph tools on the `sci-rag` server (F.5.3), and the report's project lanes with `pnpm
+   lit:graph` and `pnpm lit:report --project` (F.5.4). Every live step waits on the account (Blockers), in this order
+   once it answers: opus-max's other ten questions and the larger room's measure, the second judge, the summary; F.3,
+   the fourteen on the Postdoc screen on the final routes; F.4, `pnpm prove --live`; and F.5's live run, `pnpm lit:graph
+   --project ethanol --by <name>`, then `pnpm lit:report --project ethanol --by <name> --judge --render`. The service
+   and every live command run with `OPENFERMENT_DATA_DIR` on a copy of the fetched caches (Yeast9's and iMM904's files
+   and the toolkit's reference files), which live outside `core/data/` in this container. Alpha 2.1's Ethanol project is
+   kept whole in `openferment_dev_alpha21`, the name F.1 gave alpha 2.1's development database, and read there with
+   SELECT alone. A fresh container makes the project again on Home from the sources file through Intake (four minutes of
+   collecting), then extracts (fourteen minutes).
    Stage E is done (E.0a to E.16, then its gate; the Log): every screen, component and `src/lib` module reads the
    generated `src/api/types.gen.ts`, `src/data/types.ts` is deleted, and `check:plan` keeps the provenance ranking
    alone; the catalogues screen stands at `/catalogues`, and Primer's lessons, Guild's skills and the protocols are the
    project's own, a protocol begun on the protocols page; the research funnel is deleted; the agent builder's interface
    points are paid; and the gate holds: `pnpm verify` on all sixteen stages, `pnpm smoke` with no key opening every
-   screen, and `pnpm prove` offline with the catalogue screen in the walk. Two Known debts wait after stage F, each a
-   commit of its own before the close (stage H): a Proforma panel row that chooses a deposition reading and keeps its
-   own value and unit, and Studies' run card naming a kinetics configuration by its kind and when it was kept
-   (Departures, E.gate). Stage D is done: D.0 sealed
-   the handoff pages before the core's commit was recorded (`CORE=6f85338`, D.1), and both
-   strangers finished in their first round with no core file changed: the mirror engine
-   (`examples/engines/openferment-engine-mirror/`) and the record-reader agent
-   (`examples/agents/record-reader/`), each round in `docs/reports/handoff-2026-11.md`. Stage C is
-   done: every run one shape.
-5. Files in flight: none; the F.1 commit holds the report's stage F section and this file's record of F.0 and F.1.
+   screen, and `pnpm prove` offline with the catalogue screen in the walk. Its two Known debts are paid on the branch
+   during stage F (E.17, E.18), with E.19, the review of the three (E.debts) and the gate's leftovers (E.20) after them;
+   that series and F.5's four were each built in a worktree and landed by cherry-pick on 8 November (Departures,
+   E.gate). Stage D is done: D.0 sealed the handoff pages before the core's commit was recorded (`CORE=6f85338`, D.1),
+   and both strangers finished in their first round with no core file changed: the mirror engine
+   (`examples/engines/openferment-engine-mirror/`) and the record-reader agent (`examples/agents/record-reader/`), each
+   round in `docs/reports/handoff-2026-11.md`. Stage C is done: every run one shape.
+5. Files in flight: none; the landing's record commit holds this file's account of the nine picks and the runs on
+   the final tree.
 
 ## Current stage
 
@@ -283,6 +291,9 @@ DOI or PMID. Each now reads the project's rows.
 | 2026-11-05 07:04 | CI on `dc02f20` (E.16), run 41982676788: `pnpm verify`, then `pnpm prove` | every stage green; every proof check holds | 13 min 9 s (verify); 3 min 25 s (the proof) | `dc02f20` |
 | 2026-11-05 08:49 | The stage E gate (E.gate): the changed tests with the tests of the code they cover, with the database address empty, on Python 3.13 and on 3.12; `pnpm test:sim`; `pnpm test:core`; `gen:api`, `gen:tools` and `gen:components`; `typecheck`, `check:plan`, `check:state`, `check:figures`, `check:guild`, `test:reconcile`, `check:secrets`; `build`; `pnpm smoke` with no key; `pnpm prove --steps 9` and `pnpm prove`, offline; `pnpm verify`, all sixteen stages | 579 passed each way; 142 passed; 2946 passed, 1 skipped, 175 deselected; the document, the types and `docs/TOOLS.md` regenerated, `COMPONENTS.md` as it was; every check green, `check:state` 66 checks, `check:guild` 146; 20 of 20 screens, Postdoc's saying it runs with no key; 52 of 52 and 93 of 93 checks, the catalogue screen and the five new walk steps in the walk, no call in the proof's spend table; every stage green (`test:core` 2946 passed, `test:sim` 142, `test:lit` 10, `smoke` 20 of 20) | 5 min 29 s (sim); 5 min 25 s (core); 218 s (the proof); 13 min 7 s (verify) | `dc02f20` and E.gate |
 | 2026-11-05 09:55 | F.1: `pnpm test:core` on the final tree, the report's stage F section and this file's record of F.0 and F.1 in it | 2946 passed, 1 skipped, 175 deselected | 5 min 20 s | F.1 |
+| 2026-11-08 05:42 | The landing, w1's five picks (E.17, E.18, E.19, E.debts, E.20) on `2ed7dac`: after each, its changed tests with the tests of the code they cover, with the database address empty, on Python 3.13 and on 3.12, `gen:api`, `gen:tools` and `gen:components` with each `--check`, and `typecheck`; `check:state` after E.19; then `pnpm test:core` | 158, 143, 428 and 160 passed each way (E.19 changed no Python); every check green; 2987 passed, 1 skipped, 175 deselected | 4 min 57 s | `448adbb` (E.20) |
+| 2026-11-08 05:53 | The landing, w2's four picks (F.5.1 to F.5.4): after each, its changed tests with the tests that reach `llm.call`, the kit or the package map, with the database address empty, on Python 3.13 and on 3.12, and `gen:api`, `gen:tools` and `gen:components` with each `--check` (`typecheck` after F.5.2, whose generated types moved); then `pnpm test:core` | 297, 171, 177 and 253 passed each way; every check green; 3037 passed, 1 skipped, 175 deselected | 5 min 5 s | `adb9c8d` (F.5.4) |
+| 2026-11-08 05:55 | The landing's final tree: `gen:api`, `gen:tools` and `gen:components` with each `--check`; `check:secrets`, `check:plan`, `check:state` (86 checks), `check:figures`, `check:guild` (146 checks), `check:tools`; `pnpm test:sim`; `pnpm test:lit`; `pnpm build`; `pnpm smoke` with no key, on its own service at 127.0.0.1:43339, stopped after; `pnpm prove`, offline, steps 1 to 10 | each file as the code writes it; every check green; 142 passed, 3071 deselected; 10 passed, 3203 deselected; built; 20 of 20 screens; 99 of 99 checks, the sci-rag server's graph tools in step 3 and no call in the proof's spend table | 4 min 55 s (sim); 7 s (lit); 18 s (build); 36 s (smoke); 195 s (the proof) | `adb9c8d` |
 | 2026-10-30 06:47 | `test:core` with 2.2; `check:tools`; `pnpm smoke` (own database, project made through the API) | 1920 passed, 2 skipped, 128 deselected; passed; 11 of 11 rail entries open in the project | 4 min 26 s | 2.2 |
 
 ## Spend (alpha 2.1)
@@ -399,7 +410,7 @@ prompt's §4).
 | alpha 2.2 §6.5, E.12 | The Durable snapshot keeps no lesson, and Primer lists the project's lessons in the catalogue's order, a lesson addressed by its id alone (`/primer/<lesson>`): the modules slice, `learnProgress` and `completeLesson` leave the store, and a lesson shows passed from the ledger's knowledge entries for whoever is learning, so a lesson that counts toward no skill shows passed for nobody; a snapshot's older `learnProgress` loads, and the next save leaves it out (ADR-014's note of E.12) | §6.5 asks that the snapshot keep no lesson; the lesson catalogue keeps no module (ADR-018), and the ledger is where a lesson's passing stands for every device and every person |
 | alpha 2.2 §6.5, E.12 | `src/lib/protocols.ts` is born with the protocol screens, beside the two libs §6.5 names for them (`lib/guild.ts`, `lib/practice.ts`): the generated protocol family, the four protocol routes and the readers of a version's lists | A project keeps its protocols on the service since E.12a (ADR-017), and the protocol screens, Guild's Matrix and skills, Primer's path and the bench read them; neither of the two named libs is about protocols |
 | alpha 2.2 §6.5, E.gate | An artifact's `output` stays the engine's own dict, and the screens read it per tool through the shapes their readers name, each field read with its default: a comparison's runs, rows and values (ProformaComparison), a run's `outputs.values` (each in the shape the service writes an input in, `RunInput`, through a guard), geneOS's frontier and mix points, a Proforma or library run's tables and its package-test checks (`lib/proforma.ts`) and a train run's (`lib/pureos.ts`). The service serves a run's tables and checks as typed reads (`GET /api/biorepo/artifacts/{id}/tables` and `/checks`, alpha 2.2 E.0a) for a client that holds no artifact, and the screens read the artifact they hold already. The SSE envelopes (`ServiceEvent`, `StreamEvent`) and the kit's answer citations (`AnswerSource`, `lib/literature.ts`) stay the client's own event shapes | `Artifact.output` is `dict[str, Any]` on the service: each tool writes its own, and a tool's output gains fields over its versions (a run kept before the tables reads with empty ones), so a model per tool's output is a change to the artifact store's contract that needs a decision record of its own; the OpenAPI document holds no events (the stage plan's finding 5) |
-| alpha 2.2 stage E, E.gate | The two Known debts alpha 2.1 gave stage E (a Proforma panel row that chooses a deposition reading; Studies' run card naming a kinetics configuration by its kind and when it was kept) leave stage E's gate: each is built as a commit of its own (E.17, E.18) in a worktree beside stage F's live rebuild, and they land on the branch during stage F, before the fourteen are asked on the screen | Each needs a service model beyond the screens' types: a panel override that keeps a reading's own value and unit (`Override` holds a bare value in its parameter's unit), and a title per configuration in `EngineThing`, which changes the engine contract's page; stage E's gate stands on the type move, the catalogues, Primer and Guild on the catalogue, and the review's fixes |
+| alpha 2.2 stage E, E.gate; F.5 | The two Known debts alpha 2.1 gave stage E (a Proforma panel row that chooses a deposition reading; Studies' run card naming a kinetics configuration by its kind and when it was kept) leave stage E's gate: each is built as a commit of its own (E.17, E.18) in a worktree beside stage F's live rebuild, E.19, the review of the three (E.debts) and the gate's leftovers (E.20) after them on the same worktree's branch (`alpha22-e-debts`), and stage F's retrieval commands in a second worktree (`alpha22-f5`: F.5.1 to F.5.4). Both landed on `claude/alpha-2-2-base` on 8 November, before the fourteen are asked on the screen, each commit cherry-picked onto F.2e/F.2f's `2ed7dac` with its own message: E.17 `7e178bb`, E.18 `09e95dd`, E.19 `b70fa83`, E.debts `8bde8ab`, E.20 `448adbb`; F.5.1 `2795aa7`, F.5.2 `8e2ec88`, F.5.3 `19d129a`, F.5.4 `adb9c8d`. Each pick's log lines go in their stage's section; the main line had moved under both (F.1 to F.2f), so F.5's note in ADR-008 stands as Implementation 18 with each reference to it, `llm.KIT_ROOM`'s comment names the judge's 32,000 tokens (`JUDGE_TOKENS`), and F.5.1's two new tests read the routes' defaults of Implementation 17 (its tally test `explain` at high and `judge` at max; its room test sets `explain` at medium, F.5.4's version of it at high) | Each needs a service model beyond the screens' types: a panel override that keeps a reading's own value and unit (`Override` holds a bare value in its parameter's unit), and a title per configuration in `EngineThing`, which changes the engine contract's page; stage E's gate stands on the type move, the catalogues, Primer and Guild on the catalogue, and the review's fixes. F.5's commands are built and checked with no model call, beside stage F's live steps |
 | alpha 2.2 §6.5, E.7 | `src/lib/proposals.ts` moves to the generated types with pureOS's screens, where §6.5 names it; its readers are Home's ProposalsCard and check:guild, and it reads the Guild person acting from the hand-kept types until Guild's lib moves (E.12) | A gate's proposal is what a model asked for in any module (OF-BLD-015 §7.4); pureOS's screens read a train's proposal, `TrainProposal`, from `lib/pureos.ts`. The file moves in the commit §6.5 names, with the readers it has |
 | alpha 2.2 §6.1, B.2 | `run(thing, configuration, inputs, by)` takes `inputs` as a list of `EngineInput`, each a parameter's key and a `Quantity` (the shape a run's inputs have, `RunInput`), where §6.1 writes `inputs: list[Quantity]` | A `Quantity` carries no name, so the parameter each value sets is named beside it |
 | alpha 2.2 §6.1, B.2 and B.6 | An engine declares `heavy` beside `worker`: the modules its worker alone imports. The registry and conformance check 6 keep the worker module, each module `heavy` names (with every module below it) and `workers.WORKER_LIBRARIES` (BioSTEAM, thermosteam, biorefineries, the SFF toolkit, cobra) out of the service's process for every engine; `worker` may be `None` only with `heavy` empty | §6.1's `worker` names one module, and its name alone cannot say which of the libraries it imports are heavy; check 6 needs the list to hold them out |
@@ -3176,3 +3187,19 @@ The live work (the prompt's §6.7 and §7), on the routes of its §4 as `core/.e
   and `gen:components --check`, each file as written (COMPONENTS.md regenerated); `pnpm test:lit` 10 passed; `pnpm
   prove --steps 3`, offline, steps 1 to 3, 19 of 19 checks in 40 s, no model call; `pnpm test:core` 3016 passed, 1
   skipped, 175 deselected (5 min 10 s).
+- The landing (8 November). The two worktrees' commits land on the branch by cherry-pick from the main checkout, each
+  read first and each keeping its own message: w1's five (`alpha22-e-debts`, cut at `3b40de6`) as `7e178bb` (E.17),
+  `09e95dd` (E.18), `b70fa83` (E.19), `8bde8ab` (E.debts) and `448adbb` (E.20), their log lines in stage E's section;
+  then w2's four (`alpha22-f5`, cut at `0bd047e`) as `2795aa7` (F.5.1), `8e2ec88` (F.5.2), `19d129a` (F.5.3) and
+  `adb9c8d` (F.5.4), their log lines after F.2e and F.2f. Each conflict was a log line both sides appended, save two
+  in F.5.4: `test_llm.py`'s room test, taken as F.5.4 wrote it, and ADR-008, where F.5's note follows
+  Implementation 17 as Implementation 18, F.5.4's two lines here naming it so. F.5.1's pick names the judge's 32,000
+  tokens in `llm.KIT_ROOM`'s comment, and its two new tests read the defaults of Implementation 17, which F.5.1 was
+  written before (its tally test `explain` at high and `judge` at max; its room test sets `explain` at medium). Every
+  generated file stood as the code writes it after each pick. Checks: after each pick its changed tests with the
+  tests of the code they cover, with the database address empty, on Python 3.13 and on 3.12, each set green both ways;
+  `pnpm test:core` after each series, 2987 and then 3037 passed, 1 skipped, 175 deselected; and on the final tree
+  `gen:api`, `gen:tools` and `gen:components --check`, `check:secrets`, `check:plan`, `check:state`, `check:figures`,
+  `check:guild`, `check:tools`, `pnpm test:sim` 142 passed, `pnpm test:lit` 10 passed, `pnpm build`, `pnpm smoke` with
+  no key on 20 of 20 screens, and `pnpm prove`, offline, steps 1 to 10, 99 of 99 checks in 195 s with no model call
+  (Last green runs). Every check held, so this record is the one commit after the picks.
