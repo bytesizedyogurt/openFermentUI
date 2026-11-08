@@ -73,7 +73,7 @@ for 1, 5 and 8 are the third asking's; the rest are the second's.
 | # | Expects | First step | Answer | Tool calls | Claims | Stopped | USD | Models | Judged |
 |---|---|---|---|---|---|---|---|---|---|
 | 1 | cited quotes | 362 ms | 107 s | 22 | 5 / 5 | done | 0.7502 | claude-opus-5-5 | as expected, short in coverage: four documents' titres with their conditions in words, each citing its passages and records, and a claim that no other document's titre was found; five dropped (an ordinal, a numeral, a quote past 300 characters, a quote that was not a whole sentence), and the gaps say the candidate list was read in part |
-| 2 | cited quotes | 238 ms | 68 s | 29 | 9 / 1 | done | 0.5692 | claude-opus-5-5 → claude-sonnet-5-5 | as expected: nine claims on the strains (CEN.PK113-7D and its engineered descendants, S288C, Ethanol Red, BY4743, AFY, the distillery isolates, the Tuscan wine isolates), each citing a passage; Opus declined in the `bio` category and Sonnet answered |
+| 2 | cited quotes | 238 ms | 68 s | 29 | 9 / 1 | done | 0.5692 | claude-opus-5-5 → claude-sonnet-5-5 | as expected: nine claims on the strains the documents name, each citing a passage; Opus declined in the `bio` category and Sonnet answered |
 | 3 | typed values from the run's read-back, origins named | 235 ms | 90 s | 7 | 8 / 0 | done | 0.3710 | claude-opus-5-5 | as expected: the feedstock's composition (eleven shares), moisture, flow and price as typed values read back from the run, each named the package's own; their match to the Humbird report is labelled the model's comparison, and the report's price per dry ton converted is a labelled estimate |
 | 4 | artifact citations | 269 ms | 73 s | 13 | 8 / 0 | done | 0.4472 | claude-opus-5-5 | as expected: the TEA lines per kilogram and per year, the capital, the package's prices and finance terms, each cited by its evidence id, and what a person could change in a scenario |
 | 5 | a scenario with labelled estimates; comparison cited | 236 ms | 97 s | 11 | 8 / 0 | done | 0.4782 | claude-opus-5-5 | as expected: a glucose-only scenario (every reaction that consumes xylose set to none, the model's estimate) made, run and compared; ethanol down by a third, the solved price up 28.7 %, NPV negative, each cited; the claims are `assumed` and say why |
@@ -236,4 +236,6 @@ or above is the drivers' own. One fault shows on Intake's screen: the extraction
 document by the kit's id, 32 hex characters, as the job's title ("Extract <id>") and the activity line
 ("Extracting <id>") do, and that unbroken id widens the toast's row past its fixed 340 px, so its Open
 Witness button sits outside the toast, cut by the window's edge at 1440 px (`src/store.ts` 1462, 1470
-and 1482; `src/components/ui.tsx` 364-386). It joins this stage's list of faults.
+and 1482; `src/components/ui.tsx` 364-386). It joined this stage's list of faults, and E.20 fixed it
+(`448adbb`): the job, its activity line and its toasts name the document by its title where the
+project holds one, and the toast's words break inside a long word, so its buttons stay inside it.

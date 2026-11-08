@@ -38,7 +38,7 @@ ONE DAILY CAP. Every response is charged to `spend.py` under its role, and a
 call whose worst case could take the UTC day past `OPENFERMENT_DAILY_BUDGET_USD`
 is refused before it is sent (`BudgetExhausted`).
 
-A RUN'S OWN COUNT (alpha 2.2 F.5). Within `tally()`, every `call` adds one
+A RUN'S OWN COUNT (alpha 2.2 F.5; ADR-008, Implementation 18). Within `tally()`, every `call` adds one
 `Spent` to the list the tally yields, an answer, a refusal and an outage
 alike: its family and effort, the model that answered, the models asked and
 those that declined, its tokens and USD, how the answer stopped, and a
@@ -203,7 +203,9 @@ ROUTES: dict[str, Route] = {
     # sonnet's by more than the judge's own noise on answering and coverage.
     "plan": Route(_DEFAULT_CHAIN, DEFAULT_EFFORT),
     # Held at extract's route until the retrieval report's answer lane
-    # measures it; none of the fourteen questions reaches this family.
+    # measures it (`pnpm lit:report --project <id> --by <name> --judge`, the
+    # kit's answers graded for grounding; ADR-008, Implementation 18); none
+    # of the fourteen questions reaches this family.
     "explain": Route(_DEFAULT_CHAIN, "high"),
     # The rebuild's extraction (F.1): Sonnet answered each of the nine
     # documents Opus declined in `bio`.
@@ -1096,14 +1098,18 @@ def _converse_once(request: dict[str, Any], ask: Callable[[dict[str, Any]], Any]
 KIT_ROLES = {"answer": "explain", "extraction": "index", "judge": "judge"}
 
 #: The room a kit call has for thinking, in output tokens, by its route's
-#: effort. The kit sizes each call for a model that writes its answer at
-#: once (a judgement in 1,024 tokens, a graph batch in 8,192, HyDE's
-#: passage in 512), and a model's output tokens include its thinking,
-#: so at a high effort the thinking may spend the ceiling before the answer
-#: is written. A kit call asks the larger of the kit's ceiling and this room;
-#: at effort low the kit's ceiling stands. openFerment's own judge asks
-#: 32,000 at every effort (`postdoc.evaluate.JUDGE_TOKENS`).
-KIT_ROOM = {"low": 0, "medium": 4096, "high": 8192, "xhigh": 12000, "max": 16000}
+#: effort (ADR-008, Implementation 18). The kit sizes each call for a model
+#: that writes its answer at once (a judgement in 1,024 tokens, a graph batch
+#: in 8,192, HyDE's passage in 512), and a model's output tokens include its
+#: thinking, so at a high effort the thinking may spend the ceiling before the
+#: answer is written. A kit call asks the larger of the kit's ceiling and this
+#: room; at effort low the kit's ceiling stands. At max the room is
+#: openFerment's own judge's, 32,000 (`postdoc.evaluate.JUDGE_TOKENS`), where
+#: Implementation 15 measured 16,000 too small for a judgement at max; the
+#: judge route runs at max (Implementation 17), so every kit judgement asks
+#: it. The kit's own judgements at max are measured by the retrieval report's
+#: run, its truncated count (`literature/report.py`).
+KIT_ROOM = {"low": 0, "medium": 4096, "high": 8192, "xhigh": 12000, "max": 32000}
 
 
 def kit_client(kit_role: str = "answer") -> Any:

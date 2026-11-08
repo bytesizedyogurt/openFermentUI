@@ -10,11 +10,16 @@ chunk the store holds, whoever collected it.
 
 THE BUILD. `build` reads the project's chunks that no build has read
 (`pending`: the chunks of the documents the project holds, in the kit's order,
-the document's content hash and then the chunk's index), ten to a batch, each
-batch through the kit's own batch step (`_extract_with_recovery`): one model
-call on the client the caller hands in, a batch whose answer cannot be read
-halved down to one chunk, a batch that fails left unstamped for the next build.
-A chunk of a document two projects hold is read once and serves both.
+the document's content hash and then the chunk's index), ten to a batch within
+one document (`batches`), each batch through the kit's own batch step
+(`_extract_with_recovery`): one model call on the client the caller hands in, a
+batch whose answer cannot be read halved down to one chunk, a batch that fails
+left unstamped for the next build. A batch ends where its document ends: the
+kit writes one description a name from the whole batch and files each entity
+and edge against the passage numbers the model names, so a batch of one
+document keeps every word of its answer inside a document that each project
+holding any of its passages holds whole. A chunk of a document two projects
+hold is read once and serves both.
 `literature/` imports no `llm`, so the command hands in the client and `stop`,
 a predicate read after each batch: its words (no key, the account's usage
 limit, the day's cap) end the build, and the chunks it had yet to read wait for
@@ -29,24 +34,30 @@ run of other characters one space.
 - An entity is the project's when one of its evidence chunks is a passage of a
   document the project holds and that passage names it; the names the kit
   holds as aliases find nothing here. Its passage count counts those passages.
-- An entity's description is shown when every document the entity is named in
-  is one the project holds; the kit keeps one description a name, so it is
-  withheld, with a note, otherwise.
+- An entity's description is shown when a model wrote one and every document
+  the entity is named in is one the project holds; the kit keeps one
+  description a name. An entity listed with no description carries one note,
+  the same whichever of the two left it out (`DESCRIPTION_NOTE`).
 - A relationship is the project's when its evidence chunk is the project's and
-  both its ends are entities of the project. Its quote is shown when its words
-  stand in that passage, compared as a name is, and withheld with a note
-  otherwise.
+  that passage names both its ends. Its quote is shown when its words stand in
+  that passage, compared as a name is, and withheld with a note otherwise.
+- The kit matches each name a build extracts against every entity's aliases
+  across the store, so a name another project's build kept as an alias joins
+  that entity at build time. Where the project's passage holds that name
+  alone, its reads list neither the name nor the edges that passage states of
+  it, so another project's name for the entity stays out of them.
 - A count counts the project's passages alone.
 
 Communities stay unbuilt: the kit reads none under a scope. Entity resolution
 stays off: it merges rows every project reads, and a merged row is read by none
 of these. `NO_GRAPH` is what a read says of a project whose passages no build
-has read.
+has read, and `NO_PASSAGES` what it says of a project that holds no passage.
 """
 from __future__ import annotations
 
 import asyncio
-from collections.abc import Callable, Sequence
+import itertools
+from collections.abc import Callable, Iterator, Sequence
 from dataclasses import dataclass
 from typing import Any
 
@@ -63,9 +74,13 @@ from . import kit
 #: What a read says of a project whose passages no build has read.
 NO_GRAPH = ("No concept graph is built over this project's passages yet: `pnpm lit:graph --project {project} "
             "--by <name>` builds it on the index route's model.")
-#: The note beside an entity whose description a read leaves out.
-DESCRIPTION_WITHHELD = ("Withheld: this entity is also named in documents this project does not hold, and the "
-                        "kit keeps the one description a model first wrote for the name.")
+#: What a read says of a project that holds no passage: a store that holds no
+#: project of the id, a project with no document, documents with no chunk.
+NO_PASSAGES = ("The project {project} holds no passage yet: its documents enter on Intake, and `pnpm lit:graph "
+               "--project {project} --by <name>` then builds the concept graph over their passages.")
+#: The note beside every entity a read lists with no description.
+DESCRIPTION_NOTE = ("A read shows the kit's one description of a name when a model wrote one and every document "
+                    "naming the entity is one this project holds.")
 #: The note beside an edge whose quote a read leaves out.
 EVIDENCE_WITHHELD = "Withheld: the quote's words do not stand in the passage this edge cites."
 #: The most entities one read lists, as the kit's own tool bounds it.
@@ -76,6 +91,16 @@ ANSWER_TOKENS = 8192
 
 def no_graph(project_id: str) -> str:
     return NO_GRAPH.format(project=project_id)
+
+
+def no_passages(project_id: str) -> str:
+    return NO_PASSAGES.format(project=project_id)
+
+
+def unread(project_id: str, chunks: int) -> str:
+    """What a read says of a project whose passages no build has read: that
+    it holds none (`NO_PASSAGES`), else the command that builds its graph."""
+    return no_passages(project_id) if not chunks else no_graph(project_id)
 
 
 # ── the build ──────────────────────────────────────────────────────────────
@@ -122,7 +147,9 @@ async def pending(project_id: str, *, rebuild: bool = False,
     )
     if not rebuild:
         statement = statement.where(Chunk.graph_extracted_at.is_(None))
-    if limit:
+    if limit is not None:
+        if limit < 1:
+            raise ValueError("a limit counts one passage at least")
         statement = statement.limit(limit)
     async with kit.service().session_factory() as session:
         return list((await session.execute(statement)).all())
@@ -132,36 +159,50 @@ async def build(project_id: str, *, llm: LLMClient, batch_size: int = 10, limit:
                 rebuild: bool = False, rate_limit_s: float = 0.2,
                 stop: Callable[[], str | None] | None = None) -> Built:
     """Read the project's pending chunks into the concept graph, `batch_size`
-    to a batch, each through the kit's own batch step on `llm` (the kit's
-    `extraction` role). `stop` is read after each batch, and words from it end
-    the build there (`Built.stopped`)."""
+    to a batch within one document (`batches`), each through the kit's own
+    batch step on `llm` (the kit's `extraction` role). `stop` is read after
+    each batch, and words from it end the build there (`Built.stopped`)."""
     if batch_size < 1:
         raise ValueError("a batch holds one chunk at least")
     rows = await pending(project_id, rebuild=rebuild, limit=limit)
+    cut = list(batches(rows, batch_size=batch_size))
     built = Built(chunks_pending=len(rows))
     service = kit.service()
-    for start in range(0, len(rows), batch_size):
-        await _extract_with_recovery(rows[start:start + batch_size], service.session_factory, llm, service.domain,
-                                     built, rate_limit_s=rate_limit_s)
+    for n, batch in enumerate(cut, start=1):
+        await _extract_with_recovery(batch, service.session_factory, llm, service.domain, built,
+                                     rate_limit_s=rate_limit_s)
         built.batches_run += 1
         words = stop() if stop is not None else None
         if words:
             built.stopped = words
             break
-        if rate_limit_s and start + batch_size < len(rows):
+        if rate_limit_s and n < len(cut):
             await asyncio.sleep(rate_limit_s)
     return built
 
 
+def batches(rows: Sequence[Row[tuple[str, str, str]]], *,
+            batch_size: int = 10) -> Iterator[Sequence[Row[tuple[str, str, str]]]]:
+    """`rows` in batches of `batch_size` at most, each within one document:
+    a document's chunks stand together in the kit's order, and a batch ends
+    where its document ends."""
+    if batch_size < 1:
+        raise ValueError("a batch holds one chunk at least")
+    for _, same in itertools.groupby(rows, key=lambda row: row[1]):
+        held = list(same)
+        for start in range(0, len(held), batch_size):
+            yield held[start:start + batch_size]
+
+
 def prompts(rows: Sequence[Row[tuple[str, str, str]]], *, batch_size: int = 10) -> list[str]:
-    """The prompt the kit's batch step writes for each batch of `rows`, as
-    `_extract_batch` renders it (each passage cut at the kit's length): what
-    a dry run measures, with no model asked."""
+    """The prompt the kit's batch step writes for each batch of `rows`
+    (`batches`), as `_extract_batch` renders it (each passage cut at the
+    kit's length): what a dry run measures, with no model asked."""
     domain = kit.service().domain
     out = []
-    for start in range(0, len(rows), batch_size):
+    for batch in batches(rows, batch_size=batch_size):
         passages = "\n\n".join(f"{i}. {content[:_MAX_PASSAGE_CHARS]}"
-                                for i, (_, _, content) in enumerate(rows[start:start + batch_size], start=1))
+                                for i, (_, _, content) in enumerate(batch, start=1))
         out.append(domain.render_prompt("entity_extraction", DOMAIN_NAME=domain.name,
                                         ENTITY_TYPES=domain.entity_types_block(),
                                         RELATION_TYPES=domain.relation_types_block(), PASSAGES=passages))
@@ -205,6 +246,10 @@ def _named(where: str = "") -> str:
 _PROVEN = """
     proven AS MATERIALIZED (SELECT DISTINCT entity_id FROM named)"""
 
+# An edge `r` whose own passage names both its ends.
+_BOTH_ENDS = """EXISTS (SELECT 1 FROM named ns WHERE ns.entity_id = r.source_entity_id AND ns.chunk_id = r.chunk_id)
+              AND EXISTS (SELECT 1 FROM named nt WHERE nt.entity_id = r.target_entity_id AND nt.chunk_id = r.chunk_id)"""
+
 _DOCUMENTS = bindparam("documents", type_=ARRAY(String()))
 
 
@@ -244,7 +289,7 @@ async def entities(session_factory: async_sessionmaker[AsyncSession], documents:
     async with session_factory() as session:
         chunks, read = await _coverage(session, documents) if documents else (0, 0)
         if not read:
-            return {"entities": [], **_note(no_graph(project))}
+            return {"entities": [], **_note(unread(project, chunks))}
         where = "AND strpos(lower(e.name), lower(:needle)) > 0"
         params: dict[str, Any] = {"documents": list(documents), "needle": name_contains, "limit": limit}
         if entity_type:
@@ -261,10 +306,11 @@ async def entities(session_factory: async_sessionmaker[AsyncSession], documents:
         """), params)).all()
     found = []
     for name, kind, description, described, passages in rows:
-        entry: dict[str, Any] = {"name": name, "type": kind, "description": description if described else None,
+        shown = description if described and description else None
+        entry: dict[str, Any] = {"name": name, "type": kind, "description": shown,
                                  "evidence_chunk_count": int(passages)}
-        if description and not described:
-            entry["description_note"] = DESCRIPTION_WITHHELD
+        if shown is None:
+            entry["description_note"] = DESCRIPTION_NOTE
         found.append(entry)
     missing = None
     if not found:
@@ -277,14 +323,15 @@ async def entities(session_factory: async_sessionmaker[AsyncSession], documents:
 async def relationships(session_factory: async_sessionmaker[AsyncSession], documents: Sequence[str],
                         entity_name: str, *, project: str) -> dict[str, Any]:
     """Every relationship of the project's entity named `entity_name` (case
-    aside, aliases left out) that the project holds, each with its statement,
-    its quote where the module's rule shows it, its confidence, its chunk, and
-    the document and passage (`p<index>`) it stands in (the kit's
-    `get_entity_relationships`, read under the rule)."""
+    aside, aliases left out) that the project holds, its passage naming both
+    its ends, each with its statement, its quote where the module's rule
+    shows it, its confidence, its chunk, and the document and passage
+    (`p<index>`) it stands in (the kit's `get_entity_relationships`, read
+    under the rule)."""
     async with session_factory() as session:
         chunks, read = await _coverage(session, documents) if documents else (0, 0)
         if not read:
-            return {"entity": entity_name, "found": False, "hint": no_graph(project)}
+            return {"entity": entity_name, "found": False, "hint": unread(project, chunks)}
         params = {"documents": list(documents), "name": entity_name}
         found = (await session.execute(_sql(f"""
             WITH {_PASSAGES}, {_named("AND lower(e.name) = lower(:name)")}
@@ -300,18 +347,17 @@ async def relationships(session_factory: async_sessionmaker[AsyncSession], docum
                             "search_entities lists the names they hold."}
         entity_id, name, kind = found
         edges = (await session.execute(_sql(f"""
-            WITH {_PASSAGES}, {_named()}, {_PROVEN}
+            WITH {_PASSAGES}, {_named()}
             SELECT s.name, r.relation_type, t.name, r.evidence, r.confidence, r.chunk_id, mine.document_id,
                    mine.chunk_index,
                    coalesce({_words('r.evidence')} <> ''
                             AND position(' ' || {_words('r.evidence')} || ' ' IN mine.words) > 0, false) AS quoted
             FROM kg_relationships r
             JOIN mine ON mine.id = r.chunk_id
-            JOIN proven ps ON ps.entity_id = r.source_entity_id
-            JOIN proven pt ON pt.entity_id = r.target_entity_id
             JOIN kg_entities s ON s.id = r.source_entity_id
             JOIN kg_entities t ON t.id = r.target_entity_id
             WHERE :entity IN (r.source_entity_id, r.target_entity_id)
+              AND {_BOTH_ENDS}
             ORDER BY s.name, r.relation_type, t.name, mine.document_id, mine.chunk_index, r.id
         """), {"documents": list(documents), "entity": entity_id})).all()
     listed = []
@@ -349,8 +395,7 @@ async def counts(session_factory: async_sessionmaker[AsyncSession], documents: S
             SELECT 'relationship', r.relation_type, count(*)
             FROM kg_relationships r
             JOIN mine ON mine.id = r.chunk_id
-            JOIN proven ps ON ps.entity_id = r.source_entity_id
-            JOIN proven pt ON pt.entity_id = r.target_entity_id
+            WHERE {_BOTH_ENDS}
             GROUP BY r.relation_type
         """), {"documents": list(documents)})).all()
     for what, kind, n in rows:

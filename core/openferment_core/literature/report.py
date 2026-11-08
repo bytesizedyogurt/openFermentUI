@@ -329,6 +329,8 @@ async def truth(project_id: str, *, limit: int | None = None) -> Truth:
     the groups are taken a document at a time in turn (documents by title,
     passages in order), so `limit` spreads the questions over the documents.
     Runs on the database loop."""
+    if limit is not None and limit < 1:
+        raise ValueError("a limit counts one question at least")
     titles, passages = await _corpus(project_id)
     candidates, unread = await _candidates(project_id)
     built = Truth(documents=len(titles), read=len(candidates) + unread)
@@ -354,7 +356,7 @@ async def truth(project_id: str, *, limit: int | None = None) -> Truth:
     for key in sorted(groups, key=lambda k: (titles.get(k[0], ""), k[0], _index(k[1]), k[2])):
         by_document.setdefault(key[0], []).append(key)
     order = [key for turn in itertools.zip_longest(*by_document.values()) for key in turn if key]
-    for n, key in enumerate(order[:limit] if limit else order, start=1):
+    for n, key in enumerate(order if limit is None else order[:limit], start=1):
         document_id, passage, field_id = key
         group = groups[key]
         name = str((units.field(field_id) or {}).get("name") or field_id)

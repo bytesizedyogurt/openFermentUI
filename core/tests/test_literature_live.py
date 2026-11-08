@@ -95,6 +95,7 @@ def test_a_dry_run_measures_what_a_build_would_send_and_calls_no_model(tmp_path,
     assert said["chunks"] == len(rows) >= 1 and said["batches"] == len(graph.prompts(rows))
     assert said["promptCharacters"] == sum(len(p) for p in graph.prompts(rows)) and said["model"] == llm.chain("index")[0]
     assert 0 < said["inputUsd"] < said["mostUsd"] and not _audited("literature_graph")
+    assert kit._MODEL is None, "a dry run installs no model client"
 
 
 def test_a_build_is_audited_under_the_person_named(tmp_path, monkeypatch, capsys):
@@ -140,10 +141,40 @@ def test_a_run_keeps_its_whole_in_the_data_folder_and_renders_its_numbers_alone(
     [row] = _audited("literature_report")
     assert (row.who, row.state, row.detail["file"], row.detail["questions"]) == (BY, "done", said["file"], 1)
 
-    # A kept run's file renders alone, and spends nothing.
+    # A kept run's file renders alone, and spends nothing: no client, no store.
     report.OUT.with_suffix(".md").unlink()
+    kit.install_model(None)
+
+    def stored(*_, **__):
+        raise AssertionError("a rendering read the store")
+
+    monkeypatch.setattr(projects, "get", stored)
     assert literature_live.main(["report", "--project", HERE, "--render", "--from", said["file"]]) == 0
     assert f"`{HERE}`" in report.OUT.with_suffix(".md").read_text() and len(_audited("literature_report")) == 1
+    assert kit._MODEL is None
+    rendered = json.loads(report.OUT.with_suffix(".json").read_text())["projects"][HERE]
+
+    # The part is rebuilt from the run whole and filed under the run's own
+    # project: a public block's own project and its other fields are not read.
+    kept["public"] |= {"project": "another-project", "words": words}
+    forged = tmp_path / "forged.json"
+    forged.write_text(json.dumps(kept), encoding="utf-8")
+    assert literature_live.main(["report", "--project", HERE, "--render", "--from", str(forged)]) == 0
+    whole = json.loads(report.OUT.with_suffix(".json").read_text())
+    assert set(whole["projects"]) == {HERE} and whole["projects"][HERE] == rendered
+    assert words not in report.OUT.with_suffix(".json").read_text()
+    forged.write_text(json.dumps(kept | {"kind": "retrieval-report"}), encoding="utf-8")
+    assert literature_live.main(["report", "--project", HERE, "--render", "--from", str(forged)]) == 2
+    assert "holds no run of project" in capsys.readouterr().err
+
+
+@pytest.mark.parametrize("command", [["graph", "--project", HERE, "--by", BY], ["report", "--project", HERE, "--by", BY]])
+@pytest.mark.parametrize("limit", ["0", "-3", "two"])
+def test_a_limit_counts_one_at_least(command, limit, capsys):
+    with pytest.raises(SystemExit):
+        literature_live.main([*command, "--limit", limit])
+    assert "--limit" in capsys.readouterr().err
+    assert literature_live._parser().parse_args([*command, "--limit", "1"]).limit == 1
 
 
 def test_a_project_the_store_does_not_hold_and_a_run_with_no_question_are_refused_in_words(tmp_path, monkeypatch,

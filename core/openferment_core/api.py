@@ -2120,7 +2120,8 @@ def literature_documents() -> list[LiteratureDocument]:
 def literature_stats() -> LiteratureStats:
     """The project's documents and chunks in the kit, by source, licence class
     and embedding version, and its concept graph's entities and relationships,
-    the ones its own passages name and hold."""
+    the ones its own passages name and hold, and 0 communities, the community
+    layer staying off (ADR-002, Implementation F)."""
     return LiteratureStats.model_validate(kit.stats(projects.current()))
 
 

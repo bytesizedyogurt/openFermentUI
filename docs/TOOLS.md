@@ -12,8 +12,8 @@ One registry, three callers: Postdoc's loop, the HTTP endpoints (`GET /api/tools
 and the two ways it reaches a project, and [A client](#a-client) is the recipe: the SDK's names, the
 environment to hand the server, the shape of every answer, and where a write's audit row is read.
 What a module read answers, and what each kind of row holds, closes [Module reads](#module-reads).
-[The sci-rag server](#the-sci-rag-server), last, lists Sci RAG Kit's own tools over the project's
-literature.
+[The sci-rag server](#the-sci-rag-server), last, lists its tools over the project's literature: six of
+Sci RAG Kit's own, and openFerment's two concept graph tools under the kit's names.
 
 - **Inputs** carry ids, words and quantities (ADR-006). A number stands only inside a quantity, an
   object of `value` and `unit` (and `low` and `high` for a range), where a tool asks for one; a
@@ -902,15 +902,15 @@ Read one kept artifact by its id: what was computed, from which inputs, with its
 
 ## The sci-rag server
 
-`sci-rag` (`core/openferment_core/literature_mcp.py`, started by `.mcp.json` beside `openferment`) is Sci RAG Kit's own MCP server over the project's literature (ADR-002). Each of its tools is the kit's, served by `kit.ProjectService`, so every read stays inside the one project the server acts in. The kit's two concept graph tools, `search_entities` and `get_entity_relationships`, keep their names and arguments and read the project's graph alone (`core/openferment_core/literature/graph.py`; ADR-002, Implementation F): an entity where a passage of a document the project holds names it, an edge where its passage is the project's and both its ends are entities of the project, a description or a quote where the project's own documents carry it.
+`sci-rag` (`core/openferment_core/literature_mcp.py`, started by `.mcp.json` beside `openferment`) is Sci RAG Kit's own MCP server over the project's literature (ADR-002). Six of its tools are the kit's own, served by `kit.ProjectService`, so every read stays inside the one project the server acts in; `answer_question` and `list_sources` carry descriptions in openFerment's words. The two concept graph tools, `search_entities` and `get_entity_relationships`, are openFerment's, under the kit's names and argument schemas, each reading the project's graph alone (`core/openferment_core/literature/graph.py`; ADR-002, Implementation F): an entity where a passage of a document the project holds names it, an edge where its passage is the project's and names both its ends, a description or a quote where the project's own documents carry it.
 
 - Start it from the repository's root: `uv run --project core --all-extras python -m openferment_core.literature_mcp --project <id>`, or with `OPENFERMENT_PROJECT` in its environment. It reads `OPENFERMENT_DATABASE_URL` and `OPENFERMENT_PROJECT` from its environment, else from `core/.env`.
-- With no project, every call is refused in words naming the two ways to name one; a document the project does not hold and a database that does not answer are said in words as well. A graph tool asked of a project whose passages no build has read is refused in words naming the command that builds the project's graph.
+- With no project, every call is refused in words naming the two ways to name one; a document the project does not hold and a database that does not answer are said in words as well. A graph tool asked of a project that holds no passage is refused in words saying its documents enter on Intake, and one asked of a project whose passages no build has read in words naming the command that builds the project's graph.
 - `answer_question`, and `search_corpus` with `deep`, call a model through `core/openferment_core/llm.py` (the kit's roles on the routes `explain` and `index`), on the key the server's environment holds; every other call reads the store alone.
 
 ### `answer_question`
 
-Ask the knowledge base a question and get a grounded, cited answer. The answer cites numbered sources inline like [1]; the citations list maps each number to its document. If the corpus does not contain the answer, the response says so rather than guessing. This spends LLM tokens; for raw evidence without generation, use search_corpus instead. Set include_compression only to override the domain default; the response reports measured prompt-token counts and any full-text fallbacks.
+Ask the project's literature a question and get a grounded, cited answer. The answer cites numbered sources inline like [1]; the citations list maps each number to its document. When the corpus holds no answer, the response says the corpus holds none. This spends model tokens; search_corpus returns the evidence alone. Set include_compression only to override the domain default; the response reports measured prompt-token counts and any full-text fallbacks.
 
 | Field | Type | Required | What it is |
 |---|---|---|---|
@@ -943,7 +943,7 @@ Fetch one document's full metadata and a preview of its chunks. Use after search
 
 ### `get_entity_relationships`
 
-Show every stated relationship of one entity that this project's passages hold, each with its statement, its evidence quote where the quote's words stand in the passage it cites, its confidence, and the document and passage id (`p<index>`) it stands in. An edge is listed when its passage is the project's and both its ends are entities the project's passages name. The name is matched case aside and aliases are left out; search_entities lists the names. Its relation types are the domain's: `PRODUCES`, `CARRIES`, `GROWN_ON`, `RUN_UNDER`, `MEASURED_AS`, `RECOVERED_BY`, `REQUIRES`, `AFFECTS`. A project whose passages no build has read is refused in words naming the command that builds its graph.
+Show every stated relationship of one entity that this project's passages hold, each with its statement, its evidence quote where the quote's words stand in the passage it cites, its confidence, and the document and passage id (`p<index>`) it stands in. An edge is listed when its passage is the project's and that passage names both its ends. The name is matched case aside and aliases are left out; search_entities lists the names. Its relation types are the domain's: `PRODUCES`, `CARRIES`, `GROWN_ON`, `RUN_UNDER`, `MEASURED_AS`, `RECOVERED_BY`, `REQUIRES`, `AFFECTS`. A project that holds no passage is refused in words saying how its documents enter, and a project whose passages no build has read in words naming the command that builds its graph.
 
 | Field | Type | Required | What it is |
 |---|---|---|---|
@@ -951,7 +951,7 @@ Show every stated relationship of one entity that this project's passages hold, 
 
 ### `list_sources`
 
-List the corpus's document sources with counts and license classes. Use this to learn how the operator organized their corpus (for example "county_reports" vs "extension_notes") before filtering a search by source or license.
+List the project's document sources, each written `project:<id>:<collector>` (the project that collected it and the way it entered), with their counts and licence classes, before filtering a search by source or licence.
 
 Takes no fields.
 
@@ -971,7 +971,7 @@ Search the knowledge base and get back ranked evidence chunks. Use this when you
 
 ### `search_entities`
 
-Look up the concept graph's entities by a part of their name (case aside), in this project's graph alone: an entity is listed where a passage of a document the project holds names it, with its type, its description where every document naming it is one the project holds, and the count of the project's passages that name it (`evidence_chunk_count`). A name the kit holds as an alias finds nothing here. `entity_type` narrows the list to one of the domain's types: `Organism`, `Construct`, `Product`, `Substrate`, `Process`, `Condition`, `Measure`, `Equipment`, `Organization`. A project whose passages no build has read is refused in words naming the command that builds its graph.
+Look up the concept graph's entities by a part of their name (case aside), in this project's graph alone: an entity is listed where a passage of a document the project holds names it, with its type, its description where a model wrote one and every document naming it is one the project holds, and the count of the project's passages that name it (`evidence_chunk_count`). A name the kit holds as an alias finds nothing here. `entity_type` narrows the list to one of the domain's types: `Organism`, `Construct`, `Product`, `Substrate`, `Process`, `Condition`, `Measure`, `Equipment`, `Organization`. A project that holds no passage is refused in words saying how its documents enter, and a project whose passages no build has read in words naming the command that builds its graph.
 
 | Field | Type | Required | What it is |
 |---|---|---|---|

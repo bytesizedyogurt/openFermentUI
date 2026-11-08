@@ -21,11 +21,15 @@ is written to `<data folder>/literature/<project>-<UTC time>.json`, the data
 folder being OPENFERMENT_DATA_DIR or else core/data, outside git. `--render`
 sets the run's public numbers beside the demo in
 docs/reports/literature-retrieval.md and .json; with `--from` it renders a
-kept run's file and spends nothing.
+kept run's file and spends nothing: the part it sets is rebuilt from the
+kept run whole (`report.public`), so the committed report holds the numbers
+`public` keeps and the part is filed under the run's own project. `--limit`
+counts one at least.
 
 The command reads core/.env as `python -m openferment_core.extract` does (a
-setting the environment holds stands), installs llm.py's client for the kit,
-and counts every call in a tally (`llm.tally`): the first call no model
+setting the environment holds stands), installs llm.py's client for the kit
+where it asks a model (a build, a run), and counts every call in a tally
+(`llm.tally`): the first call no model
 answers (no key, the account's usage limit, the day's cap) ends the build or
 the run after its batch or question, in its words, with exit 1. Each build
 and each run is audited under the person `--by` names (module `intake`,
@@ -133,10 +137,18 @@ def report_command(args: argparse.Namespace) -> int:
         return report.main([])
     if args.source:
         kept = json.loads(Path(args.source).read_text(encoding="utf-8"))
-        if kept.get("project") != args.project or not kept.get("public"):
+        held = kept.get("public") if isinstance(kept, dict) else None
+        if (not isinstance(held, dict) or kept.get("kind") != "literature-lanes"
+                or kept.get("project") != args.project):
             print(f"{args.source} holds no run of project {args.project} with its public numbers", file=sys.stderr)
             return 2
-        report.write(kept["public"])
+        try:
+            part = report.public(kept, routes=held["routes"], commit=held.get("commit"))
+        except (KeyError, TypeError) as e:
+            print(f"{args.source} holds a run of project {args.project} that its numbers cannot be read from: "
+                  f"{type(e).__name__}: {e}", file=sys.stderr)
+            return 2
+        report.write(part)
         _print({"rendered": str(report.OUT.with_suffix(".md")), "from": args.source})
         return 0
     configs = tuple(c.strip() for c in args.configs.split(",") if c.strip()) if args.configs else report.PROJECT_CONFIGS
@@ -164,6 +176,17 @@ def report_command(args: argparse.Namespace) -> int:
     return 1 if run["stopped"] else 0
 
 
+def _count(said: str) -> int:
+    """A `--limit`: a whole number, one at least."""
+    try:
+        n = int(said)
+    except ValueError:
+        raise argparse.ArgumentTypeError(f"{said!r} is no whole number") from None
+    if n < 1:
+        raise argparse.ArgumentTypeError(f"{n} counts nothing: a limit is one at least")
+    return n
+
+
 def _parser() -> argparse.ArgumentParser:
     parser = argparse.ArgumentParser(prog="python -m openferment_core.literature_live",
                                      description="The literature lanes that call a model, over one project.")
@@ -171,14 +194,14 @@ def _parser() -> argparse.ArgumentParser:
     g = sub.add_parser("graph", help="build the project's concept graph on the index route")
     g.add_argument("--project", required=True)
     g.add_argument("--by", help="the person the build is audited under (required unless --dry-run)")
-    g.add_argument("--limit", type=int, default=None, help="the first N passages a build has yet to read")
+    g.add_argument("--limit", type=_count, default=None, help="the first N passages a build has yet to read")
     g.add_argument("--rebuild", action="store_true", help="read every passage of the project again")
     g.add_argument("--dry-run", action="store_true", help="measure what a build would send, and call nothing")
     r = sub.add_parser("report", help="the retrieval report: the kit's demo, or a project's lanes")
     r.add_argument("--project", default=None)
     r.add_argument("--by", help="the person the run is audited under (required with --project, unless --from)")
     r.add_argument("--judge", action="store_true", help="add the judge's relevance and the answers' grading")
-    r.add_argument("--limit", type=int, default=None, help="the first N questions, spread over the documents")
+    r.add_argument("--limit", type=_count, default=None, help="the first N questions, spread over the documents")
     r.add_argument("--configs", default=None, help=f"of {', '.join(report.PROJECT_CONFIGS)} (all by default)")
     r.add_argument("--render", action="store_true", help="set the run's public numbers in the committed report")
     r.add_argument("--from", dest="source", default=None, help="with --render: a kept run's file, rendered alone")
@@ -189,7 +212,7 @@ def main(argv: list[str] | None = None) -> int:
     parser = _parser()
     args = parser.parse_args(sys.argv[1:] if argv is None else argv)
     if args.command == "report" and not args.project:
-        if args.by or args.judge or args.render or args.source or args.limit or args.configs:
+        if args.by or args.judge or args.render or args.source or args.limit is not None or args.configs:
             parser.error("--by, --judge, --limit, --configs, --render and --from need --project")
         return report_command(args)
     if args.command == "report" and args.source and not args.render:
@@ -198,10 +221,12 @@ def main(argv: list[str] | None = None) -> int:
     if needs_by and not (args.by or "").strip():
         parser.error("--by names the person this is audited under")
     extract.load_env()
-    if projects.get(args.project) is None:
+    renders = args.command == "report" and bool(args.source)
+    if not renders and projects.get(args.project) is None:
         print(f"The store holds no project {args.project!r}.", file=sys.stderr)
         return 2
-    kit.install_model(llm.kit_client)
+    if not renders and not (args.command == "graph" and args.dry_run):
+        kit.install_model(llm.kit_client)
     return graph_command(args) if args.command == "graph" else report_command(args)
 
 

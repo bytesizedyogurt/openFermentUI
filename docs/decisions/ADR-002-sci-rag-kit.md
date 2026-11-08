@@ -55,8 +55,9 @@ Two adaptations, both meant to be offered upstream:
   once per process; `collectors.py` turns what openFerment fetches or is given into the kit's
   corpus entries; `fastembed.py` is the embedder; `domain/` is openFerment's domain profile with
   the kit's fifteen prompts; `kit_alembic/` holds the kit's six migrations from the pinned commit
-  with its licence, and an `env.py` of ours. They sit in the package beside `kit.py` rather than
-  under `core/vendor/`, so the deployed tree finds them where the code is.
+  with its licence, and an `env.py` of ours. They sit in the package beside `kit.py`, so the
+  deployed tree finds them where the code is (Departures, §8.2, records the move from
+  `core/vendor/`).
 - **Settings.** Importing `openferment_core` writes the kit's `SCI_RAG_EMBEDDING_*` and
   `SCI_RAG_DOMAIN_DIR` into the environment first, because `sci_rag.db.models` sizes its vector
   column when first imported; `kit.py` refuses to load if the kit was imported with another
@@ -104,8 +105,7 @@ Two adaptations, both meant to be offered upstream:
   /api/literature/documents`, `/api/literature/stats`; the Intake screen's "Add to this project"
   card. The kit's REST app is mounted at `/rag` with its key check on: the key is
   `OPENFERMENT_RAG_KEY` in `core/.env`, and with none set a key made in memory and never shown
-  stands in, so `/rag` refuses every request rather than running open as the kit does with no
-  keys. Its CORS origins are empty, a `/rag` request names its project as an `/api` request does,
+  stands in, so `/rag` refuses every request; the kit, given no keys, would run open. Its CORS origins are empty, a `/rag` request names its project as an `/api` request does,
   and the kit's `/mcp` endpoint is left out of the mount. The MCP server runs over stdio
   (`.mcp.json`: `sci-rag`, `python -m openferment_core.literature_mcp`), reading the database
   address and the project from `core/.env` as openFerment's own MCP server does.
@@ -155,35 +155,56 @@ refusal with no project and, with one, the connection's failure, each in words
 - **The build reads the project's chunks alone.** The kit's `extract_graph` reads every chunk of
   the store that no build has read, with no document filter. `literature/graph.py`'s `build`
   selects the project's unread chunks in the kit's order (the document's content hash, then the
-  chunk's index) and hands each batch of ten to the kit's own batch step
-  (`sci_rag.graph.extractor._extract_with_recovery`, underscore-private in 0.5.0, its signature
-  pinned by a test): one call on the client the caller hands in, the kit's `extraction` role and
-  so the `index` route, an answer it cannot read halved down to one chunk, a batch that fails left
-  unstamped for the next build. A chunk of a document two projects hold is read once and serves
-  both. `stop`, read after each batch, ends the build in its words (no key, the account's usage
-  limit, the day's cap). `literature/` imports no `llm`: the command hands in the client and the
-  stop.
+  chunk's index) and hands them to the kit's own batch step ten to a batch within one document
+  (`graph.batches`; `sci_rag.graph.extractor._extract_with_recovery`, underscore-private in 0.5.0,
+  its signature pinned by a test): one call on the client the caller hands in, the kit's
+  `extraction` role and so the `index` route, an answer it cannot read halved down to one chunk, a
+  batch that fails left unstamped for the next build. A batch ends where its document ends
+  (landing review, 8 November): the kit writes one description a name from the whole batch and
+  files each entity and edge against the passage numbers the model names, so a batch that mixed a
+  document two projects hold with one project's own could carry that project's words into the
+  other's reads, wherever the model filed them against the shared passage. A batch of one document
+  keeps its answer inside a document that each project holding any of its passages holds whole. A
+  document shorter than ten passages takes a call of its own, so a build makes more calls than its
+  passages divided by ten, and the dry run counts them. A chunk of a document two projects hold is
+  read once and serves both. A batch the index route's model declines is a batch that fails: on
+  the default route, Haiku alone (ADR-008, Implementation 17), it stays unstamped and is read
+  again, on Haiku, by every later build, counted in `chunks_left` each time; `OPENFERMENT_ROUTES`
+  naming a second index model reads it (Sonnet answered each of F.1's declines). `stop`, read
+  after each batch, ends the build in its words (no key, the account's usage limit, the day's cap).
+  `literature/` imports no `llm`: the command hands in the client and the stop.
 - **A scoped read shows what the project's own passages prove**, by the rule the kit's retrieval
   seeds its graph walk by under a scope (`retrieve/stages/graph.py`: a name and a passage compared
   in lower case, each run of other characters one space). An entity is the project's when one of
   its evidence chunks is a passage of a document the project holds and that passage names it; a
-  name the kit holds as an alias finds nothing. A description stands where every document the
-  entity is named in is the project's, and is withheld with a note otherwise, since the kit keeps
-  the first description a model wrote for the name. An edge is the project's when its evidence
-  chunk is the project's and both its ends are entities of the project, with its document and
-  passage id; its quote is withheld with a note where its words do not stand in that passage. A
-  count counts the project's passages alone. `ProjectService.search_entities` and
-  `entity_relationships` read so; `stats` counts the project's entities and relationships and 0
-  communities; `fingerprint` states the project's corpus for a report. A read of a project no build
-  has read says which command builds its graph (`graph.NO_GRAPH`).
+  name the kit holds as an alias finds nothing. A description stands where a model wrote one and
+  every document the entity is named in is the project's, since the kit keeps the first
+  description a model wrote for the name; an entity listed with no description carries one note,
+  the same whichever left it out (`graph.DESCRIPTION_NOTE`), so the note tells a project nothing
+  of the documents it does not hold. A description a project once read leaves its reads when
+  another project's build names the entity in a document of its own; a description kept per
+  project would keep it. An edge is the project's when its evidence chunk is the project's and
+  that passage names both its ends, with its document and passage id; its quote is withheld with
+  a note where its words do not stand in that passage. The kit matches each name a build extracts
+  against every entity's aliases across the store, so a name another project's build kept as an
+  alias joins that entity at build time; where the project's passage holds that name alone, its
+  reads list neither the name nor the edges that passage states of it, and the other project's
+  name for the entity stays out of them. A count counts the project's passages alone.
+  `ProjectService.search_entities` and `entity_relationships` read so; `stats` counts the
+  project's entities and relationships and 0 communities; `fingerprint` states the project's
+  corpus for a report. A read of a project that holds no passage says its documents enter on
+  Intake (`graph.NO_PASSAGES`), and a read of one whose passages no build has read says which
+  command builds its graph (`graph.NO_GRAPH`).
 - **Communities and entity resolution stay off.** The kit reads no community under a scope, and
   resolution merges rows every project reads.
 - **The graph tools are back on the `sci-rag` server (F.5.3).** `literature_mcp.build` removes the
   kit's `search_entities` and `get_entity_relationships`, which query the store whole, and adds
   openFerment's own under the same names and argument schemas, each calling the service's scoped
   read through `InWords` (the project asked for first, every failure in words) and each
-  description naming the domain's types; a graph tool asked of a project no build has read is
-  refused in `NO_GRAPH`'s words. `docs/TOOLS.md` lists the server's tools from its own listing
+  description naming the domain's types; a graph tool asked of a project that holds no passage is
+  refused in `NO_PASSAGES`' words, and one asked of a project no build has read in `NO_GRAPH`'s.
+  The kit's `answer_question` and `list_sources` are served as the kit wrote them, with
+  descriptions in openFerment's words (`literature_mcp.DESCRIBED`). `docs/TOOLS.md` lists the server's tools from its own listing
   (`tools/reference.py`, over `literature_mcp.Unopened`, a service that opens nothing).
   Implementation 8's debt is paid.
 - **The report's project lanes (F.5.4).** `pnpm lit:report --project <id>` runs
@@ -205,10 +226,13 @@ refusal with no project and, with one, the connection's failure, each in words
   handed in by the command), so it carries the model that gave it. No migration and no table: the
   run whole goes to a file under the service's data folder, outside git, and `report.public` keeps
   its numbers alone (scores with their intervals, counts, question ids, model ids, USD, seconds),
-  which `--render` sets beside the demo in `docs/reports/literature-retrieval.md` and `.json`. The
-  command reads `core/.env` through `extract.load_env` (`override=False`), installs
-  `llm.kit_client`, reads its stop from its own tally (the first call no model answered) and
-  audits each build and run. `pnpm prove` step 3 lists the sci-rag server's tools over stdio in
+  which `--render` sets beside the demo in `docs/reports/literature-retrieval.md` and `.json`;
+  `--from` rebuilds that part from a kept run whole (`report.public`), filed under the run's own
+  project, so the committed report holds the numbers `public` keeps alone. `--limit` counts one
+  at least. The command reads `core/.env` through `extract.load_env` (`override=False`), installs
+  `llm.kit_client` where it asks a model (a build, a run; the dry run and `--from` install none),
+  reads its stop from its own tally (the first call no model answered) and audits each build and
+  run. `pnpm prove` step 3 lists the sci-rag server's tools over stdio in
   the proof's project and reads a graph tool's refusal, offline.
 
 ## Revisit condition

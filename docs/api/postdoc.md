@@ -157,7 +157,7 @@ unjudged, and the run the pass was judging gains no judgement, so each judgement
 one a judge model gave. A run's stop words say to judge that answer and ask the rest. Where no
 model of the plan route answered the question either (the limit most often lands on one of an
 answer's plan calls first: the plan holds no claim, its final step reads `No answer: …` and its
-decline is no refusal), the words say to ask that question again with the rest, beside the
+decline is in words `evaluate.REFUSAL` leaves unmatched), the words say to ask that question again with the rest, beside the
 questions a full asking asks in its conversation before it when it is a follow-up, so its
 follow-ups read a conversation of the new asking. A judge that declines is kept as a judgement
 with no score.
@@ -168,7 +168,7 @@ judgement of it. Under `tags`, each tag:
 
 | Key | What it holds |
 |---|---|
-| `questions`, `models` | The questions with a run under the tag, and every model that answered them |
+| `questions`, `models` | `questions`, the count of questions with a run under the tag; `models`, every model that answered them |
 | `code` | The mean of each of the code's four scores |
 | `judges` | For each judge model: its mean of each judge score over the answers it scored, `answersJudged`, `declined` (the questions whose newest judgement it took part in holds no score of its own, for any reason: it declined, its route passed the answer on to a later model, or its answer did not arrive whole), `refused` (those of them the safety classifier declined on it, from each judgement's `refused`; a pass-over for a status or a model the key cannot reach stands in `declined` alone) and `costUsd`, what the judgements charged to it cost, every one kept (a judgement is charged to the model that gave it, or to the first its route tried when each model declined) |
 | `judgeRoutes` | For each judge route, named by its models in order (`<a> then <b>`): its newest judgement of each run counted, `judgements`, `fellBack` (given by a later model of the route after the first passed the answer on, for any reason; `judges.<model>.refused` names the refusals) and `declined` (with no score). A judgement kept before F.2a names no route and is left out |
@@ -188,11 +188,44 @@ answer, cost, and for each judge model its four scores by its newest judgement o
 judgement after <opus> declined", or "… gave no answer" for a pass-over of another kind), its
 verdict cut to 200 characters (`note`) and the cost of its judgements of the run.
 
+## The routing table
+
+Every model call names a family, and `llm.ROUTES` (`core/openferment_core/llm.py`) gives each family
+its default route: the models tried in order, each after the one before it declines or is
+unavailable, and the effort they think at (ADR-008, Implementation 17;
+`docs/reports/model-routing-2026-11.md`).
+
+| Family | Its calls | Models, in order | Effort |
+|---|---|---|---|
+| `plan` | Postdoc's loop | `claude-opus-5-5`, `claude-sonnet-5-5` | high |
+| `explain` | an answer in one call; the kit's cited answers | `claude-opus-5-5`, `claude-sonnet-5-5` | high |
+| `extract` | a document's extraction | `claude-opus-5-5`, `claude-sonnet-5-5` | high |
+| `index` | the bulk chores: a concept graph's batches, HyDE's passage, a question's entity names, `pnpm ready --probe` | `claude-haiku-5-5` | low |
+| `judge` | the evaluation's grading; the kit's judgements | `claude-opus-5-5`, `claude-sonnet-5-5` | max |
+
+The settings lay over the defaults where the environment or `core/.env` sets them, a setting written
+empty standing unset: `OPENFERMENT_MODEL` with `OPENFERMENT_FALLBACK_MODEL` (several models,
+comma-separated, tried in order) over the models of `plan`, `explain` and `extract`
+(`llm.ANSWERING`), `OPENFERMENT_EFFORT` (`low`, `medium`, `high`, `xhigh` or `max`) over their effort,
+`OPENFERMENT_INDEX_MODEL` over index's first model, and then `OPENFERMENT_ROUTES`, a JSON table
+`{"<family>": {"models": [...], "effort": "<effort>"}}`, over any family it names. `judge` and
+index's effort keep their defaults under the plain settings; `OPENFERMENT_ROUTES` moves them. A
+comparison names its table in `OPENFERMENT_ROUTES` on the command line. `GET /api/health` names the
+plan route's models, and `pnpm ready`'s model row the plan route's models and effort.
+
+The room each call has, in output tokens, thinking included:
+
+- A plan turn: `plan.ceiling(effort)`, 32,000 at high and below, 64,000 at xhigh, 128,000 at max
+  (Implementation 16).
+- A judgement of the evaluation: 32,000 at every effort, `evaluate.JUDGE_TOKENS` (Implementation 15).
+- A kit call: the larger of the kit's own ceiling and `llm.KIT_ROOM` at its route's effort, low 0,
+  medium 4,096, high 8,192, xhigh 12,000, max 32,000 (Implementation 18).
+
 ## A key the request names
 
 A request may name its own Anthropic key in the `X-OpenFerment-Key` header (owner question 10;
 ADR-008, Implementation 10): every model call it makes, Postdoc's, extraction's and the kit's, runs
-on that key in place of `core/.env`'s, and a request that names none runs on `core/.env`'s. The key
+on that key, and a request that names none runs on `core/.env`'s. The key
 is never stored, logged or echoed; the project's audit table keeps a `key_override` row that says
 an override was used. A request through Tailscale Funnel, or under a name the service does not
 answer to, is refused with a 403 in words; an empty header with a 422.

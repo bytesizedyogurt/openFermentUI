@@ -20,7 +20,7 @@
 - C: The tests make databases of their own on the server `OPENFERMENT_TEST_DATABASE_URL` names (default: the compose role on 127.0.0.1:5432) and drop them after; `pnpm db:reset openferment_dev` remakes the development database, and the command refuses the production database `openferment`.
 - C: `pnpm verify` is the gate: sixteen stages in ADR-011's order, `check:secrets` first, about twenty minutes here; CI runs it with a pgvector service, then `pnpm prove`.
 - C: `pnpm test:core`: offline, no key, no network, about five to six minutes; it leaves out the markers `sim`, `lit`, `slow` and `live`.
-- C: `pnpm test:sim` (marker `sim`) starts the real BioSTEAM worker: a cold BioSTEAM import takes about 31 s and a reference plant builds in about 17 s; the suite takes about seven minutes.
+- C: `pnpm test:sim` (marker `sim`) starts the real BioSTEAM worker: a cold BioSTEAM import takes about 31 s and a reference plant builds in about 17 s; the suite takes about five minutes.
 - C: `pnpm test:lit` (marker `lit`) runs Sci RAG Kit with FastEmbed's model over the kit's demo corpus; the model file comes from Hugging Face once and stays cached in `.cache/fastembed`.
 - C: `pnpm test:slow` (marker `slow`) and `pnpm test:live` (marker `live`: a real network call, most needing the key and spending) run by hand, outside verify.
 - C: `pnpm prove` runs the proof (`scripts/prove.py`, steps 1 to 10) on a database of its own, with no key and the network refused; run `pnpm build` first, since step 9 walks the built app in Chromium; `--steps 3,8` proves the steps named with what they stand on.
@@ -93,7 +93,7 @@
 - C: Studies: scenarios, comparisons, runbooks, a project's protocols and the export package (`docs/api/studies.md`).
 - C: Intake: the collectors, the `CorpusEntry` fields and the routes documents enter by (`docs/api/intake.md`).
 - C: The tool registry: `core/openferment_core/tools/__init__.py` is the one place a tool exists, and `docs/TOOLS.md` is generated from it (`pnpm gen:tools`).
-- C: MCP: the `openferment` server over the registry and the kit's `sci-rag` server (its two graph tools reading the project's graph alone), both in `.mcp.json`, each acting in the project `--project` names and refusing in words without one (`docs/TOOLS.md`; ADR-002).
+- C: MCP: the `openferment` server over the registry and the `sci-rag` server (the kit's tools, its two graph tools openFerment's, reading the project's graph alone), both in `.mcp.json`, each acting in the project `--project` names and refusing in words without one (`docs/TOOLS.md`; ADR-002).
 - C: The package map: `COMPONENTS.md`, generated from `core/tests/test_boundaries.py` (`pnpm gen:components`).
 
 ## Working assumptions

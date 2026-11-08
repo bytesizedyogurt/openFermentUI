@@ -45,7 +45,7 @@ and `created_by`, the person who asked.
 | `POST /api/intake/upload` | multipart `file`, `by`, `title`, `licenceClass`, `licence`, `reason` |
 | `POST /api/intake/paste` | `{title, text, by, url, licenceClass, licence, reason}` |
 | `GET /api/literature/documents` | every document the project holds, with its chunk count and selection |
-| `GET /api/literature/stats` | documents and chunks by source, licence class and embedding version, and the concept graph's entities and relationships the project's own passages name and hold (`literature/graph.py`) |
+| `GET /api/literature/stats` | documents and chunks by source, licence class and embedding version, and the concept graph's entities and relationships the project's own passages name and hold (`literature/graph.py`), and 0 communities, the community layer staying off (ADR-002, Implementation F) |
 | `GET /api/literature/search?q=` | passages best first, each with its document, passage id and citation |
 | `POST /api/intake/{documentId}/extract` | candidates anchored to the document's stored passages (`extract.py`) |
 
@@ -65,15 +65,16 @@ person `--by` names (module `intake`).
 
 | Command | Does |
 |---|---|
-| `pnpm lit:graph --project <id> --by <name> [--limit N] [--rebuild]` | Builds the concept graph over the project's passages that no build has read, ten to a batch on the `index` route; a passage of a document two projects hold is read once. Audited as `literature_graph` |
+| `pnpm lit:graph --project <id> --by <name> [--limit N] [--rebuild]` | Builds the concept graph over the project's passages that no build has read, ten to a batch within one document on the `index` route; a passage of a document two projects hold is read once; `--rebuild` reads every passage of the project again, and `--limit` counts one passage at least. A batch the index route's one model declines stays unstamped on every build of the default route, Haiku alone; `OPENFERMENT_ROUTES` naming a second index model reads it (Sonnet answered each of F.1's declines). Audited as `literature_graph` |
 | `pnpm lit:graph --project <id> --dry-run` | The batches, the prompts' characters, the kit's token estimate, and what the input and the most a build could cost come to on the route's first model; no model is called |
 | `pnpm lit:report --project <id> --by <name> [--judge] [--limit N] [--configs a,b] [--render]` | The ground truth built by code from the project's kept candidates (one question a document, passage and field), retrieval in `interactive`, `vector_only`, `keyword_only`, `full_deep`, `no_graph` and `no_hyde` under the kit's rule and the passage rule, and with `--judge` the judge route's grades of each question's top ten in `interactive` and `full_deep` and the kit's answers through both, graded for grounding. The run whole goes to `<data folder>/literature/<project>-<UTC time>.json`, outside git; `--render` sets its numbers alone in `docs/reports/literature-retrieval.md` and `.json`. Audited as `literature_report` |
-| `pnpm lit:report --project <id> --render --from <file>` | A kept run's numbers rendered into the report; nothing is asked |
+| `pnpm lit:report --project <id> --render --from <file>` | A kept run's numbers, rebuilt from the run whole and filed under its own project, rendered into the report; nothing is asked |
 | `pnpm lit:report` | The kit's demo corpus, offline, in a database of its own (stage 3) |
 
-The `sci-rag` MCP server serves the kit's `search_entities` and `get_entity_relationships` over the
-project's graph alone, by the rule `literature/graph.py` states, and refuses both in words for a
-project no build has read (`docs/TOOLS.md`, the sci-rag server).
+The `sci-rag` MCP server serves openFerment's `search_entities` and `get_entity_relationships`, under
+the kit's names, over the project's graph alone, by the rule `literature/graph.py` states, and
+refuses both in words for a project that holds no passage and for a project no build has read
+(`docs/TOOLS.md`, the sci-rag server).
 
 ## A project's catalogues (alpha 2.1; alpha 2.2 E.8 and E.12a)
 

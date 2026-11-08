@@ -410,13 +410,15 @@ the mean against Haiku's 0.0199 and Sonnet's 0.1784, and answers in a median 65 
   Effort max stays unmeasured: four answers, each out of room at the old ceiling. Effort medium,
   the old default, was asked in no table, so the cost order holds no Opus setting below high.
 - `explain`: Opus then Sonnet at high, held at extract's route. None of the fourteen reaches it
-  (Postdoc's loop answers on `plan`); it waits on the retrieval report's answer lane.
+  (Postdoc's loop answers on `plan`); it waits on the retrieval report's answer lane
+  (Implementation 18).
 - `extract`: Opus then Sonnet at high, F.1's measure: Opus declined nine of the 22 documents in
   `bio`, and Sonnet answered each.
 - `index`: Haiku alone at low. Its one measure is F.0's probe, one call; every table held `index`
   there, and none of the fourteen's calls reached it. A graph build's batch costs Haiku's price,
-  and a decline on it ends that call in words. Before this, `index` tried the answer chain after
-  Haiku (E.7), which put a declined batch on Opus.
+  and a decline on it ends that call in words, its batch read again by the next build
+  (Implementation 18). Before this, `index` tried the answer chain after Haiku (E.7), which put a
+  declined batch on Opus.
 - `judge`: Opus then Sonnet at max, the comparison's method, its room `JUDGE_TOKENS`.
 
 **What one judge leaves open.** The judge is the same model as the opus tables' plan model, so a
@@ -463,10 +465,28 @@ its numbers.
 - **A kit call has room for its thinking.** The kit sizes each call for a model that writes its
   answer at once (a judgement in 1,024 tokens, HyDE's passage in 512), and output tokens include
   thinking. `llm.KIT_ROOM` sets the room by the route's effort (low 0, medium 4,096, high 8,192,
-  xhigh 12,000, max 16,000), and a kit call asks the larger of the kit's ceiling and that room; the
-  live Search answer's call is one of them. The kit's roles stay three (`answer` on `explain`,
-  `extraction` on `index`, `judge` on `judge`): the report builds its questions by code, so the
-  kit's question drafter has no role here.
+  xhigh 12,000, max 32,000), and a kit call asks the larger of the kit's ceiling and that room; the
+  live Search answer's call is one of them. The room at max is openFerment's own judge's,
+  `evaluate.JUDGE_TOKENS`, a test holding the two equal: Implementation 15 measured 16,000 too
+  small for a judgement at max (three of fourteen ran out of room and five wrote past it), and
+  Implementation 17 set the `judge` route at max, so every kit judgement asks 32,000, the report's
+  ten passages graded in one call among them. F.5.1 wrote 16,000 on its base, where 16,000 was
+  openFerment's judge ceiling and every route defaulted to medium; the landing review of 8
+  November raised it with the judge's. The kit's own judgements at max are measured by the F.5
+  live run: its truncated count (`literature/report.py`, a call that stopped at its ceiling) is the
+  measure, and a truncated kit judgement brings the room back here with its numbers. The kit's
+  roles stay three (`answer` on `explain`, `extraction` on `index`, `judge` on `judge`): the
+  report builds its questions by code, so the kit's question drafter has no role here.
+- **The answer lane measures `explain`.** `pnpm lit:report --project <id> --by <name> --judge`
+  gives the kit's answers on the `explain` route, graded blind for grounding on the `judge` route
+  (ADR-002, Implementation F): that lane is the measure Implementation 17 holds `explain` at
+  extract's route for, and its live run (Blockers) sets the family's default or returns here with
+  its numbers.
+- **A batch the index route declines.** On the default `index` route, Haiku alone at low
+  (Implementation 17), a graph batch Haiku declines is a batch that fails: it stays unstamped and
+  is read again, on Haiku, by every later build of the default route, counted in the build's
+  `chunks_left` each time (`literature/graph.py`). `OPENFERMENT_ROUTES` naming a second index
+  model reads it; Sonnet answered each of F.1's declines.
 
 ## Evidence
 

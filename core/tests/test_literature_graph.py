@@ -241,6 +241,8 @@ def test_a_shared_document_is_built_once_and_serves_both_projects(tmp_path, two_
         listed = _entities(project_id)["entities"]
         assert [(e["name"], e["evidence_chunk_count"]) for e in listed] == [(f"organism-{tag}", 1),
                                                                             (f"substrate-{tag}", 1)]
+        assert all((e["description"], e["description_note"]) == (None, graph.DESCRIPTION_NOTE) for e in listed), (
+            "an entity no model described carries the note a withheld description carries")
         [edge] = _edges(project_id, f"substrate-{tag}")["relationships"]
         assert edge["document_id"] == shared.document_id
 
@@ -265,6 +267,100 @@ def test_a_dry_runs_prompts_are_the_prompts_a_build_sends(tmp_path):
     model = Reader({f"organism-{tag}": Named("Organism")})
     _build(HERE, model, batch_size=2)
     assert graph.prompts(rows, batch_size=2) == model.prompts and len(model.prompts) == 2
+
+
+def test_a_batch_ends_where_its_document_ends(tmp_path):
+    tag = _tag()
+    first = _store(tmp_path, HERE, tag, f"The organism-{tag} grew.", f"The organism-{tag} was fed.",
+                   f"The organism-{tag} was harvested.")
+    second = _store(tmp_path, HERE, tag + "b", f"The organism-{tag} grew once more.")
+    rows = _pending(HERE)
+    cut = list(graph.batches(rows, batch_size=2))
+    assert all(len({r[1] for r in batch}) == 1 for batch in cut), "each batch holds one document's passages"
+    assert sorted((batch[0][1], len(batch)) for batch in cut) == sorted(
+        [(first.document_id, 2), (first.document_id, 1), (second.document_id, 1)])
+    assert [r for batch in cut for r in batch] == rows, "the kit's order, each passage once"
+    model = Reader({f"organism-{tag}": Named("Organism")})
+    built = _build(HERE, model, batch_size=2)
+    assert (built.batches_run, built.chunks_processed) == (3, 4) and graph.prompts(rows, batch_size=2) == model.prompts
+    with pytest.raises(ValueError, match="one chunk at least"):
+        list(graph.batches(rows, batch_size=0))
+    with pytest.raises(ValueError, match="one passage at least"):
+        _pending(HERE, limit=0)
+
+
+class Misfiles(LLMClient):
+    """A stand-in that files what it read in the whole batch against the one
+    passage naming the organism and the substrate: a description written from
+    every passage of the batch, and, where the batch holds `marker`, an edge
+    whose quote is the passage that holds it."""
+
+    def __init__(self, organism: str, substrate: str, marker: str) -> None:
+        self.organism, self.substrate, self.marker = organism, substrate, marker
+        self.prompts: list[str] = []
+
+    async def generate(self, prompt: str, *, system: str | None = None, temperature: float = 0.2,
+                       max_tokens: int = 2048, json_mode: bool = False) -> str:
+        self.prompts.append(prompt)
+        passages = _numbered(prompt)
+        at = [n for n, words in passages.items() if self.organism in words and self.substrate in words]
+        if not at:
+            return json.dumps({"entities": [], "relationships": []})
+        read = " ".join(words.strip() for words in passages.values())
+        entities = [{"name": self.organism, "type": "Organism", "passages": at[:1], "aliases": [],
+                     "description": f"A placeholder organism; the batch read: {read}"},
+                    {"name": self.substrate, "type": "Substrate", "passages": at[:1], "aliases": [],
+                     "description": ""}]
+        stated = [{"source": self.organism, "target": self.substrate, "type": "AFFECTS", "evidence": self.marker,
+                   "passage": at[0], "confidence": 1.0}] if self.marker in read else []
+        return json.dumps({"entities": entities, "relationships": stated})
+
+    def stream(self, prompt: str, **_: object):
+        raise NotImplementedError("a build streams nothing")
+
+
+def test_a_batch_of_one_document_keeps_the_other_projects_words_out_of_a_shared_documents_reads(tmp_path,
+                                                                                               two_projects):
+    tag = _tag()
+    organism, substrate, marker = f"organism-{tag}", f"substrate-{tag}", f"marker-{tag}"
+    shared = f"The {organism} grew on {substrate} in a placeholder vessel."
+    _store(tmp_path, HERE, tag, shared)
+    assert _store(tmp_path, THERE, tag, shared).status == "linked"
+    theirs = _store(tmp_path, THERE, tag + "t", f"The other project's own passage holds {marker}.")
+    model = Misfiles(organism, substrate, marker)
+    built = _build(THERE, model)
+    assert (built.batches_run, built.chunks_processed) == (2, 2), "two documents, two batches"
+    assert all(len(_numbered(p)) == 1 for p in model.prompts) and not any(
+        marker in p and organism in p for p in model.prompts), "no batch held the shared passage and theirs"
+    mine = json.dumps([_entities(HERE), _edges(HERE, organism), _edges(HERE, substrate), _counts(HERE)])
+    for word in (marker, theirs.document_id, "AFFECTS"):
+        assert word not in mine, word
+    [listed, _] = _entities(HERE)["entities"]
+    assert listed["name"] == organism and listed["description"].startswith("A placeholder organism")
+
+
+def test_another_projects_alias_names_no_edge_of_this_project(tmp_path, two_projects):
+    tag = _tag()
+    organism, alias, substrate = f"organism-x{tag}", f"moniker-x{tag}", f"substrate-z{tag}"
+    _store(tmp_path, THERE, tag + "t", f"The {organism}, which the other project calls {alias}, grew.")
+    _build(THERE, Reader({organism: Named("Organism", aliases=(alias,))}))
+    _store(tmp_path, HERE, tag, f"The {alias} grew on {substrate}.", f"The {organism} was named.")
+    quote = f"{alias} grew on {substrate}"
+    _build(HERE, Reader({alias: Named("Organism"), organism: Named("Organism"), substrate: Named("Substrate")},
+                        [Stated(alias, "GROWN_ON", substrate, quote)]))
+
+    async def stated() -> list:
+        async with kit.service().session_factory() as session:
+            return (await session.execute(
+                select(KgEntity.name, KgRelationship.relation_type).select_from(KgRelationship)
+                .join(KgEntity, KgEntity.id == KgRelationship.source_entity_id).where(KgRelationship.evidence == quote)
+            )).all()
+
+    assert [tuple(r) for r in db.run(stated())] == [(organism, "GROWN_ON")], (
+        "the kit joined this project's name to the entity whose alias it is")
+    assert _edges(HERE, substrate)["relationships"] == [] and _edges(HERE, organism)["relationships"] == []
+    assert [e["name"] for e in _entities(HERE, tag)["entities"]] == [organism, substrate]
+    assert _counts(HERE)["relationships"] == 0
 
 
 def test_the_kits_batch_step_is_the_one_this_build_calls(tmp_path, monkeypatch):
@@ -351,7 +447,7 @@ def test_an_entity_is_listed_where_the_projects_passages_name_it(graphs):
         {"name": n.here, "type": "Organism", "description": f"A placeholder organism {n.here_says}.",
          "evidence_chunk_count": 1},
         {"name": n.shared, "type": "Substrate", "description": None, "evidence_chunk_count": 3,
-         "description_note": graph.DESCRIPTION_WITHHELD},
+         "description_note": graph.DESCRIPTION_NOTE},
     ], "the other project's organism is absent; the shared substrate counts this project's passages alone"
     assert [e["name"] for e in _entities(HERE, "SUBSTRATE-S")["entities"]] == [n.shared], "a name matched case aside"
     assert [e["name"] for e in _entities(HERE, entity_type="Organism")["entities"]] == [n.here]
@@ -367,7 +463,7 @@ def test_an_entity_is_listed_where_the_projects_passages_name_it(graphs):
     assert by_name[n.vessel]["description"] == f"A placeholder vessel {n.there_says}."
     # This project's model named the other's organism in a passage of its own,
     # so that organism is named in a document the other project does not hold.
-    assert by_name[n.there]["description"] is None and by_name[n.there]["description_note"] == graph.DESCRIPTION_WITHHELD
+    assert by_name[n.there]["description"] is None and by_name[n.there]["description_note"] == graph.DESCRIPTION_NOTE
 
 
 def test_an_alias_finds_nothing_under_a_projects_scope(graphs):
@@ -486,11 +582,14 @@ def test_an_edges_quote_is_shown_where_its_words_stand_in_its_passage(tmp_path):
 def test_a_project_with_no_graph_is_told_how_to_build_one(tmp_path, two_projects):
     tag = _tag()
     _store(tmp_path, HERE, tag, f"The organism-{tag} grew in a placeholder vessel.")
-    for project_id in (HERE, THERE):  # one holds a passage no build has read; the other holds nothing
-        words = graph.no_graph(project_id)
+    # One holds a passage no build has read; the other holds nothing, and a
+    # project the store does not hold holds nothing either.
+    for project_id, words in ((HERE, graph.no_graph(HERE)), (THERE, graph.no_passages(THERE)),
+                              (f"no-such-{tag}", graph.no_passages(f"no-such-{tag}"))):
         assert f"pnpm lit:graph --project {project_id} --by <name>" in words
         assert _entities(project_id) == {"entities": [], "note": words}
         assert _edges(project_id, f"organism-{tag}") == {"entity": f"organism-{tag}", "found": False, "hint": words}
+    assert "Intake" in graph.no_passages(THERE) and "Intake" not in graph.no_graph(HERE)
     assert _counts(HERE) == {"chunks": 1, "chunks_read": 0, "entities": 0, "relationships": 0, "entity_types": {},
                              "relation_types": {}}
 

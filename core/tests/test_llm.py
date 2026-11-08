@@ -1028,9 +1028,14 @@ def test_a_kit_call_has_room_for_its_thinking(monkeypatch):
     """The kit sizes its calls for a model that writes its answer at once (a
     judgement in 1,024 tokens, a graph batch in 8,192, HyDE's passage in 512),
     and output tokens include thinking: a kit call asks the larger of the
-    kit's ceiling and the room its route's effort sets (`KIT_ROOM`)."""
-    assert llm.KIT_ROOM == {"low": 0, "medium": 4096, "high": 8192, "xhigh": 12000, "max": 16000}
+    kit's ceiling and the room its route's effort sets (`KIT_ROOM`). At max
+    the room is openFerment's own judge's (ADR-008, Implementations 15 and
+    18)."""
+    from openferment_core.postdoc import evaluate
+
+    assert llm.KIT_ROOM == {"low": 0, "medium": 4096, "high": 8192, "xhigh": 12000, "max": 32000}
     assert set(llm.KIT_ROOM) == set(llm.EFFORTS)
+    assert llm.KIT_ROOM["max"] == evaluate.JUDGE_TOKENS
     monkeypatch.setenv(llm.ROUTES_SETTING, json.dumps({
         "judge": {"models": [OPUS, SONNET], "effort": "max"},
         "explain": {"models": [OPUS, SONNET], "effort": "high"},
@@ -1049,8 +1054,18 @@ def test_a_kit_call_has_room_for_its_thinking(monkeypatch):
     with llm.tally() as spent:
         asyncio.run(the_kit_asks())
     assert [(r["model"], r["output_config"]["effort"], r["max_tokens"]) for r in client.requests] == [
-        (OPUS, "max", 16000), (OPUS, "high", 8192), (HAIKU, "low", 512), (HAIKU, "low", 8192), (OPUS, "high", 12000),
+        (OPUS, "max", 32000), (OPUS, "high", 8192), (HAIKU, "low", 512), (HAIKU, "low", 8192), (OPUS, "high", 12000),
     ], "the room at max and high; at low, and above the room, the kit's own ceiling"
     assert [(s.family, s.max_tokens) for s in spent] == [
-        ("judge", 16000), ("explain", 8192), ("index", 512), ("index", 8192), ("explain", 12000)]
+        ("judge", 32000), ("explain", 8192), ("index", 512), ("index", 8192), ("explain", 12000)]
     assert llm.KIT_ROLES == {"answer": "explain", "extraction": "index", "judge": "judge"}
+
+    # explain at medium and at xhigh: the rooms between.
+    for effort, room in (("medium", 4096), ("xhigh", 12000)):
+        monkeypatch.setenv(llm.ROUTES_SETTING, json.dumps({"explain": {"models": [OPUS, SONNET], "effort": effort}}))
+        client.requests.clear()
+        with llm.tally() as spent:
+            asyncio.run(llm.kit_client("answer").generate("p", max_tokens=2048))
+        assert [(r["model"], r["output_config"]["effort"], r["max_tokens"]) for r in client.requests] == [
+            (OPUS, effort, room)]
+        assert [(s.family, s.max_tokens) for s in spent] == [("explain", room)]

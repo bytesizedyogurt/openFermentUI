@@ -99,6 +99,12 @@ def test_the_graph_tools_are_served_under_the_kits_names_and_arguments_for_the_p
         assert ours[name].description != theirs[name].description and "this project's" in ours[name].description
     assert all(f"`{t.name}`" in ours["search_entities"].description for t in domain.entity_types)
     assert all(f"`{t.name}`" in ours["get_entity_relationships"].description for t in domain.relation_types)
+    # Two of the kit's own tools, served as the kit wrote them, carry openFerment's descriptions.
+    for name, description in literature_mcp.DESCRIBED.items():
+        assert ours[name].input_schema == theirs[name].input_schema, name
+        assert ours[name].description == description != theirs[name].description, name
+    assert all(ours[name].description == theirs[name].description
+               for name in set(theirs) - set(literature_mcp.SCOPED) - set(literature_mcp.DESCRIBED))
 
 
 class Answering:
@@ -149,6 +155,14 @@ def test_a_project_no_build_has_read_is_refused_with_the_command_that_builds_its
                                 ("get_entity_relationships", {"entity_name": "x"})):
             assert str(_refused(server, tool, arguments)).endswith(f": {words}")
         assert "pnpm lit:graph --project p-lit" in words
+        # A project that holds no passage is sent to Intake first.
+        none = graph.no_passages("p-lit")
+        server = literature_mcp.build(Answering({"entities": [], "note": none},
+                                                {"entity": "x", "found": False, "hint": none}))
+        for tool, arguments in (("search_entities", {"name_contains": ""}),
+                                ("get_entity_relationships", {"entity_name": "x"})):
+            assert str(_refused(server, tool, arguments)).endswith(f": {none}")
+        assert "Intake" in none
         # Words about the graph a build has read stay an answer.
         partly = {"entities": [], "note": "No entity is named in this project's passages."}
         assert _answer(literature_mcp.build(Answering(partly, {})), "search_entities", {"name_contains": ""}) == partly

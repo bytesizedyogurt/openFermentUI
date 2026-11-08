@@ -23449,7 +23449,7 @@
     },
     "/api/literature/stats": {
       "get": {
-        "description": "The project's documents and chunks in the kit, by source, licence class\nand embedding version, and its concept graph's entities and relationships,\nthe ones its own passages name and hold.",
+        "description": "The project's documents and chunks in the kit, by source, licence class\nand embedding version, and its concept graph's entities and relationships,\nthe ones its own passages name and hold, and 0 communities, the community\nlayer staying off (ADR-002, Implementation F).",
         "operationId": "literature_stats_api_literature_stats_get",
         "parameters": [
           {

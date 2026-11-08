@@ -2,16 +2,19 @@
 
     uv run --project core --all-extras python -m openferment_core.literature_mcp [--project <id>]
 
-`.mcp.json` at the repository root starts it beside openFerment's own. Its
-tools are the kit's (search the corpus, answer with citations, read a
-document and its citations, the corpus's sources and size), served by
+`.mcp.json` at the repository root starts it beside openFerment's own. Six
+of its tools are the kit's own (search the corpus, answer with citations,
+read a document and its citations, the corpus's sources and size), served by
 `kit.ProjectService`, so every read stays inside the project `--project`
-names, else OPENFERMENT_PROJECT. The kit's two tools that read its concept
-graph (`SCOPED`) query the store whole, every project's entities and edges,
-so the server removes them and adds openFerment's own under the same names
-and arguments, each reading the project's graph alone through the service
-(`literature/graph.py`) and refusing in words a project whose passages no
-build has read, with the command that builds its graph.
+names, else OPENFERMENT_PROJECT; two of them, `answer_question` and
+`list_sources`, carry descriptions of openFerment's (`DESCRIBED`). The kit's
+two tools that read its concept graph (`SCOPED`) query the store whole, every
+project's entities and edges, so the server removes them and adds
+openFerment's own under the same names and arguments, each reading the
+project's graph alone through the service (`literature/graph.py`) and
+refusing in words a project that holds no passage, with the way its documents
+enter, and a project whose passages no build has read, with the command that
+builds its graph.
 Like openFerment's own server it reads the database address and the project
 from core/.env when the environment lacks them, and nothing else: an answer
 needs the model, which llm.py reaches only with a key in the environment. It
@@ -46,6 +49,20 @@ NO_PROJECT = ("This Sci RAG Kit server acts in no project. Start it with --proje
 #: serves openFerment's own under these names and arguments, each reading the
 #: project's graph alone (`graph_tools`; ADR-002, Implementation F).
 SCOPED = ("search_entities", "get_entity_relationships")
+#: The kit's own tools this server describes in openFerment's words, each
+#: served as the kit wrote it.
+DESCRIBED = {
+    "answer_question": (
+        "Ask the project's literature a question and get a grounded, cited answer. The answer cites numbered "
+        "sources inline like [1]; the citations list maps each number to its document. When the corpus holds no "
+        "answer, the response says the corpus holds none. This spends model tokens; search_corpus returns the "
+        "evidence alone. Set include_compression only to override the domain default; the response reports "
+        "measured prompt-token counts and any full-text fallbacks."),
+    "list_sources": (
+        "List the project's document sources, each written `project:<id>:<collector>` (the project that collected "
+        "it and the way it entered), with their counts and licence classes, before filtering a search by source or "
+        "licence."),
+}
 
 
 def _named() -> None:
@@ -118,10 +135,10 @@ def act_in(argv: list[str] | None = None) -> str | None:
 
 
 def _built(answer: dict[str, Any], key: str) -> dict[str, Any]:
-    """`answer`, unless it says that no build has read the project's passages:
-    then those words, as a refusal."""
+    """`answer`, unless it says that the project holds no passage or that no
+    build has read its passages: then those words, as a refusal."""
     project = projects.current_or_none()
-    if project is not None and answer.get(key) == graph.no_graph(project):
+    if project is not None and answer.get(key) in (graph.no_passages(project), graph.no_graph(project)):
         raise ToolError(answer[key])
     return answer
 
@@ -134,7 +151,8 @@ def graph_tools(service: InWords) -> dict[str, tuple[Any, str]]:
     """The two graph tools as this server serves them, by name, each with its
     description: the kit's arguments, the reads `service` makes of the
     project's graph alone (`ProjectService.search_entities` and
-    `entity_relationships`), a project with no graph refused in words."""
+    `entity_relationships`), a project with no passage or no graph refused in
+    words."""
     domain = service.domain.config
 
     async def search_entities(name_contains: str, entity_type: str | None = None, limit: int = 20) -> dict[str, Any]:
@@ -147,30 +165,34 @@ def graph_tools(service: InWords) -> dict[str, tuple[Any, str]]:
         "search_entities": (search_entities, (
             "Look up the concept graph's entities by a part of their name (case aside), in this project's graph "
             "alone: an entity is listed where a passage of a document the project holds names it, with its type, "
-            "its description where every document naming it is one the project holds, and the count of the "
-            "project's passages that name it (`evidence_chunk_count`). A name the kit holds as an alias finds "
-            f"nothing here. `entity_type` narrows the list to one of the domain's types: {_kinds(domain.entity_types)}. "
-            "A project whose passages no build has read is refused in words naming the command that builds its "
-            "graph.")),
+            "its description where a model wrote one and every document naming it is one the project holds, and "
+            "the count of the project's passages that name it (`evidence_chunk_count`). A name the kit holds as an "
+            "alias finds nothing here. `entity_type` narrows the list to one of the domain's types: "
+            f"{_kinds(domain.entity_types)}. A project that holds no passage is refused in words saying how its "
+            "documents enter, and a project whose passages no build has read in words naming the command that "
+            "builds its graph.")),
         "get_entity_relationships": (get_entity_relationships, (
             "Show every stated relationship of one entity that this project's passages hold, each with its "
             "statement, its evidence quote where the quote's words stand in the passage it cites, its confidence, "
             "and the document and passage id (`p<index>`) it stands in. An edge is listed when its passage is the "
-            "project's and both its ends are entities the project's passages name. The name is matched case aside "
-            "and aliases are left out; search_entities lists the names. Its relation types are the domain's: "
-            f"{_kinds(domain.relation_types)}. A project whose passages no build has read is refused in words "
-            "naming the command that builds its graph.")),
+            "project's and that passage names both its ends. The name is matched case aside and aliases are left "
+            "out; search_entities lists the names. Its relation types are the domain's: "
+            f"{_kinds(domain.relation_types)}. A project that holds no passage is refused in words saying how its "
+            "documents enter, and a project whose passages no build has read in words naming the command that "
+            "builds its graph.")),
     }
 
 
 def build(service: Any) -> Any:
-    """The kit's MCP server over `service`, its refusals in words, and its two
-    graph tools served for the project alone (`graph_tools`)."""
+    """The kit's MCP server over `service`, its refusals in words, two of its
+    tools described in openFerment's words (`DESCRIBED`), and its two graph
+    tools served for the project alone (`graph_tools`)."""
     from sci_rag.server.mcp_server import build_mcp_server
 
     scoped = InWords(service)
-    server, _tools = build_mcp_server(scoped)
-    for name, (tool, description) in graph_tools(scoped).items():
+    server, kits = build_mcp_server(scoped)
+    served = {name: (kits[name], description) for name, description in DESCRIBED.items()} | graph_tools(scoped)
+    for name, (tool, description) in served.items():
         server.remove_tool(name)
         server.add_tool(tool, name=name, description=description)
     return server
