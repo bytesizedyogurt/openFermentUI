@@ -53,6 +53,13 @@ in words naming the entry and who kept it, with nothing written: a model
 never replaces an entry a person kept, and an assistant that declares
 Postdoc's model id leaves Postdoc's entries as they are. A keeper's name is
 read as `tools.caller_name` writes one, at every door.
+
+WHAT IS AUDITED (alpha 2.2 E.20). A person's keep, by the route or from a
+file, writes its audit row in the keep's own transaction, as a person's other
+writes do (`project_state`, `protocols`): `keep_catalogue` under the module
+that reads the kind (`MODULES`), its target `<kind>/<id>`, naming the keeper,
+and a file's rows name the file. A write through `catalogue_write`, a model's
+or a person's, is audited by its tool as that write, with its door and note.
 """
 from __future__ import annotations
 
@@ -67,13 +74,15 @@ from typing import Annotated, Any, Literal, get_args
 from pydantic import BaseModel, Field, FiniteFloat, ValidationError, ValidationInfo, field_validator, model_validator
 from sqlalchemy import select
 
-from . import db, projects, units
+from . import audit, db, projects, units
 from .competence import POLICY as SKILL_POLICY
 from .db import models as t
 from .db import rows
 
 CatalogueKind = Literal["strain", "product", "skill", "lesson"]
 KINDS: tuple[str, ...] = ("strain", "product", "skill", "lesson")
+# The module that reads each kind, which a keep of it is audited under.
+MODULES = {"strain": "geneos", "product": "pureos", "skill": "guild", "lesson": "primer"}
 # A product's class, as pureOS's proposer reads one (pureos/proposer.py
 # CLASS_OF_CATEGORY, each a protein, a small molecule or a polymer);
 # test_catalogues.py holds the two to one list. Each class is a word.
@@ -432,7 +441,10 @@ def _taken(held: CatalogueEntry) -> str:
             "loop, or an outside assistant's), so nothing was written. Keep this entry under an id of its own")
 
 
-async def _keep(project_id: str, entries: list[CatalogueEntry]) -> None:
+async def _keep(project_id: str, entries: list[CatalogueEntry], audited: dict[str, Any] | None = None) -> None:
+    """The entries kept in one transaction, and with `audited` (a person's
+    keep: what each audit row says beside the kind) each one's audit row in
+    it, so a keep and its rows commit together."""
     async with db.session() as s:
         # One keep at a time in the project's catalogues: a person's keep
         # never lands between a model's check and its write.
@@ -452,22 +464,27 @@ async def _keep(project_id: str, entries: list[CatalogueEntry]) -> None:
                     if keeper(was) != "model" or was.by != e.by or _side(was) != _side(e):
                         raise CatalogueRefused(_taken(was))
             await rows.put(s, t.catalogue, project_id, row_id, e.model_dump(mode="json"), by=e.by, kind=e.kind)
+            if audited is not None:
+                await audit.add(project_id, agent="person", who=e.by, module=MODULES[e.kind], action="keep_catalogue",
+                                state="kept", target=f"{e.kind}/{e.id}", detail={"kind": e.kind, **audited})
 
 
 def keep(entry: CatalogueEntry, *, by: str, agent: Literal["model", "person"] = "person",
-         via: str | None = None) -> CatalogueEntry:
+         via: str | None = None, audited: bool = True) -> CatalogueEntry:
     """An entry kept in the open project's catalogue of its kind, in the name
     of `by` (read as `_name` reads one), in the lane `agent` names, a model's
     through the door `via` names (postdoc when it names none). A person's
     keep replaces an entry already held under the id. A model's replaces one
     it kept itself under the same name through the same kind of door, and is
-    refused in words for any other (CatalogueRefused), nothing written."""
+    refused in words for any other (CatalogueRefused), nothing written. A
+    person's keep writes its audit row with it (`keep_catalogue`); a caller
+    that audits the write itself (`catalogue_write`) passes `audited=False`."""
     who = _name(by)
     if not who:
         raise CatalogueRefused("a catalogue entry is kept in a person's or a model's name")
     through = (via or "postdoc") if agent == "model" else None
     kept = entry.model_copy(update={"by": who, "at": _now(), "agent": agent, "via": through})
-    db.run(_keep(projects.current(), [kept]))
+    db.run(_keep(projects.current(), [kept], {} if audited and agent == "person" else None))
     return kept
 
 
@@ -483,12 +500,12 @@ def keep_fields(kind: str, fields: dict[str, Any], *, by: str, source: str,
     the door `via` names, for a caller that holds no entry
     (`catalogue_write`): refused in words when the kind does not take them,
     and, for a model's write, when the id holds an entry another kept
-    (`keep`)."""
+    (`keep`). Its caller audits the write as its own."""
     try:
         entry = CatalogueEntry.model_validate({**fields, "kind": _kind(kind), "source": source})
     except ValidationError as e:
         raise CatalogueRefused(_first_error(e)) from None
-    return keep(entry, by=by, agent=agent, via=via)
+    return keep(entry, by=by, agent=agent, via=via, audited=False)
 
 
 # ── from a file (Intake) ───────────────────────────────────────────────
@@ -558,7 +575,7 @@ def intake(kind: str, data: bytes, filename: str, *, by: str) -> CatalogueIntake
         good.append(e)
         out.kept.append(e.id)
     if good:
-        db.run(_keep(projects.current(), good))
+        db.run(_keep(projects.current(), good, {"file": filename or "the file"}))
     return out
 
 

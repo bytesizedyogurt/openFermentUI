@@ -109,6 +109,33 @@ def test_the_routes_keep_list_and_take_a_file():
     assert up.status_code == 200 and up.json()["kept"] == ["l-1"]
 
 
+def test_a_persons_keep_writes_its_audit_row_as_a_persons_other_writes_do():
+    """A person's keep, by the route or from a file, is audited in its own
+    transaction (alpha 2.2 E.20), as `project_state` and `protocols` audit a
+    person's writes; a write through `catalogue_write` is audited by its tool
+    alone, and a keep refused is audited as nothing."""
+    client = TestClient(api.app, base_url="http://127.0.0.1")
+    kept = lambda: [(a.agent, a.who, a.module, a.action, a.state, a.target, a.detail)  # noqa: E731
+                    for a in audit.read(action="keep_catalogue")]
+    made = client.post("/api/catalogues/strain", json={"entry": STRAIN.model_dump(mode="json"), "by": "Ada Moreno"})
+    assert made.status_code == 200, made.text
+    assert kept() == [("person", "Ada Moreno", "geneos", "keep_catalogue", "kept", "strain/test-strain-1",
+                       {"kind": "strain"})]
+    refused = client.post("/api/catalogues/skill", json={"entry": {"kind": "skill", "id": "SK-PLACEHOLDER",
+                                                                   "name": "A placeholder skill"}, "by": " "})
+    assert refused.status_code == 422 and len(kept()) == 1, "a keep that names nobody is audited as nothing"
+    up = client.post("/api/intake/catalogue", data={"kind": "lesson", "by": "Grace Hopper"},
+                     files={"file": ("lessons.csv", b"id,name\nl-1,Lesson one\nl-2,Lesson two\n", "text/csv")})
+    assert up.status_code == 200 and up.json()["kept"] == ["l-1", "l-2"]
+    assert kept()[1:] == [("person", "Grace Hopper", "primer", "keep_catalogue", "kept", f"lesson/{i}",
+                           {"kind": "lesson", "file": "lessons.csv"}) for i in ("l-1", "l-2")], "each row of the file, newest last"
+    # The tool's write, in a person's lane or a model's, is the tool's own row.
+    for i, ctx in enumerate((tools.ToolContext(person="Grace Hopper"), tools.ToolContext(model="test-model-a"))):
+        wrote = tools.run("catalogue_write", {**SKILL, "id": f"test-skill-{i}"}, ctx)
+        assert wrote.error is None, wrote.error
+    assert len(kept()) == 3 and [a.who for a in audit.read(action="catalogue_write")] == ["Grace Hopper", "test-model-a"]
+
+
 def test_postdoc_reads_a_catalogue_and_keeps_an_entry_as_its_own():
     ctx = tools.ToolContext(model=llm.DEFAULT_PRIMARY)
     wrote = tools.run("catalogue_write", {"kind": "strain", "id": "test-strain-3", "name": "Test strain three",

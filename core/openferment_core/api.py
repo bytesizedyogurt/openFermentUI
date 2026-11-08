@@ -1170,8 +1170,9 @@ def catalogue_entry(kind: str, entry_id: str) -> CatalogueEntry:
         {"$ref": "#/components/schemas/Refusal"}, {"$ref": "#/components/schemas/HTTPValidationError"}]}}}}})
 def catalogue_keep(kind: str, asked: CatalogueKeep) -> CatalogueEntry:
     """One entry kept in the open project's catalogue of `kind`, in the name of
-    `by`, as a person's keep (`agent: person`); an entry already held under its
-    id is replaced, whoever kept it. The entry names its kind, the
+    `by`, as a person's keep (`agent: person`), audited as `keep_catalogue`
+    under the module that reads the kind; an entry already held under its id
+    is replaced, whoever kept it. The entry names its kind, the
     catalogue's own: the catalogues screen sends an entry as the catalogue
     answers one. 422 in words for an entry the kind does not take, for an
     entry of another kind, and for a keep that names nobody (`by` empty)."""
@@ -1192,8 +1193,9 @@ def catalogue_keep(kind: str, asked: CatalogueKeep) -> CatalogueEntry:
 def catalogue_intake(kind: str = Form(...), by: str = Form(..., min_length=1, max_length=200),
                      file: UploadFile = File(...)) -> CatalogueIntake:
     """A file of catalogue entries of one kind, JSON or CSV, taken in: every
-    row that is an entry kept with the file as its source, every other row
-    refused with its reason."""
+    row that is an entry kept with the file as its source, each audited as
+    `keep_catalogue` naming the file, every other row refused with its
+    reason."""
     from . import catalogues
 
     data = file.file.read(4 * 1024 * 1024 + 1)

@@ -91,7 +91,11 @@ export function CostWaterfall(props: CostWaterfallProps) {
   const x = (v: number) => L + ((v - lo) / (hi - lo || 1)) * (W - L - R);
   const color = markColor(props.provenance);
   const dash = DASH_ARRAY[ENCODING[props.provenance].line.dash];
-  const rows = [...props.lines.map((l) => ({ line: l, bar: drawn.find((b) => !b.total && b.key === l.key) ?? null })), ...(props.total ? [{ line: null, bar: drawn.find((b) => b.total) ?? null }] : [])];
+  // Each row with its label and the number at its end: a line's per-unit value, or the price the run solved.
+  const rows = [
+    ...props.lines.map((l) => ({ line: l, label: l.label, value: l.perUnit, bar: drawn.find((b) => !b.total && b.key === l.key) ?? null })),
+    ...(props.total ? [{ line: null, label: props.total.label, value: props.total.value, bar: drawn.find((b) => b.total) ?? null }] : []),
+  ];
   const H = T * 2 + rows.length * ROW;
   return (
     <FigureFrame
@@ -106,9 +110,8 @@ export function CostWaterfall(props: CostWaterfallProps) {
     >
       <svg viewBox={`0 0 ${W} ${H}`} className="w-full h-auto" role="img" aria-label={props.title} data-testid="waterfall">
         <line x1={x(0)} x2={x(0)} y1={T} y2={H - T} stroke="currentColor" strokeOpacity={0.4} />
-        {rows.map(({ line, bar }, i) => {
+        {rows.map(({ line, label, value, bar }, i) => {
           const y0 = T + i * ROW;
-          const label = line ? line.label : props.total!.label;
           return (
             <g key={line?.key ?? 'total'} data-testid={line ? 'waterfall-row' : 'waterfall-total'} data-line={line?.key ?? 'total'}>
               <text x={L - 6} y={y0 + ROW / 2 + 4} fontSize={11} textAnchor="end" fill="currentColor" fontWeight={line ? undefined : 600}>
@@ -132,7 +135,7 @@ export function CostWaterfall(props: CostWaterfallProps) {
               )}
               {bar && (
                 <text x={W - R + 6} y={y0 + ROW / 2 + 4} fontSize={10} fill="currentColor" opacity={0.8} className="font-num">
-                  {fmt(line ? (line.perUnit as number) : props.total!.value, 4)}
+                  {value != null && Number.isFinite(value) ? fmt(value, 4) : '—'}
                 </text>
               )}
             </g>

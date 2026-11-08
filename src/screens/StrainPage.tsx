@@ -79,10 +79,10 @@ interface FieldGroup {
   all: SPoint[];
   live: SPoint[]; // not rejected
   rejected: SPoint[];
-  usable: SPoint[]; // live and convertible
-  rejectedUsable: SPoint[];
+  usable: PlotPoint[]; // live and convertible
+  rejectedUsable: PlotPoint[];
   /** Usable but held out of the statistics — industry estimates and recitations. */
-  held: SPoint[];
+  held: PlotPoint[];
   heldIndustry: number;
   heldSecondary: number;
   unconvertible: number;
@@ -179,6 +179,12 @@ function assignLanes(xs: number[]): number[] {
 interface PlotPoint extends SPoint {
   canonical: number;
 }
+
+/**
+ * A point whose value converts into its field's canonical unit, so it is drawn and counted; one whose unit does not
+ * convert is left out of the plot and the statistics and counted as unconvertible, in words beside them.
+ */
+const converted = (p: SPoint): p is PlotPoint => p.canonical !== null;
 
 function StripPlot({
   points,
@@ -408,8 +414,8 @@ function FieldRow({
   onQueue: (ids: string[], label: string) => void;
 }) {
   const plotted = useMemo(() => {
-    const base = g.usable as PlotPoint[];
-    return showRejected ? ([...base, ...g.rejectedUsable] as PlotPoint[]) : base;
+    const base = g.usable;
+    return showRejected ? [...base, ...g.rejectedUsable] : base;
   }, [g.usable, g.rejectedUsable, showRejected]);
 
   const unverifiedIds = g.live.filter((p) => p.rec.status === 'unverified').map((p) => p.rec.id);
@@ -589,8 +595,8 @@ export default function StrainPage({ strainId }: { strainId: string }) {
       const all = by.get(def.id)!;
       const rejected = all.filter((p) => p.rec.status === 'rejected');
       const live = all.filter((p) => p.rec.status !== 'rejected');
-      const usable = live.filter((p) => p.canonical !== null);
-      const rejectedUsable = rejected.filter((p) => p.canonical !== null);
+      const usable = live.filter(converted);
+      const rejectedUsable = rejected.filter(converted);
       // The statistics run over independent evidence only; the held-out records
       // stay in `usable` so they are still drawn and still clickable.
       const aggregatable = usable.filter((p) => isAggregatable(p.rec));
@@ -606,7 +612,7 @@ export default function StrainPage({ strainId }: { strainId: string }) {
         heldIndustry: held.filter((p) => aggregateExclusion(p.rec) === 'industry-estimate').length,
         heldSecondary: held.filter((p) => aggregateExclusion(p.rec) === 'not-primary').length,
         unconvertible: live.length - usable.length,
-        stats: summarize(aggregatable.map((p) => p.canonical as number)),
+        stats: summarize(aggregatable.map((p) => p.canonical)),
         verified: live.filter((p) => p.rec.status === 'verified').length,
         gold: live.filter((p) => !!p.rec.gold).length,
         unverified: live.filter((p) => p.rec.status === 'unverified').length,
@@ -686,12 +692,12 @@ export default function StrainPage({ strainId }: { strainId: string }) {
     const canonicalUnit = ONTOLOGY_BY_ID.medium_component_conc.canonicalUnit;
     return [...by.entries()]
       .map(([tag, ps]) => {
-        const usable = ps.filter((p) => p.canonical !== null);
+        const usable = ps.filter(converted);
         const aggregatable = usable.filter((p) => isAggregatable(p.rec));
         return {
           tag,
           points: ps,
-          stats: summarize(aggregatable.map((p) => p.canonical as number)),
+          stats: summarize(aggregatable.map((p) => p.canonical)),
           held: usable.length - aggregatable.length,
           unconvertible: ps.length - usable.length,
           verified: ps.filter((p) => p.rec.status === 'verified').length,
@@ -877,7 +883,8 @@ export default function StrainPage({ strainId }: { strainId: string }) {
       key: 'field',
       label: 'Field',
       valuesOf: ({ rec }) => [rec.field],
-      labelOf: (v) => fieldName(v as FieldId),
+      // A field the ontology names reads by its name; any other by the record's own words for it.
+      labelOf: (v) => fieldName(v),
     },
     {
       key: 'status',

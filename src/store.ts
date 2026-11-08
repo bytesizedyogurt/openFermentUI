@@ -131,6 +131,8 @@ export interface Job {
   status: 'running' | 'done' | 'failed';
   failReason?: string;
   href?: string;
+  /** What the job is on, by its id (the document an extraction reads), so a page finds it; `title` names it in words. */
+  subject?: string;
   startedAt: number;
 }
 
@@ -1458,16 +1460,19 @@ export const useStore = create<OFState>()((set, get) => ({
   // (OF-BLD-012 §5.4). When it does not, nothing is fetched, and the toast
   // names the missing service and the command that starts it.
   extractPaperLive: async (paperId, again = false) => {
+    // The document by its title where the project holds one, and by the kit's id where it holds none.
+    const named = get().papers.find((p) => p.id === paperId)?.title.trim() || paperId;
     const id = get().startJob({
-      title: `Extract ${paperId}`,
+      title: `Extract ${named}`,
       kind: 'ingest',
       stages: [{ label: 'Extract', ms: 30000 }],
       href: `#/biorepo/witness`,
+      subject: paperId,
     });
     get().logActivity({
       at: stamp(),
       icon: 'sparkles',
-      text: `Extracting ${paperId} — one structured model response over its full text`,
+      text: `Extracting ${named} — one structured model response over its full text`,
       href: '#/intake/ingest',
       provenance: 'user',
     });
@@ -1479,7 +1484,7 @@ export const useStore = create<OFState>()((set, get) => ({
         .map(([rule, n]) => `${rule} ${n}`)
         .join(', ');
       get().toast({
-        text: `${paperId} extracted — ${result.candidates.length} candidate${result.candidates.length === 1 ? '' : 's'} anchored, ${result.rejected} refused${dropped ? ` (${dropped})` : ''}, $${result.usage.costUsd.toFixed(4)}`,
+        text: `${named} extracted — ${result.candidates.length} candidate${result.candidates.length === 1 ? '' : 's'} anchored, ${result.rejected} refused${dropped ? ` (${dropped})` : ''}, $${result.usage.costUsd.toFixed(4)}`,
         kind: 'success',
         href: '#/biorepo/witness',
         hrefLabel: 'Open Witness',
@@ -1489,7 +1494,7 @@ export const useStore = create<OFState>()((set, get) => ({
         e instanceof IntakeDown ? `${e.message} ${e.remedy}` : e instanceof Error ? e.message : String(e);
       get().failJob(id, message);
       if (e instanceof IntakeDown && /not running/.test(e.message)) set({ serviceUp: false });
-      get().toast({ text: `Extract ${paperId} failed — ${message}`, kind: 'error' });
+      get().toast({ text: `Extract ${named} failed — ${message}`, kind: 'error' });
       return;
     }
     // The run, the candidates and the decisions are recomputed server-side;

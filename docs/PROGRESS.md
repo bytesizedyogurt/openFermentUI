@@ -2907,6 +2907,38 @@ holds the numbers, the tables and the judgements).
     of 20 screens; `pnpm prove --steps 9`, offline, 55 of 55 checks in 89 s, the walk's reading chosen and kept in the
     reviewer's name, and no call in the proof's spend table; `pnpm test:sim` 142 passed (4 min 35 s); and
     `pnpm test:core` 2960 passed, 1 skipped, 175 deselected (4 min 30 s).
+- E.20. The stage E gate's leftovers, and stage F.1's two screen faults. Built in a worktree beside stage F's live work,
+  with no model call.
+  - The seven casts that hid a generated optional or nullable field, each narrowed where the value can be absent:
+    CostWaterfall's row carries its own label and number and says a number it lacks as a dash; StrainPage reads a
+    point whose value converts into its field's unit through a guard (`converted`), the plot and the statistics
+    taking those alone and the page counting the rest as unconvertible in words, and a field's facet label reads a
+    field the ontology names by its name and any other by the record's words; ProformaComparison's Tornado draws a
+    row whose every later change is a number, and the table says the others' changes as a dash; PaperReader finds a
+    paper's most named field in a loop the compiler follows, and asks of the paper as a whole when it holds no
+    record; Settings' conversion playground takes a field the ontology names and leaves the field as it stands for
+    any other value.
+  - Home's fermOS tile says what fermOS holds: the deposited runs it can fit (`lib/fermos.qualifies`), and its fits,
+    forecasts, simulations and vessel designs kept with the project, and the tile is drawn as a built destination's.
+  - A person's catalogue keep, by the route or from a file, writes its audit row in the keep's own transaction, as
+    `project_state` and `protocols` write a person's: `keep_catalogue` under the module that reads the kind
+    (`catalogues.MODULES`, which `catalogue_write` now reads too), its target `<kind>/<id>`, a file's rows naming the
+    file; `catalogue_write`, in a person's lane or a model's, stays audited by its tool alone, and a keep refused is
+    audited as nothing (`test_catalogues.py`; `docs/api/intake.md`).
+  - Stage F.1's screen faults: the extraction's job, its activity line and its toasts name the document by its title
+    where the project holds one, by the kit's id otherwise, and a job names its document by id in `Job.subject`,
+    which Intake, BioRepo and the paper's page find it by; the toast's words break inside a long unbroken word, so its
+    Open Witness and dismiss buttons stay inside its 340 px.
+  - Checks: the touched tests (`test_catalogues.py`, `test_catalogue.py`, `test_mcp_service.py`,
+    `test_agent_interface.py`, `test_tools.py`, `test_openapi.py`, `test_protocols.py`, `test_route_models.py`) with
+    `test_guidance.py` and `test_no_seed.py`, the database address empty, on Python 3.13 and on 3.12, 261 passed each
+    way; `gen:api`, `gen:tools` and `gen:components` with `--check`, the document and `src/api/types.gen.ts`
+    regenerated (the two catalogue routes' words); `typecheck`; `check:state`, 86 checks; `check:figures`;
+    `check:secrets`; `build`; a page with the built stylesheet drew the toast with a 32-character id, its Open Witness
+    button 62 px past the toast's edge as the toast stood before this commit and inside it after; `pnpm smoke` with no
+    key, 20 of 20 screens; `pnpm prove --steps 9`, offline, 55 of 55 checks in 87 s and no call in the proof's spend
+    table; `pnpm test:sim` 142 passed (4 min 29 s); and `pnpm test:core` 2961 passed, 1 skipped, 175 deselected
+    (4 min 35 s).
 
 ### Alpha 2.2 — Stage F — 2026-11-05
 

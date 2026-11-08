@@ -30,6 +30,7 @@ import {
 } from 'lucide-react';
 import { useStore, provenanceOf } from '@/store';
 import { ProposalsCard } from '@/components/ProposalsCard';
+import { qualifies } from '@/lib/fermos';
 import { pinnedCard } from '@/lib/proforma';
 import { href } from '@/router';
 import { RUNBOOK_STATUS_LABEL } from '@/data/labels';
@@ -234,8 +235,10 @@ const ACTIVITY_ICONS: Record<string, LucideIcon> = {
  *
  * Counted from the store's lists where there is something to count, and
  * stated as "nothing" where there is not. `built` drives the greying: a
- * destination with no code renders dimmed, because "I clicked fermOS and it
- * was empty" should be something Home told you first.
+ * destination with no code renders dimmed, so a person learns on Home that a
+ * page is empty before opening it. fermOS fits the runs deposited here, and
+ * keeps its fits, forecasts, simulations and vessel designs with the project
+ * (alpha 2.2 E.20).
  */
 interface Counted {
   records: number;
@@ -245,6 +248,8 @@ interface Counted {
   runbooks: number;
   protocols: number;
   lessons: number;
+  /** The deposited runs fermOS can fit: each with a biomass series of four readings or more (lib/fermos `qualifies`). */
+  fittable: number;
 }
 
 function stateOf(n: Counted): Record<string, { now: string; built: boolean }> {
@@ -253,7 +258,10 @@ function stateOf(n: Counted): Record<string, { now: string; built: boolean }> {
     BioRepo: { now: `${n.papers} paper${n.papers === 1 ? '' : 's'} · gold set not yet annotated`, built: true },
     Postdoc: { now: 'live through openferment-core, on the model it is configured with', built: true },
     geneOS: { now: `${n.strains} host${n.strains === 1 ? '' : 's'} · no sequence tooling`, built: true },
-    fermOS: { now: 'empty — no kinetics, no transport, no scale-up', built: false },
+    fermOS: {
+      now: `${n.fittable} deposited run${n.fittable === 1 ? '' : 's'} it can fit · fits, forecasts, simulations and vessel designs kept with the project`,
+      built: true,
+    },
     pureOS: { now: `${UNIT_OPERATIONS.length} unit operations · no process model`, built: true },
     Proforma: { now: `${n.scenarios} scenario${n.scenarios === 1 ? '' : 's'}`, built: true },
     Runbooks: { now: `${n.runbooks} runbook${n.runbooks === 1 ? '' : 's'} · ${n.protocols} protocol${n.protocols === 1 ? '' : 's'}`, built: true },
@@ -317,6 +325,7 @@ export default function Home() {
   const runbooks = useStore((s) => s.runbooks);
   const strains = useStore((s) => s.strains);
   const lessons = useStore((s) => s.lessons);
+  const depositions = useStore((s) => s.depositions);
   const liveConversations = useStore((s) => s.liveConversations);
   const activity = useStore((s) => s.activity);
   const runs = useStore((s) => s.runs);
@@ -336,8 +345,9 @@ export default function Home() {
         runbooks: runbooks.length,
         protocols: protocols.length,
         lessons: lessons.length,
+        fittable: depositions.filter((d) => qualifies(d, runbooks.find((r) => r.id === d.runbookId))).length,
       }),
-    [records, papers, strains, scenarios, runbooks, protocols, lessons],
+    [records, papers, strains, scenarios, runbooks, protocols, lessons, depositions],
   );
 
   // ── band 1 numbers ───────────────────────────────────────────────────

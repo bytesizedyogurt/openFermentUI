@@ -61,9 +61,12 @@ export function comparedOf(report: ComparisonReport): { runs: ComparedRun[]; row
 
 /** One Tornado row per output whose every later change is a number, in percent; the rest are said in the table alone. */
 export function changeRows(rows: ComparedRow[]): TornadoRow[] {
-  return rows
-    .filter((r) => r.change.length > 1 && r.change.slice(1).every((c) => typeof c === 'number' && Number.isFinite(c)))
-    .map((r) => ({ label: r.key, values: r.change.slice(1).map((c) => (c as number) * 100), tag: r.unit || undefined }));
+  return rows.flatMap((r) => {
+    const later = r.change.slice(1);
+    // A run that holds no number for the output leaves its row to the table, which says its change as —.
+    const changes = later.filter((c): c is number => typeof c === 'number' && Number.isFinite(c));
+    return later.length > 0 && changes.length === later.length ? [{ label: r.key, values: changes.map((c) => c * 100), tag: r.unit || undefined }] : [];
+  });
 }
 
 const shown = (v: number | string | null | undefined) =>

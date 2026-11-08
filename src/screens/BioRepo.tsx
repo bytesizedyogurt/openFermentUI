@@ -48,12 +48,12 @@ interface LibRow {
   ingestKey: 'complete' | 'ingesting' | 'failed';
 }
 
-/** Latest ingest job that references this paper (jobs carry the id in href). */
+/** Latest ingest job on this paper: one that names it by id (`Job.subject`), or whose href ends at its page. */
 function ingestJobFor(jobs: Job[], paperId: string): Job | undefined {
   for (let i = jobs.length - 1; i >= 0; i--) {
     const j = jobs[i];
     if (j.kind !== 'ingest') continue;
-    if (j.href?.endsWith(`/${paperId}`) || j.title.includes(paperId)) return j;
+    if (j.href?.endsWith(`/${paperId}`) || j.subject === paperId) return j;
   }
   return undefined;
 }

@@ -43,7 +43,7 @@ import {
 import { DataTable, type Column } from '@/components/DataTable';
 import { FiguresSection } from './SettingsFigures';
 import { QuantityField, Quantity, type QuantityValue } from '@/components/QuantityField';
-import { ONTOLOGY, ONTOLOGY_BY_ID, fieldName, type FieldId, type ParameterDef } from '@/data/ontology';
+import { ONTOLOGY, ONTOLOGY_BY_ID, fieldName, isFieldId, type FieldId, type ParameterDef } from '@/data/ontology';
 import type { GateMode, GuildPolicy } from '@/lib/guild';
 import { convert, fmt, toSI } from '@/engine/units';
 import { DISCLOSURE, exportCSV } from '@/lib/csv';
@@ -519,7 +519,9 @@ function UnitsSection() {
                 className="input"
                 value={field}
                 onChange={(e) => {
-                  const next = e.target.value as FieldId;
+                  // Each option is a field the ontology names; a value naming no field leaves the field as it stands.
+                  const next = e.target.value;
+                  if (!isFieldId(next)) return;
                   setField(next);
                   setQty(defaultFor(ONTOLOGY_BY_ID[next]));
                 }}

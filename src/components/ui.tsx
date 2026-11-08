@@ -367,10 +367,11 @@ export function Toasts() {
         return (
           <div key={t.id} className="overlay rounded-card p-3 flex items-start gap-2 anim-in">
             <Icon size={16} className={cx('mt-[2px] shrink-0', TOAST_COLOR[t.kind])} />
-            <div className="flex-1 text-body">{t.text}</div>
+            {/* A long unbroken word (a document's id, an address) breaks inside the toast, so its buttons stay in it. */}
+            <div className="flex-1 min-w-0 text-body break-words [overflow-wrap:anywhere]">{t.text}</div>
             {t.href && (
               <button
-                className="btn btn-sm"
+                className="btn btn-sm shrink-0"
                 onClick={() => {
                   navigate(t.href!.replace(/^#/, ''));
                   dismiss(t.id);
@@ -379,7 +380,7 @@ export function Toasts() {
                 {t.hrefLabel ?? 'Open'}
               </button>
             )}
-            <button className="text-ink-soft hover:text-ink" onClick={() => dismiss(t.id)} aria-label="Dismiss">
+            <button className="shrink-0 text-ink-soft hover:text-ink" onClick={() => dismiss(t.id)} aria-label="Dismiss">
               <X size={14} />
             </button>
           </div>

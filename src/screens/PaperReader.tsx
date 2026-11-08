@@ -80,7 +80,7 @@ function ingestJobFor(jobs: Job[], paperId: string): Job | undefined {
   for (let i = jobs.length - 1; i >= 0; i--) {
     const j = jobs[i];
     if (j.kind !== 'ingest') continue;
-    if (j.href?.endsWith(`/${paperId}`) || j.title.includes(paperId)) return j;
+    if (j.href?.endsWith(`/${paperId}`) || j.subject === paperId) return j;
   }
   return undefined;
 }
@@ -213,15 +213,16 @@ export default function PaperReader({
   const topField = useMemo(() => {
     const counts = new Map<FieldId, number>();
     for (const r of recs) counts.set(r.field, (counts.get(r.field) ?? 0) + 1);
+    // The field most of the paper's records name; none for a paper with no record, and the ask then names none.
     let best: FieldId | null = null;
     let bestN = 0;
-    counts.forEach((n, f) => {
+    for (const [f, n] of counts) {
       if (n > bestN) {
         bestN = n;
         best = f;
       }
-    });
-    return best as FieldId | null;
+    }
+    return best;
   }, [recs]);
 
   if (!paper) {

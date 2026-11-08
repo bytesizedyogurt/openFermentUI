@@ -544,7 +544,6 @@ def import_flowsheet(tool: str, file_id: str, note: str, ctx: ToolContext) -> To
     return record_result(record)
 
 
-CATALOGUE_MODULES = {"strain": "geneos", "product": "pureos", "skill": "guild", "lesson": "primer"}
 # What a kept entry's source says of the door it came in by (ToolContext.door).
 CATALOGUE_SOURCES = {"postdoc": "Postdoc ({who})", "mcp": "{who}, over MCP", "http": "{who}, at the HTTP endpoint"}
 CATALOGUE_KEPT = ("kept in the project's catalogue, marked as yours: a person may replace it, and so may a later write "
@@ -574,7 +573,7 @@ def keep_catalogue(tool: str, inp: Any, ctx: ToolContext) -> ToolResult:
         kept = catalogues.keep_fields(kind, fields, by=who, source=source, agent=agent, via=door)
     except catalogues.CatalogueRefused as e:
         return ToolResult(error=f"{tool} refused: {e}")
-    _audit_as(ctx, CATALOGUE_MODULES[kind], tool, "open", f"{kind}/{kept.id}",
+    _audit_as(ctx, catalogues.MODULES[kind], tool, "open", f"{kind}/{kept.id}",
               {"tool": tool, "kind": kind, "note": inp.note})
     entry = kept.model_dump(mode="json", exclude_none=True, exclude={"sequence"})
     return ToolResult(summary={"state": "open", **entry, "meaning": CATALOGUE_KEPT})

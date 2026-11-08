@@ -37,7 +37,7 @@ export default function IntakeIngest() {
     return counts;
   }, [candidates]);
   const running = (paperId: string) =>
-    jobs.some((j) => j.status === 'running' && j.title === `Extract ${paperId}`);
+    jobs.some((j) => j.status === 'running' && j.kind === 'ingest' && j.subject === paperId);
 
   return (
     <>
