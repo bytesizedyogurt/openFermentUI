@@ -81,7 +81,8 @@ def check_key() -> Check:
     if not key or key == PLACEHOLDER_KEY:
         return Check("key", "fail", "core/.env holds no key. Postdoc and extraction need one: set a spend cap in "
                      "the Anthropic console, write the key on core/.env's ANTHROPIC_API_KEY= line (core/.env.example "
-                     "holds it; copy the example when core/.env is absent), and restart the service")
+                     "holds it; when core/.env is absent, copy the example, leaving out its OPENFERMENT_DATABASE_URL "
+                     "line on the live host, docs/runbooks/live-host-install.md step 1), and restart the service")
     if not key.startswith("sk-ant-"):
         return Check("key", "warn", "core/.env holds a key that does not start the way Anthropic keys do")
     return Check("key", "ok", "core/.env holds a key")

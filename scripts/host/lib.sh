@@ -89,16 +89,20 @@ tailscale_cli() {
 has_key() {
   [ -f "$REPO/core/.env" ] &&
     grep -qE '^ANTHROPIC_API_KEY=sk-ant-' "$REPO/core/.env" &&
-    ! grep -qE '^ANTHROPIC_API_KEY=sk-ant-\.\.\.[[:space:]]*$' "$REPO/core/.env"
+    ! grep -qE '^ANTHROPIC_API_KEY=sk-ant-\.\.\.\s*$' "$REPO/core/.env"
 }
 
 # A setting from core/.env, by name, for the names that are not the key
 # (OPENFERMENT_DATABASE_URL, OPENFERMENT_PROJECT, OPENFERMENT_TEST_DATABASE_URL):
 # the environment's value as it stands when it has one, else the file's last
-# line for it, read as python-dotenv reads it (an `export` before the name,
-# blanks around `=`, one pair of quotes, a ` #` comment after a bare value and
-# a carriage return taken off); empty when neither names it, and the status 0
-# either way, so a caller under `set -e` may assign it. Never reads the key.
+# line for it, in the forms of python-dotenv these settings take: an `export`
+# before the name, blanks around `=`, one pair of quotes, a ` #` comment after
+# a bare value and a carriage return, each taken off. Three forms read here as
+# the line stands: a `${VAR}` stays as written, a quoted value ends at its next
+# quote (the quote of a `\"` inside it among them), and a quoted value running
+# onto a second line gives its first line. Empty when neither names it, and the
+# status 0 either way, so a caller under `set -e` may assign it. Never reads
+# the key.
 env_setting() {
   local name="$1" value=""
   if [ -n "${!name:-}" ]; then

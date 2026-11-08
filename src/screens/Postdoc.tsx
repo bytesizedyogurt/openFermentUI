@@ -148,11 +148,13 @@ function LivePanel({
               the browser bundle. The template's own line for the key names it,
               so the instruction points at that line. On the live host core/.env
               already holds the database line the install wrote, so the key goes
-              on its line there; a machine with no core/.env copies the template. */}
+              on its line there; a machine with no core/.env copies the template, and
+              the live host's copy leaves out the template's database line. */}
           <p className="text-ink">
             Write the key on its line in <span className="font-num">core/.env</span>, the line{' '}
-            <span className="font-num">core/.env.example</span> holds for it (copy the example when{' '}
-            <span className="font-num">core/.env</span> is absent), and restart the service. That
+            <span className="font-num">core/.env.example</span> holds for it (when{' '}
+            <span className="font-num">core/.env</span> is absent, copy the example, leaving out its
+            database line on the live host), and restart the service. That
             file is gitignored, and the key never reaches the browser, which is why the service
             holds it.
           </p>

@@ -10,12 +10,17 @@ the first time; afterwards `scripts/host/deploy.sh` alone brings the Mini to `ma
 Every step runs as yourself in Terminal; a command that needs root carries its own `sudo`, and
 `install.sh` stops when started with `sudo`. Nothing here prints the key.
 
+**The install waits for alpha 2.2's merge into `main`** (PROGRESS.md, Blockers). Until then `main`
+holds alpha 2.1, whose `install.sh` looks for `pg_isready` on the PATH, where Homebrew's keg-only
+`postgresql@17` puts none, and stops at step 3 with "PostgreSQL is not installed". Every `main`
+in this runbook is `main` after that merge.
+
 ## 0. What the Mini needs first
 
 | Need | How | Check |
 |---|---|---|
 | macOS with Homebrew | https://brew.sh | `brew --version` |
-| Node and pnpm | `brew install node pnpm` | `node --version` (the build has run on Node 22 in this build's container and on Node 20 in CI), `pnpm --version` |
+| Node and pnpm | `brew install node pnpm` | `node --version` (the build has run on Node 22 in this build's container and on Node 20 in CI; Homebrew's `node` is Node 26 on 8 November 2026, unrun in this build); `pnpm --version` inside `~/openferment` prints `10.33.0`, the version `package.json` names in `packageManager`, which pnpm runs inside the checkout |
 | uv, with Python 3.13 | `brew install uv && uv python install 3.13` | `uv python find 3.13` names it; the service has run on 3.12 and 3.13 |
 | PostgreSQL 17 with pgvector, started at power-on | `brew install postgresql@17 pgvector && sudo brew services start --sudo-service-user="$(id -un)" postgresql@17` | `"$(brew --prefix postgresql@17)/bin/pg_isready" -h 127.0.0.1` answers "accepting connections" |
 | Graphviz, for Proforma's flowsheet diagrams | `brew install graphviz` | `dot -V`; without it Proforma lists a flowsheet's units in run order |
@@ -28,9 +33,9 @@ runs from power-on, before anyone logs in, as the server's own LaunchDaemon runs
 `--sudo-service-user` runs it as you, the owner of its data directory (PostgreSQL refuses to run as
 root). This build read the flag in Homebrew's source and could not run it: confirm it on the Mini
 with `brew services --help`, which lists `--sudo-service-user`. A Mini that started PostgreSQL with
-`brew services` alone runs it from your login; `install.sh` says so, and `brew services stop
-postgresql@17` followed by the `sudo` line above moves it. Tailscale's background service likewise
-runs from power-on, and `install.sh` says so when it finds the Tailscale app running in its place.
+`brew services start postgresql@17` runs it from your login; `install.sh` says so, and `brew services
+stop postgresql@17` followed by the `sudo` line above moves it. Tailscale's background service likewise
+runs from power-on, and `install.sh` says so when it finds the Tailscale app running.
 
 Homebrew's formulae for `postgresql@17` and `pgvector` carry bottles for Apple Silicon alone, so on
 an Intel Mini `brew install` builds both from source with the Command Line Tools (run
@@ -39,23 +44,26 @@ dependency. `brew info postgresql@17` says `bottled` beside the version when a b
 Mac.
 
 A Mini that ran alpha 1.0 holds its checkout at `~/openferment` already (alpha 1.0's README cloned
-it there), and `core/data/` there holds every alpha 1.0 record step 5 carries. Stop alpha 1.0's two
-jobs with its own install script, keep a copy of its records, and bring the checkout to `main`:
+it there), and `core/data/` there holds every alpha 1.0 record step 5 carries. Run no alpha 1.0
+deploy before this block: its `scripts/host/deploy.sh --keep-decisions` commits the decisions and
+pushes them to GitHub, and the block's pull replaces that script with alpha 2.2's. Stop alpha 1.0's
+two jobs with its own install script, keep a copy of its records, and bring the checkout to `main`:
 
 ```
 cd ~/openferment
 scripts/host/install.sh --uninstall
-cp -Rp core/data ~/openferment-alpha-1.0-data
+[ -e ~/openferment-alpha-1.0-data ] || cp -Rp core/data ~/openferment-alpha-1.0-data
 git pull --ff-only
 ```
 
-`--uninstall` keeps the checkout and `core/data`, and step 3 installs both jobs again. `main` has
-left `core/data/biorepo.json` as alpha 1.0 committed it, so the pull keeps the review decisions in
-the file for step 5. Leave alpha 1.0's `scripts/host/deploy.sh` unrun from here on: its
-`--keep-decisions` commits the decisions and pushes them to GitHub, after which `deploy.sh` no
-longer stops for step 5. When the pull stops, saying the checkout holds commits of its own or local
-changes it would overwrite, bring the checkout to `main` with `git fetch origin && git reset --hard
-origin/main` (the copy keeps every record) and give step 5's import the copy (step 5 says how).
+`--uninstall` keeps the checkout and `core/data`, and step 3 installs both jobs again. The copy is
+made once, so a second run of the block keeps the first copy as it stands. `main` has left
+`core/data/biorepo.json` as alpha 1.0 committed it, so the pull keeps the review decisions in the
+file for step 5. When the pull stops with `fatal: Not possible to fast-forward, aborting.` (the
+checkout holds commits of its own), or with `error: Your local changes to the following files would
+be overwritten by merge` or `error: The following untracked working tree files would be overwritten
+by merge`, bring the checkout to `main` with `git fetch origin && git reset --hard origin/main` (the
+copy keeps every record) and give step 5's import the copy (step 5 says how).
 
 ## 1. The key, and the account's limit
 
@@ -94,7 +102,8 @@ origin/main` (the copy keeps every record) and give step 5's import the copy (st
    may hold model settings of its own (alpha 1.0's example offered `OPENFERMENT_EFFORT=medium`, for
    one): take out its `OPENFERMENT_MODEL`, `OPENFERMENT_FALLBACK_MODEL`, `OPENFERMENT_INDEX_MODEL`,
    `OPENFERMENT_EFFORT` and `OPENFERMENT_ROUTES` lines to keep the defaults.
-   `grep -nE '^OPENFERMENT_([A-Z_]*MODEL|EFFORT|ROUTES)=' .env` lists them and prints no key, and
+   `grep -nE '^[[:space:]]*(export[[:space:]]+)?OPENFERMENT_([A-Z_]*MODEL|EFFORT|ROUTES)[[:space:]]*=' .env`
+   lists them, an `export` or spaced line among them, and prints no key, and
    `pnpm ready`'s `model` row names the plan route's models and its effort. The install script
    writes the database line in step 3, and step 6 says which project `OPENFERMENT_PROJECT` names.
 
@@ -162,11 +171,11 @@ with each engine `core/engines.local` keeps); `model` and `roles`, the routes' m
 Models API; `europepmc`; `huggingface`; and `service`, the server on `127.0.0.1:8000`. A fresh Mini
 shows `!` on `embedder` until the first document is collected (FastEmbed fetches its model file
 then), on `intake` until a project holds a document, on `rag` until `core/.env` holds an
-`OPENFERMENT_RAG_KEY` (another program searching the literature through `/rag` needs one; the app
-runs without it), and on each engine row until its checks have run here. Where a row or a command
-says `pnpm db:up`, which starts the development database in Docker, start the Mini's own
-PostgreSQL with `sudo brew services start --sudo-service-user="$(id -un)" postgresql@17`; its
-address is the one `install.sh` wrote in `core/.env`. The last line names the lane: `full` with a
+`OPENFERMENT_RAG_KEY` (a program that searches the literature through `/rag` sends that key), and
+on each engine row until its checks have run here. On the Mini, PostgreSQL starts with `sudo brew
+services start --sudo-service-user="$(id -un)" postgresql@17`, the command the `data` row names
+beside `pnpm db:up` (the development database in Docker); its address is the one `install.sh`
+wrote in `core/.env`. The last line names the lane: `full` with a
 key the Models API accepted and Europe PMC answering, `model-only` with that key alone, `none`
 otherwise.
 
@@ -195,9 +204,9 @@ Mini's name>.<your tailnet>.ts.net`). Home lists the projects.
 ## 5. Carry alpha 1.0's records, once
 
 If the Mini ran alpha 1.0, its review decisions are in `core/data/biorepo.json`, which the service
-no longer reads, and `install.sh` stops at its deploy step until they are in a project. By then it
-has made the database and named it in `core/.env`. Keep a copy of the file, migrate the database
-and carry the records:
+no longer reads, and `install.sh` stops at its deploy step while the file differs from its committed
+version. By then it has made the database and named it in `core/.env`. Keep a copy of the file,
+migrate the database and carry the records:
 
 ```
 cd ~/openferment
@@ -233,9 +242,9 @@ proposals act in every project. On the project's Intake page collect the documen
 and review the candidates in BioRepo. Studies runs the things of every engine registered here (the
 library's plants and the composed flowsheet on `biosteam`, and each other engine's) and lists every
 engine run; a run's page makes a scenario of your own values and a runbook; Flowsheets imports SFF
-files; the catalogues screen (`/catalogues`) keeps the project's strains, products, Guild's skills
-and Primer's lessons. `docs/reports/live-questions-2026-11.md` is a worked example, done in a
-container.
+files; the catalogues screen (`#/p/<its id>/catalogues`) keeps the project's strains, products,
+Guild's skills and Primer's lessons. `docs/reports/live-questions-2026-11.md` is a worked example,
+done in a container.
 
 ## 7. Afterwards
 
@@ -246,10 +255,10 @@ container.
 | Keep an engine installed beside the lock | its package directory, one a line, in `core/engines.local` (git ignores the file), each directory outside Desktop, Documents, Downloads and iCloud Drive, as the checkout is; `scripts/host/deploy.sh` then installs it again after each sync and restarts the service (`docs/api/engines.md`) |
 | The proof, on a database of its own | from `~/openferment`: `pnpm exec playwright install chromium` once, then `pnpm build && OPENFERMENT_TEST_DATABASE_URL="postgresql://$(id -un)@127.0.0.1:5432/openferment_test" pnpm prove` (steps 1 to 10, offline; step 9 walks the built app in Chromium, step 10 makes every engine's conformance checks). For its run it installs each package under `examples/engines/` into `core/.venv` and leaves the environment as it found it, so run it while no deploy runs |
 | Restart the service by hand, after a change to `core/.env` among other times | `sudo launchctl kickstart -k system/com.umutuzo.openferment`; the nightly job is `com.umutuzo.openferment.nightly`, and `scripts/host/nightly.sh` runs its work by hand |
-| Make `core/.venv` again, after it was removed | `cd ~/openferment/core && uv sync --frozen --all-extras --python 3.13`; a deploy's sync keeps the environment's Python, and one made with no `--python` takes the newest Python uv finds |
+| Make `core/.venv` again, after it was removed | `cd ~/openferment/core && uv sync --frozen --all-extras --python 3.13 && bash ../scripts/engines-local.sh`, which installs each engine `core/engines.local` names beside the lock; a deploy's sync keeps the environment's Python, and one made with no `--python` takes the newest Python uv finds |
 | The service's log, and the nightly job's | `~/Library/Logs/openferment/server.log`, `~/Library/Logs/openferment/nightly.log` |
 | A backup | not set up: choose where a dump goes, then add a step to `scripts/host/nightly.sh` in a commit on `main`, which the next `scripts/host/deploy.sh` brings: `"$(brew --prefix postgresql@17)/bin/pg_dump" -h 127.0.0.1 openferment > <there>`, the keg's full path, since Homebrew keeps `pg_dump` off the jobs' PATH. An edit made in the Mini's checkout stops each deploy at its check for uncommitted changes (PROGRESS.md, Blockers) |
-| The tags alpha 1.0 and alpha 2.1 | once, from any machine: `git fetch origin && git tag alpha-1.0 d19224ff0b6eb809b21492d1b7a2e8fd895a0f44 && git tag alpha-2.1 fa1b7448a5b5e5a2b943b3fc9546f8a420a8ef10 && git push origin alpha-1.0 alpha-2.1` (PROGRESS.md, Blockers) |
+| The tags alpha 1.0 and alpha 2.1 | once, from any clone: `git fetch origin && git push origin d19224ff0b6eb809b21492d1b7a2e8fd895a0f44:refs/tags/alpha-1.0 fa1b7448a5b5e5a2b943b3fc9546f8a420a8ef10:refs/tags/alpha-2.1`, which runs the same in a clone that holds the tags already (PROGRESS.md, Blockers) |
 
 ## What is not covered
 

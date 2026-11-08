@@ -77,7 +77,9 @@ if [ "$VERIFY" = 1 ]; then
   export OPENFERMENT_TEST_DATABASE_URL
   # The browser checks drive a Chromium; this fetches it the first time only.
   pnpm exec playwright install chromium
-  pnpm verify
+  # The gate's own `uv run` calls read core/uv.lock as committed, as the sync
+  # above does, so a newer uv leaves the tracked lock as it stands.
+  UV_FROZEN=1 pnpm verify
 else
   say "Building the app"
   pnpm build

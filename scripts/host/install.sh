@@ -52,8 +52,8 @@ if has_key; then
   echo "core/.env holds a key."
 else
   echo "core/.env holds no key yet. The app runs; Postdoc and extraction wait for one. Write the key on"
-  echo "core/.env's ANTHROPIC_API_KEY= line, the one line of that name (set a limit in the Anthropic console"
-  echo "first), then restart the service: sudo launchctl kickstart -k system/$SERVER"
+  echo "core/.env's one ANTHROPIC_API_KEY= line, and add that line when the file has none (set a limit in"
+  echo "the Anthropic console first), then restart the service: sudo launchctl kickstart -k system/$SERVER"
 fi
 
 say "PostgreSQL, the one store"
