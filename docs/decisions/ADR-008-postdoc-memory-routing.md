@@ -310,6 +310,33 @@ seeded (`postdoc/evaluate.py`, `openferment_core/evaluation.py`, `docs/api/postd
   stopped at (`spentAtStopUsd`); the restarts are counted by kind (`restartCount`); and each row
   gives each judge's verdict cut to 200 characters.
 
+## Implementation 15 (alpha 2.2 F.2c: the judge's room set by measurement)
+
+The prompt's §4 lets a ceiling move with a measurement and a line here; the spend caps stay where
+they stand. The haiku table's fourteen answers were judged on the table's judge route,
+`claude-opus-5-5` then `claude-sonnet-5-5` at effort max, with `JUDGE_TOKENS` at 16,000, where F.2a
+held it for the comparison to measure first. Three of the fourteen judgements ran out of room
+(eq-eth-01, eq-eth-02 and eq-eth-03, each kept with no score, its `declined` reading "The judge's
+answer did not arrive whole (it ran out of room)", 0.345 to 0.385 USD each), and five of the eleven
+that arrived whole wrote about 14,000 to 16,000 tokens by their cost (eq-eth-06, 07, 10, 12 and 14).
+At effort max the model's thinking counts against the ceiling with its answer.
+
+`JUDGE_TOKENS` is now 32,000, the plan's own turn ceiling (`postdoc/plan.py`, `MAX_TOKENS`), and the
+haiku table was judged again at it on the same route (`pnpm eval judge --suite ethanol --tag haiku`,
+11:45 to 12:20 UTC on 5 November 2026), so the four tables are judged at one setting; the summary
+reads each run's newest judgement. At 32,000 all fourteen arrived whole, each given by
+`claude-opus-5-5` with no fallback and no refusal. The largest wrote about 23,900 tokens
+(eq-eth-01), three quarters of the room, and five of the fourteen wrote past 16,000 (eq-eth-01, 02,
+03, 05 and 07). A judgement cost 0.3346 USD on the mean and 0.5183 at the most, against 0.2928 and
+0.3853 at 16,000 (4.6846 USD for the fourteen, against 4.0988). The hold a judge call places on the
+daily cap until it settles carries its whole room, now 0.64 USD of output at Opus 5.5's price.
+
+A judgement keeps its cost, and a spend row its USD; neither keeps tokens. Each count above comes
+from a judgement's cost at Opus 5.5's prices (4 USD a million tokens in and 20 out; a judge call
+caches nothing). A judgement cut short at 16,000 wrote 16,000 tokens, which gives its question's
+input exactly, and the input of each other question is estimated from the length of its request by
+a line through those three, within a few hundred tokens; the same request went out at both ceilings.
+
 ## Evidence
 
 - `postdoc_agent.py`, `llm.py`, `spend.py`, `tools/__init__.py` at `alpha-1.0`.

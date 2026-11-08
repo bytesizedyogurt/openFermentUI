@@ -2842,3 +2842,19 @@ The live work (the prompt's §6.7 and §7), on the routes of its §4 as `core/.e
   with the database address empty, on Python 3.13 and on 3.12, 157 passed each way; `gen:api`, `gen:tools` and
   `gen:components --check`, each file as it was; `pnpm test:core` 2966 passed, 1 skipped, 175 deselected (5 min
   40 s); `pnpm prove --steps 6`, offline, steps 1, 2 and 6, 16 of 16 checks in 64 s, no model call.
+- F.2c. The judge's room set by measurement (ADR-008, Implementation 15; `docs/api/postdoc.md`, the evaluation set).
+  The haiku table's fourteen answers, judged on its judge route (`claude-opus-5-5` then `claude-sonnet-5-5` at effort
+  max) with `JUDGE_TOKENS` at 16,000, lost three judgements to the ceiling (eq-eth-01, 02 and 03, each kept with no
+  score, its `declined` saying the judge's answer ran out of room), and five more wrote about 14,000 to 16,000 tokens
+  by their cost. `JUDGE_TOKENS` is now 32,000, the plan's own turn ceiling (`postdoc/plan.py`, `MAX_TOKENS`), the
+  step's one line of Python, and `pnpm eval judge --suite ethanol --tag haiku` judged the table's fourteen newest runs
+  again on the table's own judge route (11:45:48 to 12:20:29 UTC, exit 0), each run keeping both judgements and the
+  summary reading the newer, so the four tables are judged at one setting. All fourteen arrived whole, each given by
+  `claude-opus-5-5` with no fallback and no refusal; the largest wrote about 23,900 tokens (eq-eth-01), and five wrote
+  past 16,000. A judgement cost 0.3346 USD on the mean and 0.5183 at the most, against 0.2928 and 0.3853 at 16,000;
+  the pass spent 4.6846 USD over 14 calls, each spend row equal to its judgement's cost, and the day over every
+  database read 9.754722 USD before it and 14.439322 after, against the 150 USD cap. Opus's means over the fourteen,
+  by its newest judgement of each: answers 0.601, grounded 0.646, labelled 0.938, coverage 0.589 (0.573, 0.595, 0.923
+  and 0.573 over the eleven it scored at 16,000). Each token count comes from a judgement's cost, since neither a
+  judgement nor a spend row keeps tokens (Implementation 15 says how). Checks: `test_evaluate.py` with the database
+  address empty, 31 passed.

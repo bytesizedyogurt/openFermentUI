@@ -129,6 +129,10 @@ quote, each passage's words), the gaps and the tools called, and score it from 0
 | `labelled` | Every value's origin said, every estimate labelled as the model's |
 | `coverage` | How much of what a good answer covers this one covers |
 
+A judgement may write 32,000 tokens, its thinking included (`evaluate.JUDGE_TOKENS`, the plan's own
+turn ceiling, set by the measurement in ADR-008, Implementation 15); one that runs out of room is kept
+with no score, its `declined` reading "The judge's answer did not arrive whole (it ran out of room)".
+
 A judgement keeps the judge model's id, its faults in words and its cost, beside the code's scores,
 with `tried`, the models the route asked in order (the last of them gave the judgement, named in
 `model` by the id the API served; a refusal names each model that declined), `refused`, those of
