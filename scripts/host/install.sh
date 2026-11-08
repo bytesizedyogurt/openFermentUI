@@ -3,16 +3,20 @@
 # and §B.8). Run as yourself, from the checkout, after `git clone`:
 #
 #   scripts/host/install.sh              install, or reinstall after a change here
-#   scripts/host/install.sh --uninstall  stop both jobs and remove them
+#   scripts/host/install.sh --uninstall  stop both jobs, remove them, and turn off tailscale serve's HTTPS port
 #
 # What it does, in order: checks the tools and where the checkout lives;
-# builds the app and the service's environment; sets the power settings an
-# always-on machine needs; installs two LaunchDaemons (the server, which starts
-# at power-on before anyone logs in, and the 03:00 extraction); waits for
-# /api/health; then publishes the port to your own devices with Tailscale.
+# makes the database `openferment` on Homebrew's PostgreSQL and names it in
+# core/.env when none is named there; installs the packages, builds the app
+# and migrates both schemas (deploy.sh --no-pull --no-restart); sets the
+# power settings an always-on machine needs; installs two LaunchDaemons (the
+# server, which starts at power-on before anyone logs in, and the 03:00
+# nightly job); waits for /api/health; publishes the port to your own devices
+# with Tailscale; then runs pnpm ready (docs/runbooks/live-host-install.md).
 #
-# It asks for your password (sudo) for the power settings and for the two files
-# it puts in /Library/LaunchDaemons. It never reads the key and never prints it.
+# It asks for your password (sudo) for the power settings, for the two files it
+# puts in /Library/LaunchDaemons, and for Tailscale's CLI when the background
+# service answers root alone. It never reads the key and never prints it.
 set -euo pipefail
 # shellcheck source=lib.sh
 source "$(dirname "$0")/lib.sh"
@@ -28,7 +32,7 @@ if [ "${1:-}" = --uninstall ]; then
   done
   # Only openFerment's own serve: `serve reset` would remove every one.
   command -v tailscale >/dev/null && tailscale_cli serve --https=443 off >/dev/null 2>&1 || true
-  say "Both jobs are stopped and removed. The checkout and core/data are untouched."
+  say "Both jobs are stopped and removed. The checkout, core/.env and the database are untouched."
   exit 0
 fi
 [ -z "${1:-}" ] || die "unknown option $1. Usage: install.sh [--uninstall]"
@@ -47,8 +51,9 @@ done
 if has_key; then
   echo "core/.env holds a key."
 else
-  echo "core/.env holds no key yet. The app runs; Postdoc's Live mode and Extract stay off until you"
-  echo "copy core/.env.example to core/.env and add one (set a spend cap in the Anthropic console first)."
+  echo "core/.env holds no key yet. The app runs; Postdoc and extraction wait for one. Write the key on"
+  echo "core/.env's ANTHROPIC_API_KEY= line, the one line of that name (set a limit in the Anthropic console"
+  echo "first), then restart the service: sudo launchctl kickstart -k system/$SERVER"
 fi
 
 say "PostgreSQL, the one store"
@@ -65,8 +70,11 @@ fi
 
 say "Installing the two LaunchDaemons"
 mkdir -p "$LOGS"
-# The jobs start with almost no environment; give them the folders these tools live in.
-JOB_PATH="$(for t in uv node pnpm git; do dirname "$(command -v "$t")"; done | awk '!seen[$0]++' | paste -sd: -):/usr/bin:/bin:/usr/sbin:/sbin"
+# The jobs start with almost no environment; give them the folders these tools
+# live in, and Homebrew's own bin, where Graphviz's dot lives (Proforma draws
+# with it).
+JOB_PATH="$( { for t in uv node pnpm git; do dirname "$(command -v "$t")"; done
+  if command -v brew >/dev/null; then echo "$(brew --prefix)/bin"; fi; } | awk '!seen[$0]++' | paste -sd: -):/usr/bin:/bin:/usr/sbin:/sbin"
 STAGE="$(mktemp -d)"
 "$REPO/core/.venv/bin/python" "$REPO/scripts/host/launchd.py" \
   --repo "$REPO" --user "$(id -un)" --home "$HOME" --path "$JOB_PATH" \
@@ -119,6 +127,6 @@ cat <<EOF
 On this Mac:      http://127.0.0.1:$PORT
 Logs:             tail -f "$LOGS/server.log"   ·   "$LOGS/nightly.log"
 After a change:   scripts/host/deploy.sh
-Nightly intake:   03:00, or now by hand: scripts/host/nightly.sh
+Nightly job:      03:00, or now by hand: scripts/host/nightly.sh
 Is it all wired:  pnpm ready
 EOF

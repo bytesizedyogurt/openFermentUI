@@ -1,4 +1,4 @@
-# Shared by install.sh and deploy.sh (OF-BLD-012 Appendix B). Sourced, never run,
+# Shared by install.sh, deploy.sh and nightly.sh (OF-BLD-012 Appendix B). Sourced, never run,
 # so its names are used by the scripts that source it.
 # shellcheck disable=SC2034
 # shellcheck shell=bash
@@ -89,37 +89,74 @@ tailscale_cli() {
 has_key() {
   [ -f "$REPO/core/.env" ] &&
     grep -qE '^ANTHROPIC_API_KEY=sk-ant-' "$REPO/core/.env" &&
-    ! grep -qE '^ANTHROPIC_API_KEY=sk-ant-\.\.\.\s*$' "$REPO/core/.env"
+    ! grep -qE '^ANTHROPIC_API_KEY=sk-ant-\.\.\.[[:space:]]*$' "$REPO/core/.env"
 }
 
 # A setting from core/.env, by name, for the names that are not the key
-# (OPENFERMENT_DATABASE_URL, OPENFERMENT_PROJECT): the environment's value
-# when it has one, else the file's last line for it. Never reads the key.
+# (OPENFERMENT_DATABASE_URL, OPENFERMENT_PROJECT, OPENFERMENT_TEST_DATABASE_URL):
+# the environment's value as it stands when it has one, else the file's last
+# line for it, read as python-dotenv reads it (an `export` before the name,
+# blanks around `=`, one pair of quotes, a ` #` comment after a bare value and
+# a carriage return taken off); empty when neither names it, and the status 0
+# either way, so a caller under `set -e` may assign it. Never reads the key.
 env_setting() {
-  local name="$1"
+  local name="$1" value=""
   if [ -n "${!name:-}" ]; then
-    printf '%s' "${!name}"
+    value="${!name}"
   elif [ -f "$REPO/core/.env" ]; then
-    grep -E "^$name=" "$REPO/core/.env" | tail -1 | cut -d= -f2-
+    value="$(grep -E "^[[:space:]]*(export[[:space:]]+)?${name}[[:space:]]*=" "$REPO/core/.env" | tail -1 | cut -d= -f2- | tr -d '\r')" || true
+    value="${value#"${value%%[![:space:]]*}"}"
+    case "$value" in
+      \"*) value="${value#\"}"; value="${value%%\"*}" ;;
+      \'*) value="${value#\'}"; value="${value%%\'*}" ;;
+      *) value="${value%%[[:space:]]#*}"; value="${value%"${value##*[![:space:]]}"}" ;;
+    esac
   fi
+  printf '%s' "$value"
 }
 
 # PostgreSQL, the one store (alpha 2.0, ADR-001): Homebrew's postgresql@17
 # with pgvector, answering on this Mac, a database named `openferment`, and
 # its address in core/.env. Makes what is missing and says what it made.
 ensure_database() {
-  command -v pg_isready >/dev/null ||
-    die "PostgreSQL is not installed. Run: brew install postgresql@17 pgvector && brew services start postgresql@17"
-  pg_isready -q -h 127.0.0.1 ||
-    die "PostgreSQL is not answering on 127.0.0.1. Run: brew services start postgresql@17"
-  if [ -n "$(env_setting OPENFERMENT_DATABASE_URL)" ]; then
-    echo "core/.env names the database."
-    return
+  # Homebrew keeps postgresql@17 keg-only: its tools live under its own prefix,
+  # which goes first on the path whenever the formula is installed.
+  local keg
+  if command -v brew >/dev/null && keg="$(brew --prefix --installed postgresql@17 2>/dev/null)"; then
+    PATH="$keg/bin:$PATH"
   fi
-  psql -h 127.0.0.1 -d postgres -tAc "SELECT 1 FROM pg_database WHERE datname = 'openferment'" | grep -q 1 ||
+  # `sudo brew services` starts it at power-on, as the server's LaunchDaemon
+  # starts, and --sudo-service-user runs it as the owner of its data directory.
+  local start
+  start="sudo brew services start --sudo-service-user=$(id -un) postgresql@17"
+  command -v pg_isready >/dev/null ||
+    die "PostgreSQL is not installed. Run: brew install postgresql@17 pgvector && $start"
+  pg_isready -q -h 127.0.0.1 ||
+    die "PostgreSQL is not answering on 127.0.0.1. Run: $start"
+  # Homebrew's LaunchAgent starts PostgreSQL at your login; an always-on host needs its LaunchDaemon.
+  if [ -f "$HOME/Library/LaunchAgents/homebrew.mxcl.postgresql@17.plist" ] &&
+    [ ! -f /Library/LaunchDaemons/homebrew.mxcl.postgresql@17.plist ]; then
+    echo "PostgreSQL here starts at your login, so after a power cut the service waits for a login to reach its database."
+    echo "For an always-on host: brew services stop postgresql@17 && $start"
+  fi
+  local named vector
+  named="$(env_setting OPENFERMENT_DATABASE_URL)"
+  case "$named" in
+    */openferment_dev | */openferment_dev\?* | *://openferment:openferment@*)
+      die "OPENFERMENT_DATABASE_URL names the developer's database of core/.env.example (role openferment, database openferment_dev), which this Mac's PostgreSQL lacks. Delete that line from core/.env and run this again: it then makes the live database, openferment, reached as $(id -un)" ;;
+    ?*)
+      echo "OPENFERMENT_DATABASE_URL names the database."
+      return ;;
+  esac
+  # The kit's migration makes the vector extension (kit_alembic/env.py): ask
+  # first, so a missing pgvector is named here in its own words.
+  vector="$(psql -X -h 127.0.0.1 -d postgres -tAc "SELECT 1 FROM pg_available_extensions WHERE name = 'vector'")" ||
+    die "psql could not ask PostgreSQL on 127.0.0.1 as $(id -un); the message above says why"
+  [ "$vector" = 1 ] || die "pgvector is not installed for this PostgreSQL. Run: brew install pgvector, then run this again"
+  psql -X -h 127.0.0.1 -d postgres -tAc "SELECT 1 FROM pg_database WHERE datname = 'openferment'" | grep -q 1 ||
     createdb -h 127.0.0.1 openferment || die "createdb openferment failed; the message above says why"
-  printf 'OPENFERMENT_DATABASE_URL=postgresql://%s@127.0.0.1:5432/openferment\n' "$(id -un)" >> "$REPO/core/.env"
+  # On a line of its own, whether or not the file's last line ends in one.
+  printf '\nOPENFERMENT_DATABASE_URL=postgresql://%s@127.0.0.1:5432/openferment\n' "$(id -un)" >> "$REPO/core/.env"
   chmod 600 "$REPO/core/.env"
   echo "Database openferment is ready, and its address is in core/.env."
 }
-

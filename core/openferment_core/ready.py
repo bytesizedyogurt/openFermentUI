@@ -50,6 +50,9 @@ CORE = Path(__file__).parent.parent
 REPO = CORE.parent
 MARKS = {"ok": "✓", "warn": "!", "fail": "✗", "skip": "·"}
 PLACEHOLDER_KEY = "sk-ant-..."
+# How the live host starts its PostgreSQL, from power-on and as its owner
+# (docs/runbooks/live-host-install.md, step 0).
+LIVE_START = 'sudo brew services start --sudo-service-user="$(id -un)" postgresql@17'
 # A PMCID the Europe PMC check asks about: one search says whether it answers.
 PROBE_PMCID = "PMC8471596"
 # Where FastEmbed fetches its model file from, once (ADR-002).
@@ -76,8 +79,9 @@ class Check:
 def check_key() -> Check:
     key = (os.environ.get("ANTHROPIC_API_KEY") or "").strip()
     if not key or key == PLACEHOLDER_KEY:
-        return Check("key", "fail", "core/.env holds no key. Postdoc and extraction need one: set a "
-                     "spend cap in the Anthropic console, copy core/.env.example to core/.env, add the key")
+        return Check("key", "fail", "core/.env holds no key. Postdoc and extraction need one: set a spend cap in "
+                     "the Anthropic console, write the key on core/.env's ANTHROPIC_API_KEY= line (core/.env.example "
+                     "holds it; copy the example when core/.env is absent), and restart the service")
     if not key.startswith("sk-ant-"):
         return Check("key", "warn", "core/.env holds a key that does not start the way Anthropic keys do")
     return Check("key", "ok", "core/.env holds a key")
@@ -116,7 +120,8 @@ def check_data() -> Check:
     try:
         at, head = migrate.revision(url), migrate.head()
     except Exception as e:  # the server's own words are the row's answer
-        return Check("data", "fail", f"{where} did not answer ({type(e).__name__}: {e}). Start PostgreSQL: pnpm db:up")
+        return Check("data", "fail", f"{where} did not answer ({type(e).__name__}: {e}). Start PostgreSQL: pnpm "
+                                     f"db:up for the development database, or on the live host {LIVE_START}")
     if at != head:
         return Check("data", "fail", f"{where} is at revision {at or 'none'} of {head}. Run: pnpm db:migrate")
     n_projects, n_decisions = _held()

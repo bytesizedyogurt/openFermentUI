@@ -66,10 +66,23 @@ session continues from this file and `git log` alone.
    and both strangers finished in their first round with no core file changed: the mirror engine
    (`examples/engines/openferment-engine-mirror/`) and the record-reader agent (`examples/agents/record-reader/`), each
    round in `docs/reports/handoff-2026-11.md`. Stage C is done: every run one shape.
-5. Files in flight: none; the landing review's commit holds its fixes and the runs on its tree (the Log, the
-   landing review).
+5. **Stage G is done** (8 November; the Log): `docs/runbooks/live-host-install.md` and `scripts/host/` are held to
+   the tree with no model call, and nothing has run on the Mini. The runbook's order for a Mini that ran alpha 1.0:
+   PostgreSQL started at power-on with `sudo brew services start --sudo-service-user="$(id -un)" postgresql@17`,
+   alpha 1.0's jobs stopped and `core/data` copied before the pull (step 0), `core/.env` made without the example's
+   database line (step 1), `install.sh` stopping at its deploy step, the import after `pnpm db:migrate` and
+   `install.sh` again (steps 3 and 5). The owner's first install on the Mini is the test of it (Blockers, Known
+   debts).
+6. Files in flight: none; stage G's commit holds its fixes and the runs on its tree (the Log, stage G).
 
 ## Current stage
+
+Alpha 2.2, stage G (2026-11-08, done): the live host's runbook and scripts held to the tree. A reader held
+`docs/runbooks/live-host-install.md` and `scripts/host/` to the code, five verifiers held its findings and its patch to
+Homebrew's source, python-dotenv and stand-ins, and every verdict is applied: the keg's tools, PostgreSQL from
+power-on, the example's database line kept out of the live `core/.env`, the checkout at `~/openferment`, step 5's
+order, `pnpm ready`'s rows, the tests' server for `deploy.sh --verify`, and the settings read as python-dotenv reads
+them (the Log). Nothing in it has run on macOS.
 
 Alpha 2.2, stage F (from 2026-11-05, under way): the live work. F.0's probe answered, and F.1 rebuilt the Ethanol
 project from Home through Intake, its 22 documents extracted on the `extract` route. F.2 ran as far as the account
@@ -484,8 +497,8 @@ prompt's §4).
 | Since | Blocker | Next command |
 |---|---|---|
 | 2026-11-08 04:28 UTC | The Anthropic account's own usage limit: "You have reached your specified API usage limits. You will regain access on 2026-12-01 at 00:00 UTC." Every model call is refused, a limit apart from openFerment's daily cap (25.28 USD of 150 spent that day). It stops stage F's live steps where they stand: the opus-max table's other ten questions (eq-eth-05 to eq-eth-14), the second judge (Sonnet alone at max over every tag's newest runs), the measure of the plan's larger room (F.2g), the fourteen on the Postdoc screen on the final routes (F.3), `pnpm prove --live` (F.4) and the retrieval lanes that call a model (F.5: the concept graph, HyDE, the judge's grading and the answer lane) | The owner raises the limit in the Anthropic console (Settings, Limits), or waits for 2026-12-01; then the five steps `docs/reports/model-routing-2026-11.md` lists under "To finish it", in its order, `OPENFERMENT_MAX` standing for the opus-max table it writes out: `pnpm ready --probe`, its probe row green; the larger room's measure, `OPENFERMENT_PROJECT=ethanol OPENFERMENT_ROUTES="$OPENFERMENT_MAX" pnpm eval run --live --suite ethanol --tag opus-max-room --judge --only eq-eth-01,eq-eth-02,eq-eth-03,eq-eth-04`; the table's other ten on the same table and tag, `--only eq-eth-05,eq-eth-06,eq-eth-07,eq-eth-08,eq-eth-09,eq-eth-10,eq-eth-11,eq-eth-12,eq-eth-13,eq-eth-14`; the Sonnet pass, `OPENFERMENT_PROJECT=ethanol OPENFERMENT_ROUTES='{"judge":{"models":["claude-sonnet-5-5"],"effort":"max"}}' pnpm eval judge --suite ethanol`; and `OPENFERMENT_PROJECT=ethanol pnpm eval summary --suite ethanol --rows`. The tag `opus-max` keeps the old room's four answers. Then F.3, F.4 and F.5's live run, in Resume item 4's order |
-| 2026-10-30 | Owner action, before the first alpha 2.0 deploy on the live Mini: its records are files under `core/data/` until carried into a project. Nothing is lost by waiting: the service no longer writes them | On the Mini: `brew install postgresql@17 pgvector && brew services start postgresql@17`; `scripts/host/install.sh` (makes the database `openferment` and names it in `core/.env`; when `core/data/biorepo.json` holds uncommitted decisions, the old deploy asks to commit and push them first, which keeps them); then `pnpm db:import-alpha1 --name "Alpha 1.0 records" --by "<your name>"`, and `OPENFERMENT_PROJECT=<the id it prints>` in `core/.env` for the nightly extraction |
-| 2026-10-31 | Owner decision: the live instance's PostgreSQL has no backup. `pnpm ready` used to say a git push "backs up" Guild's decisions, which stopped being true when they moved into the database at stage 2; the row is gone (8.5). Guild's ledger is personnel data and never enters git | Choose where a dump of the database goes, then add it to the nightly (`scripts/host/nightly.sh`): `pg_dump openferment` to that place |
+| 2026-10-30 | Owner action, before the first alpha 2.0 deploy on the live Mini: its records are files under `core/data/` until carried into a project. Nothing is lost by waiting: the service no longer writes them | On the Mini, in its checkout `~/openferment`, as `docs/runbooks/live-host-install.md` steps 0 to 5 give it: `brew install postgresql@17 pgvector && sudo brew services start --sudo-service-user="$(id -un)" postgresql@17` (PostgreSQL from power-on; `brew services --help` lists the flag); alpha 1.0's own `scripts/host/install.sh --uninstall`, `cp -Rp core/data ~/openferment-alpha-1.0-data` and `git pull --ff-only`; `core/.env` kept, or made from the example without its database line; `scripts/host/install.sh`, which makes the database `openferment`, names it in `core/.env` and stops at its deploy step while `core/data/biorepo.json` holds the Mini's decisions; then a copy of the file outside the checkout, `pnpm db:migrate && pnpm db:import-alpha1 --name "Alpha 1.0 records" --by "<your name>"`, `git checkout -- core/data/biorepo.json` and `scripts/host/install.sh` again; then `pnpm ready` (step 4) and `OPENFERMENT_PROJECT` as step 6 says. Alpha 1.0's `deploy.sh --keep-decisions` stays unrun: it commits the decisions and pushes them to GitHub |
+| 2026-10-31 | Owner decision: the live instance's PostgreSQL has no backup. `pnpm ready` used to say a git push "backs up" Guild's decisions, which stopped being true when they moved into the database at stage 2; the row is gone (8.5). Guild's ledger is personnel data and never enters git | Choose where a dump of the database goes, then add a step to the nightly (`scripts/host/nightly.sh`) in a commit on `main`, which the next deploy brings: `"$(brew --prefix postgresql@17)/bin/pg_dump" -h 127.0.0.1 openferment` to that place, the keg's full path, since Homebrew keeps `pg_dump` off the jobs' PATH. An edit made in the Mini's checkout stops each deploy at its check for uncommitted changes |
 | 2026-10-30, again 2026-11-02 (HTTP 403, twice) | The session's git relay refuses tag pushes (branch pushes work): `git push origin alpha-1.0 alpha-2.1` ends with "RPC failed; HTTP 403" and "unexpected disconnect while reading sideband packet". The tags `alpha-1.0` (`d19224f`) and `alpha-2.1` (`fa1b744`, #16's head) exist in this container only; both commits stay reachable from `main` | On the owner's machine: `git fetch origin && git tag alpha-1.0 d19224ff0b6eb809b21492d1b7a2e8fd895a0f44 && git tag alpha-2.1 fa1b7448a5b5e5a2b943b3fc9546f8a420a8ef10 && git push origin alpha-1.0 alpha-2.1` |
 
 ## Known debts (each names the stage that pays it)
@@ -519,7 +532,7 @@ prompt's §4).
 | `units.json` maps `wt%` and `% (w/w)` to `% CDW`, aliases written for the PHA program; changing them changes how a stored record converts | the vocabulary review, after alpha 2.0 |
 | Paid: `openferment.records` (migration 0001, §7.4) was written by no code; each decision `biorepo.write` keeps now writes the record as it leaves it as the next version of its row, and an undo the candidate as extracted (`biorepo.versions`) | alpha 2.1, D.2 (the owner's §6 chose to write it) |
 | `test_biorepo.py::test_the_committed_file_is_the_model_and_starts_empty` holds the shape of a tracked file nothing reads | when `core/data/biorepo.json` leaves git (owner action, Blockers) |
-| The host scripts' PostgreSQL steps (`ensure_database`, the migration in `deploy.sh`, the nightly's settings) have run only as `bash -n` here: this container is not a Mac | the owner's first install on the Mini |
+| The host scripts' PostgreSQL steps (`ensure_database`, the migration in `deploy.sh`, the nightly's settings) have run as `bash -n`, under ShellCheck 0.11.0 and against stand-ins for Homebrew and the PostgreSQL tools on Linux's bash 5 (stage G; `core/tests/test_host.py`): this container is not a Mac, and macOS's bash 3.2 and BSD tools were reasoned about, never run | the owner's first install on the Mini |
 | `pnpm db:up` (compose.yaml, `pgvector/pgvector:pg17`) has never run here: this container has no Docker daemon; CI runs the same image as a service | the owner's machine |
 | Paid: fermOS's, pureOS's and Proforma's run requests take typed quantities with their origins, and their runs are rows of the engines `kinetics`, `train` and `biosteam` (alpha 2.2 C.2, C.3, C.4); every door of Proforma takes `inputs` (`?inputs=` on the binding and the ceiling check), and the library's door takes them on the biosteam engine's own path. Two shapes keep the resolvers' `Override` form, recorded in Departures (C.7) and the debt below | alpha 2.2, C.4 |
 | A train's own carried values (`TrainParam`) keep the resolvers' `Override` shape, a bare value with no unit, and the project's stored panel overrides (`PUT /api/state/overrides/{scope}`) keep it for a person's value and a model's estimate, a deposition's reading keeping its own value and unit since alpha 2.2 E.17 (`Override.unit`; Departures, E.17): a saved train cannot hold a measurement, and a value a person typed into a train is checked against its parameter's unit only as its parameter's own (Departures, C.7) | a train spec version that moves the train runs' ids, its values typed quantities with their origins; and accounts giving the Durable snapshot's pending writes a home on the service (ADR-014) |
@@ -3276,3 +3289,60 @@ F.2f on, on `llm.ROUTES`' defaults (ADR-008, Implementation 17);
     `pnpm test:lit` 10 passed; `pnpm prove --steps 3`, offline, 19 of 19 checks in 40 s with no model call; and
     `pnpm test:core` 3046 passed, 1 skipped, 175 deselected (5 min 4 s). `test:sim` is not owed: no worker, engine or
     flowsheet changed.
+
+### Alpha 2.2 — Stage G — 2026-11-08
+
+- The live host's runbook and scripts held to the tree, with no model call and nothing run on the Mini. A reader held
+  `docs/runbooks/live-host-install.md` and `scripts/host/` (install, deploy, nightly, lib and launchd) to the code and
+  wrote a patch; five verifiers held its 24 findings and the patch to Homebrew's source, python-dotenv 1.2.3 and
+  stand-ins for brew and the PostgreSQL tools; every verdict is applied here, the refuted one dropped (`tailscale_cli`
+  shows its error on the retry that matters). The groups:
+  - PostgreSQL on the Mini: `ensure_database` puts the keg's tools first on the path whenever `brew --prefix
+    --installed postgresql@17` answers (Homebrew keeps the formula keg-only), names `sudo brew services start
+    --sudo-service-user=<you> postgresql@17` for a server from power-on and says so when a LaunchAgent starts it at
+    login, refuses the example's developer database (`openferment_dev`, or the role `openferment`) in words, checks
+    pgvector with `psql -X` before it makes the database, and writes the database line on a line of its own.
+  - `core/.env`: step 1 makes it from the example without the database line and keeps one already there (an alpha 1.0
+    Mini's, with its key); the key goes on the file's one `ANTHROPIC_API_KEY=` line, in `install.sh`'s, `pnpm
+    ready`'s and Postdoc's words alike, with the restart; step 1 says how each model setting lays over `llm.ROUTES`'
+    defaults and lists alpha 1.0's model lines to take out. `env_setting` reads a line as python-dotenv reads it
+    (`export`, blanks around `=`, quotes, a ` #` comment, a carriage return), leaves an environment value as it
+    stands, and returns 0 when the name is absent, so a caller under `set -e` may assign it.
+  - The alpha 1.0 Mini: the checkout at `~/openferment` throughout; step 0 stops alpha 1.0's jobs with its own
+    `install.sh --uninstall`, copies `core/data` and pulls, with the recourse when the pull stops and a word against
+    alpha 1.0's `--keep-decisions`; step 5's order runs: `install.sh` stops at its deploy step, then the copy, `pnpm
+    db:migrate && pnpm db:import-alpha1`, the file put back and `install.sh` again, and `deploy.sh`'s stop says that
+    order (and sends a machine whose `core/.env` names no database to `install.sh` first). `import_alpha1` refuses a
+    database behind the newest schema in words naming `pnpm db:migrate`, where a traceback stood.
+  - The deploy: `--verify` names the tests' server (the environment or `core/.env`, else the live database's server,
+    else this Mac's PostgreSQL as you); the migration runs after the gate and the build, so a deploy that stops at
+    either leaves the live database on the running service's schema; each deploy fetches a genome-scale model the
+    shelf gained; the migration's failure names pgvector and a role or database the server lacks; the jobs' PATH holds
+    Homebrew's bin, where Graphviz's `dot` lives.
+  - The runbook's steps: Python 3.13 and `uv sync --frozen`, `pnpm geneos:fetch`, Tailscale's background service,
+    Graphviz, Node as run, the Intel Mini's source builds; step 4 with every row `pnpm ready` prints, its marks, the
+    lane, what a fresh Mini shows and what `pnpm db:up` means there; step 6 with `OPENFERMENT_PROJECT`, Studies as it
+    stands and the catalogues screen; step 7 with the engines row, the proof, the restart, the environment made again,
+    a backup step as a commit on `main` with the keg's `pg_dump`, and both tags. The flag `--sudo-service-user` was
+    read in Homebrew's source; the runbook says to confirm it on the Mini with `brew services --help`.
+  - Words: the scripts' headers (`install.sh`, `deploy.sh`, `nightly.sh`, `lib.sh`, `launchd.py`) say what each runs;
+    `core/.env.example` gains `OPENFERMENT_PROJECT` and `OPENFERMENT_RAG_KEY` as commented lines with what each does,
+    and the per-question cap sits in the spend block; `db/engine.py`'s, `ready.py`'s and `conform.py`'s words for a
+    database that is absent or silent name the live host beside `pnpm db:up`; CLAUDE.md names `~/.cache/fastembed`
+    and `uv sync --frozen`, README.md too; Resume, Current stage, Blockers (the live host's row in the runbook's order,
+    the backup row) and Known debts.
+  - Left for the owner: `has_key` reads an unquoted `ANTHROPIC_API_KEY=sk-ant-` line alone, where python-dotenv also
+    reads a quoted or `export` line, and widening it changes how the key line is read, a stop condition (it changed
+    only `\s` to `[[:space:]]`); `OPENFERMENT_HOST` stays an install's explicit choice, default loopback.
+  - Checks: `bash -n` on the four changed scripts; ShellCheck 0.11.0 (`-x -s bash`) on them, no finding; stand-in
+    runs of `deploy.sh` in a scratch clone (both words of the decisions stop; `--verify`'s order: install, sync,
+    model fetch, playwright, verify, then the migration, with the derived test server); the runbook's step 1 block on
+    a fresh and a kept file (mode 600, no database line, the key line once). `core/tests/test_host.py` (17 new: eleven
+    lines read as python-dotenv reads them, an environment value as it stands, the database made from the keg and
+    named once on a line of its own, three developer addresses refused, a missing pgvector and a login-started
+    server said) 49 passed on Python 3.13 and on 3.12; `test_import_alpha1.py` (1 new) with `test_host.py`,
+    `test_ready.py`, `test_engines.py`, `test_db.py`, `test_mcp_service.py`, `test_guidance.py`,
+    `test_boundaries.py` and `test_no_seed.py`, with the database address empty, 408 passed each way; `gen:api`,
+    `gen:tools` and `gen:components --check`, each file as the code writes it; `check:secrets`; `typecheck`;
+    `pnpm build`; `pnpm smoke` on a loopback port of its own, 20 of 20 screens with no key; and `pnpm test:core`
+    3064 passed, 1 skipped, 175 deselected (5 min 25 s). `test:sim` and `test:lit` are not owed: no worker, engine, flowsheet or literature code changed.

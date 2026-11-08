@@ -2,7 +2,9 @@
 
 The plists are rendered by scripts/host/launchd.py and parsed back here with
 plistlib, so their shape is checked on any operating system; the shell
-scripts are checked for syntax. Running them for real needs macOS.
+scripts are checked for syntax, and lib.sh's reading of core/.env and its
+database step run against stand-ins for Homebrew and the PostgreSQL tools.
+Running them for real needs macOS.
 """
 from __future__ import annotations
 
@@ -165,6 +167,125 @@ def test_a_reinstall_never_keeps_a_wide_host_unasked(tmp_path, asked, expected):
     out = subprocess.run(["bash", "-c", script], env=env, capture_output=True, text=True, check=True).stdout
     assert out.splitlines()[-1].split() == ["=", expected, "8123"]
     assert ("will now listen on 127.0.0.1" in out) is (asked is None)
+
+
+# ── core/.env's settings and the database, against stand-ins (alpha 2.2 G) ──
+
+
+def _lib(tmp_path: Path, body: str, env: dict[str, str] | None = None) -> subprocess.CompletedProcess:
+    """`body` run under `set -euo pipefail` after lib.sh is sourced, with REPO
+    and HOME in `tmp_path`, no OPENFERMENT_ setting in the environment beyond
+    `env`, and no installed job."""
+    base = {k: v for k, v in os.environ.items() if not k.startswith("OPENFERMENT_")}
+    base |= {"OPENFERMENT_LAUNCHD_DIR": str(tmp_path / "daemons"), "HOME": str(tmp_path / "home"), **(env or {})}
+    (tmp_path / "core").mkdir(exist_ok=True)
+    (tmp_path / "home").mkdir(exist_ok=True)
+    script = f'set -euo pipefail; source "{HOST_DIR / "lib.sh"}"; REPO="{tmp_path}"; {body}'
+    return subprocess.run(["bash", "-c", script], env=base, capture_output=True, text=True)
+
+
+@pytest.mark.skipif(shutil.which("bash") is None, reason="no bash on this machine")
+@pytest.mark.parametrize("lines", [
+    "OPENFERMENT_PROJECT=ethanol\n",
+    'OPENFERMENT_PROJECT="ethanol"\n',
+    "OPENFERMENT_PROJECT='ethanol'\n",
+    "OPENFERMENT_PROJECT=ethanol # the live one\n",
+    "OPENFERMENT_PROJECT=ethanol   \n",
+    "export OPENFERMENT_PROJECT=ethanol\n",
+    "OPENFERMENT_PROJECT = ethanol\n",
+    'OPENFERMENT_PROJECT="a b" # two words\n',
+    "OPENFERMENT_PROJECT=ethanol\r\n",
+    "OPENFERMENT_PROJECT=first\nOPENFERMENT_PROJECT=second\n",
+    "OPENFERMENT_OTHER=ethanol\n",
+])
+def test_a_setting_is_read_from_core_env_as_python_dotenv_reads_it(tmp_path, lines):
+    from dotenv import dotenv_values
+
+    (tmp_path / "core").mkdir()
+    (tmp_path / "core" / ".env").write_bytes(lines.encode())
+    done = _lib(tmp_path, 'printf "[%s]" "$(env_setting OPENFERMENT_PROJECT)"')
+    assert done.returncode == 0, done.stderr
+    expected = dotenv_values(tmp_path / "core" / ".env").get("OPENFERMENT_PROJECT") or ""
+    assert done.stdout == f"[{expected}]"
+
+
+@pytest.mark.skipif(shutil.which("bash") is None, reason="no bash on this machine")
+def test_the_environment_names_a_setting_as_it_stands(tmp_path):
+    (tmp_path / "core").mkdir()
+    (tmp_path / "core" / ".env").write_text("OPENFERMENT_PROJECT=from-the-file\n")
+    done = _lib(tmp_path, 'printf "[%s]" "$(env_setting OPENFERMENT_PROJECT)"', {"OPENFERMENT_PROJECT": '"quoted"'})
+    assert done.stdout == '["quoted"]'
+
+
+def _postgres_stand_ins(tmp_path: Path, *, vector: str = "1") -> Path:
+    """Homebrew with postgresql@17 keg-only: brew answers the keg's prefix,
+    and the keg holds pg_isready (answering), psql (answering `vector` for
+    pgvector and no row for the database) and createdb; each call is written
+    to `calls`. The PATH to run with."""
+    stand_ins, keg = tmp_path / "bin", tmp_path / "keg" / "bin"
+    stand_ins.mkdir()
+    keg.mkdir(parents=True)
+    calls = tmp_path / "calls"
+    tools = {
+        stand_ins / "brew": f'[ "$*" = "--prefix --installed postgresql@17" ] && echo "{keg.parent}" && exit 0\nexit 1',
+        keg / "pg_isready": "exit 0",
+        keg / "psql": f'case "$*" in *pg_available_extensions*) echo "{vector}" ;; esac',
+        keg / "createdb": "",
+    }
+    for path, body in tools.items():
+        path.write_text(f'#!/bin/bash\necho "{path.name} $*" >> "{calls}"\n{body}\n')
+        path.chmod(0o755)
+    return stand_ins
+
+
+@pytest.mark.skipif(shutil.which("bash") is None, reason="no bash on this machine")
+def test_the_database_is_made_from_the_keg_and_named_once_on_a_line_of_its_own(tmp_path):
+    path = f"{_postgres_stand_ins(tmp_path)}:/usr/bin:/bin"
+    env_file = tmp_path / "core" / ".env"
+    (tmp_path / "core").mkdir()
+    env_file.write_text("# a placeholder\nANTHROPIC_API_KEY=sk-ant-...")  # no newline at the end
+    done = _lib(tmp_path, "ensure_database", {"PATH": path})
+    assert done.returncode == 0, done.stderr
+    calls = (tmp_path / "calls").read_text().splitlines()
+    assert calls[:2] == ["brew --prefix --installed postgresql@17", "pg_isready -q -h 127.0.0.1"], \
+        "the keg's tools go first on the path"
+    assert "createdb -h 127.0.0.1 openferment" in calls
+    assert all(c.startswith("psql -X ") for c in calls if c.startswith("psql")), "psql reads no ~/.psqlrc"
+    user = subprocess.run(["id", "-un"], capture_output=True, text=True, check=True).stdout.strip()
+    lines = env_file.read_text().splitlines()
+    assert lines[1] == "ANTHROPIC_API_KEY=sk-ant-..." and lines[-1] == (
+        f"OPENFERMENT_DATABASE_URL=postgresql://{user}@127.0.0.1:5432/openferment")
+    assert oct(env_file.stat().st_mode & 0o777) == "0o600"
+    again = _lib(tmp_path, "ensure_database", {"PATH": path})
+    assert again.returncode == 0 and "OPENFERMENT_DATABASE_URL names the database." in again.stdout
+    assert env_file.read_text().count("OPENFERMENT_DATABASE_URL=") == 1
+
+
+@pytest.mark.skipif(shutil.which("bash") is None, reason="no bash on this machine")
+@pytest.mark.parametrize("line", [
+    "OPENFERMENT_DATABASE_URL=postgresql://openferment:openferment@127.0.0.1:5432/openferment_dev",
+    'OPENFERMENT_DATABASE_URL="postgresql://someone@127.0.0.1:5432/openferment_dev" # dev',
+    "OPENFERMENT_DATABASE_URL=postgresql://openferment:openferment@127.0.0.1:5432/openferment",
+])
+def test_the_developers_database_of_the_example_is_refused_in_words(tmp_path, line):
+    path = f"{_postgres_stand_ins(tmp_path)}:/usr/bin:/bin"
+    (tmp_path / "core").mkdir()
+    (tmp_path / "core" / ".env").write_text(f"{line}\n")
+    done = _lib(tmp_path, "ensure_database", {"PATH": path})
+    assert done.returncode == 1 and "the developer's database of core/.env.example" in done.stderr
+    assert "createdb" not in (tmp_path / "calls").read_text()
+
+
+@pytest.mark.skipif(shutil.which("bash") is None, reason="no bash on this machine")
+def test_a_missing_pgvector_and_a_login_started_postgresql_are_said(tmp_path):
+    path = f"{_postgres_stand_ins(tmp_path, vector='')}:/usr/bin:/bin"
+    agents = tmp_path / "home" / "Library" / "LaunchAgents"
+    agents.mkdir(parents=True)
+    (agents / "homebrew.mxcl.postgresql@17.plist").write_text("")
+    done = _lib(tmp_path, "ensure_database", {"PATH": path})
+    assert done.returncode == 1 and "pgvector is not installed for this PostgreSQL" in done.stderr
+    assert "starts at your login" in done.stdout and "sudo brew services start --sudo-service-user=" in done.stdout
+    assert "createdb" not in (tmp_path / "calls").read_text()
 
 
 # ── the engines a machine keeps beside core/uv.lock (alpha 2.2 D0.11) ────

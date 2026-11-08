@@ -144,15 +144,17 @@ function LivePanel({
       {health && health.ok && !health.hasKey && (
         <div data-testid="postdoc-no-key">
         <Callout kind="warn" title="Postdoc is running without an API key">
-          {/* The variable is deliberately NOT named here. check:secrets forbids
-              src/ from naming it at all — src/ is the browser bundle, and the
-              rule is absence rather than care. Pointing at the template is a
-              better instruction anyway: it names the exact file operation. */}
+          {/* check:secrets keeps src/ from naming the key's variable: src/ is
+              the browser bundle. The template's own line for the key names it,
+              so the instruction points at that line. On the live host core/.env
+              already holds the database line the install wrote, so the key goes
+              on its line there; a machine with no core/.env copies the template. */}
           <p className="text-ink">
-            Copy <span className="font-num">core/.env.example</span> to{' '}
-            <span className="font-num">core/.env</span>, fill in the key it names, and restart
-            the service. That file is gitignored, and the key never reaches the browser — which
-            is the whole reason the service exists.
+            Write the key on its line in <span className="font-num">core/.env</span>, the line{' '}
+            <span className="font-num">core/.env.example</span> holds for it (copy the example when{' '}
+            <span className="font-num">core/.env</span> is absent), and restart the service. That
+            file is gitignored, and the key never reaches the browser, which is why the service
+            holds it.
           </p>
         </Callout>
         </div>

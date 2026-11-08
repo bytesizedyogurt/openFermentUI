@@ -12,7 +12,8 @@ instance moves to PostgreSQL:
 
 (`pnpm db:import-alpha1 --name … --by …`.) Every file is read and checked
 before anything is written, and everything is written in one transaction: an
-import lands whole or not at all. The stores' rules are not run again on old
+import lands whole or not at all. A database the migrations have yet to bring
+to the newest schema is refused in words that name `pnpm db:migrate`. The stores' rules are not run again on old
 records (several cite records alpha 2.0 does not hold); each ran when its
 record was written. A decision's provenance is the one thing computed again,
 as `biorepo.write` computes it from what the decision is (ADR-006); the label
@@ -32,9 +33,11 @@ from typing import Any
 
 from dotenv import load_dotenv
 from pydantic import BaseModel, ValidationError
-from sqlalchemy import insert, update
+from sqlalchemy import insert, text, update
+from sqlalchemy.ext.asyncio import AsyncSession
 
 from . import artifacts, biorepo, db, projects
+from .db import migrate
 from .db import models as t
 from .db import rows
 from .models import (
@@ -150,8 +153,21 @@ def read(data: Path) -> Found:
     return found
 
 
+async def _revision(s: AsyncSession) -> str | None:
+    """The revision the session's database is at, or None before its first
+    migration, asked without an error the transaction would carry."""
+    if (await s.execute(text(f"SELECT to_regclass('{db.SCHEMA}.alembic_version')"))).scalar() is None:
+        return None
+    return (await s.execute(text(f'SELECT version_num FROM "{db.SCHEMA}".alembic_version'))).scalar()
+
+
 async def _write(found: Found, asked: ProjectCreate) -> str:
     async with db.session() as s:
+        # A database the migrations have yet to bring to the newest schema
+        # holds no table, or an older one, for these rows: say so in words.
+        at, head = await _revision(s), migrate.head()
+        if at != head:
+            raise ImportRefused(f"the database is at revision {at or 'none'} of {head}. Run: pnpm db:migrate")
         made = await projects._create(asked)
         pid = made.id
         records = {c.id: c for c in found.repo.records}

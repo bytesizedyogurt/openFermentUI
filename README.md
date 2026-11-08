@@ -31,14 +31,14 @@ its origin, an estimate marked as one.
 
 ```
 pnpm install --frozen-lockfile
-cd core && uv sync --all-extras && cd ..
+cd core && uv sync --frozen --all-extras && cd ..
 pnpm db:up && pnpm db:migrate     # PostgreSQL 16 or later with pgvector; or name a server in core/.env
 pnpm prototype:up                 # the service on 127.0.0.1:8000, the app on 127.0.0.1:4173
 ```
 
-The model key goes in `core/.env` (gitignored; `core/.env.example` lists every setting). The
-service binds `127.0.0.1` alone. Without a key the app runs whole, and the steps that need a
-model say so.
+The model key goes in `core/.env` (gitignored; `core/.env.example` shows the key's line and the
+settings an install sets most). The service binds `127.0.0.1` alone. Without a key the app runs
+whole, and the steps that need a model say so.
 
 ## Test it
 

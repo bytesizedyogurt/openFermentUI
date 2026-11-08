@@ -1,14 +1,16 @@
 #!/bin/bash
-# Nightly extraction (OF-BLD-012 §B.8), and the night's check proposals
-# (OF-BLD-013 §5.2). The com.umutuzo.openferment.nightly LaunchDaemon runs
-# this at 03:00; running it by hand does the same thing.
+# The nightly job (OF-BLD-012 §B.8, OF-BLD-013 §5.2). The
+# com.umutuzo.openferment.nightly LaunchDaemon runs this at 03:00; running it
+# by hand does the same thing. In order: the night's extraction, the nightly
+# checks, the check proposals, and a brief for each new check.
 #
-# Extracts from every document the project holds in its literature (ADR-002;
-# documents arrive through Intake, collected by a person). The batch skips
-# what is already extracted, so a night with nothing new costs nothing, and
-# extraction prints its cost per document. The running service reads the new
-# rows on its next request; no restart. Exits non-zero when a batch failed,
-# so the log says so.
+# Extracts from every document the project OPENFERMENT_PROJECT names holds in
+# its literature (ADR-002; documents arrive through Intake, collected by a
+# person), and waits while none is named. The batch skips what is already
+# extracted, so a night with nothing new costs nothing, and extraction prints
+# its cost per document. The running service reads the new rows on its next
+# request; no restart. Exits non-zero when any of the four steps failed, so
+# the log says so.
 set -uo pipefail
 # shellcheck source=lib.sh
 source "$(dirname "$0")/lib.sh"

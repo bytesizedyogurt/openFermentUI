@@ -15,13 +15,13 @@
 
 ## Run and test
 
-- C: Install: `pnpm install --frozen-lockfile`, then `cd core && uv sync --all-extras`; this container runs Python 3.13.17 and CI runs 3.12.
+- C: Install: `pnpm install --frozen-lockfile`, then `cd core && uv sync --frozen --all-extras`; this container runs Python 3.13.17 and CI runs 3.12.
 - C: Database: PostgreSQL 16 or later with pgvector. `pnpm db:up` starts `compose.yaml`'s `pgvector/pgvector:pg17`, or `OPENFERMENT_DATABASE_URL` in `core/.env` names a local server (`core/.env.example` has the development address); then `pnpm db:migrate` migrates both schemas, `openferment` and the kit's `sci_rag` (ADR-001).
 - C: The tests make databases of their own on the server `OPENFERMENT_TEST_DATABASE_URL` names (default: the compose role on 127.0.0.1:5432) and drop them after; `pnpm db:reset openferment_dev` remakes the development database, and the command refuses the production database `openferment`.
 - C: `pnpm verify` is the gate: sixteen stages in ADR-011's order, `check:secrets` first, about twenty minutes here; CI runs it with a pgvector service, then `pnpm prove`.
 - C: `pnpm test:core`: offline, no key, no network, about five to six minutes; it leaves out the markers `sim`, `lit`, `slow` and `live`.
 - C: `pnpm test:sim` (marker `sim`) starts the real BioSTEAM worker: a cold BioSTEAM import takes about 31 s and a reference plant builds in about 17 s; the suite takes about five minutes.
-- C: `pnpm test:lit` (marker `lit`) runs Sci RAG Kit with FastEmbed's model over the kit's demo corpus; the model file comes from Hugging Face once and stays cached in `.cache/fastembed`.
+- C: `pnpm test:lit` (marker `lit`) runs Sci RAG Kit with FastEmbed's model over the kit's demo corpus; the model file comes from Hugging Face once and stays cached in `~/.cache/fastembed` (`FASTEMBED_CACHE_PATH` moves it, and CI keeps it in the workspace's `.cache/fastembed`).
 - C: `pnpm test:slow` (marker `slow`) and `pnpm test:live` (marker `live`: a real network call, most needing the key and spending) run by hand, outside verify.
 - C: `pnpm prove` runs the proof (`scripts/prove.py`, steps 1 to 10) on a database of its own, with no key and the network refused; run `pnpm build` first, since step 9 walks the built app in Chromium; `--steps 3,8` proves the steps named with what they stand on.
 - C: `pnpm ready` (or `pnpm ready --offline`) says in rows whether the service can run: the database, both schemas, pgvector, the embedder, the model routes and the key; `pnpm ready --probe` adds one minimal call on the `index` route, the one row that sees the account's own usage limit, and it spends.
