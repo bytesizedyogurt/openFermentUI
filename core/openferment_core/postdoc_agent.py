@@ -22,8 +22,9 @@ THE BUDGET. `MAX_ROUNDS` model turns, `MAX_TOOL_CALLS` tool calls,
 `OPENFERMENT_ASK_BUDGET_USD` (spend.ask_budget) and `MAX_SECONDS` of wall
 time. Whichever is spent first names the plan's `stopped`. Each turn may
 write as much as the budget has left to pay for, between `MIN_TOKENS` and
-`MAX_TOKENS` (`_turn_tokens`), and the loop holds back a `MIN_TOKENS` answer
-before it asks another round.
+the ceiling the plan route's effort sets (`postdoc.plan.ceiling`: `MAX_TOKENS`
+at high and below, more at xhigh and max; `_turn_tokens`), and the loop holds
+back a `MIN_TOKENS` answer before it asks another round.
 
 A REFUSAL OR AN OUTAGE mid-loop restarts the question once on the next model
 in the answer chain, with a fresh conversation; tool results come from the
@@ -64,7 +65,7 @@ from typing import Any, Callable
 
 from . import llm, module_stores, spend, tools
 from .models import AnswerPlan, CoverageMap, PriorTurn, RunbookDraft, ToolResult, TraceStep, Usage
-from .postdoc import MAX_TOKENS, MIN_TOKENS, SYSTEM as PLAN_SYSTEM, TOOL as PLAN_TOOL
+from .postdoc import MAX_TOKENS, MIN_TOKENS, SYSTEM as PLAN_SYSTEM, TOOL as PLAN_TOOL, ceiling
 from .validate import SeenSet, decline_reason, find_number, validate_plan
 
 log = logging.getLogger("openferment.postdoc_agent")
@@ -354,6 +355,9 @@ class _Run:
     coverage: CoverageMap | None = None
     cancelled: Callable[[], bool] = lambda: False
     history: list[PriorTurn] = field(default_factory=list)
+    # The most a turn may write, its thinking included: the plan route's
+    # effort sets it (postdoc.plan.ceiling), MAX_TOKENS at high and below.
+    ceiling: int = MAX_TOKENS
     # Told of each tool call before it runs and of its result after, cached or not: the
     # conversation store keeps them and the event stream says them (postdoc/conversations.py).
     on_call: Callable[[str, dict[str, Any]], None] | None = None
@@ -514,18 +518,20 @@ def _turn_tokens(run: _Run, model: str, messages: list[dict[str, Any]], defs: li
     """A turn's ceiling on what it writes, its thinking included (alpha 2.1):
     as many tokens as the question's budget has left to pay for after the
     conversation so far is read, at least MIN_TOKENS, which the loop holds
-    back for the answer, and at most MAX_TOKENS. A model with no price on
-    file gets MIN_TOKENS; the daily cap refuses it anyway."""
+    back for the answer, and at most the run's ceiling, which the plan
+    route's effort sets (alpha 2.2 F.2g). A model with no price on file gets
+    MIN_TOKENS; the daily cap refuses it anyway."""
     _, model_id = llm.spec(model)
     if model_id not in llm.PRICES:
         return MIN_TOKENS
+    top = run.ceiling
     request = {"system": AGENT_SYSTEM, "messages": messages, "tools": defs}
     read = llm.worst_case_usd(model_id, request, 0)
-    per_token = (llm.worst_case_usd(model_id, request, MAX_TOKENS) - read) / MAX_TOKENS
+    per_token = (llm.worst_case_usd(model_id, request, top) - read) / top
     left = budget_usd - run.spent.costUsd - read
     if per_token <= 0:
-        return MAX_TOKENS
-    return max(MIN_TOKENS, min(MAX_TOKENS, int(left / per_token)))
+        return top
+    return max(MIN_TOKENS, min(top, int(left / per_token)))
 
 
 def _out_of_budget(run: _Run, rounds: int, budget_usd: float, final_usd: float = 0.0) -> str | None:
@@ -695,6 +701,7 @@ def ask(
     _sweep(run, ctx)
 
     models = llm.chain("plan")
+    run.ceiling = ceiling(llm.routes()["plan"].effort)
     answer: llm.Turn | None = None
     stopped = "done"
     failure: Exception | None = None

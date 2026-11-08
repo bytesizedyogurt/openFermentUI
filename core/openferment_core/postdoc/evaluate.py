@@ -600,8 +600,8 @@ JUDGE_SCHEMA: dict[str, Any] = {
     "required": ["answers", "grounded", "labelled", "coverage", "errors", "note"],
     "additionalProperties": False,
 }
-# What a judgement may write, its thinking included: the plan's own turn
-# ceiling (plan.MAX_TOKENS). Alpha 2.2 F.2c raised it from 16,000, where three
+# What a judgement may write, its thinking included: the plan's turn ceiling
+# at effort high (plan.MAX_TOKENS). Alpha 2.2 F.2c raised it from 16,000, where three
 # of the haiku table's fourteen judgements on Opus at effort max ran out of
 # room and five more came near it (ADR-008, Implementation 15). A judgement
 # pays for what it writes.

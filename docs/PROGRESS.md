@@ -447,6 +447,7 @@ prompt's §4).
 
 | Since | Blocker | Next command |
 |---|---|---|
+| 2026-11-08 04:28 UTC | The Anthropic account's own usage limit: "You have reached your specified API usage limits. You will regain access on 2026-12-01 at 00:00 UTC." Every model call is refused, a limit apart from openFerment's daily cap (25.28 USD of 150 spent that day). It stops stage F's live steps where they stand: the opus-max table's other ten questions (eq-eth-05 to eq-eth-14), the second judge (Sonnet alone at max over every tag's newest runs), the measure of the plan's larger room (F.2g), the fourteen on the Postdoc screen on the final routes (F.3), `pnpm prove --live` (F.4) and the retrieval lanes that call a model (F.5: the concept graph, HyDE, the judge's grading and the answer lane) | The owner raises the limit in the Anthropic console (Settings, Limits), or waits for 2026-12-01; then `pnpm ready --probe` shows the probe row green, and `OPENFERMENT_PROJECT=ethanol pnpm eval run --live --suite ethanol --tag opus-max --judge --only eq-eth-05,eq-eth-06,eq-eth-07,eq-eth-08,eq-eth-09,eq-eth-10,eq-eth-11,eq-eth-12,eq-eth-13,eq-eth-14` with the table's routes in `OPENFERMENT_ROUTES` (`docs/reports/model-routing-2026-11.md` lists them), then the steps the row names in order |
 | 2026-10-30 | Owner action, before the first alpha 2.0 deploy on the live Mini: its records are files under `core/data/` until carried into a project. Nothing is lost by waiting: the service no longer writes them | On the Mini: `brew install postgresql@17 pgvector && brew services start postgresql@17`; `scripts/host/install.sh` (makes the database `openferment` and names it in `core/.env`; when `core/data/biorepo.json` holds uncommitted decisions, the old deploy asks to commit and push them first, which keeps them); then `pnpm db:import-alpha1 --name "Alpha 1.0 records" --by "<your name>"`, and `OPENFERMENT_PROJECT=<the id it prints>` in `core/.env` for the nightly extraction |
 | 2026-10-31 | Owner decision: the live instance's PostgreSQL has no backup. `pnpm ready` used to say a git push "backs up" Guild's decisions, which stopped being true when they moved into the database at stage 2; the row is gone (8.5). Guild's ledger is personnel data and never enters git | Choose where a dump of the database goes, then add it to the nightly (`scripts/host/nightly.sh`): `pg_dump openferment` to that place |
 | 2026-10-30, again 2026-11-02 (HTTP 403, twice) | The session's git relay refuses tag pushes (branch pushes work): `git push origin alpha-1.0 alpha-2.1` ends with "RPC failed; HTTP 403" and "unexpected disconnect while reading sideband packet". The tags `alpha-1.0` (`d19224f`) and `alpha-2.1` (`fa1b744`, #16's head) exist in this container only; both commits stay reachable from `main` | On the owner's machine: `git fetch origin && git tag alpha-1.0 d19224ff0b6eb809b21492d1b7a2e8fd895a0f44 && git tag alpha-2.1 fa1b7448a5b5e5a2b943b3fc9546f8a420a8ef10 && git push origin alpha-1.0 alpha-2.1` |
@@ -2858,3 +2859,21 @@ The live work (the prompt's §6.7 and §7), on the routes of its §4 as `core/.e
   and 0.573 over the eleven it scored at 16,000). Each token count comes from a judgement's cost, since neither a
   judgement nor a spend row keeps tokens (Implementation 15 says how). Checks: `test_evaluate.py` with the database
   address empty, 31 passed.
+- F.2c, the other three tables, asked on 8 November one at a time with the machine quiet (`pnpm eval run --live
+  --suite ethanol --tag <tag> --judge`, each table's routes in `OPENFERMENT_ROUTES`, the judge route Opus then Sonnet
+  at effort max with `JUDGE_TOKENS` at 32,000). sonnet: 14 of 14 (02:27 to 03:01 UTC), answers 2.4974 USD and
+  judgements 4.4227; Opus's means answers 0.656, grounded 0.540, labelled 0.882, coverage 0.625. opus-high: 14 of 14
+  (03:07 to 03:53 UTC), answers 6.5359 USD and judgements 5.3676; answers 0.787, grounded 0.662, labelled 0.942,
+  coverage 0.760. opus-max: 4 of 14 (eq-eth-01 to eq-eth-04, 04:00 to 04:22 UTC), each at the 24 tool calls and its
+  answer out of room at 32,000 tokens (F.2g), answers 5.5457 USD and judgements 0.2421; the runner then reached the
+  session's two-hour limit for a background command and stopped. Asked again from eq-eth-05 with `--only` at 04:26,
+  the Anthropic account's own usage limit refused the next call at 04:28 ("You will regain access on 2026-12-01 at
+  00:00 UTC"); eq-eth-05's run keeps that decline in words (0.2822 USD for the tool calls before it), and the table's
+  other nine wait on the account. Every judgement made at 32,000 arrived whole (32 of 32), each given by
+  `claude-opus-5-5` with no fallback. The day over every database: 25.28448 USD settled (`openferment_dev`),
+  against the 150 USD cap; one hold of 0.9821 USD left by the stopped runner settles nothing and expires.
+- F.2g. The plan's room set by the route's effort (ADR-008, Implementation 16): `postdoc/plan.py` gains `ceiling`,
+  `MAX_TOKENS` (32,000) at high and below, 64,000 at xhigh and 128,000 at max, and `postdoc_agent` sizes each turn to
+  it within the question's budget. Tests: `test_postdoc_agent.py` two new (48 in the file, 3.13 and 3.12), one
+  holding the three levels and one holding the tool turn and the answer after a stop at the larger room, effort high
+  at 32,000 and a spent budget at the floor. The measure of the larger room waits on the account (Blockers).

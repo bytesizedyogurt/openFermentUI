@@ -321,7 +321,7 @@ answer did not arrive whole (it ran out of room)", 0.345 to 0.385 USD each), and
 that arrived whole wrote about 14,000 to 16,000 tokens by their cost (eq-eth-06, 07, 10, 12 and 14).
 At effort max the model's thinking counts against the ceiling with its answer.
 
-`JUDGE_TOKENS` is now 32,000, the plan's own turn ceiling (`postdoc/plan.py`, `MAX_TOKENS`), and the
+`JUDGE_TOKENS` is now 32,000, the plan's turn ceiling at effort high (`postdoc/plan.py`, `MAX_TOKENS`), and the
 haiku table was judged again at it on the same route (`pnpm eval judge --suite ethanol --tag haiku`,
 11:45 to 12:20 UTC on 5 November 2026), so the four tables are judged at one setting; the summary
 reads each run's newest judgement. At 32,000 all fourteen arrived whole, each given by
@@ -336,6 +336,30 @@ from a judgement's cost at Opus 5.5's prices (4 USD a million tokens in and 20 o
 caches nothing). A judgement cut short at 16,000 wrote 16,000 tokens, which gives its question's
 input exactly, and the input of each other question is estimated from the length of its request by
 a line through those three, within a few hundred tokens; the same request went out at both ceilings.
+
+## Implementation 16 (alpha 2.2 F.2g: the plan's room set by the route's effort)
+
+The opus-max table (`claude-opus-5-5` then `claude-sonnet-5-5` at effort max on the plan route) was
+asked on 8 November 2026 from 03:53 UTC. Each of its first four questions (eq-eth-01 to eq-eth-04)
+spent its 24 tool calls, and the answer after the stop ran out of room at the plan's ceiling of
+32,000 tokens: each run keeps "Postdoc's answer did not arrive whole (it ran out of room)", 24 tool
+calls, 360 to 438 seconds and 1.25 to 1.46 USD. The other three tables answered whole after their
+one stop each at the bound (haiku eq-eth-02, sonnet eq-eth-05, opus-high eq-eth-02). At effort max
+the model's thinking counts against the ceiling with its answer, as the judge's did (Implementation
+15). The judge's room holds: none of the 32 judgements made at 32,000 on 8 November ran out.
+
+A plan turn's ceiling now follows the plan route's effort (`postdoc/plan.py`, `ceiling`):
+`MAX_TOKENS`, 32,000, at high and below; 64,000 at xhigh; 128,000 at max, the output ceiling of
+every model the routes name (Opus 5.5, Sonnet 5.5 and Haiku 5.5 on a streamed call, which every
+call here is). The question's budget still bounds each turn (`postdoc_agent._turn_tokens`), and the
+loop still holds back a `MIN_TOKENS` answer before it asks another round. A turn pays for what it
+writes; the hold a call places on the daily cap until it settles carries the turn's whole room.
+
+The table's other ten questions and a measure of the larger room on eq-eth-01 to eq-eth-04 wait on
+the Anthropic account's own usage limit, reached at 04:28 UTC on 8 November ("You will regain
+access on 2026-12-01 at 00:00 UTC"; `pnpm ready --probe` says it in words). Revisit: when the account
+answers again, ask eq-eth-01 to eq-eth-04 on the opus-max table under a tag of their own and see each
+answer arrive whole; a larger room that still runs out returns here with its measure.
 
 ## Evidence
 

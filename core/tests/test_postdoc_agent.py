@@ -219,6 +219,36 @@ def test_each_turn_is_asked_with_the_ceiling_its_budget_allows(pool, monkeypatch
     assert [c["max_tokens"] for c in script.calls] == [postdoc_agent.MIN_TOKENS]
 
 
+def test_the_plan_routes_effort_sets_the_ceiling_a_turn_may_write_to():
+    # Alpha 2.2 F.2g: on Opus at effort max, four answers in four ran out of
+    # room at 32,000 tokens after their 24 tool calls.
+    from openferment_core.postdoc import plan as plan_module
+    for level in ("low", "medium", "high"):
+        assert plan_module.ceiling(level) == plan_module.MAX_TOKENS == 32_000, level
+    assert plan_module.ceiling("xhigh") == 64_000
+    assert plan_module.ceiling("max") == 128_000
+    assert plan_module.MIN_TOKENS < plan_module.MAX_TOKENS < plan_module.ceiling("xhigh") < plan_module.ceiling("max")
+
+
+def test_at_effort_max_each_turn_and_the_answer_after_a_stop_may_write_to_the_larger_ceiling(pool, monkeypatch):  # noqa: F811
+    monkeypatch.setenv("OPENFERMENT_ASK_BUDGET_USD", "8")
+    monkeypatch.setenv("OPENFERMENT_ROUTES", '{"plan": {"effort": "max"}}')
+    monkeypatch.setattr(postdoc_agent, "MAX_TOOL_CALLS", 1)
+    script = Script([records()], plan())
+    out = ask(script, pool)
+    assert out.stopped == "calls", out.stopped
+    assert [c["max_tokens"] for c in script.calls] == [128_000] * 2, "the tool turn and the answer after the stop"
+    monkeypatch.setenv("OPENFERMENT_ROUTES", '{"plan": {"effort": "high"}}')
+    script = Script([records()], plan())
+    ask(script, pool)
+    assert [c["max_tokens"] for c in script.calls] == [postdoc_agent.MAX_TOKENS] * 2
+    monkeypatch.setenv("OPENFERMENT_ROUTES", '{"plan": {"effort": "max"}}')
+    monkeypatch.setenv("OPENFERMENT_ASK_BUDGET_USD", "0.003")
+    script = Script(plan())
+    ask(script, pool)
+    assert [c["max_tokens"] for c in script.calls] == [postdoc_agent.MIN_TOKENS], "the budget still bounds a turn"
+
+
 def test_wall_time_ends_the_loop(pool):  # noqa: F811
     ticks = iter(range(0, 10_000, 100))
     script = Script([records()], [records("b")], plan())
