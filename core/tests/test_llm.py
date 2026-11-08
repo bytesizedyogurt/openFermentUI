@@ -165,7 +165,7 @@ def test_opus_answers_as_json_by_schema():
     assert result.model == OPUS and not result.fell_back and client.asked == [OPUS]
     request = client.requests[0]
     assert "tool_choice" not in request and "tools" not in request, "forced tool use is a 400 on these models"
-    assert request["output_config"]["effort"] == "medium"
+    assert request["output_config"]["effort"] == "high", "explain's default effort"
     assert request["output_config"]["format"]["type"] == "json_schema"
     assert request["output_config"]["format"]["schema"]["additionalProperties"] is False
 
@@ -429,7 +429,7 @@ def test_the_request_the_sdk_sends_is_the_one_these_models_accept():
     # no temperature or top_p (a non-default value is a 400 on Sonnet 5.5).
     assert sorted(body) == ["max_tokens", "messages", "model", "output_config", "stream", "system"]
     assert body["stream"] is True
-    assert body["output_config"]["effort"] == "medium"
+    assert body["output_config"]["effort"] == "high", "explain's default effort"
     assert body["output_config"]["format"]["type"] == "json_schema"
     assert body["output_config"]["format"]["schema"]["additionalProperties"] is False
 
@@ -545,9 +545,9 @@ def test_haiku_5_5_has_both_tiers_on_file():
 
 def test_the_roles_name_their_chains(monkeypatch):
     assert llm.chain() == llm.chain("answer") == [OPUS, SONNET]
-    assert llm.chain("index") == [HAIKU, OPUS, SONNET]
+    assert llm.chain("index") == [HAIKU], "index runs on Haiku alone (ADR-008, Implementation 17)"
     monkeypatch.setenv("OPENFERMENT_INDEX_MODEL", SONNET)
-    assert llm.chain("index") == [SONNET, OPUS], "no model twice"
+    assert llm.chain("index") == [SONNET] and llm.chain("plan") == [OPUS, SONNET]
     with pytest.raises(ValueError):
         llm.chain("other")
 
@@ -681,15 +681,62 @@ def test_the_routing_table_names_each_familys_models_and_effort(monkeypatch):
     table = llm.routes()
     assert set(table) == set(llm.FAMILIES) == {"plan", "explain", "extract", "index", "judge"}
     assert table == llm.ROUTES, "with core/.env silent, the table is ROUTES"
-    assert table["plan"].models == (OPUS, SONNET) and table["index"].models == (HAIKU, OPUS, SONNET)
+    # The defaults the model comparison and its neighbours set (ADR-008, Implementation 17).
+    assert table == {"plan": llm.Route((OPUS, SONNET), "high"), "explain": llm.Route((OPUS, SONNET), "high"),
+                     "extract": llm.Route((OPUS, SONNET), "high"), "index": llm.Route((HAIKU,), "low"),
+                     "judge": llm.Route((OPUS, SONNET), "max")}
     assert {f: llm.SPEND_ROLES[f] for f in llm.FAMILIES} == {"plan": "answer", "explain": "answer", "extract": "answer",
                                                             "index": "index", "judge": "answer"}
     monkeypatch.setenv("OPENFERMENT_ROUTES", json.dumps({"judge": {"models": [f"anthropic:{SONNET}"], "effort": "low"},
                                                          "index": {"effort": "high"}}))
     table = llm.routes()
     assert table["judge"] == llm.Route((f"anthropic:{SONNET}",), "low")
-    assert table["index"] == llm.Route((HAIKU, OPUS, SONNET), "high") and table["plan"] == llm.ROUTES["plan"]
+    assert table["index"] == llm.Route((HAIKU,), "high") and table["plan"] == llm.ROUTES["plan"]
     assert llm.chain("judge") == [f"anthropic:{SONNET}"] and llm.chain("answer") == llm.chain("plan")
+
+
+def test_a_plain_setting_lays_over_the_families_it_covers_when_it_is_set(monkeypatch):
+    """alpha 2.2 F.2f: each family keeps its own default until the
+    environment names a plain setting; the answering chain and the effort
+    cover plan, explain and extract, the index model index's first place;
+    judge and index's effort move with OPENFERMENT_ROUTES alone, laid over
+    them after."""
+    assert llm.ANSWERING == ("plan", "explain", "extract")
+    for name in ("OPENFERMENT_MODEL", "OPENFERMENT_FALLBACK_MODEL", "OPENFERMENT_INDEX_MODEL", "OPENFERMENT_EFFORT"):
+        monkeypatch.setenv(name, "  ")
+    assert llm.routes() == llm.ROUTES, "a setting written empty is a setting left unset"
+    monkeypatch.setenv("OPENFERMENT_FALLBACK_MODEL", HAIKU)
+    table = llm.routes()
+    assert {f: table[f] for f in llm.ANSWERING} == {f: llm.Route((OPUS, HAIKU), llm.ROUTES[f].effort)
+                                                    for f in llm.ANSWERING}, "the fallback alone, the model's default before it"
+    monkeypatch.setenv("OPENFERMENT_FALLBACK_MODEL", "  ")
+    monkeypatch.setenv("OPENFERMENT_MODEL", HAIKU)
+    table = llm.routes()
+    assert {f: table[f] for f in llm.ANSWERING} == {f: llm.Route((HAIKU, SONNET), llm.ROUTES[f].effort)
+                                                    for f in llm.ANSWERING}, "the fallback's default behind it"
+    assert table["index"] == llm.ROUTES["index"] and table["judge"] == llm.ROUTES["judge"], "the grader keeps its route"
+    monkeypatch.setenv("OPENFERMENT_INDEX_MODEL", SONNET)
+    assert llm.routes()["index"] == llm.Route((SONNET,), "low")
+    monkeypatch.setenv("OPENFERMENT_EFFORT", "medium")
+    table = llm.routes()
+    assert {table[f].effort for f in llm.ANSWERING} == {"medium"}
+    assert (table["index"].effort, table["judge"]) == ("low", llm.ROUTES["judge"]), "index and judge keep their effort"
+    monkeypatch.setenv("OPENFERMENT_ROUTES", json.dumps({"plan": {"effort": "max"}, "judge": {"effort": "high"},
+                                                         "index": {"effort": "medium"}}))
+    table = llm.routes()
+    assert table["plan"] == llm.Route((HAIKU, SONNET), "max") and table["explain"] == llm.Route((HAIKU, SONNET), "medium")
+    assert table["judge"] == llm.Route((OPUS, SONNET), "high") and table["index"] == llm.Route((SONNET,), "medium")
+
+
+def test_the_runbooks_four_settings_leave_every_family_at_its_default(monkeypatch):
+    """alpha 2.2 F.2f: a host whose core/.env carries the live-host runbook's
+    model, fallback, index model and effort runs on `ROUTES` as it stands,
+    judge at max and index at low among it."""
+    monkeypatch.setenv("OPENFERMENT_MODEL", OPUS)
+    monkeypatch.setenv("OPENFERMENT_FALLBACK_MODEL", SONNET)
+    monkeypatch.setenv("OPENFERMENT_INDEX_MODEL", HAIKU)
+    monkeypatch.setenv("OPENFERMENT_EFFORT", "high")
+    assert llm.routes() == llm.ROUTES
 
 
 @pytest.mark.parametrize("raw, says", [

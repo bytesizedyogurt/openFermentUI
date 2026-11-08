@@ -130,6 +130,11 @@ def test_a_models_write_carries_the_effort_of_the_plan_route(pool, store, monkey
     c.model = "claude-haiku-5-5"
     write("runbooks", c, "lock", target="rb-2")
     assert audit.read()[-1].effort == "medium", "core/.env's single setting"
+    monkeypatch.delenv("OPENFERMENT_EFFORT")
+    c = ctx(pool, ask="ask-three")
+    c.model = "claude-haiku-5-5"
+    write("runbooks", c, "lock", target="rb-3")
+    assert audit.read()[-1].effort == "high", "the single setting's default, the plan route's (DEFAULT_EFFORT)"
 
 
 def test_a_proposal_shows_on_home_read(pool, store):  # noqa: F811

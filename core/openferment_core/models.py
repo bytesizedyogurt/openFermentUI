@@ -4598,10 +4598,10 @@ class Refusal(BaseModel):
 
 
 class Health(BaseModel):
-    """GET /api/health: the service answering, the models a call goes to
-    (the primary, and the one a call falls back to), and whether it holds a
-    key, so a page can say the service is up with no key to call a model
-    with."""
+    """GET /api/health: the service answering, the plan route's models
+    (the first a Postdoc answer starts on, and those it falls back to, in
+    order), and whether it holds a key, so a page can say the service is up
+    with no key to call a model with."""
 
     ok: bool
     service: str

@@ -127,6 +127,16 @@ def test_model_checks_both_models_in_the_chain(errors, mark, says):
     assert check.mark == mark and says in check.detail, check.detail
 
 
+def test_the_model_row_names_the_plan_routes_models_and_effort(monkeypatch):
+    """alpha 2.2 F.2f: the row reads the plan route, its default effort high,
+    and a route table's own effort where one names it."""
+    check = ready.check_model(True, client_factory=FakeClient)
+    assert check.mark == "ok" and check.detail.endswith(f"{OPUS} then {SONNET} on the plan route, effort high"), check.detail
+    monkeypatch.setenv("OPENFERMENT_ROUTES", '{"plan": {"models": ["claude-haiku-5-5"], "effort": "max"}}')
+    check = ready.check_model(True, client_factory=FakeClient)
+    assert check.mark == "ok" and check.detail.endswith("claude-haiku-5-5 on the plan route, effort max"), check.detail
+
+
 def test_a_model_with_no_price_on_file_is_named(monkeypatch):
     monkeypatch.setenv("OPENFERMENT_FALLBACK_MODEL", "claude-some-future-model")
     check = ready.check_model(True, client_factory=FakeClient)
@@ -516,9 +526,12 @@ def test_roles_names_each_chain_and_todays_spend(monkeypatch):
         monkeypatch.delenv(name, raising=False)
     check = ready.check_roles(True, client_factory=lambda: FakeRolesClient())
     assert check.mark == "ok"
-    assert "index: claude-haiku-5-5 → claude-opus-5-5" in check.detail and "of the $25.00 daily cap" in check.detail
+    assert "index: claude-haiku-5-5;" in check.detail and "of the $25.00 daily cap" in check.detail
     check = ready.check_roles(True, client_factory=lambda: FakeRolesClient(missing={"claude-haiku-5-5"}))
-    assert check.mark == "warn" and "index work runs on the answer chain" in check.detail
+    assert check.mark == "warn" and "the index route names no other model it lists" in check.detail, check.detail
+    monkeypatch.setenv("OPENFERMENT_ROUTES", '{"index": {"models": ["claude-haiku-5-5", "claude-sonnet-5-5"]}}')
+    check = ready.check_roles(True, client_factory=lambda: FakeRolesClient(missing={"claude-haiku-5-5"}))
+    assert check.mark == "warn" and "index work runs on claude-sonnet-5-5" in check.detail, check.detail
     assert ready.check_roles(False).mark == "skip"
 
 

@@ -404,11 +404,12 @@ def check_spend() -> Check:
 
 
 def check_model(have_key: bool, client_factory: Callable[[], object] | None = None) -> Check:
-    """Both models in the chain, through the free Models API: the primary every
-    call starts on and the fallback it moves to (llm.py)."""
+    """The plan route's models, through the free Models API: the first a
+    Postdoc answer starts on and those it moves to (llm.py), and the effort
+    the route runs at."""
     if llm.effort() not in llm.EFFORTS:
         return Check("model", "fail", f"OPENFERMENT_EFFORT={llm.effort()} is not one of "
-                     f"{', '.join(llm.EFFORTS)}, so every call would be refused")
+                     f"{', '.join(llm.EFFORTS)}, so every call on plan, explain and extract would be refused")
     try:
         table = llm.routes()
     except llm.RoutesInvalid as e:
@@ -452,7 +453,8 @@ def check_model(have_key: bool, client_factory: Callable[[], object] | None = No
     if waiting:
         return Check("model", "warn", f"the key is accepted; {' then '.join(offered)}; the routes name "
                      f"{', '.join(waiting)}, which wait: {_why_it_waits(waiting[0])}")
-    return Check("model", "ok", f"the key is accepted; {' then '.join(offered)}, effort {llm.effort()}")
+    return Check("model", "ok", f"the key is accepted; {' then '.join(offered)} on the plan route, "
+                 f"effort {table['plan'].effort}")
 
 
 def _why_it_waits(named: str) -> str:
@@ -506,12 +508,15 @@ def check_roles(have_key: bool, client_factory: Callable[[], object] | None = No
             return Check("roles", "skip", f"{named}; {today}; the model row says why the models could not be asked")
     unlisted = [m for m in listed if not listed[m]]
     if unlisted:
-        index_first = chains["index"][0]
-        why = (
-            f"{index_first} is not listed for this key, so index work runs on the answer chain"
-            if index_first in unlisted
-            else f"{', '.join(unlisted)} not listed for this key"
-        )
+        index_first, *index_rest = chains["index"]
+        later = [m for m in index_rest if m not in unlisted]
+        if index_first not in unlisted:
+            why = f"{', '.join(unlisted)} not listed for this key"
+        elif later:
+            why = f"{index_first} is not listed for this key, so index work runs on {' then '.join(later)}"
+        else:
+            why = (f"{index_first} is not listed for this key, and the index route names no other model it lists, "
+                   "so every index call fails; name one in OPENFERMENT_INDEX_MODEL or OPENFERMENT_ROUTES")
         return Check("roles", "warn", f"{named}; {why}; {today}")
     return Check("roles", "ok", f"{named}; every model listed for this key; {today}")
 

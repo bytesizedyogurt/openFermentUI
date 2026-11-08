@@ -307,7 +307,7 @@ prompt's §4).
 | B | 0 | 0 | none: the contract, the registry and the conformance checks make no model call |
 | C | 0 | 0 | none: every step of stage C and its gate ran offline with no key; each proof's spend table held no call |
 | D | 0 | 0 | none: the pre-read, the fixes, both strangers' rounds and every proof ran offline with no key; the record-reader's run against the kept proof made no model call |
-| F | 32 | 5.377954 | so far, F.0 and F.1. F.0: `pnpm ready --probe`, one call on the index route (`claude-haiku-5-5`), 0.000004, its row now in `openferment_dev_alpha21`. F.1: the extraction of the 22 documents on the `extract` route, 31 calls and 5.377950 in `openferment_dev`: 22 answers (13 by `claude-opus-5-5`, 9 by `claude-sonnet-5-5` after Opus declined in `bio`) and the nine declines (1.216816). The day over every database read 5.377954 against the 150 USD cap |
+| F | 348 | 39.723802 | so far, F.0 to F.2, over two days, each read over every database (`openferment_dev`, `openferment_dev_alpha21`). 5 November, 140 calls and 14.439322 settled: F.0's `pnpm ready --probe`, one call on the index route (`claude-haiku-5-5`), 0.000004, its row now in `openferment_dev_alpha21`; F.1's extraction of the 22 documents on the `extract` route, 31 calls and 5.377950 (22 answers, 13 by `claude-opus-5-5` and 9 by `claude-sonnet-5-5` after Opus declined in `bio`, and the nine declines, 1.216816); the haiku table, 94 calls and 4.376768 (answers on `claude-haiku-5-5` 0.2780, judgements on `claude-opus-5-5` at 16,000 4.0988); its second judge pass at 32,000, 14 calls and 4.684600. 8 November, 208 calls and 25.284480 settled: the sonnet table, 75 calls and 6.920110 (answers on `claude-sonnet-5-5` 2.4974, judgements on `claude-opus-5-5` 4.4227); the opus-high table, 92 calls and 11.903559 (answers on `claude-opus-5-5` 6.5359, judgements 5.3676); the opus-max table, 41 calls and 6.460811 (four answers on `claude-opus-5-5` 5.5457 and their judgements 0.2421, eq-eth-05's first asking cut off by the session's two-hour limit 0.3909 with no run kept, its second refused by the account 0.2822); one hold of 0.982072 left by the stopped runner settles nothing and expires. Each day against the 150 USD cap |
 
 ## Decisions
 
@@ -2877,3 +2877,39 @@ The live work (the prompt's §6.7 and §7), on the routes of its §4 as `core/.e
   it within the question's budget. Tests: `test_postdoc_agent.py` two new (48 in the file, 3.13 and 3.12), one
   holding the three levels and one holding the tool turn and the answer after a stop at the larger room, effort high
   at 32,000 and a spent budget at the floor. The measure of the larger room waits on the account (Blockers).
+- F.2e and F.2f. The report and the defaults (ADR-008, Implementation 17; `docs/reports/model-routing-2026-11.md`,
+  the section of 8 November 2026, alpha 2.1's text kept above it, its one strain name cut from sonnet Q2's quoted
+  words, and its "To finish it" marked finished here as far as the account allowed). The section holds the method
+  (the rebuilt project, the fourteen and what each expects, the four tables as JSON, the judge and its room, one
+  table at a time with the machine quiet), one row a table for every quantity of the summary, the per-question rows,
+  the judge's words paraphrased to what it found about each answer, question 14's footnote, what the account's limit
+  left unasked, the decision and a new "To finish it" (the larger room's measure on eq-eth-01 to 04, then opus-max's
+  rest, both on the opus-max table under the tag `opus-max-room`, so its fourteen at 128,000 make one summary row;
+  the Sonnet pass; the summary; each with its routes). With one judge, the rule of §6.7 is worked against the
+  judge's disagreement with itself, taken as a floor under the two judges' disagreement: Opus judged eleven haiku
+  answers twice whole (eq-eth-04 to 14, the same request at 16,000 and at 32,000), mean absolute difference answers
+  0.023, grounded 0.041, labelled 0.032, coverage 0.045. opus-high stands above haiku past it on answering (+0.186,
+  higher on 11 of 14) and coverage (+0.171, 9 of 14), within it on grounded and labelled, and above sonnet past it
+  on all four; the code's tools and citations point the same way; opus-max's four answers hold no claim and stay out
+  of the rule, and eq-eth-05's refused run out of every mean. The decision rests on one judge, the same model as the
+  opus tables' plan model, so a judge's preference for its own model's answers is unmeasured until the Sonnet pass;
+  effort medium, the old default, was asked in no table. The defaults in `llm.ROUTES`: `plan` Opus then Sonnet at
+  high (the opus-high table); `explain` Opus then Sonnet at high, held there until the retrieval report's answer
+  lane measures it; `extract` Opus then Sonnet at high (F.1: Sonnet answered the nine documents Opus declined in
+  `bio`); `index` Haiku alone at low (F.0's probe, its one call; every table held it there, and none of their calls
+  reached it); `judge` Opus then Sonnet at max with `JUDGE_TOKENS` 32,000. `routes()` starts from `ROUTES` and lays
+  a plain setting over the families it covers when the environment sets it: the answering chain and the effort over
+  plan, explain and extract (`llm.ANSWERING`), the index model over index's first model; judge and index's effort
+  keep their defaults under every plain setting and move with `OPENFERMENT_ROUTES`, laid last, so the live-host
+  runbook's four settings leave every family at its default. `DEFAULT_EFFORT` is high. `GET /api/health` names the
+  plan route's models, its `fallbackModel` joined the same way on both paths, and the Postdoc screen's "Working on"
+  after a restart names the first of them; `pnpm ready`'s model row names the plan route's models and effort, and
+  its roles row says when the index route holds no other model the key lists; `core/.env.example`'s routing comment
+  says each default and where it rests. This container's `core/.env` set `OPENFERMENT_EFFORT=max` and laid the
+  prompt's §4 table through `OPENFERMENT_ROUTES` (`plan` at max); its five routing lines are commented out in place
+  after this commit, the budgets and the key kept, so F.3 asks on the defaults. Tests: `test_llm.py` (2 new, 4
+  changed), `test_ready.py` (1 new, 1 changed), `test_api_intake.py` (1 new, the health test), `test_writes.py` (1
+  changed, the single setting's default). Checks: the four files with the database address empty, on Python 3.13 and
+  on 3.12, 203 passed each way; `gen:api` regenerated for the health docstrings, then `gen:api`, `gen:tools` and
+  `gen:components`, each with `--check`, each file as the service writes it; `pnpm typecheck` and
+  `pnpm check:secrets`; `pnpm test:core` 2972 passed, 1 skipped, 175 deselected (4 min 54 s).

@@ -361,6 +361,94 @@ access on 2026-12-01 at 00:00 UTC"; `pnpm ready --probe` says it in words). Revi
 answers again, ask eq-eth-01 to eq-eth-04 on the opus-max table under a tag of their own and see each
 answer arrive whole; a larger room that still runs out returns here with its measure.
 
+## Implementation 17 (alpha 2.2 F.2e and F.2f: the defaults set by the comparison)
+
+`docs/reports/model-routing-2026-11.md`, the section of 8 November 2026, holds the numbers. Four
+route tables varied the `plan` family alone over the fourteen of the suite `ethanol` in the
+rebuilt project: `haiku` (Haiku alone at high), `sonnet` (Sonnet alone at high), `opus-high` (Opus
+then Sonnet at high) and `opus-max` (Opus then Sonnet at max), each with `explain` and `extract` at
+Opus then Sonnet at high, `index` at Haiku at low and `judge` at Opus then Sonnet at max. haiku,
+sonnet and opus-high were asked whole; opus-max's first four answers ran out of room at the plan's
+32,000 tokens (Implementation 16), and the account's own usage limit refused every call from 04:28
+UTC, partway through eq-eth-05's second asking.
+
+**The judge.** One judge: the judge route's first model, `claude-opus-5-5` at effort max with
+`JUDGE_TOKENS` 32,000 (Implementation 15), gave all 46 judgements whole, with no fallback, decline
+or refusal. The second judge, Sonnet alone at max over every tag's newest runs, waits on the
+account, so the disagreement between two judges the prompt's §6.7 rule reads is unmeasured.
+
+**The floor.** The measure in hand is the judge's disagreement with itself: Opus judged eleven haiku
+answers twice, each time whole (eq-eth-04 to eq-eth-14, the same request at 16,000 and at 32,000,
+so the measure holds the room's change with the judge's own noise; eq-eth-01 to 03 ran out of room
+the first time and have no pair), with a mean absolute difference of 0.023 on answers, 0.041 on
+grounded, 0.032 on labelled and 0.045 on coverage. Two judges are taken to disagree at least that
+much, an assumption the second judge's reading will test, so it stands as a floor under the
+disagreement the rule asks for.
+
+**The rule, worked** on `plan` in cost order, Opus's mean of the dearer table less the cheaper's,
+beside the floor:
+
+| Pair | Answers | Grounded | Labelled | Coverage |
+|---|---|---|---|---|
+| sonnet − haiku | +0.054 (past) | −0.106 (past, lower) | −0.056 (past, lower) | +0.036 (within) |
+| opus-high − haiku | +0.186 (past; higher on 11 of 14) | +0.016 (within) | +0.004 (within) | +0.171 (past; higher on 9 of 14) |
+| opus-high − sonnet | +0.131 (past) | +0.122 (past) | +0.060 (past) | +0.135 (past) |
+
+Haiku scores below opus-high past the floor on answering and coverage, by eight and four times it,
+so the rule keeps Opus at high; sonnet crosses haiku (above on answering, below on grounding and
+labelling) and stands below opus-high on all four. The code's scores, computed from each run's tools
+and claims, point the same way: opus-high's tools 0.923 and citations 0.843 against haiku's 0.839
+and 0.748 and sonnet's 0.851 and 0.718, bare numbers level at 0.643. Each whole table stopped once
+at the tool-call bound; no answering model restarted, and Postdoc declined one question, sonnet's
+question 14, the refusal in words that question allows. Opus at high costs 0.4669 USD a question at
+the mean against Haiku's 0.0199 and Sonnet's 0.1784, and answers in a median 65 s against 40 and 25.
+
+**The choice for each family** (`llm.ROUTES`):
+
+- `plan`: `claude-opus-5-5` then `claude-sonnet-5-5` at high, the opus-high table. Sonnet stands
+  behind Opus for a refusal (stage B's lesson); Opus declined none of the fourteen plans here.
+  Effort max stays unmeasured: four answers, each out of room at the old ceiling. Effort medium,
+  the old default, was asked in no table, so the cost order holds no Opus setting below high.
+- `explain`: Opus then Sonnet at high, held at extract's route. None of the fourteen reaches it
+  (Postdoc's loop answers on `plan`); it waits on the retrieval report's answer lane.
+- `extract`: Opus then Sonnet at high, F.1's measure: Opus declined nine of the 22 documents in
+  `bio`, and Sonnet answered each.
+- `index`: Haiku alone at low. Its one measure is F.0's probe, one call; every table held `index`
+  there, and none of the fourteen's calls reached it. A graph build's batch costs Haiku's price,
+  and a decline on it ends that call in words. Before this, `index` tried the answer chain after
+  Haiku (E.7), which put a declined batch on Opus.
+- `judge`: Opus then Sonnet at max, the comparison's method, its room `JUDGE_TOKENS`.
+
+**What one judge leaves open.** The judge is the same model as the opus tables' plan model, so a
+judge's preference for its own model's answers is unmeasured until the Sonnet pass reads the same
+answers. The floor marks a difference below it as within the judge's own noise. The rule drops
+haiku while any score stands past the two judges' disagreement, so opus-high's lead over haiku
+holds while that disagreement proves smaller than 0.186 on answering or than 0.171 on coverage.
+
+**`routes()`.** It builds every family from `ROUTES`, each with a default of its own, and lays a
+plain setting over the families it covers when the environment sets it, an unset one leaving the
+defaults as they stand: `OPENFERMENT_MODEL` with `OPENFERMENT_FALLBACK_MODEL` over the models of
+`plan`, `explain` and `extract` (`llm.ANSWERING`, the efforts kept), `OPENFERMENT_EFFORT` over
+their effort, `OPENFERMENT_INDEX_MODEL` over index's first model; then `OPENFERMENT_ROUTES`. A
+setting written empty is a setting left unset. `judge` and index's effort keep their defaults
+under every plain setting, so a model or effort chosen for answers leaves the evaluation's grader
+as the comparison's method set it; `OPENFERMENT_ROUTES` moves them. The live-host runbook's four
+settings (Opus, Sonnet, Haiku, high) therefore leave every family at its default. Before this,
+every family read the plain settings with their defaults, so `ROUTES` was read nowhere, the judge
+moved with a plain model setting, and with `core/.env` silent every family ran at medium. `DEFAULT_EFFORT`, the single setting's default, is
+the plan route's, high. `GET /api/health` names the plan route's models (`model`, and
+`fallbackModel` the rest in order joined with a comma and a space, empty for a route of one, the
+plain settings' chain where the table cannot route), and `pnpm ready`'s model row names the plan
+route's models and effort; its roles row says when the index route holds no other model the key
+lists. A host whose `core/.env` carries `OPENFERMENT_ROUTES` keeps its own table over these
+defaults. This container's laid the prompt's §4 table (`plan` at max) with
+`OPENFERMENT_EFFORT=max`, and F.3 asks on the defaults with its five routing lines commented out.
+
+Revisit: when the account answers, the Sonnet pass and the opus-max table's fourteen at the larger
+room under the tag `opus-max-room` (eq-eth-01 to eq-eth-04 first, Implementation 16's measure), in
+the order the report's "To finish it" lists; a default the second judge reverses returns here with
+its numbers.
+
 ## Evidence
 
 - `postdoc_agent.py`, `llm.py`, `spend.py`, `tools/__init__.py` at `alpha-1.0`.

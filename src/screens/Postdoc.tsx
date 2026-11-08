@@ -80,8 +80,10 @@ function LiveTurnView({
               <>
                 Working on{' '}
                 <span className="font-num normal-case">
-                  {/* After a restart the second model in the chain answers (§5.R). */}
-                  {(steps.some((s) => s.kind === 'restart') ? health?.fallbackModel : health?.model) ?? 'the model'}
+                  {/* After a restart the second model in the chain answers (§5.R), the first fallbackModel names. */}
+                  {(steps.some((s) => s.kind === 'restart')
+                    ? health?.fallbackModel.split(',')[0].trim() || health?.model
+                    : health?.model) ?? 'the model'}
                 </span>
               </>
             ) : (

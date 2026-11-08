@@ -471,14 +471,20 @@ def health() -> Health:
     `hasKey` lets the UI tell "the service is down" from "the service is up but
     has no key" — two different problems with two different fixes, and a single
     "unavailable" would send somebody to restart a process that is running fine.
+    The models are the plan route's, the one Postdoc's loop answers on.
     """
+    try:
+        plan = llm.chain("plan")
+    except llm.RoutesInvalid:
+        # A table that cannot route: the plain settings, and `pnpm ready` says why.
+        plan = list(llm.plain_chain())
     return Health(
         ok=True,
         service="openferment-core",
-        model=llm.primary(),
-        # The model a call falls back to when the primary declines or is
-        # unavailable (llm.py).
-        fallbackModel=llm.fallback(),
+        model=plan[0],
+        # The models the route moves to, in order, when its first declines or
+        # is unavailable (llm.py); empty for a route of one model.
+        fallbackModel=", ".join(plan[1:]),
         hasKey=bool(os.environ.get("ANTHROPIC_API_KEY")),
     )
 

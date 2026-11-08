@@ -204,7 +204,7 @@ def _plan_effort() -> str:
     """The effort the plan route's models answer at, the route Postdoc's loop
     answers on (`llm.routes`): a route table's own, so a write made on a table
     carries the table's effort, and core/.env's single effort setting where
-    the table names none for the route or cannot be read."""
+    the table cannot be read."""
     try:
         return llm.routes()["plan"].effort
     except llm.RoutesInvalid:

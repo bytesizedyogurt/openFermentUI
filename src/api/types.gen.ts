@@ -1306,6 +1306,7 @@ export interface paths {
          *     `hasKey` lets the UI tell "the service is down" from "the service is up but
          *     has no key" — two different problems with two different fixes, and a single
          *     "unavailable" would send somebody to restart a process that is running fine.
+         *     The models are the plan route's, the one Postdoc's loop answers on.
          */
         get: operations["health_api_health_get"];
         put?: never;
@@ -5110,10 +5111,10 @@ export interface components {
         };
         /**
          * Health
-         * @description GET /api/health: the service answering, the models a call goes to
-         *     (the primary, and the one a call falls back to), and whether it holds a
-         *     key, so a page can say the service is up with no key to call a model
-         *     with.
+         * @description GET /api/health: the service answering, the plan route's models
+         *     (the first a Postdoc answer starts on, and those it falls back to, in
+         *     order), and whether it holds a key, so a page can say the service is up
+         *     with no key to call a model with.
          */
         Health: {
             /** Fallbackmodel */

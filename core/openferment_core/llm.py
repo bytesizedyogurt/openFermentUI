@@ -1,20 +1,29 @@
 """The one place openFerment calls a Claude model (Postdoc, Extract).
 
-    PRIMARY   claude-opus-5-5     every call starts here
-    FALLBACK  claude-sonnet-5-5   when the primary declines or is unavailable
+Each task family has a default route in `ROUTES`, its models tried in order
+and the effort they run at (ADR-008, Implementation 17):
 
-Override with OPENFERMENT_MODEL and OPENFERMENT_FALLBACK_MODEL in core/.env
-(the fallback may be a comma-separated list, tried in order);
-thinking depth with OPENFERMENT_EFFORT (low, medium, high, xhigh, max;
-default medium).
+    plan     claude-opus-5-5 then claude-sonnet-5-5   effort high
+    explain  claude-opus-5-5 then claude-sonnet-5-5   effort high
+    extract  claude-opus-5-5 then claude-sonnet-5-5   effort high
+    index    claude-haiku-5-5                         effort low
+    judge    claude-opus-5-5 then claude-sonnet-5-5   effort max
+
+The plain settings in core/.env lay over those defaults, each when it is
+set: OPENFERMENT_MODEL with OPENFERMENT_FALLBACK_MODEL (a comma-separated
+list, tried in order) is the chain of the answering families, plan, explain
+and extract, and OPENFERMENT_EFFORT (low, medium, high, xhigh, max) their
+thinking depth; OPENFERMENT_INDEX_MODEL is index's model. judge, the
+evaluation's grader, and index's effort keep their defaults under every plain
+setting, and OPENFERMENT_ROUTES moves them.
 
 THE ROUTING TABLE (execution prompt §4.8; ADR-008). A call names its task
 family, and `routes()` gives the family's models, tried in order, and the
 effort they run at: `plan` (Postdoc's loop of tools), `explain` (an answer in
 one call, the literature layer's cited answers), `extract` (a document read
-into candidates), `index` (bulk helper work, OPENFERMENT_INDEX_MODEL first,
-default claude-haiku-5-5) and `judge` (an evaluation's grading). `ROUTES` is
-the table core/.env leaves alone; OPENFERMENT_ROUTES lays a JSON object of
+into candidates), `index` (bulk helper work, its model OPENFERMENT_INDEX_MODEL,
+default claude-haiku-5-5) and `judge` (an evaluation's grading). `ROUTES`
+holds each family's default; OPENFERMENT_ROUTES lays a JSON object of
 family to `{"models": [...], "effort": ...}` over it. A model is a spec in
 Sci RAG Kit's syntax, `provider:model` (a bare id is Anthropic's), so every
 provider routes the same way; the service serves Anthropic's models itself,
@@ -95,7 +104,9 @@ log = logging.getLogger("openferment.llm")
 
 DEFAULT_PRIMARY = "claude-opus-5-5"
 DEFAULT_FALLBACK = "claude-sonnet-5-5"
-DEFAULT_EFFORT = "medium"
+# The plan route's effort (`ROUTES`), which the single setting reads when
+# core/.env names none.
+DEFAULT_EFFORT = "high"
 # What `output_config.effort` accepts; anything else is a 400 on every call,
 # which `pnpm ready` reports before the first one.
 EFFORTS = ("low", "medium", "high", "xhigh", "max")
@@ -173,13 +184,33 @@ class Route:
 
 
 _DEFAULT_CHAIN = (DEFAULT_PRIMARY, DEFAULT_FALLBACK)
+# Each family's default, and the measure it rests on (ADR-008, Implementation
+# 17; docs/reports/model-routing-2026-11.md, the section of 8 November 2026).
+# A second model stands behind Opus for a refusal in plan, explain, extract
+# and judge (stage B's lesson: the `bio` classifier declines yeast literature
+# on Opus).
 ROUTES: dict[str, Route] = {
+    # The model comparison: the opus-high table, its answers above haiku's and
+    # sonnet's by more than the judge's own noise on answering and coverage.
     "plan": Route(_DEFAULT_CHAIN, DEFAULT_EFFORT),
-    "explain": Route(_DEFAULT_CHAIN, DEFAULT_EFFORT),
-    "extract": Route(_DEFAULT_CHAIN, DEFAULT_EFFORT),
-    "index": Route((DEFAULT_INDEX, *_DEFAULT_CHAIN), DEFAULT_EFFORT),
-    "judge": Route(_DEFAULT_CHAIN, DEFAULT_EFFORT),
+    # Held at extract's route until the retrieval report's answer lane
+    # measures it; none of the fourteen questions reaches this family.
+    "explain": Route(_DEFAULT_CHAIN, "high"),
+    # The rebuild's extraction (F.1): Sonnet answered each of the nine
+    # documents Opus declined in `bio`.
+    "extract": Route(_DEFAULT_CHAIN, "high"),
+    # F.0's probe, its one call on Haiku at low; every table of the
+    # comparison held index there, and none of the fourteen's calls reached
+    # it. Haiku alone, so a graph build's batch costs Haiku's price.
+    "index": Route((DEFAULT_INDEX,), "low"),
+    # The comparison's method, its room `evaluate.JUDGE_TOKENS` (Implementation 15).
+    "judge": Route(_DEFAULT_CHAIN, "max"),
 }
+# The families OPENFERMENT_MODEL with its fallback, and OPENFERMENT_EFFORT,
+# lay over. judge keeps the comparison's method and index its own effort under
+# every plain setting, so a setting chosen for answers leaves the grader and
+# the bulk chores at their defaults; OPENFERMENT_ROUTES moves either.
+ANSWERING = ("plan", "explain", "extract")
 
 
 def spec(text: str) -> tuple[str, str]:
@@ -196,14 +227,35 @@ def spec(text: str) -> tuple[str, str]:
     return provider, model.strip()
 
 
+def _named(setting: str) -> bool:
+    """Whether the environment (core/.env among it) sets a plain setting."""
+    return bool(os.environ.get(setting, "").strip())
+
+
+def plain_chain() -> tuple[str, ...]:
+    """OPENFERMENT_MODEL, then each model its fallback names, in order and
+    without repeats, each setting's default where it is unset."""
+    return tuple(dict.fromkeys(m for m in (primary(), *(x.strip() for x in fallback().split(","))) if m))
+
+
 def routes() -> dict[str, Route]:
-    """The routing table a call reads, when it is made: `ROUTES` with the
-    models and the effort core/.env names (OPENFERMENT_MODEL, its fallback,
-    OPENFERMENT_INDEX_MODEL, OPENFERMENT_EFFORT), then OPENFERMENT_ROUTES laid
-    over it family by family. Raises RoutesInvalid in words."""
-    answer = tuple(dict.fromkeys(m for m in (primary(), *(x.strip() for x in fallback().split(","))) if m))
-    table = {family: Route(answer, effort()) for family in FAMILIES}
-    table["index"] = Route(tuple(dict.fromkeys((index_model(), *answer))), effort())
+    """The routing table a call reads, when it is made: `ROUTES`, each family
+    with its own default; then each plain setting the environment names, laid
+    over the families it covers (OPENFERMENT_MODEL with its fallback over the
+    models of plan, explain and extract, OPENFERMENT_EFFORT over their effort,
+    OPENFERMENT_INDEX_MODEL over index's first model), a setting left unset
+    leaving the defaults as they stand; then OPENFERMENT_ROUTES laid over it
+    family by family, the one setting that moves judge and index's effort.
+    Raises RoutesInvalid in words."""
+    table = dict(ROUTES)
+    if _named("OPENFERMENT_MODEL") or _named("OPENFERMENT_FALLBACK_MODEL"):
+        answer = plain_chain()
+        table.update({family: Route(answer, table[family].effort) for family in ANSWERING})
+    if _named("OPENFERMENT_INDEX_MODEL"):
+        index = table["index"]
+        table["index"] = Route(tuple(dict.fromkeys((index_model(), *index.models[1:]))), index.effort)
+    if _named("OPENFERMENT_EFFORT"):
+        table.update({family: Route(table[family].models, effort()) for family in ANSWERING})
     raw = os.environ.get(ROUTES_SETTING, "").strip()
     if not raw:
         return table
@@ -406,7 +458,8 @@ class Result:
 def chain(name: str = "plan") -> list[str]:
     """The model specs a call in a family tries, in order, without repeats
     (`routes()`). The fallback may name several, comma-separated, each tried
-    in turn; `index` tries its own model first, then the answer chain (E.7)."""
+    in turn; `index` runs on its own model alone unless a route names more
+    (ADR-008, Implementation 17)."""
     return list(routes()[family_of(name)].models)
 
 
