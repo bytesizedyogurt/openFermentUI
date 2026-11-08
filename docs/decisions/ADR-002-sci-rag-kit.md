@@ -233,7 +233,10 @@ refusal with no project and, with one, the connection's failure, each in words
   `llm.kit_client` where it asks a model (a build, a run; the dry run and `--from` install none),
   reads its stop from its own tally (the first call no model answered) and audits each build and
   run. `pnpm prove` step 3 lists the sci-rag server's tools over stdio in
-  the proof's project and reads a graph tool's refusal, offline.
+  the proof's project and reads a graph tool's refusal, offline. F.5's offline run (8 November) measured the three
+  configurations that ask no model over the Ethanol project, each question under both rules, and the graph build's
+  dry run (`docs/reports/literature-retrieval.md`); `full_deep`, `no_graph`, `no_hyde`, the judge's grading and the
+  answer lane wait on the account (`docs/PROGRESS.md`, Blockers).
 
 ## Revisit condition
 
