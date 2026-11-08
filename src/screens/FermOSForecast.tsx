@@ -42,7 +42,7 @@ import { EngineRunLink } from '@/components/EngineRunLink';
 import { Button, Callout } from '@/components/ui';
 import { NewScenarioDialog } from '@/components/NewScenarioDialog';
 import { ParameterPanel } from '@/components/ParameterPanel';
-import { FIT_TOOL_WORDS, sendFitPath } from '@/lib/proforma';
+import { FIT_TOOL_WORDS, plainNote, sendFitPath } from '@/lib/proforma';
 import { paramScope, type ParameterSpec, type ParamScope } from '@/lib/params';
 import { EvidenceCard } from '@/components/EvidenceCard';
 import { TimeCourse, TrajectoryBand } from '@/components/figures';
@@ -354,7 +354,7 @@ export default function FermOSForecast() {
             series={fitFigureSeries(seriesFor(fit.depositionId), fit.kinetic)}
             forecast={{ times: result.times, bands: result.bands, provenance: result.evidence?.provenance }}
             readingProvenance="measured"
-            notes={result.notes}
+            notes={result.notes?.map(plainNote)}
             basis={result.evidence ? [result.evidence.basis] : undefined}
             csvName={`forecast-${fit.depositionId}`}
           />

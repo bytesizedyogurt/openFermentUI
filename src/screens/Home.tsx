@@ -609,8 +609,8 @@ export default function Home() {
           </div>
         </section>
 
-        {/* ── Band 1b · Catalogue (OF-BLD-005) ───────────────────────── */}
-        <section aria-labelledby="home-catalogue" className="mb-7">
+        {/* ── Band 1b · Runbooks (OF-BLD-005) ────────────────────────── */}
+        <section aria-labelledby="home-runbooks" className="mb-7">
           <SectionTitle
             right={
               <Explain label="Why this is a separate band">
@@ -621,7 +621,7 @@ export default function Home() {
               </Explain>
             }
           >
-            <span id="home-catalogue">Catalogue</span>
+            <span id="home-runbooks">Runbooks</span>
           </SectionTitle>
 
           <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">

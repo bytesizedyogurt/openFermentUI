@@ -79,9 +79,13 @@ import {
   referenceRunOf,
   retiredEntryOf,
   runBody,
+  plainNote,
   runSpecs,
   stampsIn,
 } from '../src/lib/proforma';
+import { RAIL } from '../src/data/nav';
+import { COMPONENTS } from '../src/data/components';
+import { stubsFor, type SubsystemOwner } from '../src/data/subsystems';
 import { idTail, shortCite } from '../src/lib/cite';
 import { fmt } from '../src/engine/units';
 import { interpolate } from '../src/engine/interp';
@@ -942,6 +946,65 @@ async function callAgainst(answer: { status: number; body?: unknown }, healthy =
     `${shortCite(paper)} · ${idTail(paper.id)}`,
   );
   check('a power of ten is written in superscript, never with a caret', fmt(88467389.96) === '8.85×10⁷' && fmt(6.88e-6) === '6.88×10⁻⁶', `${fmt(88467389.96)} · ${fmt(6.88e-6)}`);
+}
+
+// H.0's second sweep: the names a screen reads, held to the rail, the service and the build's own words.
+{
+  // A note the service keeps whole in a basis (its id hashes the words) reads on a screen with the build's decision
+  // tags dropped: a decision, a build document, a rule's constant. A parenthesis of plain words stays.
+  const said = [
+    plainNote('No death or decay term: zero when absent, said so (D5).'),
+    plainNote('Until the sugar runs out (Appendix 2 §A): the first hour (kinetics.RUN_OUT_SHARE). A run stops.'),
+    plainNote('Absent: anaerobic. A record of biomass_yield_oxygen (OF-BLD-020 §3.2 added the field) binds it.'),
+    plainNote('D8: the medium belongs to the experimenter (STRAIN_FREE).'),
+    plainNote('Off when absent, said so, never Ki = 0 (D5 as built, 4). Left out (CARBON_RULE).'),
+  ];
+  check(
+    'a kept note reads on a screen with its decision tags, build documents and constants dropped, its plain parentheses kept',
+    said.join(' | ') ===
+      'No death or decay term: zero when absent, said so. | Until the sugar runs out: the first hour. A run stops. | ' +
+        'Absent: anaerobic. A record of biomass_yield_oxygen binds it. | the medium belongs to the experimenter. | ' +
+        'Off when absent, said so, never Ki = 0. Left out.' &&
+      plainNote('the Haldane term (Haldane) and 2026-11-08T03:23:03Z') === 'the Haldane term (Haldane) and 2026-11-08 03:23 UTC',
+    said.join(' | '),
+  );
+
+  // Every destination on the rail is named on Settings → Architecture, read at its rail address.
+  const unmapped = RAIL.filter((r) => r.to !== '/' && !COMPONENTS.some((c) => c.owner === r.label && (c.surfacedAs ?? '').includes(r.to)));
+  check('every destination on the rail is a named component, read at its rail address', unmapped.length === 0, unmapped.map((r) => r.label).join(', '));
+
+  // A link back to a rail destination names it by its rail label (the reader's crumb said "Library" for BioRepo).
+  const SRC = join(import.meta.dirname, '..', 'src');
+  const filesUnder = (dir: string): string[] =>
+    readdirSync(dir, { withFileTypes: true }).flatMap((d) => {
+      const path = join(dir, d.name);
+      if (d.isDirectory()) return filesUnder(path);
+      return /\.tsx$/.test(d.name) ? [path] : [];
+    });
+  const labelOf = new Map(RAIL.map((r) => [r.to, r.label]));
+  const misnamed: string[] = [];
+  const backFromTab: string[] = [];
+  for (const path of filesUnder(SRC)) {
+    const text = readFileSync(path, 'utf8');
+    for (const m of text.matchAll(/<a href=\{href\('(\/[a-z-]+)'\)\}[^>]*>\s*<ArrowLeft[^>]*\/>\s*([^<{]+?)\s*<\/a>/g)) {
+      const label = labelOf.get(m[1]);
+      if (label && m[2] !== label) misnamed.push(`${relative(SRC, path)}: ${m[2]} for ${label}`);
+    }
+    // A tab of a destination sits beside its siblings; its header sends nobody back elsewhere.
+    if (text.includes('<OwnerTabs') && /actions=\{<LinkButton[^>]*>Back to /.test(text)) backFromTab.push(relative(SRC, path));
+  }
+  check('a link back to a rail destination names it as the rail does', misnamed.length === 0, misnamed.join('; '));
+  check("a destination's tab carries no link back to another destination in its header", backFromTab.length === 0, backFromTab.join(', '));
+
+  // A subsystem the shelf lists as not built has no route of its own on the service (the shelf once called Audit unbuilt
+  // while GET /api/audit served the trail).
+  const served = new Set(Object.keys((JSON.parse(readFileSync(join(SRC, '..', 'docs', 'api', 'openapi.json'), 'utf8')) as { paths: Record<string, unknown> }).paths));
+  const OWNERS: SubsystemOwner[] = ['Intake', 'BioRepo', 'geneOS', 'fermOS', 'pureOS', 'Proforma', 'Guild'];
+  const builtAfterAll = OWNERS.flatMap((o) => stubsFor(o)).filter((st) => {
+    const [owner, part] = st.id.split('.');
+    return served.has(`/api/${part}`) || served.has(`/api/${owner}/${part}`);
+  });
+  check('no subsystem the shelf calls unbuilt has a route the service serves', builtAfterAll.length === 0, builtAfterAll.map((st) => st.id).join(', '));
 }
 
 console.log(fails ? `\n✗ ${fails} check(s) failed` : '\n✓ The project rows are sent as the page changes them, and kept until the service answers; a refusal is never an outage.');

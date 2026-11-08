@@ -17,7 +17,7 @@ import {
   type Skill,
   type Strain,
 } from '@/lib/catalogues';
-import type { Check, CheckNote, CheckResult, Checks } from '@/lib/checks';
+import type { CheckNote, CheckResult, Checks } from '@/lib/checks';
 import type { Guild, GuildEvidence, GuildPerson, GuildPolicy, GuildWithdrawal } from '@/lib/guild';
 import type { Practice, PracticeScenario, PracticeSession } from '@/lib/practice';
 import { ProtocolsDown, ProtocolsRefused, keepVersion, listProtocols, makeProtocol as makeProtocolOnService, protocolOf, type Protocol, type ProtocolVersion } from '@/lib/protocols';
@@ -3331,11 +3331,6 @@ export const useStore = create<OFState>()((set, get) => ({
 /** The ledger every Guild screen reads. */
 export function guildView(s: Pick<OFState, 'guild'>): Guild {
   return s.guild;
-}
-
-/** The checks every Guild screen reads, as the service last answered. */
-export function checksView(s: Pick<OFState, 'checks'>): Check[] {
-  return s.checks?.checks ?? [];
 }
 
 /** One move on one open check: `post` asks the service and the queue is fetched again. */

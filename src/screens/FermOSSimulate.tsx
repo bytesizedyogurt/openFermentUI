@@ -52,7 +52,7 @@ import { CARBON_SOURCES } from '@/data/vocabulary';
 import { PRODUCT_WORDS, productWords } from '@/lib/geneos';
 import { strainWords } from '@/lib/catalogues';
 import { paramScope, type ParameterSpec, type ParameterValue, type ParamScope } from '@/lib/params';
-import { FIT_TOOL_WORDS, fermosFits, proformaShelf } from '@/lib/proforma';
+import { FIT_TOOL_WORDS, fermosFits, plainNote, proformaShelf } from '@/lib/proforma';
 import { exportCSV } from '@/lib/csv';
 import { fmt } from '@/engine/units';
 import {
@@ -238,14 +238,14 @@ function EndState({ r }: { r: SimulationResult }) {
           ; harvested at <span className="font-num">{fmt(r.harvestH, 4)}</span> h.
         </li>
       </ul>
-      <p className={`text-caption mt-1 ${r.massBalance.ok ? 'text-ink-soft' : 'text-signal-warn'}`}>{r.massBalance.note}</p>
+      <p className={`text-caption mt-1 ${r.massBalance.ok ? 'text-ink-soft' : 'text-signal-warn'}`}>{plainNote(r.massBalance.note)}</p>
       {r.steadyState && <SteadyStateCard ss={r.steadyState} units={u} />}
       {r.flags.map((f) => (
         <p key={f} className="text-caption text-signal-warn" data-testid="simulation-flag">
           {f}
         </p>
       ))}
-      {r.our.note && <p className="text-caption text-ink-soft mt-1">{r.our.note}</p>}
+      {r.our.note && <p className="text-caption text-ink-soft mt-1">{plainNote(r.our.note)}</p>}
     </section>
   );
 }
@@ -625,7 +625,7 @@ export default function FermOSSimulate() {
           {binding && binding.notes.length > 0 && (
             <ul className="text-caption text-ink-soft space-y-0.5 mt-2" data-testid="simulate-notes">
               {binding.notes.map((n) => (
-                <li key={n}>{n}</li>
+                <li key={n} title={n}>{plainNote(n)}</li>
               ))}
             </ul>
           )}
@@ -644,7 +644,7 @@ export default function FermOSSimulate() {
               <ul className="ml-3 list-disc">
                 {waiting.map((k) => (
                   <li key={k}>
-                    <span className="font-num">{k}</span> ({label(k)}): {binding.values.find((v) => v.key === k)?.detail ?? 'no source yet'}
+                    <span className="font-num">{k}</span> ({label(k)}): {plainNote(binding.values.find((v) => v.key === k)?.detail ?? 'no source yet')}
                   </li>
                 ))}
               </ul>

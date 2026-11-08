@@ -13,7 +13,7 @@ import { fmt } from '@/engine/units';
 import { inputsOf, type Override, type ParameterSpec } from './params';
 import type { Artifact, BasisInput, BasisSource, ComputedBasis, EngineRun, Provenance } from './studies';
 
-export { ServiceDown as ProformaDown, ServiceRefused as ProformaRefused };
+export { ServiceDown as ProformaDown };
 
 type S = components['schemas'];
 
@@ -209,6 +209,17 @@ export const stampsIn = (words: string) =>
   words.replace(/\b(\d{4}-\d{2}-\d{2})T(\d{2}:\d{2})(?::\d{2}(?:\.\d+)?)?(Z|[+-]00:00)?/g, (_m, day: string, hm: string, z?: string) =>
     `${day} ${hm}${z ? ' UTC' : ''}`,
   );
+
+/**
+ * A note as a page shows it, the build's own decision tags dropped: a leading `D8: `, and a parenthesis anywhere naming
+ * a decision (`(D9)`, `(D5 as built, 4)`), a build document (`(OF-BLD-020 §3.2 added the field)`, `(Appendix 2 §A)`)
+ * or a rule's constant (`(CARBON_RULE)`, `(kinetics.RUN_OUT_SHARE)`). A basis keeps the words whole, its id hashing
+ * them, and so does a CSV; the full words stay in a title.
+ */
+const LEADING_TAG = /^D\d+:\s+/;
+const TAG = /\s*\((?:D\d+\b[^()]*|OF-[A-Z]+-\d+[^()]*|Appendix \d+[^()]*|(?:[a-z_]+\.)?[A-Z][A-Z0-9]*_[A-Z0-9_]+)\)/g;
+export const plainNote = (note: string) =>
+  stampsIn(note.replace(LEADING_TAG, '').replace(TAG, '').replace(/\s+([.,;:])/g, '$1').trim());
 
 /** A price read from a run, with the words that say per what. */
 export interface PriceRead {
@@ -784,9 +795,6 @@ export function runViewOfRun(art: Artifact): RunView | null {
 
 /** A run's checks against its package's own test, as the service wrote them (`output.checks`). */
 export const packageChecks = (art: Artifact | null): RegressionCheck[] => arr<RegressionCheck>(art?.output?.checks);
-
-/** A basis input a run names, by name ('compatibility', 'simulator'), or null. */
-export const basisInput = (art: Artifact | null, name: string): BasisInput | null => art?.inputs.find((i) => i.name === name) ?? null;
 
 // ── The inputs a run was bound with, read from its basis (Compare) ──────
 

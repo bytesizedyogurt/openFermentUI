@@ -34,7 +34,7 @@
 // 2.2 E.17) and goes so, and the service sets it in its parameter's unit.
 import type { components } from '@/api/types.gen';
 import type { EngineInput } from './studies';
-import { ServiceDown, ServiceRefused, call } from './http';
+import { ServiceDown, call } from './http';
 
 type S = components['schemas'];
 
@@ -55,7 +55,7 @@ export type ParamScope = S['ParamScope'];
 export type ParamResolveRequest = S['ParamResolveRequest'];
 export type ParamResolveResult = S['ParamResolveResult'];
 
-export { ServiceDown as ParamsDown, ServiceRefused as ParamsRefused };
+export { ServiceDown as ParamsDown };
 
 /**
  * What a scope is asked with besides its name, the resolve's body without its inputs: a Proforma scenario names its

@@ -17,7 +17,7 @@ import { fetchSourceName, licenceWords } from '@/lib/intake';
 import { OwnerTabs } from '@/components/OwnerTabs';
 import { CollectCard } from '@/components/CollectCard';
 import { INTAKE_TABS } from '@/data/tabs';
-import { Button, Callout, Card, EmptyState, LinkButton, PageHeader, SectionTitle } from '@/components/ui';
+import { Button, Callout, Card, EmptyState, PageHeader, SectionTitle } from '@/components/ui';
 
 const NO_CANDIDATES: Candidate[] = [];
 
@@ -52,7 +52,6 @@ export default function IntakeIngest() {
             record&rsquo;s quote can anchor to the document&rsquo;s own words.
           </>
         }
-        actions={<LinkButton to="/biorepo">Back to BioRepo</LinkButton>}
       />
       <OwnerTabs tabs={INTAKE_TABS} />
 

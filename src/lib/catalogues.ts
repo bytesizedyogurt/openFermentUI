@@ -21,7 +21,7 @@
 // body is the entry as the catalogue answers one (`CatalogueKeep.entry`), so the generated entry names every field
 // with a default as one a reader may find absent.
 import type { components } from '@/api/types.gen';
-import { ServiceDown, ServiceRefused, call } from './http';
+import { ServiceDown, call } from './http';
 
 type S = components['schemas'];
 
@@ -63,7 +63,7 @@ export type LessonBlock = S['LessonProse'] | S['LessonEmbed'];
  */
 export type CheckpointQuestion = S['CheckpointQuestion'];
 
-export { ServiceDown as CataloguesDown, ServiceRefused as CataloguesRefused };
+export { ServiceDown as CataloguesDown };
 
 /** The four catalogues, in the order the screen shows them. */
 export const KINDS: CatalogueKind[] = ['strain', 'product', 'skill', 'lesson'];

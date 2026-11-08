@@ -52,7 +52,7 @@ import { OxygenBalance } from '@/components/figures';
 import { fmt } from '@/engine/units';
 import { exportCSV } from '@/lib/csv';
 import { paramScope, type ParamScope } from '@/lib/params';
-import { COMPOSITE_FLOWSHEET, fermosFits, proformaStatus, stamp } from '@/lib/proforma';
+import { COMPOSITE_FLOWSHEET, fermosFits, plainNote, proformaStatus, stamp } from '@/lib/proforma';
 import {
   FermosDown,
   FermosRefused,
@@ -277,7 +277,7 @@ function Result({ design }: { design: VesselDesign }) {
               {i.name}: <span className="font-num text-ink">{String(i.value)}</span> {i.unit} — {i.source.kind}
               {i.source.by ? ` by ${i.source.by}` : ''}
               {i.source.id ? ` ${i.source.id}` : ''}
-              {i.source.note ? ` (${i.source.note})` : ''}
+              {i.source.note ? ` (${plainNote(i.source.note)})` : ''}
             </li>
           ))}
         </ul>

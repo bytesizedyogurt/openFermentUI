@@ -9,7 +9,6 @@ import {
   Database,
   Download,
   Info,
-  KeyRound,
   Layers,
   Moon,
   Palette,
@@ -51,6 +50,8 @@ import { DISCLOSURE, exportCSV } from '@/lib/csv';
 import { href } from '@/router';
 
 const APP_VERSION = '0.1.0';
+// The release this tree builds, named once for the About page.
+const RELEASE = 'alpha 2.2';
 
 interface SectionDef {
   id: string;
@@ -63,7 +64,7 @@ const SECTIONS: SectionDef[] = [
   {
     id: 'appearance',
     label: 'Appearance',
-    blurb: 'Theme, density, motion and the rehearsal clock. Changes apply immediately.',
+    blurb: 'Theme, density and motion. Changes apply immediately.',
   },
   {
     id: 'units',
@@ -99,7 +100,7 @@ const SECTIONS: SectionDef[] = [
   {
     id: 'export',
     label: 'Export center',
-    blurb: 'Everything you have exported this session, and what is deliberately not wired up.',
+    blurb: 'Everything you have exported this session, and the header every file carries.',
   },
   {
     id: 'about',
@@ -921,49 +922,6 @@ function ExportSection() {
           evidence in someone else's analysis.
         </Callout>
       </section>
-
-      <section>
-        <SectionTitle
-          right={
-            <span className="chip text-signal-warn border-signal-warn/40">
-              Not active in this build
-            </span>
-          }
-        >
-          API keys
-        </SectionTitle>
-        <Card className="p-3">
-          <div className="flex items-start gap-2.5">
-            <KeyRound size={16} className="mt-1 shrink-0 text-ink-soft" aria-hidden />
-            <div className="min-w-0 flex-1">
-              <label htmlFor="api-key" className="block text-caption text-ink-soft mb-1">
-                Personal access key
-              </label>
-              <input
-                id="api-key"
-                className="input font-num max-w-[420px] opacity-60"
-                value="of_live_—————————————— (none issued)"
-                disabled
-                readOnly
-                aria-describedby="api-key-note"
-              />
-              <div className="mt-2 flex flex-wrap gap-2">
-                <Button size="sm" disabled title="Not active in this build">
-                  Generate key
-                </Button>
-                <Button size="sm" disabled title="Not active in this build">
-                  Revoke all
-                </Button>
-              </div>
-              <p id="api-key-note" className="text-body text-ink-soft mt-2 max-w-3xl">
-                These controls stay disabled: the service has no sign-in and issues no key, so
-                nothing here authenticates against anything. Once accounts exist, this panel would
-                mint scoped tokens for the extraction and retrieval endpoints and list their last use.
-              </p>
-            </div>
-          </div>
-        </Card>
-      </section>
     </div>
   );
 }
@@ -1270,8 +1228,7 @@ function AboutSection() {
         </SectionTitle>
         <Card className="p-3">
           <Row label="App version">
-            <span className="font-num">openFerment {APP_VERSION}</span> — alpha 2.0, the foundation
-            build
+            <span className="font-num">openFerment {APP_VERSION}</span> — {RELEASE}, the base
           </Row>
           <Row label="Project">
             <span className="font-num">{papers.length}</span> documents held,{' '}
@@ -1310,7 +1267,7 @@ function AboutSection() {
                 }}
                 aria-hidden
               />
-              alpha 2.0: a working platform, run on one machine, on loopback, by its owner.
+              {RELEASE}: a working platform, run on one machine, on loopback, by its owner.
             </span>
           </Row>
         </Card>

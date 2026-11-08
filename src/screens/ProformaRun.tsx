@@ -62,7 +62,7 @@ import type { Quantity, RunReport as EngineRunReport } from '@/lib/studies';
 import { href, navigate } from '@/router';
 import { useStore } from '@/store';
 import { exportCSV } from '@/lib/csv';
-import { RUN_TOOL, baseCaseRefusal, proformaShelf, regressionTable, runViewOfArtifact, runViewOfRun, stamp, stampsIn } from '@/lib/proforma';
+import { RUN_TOOL, baseCaseRefusal, proformaShelf, regressionTable, runViewOfArtifact, runViewOfRun, plainNote, stamp } from '@/lib/proforma';
 import { trainOfRun } from '@/lib/pureos';
 import { StudiesDown, downloadFlowsheet, listScenarios, makeRunbook, predictable, runReport } from '@/lib/studies';
 import { Button, Callout, Card, LinkButton, PageHeader, cx } from '@/components/ui';
@@ -144,16 +144,6 @@ const FOLDED_OUTPUTS = new Set(['library.run', RUN_TOOL]);
 /** A number as this page writes every one: grouped from a thousand up, as the TEA's sentence writes it, else `fmt`. */
 const shown = (v: unknown) =>
   typeof v === 'number' ? (Number.isFinite(v) && Math.abs(v) >= 1000 ? Math.round(v).toLocaleString('en-US') : fmt(v)) : String(v);
-
-/**
- * A basis note as the page shows it, the build's own decision tags dropped: a leading `D8: `, and a trailing
- * parenthesis naming a decision, a build document or a rule's constant (`(D9)`, `(OF-BLD-020 §3.2 added the
- * field)`, `(Appendix 2 §A)`, `(CARBON_RULE)`). The basis keeps the words whole, its id hashing them, and so does
- * the CSV.
- */
-const LEADING_TAG = /^D\d+:\s+/;
-const TRAILING_TAG = /\s*\((?:D\d+\b[^)]*|OF-[A-Z]+-\d+[^)]*|Appendix \d+[^)]*|[A-Z][A-Z0-9]*_[A-Z0-9_]+)\)\s*$/;
-const plainNote = (note: string) => stampsIn(note.replace(LEADING_TAG, '').replace(TRAILING_TAG, '').trim());
 
 /** A run's time in words: milliseconds under a tenth of a second, seconds above. */
 const took = (ms: number) => (ms < 100 ? `${Math.round(ms)} ms` : `${(ms / 1000).toFixed(1)} s`);

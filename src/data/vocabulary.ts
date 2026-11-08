@@ -155,13 +155,13 @@ export const UNIT_OPERATIONS: UnitOperation[] = [
     id: 'nanofiltration',
     label: 'Nanofiltration',
     stage: 'concentration',
-    note: 'oligosaccharide retention',
+    note: 'a tight membrane: water and small ions pass, larger solutes stay',
   },
   {
     id: 'electrodialysis',
     label: 'Electrodialysis',
     stage: 'desalting',
-    note: 'HMO salt removal',
+    note: 'ions leave the stream through charged membranes under an electric field',
   },
   {
     id: 'iex',
@@ -189,7 +189,7 @@ export const UNIT_OPERATIONS: UnitOperation[] = [
     id: 'sec',
     label: 'Size exclusion chromatography',
     stage: 'polish',
-    note: 'low throughput, high resolution',
+    note: 'separates by molecular size through a porous bed',
   },
   {
     id: 'mixed-mode',
@@ -200,13 +200,13 @@ export const UNIT_OPERATIONS: UnitOperation[] = [
     id: 'heat-step',
     label: 'Thermal clarification',
     stage: 'capture',
-    note: 'thermostable enzymes only — huge cost saver for Taq-class products',
+    note: 'the stream is heated so host proteins denature and settle out, and a heat-stable product stays in solution',
   },
   {
     id: 'refolding',
     label: 'Inclusion body solubilisation + refolding',
     stage: 'recovery',
-    note: 'E. coli intracellular route',
+    note: 'insoluble aggregates dissolve in a denaturant, and the protein folds again as the denaturant leaves',
   },
   {
     id: 'protease-cleavage',
@@ -229,7 +229,7 @@ export const UNIT_OPERATIONS: UnitOperation[] = [
     id: 'lle',
     label: 'Liquid-liquid extraction',
     stage: 'capture',
-    note: 'terpene recovery',
+    note: 'the product moves from the broth into an immiscible solvent',
     biosteamClasses: [
       'LLEUnit',
       'LLESettler',
@@ -244,7 +244,7 @@ export const UNIT_OPERATIONS: UnitOperation[] = [
     id: 'distillation',
     label: 'Distillation / rectification',
     stage: 'purification',
-    note: 'terpene finishing; the beer column and rectifier of an ethanol plant',
+    note: 'separates by volatility; the beer column and rectifier of an ethanol plant',
     biosteamClasses: ['Distillation', 'BinaryDistillation', 'MESHDistillation', 'AdiabaticMultiStageVLEColumn'],
   },
   {
@@ -260,20 +260,20 @@ export const UNIT_OPERATIONS: UnitOperation[] = [
     id: 'spray-dry',
     label: 'Spray drying',
     stage: 'drying',
-    note: 'ambient-stable powder',
+    note: 'the liquid, atomised into hot gas, dries to a powder',
     biosteamClasses: ['SprayDryer'],
   },
   {
     id: 'lyophilisation',
     label: 'Lyophilisation',
     stage: 'drying',
-    note: 'highest stability, highest cost',
+    note: 'water sublimes from the frozen product under vacuum',
   },
   {
     id: 'granulation',
     label: 'Granulation',
     stage: 'formulation',
-    note: 'dust-free industrial enzyme',
+    note: 'a powder bound into granules',
   },
   {
     id: 'sterile-filtration',
@@ -284,13 +284,13 @@ export const UNIT_OPERATIONS: UnitOperation[] = [
     id: 'endotoxin-removal',
     label: 'Endotoxin clearance',
     stage: 'polish',
-    note: 'mandatory for E. coli-derived research/clinical proteins',
+    note: 'lipopolysaccharide removed from the product stream',
   },
   {
     id: 'nuclease-clearance',
     label: 'Nuclease/residual-DNA clearance',
     stage: 'polish',
-    note: 'defining step for molecular-biology enzyme grade',
+    note: 'nucleic acid digested or bound and removed from the product stream',
   },
   // OF-BLD-020 §5.1 — the steps pureOS's unit catalogue builds a train from
   // (core/openferment_core/pureos/catalogue.py), each a catalogue id. The

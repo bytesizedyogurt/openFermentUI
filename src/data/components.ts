@@ -150,6 +150,15 @@ export const COMPONENTS: ComponentDef[] = [
     role: 'The project\u2019s records and the decisions on them, what was computed from them, and search over its documents',
   },
   {
+    // alpha 2.2 E.8 — the catalogues screen over the project's catalogue rows.
+    name: 'Catalogues',
+    owner: 'Catalogues',
+    layer: 'Evidence in',
+    livesIn: ['src/screens/Catalogues.tsx', 'src/lib/catalogues.ts', 'core/openferment_core/catalogues.py'],
+    surfacedAs: 'the rail, /catalogues',
+    role: 'The strains and their other names, the products, the skills and the lessons a project keeps, each entry in its keeper\u2019s name, read by geneOS, pureOS, ProtParam, Guild and Primer',
+  },
+  {
     // OF-BLD-011 §2 — the first of the three stages. The strain catalogue and
     // its pages moved here from fermOS, because choosing a chassis is a
     // genetic design decision.
@@ -341,13 +350,6 @@ export const UNNAMED: {
     layer: 'Evidence in',
     livesIn: ['core/openferment_core/db/', 'core/openferment_core/projects/', 'core/openferment_core/migrations.py'],
     role: 'PostgreSQL: every project\u2019s documents, records, decisions, runs, studies and conversations',
-  },
-  {
-    // alpha 2.2 E.8 — the catalogues screen over the project's catalogue rows.
-    what: 'the catalogues',
-    layer: 'Evidence in',
-    livesIn: ['src/screens/Catalogues.tsx', 'src/lib/catalogues.ts', 'core/openferment_core/catalogues.py'],
-    role: 'The strains and their other names, the products, the skills and the lessons a project keeps, each entry in its keeper\u2019s name, read by geneOS, pureOS, ProtParam, Guild and Primer',
   },
   {
     // OF-BLD-014 §3.4 — heavy simulators run in their own processes.

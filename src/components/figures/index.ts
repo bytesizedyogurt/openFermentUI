@@ -2,16 +2,16 @@
 // from these; `pnpm check:figures` holds the grammar.
 export { ENCODING, NEVER_EVIDENCE, pointKey, type MarkStyle } from './encoding';
 export { FigureFrame, Mark, EncodingLegend, lineStroke, type FigureTable } from './FigureFrame';
-export { EvidenceStrip, stripPoints, median, toTable as evidenceStripTable, type EvidenceStripProps, type StripRule } from './EvidenceStrip';
-export { CeilingGap, CEILING_NOTES, toTable as ceilingGapTable, type CeilingGapProps, type Ceiling } from './CeilingGap';
+export { EvidenceStrip, stripPoints, median, type EvidenceStripProps, type StripRule } from './EvidenceStrip';
+export { CeilingGap, CEILING_NOTES, type CeilingGapProps, type Ceiling } from './CeilingGap';
 export { Frontier, toTable as frontierTable, type FrontierProps, type FrontierPoint } from './Frontier';
-export { MixLine, toTable as mixLineTable, type MixLineProps, type MixPoint } from './MixLine';
-export { TrajectoryBand, toTable as trajectoryTable, type TrajectoryBandProps, type TrajectorySeries } from './TrajectoryBand';
+export { MixLine, type MixLineProps, type MixPoint } from './MixLine';
+export { TrajectoryBand, type TrajectoryBandProps, type TrajectorySeries } from './TrajectoryBand';
 export { Distribution, toTable as distributionTable, type DistributionProps } from './Distribution';
-export { Tornado, toTable as tornadoTable, sorted as tornadoSorted, type TornadoProps, type TornadoRow } from './Tornado';
-export { IntervalLedger, toTable as intervalLedgerTable, type IntervalLedgerProps, type IntervalLedgerRow } from './IntervalLedger';
-export { CostWaterfall, waterfallTotal, priceNote, toTable as costWaterfallTable, bars as costWaterfallBars, type CostWaterfallProps, type WaterfallLine, type WaterfallBar } from './CostWaterfall';
-export { RecoveryByUnit, toTable as recoveryByUnitTable, noBar as recoveryNoBar, type RecoveryByUnitProps } from './RecoveryByUnit';
-export { OxygenBalance, toTable as oxygenBalanceTable, emptyOf as oxygenBalanceEmpty, isShort as oxygenShort, type OxygenBalanceProps } from './OxygenBalance';
+export { Tornado, toTable as tornadoTable, type TornadoProps, type TornadoRow } from './Tornado';
+export { IntervalLedger, type IntervalLedgerProps, type IntervalLedgerRow } from './IntervalLedger';
+export { CostWaterfall, waterfallTotal, priceNote, type CostWaterfallProps, type WaterfallLine, type WaterfallBar } from './CostWaterfall';
+export { RecoveryByUnit, type RecoveryByUnitProps } from './RecoveryByUnit';
+export { OxygenBalance, type OxygenBalanceProps } from './OxygenBalance';
 export { TimeCourse, toTable as timeCourseTable, type TimeCourseProps, type TimeCourseState } from './TimeCourse';
-export { PurityByStream, toTable as purityByStreamTable, emptyOf as purityByStreamEmpty, noBar as purityNoBar, type PurityByStreamProps } from './PurityByStream';
+export { PurityByStream, noBar as purityNoBar, type PurityByStreamProps } from './PurityByStream';

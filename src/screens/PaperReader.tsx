@@ -394,7 +394,7 @@ export default function PaperReader({
     <article className="flex-1 min-w-0 max-w-[760px]">
       <div className="mb-3 flex items-center gap-2 text-caption text-ink-soft">
         <a href={href('/biorepo')} className="inline-flex items-center gap-1 hover:text-accent">
-          <ArrowLeft size={12} /> Library
+          <ArrowLeft size={12} /> BioRepo
         </a>
         <span aria-hidden>/</span>
         <span className="truncate" title={paper.id}>

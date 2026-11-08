@@ -63,6 +63,7 @@ import { FERMOS_TABS } from '@/data/tabs';
 import { stubsFor } from '@/data/subsystems';
 import { fmt } from '@/engine/units';
 import { shortTitle } from '@/lib/cite';
+import { plainNote } from '@/lib/proforma';
 import {
   FIT_FAMILIES,
   FIT_FAMILY_WORDS,
@@ -261,7 +262,7 @@ function Fits() {
             'a simulation from it'
           )}{' '}
           integrates the family with them.
-          {(result.kinetic.notes ?? []).length > 0 && ` ${(result.kinetic.notes ?? []).join(' ')}`}
+          {(result.kinetic.notes ?? []).length > 0 && ` ${(result.kinetic.notes ?? []).map(plainNote).join(' ')}`}
         </p>
       )}
       {result && chosen && (
@@ -270,7 +271,7 @@ function Fits() {
             title={`What did ${chosen} do, and what curve fits it?`}
             series={fitFigureSeries(seriesFor(chosen), result.kinetic)}
             readingProvenance="measured"
-            notes={result.notes}
+            notes={result.notes?.map(plainNote)}
             csvName={`fit-${chosen}`}
           />
           <section aria-label="Growth rate" className="text-body" data-testid="growth-fit">

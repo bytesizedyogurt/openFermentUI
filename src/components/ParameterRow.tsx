@@ -32,7 +32,7 @@ import { readingLeftTheList, type Override, type ParameterSpec, type ParameterVa
 import { StudiesDown, depositionReadings, type DepositionReading } from '@/lib/studies';
 import { href } from '@/router';
 import { fmt } from '@/engine/units';
-import { stampsIn } from '@/lib/proforma';
+import { plainNote } from '@/lib/proforma';
 import { CitationChip } from './Chip';
 import { ReadingChoice, depositionPath, minute, readingOf } from './ReadingOrigin';
 import { Button, cx } from './ui';
@@ -303,7 +303,7 @@ function Why({ spec, value }: { spec: ParameterSpec; value: ParameterValue | nul
         <div>
           <dt className="font-medium">Bounds</dt>
           <dd className="text-ink-soft">
-            <span className="font-num">{boundsWords(spec)}</span>: {spec.boundsReason}. A value outside them is kept as typed, and the
+            <span className="font-num">{boundsWords(spec)}</span>: {plainNote(spec.boundsReason)}. A value outside them is kept as typed, and the
             panel says so.
           </dd>
         </div>
@@ -318,13 +318,13 @@ function Why({ spec, value }: { spec: ParameterSpec; value: ParameterValue | nul
         {spec.note && (
           <div>
             <dt className="font-medium">Note</dt>
-            <dd className="text-ink-soft">{spec.note}</dd>
+            <dd className="text-ink-soft" title={spec.note}>{plainNote(spec.note)}</dd>
           </div>
         )}
         {value?.detail && (
           <div>
             <dt className="font-medium">What the service says of this value</dt>
-            <dd className="text-ink-soft">{stampsIn(value.detail)}</dd>
+            <dd className="text-ink-soft" title={value.detail}>{plainNote(value.detail)}</dd>
           </div>
         )}
       </dl>
@@ -620,7 +620,7 @@ export function ParameterRow({
       </div>
       {value?.detail && value.origin !== 'assumption' && value.origin !== 'model-estimate' && (
         <p className="text-caption text-ink-soft mt-0.5" data-testid="param-detail">
-          {value.origin === 'measurement' ? measuredWords(value.detail) : value.detail}
+          {value.origin === 'measurement' ? measuredWords(value.detail) : plainNote(value.detail)}
         </p>
       )}
       {warning && (
