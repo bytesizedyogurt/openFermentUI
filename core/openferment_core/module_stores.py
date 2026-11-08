@@ -1,4 +1,4 @@
-"""Every module's store, read the same way (OF-BLD-015 §7.1, §7.2).
+"""Every module's store, read the same way.
 
 Postdoc once answered that a module held nothing while its screen showed
 rows: it could read records and passages and nothing else. This module reads
@@ -524,7 +524,7 @@ class Stores:
 
     def forget(self, *sources: str) -> None:
         """Read the named sources afresh on next use, and every module's rows
-        with them (OF-BLD-020 §5.R, finding 21): a write in the middle of a
+        with them: a write in the middle of a
         question (a model's train changed, a run kept) changes what a later
         read of the same question must see. The other sources stay as read."""
         for name in sources:
@@ -681,7 +681,7 @@ class Stores:
                 yield _vessel_row(a, self._artifact_mark(a))
 
     def _simulations(self) -> Iterable[Row]:
-        """One row a kept simulation (OF-BLD-020 §3.4), `fermos/simulation/<id>`:
+        """One row a kept simulation, `fermos/simulation/<id>`:
         its family and strain in the label, the mark worked out from its
         inputs as they stand (`_artifact_mark`), and a detail of words, ids
         and flags alone. Its numbers stay in the artifact: a claim cites the
@@ -725,7 +725,7 @@ class Stores:
         yield from self._train_runs()
 
     def _kept_trains(self) -> Iterable[Row]:
-        """One row a train a model built (OF-BLD-020 §5.4), kind `train`,
+        """One row a train a model built, kind `train`,
         `pureos/train/<train id>`: the train as data in words and ids, who made
         it and when, and the ids of its runs, newest first; found by the
         train's id or a run's. It carries no mark: a train is data, and its
@@ -753,7 +753,7 @@ class Stores:
                                       "pureos_build returns, or its train-run row's ref"})
 
     def _train_runs(self) -> Iterable[Row]:
-        """One row a kept train run (OF-BLD-020 §5.4), kind `train-run`,
+        """One row a kept train run, kind `train-run`,
         `pureos/train-run/<artifact id>`: labelled with its train's name and
         product, its mark worked out from its inputs as they stand when read
         (`_artifact_mark`), and a detail of words, ids and flags alone; its
@@ -781,7 +781,7 @@ class Stores:
                                       "pureos_build returns a run's evidence id"})
 
     def _trains(self, operation: dict[str, str]) -> Iterable[Row]:
-        """The train of each scenario's newest Proforma run (OF-BLD-019 §4.1),
+        """The train of each scenario's newest Proforma run,
         and one row a unit of it, read by `pureos.train_of` from the run's
         stream table: the same numbers pureOS → Train shows. A read by the
         scenario's id or the run's artifact id finds the train and its units;
@@ -1080,7 +1080,7 @@ def species_spellings(species: str) -> tuple[str, str]:
 def named_rows(question: str, rows: Iterable[Row]) -> list[tuple[Row, str]]:
     """Rows whose label, id or a spelling stands in the question as whole
     words, with the spelling that matched; and rows of a species the question
-    names in full or abbreviated (OF-BLD-016 D10)."""
+    names in full or abbreviated."""
     q = f" {norm(question)} "
     out = []
     for row in rows:

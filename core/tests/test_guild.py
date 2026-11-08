@@ -66,7 +66,7 @@ def refused(rule: str, fn, *args, **kwargs) -> str:
 # ── the projection ─────────────────────────────────────────────────────
 
 
-def test_projection_holds_the_seed_skills_and_tags():
+def test_the_projection_holds_the_fixture_skills_and_tags():
     skills = guild.skills()
     assert "SK-OD" in skills and "SK-CIP" in skills
     assert guild.step_skills("PR-OD-01", "o4") == ["SK-OD"]

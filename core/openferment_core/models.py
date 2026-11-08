@@ -1,4 +1,4 @@
-"""AnswerPlan (OF-BLD-007 §3).
+"""AnswerPlan.
 
 The only representation of an answer in the system, defined here with every
 other shape the service serves. The browser's types are generated from the
@@ -115,7 +115,7 @@ StopReason = Literal["done", "rounds", "calls", "cost", "time"]
 
 
 class TraceStep(BaseModel):
-    """One step of Postdoc's loop, as the browser shows it (OF-BLD-014 §5.1)."""
+    """One step of Postdoc's loop, as the browser shows it."""
 
     n: int
     kind: TraceKind
@@ -184,7 +184,7 @@ class ModuleCoverage(BaseModel):
 
 
 class ModuleRow(BaseModel):
-    """One row a module's read tool returns (OF-BLD-015 §7.2): what the
+    """One row a module's read tool returns: what the
     module holds, where it stands, and how it is marked."""
 
     module: ModuleName
@@ -206,7 +206,7 @@ class ModuleRow(BaseModel):
 
 
 class ModuleRead(BaseModel):
-    """What a module's read tool (`<module>_read`, OF-BLD-015 §7.2) answers as
+    """What a module's read tool (`<module>_read`) answers as
     its summary, beside the rows themselves on the result's `rows`."""
 
     module: str = Field(description="The module, by the name the rail gives it (BioRepo, fermOS).")
@@ -225,7 +225,7 @@ class ModuleRead(BaseModel):
 
 
 class AuditEntry(BaseModel):
-    """One row of the audit table (OF-BLD-015 §7.3): a write a model, an MCP
+    """One row of the audit table: a write a model, an MCP
     client or a named person made, a proposal a person carried out or
     dismissed, or a request that named its own key. `agent` is `model` for a
     model's or an assistant's write and `person` for a person's; `who` names
@@ -273,7 +273,7 @@ ProposalState = Literal["proposed", "done", "dismissed"]
 
 
 class Proposal(BaseModel):
-    """What a model asked for at a gate (OF-BLD-015 §7.4), until a person
+    """What a model asked for at a gate, until a person
     carries it out or dismisses it on Home."""
 
     id: str
@@ -686,7 +686,7 @@ class Overlay(BaseModel):
     values reviewers typed by `witness.py` (§6.2); `records` from the
     project's decisions (§7).
 
-    `candidates` and `runs` are a LIST OR NULL (OF-BLD-012.1 F3). The service
+    `candidates` and `runs` are a LIST OR NULL. The service
     always sends the full list, so an empty list means the extractor produced
     nothing and the store drops what it had. `None` means "not supplied" and
     the store keeps what it had — nothing here sends it, and it exists so that
@@ -992,7 +992,7 @@ DecisionRule = Literal["record", "reviewer", "fulltext", "quote", "paper", "unit
 
 
 class DecisionCheck(BaseModel):
-    """What `POST /api/biorepo/check` answers (OF-BLD-012.1 F1.5): whether
+    """What `POST /api/biorepo/check` answers: whether
     `biorepo.write` would store this decision, and the rule it would refuse
     it under, with why (both null when it would store it). The browser asks
     before the reviewer presses the key, so the screen says what the service
@@ -1228,7 +1228,7 @@ GateMode = Literal["advise", "enforce"]
 
 
 class GuildPolicy(BaseModel):
-    """The lead's choices for the team (OF-BLD-013 §5.1). In advise mode the
+    """The lead's choices for the team. In advise mode the
     run-mode gate warns and records a deviation; in enforce mode it holds the
     step until a cosigner is recorded, or someone qualified takes over. Set
     per criticality: a routine skill and a critical one can differ."""
@@ -1680,7 +1680,7 @@ class GeneosModelInfo(BaseModel):
     feed: str
     notes: list[str] = Field(default_factory=list)
     # The product a view opens on, and every product the shelf names a route
-    # to in this model ("phb", "ethanol"); the worker decides what it makes.
+    # to in this model ("ethanol", or a placeholder id); the worker decides what it makes.
     product: str
     products: list[str] = Field(default_factory=list)
 
@@ -1782,8 +1782,7 @@ class SeriesFitQuality(BaseModel):
 
 class KineticFit(BaseModel):
     """Logistic growth, Luedeking–Piret production and the substrate balance
-    (`logistic_v0`), or a kinetics family fitted to the same series
-    (OF-BLD-020 §3.1)."""
+    (`logistic_v0`), or a kinetics family fitted to the same series."""
 
     params: list[FitParam] = Field(default_factory=list)
     quality: list[SeriesFitQuality] = Field(default_factory=list)
@@ -2913,7 +2912,7 @@ class ParameterSpec(BaseModel):
     @classmethod
     def _bounds_have_a_reason(cls, v: str) -> str:
         if not (v or "").strip():
-            raise ValueError("every parameter's bounds carry a written reason (OF-BLD-020 D4)")
+            raise ValueError("every parameter's bounds carry a written reason")
         return v
 
     @field_validator("sourceRule")
@@ -3343,7 +3342,7 @@ class SimulationRequest(BaseModel):
 
 
 class FermosBinding(BaseModel):
-    """GET /api/fermos/bind (OF-BLD-020 §3.2): a family's parameters bound
+    """GET /api/fermos/bind: a family's parameters bound
     for a strain, product and sugar from a fit, the records, a kept
     simulation and the conventions, starting no integration."""
 
@@ -3755,7 +3754,7 @@ class TrainSpec(BaseModel):
 class TrainValidation(BaseModel):
     """POST /api/pureos/train/validate: every refusal at once, in words;
     runs nothing. POST /api/pureos/train/check answers in the same shape
-    with everything the run would refuse (OF-BLD-020 §5.3)."""
+    with everything the run would refuse."""
 
     ok: bool
     refusals: list[str] = Field(default_factory=list)
@@ -3891,7 +3890,7 @@ class TrainRun(BaseModel):
 
 
 class TrainFromRunRequest(BaseModel):
-    """POST /api/pureos/train/from-run (OF-BLD-020 §5.3): a run's units read
+    """POST /api/pureos/train/from-run: a run's units read
     into a train, each by its class."""
 
     model_config = ConfigDict(extra="forbid")
@@ -4005,7 +4004,7 @@ class ProposalMissing(BaseModel):
 class TrainProposal(BaseModel):
     """POST /api/pureos/propose: a train proposed by the written rules, or
     none, with what is missing. (Named apart from `Proposal`, a write a
-    model proposed at a gate, OF-BLD-015 §7.4.)"""
+    model proposed at a gate)"""
 
     product: str
     host: str

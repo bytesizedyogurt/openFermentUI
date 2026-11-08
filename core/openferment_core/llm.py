@@ -46,8 +46,7 @@ refusal or an outage in words. A command that reports what one run spent
 opens a tally around the run; outside every tally nothing is kept.
 
 TOOL TURNS. `converse` runs one turn of a conversation the caller owns, each
-tool strict unless the registry marks it loose (the module tools, OF-BLD-015
-§7.2), `tool_choice` `auto` or `none` and nothing else, the answer schema in
+tool strict unless the registry marks it loose (the module tools), `tool_choice` `auto` or `none` and nothing else, the answer schema in
 `output_config.format`, and top-level `cache_control`. It falls back
 nowhere; the loop that owns the conversation decides (§5.2).
 
@@ -398,15 +397,30 @@ class UsageLimitReached(ModelUnavailable):
     """The Anthropic account's own usage limit is reached: no model answers."""
 
 
+def regains(said: str) -> str:
+    """The date the API names for the account's access to return, as it wrote
+    it (" until 2026-12-01 at 00:00 UTC"), or nothing when it names none."""
+    import re
+
+    m = re.search(r"regain access on ([0-9]{4}-[0-9]{2}-[0-9]{2}(?: at [0-9]{2}:[0-9]{2} UTC)?)", said)
+    return f" until {m.group(1)}" if m else ""
+
+
 def _bad_request(e: Any, usage: Usage | None = None) -> ModelUnavailable:
     """A 400 in words: the account's usage limit, a grammar too large, or a
-    request the API could not take."""
+    request the API could not take. The usage limit is said from the date the
+    API names alone; the API's own message, its body and request id with it,
+    goes to the log."""
     message = str(getattr(e, "message", e))
     low = message.lower()
     if USAGE_LIMIT in low:
-        return UsageLimitReached(
-            f"The Anthropic account's usage limit is reached, so no model can answer: {message} The account's "
-            "owner raises the limit in the Anthropic console; openFerment's daily cap is a separate limit.", usage)
+        log.warning("the Anthropic account's usage limit answered a call: %s", message)
+        until = regains(message)
+        reached = UsageLimitReached(
+            f"The Anthropic account's usage limit is reached{until}, so no model can answer; the account's "
+            "owner raises it in the Anthropic console, a limit separate from openFerment's daily cap.", usage)
+        reached.until = until  # " until <date>" as the API named it, or "": ready's probe row names it the same way
+        return reached
     kind = GrammarTooLarge if GRAMMAR_TOO_LARGE in low else ModelUnavailable
     return kind(f"The Anthropic API refused the request as malformed: {message}", usage)
 
@@ -587,7 +601,7 @@ def strict_schema(schema: dict[str, Any], *, keep_maps: bool = False) -> dict[st
     """A tool-style JSON schema made acceptable to structured outputs: every
     object closed (`additionalProperties: false`) and the keywords it rejects
     moved into the description. The input is left untouched. With
-    `keep_maps` (a loose tool's input, OF-BLD-020 §3.4) an object whose
+    `keep_maps` (a loose tool's input) an object whose
     `additionalProperties` is a schema stays a map, that schema kept and
     walked, so a model reads `recordsByParam` as keys to record ids and a
     write's `fields` as names to words, not as objects that take nothing."""
@@ -1002,7 +1016,7 @@ def converse(
     when a tool is not; `tool_param` is applied here. A tool goes out strict
     unless its registry entry says otherwise: the API compiles one grammar
     for every strict tool in a request and refused eighteen as too large
-    (OF-BLD-015 §7.2, 2026-10-19), so the module read tools go out loose and
+    (2026-10-19), so the module read tools go out loose and
     `tools.run` validates their input as it validates every tool's. `ask` stands in for
     the API in offline tests: it receives the request and returns a message.
     """

@@ -592,7 +592,7 @@ def test_the_run_endpoint_answers_422_409_and_503_in_words(client, store, worker
     waiting = spec_of(units=[{"id": "D1", "type": "distillation"}])
     detail = client.post("/api/pureos/train/run", json={"train": waiting.model_dump(mode="json")}).json()["detail"]
     for words in ("unit D1 (distillation): light_key waits", "unit D1 (distillation): k waits",
-                  "unit D1: BinaryDistillation waits for Light key and Heavy key"):
+                  "unit D1: Distillation column waits for Light key and Heavy key"):
         assert words in detail, detail
     # A damaged inlet artifact is a 409.
     from standins import plant_damaged
@@ -600,7 +600,7 @@ def test_the_run_endpoint_answers_422_409_and_503_in_words(client, store, worker
     plant_damaged("b" * 16)
     damaged = spec_of(inlet={"kind": "simulation", "ref": "b" * 16, "params": {"broth_flow": typed(1.0)}})
     r = client.post("/api/pureos/train/run", json={"train": damaged.model_dump(mode="json")})
-    assert r.status_code == 409 and "damaged on disk" in r.json()["detail"]
+    assert r.status_code == 409 and "damaged in its row" in r.json()["detail"]
     # The worker's refusal is a 422 in its words, kept as a receipt; a worker that cannot answer, a 503 keeping nothing.
     monkeypatch.setattr(proforma, "call", TrainWorker(fail="Refused: unit F1 (flash, Flash) did not converge: BioSTEAM "
                                                            "said: STAND-IN"))

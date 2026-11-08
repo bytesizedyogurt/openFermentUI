@@ -1,4 +1,4 @@
-"""Proforma's shelf of flowsheets (OF-BLD-019 §2.1, D2).
+"""Proforma's shelf of flowsheets.
 
 Pure data: what each flowsheet is, where it comes from, which program it
 belongs to, the inputs it takes and the outputs it reports. The service
@@ -19,7 +19,7 @@ went at alpha 2.2 (D8).
     TEST_ONLY  the toy, a STAND-IN for tests: never on the shelf, never
                served, and refused wherever the shelf is asked unless the
                caller says `allow_toy` (as geneOS's toy network is)
-    brothStream   (OF-BLD-020 §6.2) the stream a scenario flowsheet names as
+    brothStream the stream a scenario flowsheet names as
                its fermenter's broth, by the id its own file gives the
                fermenter's outlet (test_seam holds each to its file); a
                train's inlet from a scenario takes it from the newest run.
@@ -307,7 +307,7 @@ def depreciation_lengths() -> dict[str, int]:
     MACRS schedule's table runs a year past its name, by the half-year
     convention). BioSTEAM refuses a schedule longer than the plant's life
     (its `_fill_depreciation_array`), so the panel says so before a run
-    (OF-BLD-020 §6.R, main-29). Empty when not found here; a table this
+    (main-29). Empty when not found here; a table this
     reader cannot count is left out."""
     return {name: n for name, n in (_depreciation_table() or []) if n is not None}
 

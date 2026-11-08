@@ -1,8 +1,7 @@
 """A runbook lock's digest, as the browser writes it (src/engine/lock.ts).
 
 A lock freezes a runbook's predictions and measures under a digest of
-them, so a later reader can tell whether what they read is what was frozen
-(OF-BLD-006 §3.3). The browser computes it in `runbookLockHash`; the
+them, so a later reader can tell whether what they read is what was frozen. The browser computes it in `runbookLockHash`; the
 service computes the same digest here, over the row as the project keeps
 it, so a runbook the service locks reads as intact on the runbook's page
 and a row sent after a lock can be checked against it (project_state.py).

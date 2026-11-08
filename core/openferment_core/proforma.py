@@ -1,4 +1,4 @@
-"""Proforma on the service's side (OF-BLD-014 §8.1).
+"""Proforma on the service's side.
 
 The worker that runs BioSTEAM is managed by engine/simulator.py; this module
 re-exports its `call`, `start`, `status` and `worker`, the names the shelf's
@@ -285,8 +285,7 @@ def _settle(inp, bound: list, field_id: str) -> None:
 
 
 def _in_place_of(inp, bound: list) -> None:
-    """Say how many bound records a person's value stands in place of
-    (OF-BLD-020 D3), as a fermOS fit chosen in their place says it."""
+    """Say how many bound records a person's value stands in place of, as a fermOS fit chosen in their place says it."""
     if bound:
         inp.flags.append(f"chosen in place of the {len(bound)} record{'s' if len(bound) != 1 else ''} it bound")
 
@@ -365,7 +364,7 @@ def values_read(sets: bool) -> list:
     """The basis input a run writes when it sets a value, an input's or a
     composite's Finance value (`ASSUMPTIONS_READ`, a convention); none for a
     run that sets nothing. The parameter panel's resolve says what a run
-    adds through this same function (OF-BLD-020 §2.R)."""
+    adds through this same function."""
     from .models import BasisInput, BasisSource
 
     if not sets:
@@ -382,7 +381,7 @@ def proforma_scope(scenario_id: str) -> str:
 def held_to_scope(scenario_id: str, overrides: list) -> None:
     """An override names the scope it changes: one sent for a run of
     `scenario_id` under another scenario's scope is refused in words, an
-    input's and a composite's finance alike (OF-BLD-020 §6.R, main-28)."""
+    input's and a composite's finance alike (main-28)."""
     stray = sorted({o.scope for o in overrides if o.scope != proforma_scope(scenario_id)})
     if stray:
         raise ScenarioRefused(f"an override names the scope it changes, and these were sent for "
@@ -504,9 +503,8 @@ def basis_inputs(inputs: list, flowsheet: str, samples: int = SAMPLES, scenario_
     """The run's basis: the flowsheet, the scenario it belongs to, what it
     borrows from a package, the samples, and every record, assumption and
     convention; an input a fermOS fit feeds names the fit's
-    artifact (OF-BLD-019 §5.1), and `fitted` adds what else the fit gave
-    (the batch time a productivity is the titre over). A composite run
-    (OF-BLD-020 §6.1) adds its vessel design, its train run and its finance
+    artifact, and `fitted` adds what else the fit gave
+    (the batch time a productivity is the titre over). A composite run adds its vessel design, its train run and its finance
     (`composite.basis_inputs`), and names the plant scale the vessel design
     gave as `plant_scale vessel`."""
     from .models import BasisInput, BasisSource
@@ -550,7 +548,7 @@ def assumption_inputs(inp) -> list:
     """The basis inputs a run writes for one input bound to a named person's
     value: the value, its low and its high, each with the person as its
     source. The parameter panel's resolve says what a run adds through this
-    same function (OF-BLD-020 §2.R)."""
+    same function."""
     from .models import BasisInput
 
     return [BasisInput(name=f"{inp.key}{part}", value=v, unit=inp.unit, source=inp.source)
@@ -559,7 +557,7 @@ def assumption_inputs(inp) -> list:
 
 def utility_input():
     """What a priced scenario run's utility lines and equipment costs rest
-    on (OF-BLD-019 §2.R): BioSTEAM's own default utility prices and plant
+    on: BioSTEAM's own default utility prices and plant
     cost index, which the flowsheet sets at the start of every case and
     reads back, so no case prices on what an earlier plant left in the
     worker. BioSTEAM's defaults, not the corn plant's own settings."""
@@ -963,7 +961,7 @@ def run_flowsheet(flowsheet: str, assumptions: list, *, samples: int = SAMPLES, 
     tool or engine reaches it, and a test or a fixture makes a run's artifact
     with it (`run` keeps the row of every run a door asks for). The toy is
     refused unless the caller is a test or a fixture and says `allow_toy`; a
-    flowsheet built from kept artifacts (OF-BLD-020 §6.1) runs as a scenario
+    flowsheet built from kept artifacts runs as a scenario
     that names them."""
     from . import artifacts
     from .models import ScenarioInput
@@ -1056,7 +1054,7 @@ def evidence_of(art):
 def latest_run(scenario_id: str):
     """The most recent stored run of a scenario, or None: a run whose basis
     names the scenario, or one stored before a basis named its scenario
-    whose flowsheet is the kept scenario's (OF-BLD-019 §2.3)."""
+    whose flowsheet is the kept scenario's."""
     from . import artifacts
 
     own = {s["id"]: s.get("modelId") for s in held_scenarios()}.get(scenario_id)
@@ -1134,8 +1132,7 @@ def bind_inputs(flowsheet: str, records: list[dict], host: str | None = None, as
     with a bound record wins) in the evidence pool that pass the
     aggregate gate and name the flowsheet's feed as their carbon source, each
     converted by units.py into the input's unit; else it waits. A named
-    person's assumption (an Override from the parameter panel, OF-BLD-020
-    D3) wins over the records and says how many it stands in place of. A
+    person's assumption (an Override from the parameter panel) wins over the records and says how many it stands in place of. A
     convention takes no value: the run's basis states it."""
     from . import units, validate
     from .models import BoundRecord, ScenarioInput
@@ -1240,10 +1237,8 @@ def bound(flowsheet: str, *, scenario_id: str = "", name: str = "", host: str | 
           vessel: str | None = None, train_run: str | None = None):
     """A flowsheet's inputs bound, in the shape GET /api/proforma/scenarios
     serves: a kept scenario's with its id and name, a flowsheet's alone with
-    both empty (§2.3, c); with the fermOS fits a person chose laid on
-    (OF-BLD-019 §5.1), and a person's named values over both (OF-BLD-020
-    D3: an input a value overrides takes no fit). A composite (OF-BLD-020
-    §6.1) binds with the vessel design and the train run it names, held to
+    both empty (§2.3, c); with the fermOS fits a person chose laid on, and a person's named values over both (OF-BLD-020
+    D3: an input a value overrides takes no fit). A composite binds with the vessel design and the train run it names, held to
     the rules, and the plant scale
     the vessel was designed at."""
     from . import evidence_pool
@@ -1312,7 +1307,7 @@ def bind_flowsheet(flowsheet: str, host: str | None = None,
                    vessel: str | None = None, train_run: str | None = None):
     """GET /api/proforma/bind (§2.3, c): a shelf flowsheet's inputs bound as a
     scenario of that flowsheet not yet saved (ADR-014) shows them, id and
-    name empty, with the fermOS fits a person chose (OF-BLD-019 §5.1). The
+    name empty, with the fermOS fits a person chose. The
     toy, an id the shelf does not hold, and a fit that cannot feed the input
     it was chosen for are refused in words."""
     runnable(flowsheet)
@@ -1736,7 +1731,7 @@ def simulation_batch_note(aid: str, where: str) -> str:
 
 
 def _simulation_info(art, out, declared: dict, product: str, flowsheet: str, refuse_all):
-    """What a kept simulation feeds (OF-BLD-020 §3.3): its end state as it
+    """What a kept simulation feeds: its end state as it
     was kept, read from the artifact and recomputed nowhere."""
     from . import fermos, kinetics, units
     from .models import FitFeed
@@ -1802,7 +1797,7 @@ def _simulation_info(art, out, declared: dict, product: str, flowsheet: str, ref
 
 def fermos_fits(flowsheet: str) -> list:
     """GET /api/fermos/fits: every kinetic fit and forecast fermOS keeps,
-    and every simulation (OF-BLD-020 §3.3), newest first, each with what it
+    and every simulation, newest first, each with what it
     can feed `flowsheet` and why not. A read: it keeps nothing and starts no
     simulator."""
     from . import artifacts, fermos
@@ -1941,7 +1936,7 @@ def stored_ceilings(model_id: str, product: str, sugar: str | None = None, store
     """The stored geneOS ceilings of one shelf model for one product, newest
     first (all_artifacts' order), on `sugar` alone when it is named: the
     lookup ceiling_check reads, and fermOS's simulation reads beside its
-    Yp/s (OF-BLD-020 §3.1)."""
+    Yp/s."""
     from . import artifacts, geneos
 
     stored = [a for a in artifacts.all_artifacts() if a.tool == geneos.CEILING] if stored is None else stored
@@ -1954,7 +1949,7 @@ def host_models(product: str, strain: str) -> list[tuple[Any, str, str]]:
     """The geneOS shelf models with a route to `product` whose host is the
     strain ('strain') or of its species ('species'), each with the words
     that say so, as ceiling_check matches a scenario's organism, for one
-    named strain (OF-BLD-020 §3.1)."""
+    named strain."""
     from . import geneos_models, module_stores
 
     labels, _ = _strain_labels()

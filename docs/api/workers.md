@@ -112,7 +112,7 @@ The same request as `run` → `{"flowsheet": <an SFF document>}`, which the serv
 scores in the Proforma worker and keeps as the run's flowsheet record; or `Refused: <words>` when
 the engine has no plant, which the service keeps as the run's `sffRefused`.
 
-## Proforma's flowsheet ops (Proforma worker; OF-BLD-014 §8, OF-BLD-019 §2, `proforma.py`)
+## Proforma's flowsheet ops (Proforma worker, `proforma.py`)
 
 A flowsheet is an id in `flowsheets.KNOWN`: the shelf's ids and the test-only `toy`. Every op that
 names a `flowsheet` refuses an id outside it in the words of `flowsheets.load`'s `KeyError`, as
@@ -133,7 +133,7 @@ and `replay_benchmark` alone.
 
 ### `replay_benchmark`
 
-A kept `proforma_benchmark` artifact recomputed for its replay (OF-BLD-014 §8.2; alpha 2.2 D8):
+A kept `proforma_benchmark` artifact recomputed for its replay (alpha 2.2 D8):
 `biorefineries.cornstover`'s plant built afresh inside `package_defaults()`, its ethanol price
 solved by the package's TEA (`workers/kept_references.benchmark`). Request `{}`; the handler reads
 no field. Result `{"package", "biosteam", "mespUsdPerGal", "mespUsdPerKg",
@@ -183,7 +183,7 @@ spec of another kind is refused, and a refusal in any sample ends the op.
 
 ### `run`
 
-One whole run (OF-BLD-019 §2.1), which `proforma.py` keeps as one `proforma.run` artifact. Request
+One whole run, which `proforma.py` keeps as one `proforma.run` artifact. Request
 `{"flowsheet", "base", "specs", "samples" (default 0), "seed" (default 0), "axes", "diagram",
 "structure"}`: `base`, `specs` and `axes` as `evaluate`, `montecarlo` and `grid` take them (`axes`
 null for no grid), `samples` the number of samples, `diagram` what the run's basis says of its
@@ -200,7 +200,7 @@ and `costLines`; and every key of `tables`. A refusal in any case ends the run.
 
 ### `replay_reference`
 
-A kept `proforma.reference` artifact recomputed for its replay (OF-BLD-019 §2.2; alpha 2.2 D8):
+A kept `proforma.reference` artifact recomputed for its replay (alpha 2.2 D8):
 the plant of the retired entry its basis names, built afresh inside `package_defaults()` and read
 before the worker's settings go back (`workers/kept_references.py`). Request `{"flowsheet",
 "digits" (1–17, default 17), "diagram"}`; `proforma.py` sends the entry its basis names, the digits
@@ -395,7 +395,7 @@ case sets every settable parameter to its library default and then its own value
 (recycles emptied, the TEA's sales guess cleared) and runs. Result: one entry per case, `{"values",
 "price", "outputs"}` or `{"values", "refused"}`, rounded to `digits`. The A→B→A gate runs here.
 
-## Thermo ops (Proforma worker; OF-BLD-019 §4.2, OF-BLD-020 §7.1, `thermo.py`)
+## Thermo ops (Proforma worker, `thermo.py`)
 
 The worker looks up each chemical in thermosteam's library by its name and makes one property
 package per set of names, kept for the worker's life. A question naming a chemical the library
@@ -460,7 +460,7 @@ and `azeotropeMassFraction` are `chemical`'s fractions in that liquid, and `azeo
 bubble point at `P`. `units` gives K for the temperatures, Pa for `P`, and mol/mol and kg/kg for
 the fractions. The op refuses a missing `chemical` or `partner`, and the two the same.
 
-## Vessel and catalogue ops (Proforma worker; OF-BLD-020 §4.1, §5.1, `vessel.py`, `pureos/catalogue.py`)
+## Vessel and catalogue ops (Proforma worker, `vessel.py`, `pureos/catalogue.py`)
 
 `vessel_specs` and `catalogue_specs` read what BioSTEAM alone knows of a unit class: its defaults
 (from its signatures, class attributes and a probe instance), the choices its tables and setters
@@ -610,7 +610,7 @@ each attribute as the built unit holds it, or `"unreadable: <ExceptionType>"`. A
 does not hold is refused in the catalogue's words (`Refused: there is no unit type …`); a unit that
 cannot be built or simulated is the class's own exception and words.
 
-## pureOS train ops (Proforma worker; OF-BLD-020 §5.2, `pureos/train_spec.py`)
+## pureOS train ops (Proforma worker, `pureos/train_spec.py`)
 
 A train is an inlet and an ordered list of catalogue units. The service resolves and names every
 value (`pureos/train_spec.py`); the worker builds the BioSTEAM objects (`flowsheets/train.py`) and
@@ -680,7 +680,7 @@ it was found. The op refuses a unit type the catalogue does not hold in the cata
 cannot fill it; a unit that cannot be built (`unit <id> (<type>, <class>) could not be built:
 BioSTEAM said: …`); a unit that does not converge; and a train that does not converge as a whole.
 
-## geneos ops (geneos worker; OF-BLD-014 §6.2, §6.3, `geneos.py`)
+## geneos ops (geneos worker, `geneos.py`)
 
 Every request names a model, `{"modelId", "path"}`: `modelId` is a model on the shelf
 (`geneos_models.SHELF`) or `toy`, the hand-worked test network, and `path` is the local file of a

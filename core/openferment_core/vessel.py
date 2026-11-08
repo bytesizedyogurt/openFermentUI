@@ -1,5 +1,4 @@
-"""fermOS sizes the vessel a simulation needs, on BioSTEAM (OF-BLD-020 §4.1,
-D7, E.2‴, E.3‴, Appendix 2 §C).
+"""fermOS sizes the vessel a simulation needs, on BioSTEAM (E.2‴, E.3‴, Appendix 2 §C).
 
 From a kept `fermos.simulation` (or, anaerobic only, a `kinetic_fit` or
 `growth_forecast`, read through `proforma.fit_info` for titre, yield and
@@ -317,7 +316,7 @@ def _past_harvest(end_t: Any, harvest: float) -> bool:
 
 def fit_inputs(art: Artifact) -> dict[str, Any]:
     """What a vessel design reads from a kept kinetic fit or forecast, through
-    `proforma.fit_info` (OF-BLD-019 §5.1): the titre, the yield and the batch
+    `proforma.fit_info`: the titre, the yield and the batch
     time, as the ethanol flowsheet takes them. A fit gives no cells and no
     oxygen uptake, so its vessel is the anaerobic one; the glucose fed is
     what the titre over the yield used (all of it), and none is carried in."""

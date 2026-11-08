@@ -1,4 +1,4 @@
-"""What Proforma and fermOS bind a value from records with (OF-BLD-020 §3.2).
+"""What Proforma and fermOS bind a value from records with.
 
 Moved here from proforma.py, unchanged, so fermOS's simulation binds through
 the same gate and the same statistic as Proforma's inputs do (D6). proforma.py
@@ -58,8 +58,7 @@ class Statistic(NamedTuple):
 def statistic(values: list[float]) -> Statistic:
     """The median of the values with their range and a triangular draw from
     three distinct values on; a distinct pair's middle with both ends, drawn
-    uniform; one value, or values all alike, held fixed and flagged
-    (OF-BLD-014 §8.3). Refused for no values."""
+    uniform; one value, or values all alike, held fixed and flagged. Refused for no values."""
     vals = sorted(values)
     if not vals:
         raise ValueError("no value to summarise")

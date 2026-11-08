@@ -1,4 +1,4 @@
-"""pureOS's unit catalogue (OF-BLD-020 §5.1, D8, E.3‴, Appendix 2 §B).
+"""pureOS's unit catalogue (E.3‴, Appendix 2 §B).
 
 A train is built from unit types, and each unit type is one entry here: a
 BioSTEAM class, or one of three in-house `bst.Unit` subclasses BioSTEAM lacks
@@ -245,11 +245,12 @@ def _moisture(rule: tuple[str, ...] = ("record:cake_moisture", "assumption", "li
     return Param("moisture_content", label, gloss, "fraction", "", "Separation", rule, (0, 1, _SHARE), note=note)
 
 
-def _column(name: str, line: str, *, cls: str, notes: tuple[str, ...]) -> Entry:
-    """BinaryDistillation and ShortcutColumn: one constructor (Distillation's)."""
+def _column(name: str, line: str, *, cls: str, title: str, notes: tuple[str, ...]) -> Entry:
+    """BinaryDistillation and ShortcutColumn: one constructor (Distillation's),
+    each entry named in a person's words (`title`) beside its class."""
     frac = (0, 1, _SHARE)
     return Entry(
-        id=name, name=cls, line=line, stage="concentration", biosteam=cls, cost_model=True,
+        id=name, name=title, line=line, stage="concentration", biosteam=cls, cost_model=True,
         params=(
             Param("light_key", "Light key", "the more volatile of the two chemicals the column separates, sent to the "
                   "distillate", "choice", "", "Separation", ASSUME, (None, None, _WORDS), name="LHK",
@@ -453,14 +454,14 @@ UNIT_TYPES: tuple[Entry, ...] = (
     _column(
         "distillation",
         "separates two keys by repeated boiling and condensing on trays: the lighter leaves at the top, the heavier at "
-        "the bottom, each to the purity or recovery set", cls="BinaryDistillation",
+        "the bottom, each to the purity or recovery set", cls="BinaryDistillation", title="Distillation column",
         notes=("The column is sized and costed by BioSTEAM (McCabe–Thiele stages, tray efficiency, flooding).",
                "thermosteam's own vapour–liquid equilibrium decides how far the keys can be split; an azeotrope "
                "between them limits the top (a train's run warns of it, §5.2).")),
     _column(
         "distillation-shortcut",
         "as the binary column, with the stages found by the Fenske–Underwood–Gilliland shortcut over every "
-        "chemical, not the two keys alone", cls="ShortcutColumn",
+        "chemical beside the two keys", cls="ShortcutColumn", title="Shortcut distillation column",
         notes=("The Fenske–Underwood–Gilliland shortcut, sized and costed by BioSTEAM.",)),
     Entry(
         id="evaporation", name="Multi-effect evaporator", stage="concentration", biosteam="MultiEffectEvaporator",
@@ -1226,7 +1227,7 @@ def _provider(ids: tuple[str, ...], req: ParamResolveRequest) -> params.Provided
                                   "(JSON) or as the resolve's `train`")
     if not req.unitType:
         raise params.ScopeUnknown(
-            f"pureOS's train units are served with their train (?train=, OF-BLD-020 §5.2), or by their unit type: "
+            f"pureOS's train units are served with their train (?train=), or by their unit type: "
             f"name the type of unit {unit} of train {train} with ?unitType=<catalogue id>")
     try:
         e = entry(req.unitType)

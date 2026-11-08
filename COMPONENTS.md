@@ -74,21 +74,21 @@ The engine (execution prompt §7.2; ADR-003, ADR-004, ADR-015): every engine beh
 | `runs.py` | Engine runs (execution prompt §7.4; ADR-004, ADR-003, ADR-006, ADR-015). |
 | `sample.py` | The engine contract's own sample engine (docs/api/engines.md; ADR-015). |
 | `sff.py` | SFF flowsheet records (ADR-003; execution prompt §8.3). |
-| `simulator.py` | The engine's simulator: the Proforma worker, BioSTEAM in a process of its own (OF-BLD-014 §8.1; execution prompt §7.2). |
+| `simulator.py` | The engine's simulator: the Proforma worker, BioSTEAM in a process of its own (execution prompt §7.2). |
 
 ### `flowsheets/`
 
-Proforma's flowsheets (OF-BLD-014 §8.1; the shelf, OF-BLD-019 §2.1).
+Proforma's flowsheets (the shelf).
 
 | Module | What it says it is |
 |---|---|
 | `cellulosic_ethanol_v0.py` | Cellulosic ethanol, version 0: openFerment's first flowsheet of its own, composed from the `biorefineries.cellulosic` factories (ADR-004; execution prompt §4.4, §8.4). |
-| `custom_train_v1.py` | A vessel and a train, priced: the seam (OF-BLD-020 §6.1, D11, E.2‴, E.3‴). |
-| `ethanol_glucose_v0.py` | Glucose to ethanol, version 0: a flowsheet of our own (OF-BLD-019 §2.3; D3, D4). |
-| `shelf.py` | Proforma's shelf of flowsheets (OF-BLD-019 §2.1, D2). |
-| `toy.py` | The toy flowsheet (OF-BLD-014 §8.1): two units whose mass balance is worked by hand. A STAND-IN for tests and fixtures, not a process. |
-| `train.py` | pureOS's train, built and run in the Proforma worker (OF-BLD-020 §5.2, D9, D10, E.3‴). |
-| `vessel.py` | fermOS's vessel, designed by BioSTEAM (OF-BLD-020 §4.1, D7, E.3‴). |
+| `custom_train_v1.py` | A vessel and a train, priced: the seam (E.2‴, E.3‴). |
+| `ethanol_glucose_v0.py` | Glucose to ethanol, version 0: a flowsheet of our own (D3, D4). |
+| `shelf.py` | Proforma's shelf of flowsheets. |
+| `toy.py` | The toy flowsheet: two units whose mass balance is worked by hand. A STAND-IN for tests and fixtures, not a process. |
+| `train.py` | pureOS's train, built and run in the Proforma worker (E.3‴). |
+| `vessel.py` | fermOS's vessel, designed by BioSTEAM (E.3‴). |
 
 ### `literature/`
 
@@ -110,7 +110,7 @@ Postdoc (execution prompt §7.2, §4.8; ADR-008): the loop, its validator, the c
 |---|---|
 | `conversations.py` | Postdoc's conversations, kept under the project (execution prompt §4.8; ADR-008). |
 | `evaluate.py` | Postdoc's evaluation set (execution prompt §10 stage 6.4; ADR-006, ADR-008). |
-| `plan.py` | The plan Postdoc answers in (OF-BLD-007 §6): its system prompt, its schema and the shape evidence takes in a tool's result. |
+| `plan.py` | The plan Postdoc answers in: its system prompt, its schema and the shape evidence takes in a tool's result. |
 
 ### `projects/`
 
@@ -121,18 +121,18 @@ Projects (ADR-005; execution prompt §4.5).
 
 ### `pureos/`
 
-pureOS reads the train a flowsheet ran (OF-BLD-019 §4.1, D1).
+pureOS reads the train a flowsheet ran.
 
 | Module | What it says it is |
 |---|---|
-| `build.py` | What a model's build does to a train, as data (OF-BLD-020 §5.4; D9, D13). |
-| `catalogue.py` | pureOS's unit catalogue (OF-BLD-020 §5.1, D8, E.3‴, Appendix 2 §B). |
+| `build.py` | What a model's build does to a train, as data (D9, D13). |
+| `catalogue.py` | pureOS's unit catalogue (E.3‴, Appendix 2 §B). |
 | `engine.py` | pureOS's trains as the engine `train` (docs/api/engines.md; ADR-015; alpha 2.2 D5). |
-| `from_run.py` | A run's train, read into the Builder (OF-BLD-020 §5.3, D9). |
-| `inhouse.py` | The three unit types pureOS's catalogue needs and BioSTEAM lacks (OF-BLD-020 §5.1, D8). |
-| `kept.py` | The trains a model built, kept on the service (OF-BLD-020 §5.4). |
-| `proposer.py` | pureOS proposes a train by rules that each name the property they read (OF-BLD-020 §7.2, D12, D13, E.4‴). |
-| `train_spec.py` | pureOS's train: data, checked, resolved, run, and kept (OF-BLD-020 §5.2; D9, D10, E.2‴, E.3‴). |
+| `from_run.py` | A run's train, read into the Builder. |
+| `inhouse.py` | The three unit types pureOS's catalogue needs and BioSTEAM lacks. |
+| `kept.py` | The trains a model built, kept on the service. |
+| `proposer.py` | pureOS proposes a train by rules that each name the property they read (E.4‴). |
+| `train_spec.py` | pureOS's train: data, checked, resolved, run, and kept (D9, D10, E.2‴, E.3‴). |
 
 ### `studies/`
 
@@ -142,46 +142,46 @@ Studies (execution prompt §7.2, §9.1 step 5): what a project asks of its plant
 |---|---|
 | `comparisons.py` | Comparisons (execution prompt §7.4, §9.1 step 5). |
 | `exports.py` | The export package of a project's studies (execution prompt §9.1 step 5). |
-| `runbooks.py` | Runbooks from a study (execution prompt §9.1 step 5; OF-BLD-006 §3). |
+| `runbooks.py` | Runbooks from a study (execution prompt §9.1 step 5). |
 | `scenarios.py` | A study's scenarios (execution prompt §9.1 step 5; ADR-006). |
 
 ### `tools/`
 
-One tool registry, three callers (OF-BLD-014 §3.4, E.6).
+One tool registry, three callers.
 
 | Module | What it says it is |
 |---|---|
 | `catalogues.py` | A project's catalogues, for Postdoc (alpha 2.1 stage D, debt 1; catalogues.py). |
 | `engine.py` | The library shelf and the project's engine runs, for Postdoc (alpha 2.0 stage 6; execution prompt §4.6, §9.1 step 6; ADR-004, ADR-006). |
-| `fermos.py` | fermOS's tools: `growth_forecast` (OF-BLD-014 §7.3), `fermos_simulate` (OF-BLD-020 §3.4) and `fermos_vessel` (OF-BLD-020 §4.2). |
+| `fermos.py` | fermOS's tools: `growth_forecast`, `fermos_simulate` and `fermos_vessel`. |
 | `flowsheets.py` | SFF flowsheets, for Postdoc (alpha 2.1 stage B; ADR-003): the toolkit's reference files, a reference file imported into the project, and a kept record read back. |
-| `gates.py` | The gates (OF-BLD-015 §7.4): one table, one row a gate. |
-| `geneos.py` | `yield_ceiling`: the most product a published reaction network can make from a feed (OF-BLD-014 §6.3). |
+| `gates.py` | The gates: one table, one row a gate. |
+| `geneos.py` | `yield_ceiling`: the most product a published reaction network can make from a feed. |
 | `literature.py` | The documents a project holds, for Postdoc (alpha 2.0 stage 6; ADR-002). |
-| `modules.py` | One read tool per module (OF-BLD-015 §7.2). |
+| `modules.py` | One read tool per module. |
 | `passages.py` | `search_passages`: the papers' own words, found for a question. |
-| `proforma.py` | Proforma's tools: `selling_price` (OF-BLD-014 §8.5), `run_flowsheet` and `stream_table` (OF-BLD-019 §6.1). |
+| `proforma.py` | Proforma's tools: `selling_price`, `run_flowsheet` and `stream_table`. |
 | `pureos.py` | pureOS's tools: `pureos_build` and `pureos_propose`. |
-| `records.py` | `search_records`: the records and candidates Postdoc may cite, found by words (OF-BLD-014 §3.4). |
+| `records.py` | `search_records`: the records and candidates Postdoc may cite, found by words. |
 | `reference.py` | `docs/TOOLS.md`, written from the registry (execution prompt §7.3 item 7, A5). |
-| `runbook.py` | `draft_runbook`: Postdoc drafts a runbook, and the service writes every number (OF-BLD-014 §9.2). |
+| `runbook.py` | `draft_runbook`: Postdoc drafts a runbook, and the service writes every number. |
 | `studies.py` | The project's studies, for Postdoc (alpha 2.0 stage 6; execution prompt §4.6, §9.1 step 6; ADR-006). |
-| `thermo.py` | `thermo_props`: what thermosteam says of a mixture on file (OF-BLD-019 §4.2, D9). |
-| `units.py` | `convert_units`: a record's own value in another unit (OF-BLD-014 §3.4). |
-| `writes.py` | One write tool per module, the pair of its read tool (OF-BLD-015 §7.3). |
+| `thermo.py` | `thermo_props`: what thermosteam says of a mixture on file. |
+| `units.py` | `convert_units`: a record's own value in another unit. |
+| `writes.py` | One write tool per module, the pair of its read tool. |
 
 ### `workers/`
 
-Heavy libraries run in workers (OF-BLD-014 §3.4, E.6).
+Heavy libraries run in workers.
 
 | Module | What it says it is |
 |---|---|
-| `dot_names.py` | Stable node names for a BioSTEAM digraph (OF-BLD-019 §7.R, finding 5). |
-| `echo_worker.py` | A worker for the tests (OF-BLD-014 §3.4). It echoes, sleeps on request and exits on request, so start, timeout, crash and restart are each exercised. It computes nothing. |
-| `geneos_worker.py` | The geneOS worker: flux balance analysis, in a process of its own (OF-BLD-014 §6.2, Appendix 2). |
+| `dot_names.py` | Stable node names for a BioSTEAM digraph. |
+| `echo_worker.py` | A worker for the tests. It echoes, sleeps on request and exits on request, so start, timeout, crash and restart are each exercised. It computes nothing. |
+| `geneos_worker.py` | The geneOS worker: flux balance analysis, in a process of its own (Appendix 2). |
 | `kept_references.py` | The replay of runs kept from two retired shelf entries (alpha 2.2 D8). |
 | `library_plants.py` | The `biorefineries` package's plants, found by inspection and run whole (ADR-004; execution prompt §4.4, §8.4). |
-| `proforma_worker.py` | The Proforma worker: BioSTEAM in a process of its own, kept warm (OF-BLD-014 §8.1). |
+| `proforma_worker.py` | The Proforma worker: BioSTEAM in a process of its own, kept warm. |
 | `sample_worker.py` | A worker for the engine contract's own tests (docs/api/engines.md; ADR-015). |
 | `sff_toolkit.py` | The PISCES SFF toolkit, called in the Proforma worker (ADR-003; execution prompt §8.3). |
 
@@ -189,57 +189,57 @@ Heavy libraries run in workers (OF-BLD-014 §3.4, E.6).
 
 | Module | What it says it is |
 |---|---|
-| `api.py` | FastAPI app — openferment-core's first surface (OF-BLD-007 §4). |
-| `artifacts.py` | What was computed is kept and can be replayed (OF-BLD-014 §3.2, E.5). |
-| `atomic.py` | Whole-file writes that land whole or not at all (OF-BLD-012 §B.8). |
-| `audit.py` | The audit log (OF-BLD-015 §7.3; execution prompt §7.3): every write a model makes, and every proposal a person carries out or dismisses, one row each in the `audit` table, under the project it was made in. |
-| `basis.py` | The provenance of a computed value (OF-BLD-014 §3.1, E.4). |
-| `binding.py` | What Proforma and fermOS bind a value from records with (OF-BLD-020 §3.2). |
-| `biorepo.py` | BioRepo — one write function for a project's review decisions (OF-BLD-012 §2.3, §7.1). |
+| `api.py` | FastAPI app — openferment-core's first surface. |
+| `artifacts.py` | What was computed is kept and can be replayed. |
+| `atomic.py` | Whole-file writes that land whole or not at all. |
+| `audit.py` | The audit log (execution prompt §7.3): every write a model makes, and every proposal a person carries out or dismisses, one row each in the `audit` table, under the project it was made in. |
+| `basis.py` | The provenance of a computed value. |
+| `binding.py` | What Proforma and fermOS bind a value from records with. |
+| `biorepo.py` | BioRepo — one write function for a project's review decisions. |
 | `catalogues.py` | A project's catalogues (alpha 2.1 stage D, debt 1): the strains and their aliases, the products, Guild's skills and Primer's lessons. |
-| `checks.py` | Checks — proposed by fixed rules, scheduled and run by an assessor (OF-BLD-013 §5.2). |
-| `competence.py` | Competence, mirrored (OF-BLD-013 §2.1). |
-| `composite.py` | The seam on the service's side: a vessel and a train become a flowsheet Proforma prices (OF-BLD-020 §6.1, D11, D3, E.2‴, E.3‴; Appendix 2 §D). |
+| `checks.py` | Checks — proposed by fixed rules, scheduled and run by an assessor. |
+| `competence.py` | Competence, mirrored. |
+| `composite.py` | The seam on the service's side: a vessel and a train become a flowsheet Proforma prices (E.2‴, E.3‴; Appendix 2 §D). |
 | `evaluation.py` | `pnpm eval`: Postdoc's evaluation set, asked through the service's answer path (postdoc/evaluate.py; execution prompt §10 stage 6.4; alpha 2.1 stage C). |
 | `events.py` | A project's event stream (execution prompt §7.3 item 2): `GET /api/events?project=`. |
-| `evidence_pool.py` | What Postdoc may cite: one view over every record the project holds (OF-BLD-014 §3.4). |
-| `extract.py` | Extract — one structured response per document (OF-BLD-012 §6.1; ADR-002). |
-| `fermos.py` | fermOS fits what a run measured (OF-BLD-014 §7.2), and simulates a run from its sources (OF-BLD-020 §3.1). |
+| `evidence_pool.py` | What Postdoc may cite: one view over every record the project holds. |
+| `extract.py` | Extract — one structured response per document (ADR-002). |
+| `fermos.py` | fermOS fits what a run measured, and simulates a run from its sources. |
 | `fermos_engine.py` | fermOS as the engine `kinetics` (docs/api/engines.md; ADR-015; alpha 2.2 D4). |
-| `geneos.py` | geneOS on the service's side (OF-BLD-014 §6.2). |
-| `geneos_models.py` | geneOS's shelf of published reaction networks (OF-BLD-014 §6.2). |
-| `guard.py` | Which requests may change something (OF-BLD-012 §B.6). |
-| `guild.py` | Guild — the competence ledger, and the only functions that write it (OF-BLD-013 §1.2, §2.1, §3.1). |
+| `geneos.py` | geneOS on the service's side. |
+| `geneos_models.py` | geneOS's shelf of published reaction networks. |
+| `guard.py` | Which requests may change something. |
+| `guild.py` | Guild — the competence ledger, and the only functions that write it. |
 | `import_alpha1.py` | Carry an alpha 1.0 data directory into a new project (stage 2; ADR-001). |
-| `intake.py` | Intake: what a project reads, collected into Sci RAG Kit (ADR-002; OF-BLD-012 §5). |
-| `kinetics.py` | fermOS's model families (OF-BLD-020 §3.1, D5): code written once, each integrated on scipy's `solve_ivp` and fitted on `least_squares`. |
+| `intake.py` | Intake: what a project reads, collected into Sci RAG Kit (ADR-002). |
+| `kinetics.py` | fermOS's model families: code written once, each integrated on scipy's `solve_ivp` and fitted on `least_squares`. |
 | `literature_live.py` | `python -m openferment_core.literature_live` — the literature lanes that call a model, over one project (alpha 2.2 F.5; ADR-002, Implementation F). |
 | `literature_mcp.py` | Sci RAG Kit's MCP server, over stdio, for one project (ADR-002). |
 | `llm.py` | The one place openFerment calls a Claude model (Postdoc, Extract). |
-| `mcp_server.py` | openFerment's tools for assistants outside the app (OF-BLD-014 §10.1). |
+| `mcp_server.py` | openFerment's tools for assistants outside the app. |
 | `measurements.py` | A deposition's reading as a value a run sets (ADR-006's measurement; alpha 2.2 §6.3, D7). |
 | `migrations.py` | `python -m openferment_core.migrations` — both schemas' migrations, and the database commands (execution prompt §8.1, §8.2). |
-| `models.py` | AnswerPlan (OF-BLD-007 §3). |
-| `module_stores.py` | Every module's store, read the same way (OF-BLD-015 §7.1, §7.2). |
-| `nightly_checks.py` | What the nightly job checks after intake (OF-BLD-014 §10.2): every fetched model file against its pinned hash, and the ten newest artifacts of each project replayed against what was kept. A replay holds when it is identical, or when every number lies within the precision its basis states (a BioSTEAM run's last kept digit); the log says which. It reports and rewrites nothing; the exit code is non-zero when a file does not match or a replay lies outside its precision, so the night's log says so. |
-| `params.py` | One parameter panel, declared in Python (OF-BLD-020 Phase 2, D2–D4). |
-| `postdoc_agent.py` | Postdoc as an agent: a bounded loop of tools, answered with a checked plan (OF-BLD-014 §5.2). |
-| `practice.py` | Practice — scenarios drafted from the bench, and a tutor that questions the trainee's reasoning (OF-BLD-013 §4.1, §4.2). |
-| `proforma.py` | Proforma on the service's side (OF-BLD-014 §8.1). |
+| `models.py` | AnswerPlan. |
+| `module_stores.py` | Every module's store, read the same way. |
+| `nightly_checks.py` | What the nightly job checks after intake: every fetched model file against its pinned hash, and the ten newest artifacts of each project replayed against what was kept. A replay holds when it is identical, or when every number lies within the precision its basis states (a BioSTEAM run's last kept digit); the log says which. It reports and rewrites nothing; the exit code is non-zero when a file does not match or a replay lies outside its precision, so the night's log says so. |
+| `params.py` | One parameter panel, declared in Python. |
+| `postdoc_agent.py` | Postdoc as an agent: a bounded loop of tools, answered with a checked plan. |
+| `practice.py` | Practice — scenarios drafted from the bench, and a tutor that questions the trainee's reasoning. |
+| `proforma.py` | Proforma on the service's side. |
 | `project_state.py` | What a project keeps of the work done in its pages (execution prompt §5.5, stage 2; ADR-001, ADR-005). |
-| `proposals.py` | Proposals (OF-BLD-015 §7.4): what a model asked for at a gate, kept until a person carries it out or dismisses it. |
+| `proposals.py` | Proposals: what a model asked for at a gate, kept until a person carries it out or dismisses it. |
 | `protocols.py` | A project's protocols (alpha 2.2 E.12a; ADR-017): each protocol the lab writes, kept whole, and read by Guild, Practice and the module reads. |
-| `protparam.py` | A protein product's properties from its sequence (OF-BLD-020 §7.1, D12). |
+| `protparam.py` | A protein product's properties from its sequence. |
 | `quotes.py` | Sentences, and whether a quote is whole ones of its passage. |
-| `ready.py` | Is this machine ready for the live loop? (OF-BLD-012 §B.9) |
-| `runbook_draft.py` | A runbook Postdoc drafts, with every number written by the service (OF-BLD-014 §9.2). |
+| `ready.py` | Is this machine ready for the live loop? |
+| `runbook_draft.py` | A runbook Postdoc drafts, with every number written by the service. |
 | `runbook_lock.py` | A runbook lock's digest, as the browser writes it (src/engine/lock.ts). |
-| `spend.py` | The day's spend on models, by role, and the daily cap (OF-BLD-014 §3.3, E.7). |
-| `thermo.py` | thermosteam answers property questions (OF-BLD-019 §4.2, D9). |
-| `units.py` | Units — the engine's tables and the record fields (OF-BLD-012 §5.3). |
-| `validate.py` | Rule 1 enforcement (OF-BLD-007 §5). |
-| `vessel.py` | fermOS sizes the vessel a simulation needs, on BioSTEAM (OF-BLD-020 §4.1, D7, E.2‴, E.3‴, Appendix 2 §C). |
-| `witness.py` | Witness — scoring the run that actually ran (OF-BLD-012 §6.2). |
+| `spend.py` | The day's spend on models, by role, and the daily cap. |
+| `thermo.py` | thermosteam answers property questions. |
+| `units.py` | Units — the engine's tables and the record fields. |
+| `validate.py` | Rule 1 enforcement. |
+| `vessel.py` | fermOS sizes the vessel a simulation needs, on BioSTEAM (E.2‴, E.3‴, Appendix 2 §C). |
+| `witness.py` | Witness — scoring the run that actually ran. |
 
 ## The client (`src/`)
 
@@ -249,5 +249,5 @@ Heavy libraries run in workers (OF-BLD-014 §3.4, E.6).
 | `src/components/` | 55: `AnswerPlanView.tsx`, `CeilingGap.tsx`, `Chip.tsx`, `CollectCard.tsx`, `CommandPalette.tsx`, `ComponentTag.tsx`, `CostWaterfall.tsx`, `DataTable.tsx`, `DepositionPanel.tsx`, `Distribution.tsx`, `Dossier.tsx`, `EngineRunLink.tsx`, `EvidenceCard.tsx`, `EvidenceStrip.tsx`, `FigureFrame.tsx`, `Frontier.tsx`, `GuidedTour.tsx`, `GuildBits.tsx`, `GuildGate.tsx`, `HomeStart.tsx`, `IntervalLedger.tsx`, `JobsTray.tsx`, `LessonEmbeds.tsx`, `LevelGlyph.tsx`, `Markdown.tsx`, `MixLine.tsx`, `NewScenarioDialog.tsx`, `OwnerTabs.tsx`, `OxygenBalance.tsx`, `ParameterPanel.tsx`, `ParameterRow.tsx`, `PassageQuote.tsx`, `PlanTrace.tsx`, `ProcessTrain.tsx`, `ProjectSwitch.tsx`, `PropertiesPanel.tsx`, `ProposalsCard.tsx`, `ProposedTrain.tsx`, `Provenance.tsx`, `PurityByStream.tsx`, `QuantityField.tsx`, `ReadingOrigin.tsx`, `RecoveryByUnit.tsx`, `ReferenceView.tsx`, `RunbookBits.tsx`, `SffGraph.tsx`, `TimeCourse.tsx`, `TimeSeriesPanel.tsx`, `Tornado.tsx`, `TraceCards.tsx`, `TrajectoryBand.tsx`, `Unbuilt.tsx`, `encoding.ts`, `index.ts`, `ui.tsx` |
 | `src/data/` | 9: `components.ts`, `labels.ts`, `nav.ts`, `ontology.ts`, `shortcuts.ts`, `skillFamilies.ts`, `subsystems.ts`, `tabs.ts`, `vocabulary.ts` |
 | `src/engine/` | 14: `capture.ts`, `checks.ts`, `competence.ts`, `diff.ts`, `interp.ts`, `ledger.ts`, `lock.ts`, `metrics.ts`, `path.ts`, `readings.ts`, `reconcile.ts`, `scale.ts`, `series.ts`, `units.ts` |
-| `src/lib/` | 26: `artifacts.ts`, `catalogues.ts`, `checks.ts`, `csv.ts`, `durable.ts`, `events.ts`, `fermos.ts`, `geneos.ts`, `guild.ts`, `http.ts`, `intake.ts`, `library.ts`, `literature.ts`, `params.ts`, `postdoc.ts`, `practice.ts`, `proforma.ts`, `project.ts`, `projectState.ts`, `proposals.ts`, `protocols.ts`, `pureos.ts`, `review.ts`, `studies.ts`, `thermo.ts`, `viz.ts` |
+| `src/lib/` | 27: `artifacts.ts`, `catalogues.ts`, `checks.ts`, `cite.ts`, `csv.ts`, `durable.ts`, `events.ts`, `fermos.ts`, `geneos.ts`, `guild.ts`, `http.ts`, `intake.ts`, `library.ts`, `literature.ts`, `params.ts`, `postdoc.ts`, `practice.ts`, `proforma.ts`, `project.ts`, `projectState.ts`, `proposals.ts`, `protocols.ts`, `pureos.ts`, `review.ts`, `studies.ts`, `thermo.ts`, `viz.ts` |
 | `src/screens/` | 55: `Architecture.tsx`, `BenchCheck.tsx`, `BioRepo.tsx`, `BioRepoArtifacts.tsx`, `BioRepoSearch.tsx`, `Catalogues.tsx`, `Compare.tsx`, `Deposition.tsx`, `DepositionDetail.tsx`, `Depositions.tsx`, `FermOS.tsx`, `FermOSForecast.tsx`, `FermOSSimulate.tsx`, `FermOSVessel.tsx`, `FlowsheetPage.tsx`, `Flowsheets.tsx`, `GeneOS.tsx`, `GeneOSModel.tsx`, `Guild.tsx`, `GuildChecks.tsx`, `GuildMatrix.tsx`, `GuildPeople.tsx`, `GuildSkills.tsx`, `Home.tsx`, `Intake.tsx`, `IntakeIngest.tsx`, `Organisms.tsx`, `PaperReader.tsx`, `Postdoc.tsx`, `Primer.tsx`, `PrimerLesson.tsx`, `PrimerPath.tsx`, `PrimerPractice.tsx`, `Proforma.tsx`, `ProformaBiosteam.tsx`, `ProformaComparison.tsx`, `ProformaReference.tsx`, `ProformaRun.tsx`, `ProformaScenario.tsx`, `ProformaStudies.tsx`, `ProjectHome.tsx`, `ProtocolDetail.tsx`, `ProtocolEditor.tsx`, `Protocols.tsx`, `PureOS.tsx`, `PureOSBuilder.tsx`, `PureOSPropose.tsx`, `PureOSTrain.tsx`, `RunbookDetail.tsx`, `RunbookLedger.tsx`, `Runbooks.tsx`, `Settings.tsx`, `SettingsFigures.tsx`, `StrainPage.tsx`, `Witness.tsx` |

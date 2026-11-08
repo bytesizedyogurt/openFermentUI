@@ -1,5 +1,5 @@
 """The engine's simulator: the Proforma worker, BioSTEAM in a process of
-its own (OF-BLD-014 §8.1; execution prompt §7.2).
+its own (execution prompt §7.2).
 
 One `SimWorker` runs BioSTEAM, thermosteam, biorefineries and the vendored
 SFF toolkit. Its cold start takes about thirty seconds, so the worker starts
@@ -74,7 +74,7 @@ def start(background: bool = True) -> dict[str, Any]:
 def call(op: str, args: dict[str, Any]) -> Any:
     """A request on the warm worker; the first one starts it and waits, and
     one arriving while another starts it waits for that start, as long as
-    a start may take (OF-BLD-019 §7.R), then says in words why it cannot
+    a start may take, then says in words why it cannot
     run: the start's own error, or that the simulator is still starting."""
     if _STATE["status"] != "ready":
         start(background=False)

@@ -470,4 +470,4 @@ def test_an_artifact_damaged_on_disk_under_a_vessel_scope_is_a_409_in_words(clie
     plant_damaged(aid)
     scope = f"fermos:vessel:{aid}"
     for r in (client.get(f"/api/params/{scope}"), client.post(f"/api/params/{scope}/resolve", json={})):
-        assert r.status_code == 409 and f"artifact {aid} is damaged on disk" in r.json()["detail"], (r.status_code, r.text)
+        assert r.status_code == 409 and f"artifact {aid} is damaged in its row" in r.json()["detail"], (r.status_code, r.text)

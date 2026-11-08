@@ -1896,8 +1896,8 @@ def test_a_trains_parameters_are_each_places_values_with_the_origins_their_resol
     # a component the typed inlet does not carry, a value the class decides at run time.
     absent, decided = got["inlet.conc.Octane"], got["F1.T"]
     assert (absent.value, absent.origin, decided.value, decided.origin) == (None, None, None, None)
-    assert absent.note.endswith(f"{train_engine.FILLS_ITSELF} (absent from the inlet: a component nobody typed is not "
-                                "in it).")
+    assert absent.note.endswith(f"{train_engine.FILLS_ITSELF} (absent from the inlet: the inlet carries the components a "
+                                "person typed).")
     assert f"{train_engine.FILLS_ITSELF} (" in decided.note and "the class decides at run time" in decided.note
     assert not [p.key for p in got.values() if p.value is not None and train_engine.FILLS_ITSELF in (p.note or "")]
     held, said = conform._origins(TRAIN, TRAIN.things())

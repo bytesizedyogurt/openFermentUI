@@ -1,4 +1,4 @@
-"""Rule 1 enforcement (OF-BLD-007 §5).
+"""Rule 1 enforcement.
 
 THE PART THAT MATTERS. Claim text may not contain a number. The model writes
 prose and cites a record; the interface renders the value from that record.
@@ -275,7 +275,7 @@ def validate_claims(
         # — "nobody has measured this in this host" is a useful answer — but it
         # has to be declared, not arrived at by omission.
         if not record_ids and support != "unsupported":
-            reject(f"no recordIds and support is '{support}', not 'unsupported'")
+            reject(f"no recordIds, so its support must be 'unsupported'; it says '{support}'")
             continue
 
         # Papers are derived from the cited records rather than trusted from the
@@ -321,7 +321,7 @@ KEPT_RUNS = {"fermos.simulation": ("fermos", "simulation"), "fermos.vessel": ("f
 class SeenSet:
     """What this run's tool calls returned. A claim may cite only these: a
     record, passage or computed value the model never retrieved is one it
-    cannot have read. A vessel design (OF-BLD-020 §4.2) is learned as the
+    cannot have read. A vessel design is learned as the
     evidence fermos_vessel returns, by its `fermos.vessel` artifact id, and as
     the `fermos/vessel/<id>` row fermos_read returns (a kept run, KEPT_RUNS,
     as a simulation is); a refused call teaches it nothing, so a design
@@ -450,8 +450,7 @@ def validate_plan(raw_claims: list[dict[str, Any]], seen: SeenSet, pool: Any, *,
     3. A record, passage, evidence id or module ref was never returned by a
        tool call in this run. A kept run (a simulation, a vessel design or a
        train run, KEPT_RUNS) a read returned only as a row is cited by that
-       row's ref, and a claim citing it by evidence id is told so (OF-BLD-020
-       §3.4, §4.2, §5.4).
+       row's ref, and a claim citing it by evidence id is told so.
     4. A quote is longer than MAX_QUOTE_CHARS, or is not one whole sentence
        or table row of its passage, or a run of them, after `normalize_text`
        (§5.R: a fragment can lift a number out of its negation).
@@ -542,7 +541,7 @@ def validate_plan(raw_claims: list[dict[str, Any]], seen: SeenSet, pool: Any, *,
                 record_ids.append(v.source)
         estimated = any(v.quantity.origin.kind == "model-estimate" for v in values)
         if not (record_ids or refs or evidence_ids or module_refs) and support != "unsupported":
-            reject(f"cites nothing and support is '{support}', not 'unsupported'")
+            reject(f"cites nothing, so its support must be 'unsupported'; it says '{support}'")
             continue
 
         classes = [pool.record(r).get("provenance", "unverified") for r in record_ids]
@@ -1133,7 +1132,7 @@ def anchor_candidate(
     `sections` are the document's passages in the kit. The record fields and
     the unit tables come from `schema/` through `units`.
 
-    A candidate that anchors may still lose a field (OF-BLD-014 §2.1): a
+    A candidate that anchors may still lose a field: a
     carbon source whose words are not in the cited section, or carry a number,
     is dropped and the candidate kept. Each drop is appended to `field_drops`
     as (reason, detail) when the caller passes a list to count them in.

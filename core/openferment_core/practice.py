@@ -1,5 +1,5 @@
 """Practice — scenarios drafted from the bench, and a tutor that questions the
-trainee's reasoning (OF-BLD-013 §4.1, §4.2).
+trainee's reasoning.
 
 The model drafts a short situation from the steps that need a skill, the
 protocol's materials, and what was recorded at those steps in real runs. The

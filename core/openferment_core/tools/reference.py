@@ -175,7 +175,7 @@ def _module_reads() -> list[str]:
 
 
 def _gates() -> list[str]:
-    rows = ["## The gates (OF-BLD-015 §7.4)", "",
+    rows = ["## The gates", "",
             "A write tool whose module and action a gate names writes nothing: the call becomes a proposal with "
             "`state: proposed`, and Home shows it with the one button a person presses "
             "(`core/openferment_core/tools/gates.py`).", "",

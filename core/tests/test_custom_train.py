@@ -200,7 +200,7 @@ def test_a_part_of_another_tool_not_on_file_or_damaged_is_refused_in_words(parts
     from standins import plant_damaged
 
     plant_damaged("b" * 16)
-    with pytest.raises(proforma.ScenarioRefused, match="the train run, artifact bbbbbbbbbbbbbbbb is damaged on disk"):
+    with pytest.raises(proforma.ScenarioRefused, match="the train run, artifact bbbbbbbbbbbbbbbb is damaged in its row"):
         composite.parts_of(parts.vessel, "b" * 16)
 
 

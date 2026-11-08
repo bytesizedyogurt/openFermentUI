@@ -1,4 +1,4 @@
-"""The day's spend on models, by role, and the daily cap (OF-BLD-014 §3.3, E.7).
+"""The day's spend on models, by role, and the daily cap.
 
 `llm.py` charges every response here, and asks before every call whether the
 call could pass `OPENFERMENT_DAILY_BUDGET_USD`. The day is the UTC day; a new

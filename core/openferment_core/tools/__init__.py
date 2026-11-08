@@ -1,4 +1,4 @@
-"""One tool registry, three callers (OF-BLD-014 §3.4, E.6).
+"""One tool registry, three callers.
 
 Postdoc's loop, the HTTP endpoints (`GET /api/tools`, `POST /api/tools/{name}`)
 and the MCP server all run a tool through `run`, so a rule enforced here is
@@ -7,14 +7,13 @@ enforced for every caller.
 The whitelist is closed, added phase by phase: `search_records` and
 `convert_units` (OF-BLD-014 Phase 3), `search_passages` (5), `yield_ceiling`
 (6), `growth_forecast` (7), `selling_price` (8), `draft_runbook` (9); then one
-read tool per module (OF-BLD-015 §7.2), written `<module>_read` because the
+read tool per module, written `<module>_read` because the
 Messages API refuses a dot in a tool name, and its write pair (§7.3); then
-`thermo_props` (OF-BLD-019 §4.2), a read offered loose; then Proforma's two
-(OF-BLD-019 §6.1): `run_flowsheet`, a free write through `proforma.run`, and
-`stream_table`, a read of a kept run's streams; then fermOS's two (OF-BLD-020):
+`thermo_props`, a read offered loose; then Proforma's two: `run_flowsheet`, a free write through `proforma.run`, and
+`stream_table`, a read of a kept run's streams; then fermOS's two:
 `fermos_simulate` (§3.4), a free write through `fermos.simulate`, and
 `fermos_vessel` (§4.2), a free write through `fermos_write`'s `design_vessel`;
-then pureOS's `pureos_build` (OF-BLD-020 §5.4), a free write through
+then pureOS's `pureos_build`, a free write through
 `pureos_write`'s train actions that builds and runs a train from unit type
 names and record ids; then `pureos_propose` (§7.2), a read: a train proposed
 by written rules, each naming the property it read; then the study tools of

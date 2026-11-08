@@ -60,6 +60,14 @@ PRICE_WORDS = {
 }
 
 
+# The unit of a price number the run's own block leaves blank: an internal
+# rate of return is a share a year, written as a fraction, so a claim citing
+# it carries a unit beside its USD/kg neighbours. The run's output is kept as
+# it was kept (its blank unit is part of its output hash); its evidence names
+# the unit.
+BLANK_UNITS = {"IRR": "fraction"}
+
+
 def _number(x: Any) -> bool:
     return isinstance(x, (int, float)) and not isinstance(x, bool)
 
@@ -78,7 +86,8 @@ def run_evidence(report: RunReport) -> list[Evidence]:
     for key, unit in (price.get("units") or {}).items():
         if _number(price.get(key)):
             out.append(Evidence(id=f"{art.id}:price.{key}", label=f"{name}: {PRICE_WORDS.get(key, key)}",
-                                value=price[key], unit=unit, provenance=art.provenance, basis=basis))
+                                value=price[key], unit=unit or BLANK_UNITS.get(key, ""), provenance=art.provenance,
+                                basis=basis))
     units = art.output.get("outputUnits") or {}
     for key, value in (art.output.get("outputs") or {}).items():
         if _number(value) or isinstance(value, str):

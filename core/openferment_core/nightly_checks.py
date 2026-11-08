@@ -1,4 +1,4 @@
-"""What the nightly job checks after intake (OF-BLD-014 §10.2): every
+"""What the nightly job checks after intake: every
 fetched model file against its pinned hash, and the ten newest artifacts of
 each project replayed against what was kept. A replay holds when it is
 identical, or when every number lies within the precision its basis states

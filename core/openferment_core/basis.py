@@ -1,4 +1,4 @@
-"""The provenance of a computed value (OF-BLD-014 §3.1, E.4).
+"""The provenance of a computed value.
 
 A computed value is a deterministic calculation whose every input names a
 source. Its provenance follows from those sources and from nothing else: no
@@ -45,16 +45,14 @@ from .models import (READING_REF, BasisSource, ComputedBasis, EngineInput, Origi
 # The sources whatever rests on is `assumed`: a named person's value and a
 # model's estimate.
 ASSUMED_KINDS = ("assumption", "model-estimate")
-# The source kinds of a value a run sets, as its basis names them: a named
-# person's assumption, a model's estimate and a deposition, of which the one
-# a run sets is a reading (a measurement, `measurement_source`); a deposition
-# naming a whole series is the record a kinetic fit rests on. Every reader of
-# "a value this run set" asks `is_set`, which holds a deposition to being a
-# reading: the values a library run hands its worker, its regression gate and
-# its SFF file, a run's parameters, the comparisons and the tools' words. A
-# record, an artifact, a library default and a convention are bound by the
-# module that runs.
-SET_KINDS = (*ASSUMED_KINDS, "deposition")
+# A value a run sets is, as its basis names it, a named person's assumption,
+# a model's estimate or a deposition's reading (a measurement,
+# `measurement_source`); a deposition naming a whole series is the record a
+# kinetic fit rests on. Every reader of "a value this run set" asks `is_set`,
+# which holds a deposition to being a reading: the values a library run hands
+# its worker, its regression gate and its SFF file, a run's parameters, the
+# comparisons and the tools' words. A record, an artifact, a library default
+# and a convention are bound by the module that runs.
 # The same three as an Origin and an Override name them (ADR-006) ...
 SET_ORIGINS = ("person-assumption", "model-estimate", "measurement")
 # ... and as a parameter's value names where it came from (ParamOrigin).
@@ -79,7 +77,7 @@ def _provenance_of(item: Any) -> str:
 
 def assumption_source(by: str, at: str, note: str | None = None) -> BasisSource:
     """The source of a value a named person typed: a Proforma assumption, or
-    an `Override` from the parameter panel (OF-BLD-020 D3). Its kind is
+    an `Override` from the parameter panel. Its kind is
     `assumption`, the person is `by`, and `note` says the day it was typed and
     what it rests on, so the basis names both and `basis_provenance` makes
     whatever rests on it `assumed`."""
@@ -205,7 +203,7 @@ def is_measurement(source: BasisSource) -> bool:
 
 
 def is_set(source: BasisSource) -> bool:
-    """Whether a basis source is a value a run set (SET_KINDS): a person's
+    """Whether a basis source is a value a run set: a person's
     assumption, a model's estimate, or a deposition's reading
     (`is_measurement`)."""
     return source.kind in ASSUMED_KINDS or is_measurement(source)

@@ -1,5 +1,4 @@
-"""Checks — proposed by fixed rules, scheduled and run by an assessor
-(OF-BLD-013 §5.2).
+"""Checks — proposed by fixed rules, scheduled and run by an assessor.
 
 `rank_pairs` and `propose` mirror src/engine/checks.ts, which is the
 reference; the competence fixture holds the two together
@@ -37,8 +36,7 @@ Running a check writes one witnessed entry per skill through Guild
 assessor's own words as its raw: passed when every criterion of that skill
 was met. The entries are asked against one ledger and written in the same
 transaction that closes the check, so a run lands whole or not at all; an
-entry naming a check as its source is taken from nowhere else (OF-BLD-013
-§5.5).
+entry naming a check as its source is taken from nowhere else.
 
 The nightly job is a second process; the lock is the database's, so it holds
 across processes as well as threads. The nightly commands act in the project

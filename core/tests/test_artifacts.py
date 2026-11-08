@@ -174,7 +174,7 @@ def test_all_artifacts_skips_a_damaged_row_and_lists_newest_first():
 
 def test_a_damaged_row_is_refused_in_words_naming_it():
     plant_damaged("0" * 16)
-    with pytest.raises(artifacts.ArtifactDamaged, match=f"artifact {'0' * 16} is damaged on disk"):
+    with pytest.raises(artifacts.ArtifactDamaged, match=f"artifact {'0' * 16} is damaged in its row"):
         artifacts.get("0" * 16)
 
 

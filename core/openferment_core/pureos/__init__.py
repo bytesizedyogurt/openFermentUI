@@ -1,4 +1,4 @@
-"""pureOS reads the train a flowsheet ran (OF-BLD-019 §4.1, D1).
+"""pureOS reads the train a flowsheet ran.
 
 Proforma's run is one `proforma.run` artifact holding the base case's stream
 and unit tables (`proforma.tables_of`). pureOS reads that same artifact unit
@@ -36,7 +36,7 @@ run carries one; else the one scenario the project keeps
 (`proforma.held_scenarios`) whose `modelId` is the run's flowsheet.
 A run no scenario claims is a train known by its artifact id.
 
-THE PACKAGE (OF-BLD-020 §5.1). This module was pureos.py; it became the
+THE PACKAGE. This module was pureos.py; it became the
 package so the train's pieces live beside it. `pureos.catalogue` is the unit
 catalogue (data, served without BioSTEAM; the functions that read a class's
 defaults import BioSTEAM inside themselves and run in the Proforma worker),
@@ -44,7 +44,7 @@ and `pureos.inhouse` holds the three `bst.Unit` subclasses BioSTEAM lacks,
 imported by the worker alone. This module imports the in-house units never,
 and the catalogue only through `pureos.train_spec` (data: no BioSTEAM).
 
-A TRAIN RUN IS READ AS A RUN IS (OF-BLD-020 §5.2). `pureos.train_spec` holds the
+A TRAIN RUN IS READ AS A RUN IS. `pureos.train_spec` holds the
 train as data (`validate`, `inlet_stream`, `run_train`, re-exported here):
 one `pureos.train_run` artifact keeps the tables as `proforma.tables_of`
 reads them, so `train_of` reads a train run as it reads a Proforma run, by
@@ -54,7 +54,7 @@ outlet (`productStream`). `trains()` and `train()` list and open train runs
 beside Proforma's: a train run is known by its train's id (its newest run
 read), or by its artifact id.
 
-A TRAIN PROPOSED BY RULES (OF-BLD-020 §7.2, D12). `pureos.proposer` reads a
+A TRAIN PROPOSED BY RULES. `pureos.proposer` reads a
 product's class and the properties its class's rule splits on (thermosteam's
 volatility, ProtParam on its sequence, where the products catalogue holds one)
 and proposes a `TrainSpec` with every parameter at its library default or
@@ -69,7 +69,11 @@ from ..models import Artifact, ProformaTables, StreamRow, Train, TrainSummary, T
 RUN = "proforma.run"
 # A pureOS train run (OF-BLD-020 §5.2), read as a run is.
 TRAIN_RUN = "pureos.train_run"
-TABLE_RUNS = (RUN, TRAIN_RUN)
+# A library plant's run (engine/library.py): its tables hold the same keys as
+# a Proforma run's (`proforma.tables_of`), and its runs row names the study
+# scenario that asked for it.
+LIBRARY_RUN = "library.run"
+TABLE_RUNS = (RUN, TRAIN_RUN, LIBRARY_RUN)
 # kg/hr: a flow at or below this carries nothing.
 EPS = 1e-9
 # A share of the product entering a unit below which what does not leave it
@@ -221,15 +225,35 @@ def _train_product(art: Artifact, t: ProformaTables) -> tuple[str | None, str | 
                              "the last unit's onward outlet")
 
 
+def library_scenarios(kept: Iterable[Artifact]) -> dict[str, tuple[str | None, str | None]]:
+    """Each library run's study scenario and its title, by the run's id, as
+    the project's runs rows and studies keep them; a run no scenario asked
+    for names none. Read only when a library run is among `kept`, and empty
+    where the project's rows cannot be read."""
+    ids = {a.id for a in kept if a.tool == LIBRARY_RUN}
+    if not ids:
+        return {}
+    try:
+        from ..engine import runs as _runs_rows
+        from ..studies import scenarios as _studies
+
+        titles = {sc.id: sc.title for sc in _studies.listed()}
+        return {r.id: (r.scenarioId, titles.get(r.scenarioId) if r.scenarioId else None)
+                for r in _runs_rows.listed() if r.id in ids}
+    except Exception:  # noqa: BLE001 — no project rows to read: each library run stands as its own train
+        return {}
+
+
 def train_of(art: Artifact, *, scenarios: Iterable[dict[str, Any]] | None = None, provenance: str | None = None,
-             runs: int = 1) -> Train:
+             runs: int = 1, named: dict[str, tuple[str | None, str | None]] | None = None) -> Train:
     """One run's train, read from its stream and unit tables alone: a
-    Proforma run's, or a pureOS train run's (OF-BLD-020 §5.2)."""
+    Proforma run's, a library plant's run (its study scenario from `named`,
+    `library_scenarios`), or a pureOS train run's."""
     from .. import proforma
 
     if art.tool not in TABLE_RUNS:
-        raise TrainNotFound(f"artifact {art.id} is a {art.tool} artifact, not a Proforma run or a train run; a train is "
-                            "read from a run")
+        raise TrainNotFound(f"artifact {art.id} is a {art.tool} artifact; a train is read from a Proforma run, a "
+                            "library plant's run or a train run")
     t = proforma.tables_of(art)
     train_id = train_name = None
     if art.tool == TRAIN_RUN:
@@ -242,6 +266,11 @@ def train_of(art: Artifact, *, scenarios: Iterable[dict[str, Any]] | None = None
         spec = (art.output or {}).get("train") or {}
         train_id, train_name = spec.get("id"), spec.get("name")
         program = _train.program_of_run(art)
+    elif art.tool == LIBRARY_RUN:
+        sid, sname = (named or {}).get(art.id, (None, None))
+        infeasible = None
+        stream_id, product, how = product_of(t)
+        program = None
     else:
         scenarios = list(held_scenarios() if scenarios is None else scenarios)
         sid, sname = scenario_of(art, scenarios)
@@ -249,7 +278,7 @@ def train_of(art: Artifact, *, scenarios: Iterable[dict[str, Any]] | None = None
         no_tea = (f"the base case could not run ({infeasible}), so the run kept no tables, names no product and reads "
                   "no recovery" if infeasible else
                   None if _kept_tables(art) else
-                  "this run was kept before runs carried their tables (OF-BLD-019 §2.1), so it names no product here "
+                  "this run was kept before runs carried their tables, so it names no product here "
                   "and reads no recovery")
         stream_id, product, how = product_of(t, no_tea=no_tea)
         program = program_of(art, sid, scenarios)
@@ -318,7 +347,7 @@ def train_of(art: Artifact, *, scenarios: Iterable[dict[str, Any]] | None = None
         note = (f"the base case could not run ({infeasible}), so the run kept no tables and no train is read; change "
                 "the inputs it cannot hold in Proforma and run it again")
     elif not t.units:
-        note = ("this run was kept before runs carried their tables (OF-BLD-019 §2.1); run the scenario again in "
+        note = ("this run was kept before runs carried their tables; run the scenario again in "
                 "Proforma and its train reads here" if not _kept_tables(art) else "this run kept no unit table")
     elif product and not any(u.onPath for u in units):
         note = f"no unit's outlet leads to {stream_id}, so no recovery is read"
@@ -354,14 +383,18 @@ class _Marks:
         return basis_provenance(basis_of(art), records or {}, self.kept if "artifact" in kinds else {})
 
 
-def _runs(arts: Iterable[Artifact], scenarios: list[dict[str, Any]]) -> dict[str, list[Artifact]]:
+def _runs(arts: Iterable[Artifact], scenarios: list[dict[str, Any]],
+          named: dict[str, tuple[str | None, str | None]] | None = None) -> dict[str, list[Artifact]]:
     """The runs on file by the key a train is known by: a Proforma run's
-    scenario, else its own id; a train run's train id (OF-BLD-020 §5.2), else
-    its own id; newest first."""
+    scenario, else its own id; a library run's study scenario (`named`), else
+    its own id; a train run's train id, else its own id;
+    newest first."""
     out: dict[str, list[Artifact]] = {}
     for a in arts:
         if a.tool == RUN:
             sid, _ = scenario_of(a, scenarios)
+        elif a.tool == LIBRARY_RUN:
+            sid = (named or {}).get(a.id, (None, None))[0]
         elif a.tool == TRAIN_RUN:
             spec = (a.output or {}).get("train") if isinstance(a.output, dict) else None
             sid = spec.get("id") if isinstance(spec, dict) else None
@@ -383,9 +416,10 @@ def trains(*, arts: Iterable[Artifact] | None = None,
     scenarios = list(held_scenarios() if scenarios is None else scenarios)
     kept = list(artifacts.all_artifacts() if arts is None else arts)
     mark = _Marks(kept, records_by_id)
+    named = library_scenarios(kept)
     out = []
-    for runs in _runs(kept, scenarios).values():
-        tr = train_of(runs[0], scenarios=scenarios, provenance=mark(runs[0]), runs=len(runs))
+    for runs in _runs(kept, scenarios, named).values():
+        tr = train_of(runs[0], scenarios=scenarios, provenance=mark(runs[0]), runs=len(runs), named=named)
         out.append(tr)
     return sorted(out, key=lambda tr: tr.createdAt, reverse=True)
 
@@ -407,20 +441,21 @@ def train(key: str, *, arts: Iterable[Artifact] | None = None, scenarios: Iterab
     scenarios = list(held_scenarios() if scenarios is None else scenarios)
     kept = list(artifacts.all_artifacts() if arts is None else arts)
     mark = _Marks(kept, records_by_id)
-    runs = _runs(kept, scenarios)
+    named = library_scenarios(kept)
+    runs = _runs(kept, scenarios, named)
     if key in runs:
         a = runs[key][0]
-        return train_of(a, scenarios=scenarios, provenance=mark(a), runs=len(runs[key]))
+        return train_of(a, scenarios=scenarios, provenance=mark(a), runs=len(runs[key]), named=named)
     for group in runs.values():
         for a in group:
             if a.id == key:
-                return train_of(a, scenarios=scenarios, provenance=mark(a), runs=1)
+                return train_of(a, scenarios=scenarios, provenance=mark(a), runs=1, named=named)
     other = next((a for a in kept if a.id == key), None)
     if other is not None:
-        raise TrainNotFound(f"artifact {key} is a {other.tool} artifact, not a Proforma run or a train run; a train is "
-                            "read from a run")
-    raise TrainNotFound(f"no Proforma run of {key} is on file here: run the scenario in Proforma, and pureOS reads its "
-                        "train from that run; a train built in pureOS is read by its id once it has run")
+        raise TrainNotFound(f"artifact {key} is a {other.tool} artifact; a train is read from a Proforma run, a library "
+                            "plant's run or a train run")
+    raise TrainNotFound(f"no run of {key} is on file here: run the scenario from Studies or Proforma, and pureOS reads "
+                        "its train from that run; a train built in pureOS is read by its id once it has run")
 
 
 # OF-BLD-020 §5.2: the train as data, re-exported (pureos.train_spec imports this

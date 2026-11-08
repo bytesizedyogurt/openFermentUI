@@ -17,8 +17,7 @@ export interface paths {
         put?: never;
         /**
          * Ask
-         * @description One question in, one AnswerPlan out: the bounded loop of tools
-         *     (OF-BLD-014 §5.2), kept as a turn of its conversation.
+         * @description One question in, one AnswerPlan out: the bounded loop of tools, kept as a turn of its conversation.
          *
          *     Every failure below returns a plan with `declined` set rather than an HTTP
          *     error, because a declined plan is a thing the UI already knows how to
@@ -44,7 +43,7 @@ export interface paths {
         put?: never;
         /**
          * Ask Stream
-         * @description The loop's steps as they complete (OF-BLD-014 §5.3), as server-sent
+         * @description The loop's steps as they complete, as server-sent
          *     events: `turn` (the conversation and the turn the service keeps the
          *     question as), each `step` (a TraceStep), then `plan` (the validated
          *     AnswerPlan), or `error` when the service itself failed. A declined plan
@@ -218,7 +217,7 @@ export interface paths {
         put?: never;
         /**
          * Biorepo Check
-         * @description Would `biorepo.write` keep this decision? (OF-BLD-012.1 F1.5)
+         * @description Would `biorepo.write` keep this decision?
          *
          *     Every rule of §2.3 runs; nothing is written. A refusal is an ANSWER, not
          *     an error, so it comes back 200 with the rule and the reason — the browser
@@ -521,13 +520,13 @@ export interface paths {
         /**
          * Fermos Bind
          * @description A family's parameters bound for a strain, product and sugar
-         *     (`FermosBinding`, OF-BLD-020 §3.2, D6): each from the fit a person chose
+         *     (`FermosBinding`): each from the fit a person chose
          *     (`?fit=`), the records of the evidence pool through the aggregate gate, a kept simulation (`?startFrom=simulation:<id>`), or the
          *     spec's convention, with its source; what waits, each named with the field
          *     that would bind it; and notes saying what bound from where. `?inputs=`
          *     (a JSON list of the values a person sets on `fermos:family:<family>`,
          *     each a typed quantity with its origin, as the simulation would carry
-         *     them; OF-BLD-020 §3.3, alpha 2.2 D2) lays them on, so `waiting` is what
+         *     them; alpha 2.2 D2) lays them on, so `waiting` is what
          *     Simulate would refuse for. Starts no integration and keeps nothing. 404
          *     for a family no one declared; 422 in words for a fit or simulation not
          *     on file, a fit of another family, a sugar or id that is not one, or a
@@ -614,9 +613,8 @@ export interface paths {
         /**
          * Fermos Fits
          * @description The kinetic fits, forecasts and simulations fermOS keeps (a
-         *     simulation since OF-BLD-020 §3.3), newest first, each with what it can
-         *     feed a shelf flowsheet's titre, yield and productivity and why not
-         *     (OF-BLD-019 §5.1, D10). A person picks one on the scenario page;
+         *     simulation among them), newest first, each with what it can
+         *     feed a shelf flowsheet's titre, yield and productivity and why not. A person picks one on the scenario page;
          *     a read: it keeps nothing. A flowsheet a scenario cannot run is a 422.
          */
         get: operations["fermos_fits_api_fermos_fits_get"];
@@ -663,13 +661,12 @@ export interface paths {
         };
         /**
          * Fermos Harvest
-         * @description A kept simulation's broth at an hour (`FermosHarvest`, OF-BLD-020
-         *     §6.2, D10): its own harvest hour, or `?hour=`, a person's (the hour the
+         * @description A kept simulation's broth at an hour (`FermosHarvest`): its own harvest hour, or `?hour=`, a person's (the hour the
          *     Builder's inlet scope holds under their name; a model never sends one),
          *     read from the series the artifact keeps, each state with its unit, the
          *     hour's source and how it was read. A read: nothing is integrated again
          *     and nothing is kept. 404 for a simulation not on file, 409 for one
-         *     damaged on disk, 422 in words for an hour outside the simulated span, a
+         *     damaged in its row, 422 in words for an hour outside the simulated span, a
          *     simulation that keeps no product in the broth, and another artifact.
          */
         get: operations["fermos_harvest_api_fermos_harvest_get"];
@@ -747,7 +744,7 @@ export interface paths {
          *     in words for a design that cannot be made as asked (no plant scale and no
          *     batch volume, a fit asked for an aerobic design, an artifact not on file,
          *     a value set that cannot stand, BioSTEAM's own refusal); 409 for a file
-         *     damaged on disk; 503 when the worker cannot answer.
+         *     damaged in its row; 503 when the worker cannot answer.
          */
         post: operations["fermos_vessel_api_fermos_vessel_post"];
         delete?: never;
@@ -1633,10 +1630,9 @@ export interface paths {
          *     bind as `/api/proforma/bind` does. Binding only: it starts no worker,
          *     integrates nothing and keeps nothing. `fermos:vessel:<id>` (with
          *     `?vesselType=`) reads its class's defaults through the Proforma worker,
-         *     which a read starts when it is cold (OF-BLD-020 §4.1). `fermos:family:<id>`
+         *     which a read starts when it is cold. `fermos:family:<id>`
          *     binds as GET /api/fermos/bind does, from `?strain=`, `?product=`,
-         *     `?sugar=`, `?fit=`, `?startFrom=` and `?durationPreset=` (OF-BLD-020
-         *     §3.2). `pureos:unit:<train>:<unit>` takes
+         *     `?sugar=`, `?fit=`, `?startFrom=` and `?durationPreset=`. `pureos:unit:<train>:<unit>` takes
          *     the unit's catalogue type as `?unitType=` and reads its class's defaults
          *     through the Proforma worker as the vessel's do (§5.1); with no type it is
          *     a 404 in words. With `?train=` (the whole TrainSpec, JSON, §5.2) the unit is
@@ -1644,10 +1640,10 @@ export interface paths {
          *     chemicals and its records bound from the evidence pool by each parameter's field, and
          *     `pureos:unit:<train>:inlet` is the train's inlet. A `proforma:` scope on
          *     `custom_train_v1` names its vessel design and train run (`?vessel=`,
-         *     `?trainRun=`; OF-BLD-020 §6.1) and serves the group Finance, read from
+         *     `?trainRun=`) and serves the group Finance, read from
          *     the installed package with no worker. 404 for a scope no provider here
          *     knows; 422 in words for a malformed one or a refused binding; 409 for an
-         *     artifact the scope names that is damaged on disk, as the vessel's own route
+         *     artifact the scope names that is damaged in its row, as the vessel's own route
          *     answers it (§2.R, finding 17); 503 when the worker cannot answer.
          */
         get: operations["params_scope_api_params__scope__get"];
@@ -1776,13 +1772,13 @@ export interface paths {
         /**
          * Proforma Bind
          * @description A shelf flowsheet's inputs bound, as a scenario not yet saved to the
-         *     project shows them (OF-BLD-019 §2.3, D6), id and name empty; `?fits=`
+         *     project shows them, id and name empty; `?fits=`
          *     lays on the fermOS fits a person chose (§5.1), a JSON object of input
          *     key to artifact id, and `?inputs=` the values a person sets over both
-         *     (OF-BLD-020 D3; alpha 2.2 D2), a JSON list of typed quantities, each
+         *     (alpha 2.2 D2), a JSON list of typed quantities, each
          *     converted at Proforma's door into the Override of the flowsheet's own
          *     scope, `proforma:<flowsheet id>`, as a run converts its values. A
-         *     flowsheet built from kept artifacts (`custom_train_v1`, OF-BLD-020 §6.1)
+         *     flowsheet built from kept artifacts (`custom_train_v1`)
          *     names its vessel design and its train run (`?vessel=`, `?trainRun=`).
          *     The toy, an unknown id, a fit that cannot feed its input, a value that
          *     cannot stand, or a composite's part that cannot (missing, another tool's,
@@ -1808,10 +1804,9 @@ export interface paths {
         /**
          * Proforma Ceiling Check
          * @description A scenario's fermenter yield read against the newest stored geneOS
-         *     ceiling of each shelf model of its organism, on its flowsheet's sugar
-         *     (OF-BLD-019 §5.2, D11): `CeilingCheck`. A scenario the project keeps by
+         *     ceiling of each shelf model of its organism, on its flowsheet's sugar: `CeilingCheck`. A scenario the project keeps by
          *     its id, one not yet saved by the flowsheet it names; `?fits=` and
-         *     `?inputs=` (JSON; OF-BLD-020 D3, alpha 2.2 D2: the values a person sets,
+         *     `?inputs=` (JSON; alpha 2.2 D2: the values a person sets,
          *     each a typed quantity converted at Proforma's door into the Override of
          *     the scenario's scope) bind its yield as its page binds it. A yield above
          *     a ceiling is flagged and kept as bound. A read: it keeps nothing, starts
@@ -1839,7 +1834,7 @@ export interface paths {
         /**
          * Proforma Run
          * @description Run a scenario the project keeps by its id, or one not yet saved by
-         *     the shelf flowsheet it names (OF-BLD-019 §2.3, d), with the values a
+         *     the shelf flowsheet it names (d), with the values a
          *     person or a model sets as typed inputs, and keep it as one run of the
          *     biosteam engine (GET /api/runs/{id}, its id the artifact's) with its SFF
          *     file: 422 in words for any other case, listing every input waiting for a
@@ -1862,7 +1857,7 @@ export interface paths {
         };
         /**
          * Proforma Runs
-         * @description A scenario's newest run on this service (OF-BLD-019 §3.R): the newest
+         * @description A scenario's newest run on this service: the newest
          *     stored `proforma.run` whose basis names the scenario (`latest_run`, the
          *     one pureOS and selling_price read), or none. A read: it runs nothing and
          *     starts no simulator. The scenario is named by id, and a link opens what
@@ -1887,7 +1882,7 @@ export interface paths {
         /**
          * Proforma Scenarios
          * @description Every BioSTEAM scenario the project keeps, with its inputs bound to
-         *     records (§8.3; OF-BLD-019 §2.3; alpha 2.2 D9): a scenario on
+         *     records (§8.3; alpha 2.2 D9): a scenario on
          *     custom_train_v1 binds with the vessel design and the train run it names,
          *     and one whose binding is refused is listed with the words (`refused`).
          *     A read: it starts no simulator.
@@ -1910,7 +1905,7 @@ export interface paths {
         };
         /**
          * Proforma Shelf
-         * @description The shelf of flowsheets (OF-BLD-019 §2.1, D2): pure data, read with no
+         * @description The shelf of flowsheets: pure data, read with no
          *     simulator.
          */
         get: operations["proforma_shelf_api_proforma_shelf_get"];
@@ -2134,7 +2129,7 @@ export interface paths {
          *     `protparam` artifact computed here or returned as stored. 404 for a
          *     product with no sequence (the words say the entry carries none) or no
          *     such product; 422 for a sequence ProtParam cannot read, in words naming
-         *     each letter and its positions; 409 for an answer damaged on disk.
+         *     each letter and its positions; 409 for an answer damaged in its row.
          */
         post: operations["protparam_compute_api_protparam_post"];
         delete?: never;
@@ -2211,7 +2206,7 @@ export interface paths {
          *     product neither the products catalogue nor thermo.CHEMICALS holds; 422 in
          *     words for a refusal (an unknown host, an inlet that is not one, a sequence
          *     ProtParam cannot read, a chemical the library lacks); 409 for a property
-         *     answer damaged on disk; 503 when the worker cannot answer a volatility
+         *     answer damaged in its row; 503 when the worker cannot answer a volatility
          *     question.
          */
         post: operations["pureos_propose_api_pureos_propose_post"];
@@ -2230,8 +2225,7 @@ export interface paths {
         };
         /**
          * Pureos Train Runs
-         * @description Every kept pureOS train run (`TrainSummary`), newest first (OF-BLD-020
-         *     §5.2). A read: it starts no simulator.
+         * @description Every kept pureOS train run (`TrainSummary`), newest first. A read: it starts no simulator.
          */
         get: operations["pureos_train_runs_api_pureos_train_runs_get"];
         put?: never;
@@ -2257,11 +2251,10 @@ export interface paths {
          *     words, each by the place it belongs to (`TrainValidation`: a unit's id,
          *     `inlet`, or `train`): an input that names no place or no parameter, a
          *     key set twice, a value its parameter cannot take, then the validation's
-         *     refusals, a value that waits naming what would bind it, a unit's needs
-         *     (OF-BLD-020 §5.3). Runs no
+         *     refusals, a value that waits naming what would bind it, a unit's needs. Runs no
          *     train and keeps nothing; it reads what the scopes read (the program's
          *     chemicals, each class's defaults), which a cold worker starts for. 409 for
-         *     an artifact the train names that is damaged on disk; 503 when the worker
+         *     an artifact the train names that is damaged in its row; 503 when the worker
          *     cannot answer.
          */
         post: operations["pureos_train_check_api_pureos_train_check_post"];
@@ -2282,14 +2275,13 @@ export interface paths {
         put?: never;
         /**
          * Pureos Train From Run
-         * @description A kept run's units read into a train (`TrainFromRun`, OF-BLD-020
-         *     §5.3): every unit on the product's path whose class is a catalogue
+         * @description A kept run's units read into a train (`TrainFromRun`): every unit on the product's path whose class is a catalogue
          *     type, in run order, its outlets routed as the run routed them, its values
          *     read from the package's own unit when the run is of a shelf flowsheet;
          *     the units it does not take and why; the train's structural refusals.
          *     Keeps nothing and starts no simulator. 404 for an artifact not on file;
          *     422 in words for one that is no run or that no train is read from; 409
-         *     for one damaged on disk.
+         *     for one damaged in its row.
          */
         post: operations["pureos_train_from_run_api_pureos_train_from_run_post"];
         delete?: never;
@@ -2321,8 +2313,8 @@ export interface paths {
          *     take, the validation's, a value that waits naming what would bind it, a
          *     unit's needs, and, kept as a receipt the same request is answered from, a
          *     unit that does not converge, with BioSTEAM's words); 409 for an artifact
-         *     the train names that is damaged on disk; 503 when the worker cannot
-         *     answer (OF-BLD-020 §5.2).
+         *     the train names that is damaged in its row; 503 when the worker cannot
+         *     answer.
          */
         post: operations["pureos_train_run_api_pureos_train_run_post"];
         delete?: never;
@@ -2345,7 +2337,7 @@ export interface paths {
          * @description Every refusal of a train at once, in words (`TrainValidation`): a type
          *     not in the catalogue, an outlet its type does not have, a recycle that is
          *     not to an earlier unit, a key its unit does not declare, no unit, two
-         *     outlets on, a duplicate id. Runs nothing (OF-BLD-020 §5.2, D9).
+         *     outlets on, a duplicate id. Runs nothing.
          */
         post: operations["pureos_train_validate_api_pureos_train_validate_post"];
         delete?: never;
@@ -2364,7 +2356,7 @@ export interface paths {
         /**
          * Pureos Train
          * @description One train: the newest run of the scenario `key` names, the newest run
-         *     of the pureOS train it names (OF-BLD-020 §5.2), or the run whose artifact
+         *     of the pureOS train it names, or the run whose artifact
          *     id it is. 404 says how a run gets there; a deep link opens what it
          *     names.
          */
@@ -2410,7 +2402,7 @@ export interface paths {
          * Pureos Trains Kept
          * @description The trains a model built with `pureos_build` or `pureos_write`
          *     (`KeptTrain`: the train as data, `madeBy` the model, `at` and
-         *     `updatedAt`), the most recently changed first (OF-BLD-020 §5.4). A
+         *     `updatedAt`), the most recently changed first. A
          *     person's trains are the project's rows (`GET /api/state`). A read: it
          *     writes nothing and starts no simulator.
          */
@@ -2736,7 +2728,7 @@ export interface paths {
          *     `thermo_props` artifact, computed in the Proforma worker or returned as
          *     stored, beside what it holds, read as `ThermoProps`. 404 for a run,
          *     stream or record not on file; 409 for a run or an answer whose file is
-         *     damaged on disk; 422 for a question that cannot be asked, a chemical the
+         *     damaged in its row; 422 for a question that cannot be asked, a chemical the
          *     library lacks among them, in words; 503 when the worker cannot answer.
          */
         post: operations["thermo_props_api_thermo_props_post"];
@@ -2768,7 +2760,7 @@ export interface paths {
          *     equilibrium gives the pair a minimum-boiling azeotrope, one `volatility`
          *     artifact computed in the Proforma worker or returned as stored. 404 for a
          *     product that names no chemical of the library here; 422 for a chemical
-         *     the library lacks, in words naming it; 409 for an answer damaged on disk;
+         *     the library lacks, in words naming it; 409 for an answer damaged in its row;
          *     503 when the worker cannot answer.
          */
         post: operations["thermo_volatility_api_thermo_volatility_post"];
@@ -3880,7 +3872,7 @@ export interface components {
         };
         /**
          * DecisionCheck
-         * @description What `POST /api/biorepo/check` answers (OF-BLD-012.1 F1.5): whether
+         * @description What `POST /api/biorepo/check` answers: whether
          *     `biorepo.write` would store this decision, and the rule it would refuse
          *     it under, with why (both null when it would store it). The browser asks
          *     before the reviewer presses the key, so the screen says what the service
@@ -4535,7 +4527,7 @@ export interface components {
         };
         /**
          * FermosBinding
-         * @description GET /api/fermos/bind (OF-BLD-020 §3.2): a family's parameters bound
+         * @description GET /api/fermos/bind: a family's parameters bound
          *     for a strain, product and sugar from a fit, the records, a kept
          *     simulation and the conventions, starting no integration.
          */
@@ -5062,7 +5054,7 @@ export interface components {
         };
         /**
          * GuildPolicy
-         * @description The lead's choices for the team (OF-BLD-013 §5.1). In advise mode the
+         * @description The lead's choices for the team. In advise mode the
          *     run-mode gate warns and records a deviation; in enforce mode it holds the
          *     step until a cosigner is recorded, or someone qualified takes over. Set
          *     per criticality: a routine skill and a critical one can differ.
@@ -5199,8 +5191,7 @@ export interface components {
         /**
          * KineticFit
          * @description Logistic growth, Luedeking–Piret production and the substrate balance
-         *     (`logistic_v0`), or a kinetics family fitted to the same series
-         *     (OF-BLD-020 §3.1).
+         *     (`logistic_v0`), or a kinetics family fitted to the same series.
          */
         KineticFit: {
             /** Covariance */
@@ -5733,7 +5724,7 @@ export interface components {
         };
         /**
          * ModuleRow
-         * @description One row a module's read tool returns (OF-BLD-015 §7.2): what the
+         * @description One row a module's read tool returns: what the
          *     module holds, where it stands, and how it is marked.
          */
         ModuleRow: {
@@ -5807,7 +5798,7 @@ export interface components {
          *     values reviewers typed by `witness.py` (§6.2); `records` from the
          *     project's decisions (§7).
          *
-         *     `candidates` and `runs` are a LIST OR NULL (OF-BLD-012.1 F3). The service
+         *     `candidates` and `runs` are a LIST OR NULL. The service
          *     always sends the full list, so an empty list means the extractor produced
          *     nothing and the store drops what it had. `None` means "not supplied" and
          *     the store keeps what it had — nothing here sends it, and it exists so that
@@ -6759,7 +6750,7 @@ export interface components {
         };
         /**
          * Proposal
-         * @description What a model asked for at a gate (OF-BLD-015 §7.4), until a person
+         * @description What a model asked for at a gate, until a person
          *     carries it out or dismisses it on Home.
          */
         Proposal: {
@@ -8476,7 +8467,7 @@ export interface components {
         };
         /**
          * TraceStep
-         * @description One step of Postdoc's loop, as the browser shows it (OF-BLD-014 §5.1).
+         * @description One step of Postdoc's loop, as the browser shows it.
          */
         TraceStep: {
             /** Input */
@@ -8580,7 +8571,7 @@ export interface components {
         };
         /**
          * TrainFromRunRequest
-         * @description POST /api/pureos/train/from-run (OF-BLD-020 §5.3): a run's units read
+         * @description POST /api/pureos/train/from-run: a run's units read
          *     into a train, each by its class.
          */
         TrainFromRunRequest: {
@@ -8698,7 +8689,7 @@ export interface components {
          * TrainProposal
          * @description POST /api/pureos/propose: a train proposed by the written rules, or
          *     none, with what is missing. (Named apart from `Proposal`, a write a
-         *     model proposed at a gate, OF-BLD-015 §7.4.)
+         *     model proposed at a gate)
          */
         TrainProposal: {
             /** Artifacts */
@@ -8981,7 +8972,7 @@ export interface components {
          * TrainValidation
          * @description POST /api/pureos/train/validate: every refusal at once, in words;
          *     runs nothing. POST /api/pureos/train/check answers in the same shape
-         *     with everything the run would refuse (OF-BLD-020 §5.3).
+         *     with everything the run would refuse.
          */
         TrainValidation: {
             /** Ok */

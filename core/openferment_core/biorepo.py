@@ -1,4 +1,4 @@
-"""BioRepo — one write function for a project's review decisions (OF-BLD-012 §2.3, §7.1).
+"""BioRepo — one write function for a project's review decisions.
 
 Every review decision goes through `write(decision)`. There is no second
 path: not the API, not a script, not a test helper. A project's decisions
@@ -288,7 +288,7 @@ def write(decision: ReviewDecision, *, dry_run: bool = False) -> ReviewDecision:
 
     `dry_run` runs every rule and writes nothing — the question the browser
     asks through `POST /api/biorepo/check` before the reviewer presses the
-    key (OF-BLD-012.1 F1.5). There is still only one place the rules live;
+    key. There is still only one place the rules live;
     asking and deciding cannot drift apart because they are the same code.
     """
     reviewer = (decision.reviewer or "").strip()

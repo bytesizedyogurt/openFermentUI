@@ -1,4 +1,4 @@
-"""fermOS's model families (OF-BLD-020 §3.1, D5): code written once, each
+"""fermOS's model families: code written once, each
 integrated on scipy's `solve_ivp` and fitted on `least_squares`.
 
 A family declares its states, its parameters (`ParameterSpec`s, Appendix 2
@@ -10,7 +10,7 @@ else. No process number lives in this file: every parameter value arrives in
 own settings, each a named constant in SETTINGS with its reason, which every
 simulation's basis states as a convention. Where a record binds a parameter
 (the sugar, the strain, the product a field belongs to) is declared beside
-the specs, in CARBON_RULE, STRAIN_FREE and PRODUCT_OWN (OF-BLD-020 §3.2), and
+the specs, in CARBON_RULE, STRAIN_FREE and PRODUCT_OWN, and
 `fermos.bind_parameters` reads it.
 
 THE FAMILIES, AS D5 WRITES THEM
@@ -73,7 +73,7 @@ each as this step's choice)
 6. A steady culture is the low-S root of μ(S, P(S)) = D + kd, found by
    scanning S from 0 to Sf and refined by root-finding; with no root the
    cells wash out. Washout is decided by that scan, never by μ at the feed's
-   sugar alone (OF-BLD-020 §3.R, finding 1): a Haldane μ can rise above
+   sugar alone: a Haldane μ can rise above
    D + kd at low sugar while μ(Sf, P = 0) − kd is under D, and then the
    culture and washout are both stable, which one a run reaches set by
    where it starts (`reached`). μ(Sf, P = 0) − kd is the rate above which
@@ -98,11 +98,10 @@ each as this step's choice)
    (FitResult.why, UNIDENTIFIED): its interval reaches zero, it lies in the
    Jacobian's null space, the optimizer stopped at its budget, or the run
    has no biomass series (μmax, by rule). Every reader says the reason the
-   fit kept, never one the interval beside it contradicts (OF-BLD-020 §3.R,
-   finding 3).
+   fit kept, never one the interval beside it contradicts.
 12. Pmax gates β in every family with a product, and each family's
    equations, which fermOS → Simulate shows, write it so: β·fP with
-   fP = (1 − P/Pmax)ⁿ (OF-BLD-020 §3.R, finding 5).
+   fP = (1 − P/Pmax)ⁿ.
 """
 from __future__ import annotations
 
@@ -476,7 +475,7 @@ CARBON_RULE: dict[str, str] = {"ethanol_max_conc": "any", "substrate_inhibition_
 # over every strain whatever strain is chosen.
 STRAIN_FREE = ("medium_component_conc",)
 MEDIUM_NOTE = ("A record of medium_component_conc that names the sugar binds it, over every strain whatever strain "
-               "is chosen: the medium is the experimenter's, not the strain's (STRAIN_FREE).")
+               "is chosen: the medium belongs to the experimenter (STRAIN_FREE).")
 # Record fields one product owns (Appendix 2 §A names ethanol's): a field in
 # PRODUCT_OWN binds only for its product; another product binds its own field
 # in its place where the ontology holds one (PRODUCT_FIELDS), else none, and
@@ -527,7 +526,7 @@ def _inhibition() -> list[ParameterSpec]:
         _spec("p_max", "maximum product concentration", "Pmax", "the product concentration at which growth stops",
               "massConc", G_L, "Inhibition", ["fit", "record:ethanol_max_conc", "assumption"],
               note=("A record of ethanol_max_conc binds whatever carbon source it names, or none: the concentration "
-                    "at which the product stops growth is the product's, not the sugar's (CARBON_RULE). It is "
+                    "at which the product stops growth belongs to the product (CARBON_RULE). It is "
                     "ethanol's own field, so another product binds none (PRODUCT_FIELDS).")),
         _spec("n_inhibition", "product inhibition exponent", "n",
               "how sharply growth falls as product builds toward Pmax", "exponent", "", "Inhibition",
@@ -793,7 +792,7 @@ class Family:
         bounds and FIT_BOX of the start; the covariance pinv(JᵀJ)·s² in the
         parameters' own units and Student's t; a parameter in the
         Jacobian's null space is unidentified. With no X series μmax is
-        reported unidentified by rule (OF-BLD-018 D4), the numbers noted.
+        reported unidentified by rule, the numbers noted.
         Each unidentified key keeps why (`why`, UNIDENTIFIED's codes).
         A key in `unbounded` keeps FIT_BOX alone, not its spec's bounds: a
         yield read against a gauge is no physical yield."""
@@ -1069,8 +1068,7 @@ class ChemostatV1(Family):
 
     @staticmethod
     def _flowing(v: dict[str, Any]) -> None:
-        """A dilution rate of zero is refused in words (OF-BLD-020 §3.R,
-        finding 2): nothing flows, and the steady state would divide nothing
+        """A dilution rate of zero is refused in words: nothing flows, and the steady state would divide nothing
         by nothing."""
         if not v["dilution_rate"] > 0:
             raise FamilyRefused("a chemostat needs a dilution rate above zero: at zero nothing flows in or out, so "
@@ -1106,8 +1104,7 @@ class ChemostatV1(Family):
 
     def steady_state(self, p: dict[str, Any]) -> dict[str, Any]:
         """X, S and P where every derivative is zero: the low-S root of
-        μ(S, P(S)) = D + kd, scanned for from 0 to Sf whatever μ(Sf) says
-        (OF-BLD-020 §3.R, finding 1); with no root, washout. `bistable`: a
+        μ(S, P(S)) = D + kd, scanned for from 0 to Sf whatever μ(Sf) says; with no root, washout. `bistable`: a
         culture holds and washout is stable too (D ≥ μ(Sf, P = 0) − kd), so
         which one a run reaches depends on where it starts (`reached`)."""
         v = self._prepared(p)
@@ -1173,7 +1170,7 @@ class LightV1(Family):
 
     id = "light_v1"
     title = "Light-limited (a socket)"
-    what = "Growth limited by the light the culture receives: declared, not built; it refuses to run."
+    what = "Growth limited by the light the culture receives: declared and unbuilt; it refuses to run."
     states = ("X",)
     socket = True
 

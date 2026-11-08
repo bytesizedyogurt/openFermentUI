@@ -1,4 +1,4 @@
-"""Runbooks from a study (execution prompt §9.1 step 5; OF-BLD-006 §3).
+"""Runbooks from a study (execution prompt §9.1 step 5).
 
 A runbook commits, before a fermenter is touched, to what a run predicts and
 what the bench will measure. A study makes one from an engine run: each

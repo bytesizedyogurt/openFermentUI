@@ -329,7 +329,7 @@ def test_a_fit_of_another_products_series_is_refused_whole(standin, monkeypatch)
 
 def test_a_damaged_fit_file_refuses_what_rests_on_it_and_the_rest_still_lists(client):
     """OF-BLD-019 §5.R, finding 2: a forecast whose kinetic fit's file is
-    damaged on disk is refused in words naming the damage; every other fit
+    damaged in its row is refused in words naming the damage; every other fit
     still lists, and the endpoint answers."""
     fit = kept_fit()
     fc = fermos.forecast_run(fit_artifact=fit.kineticArtifactId, duration_h=LONG_H)
@@ -339,13 +339,13 @@ def test_a_damaged_fit_file_refuses_what_rests_on_it_and_the_rest_still_lists(cl
     plant_damaged(fit.kineticArtifactId)  # a row that no longer reads as an artifact
     listed = {i.artifactId: i for i in proforma.fermos_fits(ETHANOL)}
     assert set(listed) == {fc.artifactId, other.kineticArtifactId}
-    assert listed[fc.artifactId].refused and "is damaged on disk" in listed[fc.artifactId].refused
+    assert listed[fc.artifactId].refused and "is damaged in its row" in listed[fc.artifactId].refused
     assert listed[fc.artifactId].depositionId is None and listed[fc.artifactId].fitArtifactId == fit.kineticArtifactId
     assert listed[other.kineticArtifactId].refused is None
     r = client.get("/api/fermos/fits", params={"flowsheet": ETHANOL})
     assert r.status_code == 200 and len(r.json()) == 2
     b = client.get("/api/proforma/bind", params={"flowsheet": ETHANOL, "fits": json.dumps({"titre": fc.artifactId})})
-    assert b.status_code == 422 and "damaged on disk" in b.json()["detail"]
+    assert b.status_code == 422 and "damaged in its row" in b.json()["detail"]
 
 
 def test_the_rest_is_refused_in_words(standin):

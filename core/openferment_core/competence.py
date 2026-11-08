@@ -1,4 +1,4 @@
-"""Competence, mirrored (OF-BLD-013 §2.1).
+"""Competence, mirrored.
 
 `src/engine/competence.ts` is the reference implementation; this is its
 mirror, for the one place the service needs a level: deciding whether the
@@ -9,8 +9,7 @@ tests/test_competence.py replays here. If they disagree, the TypeScript side
 is right.
 
 Only what a rule needs is mirrored: the ladder, the lapse, the suspension,
-the effective level, and (since checks are proposed by the service at night,
-OF-BLD-013 §5.2) the confidence sort.
+the effective level, and (since checks are proposed by the service at night) the confidence sort.
 
 A SKILL WITH NO POLICY (alpha 2.2 E.8). The skills are the project's skills
 catalogue (catalogues.py, `as_skills`), and an entry there may be kept with

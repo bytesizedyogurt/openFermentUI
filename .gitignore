@@ -36,6 +36,11 @@ core/tests/fixtures/competence.json
 core/tests/fixtures/competence-unrated.json
 core/tests/fixtures/lock-digests.json
 
+# A model's response for a real paper is a paper's extracted values, and the
+# repository holds software alone (CLAUDE.md, acceptance A4): fixture-mode
+# extraction replays a response from here, and none is kept in git.
+core/tests/fixtures/extract/
+
 # What this machine fetches for itself, fetched again when gone: the genome-
 # scale models geneOS computes on (THIRD_PARTY.md gives each its source and
 # hash) and the SFF toolkit's reference flowsheets, checked against

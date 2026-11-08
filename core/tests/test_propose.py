@@ -363,7 +363,7 @@ def test_a_damaged_property_answer_is_a_409_in_words(client, store):
     art = thermo.volatility("ethanol")
     plant_damaged(art.id)
     r = client.post("/api/pureos/propose", json={"product": "ethanol", "host": YEAST})
-    assert r.status_code == 409 and f"{art.id} is damaged on disk" in r.json()["detail"]
+    assert r.status_code == 409 and f"{art.id} is damaged in its row" in r.json()["detail"]
 
 
 def test_with_no_strain_on_file_the_endpoint_refuses_in_words(store, worker):

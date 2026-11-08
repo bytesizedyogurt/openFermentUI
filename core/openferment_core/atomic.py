@@ -1,4 +1,4 @@
-"""Whole-file writes that land whole or not at all (OF-BLD-012 §B.8).
+"""Whole-file writes that land whole or not at all.
 
 Every file the service still keeps (a genome-scale model in models/, an
 export) would be written with `Path.write_text`, which
@@ -94,7 +94,7 @@ def held(path: Path) -> Iterator[None]:
 
     A threading lock keeps two requests in the service apart; the nightly job
     is another process, and a change made in the service while it ran would
-    be lost to whichever wrote second (OF-BLD-013 §5.5). This takes an
+    be lost to whichever wrote second. This takes an
     exclusive advisory lock on a file beside `path` (`<name>.lock`, kept out
     of git with the file it guards) and waits for it.
     """

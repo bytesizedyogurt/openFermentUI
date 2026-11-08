@@ -63,7 +63,7 @@ def test_numbers_are_found_in_every_disguise(text):
         "Nobody has measured this in this host",
         "Often the tension between yield and purity decides the train",
         "Someone should reconsider this alone",
-        "Phosphorylation state of bovine beta-casein as expressed in E. coli",
+        "Phosphorylation state of a placeholder protein as expressed in a placeholder host",
         "The wavelength used for the absorbance reading",
         # Identifiers carry digits without being quantities. A claim that cannot
         # name its strain is useless, and the first of these is the
@@ -202,7 +202,7 @@ def test_rule_four_no_citation_and_not_admitting_it():
         [{"id": "c1", "text": "Secretion is generally poor in this host", "support": "direct"}]
     )
     assert result.claims == []
-    assert "not 'unsupported'" in result.reasons[0]
+    assert "so its support must be 'unsupported'" in result.reasons[0]
 
 
 def test_an_uncited_claim_that_admits_it_survives():
@@ -582,7 +582,7 @@ class _Pool:
 
 
 PASSAGE = Passage(id="X4:s1:0", paperId="X4", sectionId="s1", heading="Results", kind="prose",
-                  text="Cells fed xylose hydrolysate accumulated polyhydroxybutyrate.  The content rose over four days.", start=0, end=97)
+                  text="Cells fed the placeholder sugar accumulated the product.  The content rose over four days.", start=0, end=90)
 
 
 def _evidence(prov="computed"):
@@ -605,9 +605,9 @@ def _one(claim, seen=None):
 
 def test_plan_happy_path_keeps_every_kind_of_citation():
     r = _one({
-        "id": "c1", "text": "Xylose-fed cells accumulated the polymer.", "support": "direct",
+        "id": "c1", "text": "Cells on the placeholder sugar accumulated the product.", "support": "direct",
         "recordIds": ["r-X1-1"], "evidenceIds": ["ev-1"],
-        "passages": [{"passageId": PASSAGE.id, "quote": "Cells fed xylose hydrolysate accumulated polyhydroxybutyrate."}],
+        "passages": [{"passageId": PASSAGE.id, "quote": "Cells fed the placeholder sugar accumulated the product."}],
         "paperIds": ["Z9"],
     })
     assert r.rejected == 0

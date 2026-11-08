@@ -1,4 +1,4 @@
-"""What Postdoc may cite: one view over every record the project holds (OF-BLD-014 §3.4).
+"""What Postdoc may cite: one view over every record the project holds.
 
 The pool is the project's candidates, read from PostgreSQL: the extractor's
 current ones and the copies kept with standing decisions (biorepo.py). A

@@ -1,4 +1,4 @@
-"""What was computed is kept and can be replayed (OF-BLD-014 §3.2, E.5).
+"""What was computed is kept and can be replayed.
 
 Every calculation from §3.4 on goes through `compute`: a tool registers a pure
 function from its inputs to a small output, and `compute` runs it once per
@@ -168,7 +168,7 @@ def _valid(aid: str, raw: Any) -> Artifact:
         return Artifact.model_validate(raw)
     except ValueError as e:
         raise ArtifactDamaged(
-            f"artifact {aid} is damaged on disk (its row in the artifact store): {e}".splitlines()[0]
+            f"artifact {aid} is damaged in its row of the artifacts table: {e}".splitlines()[0]
         ) from None
 
 

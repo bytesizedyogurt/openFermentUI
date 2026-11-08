@@ -1,4 +1,4 @@
-"""thermosteam answers property questions (OF-BLD-019 §4.2, D9).
+"""thermosteam answers property questions.
 
 thermosteam is BioSTEAM's property engine: a database of chemicals with
 their models for density, heat capacity, viscosity and vapour-liquid
@@ -40,7 +40,7 @@ the weakest of that and the record or the run otherwise.
     GET  /api/thermo/props   the stored answer for the same question, as the
                              same pair, or none; it starts no simulator
 
-A PRODUCT'S VOLATILITY (OF-BLD-020 §7.1, D12) is its own question and its
+A PRODUCT'S VOLATILITY is its own question and its
 own artifact tool, `volatility`, beside `thermo_props`, so the contract above
 is unchanged. `volatility(product)` names a product by id; `CHEMICALS` maps
 it to the library's own name for it (ethanol → Ethanol), and a product with no
@@ -76,7 +76,6 @@ VERSION_WORDS = "thermo props 1"
 STREAM = "stream"
 AZEOTROPE = "ethanol-water-azeotrope"
 BEER = "beer-at-titre-of"
-PRESETS = (AZEOTROPE, BEER)
 TITRE_FIELD = "ethanol_titre"
 KG_M3 = "kg m⁻³"
 # The library's own names for the two chemicals the presets ask about.

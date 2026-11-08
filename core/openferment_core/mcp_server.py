@@ -1,4 +1,4 @@
-"""openFerment's tools for assistants outside the app (OF-BLD-014 §10.1).
+"""openFerment's tools for assistants outside the app.
 
 An MCP server over stdio. It lists every tool in the registry under the
 registry's own name, description and input schema, and adds the two E.6

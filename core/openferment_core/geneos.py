@@ -1,4 +1,4 @@
-"""geneOS on the service's side (OF-BLD-014 §6.2).
+"""geneOS on the service's side.
 
 The geneOS worker does the flux balance analysis in a process of its own;
 this module holds the one `SimWorker` that runs it, tells the worker where a
@@ -326,7 +326,7 @@ def fetch(model: shelf.ShelfModel, *, run=subprocess.run, get=download) -> Path:
         shutil.move(str(f.local), aside)
         raise GeneosUnavailable(
             f"{model.id}: the file at {at} hashes to {got}, not the pinned {f.sha256}. "
-            f"It was moved to {aside.name} and is not used. This is a stop condition (OF-BLD-014 §6.2)."
+            f"It was moved to {aside.name} and is not used. This is a stop condition."
         )
     return f.local
 

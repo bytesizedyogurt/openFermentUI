@@ -1,4 +1,4 @@
-"""One write tool per module, the pair of its read tool (OF-BLD-015 §7.3).
+"""One write tool per module, the pair of its read tool.
 
 `runbooks_write`, `geneos_write`, `fermos_write`, `pureos_write`,
 `proforma_write`, `biorepo_write`, `guild_write`, `primer_write`,
@@ -29,17 +29,16 @@ gate is reached at run time, when the budget refuses an extraction. A
 flowsheet run is at no gate: it spends no model money and keeps one artifact
 in the open lane, as a ceiling does.
 
-ONE RUN, TWO NAMES (OF-BLD-019 §6.1). `proforma_write`'s `run` and the
+ONE RUN, TWO NAMES. `proforma_write`'s `run` and the
 registry's `run_flowsheet` (tools/proforma.py) both run a scenario through
 `run_scenario` below, so the one call to `proforma.run` stays in this file,
 where `check:tools` reads it, and both are refused, run and audited alike.
-So with a simulation (OF-BLD-020 §3.4): `fermos_write`'s `simulate` and the
+So with a simulation: `fermos_write`'s `simulate` and the
 registry's `fermos_simulate` (tools/fermos.py) both run `run_simulation`
 below, the one call to `fermos.simulate`, free (compute, no model money) and
-at no gate, audited with the model as agent. So with a vessel (OF-BLD-020
-§4.2): `fermos_write`'s `design_vessel` and the registry's `fermos_vessel`
+at no gate, audited with the model as agent. So with a vessel: `fermos_write`'s `design_vessel` and the registry's `fermos_vessel`
 (tools/fermos.py) both design through `design_vessel` below, the one call to
-`vessel.design`. So with a train (OF-BLD-020 §5.4): `pureos_write`'s
+`vessel.design`. So with a train: `pureos_write`'s
 `new_train`, `add_unit`, `remove_unit`, `set_from_record` and `run_train` and
 the registry's `pureos_build` (tools/pureos.py) share one function an action
 below, so the calls to `pureos.kept.keep_train` (the one write to the store of
@@ -368,7 +367,7 @@ def design_vessel(tool: str, simulation: str, fit: str, vessel_type: str, kla_me
     """Design the vessel a kept simulation (or, anaerobic, a kept fit) needs
     on BioSTEAM, keep it as one `fermos.vessel` artifact and as a run of the
     kinetics engine in its caller's name (alpha 2.2 D3), and mark it as the
-    model's (OF-BLD-020 §4.2, D13). `fermos_vessel` and `fermos_write`'s
+    model's. `fermos_vessel` and `fermos_write`'s
     `design_vessel` both run here, so the one call to `vessel.design` stays
     in this file. Ids and words in: the artifact, the vessel type, the kLa
     correlation by BioSTEAM's name. A person's plant scale or batch volume is
@@ -628,7 +627,7 @@ def make_comparison(tool: str, title: str, run_ids: list[str], ctx: ToolContext)
 
 def run_scenario(tool: str, scenario_id: str, note: str, ctx: ToolContext) -> ToolResult:
     """Run one of the project's BioSTEAM scenarios as its page runs it, keep
-    the run and mark it as the caller's (OF-BLD-019 §6.1): the overrides a
+    the run and mark it as the caller's: the overrides a
     person set on its page and the fits chosen for it are read from the
     project's rows (`project_state.run_request`), and the model adds no
     value. The run is kept as one row of the biosteam engine, created by the
@@ -752,8 +751,7 @@ def _simulation_evidence(r: Any) -> Any:
 
 
 def _summary_flags(r: Any) -> list[str]:
-    """The simulation's flags as the summary says them (OF-BLD-020 §3.R,
-    finding 20): a value outside its bounds by its key alone, never the
+    """The simulation's flags as the summary says them: a value outside its bounds by its key alone, never the
     value or its ends, which the artifact holds with the bounds and their
     reason; any other flag whole, or cut at a sentence or clause under
     MAX_FLAG_CHARS and said to be cut; each ending at a full stop."""
@@ -782,7 +780,7 @@ def _sig(x: Any) -> Any:
 def run_simulation(tool: str, req: Any, note: str, ctx: ToolContext) -> ToolResult:
     """Simulate one model family as the service binds it, keep it as a run of
     the kinetics engine in its caller's name and mark it as the model's
-    (OF-BLD-020 §3.4; alpha 2.2 D3). The request carries ids and words: a
+    (alpha 2.2 D3). The request carries ids and words: a
     family, a strain, a product, a sugar, the records named for a parameter,
     a fit, a start and a run-length preset. A person's assumptions are the
     project's overrides, and this call reads none: a parameter nothing binds

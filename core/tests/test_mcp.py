@@ -76,11 +76,12 @@ def test_u1_ask_postdoc_declines_in_words_when_the_loop_fails(monkeypatch):
     from openferment_core import postdoc_agent
 
     def boom(question, **kw):
-        raise FileNotFoundError("corpus.json not found. Generate it with `pnpm export:corpus`")
+        raise RuntimeError("the loop failed")
 
     monkeypatch.setattr(postdoc_agent, "ask", boom)
-    out = _text(asyncio.run(mcp_server.build().call_tool("ask_postdoc", {"question": "What PHB yields?"})))
-    assert out["declined"].startswith("Postdoc could not run") and "export:corpus" in out["declined"]
+    out = _text(asyncio.run(mcp_server.build().call_tool(
+        "ask_postdoc", {"question": "What does the reference cellulosic ethanol plant cost to run?"})))
+    assert out["declined"].startswith("Postdoc could not run") and "the loop failed" in out["declined"]
 
 
 # ── OF-BLD-015 §7.5: the same registry, the reads and the writes, the gates ──

@@ -1,4 +1,4 @@
-"""One parameter panel, declared in Python (OF-BLD-020 Phase 2, D2–D4).
+"""One parameter panel, declared in Python.
 
 Every model family, vessel design, catalogue unit and shelf flowsheet
 declares its parameters once, as `ParameterSpec`s (models.py; the browser
@@ -63,7 +63,7 @@ served; no screen writes a form for a parameter of its own.
                               boundsReason (D4); test_params holds it
 
 This module registers the `proforma` provider; vessel.py registers
-`fermos-vessel` (OF-BLD-020 §4.1), imported on first need
+`fermos-vessel`, imported on first need
 (`PROVIDER_MODULES`). The vessel scope's values are BioSTEAM's own defaults,
 read in the Proforma worker, so a read of it starts the worker when it is
 cold (and keeps its answer for the process's life). Its scope is
@@ -247,7 +247,7 @@ def _provided(scope: str, req: ParamResolveRequest) -> tuple[str, Provided]:
 def _not_read(got: Provided, values: list[ParameterValue]) -> list[ParameterValue]:
     """The values with each waiting one the others leave unread served as
     `not-read`, saying why, so a panel never marks it waiting while a run
-    would not refuse for it (OF-BLD-020 §3.R, finding 16)."""
+    would not refuse for it."""
     if got.unread is None:
         return values
     unread = got.unread(values)
@@ -384,8 +384,7 @@ def unstamped(o: Override) -> str | None:
 
 
 def held(value: Any, low: float | None, high: float | None) -> tuple[float | None, float | None]:
-    """An override's interval as every reader takes it (OF-BLD-020 §2.R,
-    findings 1 and 14): one end typed and the other left empty, the empty
+    """An override's interval as every reader takes it: one end typed and the other left empty, the empty
     end is the value itself, so the range runs from the end typed to the
     value; with neither end typed the value is held at itself and both stay
     empty (a run then holds it fixed, both ends the value). The resolve, the
@@ -411,7 +410,7 @@ def _takes_no_person(spec: ParameterSpec) -> str:
 def _checked(spec: ParameterSpec, o: Override, by: str | None) -> Override:
     """An override that can stand, with the person named and its interval
     as `held` reads it, or the refusal. A deposition's reading stands where
-    a person's value does, a value this run sets (basis.SET_KINDS), named by
+    a person's value does, a value this run sets (basis.is_set), named by
     the person who deposited it."""
     from .biorepo import reviewer_refusal
 
@@ -749,10 +748,10 @@ def _proforma(ids: tuple[str, ...], req: ParamResolveRequest) -> Provided:
         "pool that pass the aggregate gate" + (f" and name {feed} as their carbon source" if flowsheet in proforma.FEED_CARBON else "")
         + ", converted into the input's unit; a fermOS fit a person chose replaces them for titre, yield and productivity.",
         "A person's override wins over the records and any fit for its input, here and in the run, which carries the "
-        "overrides and names the person in its basis (OF-BLD-020 D3).",
+        "overrides and names the person in its basis.",
     ]
     if finance:
-        notes.append(f"Built from vessel design {req.vessel} and train run {req.trainRun} (OF-BLD-020 §6.1): the "
+        notes.append(f"Built from vessel design {req.vessel} and train run {req.trainRun}: the "
                      "fermenter is that design's, every design parameter as the design holds it, and the train's units "
                      "follow it with their values as that run held them; the train's own inlet is not an input, the "
                      "fermenter's beer is. Finance is the dry-grind corn plant's TEA: each parameter the package's own "
@@ -836,7 +835,7 @@ def check() -> tuple[int, list[str]]:
             for spec in specs:
                 n += 1
                 if not (spec.boundsReason or "").strip():
-                    problems.append(f"{label}: {spec.key} has no boundsReason (OF-BLD-020 D4)")
+                    problems.append(f"{label}: {spec.key} has no boundsReason")
                 if spec.min is not None and spec.max is not None and spec.min > spec.max:
                     problems.append(f"{label}: {spec.key} has min above max")
                 if spec.key in keys:

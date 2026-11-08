@@ -1,4 +1,4 @@
-"""Heavy libraries run in workers (OF-BLD-014 §3.4, E.6).
+"""Heavy libraries run in workers.
 
 A worker is a separate Python process that reads one JSON request per line on
 stdin and writes one JSON response per line on stdout:

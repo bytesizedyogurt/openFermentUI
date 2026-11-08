@@ -1,5 +1,4 @@
-"""The Proforma worker: BioSTEAM in a process of its own, kept warm
-(OF-BLD-014 §8.1).
+"""The Proforma worker: BioSTEAM in a process of its own, kept warm.
 
 With flowsheets/, the only place in openferment_core that imports `biosteam`
 (test_workers holds it to that). A cold import takes about forty seconds, so
@@ -10,12 +9,11 @@ its inputs on the built objects and re-simulates (Appendix 3, trap 3).
     evaluate    one case of a flowsheet: its inputs in, its outputs out
     grid        the outputs over a grid of up to three inputs
     montecarlo  Latin hypercube samples of the inputs, seeded
-    run         one whole run (OF-BLD-019 §2.1): the base case, the tables
+    run         one whole run: the base case, the tables
                 read from BioSTEAM's objects right after it (TEA breakdown,
                 streams, units, utility duties, the diagram), the grid and
                 the samples; proforma.py keeps it as one artifact (D1). A
-                flowsheet built from a structure (OF-BLD-020 §6.1,
-                `custom_train_v1`: a vessel design's fermenter, a train run's
+                flowsheet built from a structure (`custom_train_v1`: a vessel design's fermenter, a train run's
                 units and the TEA's finance) takes it as `structure`, and the
                 worker keeps a built plant per structure (STRUCTURES_KEPT)
     replay_reference, replay_benchmark  a run kept from one of the two
@@ -27,33 +25,32 @@ its inputs on the built objects and re-simulates (Appendix 3, trap 3).
                 read back and every table, numbers rounded to the digits
                 the basis states; or the corn stover plant's price solved
                 as the package solves it
-    thermo_props  thermosteam's answer for one mixture (OF-BLD-019 §4.2, D9):
+    thermo_props  thermosteam's answer for one mixture:
                 a Stream on the library's own chemicals at T and P, and its
                 density, heat capacity, viscosity, bubble and dew points;
                 thermo.py keeps it as one artifact
-    volatility  a chemical's volatility beside a partner (OF-BLD-020 §7.1,
-                D12): each one's normal boiling point as the library holds
+    volatility  a chemical's volatility beside a partner: each one's normal boiling point as the library holds
                 it, and whether the library's own vapour-liquid equilibrium
                 gives the pair a minimum-boiling azeotrope at its default
                 pressure, by the preset's search; thermo.py keeps it as one
                 `volatility` artifact
     vessel_specs  what fermOS's vessel class takes and its own defaults,
-                read from BioSTEAM at import (OF-BLD-020 §4.1, E.3‴):
+                read from BioSTEAM at import (E.3‴):
                 `flowsheets/vessel.py`'s `specs`
-    vessel_design one vessel designed for a simulation (OF-BLD-020 §4.1, D7):
+    vessel_design one vessel designed for a simulation:
                 `AeratedBioreactor` or `NRELAnaerobicBatchBioreactor`, built
                 afresh inside `package_defaults()`, its design, costs and the
                 oxygen balance read; vessel.py keeps it as one artifact
     catalogue_specs  what one of pureOS's unit types takes and its class's
                 own defaults, choices and refusals, read from its code at
-                import on the yeast program's chemicals (OF-BLD-020 §5.1):
+                import on the yeast program's chemicals:
                 `pureos/catalogue.py`'s `read_class`, handed the class
                 (BioSTEAM's, or the in-house one) and the chemical IDs
     catalogue_unit_check  one unit of a type built alone on given inlets
                 and values (catalogue keys), simulated, and read: its streams,
                 design, costs and the attributes it holds (`build_unit`,
                 `unit_report`); the catalogue's sim test runs every type so
-    train_specs   what a train builds on (OF-BLD-020 §5.2): the yeast
+    train_specs   what a train builds on: the yeast
                 program's chemical IDs and thermosteam's Stream defaults
     flowsheet_unit_values  a shelf flowsheet's own units read by catalogue
                 key, as its package builds them (a train's `readFrom`)
@@ -88,7 +85,7 @@ every worker with PYTHONBREAKPOINT=0, and this module also sets
 `sys.breakpointhook` to raise in words, so the request fails and the worker
 answers the next one.
 
-THE WARM WORKER KEEPS NO PLANT'S SETTINGS (OF-BLD-019 §2.R). BioSTEAM keeps
+THE WARM WORKER KEEPS NO PLANT'S SETTINGS. BioSTEAM keeps
 process-wide state a plant can change: the utility prices and the plant cost
 index, the stream and unit tickets that name what a package leaves unnamed,
 and the chemicals thermosteam's `chemical_cache` keeps per package, whose
@@ -545,7 +542,7 @@ def run(name: str, base: dict[str, float], specs: dict[str, dict[str, Any]], sam
     """One whole run: the base case and its tables, read before any other
     case moves the objects; then the grid, when one is asked; then the
     samples, Latin hypercube and seeded, as `montecarlo`. A flowsheet built
-    from a structure (OF-BLD-020 §6.1, custom_train_v1) takes it here, and
+    from a structure (custom_train_v1) takes it here, and
     every case of the run is of the one plant it builds."""
     module, b = built(name, structure)
     try:
@@ -608,7 +605,7 @@ def package_defaults() -> Iterator[None]:
     `bst.process_tools.default()`, which also clears the tickets and
     thermosteam's chemical cache), the stream utility prices BioSTEAM
     imports with (which `default()` leaves as the last plant set them), and
-    every package's chemicals made anew from empty caches (OF-BLD-019 §2.R). Afterwards what the worker held
+    every package's chemicals made anew from empty caches. Afterwards what the worker held
     before is put back, not the defaults, because the worker keeps other
     plants warm whose costs read these globals (a PowerUtility's cost reads
     the class's price when it is asked); a chemicals cache first filled
@@ -1019,7 +1016,7 @@ def _op_replay_benchmark(args):
     """A kept benchmark recomputed for its replay (alpha 2.2 D8), built afresh
     inside `package_defaults()`: the corn stover plant sets its own utility
     prices and cost index as it builds, and these go back with everything
-    else afterwards, so no later case prices on them (OF-BLD-019 §2.R)."""
+    else afterwards, so no later case prices on them."""
     with package_defaults():
         return kept_references.benchmark()
 
@@ -1184,7 +1181,7 @@ def _simulated_train(spec: dict[str, Any]) -> Any:
 
 
 def _op_train_run(args):
-    """One train built and run (OF-BLD-020 §5.2): inside `package_defaults()`,
+    """One train built and run: inside `package_defaults()`,
     built and simulated whole (`_simulated_train`); then its tables read with
     this worker's own readers (no TEA: a train is not priced here) and each
     unit's costs. A train that cannot be built or run is the module's

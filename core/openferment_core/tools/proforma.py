@@ -1,5 +1,5 @@
-"""Proforma's tools: `selling_price` (OF-BLD-014 §8.5), `run_flowsheet` and
-`stream_table` (OF-BLD-019 §6.1).
+"""Proforma's tools: `selling_price`, `run_flowsheet` and
+`stream_table`.
 
 `selling_price`: the price a person's run produced.
 

@@ -56,7 +56,7 @@ export interface UnitOperation {
  * and no concentration: what is resolved is the paper's wording.
  * `carbonSourceId` below matches against `spellings`.
  */
-export interface CarbonSource {
+interface CarbonSource {
   id: string;
   label: string;
   spellings: string[];
@@ -69,8 +69,8 @@ export interface CarbonSource {
  * An exact alias wins. Otherwise every alias that stands inside the wording as
  * a whole word — no letter or digit touching either end — is a hit, and when
  * all the hits name ONE id that id is the answer. No hit is null, and so is
- * hits naming two different ids: "E. coli expressing bovine β-casein" names
- * two organisms, and choosing one would merge measurements this table exists
+ * hits naming two different ids: "a host expressing a protein of another
+ * organism" names two organisms, and choosing one would merge measurements this table exists
  * to keep apart.
  *
  * `carbonSourceId` in vocabulary.ts applies the same rule, and
@@ -228,7 +228,7 @@ export const UNIT_OPERATIONS: UnitOperation[] = [
   {
     id: 'lle',
     label: 'Liquid-liquid extraction',
-    stage: 'recovery',
+    stage: 'capture',
     note: 'terpene recovery',
     biosteamClasses: [
       'LLEUnit',
@@ -252,7 +252,7 @@ export const UNIT_OPERATIONS: UnitOperation[] = [
     // train BioSTEAM ships; vocabulary, so it carries no number.
     id: 'molecular-sieve',
     label: 'Molecular sieve dehydration',
-    stage: 'purification',
+    stage: 'polish',
     note: 'adsorbs the water distillation cannot take past the ethanol-water azeotrope',
     biosteamClasses: ['MolecularSieve'],
   },
@@ -342,7 +342,7 @@ export const UNIT_OPERATIONS: UnitOperation[] = [
   {
     id: 'lle-multistage',
     label: 'Counter-current extraction',
-    stage: 'recovery',
+    stage: 'capture',
     note: 'mixer-settlers in series, the solvent against the broth',
     biosteamClasses: ['MultiStageMixerSettlers'],
   },

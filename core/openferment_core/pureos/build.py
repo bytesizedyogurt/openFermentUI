@@ -1,4 +1,4 @@
-"""What a model's build does to a train, as data (OF-BLD-020 §5.4; D9, D13).
+"""What a model's build does to a train, as data (D9, D13).
 
 `pureos_build` and `pureos_write` (tools/writes.py) build a train a step at a
 time from ids and words: a product and the artifact its inlet is read from,
@@ -319,7 +319,7 @@ def _cut(line: str) -> str:
 
 def to_run(spec: TrainSpec) -> tuple[list[str], str | None]:
     """What a run of the train would refuse now, in the run's own words
-    (`train_spec.check_train`, OF-BLD-020 §5.R, finding 20): the validation's
+    (`train_spec.check_train`): the validation's
     refusals, then every value that waits and every need a unit has, as a
     model's run would meet them (no person's value: the service holds none).
     Runs no train and keeps nothing. When the simulator, where the classes'

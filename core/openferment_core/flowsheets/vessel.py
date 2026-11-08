@@ -1,4 +1,4 @@
-"""fermOS's vessel, designed by BioSTEAM (OF-BLD-020 §4.1, D7, E.3‴).
+"""fermOS's vessel, designed by BioSTEAM (E.3‴).
 
 Not a shelf flowsheet (it is not in `KNOWN`): one vessel, built afresh for
 every design by the Proforma worker's `vessel_specs` and `vessel_design` ops,
@@ -25,8 +25,7 @@ reaction asks of the vessel (`get_OUR` over the vessels' working volume
 while they react, whether or not BioSTEAM aerated it: the class sizes no air
 at or below a floor its `_run` names, which a balanced reaction in a small
 vessel can fall under), and designing again (a fresh unit each time); only a
-scaled reaction still under that floor is designed with no air (OF-BLD-020
-§4.R). With the scale above one the vessel's outlets carry that oxygen as
+scaled reaction still under that floor is designed with no air. With the scale above one the vessel's outlets carry that oxygen as
 consumed; the broth the simulation ends with is its own end state, not this
 unit's outlet.
 
@@ -440,7 +439,7 @@ def make_unit(cls: Any, unit_id: str, feed: Any, tau: float, rxn: Any, params: d
     left out), the feed (and, aerated, an air inlet the class sizes), the
     reacting time and the reaction; one vessel when `one` (a batch volume).
     `custom_train_v1` rebuilds a kept design's fermenter through this same
-    function (OF-BLD-020 §6.1), so the two build alike."""
+    function, so the two build alike."""
     params = dict(params)
     N = params.pop("N", None)
     kwargs = {k: v for k, v in params.items()}
@@ -520,7 +519,7 @@ def _uptake_sized(R: Any) -> float:
 def _made(cls: Any, spec: dict[str, Any], chems: Any, rxn: Any, F_vol: float) -> tuple[Any, list[str]]:
     """Build the unit and simulate it, a class that refuses its construction
     (the NREL vessel's N or V_max at or below one, say) refused in BioSTEAM's
-    own words like any failure of its design (OF-BLD-020 §4.R)."""
+    own words like any failure of its design."""
     try:
         R = _build(cls, spec, chems, rxn, F_vol)
     except Refused:
@@ -597,7 +596,7 @@ def _kmol_h(mol_s: float) -> float:
 
 def _design_notes(R: Any, cls: Any, spec: dict[str, Any]) -> list[str]:
     """What the design does that its basis alone does not say: a batch
-    volume's one vessel is not bounded by V_max (OF-BLD-020 §4.R)."""
+    volume's one vessel is not bounded by V_max."""
     if spec["scale"].get("batchVolume") is None:
         return []
     V = float(R.design_results["Reactor volume"])
@@ -613,7 +612,7 @@ def _batch_oxygen(R: Any, ts: list[float], ys: list[float]) -> dict[str, float] 
     """The oxygen the simulation took up, per hour of the plant: the
     trapezoid integral of its uptake over the batch to harvest (mmol L⁻¹,
     which is mol m⁻³), times each vessel's working volume and the vessels,
-    over the cycle (D7's Cooney basis, OF-BLD-020 §4.R). None without an
+    over the cycle (D7's Cooney basis). None without an
     interval of uptake (two hours or more)."""
     if len(ts) <= 1:
         return None
@@ -766,7 +765,7 @@ def _heat(R: Any, kind: str, out: dict[str, Any], oxygen: dict[str, Any] | None)
     """BioSTEAM's duty and how it was found (`method`: the heats of formation,
     or a forced heat per oxygen times the oxygen the vessel consumed, which
     `consumedKmolPerH` is), beside D7's cross-check on the oxygen the
-    simulation took up (OF-BLD-020 §4.R)."""
+    simulation took up."""
     if kind != AEROBIC or oxygen is None:
         return {"bst": out["dutyRead"], "method": "heats-of-formation", "consumedKmolPerH": None, "convention": None,
                 "oxygenKmolPerH": None, "conventionNote": (

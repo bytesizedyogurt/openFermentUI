@@ -1,8 +1,7 @@
-"""Postdoc as an agent: a bounded loop of tools, answered with a checked plan
-(OF-BLD-014 §5.2).
+"""Postdoc as an agent: a bounded loop of tools, answered with a checked plan.
 
     seen, trace, spent = SeenSet(), [], Usage()
-    coverage = module_stores.coverage(question)   # code, no model (OF-BLD-015 §7.1)
+    coverage = module_stores.coverage(question)   # code, no model
     for round in 1 … MAX_ROUNDS:
         turn = llm.converse(... tool_choice='auto')
         if the turn called tools: run them (cached by canonical input), keep
@@ -31,9 +30,9 @@ in the answer chain, with a fresh conversation; tool results come from the
 per-question cache, so nothing is computed twice, and a `restart` step enters
 the trace. A tool whose result depends on what the run changed since (a draft
 checked against what was seen; a train a model builds step by step, whose run
-must be of the train as it now stands, OF-BLD-020 §5.4) is never served from
+must be of the train as it now stands) is never served from
 the cache (`UNCACHED`). A write that changes rows a later read must see (a
-model's train, its run: `CHANGES_ROWS`, OF-BLD-020 §5.R) makes the reads of
+model's train, its run: `CHANGES_ROWS`) makes the reads of
 the same question read those sources afresh and forgets the module reads
 cached before it. A spent daily budget is not an outage another model can fix,
 and ends the question.
@@ -425,7 +424,8 @@ def _summary_line(name: str, inp: dict[str, Any], result: ToolResult) -> str:
         return f"Read run {inp.get('run')} · {_count(len(result.evidence), 'value')}"
     if name == "study_scenario":
         made = len(result.summary.get("values") or [])
-        return f"Kept scenario {result.summary.get('scenarioId')} on {inp.get('plant')} · {_count(made, 'value')} of yours"
+        named = f"'{inp['title']}'" if inp.get("title") else str(result.summary.get("scenarioId"))
+        return f"Kept scenario {named} on {inp.get('plant')} · {_count(made, 'value')} of yours"
     if name == "study_compare":
         return f"Compared {_count(len(inp.get('runs') or []), 'run')} · kept comparison {result.summary.get('comparisonId')}"
     if name == "study_read":
@@ -434,10 +434,16 @@ def _summary_line(name: str, inp: dict[str, Any], result: ToolResult) -> str:
         return f"Listed the project's documents · {_count(len(result.summary.get('documents') or []), 'document')}"
     if name == "literature_document":
         section = f", {inp['section']}" if inp.get("section") else ""
-        return f"Read {inp.get('document')}{section} · {_count(len(result.passages), 'passage')}"
+        # A document by its title, as the reader names it; its id only when the result holds no title.
+        named = result.summary.get("title") or inp.get("document")
+        return f"Read {named}{section} · {_count(len(result.passages), 'passage')}"
     if name == "stream_table":
         cut = f", {result.summary.get('leftOut')} left out" if result.summary.get("leftOut") else ""
         return f"Read the stream table of run {inp.get('artifactId')} · {_count(int(result.summary.get('shown', 0)), 'stream')}{cut}"
+    if name == "catalogue_read":
+        kind = str(inp.get("kind") or result.summary.get("kind") or "").strip()
+        found = int(result.summary.get("matched", len(result.summary.get("entries") or [])))
+        return f"Read the project's {kind + ' ' if kind else ''}catalogue · {found} {'entry' if found == 1 else 'entries'}"
     if name.endswith("_read") and name[: -len("_read")] in module_stores.LABEL:
         label = module_stores.LABEL[name[: -len("_read")]]
         what = [f'"{inp["words"]}"'] if inp.get("words") else []
@@ -605,7 +611,7 @@ def _attempt(run: _Run, model: str, budget_usd: float) -> tuple[llm.Turn, str]:
 def _swept(question: str, history: list[PriorTurn]) -> str:
     """What the coverage pass reads. A follow-up ("which of those are
     fenced?") often names nothing itself, so it is swept with the earlier
-    questions `_opening` sends, each its own clause (OF-BLD-016 §1.R). The
+    questions `_opening` sends, each its own clause. The
     earlier answers are the model's words and are never swept."""
     return " ; ".join([*(t.question.strip()[:MAX_TURN_CHARS] for t in _recent(history)), question])
 
@@ -630,7 +636,7 @@ def _sweep(run: _Run, ctx: tools.ToolContext) -> None:
 def held_to_rule_one(gaps: Any, declined: Any, reasons: list[str]) -> tuple[list[str], str | None]:
     """A plan's gaps and its decline are model prose like a claim's text, and
     held to Rule 1 the same way: one with a number is dropped and named in
-    `reasons`, never repaired (§5.R; the decline, OF-BLD-016 §1.R). Returns
+    `reasons`, never repaired (§5.R; the decline). Returns
     the gaps kept and the model's decline, or None when it held a number, so
     the decline code writes stands in."""
     kept: list[str] = []

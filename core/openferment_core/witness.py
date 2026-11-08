@@ -1,4 +1,4 @@
-"""Witness — scoring the run that actually ran (OF-BLD-012 §6.2).
+"""Witness — scoring the run that actually ran.
 
 `match_run` builds one RunOutput for 'claude-1' by holding every reference
 record on an extracted paper against the candidates the extractor produced
@@ -80,7 +80,7 @@ def _is_categorical(value: Any) -> bool:
 
 def _ranges_agree(cr: tuple[float, float], rr: tuple[float, float], cu: str, ru: str) -> bool:
     """Two ranges are the same interval, endpoint for endpoint, after
-    conversion (OF-BLD-012.1 F1.4)."""
+    conversion."""
     try:
         return quantity_equals((cr[0], cu), (rr[0], ru), TOLERANCE_PCT) and quantity_equals(
             (cr[1], cu), (rr[1], ru), TOLERANCE_PCT
@@ -129,7 +129,7 @@ def _distance(
     r_range: tuple[float, float] | None = None,
 ) -> float | None:
     """How far a candidate is from a reference, or None when they do not
-    agree at all (OF-BLD-012.1 F6).
+    agree at all.
 
     Agreement is `_agrees`, which already converts and applies the tolerance;
     this only ORDERS the pairs that agree, so a crude magnitude comparison
@@ -174,7 +174,7 @@ def match_run(
     references on any other paper are left out rather than counted as
     misses. `dropped` supplies the span_error cases.
 
-    THE ALGORITHM (OF-BLD-012.1 F6). One candidate scores one record, and the
+    THE ALGORITHM. One candidate scores one record, and the
     pairing is by distance, not by arrival:
 
       1. Every (record, candidate) pair of the same paper and field that

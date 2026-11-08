@@ -1,5 +1,5 @@
 """pureOS proposes a train by rules that each name the property they read
-(OF-BLD-020 §7.2, D12, D13, E.4‴).
+(E.4‴).
 
 `propose(product, host, inlet_ref=None, *)` reads a
 product's class and the properties its class's rule splits on, and answers a

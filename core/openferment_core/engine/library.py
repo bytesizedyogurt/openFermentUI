@@ -67,7 +67,10 @@ LIBRARY_RUN = "library.run"
 LIBRARY_RUN_VERSION = "library run 2"
 # The significant digits a run keeps (as a reference run keeps them): BioSTEAM
 # sums a set of units in an order that moves the last digits from one build to
-# the next, and a replay compares the plant. A precision, stated in every basis.
+# the next, and a replay compares the plant's numbers at these digits. A
+# precision, stated in every basis; the basis note below keeps its words as
+# first written, its id hashing them (docs/PROGRESS.md, Debts: words stored in
+# bases).
 DIGITS = 10
 # numpy.allclose's own absolute tolerance, which the package's test uses
 # beside its rtol: a check holds when |measured − package| ≤ ATOL + rtol·|package|.

@@ -122,6 +122,31 @@ def test_a_model_keeps_a_scenario_of_its_estimates_runs_it_and_cites_the_runs_nu
     assert [(r["id"], r["runIds"]) for r in read.summary["rows"]] == [(sid, [s["runId"]])]
 
 
+class Rated(Priced):
+    """Priced, with the TEA's rate of return in the price block, its unit left blank as the worker leaves it."""
+
+    def __call__(self, op: str, args: dict):
+        out = super().__call__(op, args)
+        if op == "library_run":
+            price = out["price"]
+            out = {**out, "price": {**price, "IRR": 0.1, "units": {**price["units"], "IRR": ""}}}
+        return out
+
+
+def test_a_runs_rate_of_return_is_cited_with_its_unit(monkeypatch):
+    """Seen on the sweep: a claim citing a run's internal rate of return showed
+    the number bare beside its USD/kg neighbours. The run's price block keeps
+    the unit blank (its output hash holds it); its evidence names it."""
+    monkeypatch.setattr(simulator, "call", Rated())
+    monkeypatch.setattr(library, "_PARAMETERS", {})
+    made = tools.run("study_scenario", dearer_cane(), as_model())
+    ran = tools.run("engine_run", {"plant": "", "configuration": "", "scenario": made.summary["scenarioId"], "note": ""},
+                    as_model())
+    assert ran.error is None, ran.error
+    irr = next(e for e in ran.evidence if e.id.endswith(":price.IRR"))
+    assert (irr.value, irr.unit) == (0.1, "fraction")
+
+
 class Itemised(Priced):
     """Priced, with the TEA breakdown the worker reads from BioSTEAM's TEA: two lines."""
 
@@ -218,7 +243,7 @@ def test_the_shelf_and_a_plants_parameters(worker):
 
 @dataclass
 class _Document:
-    title: str = "Polyhydroxybutyrate on xylose hydrolysate"
+    title: str = "A placeholder product on a placeholder sugar"
     authors: list = field(default_factory=lambda: ["A. Moreno"])
     publication_year: int = 2021
     journal: str = "A Journal"
@@ -233,15 +258,15 @@ class _Held:
 
 
 SECTIONS = [
-    {"id": "p0", "heading": "Abstract", "text": "Polyhydroxybutyrate accumulated in cells fed xylose hydrolysate.",
+    {"id": "p0", "heading": "Abstract", "text": "The product accumulated in cells fed the placeholder sugar.",
      "isTable": False},
-    {"id": "p1", "heading": "Results", "text": "The granules filled the cytoplasm.", "isTable": False},
+    {"id": "p1", "heading": "Results", "text": "The cells filled the vessel.", "isTable": False},
 ]
 
 
 def test_the_literature_tools_list_the_documents_and_read_a_sections_passages(monkeypatch):
     monkeypatch.setattr(intake, "held", lambda project_id=None: {
-        "doc-1": {"title": "Polyhydroxybutyrate on xylose hydrolysate", "year": 2021, "collector": "europepmc",
+        "doc-1": {"title": "A placeholder product on a placeholder sugar", "year": 2021, "collector": "europepmc",
                   "licenceClass": "open", "passages": 2}})
 
     def passages(document_id, *, project_id):
@@ -250,13 +275,13 @@ def test_the_literature_tools_list_the_documents_and_read_a_sections_passages(mo
         return _Held(_Document(), SECTIONS)
 
     monkeypatch.setattr(kit, "passages", passages)
-    listed = tools.run("literature_sources", {"words": "xylose"}, as_model())
+    listed = tools.run("literature_sources", {"words": "placeholder sugar"}, as_model())
     assert [d["documentId"] for d in listed.summary["documents"]] == ["doc-1"]
     assert tools.run("literature_sources", {"words": "glucose"}, as_model()).summary["documents"] == []
     whole = tools.run("literature_document", {"document": "doc-1"}, as_model())
     assert whole.summary["sections"] == ["Abstract", "Results"] and whole.passages == []
     results = tools.run("literature_document", {"document": "doc-1", "section": "Results"}, as_model())
     (p,) = results.passages
-    assert (p.id, p.paperId, p.sectionId, p.text) == ("doc-1:p1:0", "doc-1", "p1", "The granules filled the cytoplasm.")
+    assert (p.id, p.paperId, p.sectionId, p.text) == ("doc-1:p1:0", "doc-1", "p1", "The cells filled the vessel.")
     assert "no section headed" in tools.run("literature_document", {"document": "doc-1", "section": "Methods"}, as_model()).error
     assert "holds no readable document" in tools.run("literature_document", {"document": "doc-2"}, as_model()).error

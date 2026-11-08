@@ -1,4 +1,4 @@
-"""FastAPI app — openferment-core's first surface (OF-BLD-007 §4).
+"""FastAPI app — openferment-core's first surface.
 
 The seam is Python rather than a Node proxy on purpose. An API key cannot live
 in the browser, so a server is required either way; and every tool Postdoc will
@@ -457,7 +457,7 @@ async def _fields_refused(request: Request, e: RequestValidationError) -> JSONRe
 @app.middleware("http")
 async def refuse_changes_from_elsewhere(request: Request, call_next):
     """A changing request from another site, or under a hostile name, stops
-    here with a 403 that says why (guard.py, OF-BLD-012 §B.6)."""
+    here with a 403 that says why (guard.py)."""
     why = guard.refusal(request.method, request.headers)
     if why is not None:
         log.warning("refused %s %s: %s", request.method, request.url.path, why)
@@ -491,7 +491,7 @@ def health() -> Health:
 
 def _ask_agent(question: str, on_step=None, cancelled=None, history=None, on_call=None, on_result=None,
                converse=None) -> AnswerPlan:
-    """The bounded loop (OF-BLD-014 §5.2) over the evidence pool as it stands,
+    """The bounded loop over the evidence pool as it stands,
     with the conversation's earlier turns when the question is a follow-up.
     `converse` stands in for the model (the evaluation's offline stand-in);
     None asks the routing table's models."""
@@ -549,8 +549,7 @@ def _answer(request: AskRequest, *, on_step=None, cancelled=None, on_turn=None, 
 
 @app.post("/api/ask", response_model=AnswerPlan)
 def ask(request: AskRequest) -> AnswerPlan:
-    """One question in, one AnswerPlan out: the bounded loop of tools
-    (OF-BLD-014 §5.2), kept as a turn of its conversation.
+    """One question in, one AnswerPlan out: the bounded loop of tools, kept as a turn of its conversation.
 
     Every failure below returns a plan with `declined` set rather than an HTTP
     error, because a declined plan is a thing the UI already knows how to
@@ -581,7 +580,7 @@ def _event_stream(what: str) -> dict[int | str, dict[str, Any]]:
 @app.post("/api/ask/stream", response_class=EventStream, responses=_event_stream(
     "Server-sent events: `turn`, each `step`, then `plan`, or `error`."))
 def ask_stream(request: AskRequest) -> StreamingResponse:
-    """The loop's steps as they complete (OF-BLD-014 §5.3), as server-sent
+    """The loop's steps as they complete, as server-sent
     events: `turn` (the conversation and the turn the service keeps the
     question as), each `step` (a TraceStep), then `plan` (the validated
     AnswerPlan), or `error` when the service itself failed. A declined plan
@@ -782,13 +781,13 @@ def fermos_bind(family: str, strain: str | None = None, product: str | None = No
                 durationPreset: str = "until-sugar-runs-out",  # noqa: N803
                 inputs: str | None = None) -> FermosBinding:
     """A family's parameters bound for a strain, product and sugar
-    (`FermosBinding`, OF-BLD-020 §3.2, D6): each from the fit a person chose
+    (`FermosBinding`): each from the fit a person chose
     (`?fit=`), the records of the evidence pool through the aggregate gate, a kept simulation (`?startFrom=simulation:<id>`), or the
     spec's convention, with its source; what waits, each named with the field
     that would bind it; and notes saying what bound from where. `?inputs=`
     (a JSON list of the values a person sets on `fermos:family:<family>`,
     each a typed quantity with its origin, as the simulation would carry
-    them; OF-BLD-020 §3.3, alpha 2.2 D2) lays them on, so `waiting` is what
+    them; alpha 2.2 D2) lays them on, so `waiting` is what
     Simulate would refuse for. Starts no integration and keeps nothing. 404
     for a family no one declared; 422 in words for a fit or simulation not
     on file, a fit of another family, a sugar or id that is not one, or a
@@ -818,13 +817,12 @@ def fermos_simulations() -> list[SimulationSummary]:
 
 @app.get("/api/fermos/harvest", response_model=FermosHarvest)
 def fermos_harvest(simulation: str, hour: float | None = None) -> FermosHarvest:
-    """A kept simulation's broth at an hour (`FermosHarvest`, OF-BLD-020
-    §6.2, D10): its own harvest hour, or `?hour=`, a person's (the hour the
+    """A kept simulation's broth at an hour (`FermosHarvest`): its own harvest hour, or `?hour=`, a person's (the hour the
     Builder's inlet scope holds under their name; a model never sends one),
     read from the series the artifact keeps, each state with its unit, the
     hour's source and how it was read. A read: nothing is integrated again
     and nothing is kept. 404 for a simulation not on file, 409 for one
-    damaged on disk, 422 in words for an hour outside the simulated span, a
+    damaged in its row, 422 in words for an hour outside the simulated span, a
     simulation that keeps no product in the broth, and another artifact."""
     from . import artifacts
 
@@ -844,9 +842,8 @@ def fermos_harvest(simulation: str, hour: float | None = None) -> FermosHarvest:
 @app.get("/api/fermos/fits", response_model=list[FermosFitInfo])
 def fermos_fits(flowsheet: str) -> list[FermosFitInfo]:
     """The kinetic fits, forecasts and simulations fermOS keeps (a
-    simulation since OF-BLD-020 §3.3), newest first, each with what it can
-    feed a shelf flowsheet's titre, yield and productivity and why not
-    (OF-BLD-019 §5.1, D10). A person picks one on the scenario page;
+    simulation among them), newest first, each with what it can
+    feed a shelf flowsheet's titre, yield and productivity and why not. A person picks one on the scenario page;
     a read: it keeps nothing. A flowsheet a scenario cannot run is a 422."""
     from . import proforma
 
@@ -873,7 +870,7 @@ def _fits_param(raw: str | None) -> dict[str, str]:
 
 
 def _train_param(raw: str | None) -> TrainSpec | None:
-    """`?train=` on GET /api/params/{scope} (OF-BLD-020 §5.2): the whole
+    """`?train=` on GET /api/params/{scope}: the whole
     TrainSpec as JSON, as the resolve's `train` carries it; refused in words
     when it is not one."""
     from pydantic import ValidationError
@@ -927,7 +924,7 @@ def proforma_status() -> SimulatorStatus:
 
 @app.get("/api/proforma/shelf", response_model=list[FlowsheetInfo])
 def proforma_shelf() -> list[FlowsheetInfo]:
-    """The shelf of flowsheets (OF-BLD-019 §2.1, D2): pure data, read with no
+    """The shelf of flowsheets: pure data, read with no
     simulator."""
     from . import proforma
 
@@ -1598,7 +1595,7 @@ def study_export(by: str = "") -> Response:
 @app.get("/api/proforma/scenarios", response_model=list[ProformaScenarioInfo])
 def proforma_scenarios(host: str | None = None) -> list[ProformaScenarioInfo]:
     """Every BioSTEAM scenario the project keeps, with its inputs bound to
-    records (§8.3; OF-BLD-019 §2.3; alpha 2.2 D9): a scenario on
+    records (§8.3; alpha 2.2 D9): a scenario on
     custom_train_v1 binds with the vessel design and the train run it names,
     and one whose binding is refused is listed with the words (`refused`).
     A read: it starts no simulator."""
@@ -1613,13 +1610,13 @@ def proforma_bind(flowsheet: str, host: str | None = None,  # noqa: N803
                   trainRun: str | None = None,  # noqa: N803 (the wire name)
                   overrides: str | None = Query(default=None, include_in_schema=False)) -> ProformaScenarioInfo:
     """A shelf flowsheet's inputs bound, as a scenario not yet saved to the
-    project shows them (OF-BLD-019 §2.3, D6), id and name empty; `?fits=`
+    project shows them, id and name empty; `?fits=`
     lays on the fermOS fits a person chose (§5.1), a JSON object of input
     key to artifact id, and `?inputs=` the values a person sets over both
-    (OF-BLD-020 D3; alpha 2.2 D2), a JSON list of typed quantities, each
+    (alpha 2.2 D2), a JSON list of typed quantities, each
     converted at Proforma's door into the Override of the flowsheet's own
     scope, `proforma:<flowsheet id>`, as a run converts its values. A
-    flowsheet built from kept artifacts (`custom_train_v1`, OF-BLD-020 §6.1)
+    flowsheet built from kept artifacts (`custom_train_v1`)
     names its vessel design and its train run (`?vessel=`, `?trainRun=`).
     The toy, an unknown id, a fit that cannot feed its input, a value that
     cannot stand, or a composite's part that cannot (missing, another tool's,
@@ -1653,10 +1650,9 @@ def proforma_ceiling_check(scenarioId: str, flowsheet: str | None = None, host: 
                            overrides: str | None = Query(default=None, include_in_schema=False),
                            assumptions: str | None = Query(default=None, include_in_schema=False)) -> CeilingCheck:  # noqa: N803
     """A scenario's fermenter yield read against the newest stored geneOS
-    ceiling of each shelf model of its organism, on its flowsheet's sugar
-    (OF-BLD-019 §5.2, D11): `CeilingCheck`. A scenario the project keeps by
+    ceiling of each shelf model of its organism, on its flowsheet's sugar: `CeilingCheck`. A scenario the project keeps by
     its id, one not yet saved by the flowsheet it names; `?fits=` and
-    `?inputs=` (JSON; OF-BLD-020 D3, alpha 2.2 D2: the values a person sets,
+    `?inputs=` (JSON; alpha 2.2 D2: the values a person sets,
     each a typed quantity converted at Proforma's door into the Override of
     the scenario's scope) bind its yield as its page binds it. A yield above
     a ceiling is flagged and kept as bound. A read: it keeps nothing, starts
@@ -1686,7 +1682,7 @@ def proforma_ceiling_check(scenarioId: str, flowsheet: str | None = None, host: 
                                            "kept."}})
 def proforma_run(req: ProformaRunRequest) -> ProformaRunResult:
     """Run a scenario the project keeps by its id, or one not yet saved by
-    the shelf flowsheet it names (OF-BLD-019 §2.3, d), with the values a
+    the shelf flowsheet it names (d), with the values a
     person or a model sets as typed inputs, and keep it as one run of the
     biosteam engine (GET /api/runs/{id}, its id the artifact's) with its SFF
     file: 422 in words for any other case, listing every input waiting for a
@@ -1705,7 +1701,7 @@ def proforma_run(req: ProformaRunRequest) -> ProformaRunResult:
 
 @app.get("/api/proforma/runs", response_model=ScenarioRunsResponse)
 def proforma_runs(scenarioId: str = "") -> ScenarioRunsResponse:  # noqa: N803 (the wire name)
-    """A scenario's newest run on this service (OF-BLD-019 §3.R): the newest
+    """A scenario's newest run on this service: the newest
     stored `proforma.run` whose basis names the scenario (`latest_run`, the
     one pureOS and selling_price read), or none. A read: it runs nothing and
     starts no simulator. The scenario is named by id, and a link opens what
@@ -1735,10 +1731,9 @@ def params_scope(scope: str, flowsheet: str | None = None, host: str | None = No
     bind as `/api/proforma/bind` does. Binding only: it starts no worker,
     integrates nothing and keeps nothing. `fermos:vessel:<id>` (with
     `?vesselType=`) reads its class's defaults through the Proforma worker,
-    which a read starts when it is cold (OF-BLD-020 §4.1). `fermos:family:<id>`
+    which a read starts when it is cold. `fermos:family:<id>`
     binds as GET /api/fermos/bind does, from `?strain=`, `?product=`,
-    `?sugar=`, `?fit=`, `?startFrom=` and `?durationPreset=` (OF-BLD-020
-    §3.2). `pureos:unit:<train>:<unit>` takes
+    `?sugar=`, `?fit=`, `?startFrom=` and `?durationPreset=`. `pureos:unit:<train>:<unit>` takes
     the unit's catalogue type as `?unitType=` and reads its class's defaults
     through the Proforma worker as the vessel's do (§5.1); with no type it is
     a 404 in words. With `?train=` (the whole TrainSpec, JSON, §5.2) the unit is
@@ -1746,10 +1741,10 @@ def params_scope(scope: str, flowsheet: str | None = None, host: str | None = No
     chemicals and its records bound from the evidence pool by each parameter's field, and
     `pureos:unit:<train>:inlet` is the train's inlet. A `proforma:` scope on
     `custom_train_v1` names its vessel design and train run (`?vessel=`,
-    `?trainRun=`; OF-BLD-020 §6.1) and serves the group Finance, read from
+    `?trainRun=`) and serves the group Finance, read from
     the installed package with no worker. 404 for a scope no provider here
     knows; 422 in words for a malformed one or a refused binding; 409 for an
-    artifact the scope names that is damaged on disk, as the vessel's own route
+    artifact the scope names that is damaged in its row, as the vessel's own route
     answers it (§2.R, finding 17); 503 when the worker cannot answer."""
     from . import artifacts, params
 
@@ -1844,7 +1839,7 @@ def fermos_vessel(req: VesselRequest) -> VesselDesign:
     in words for a design that cannot be made as asked (no plant scale and no
     batch volume, a fit asked for an aerobic design, an artifact not on file,
     a value set that cannot stand, BioSTEAM's own refusal); 409 for a file
-    damaged on disk; 503 when the worker cannot answer."""
+    damaged in its row; 503 when the worker cannot answer."""
     from . import artifacts, vessel
 
     try:
@@ -1892,7 +1887,7 @@ def thermo_props(req: ThermoPropsRequest) -> ThermoPropsAnswer:
     `thermo_props` artifact, computed in the Proforma worker or returned as
     stored, beside what it holds, read as `ThermoProps`. 404 for a run,
     stream or record not on file; 409 for a run or an answer whose file is
-    damaged on disk; 422 for a question that cannot be asked, a chemical the
+    damaged in its row; 422 for a question that cannot be asked, a chemical the
     library lacks among them, in words; 503 when the worker cannot answer."""
     from . import thermo
     from .workers import WorkerCrashed, WorkerError, WorkerTimeout
@@ -1949,7 +1944,7 @@ def protparam_compute(req: ProductPropertyRequest) -> Artifact:
     `protparam` artifact computed here or returned as stored. 404 for a
     product with no sequence (the words say the entry carries none) or no
     such product; 422 for a sequence ProtParam cannot read, in words naming
-    each letter and its positions; 409 for an answer damaged on disk."""
+    each letter and its positions; 409 for an answer damaged in its row."""
     from . import protparam
 
     return _protparam_answer(protparam.of_product, req.product)
@@ -1985,7 +1980,7 @@ def thermo_volatility(req: ProductPropertyRequest) -> Artifact:
     equilibrium gives the pair a minimum-boiling azeotrope, one `volatility`
     artifact computed in the Proforma worker or returned as stored. 404 for a
     product that names no chemical of the library here; 422 for a chemical
-    the library lacks, in words naming it; 409 for an answer damaged on disk;
+    the library lacks, in words naming it; 409 for an answer damaged in its row;
     503 when the worker cannot answer."""
     from . import thermo
     from .workers import WorkerCrashed, WorkerError, WorkerTimeout
@@ -2219,7 +2214,7 @@ def biorepo_decisions(decision: ReviewDecision) -> ReviewDecision:
 
 @app.post("/api/biorepo/check", response_model=DecisionCheck)
 def biorepo_check(decision: ReviewDecision) -> DecisionCheck:
-    """Would `biorepo.write` keep this decision? (OF-BLD-012.1 F1.5)
+    """Would `biorepo.write` keep this decision?
 
     Every rule of §2.3 runs; nothing is written. A refusal is an ANSWER, not
     an error, so it comes back 200 with the rule and the reason — the browser
@@ -2481,7 +2476,7 @@ RUN_READ_REFUSALS: dict[int | str, dict[str, Any]] = {
 
 def _run_with_tables(artifact_id: str) -> Artifact:
     """The artifact a read of a run's tables or checks names: 404 when the
-    project holds none of that id, 409 when it is damaged on disk, and 422
+    project holds none of that id, 409 when it is damaged in its row, and 422
     when it is of a tool other than the ones whose artifacts hold a run's
     tables (`proforma.TABLE_TOOLS`)."""
     from . import proforma
@@ -2559,8 +2554,7 @@ def pureos_trains() -> list[TrainSummary]:
 
 @app.get("/api/pureos/train-runs", response_model=list[TrainSummary])
 def pureos_train_runs() -> list[TrainSummary]:
-    """Every kept pureOS train run (`TrainSummary`), newest first (OF-BLD-020
-    §5.2). A read: it starts no simulator."""
+    """Every kept pureOS train run (`TrainSummary`), newest first. A read: it starts no simulator."""
     from . import pureos
 
     return pureos.train_runs()
@@ -2570,7 +2564,7 @@ def pureos_train_runs() -> list[TrainSummary]:
 def pureos_trains_kept() -> list[KeptTrain]:
     """The trains a model built with `pureos_build` or `pureos_write`
     (`KeptTrain`: the train as data, `madeBy` the model, `at` and
-    `updatedAt`), the most recently changed first (OF-BLD-020 §5.4). A
+    `updatedAt`), the most recently changed first. A
     person's trains are the project's rows (`GET /api/state`). A read: it
     writes nothing and starts no simulator."""
     from .pureos import kept
@@ -2583,7 +2577,7 @@ def pureos_train_validate(train: TrainSpec) -> TrainValidation:
     """Every refusal of a train at once, in words (`TrainValidation`): a type
     not in the catalogue, an outlet its type does not have, a recycle that is
     not to an earlier unit, a key its unit does not declare, no unit, two
-    outlets on, a duplicate id. Runs nothing (OF-BLD-020 §5.2, D9)."""
+    outlets on, a duplicate id. Runs nothing."""
     from . import pureos
 
     return pureos.validation(train)
@@ -2595,11 +2589,10 @@ def pureos_train_check(req: TrainRunRequest) -> TrainValidation:
     words, each by the place it belongs to (`TrainValidation`: a unit's id,
     `inlet`, or `train`): an input that names no place or no parameter, a
     key set twice, a value its parameter cannot take, then the validation's
-    refusals, a value that waits naming what would bind it, a unit's needs
-    (OF-BLD-020 §5.3). Runs no
+    refusals, a value that waits naming what would bind it, a unit's needs. Runs no
     train and keeps nothing; it reads what the scopes read (the program's
     chemicals, each class's defaults), which a cold worker starts for. 409 for
-    an artifact the train names that is damaged on disk; 503 when the worker
+    an artifact the train names that is damaged in its row; 503 when the worker
     cannot answer."""
     from . import artifacts, pureos
 
@@ -2614,14 +2607,13 @@ def pureos_train_check(req: TrainRunRequest) -> TrainValidation:
 
 @app.post("/api/pureos/train/from-run", response_model=TrainFromRun)
 def pureos_train_from_run(req: TrainFromRunRequest) -> TrainFromRun:
-    """A kept run's units read into a train (`TrainFromRun`, OF-BLD-020
-    §5.3): every unit on the product's path whose class is a catalogue
+    """A kept run's units read into a train (`TrainFromRun`): every unit on the product's path whose class is a catalogue
     type, in run order, its outlets routed as the run routed them, its values
     read from the package's own unit when the run is of a shelf flowsheet;
     the units it does not take and why; the train's structural refusals.
     Keeps nothing and starts no simulator. 404 for an artifact not on file;
     422 in words for one that is no run or that no train is read from; 409
-    for one damaged on disk."""
+    for one damaged in its row."""
     from . import artifacts, pureos
 
     try:
@@ -2648,8 +2640,8 @@ def pureos_train_run(req: TrainRunRequest) -> TrainRun:
     take, the validation's, a value that waits naming what would bind it, a
     unit's needs, and, kept as a receipt the same request is answered from, a
     unit that does not converge, with BioSTEAM's words); 409 for an artifact
-    the train names that is damaged on disk; 503 when the worker cannot
-    answer (OF-BLD-020 §5.2)."""
+    the train names that is damaged in its row; 503 when the worker cannot
+    answer."""
     from . import artifacts, pureos
 
     try:
@@ -2666,7 +2658,7 @@ def pureos_train_run(req: TrainRunRequest) -> TrainRun:
 @app.get("/api/pureos/train/{key}", response_model=Train)
 def pureos_train(key: str) -> Train:
     """One train: the newest run of the scenario `key` names, the newest run
-    of the pureOS train it names (OF-BLD-020 §5.2), or the run whose artifact
+    of the pureOS train it names, or the run whose artifact
     id it is. 404 says how a run gets there; a deep link opens what it
     names."""
     from . import pureos
@@ -2690,7 +2682,7 @@ def pureos_propose(req: ProposeRequest) -> TrainProposal:
     product neither the products catalogue nor thermo.CHEMICALS holds; 422 in
     words for a refusal (an unknown host, an inlet that is not one, a sequence
     ProtParam cannot read, a chemical the library lacks); 409 for a property
-    answer damaged on disk; 503 when the worker cannot answer a volatility
+    answer damaged in its row; 503 when the worker cannot answer a volatility
     question."""
     from . import artifacts, pureos
 

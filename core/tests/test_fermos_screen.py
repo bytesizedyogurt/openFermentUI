@@ -101,9 +101,9 @@ def test_a_simulation_binds_a_scenarios_inputs_as_an_artifact_and_its_provenance
 
 
 def test_a_simulation_of_another_product_or_a_chemostat_feeds_nothing_and_says_why(store):
-    other = simulate(product="phb")
+    other = simulate(product="placeholder-product")
     info = proforma.fit_info(artifacts.get(other.artifactId), ETHANOL)
-    assert info.refused and "simulates phb, not ethanol" in info.refused
+    assert info.refused and "simulates placeholder-product, not ethanol" in info.refused
     assert all(f.refused == info.refused for f in info.feeds)
     nameless = simulate(product=None)
     info = proforma.fit_info(artifacts.get(nameless.artifactId), ETHANOL)

@@ -1,4 +1,4 @@
-"""One read tool per module (OF-BLD-015 §7.2).
+"""One read tool per module.
 
 `runbooks_read`, `geneos_read`, `fermos_read`, `pureos_read`, `proforma_read`,
 `biorepo_read`, `guild_read`, `primer_read`, `intake_read` and `home_read`,

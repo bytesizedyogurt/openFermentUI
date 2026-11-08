@@ -1,4 +1,4 @@
-"""Extract — one structured response per document (OF-BLD-012 §6.1; ADR-002).
+"""Extract — one structured response per document (ADR-002).
 
 The whole document goes in, as the passages Sci RAG Kit holds for it
 (`kit.passages`: one a chunk, `p0`, `p1`, …, each under the section it sits
@@ -64,10 +64,6 @@ FIXTURE_DIR = collectors.FIXTURE_ROOT / "extract"
 # for one model: Opus answers most papers and Sonnet the ones Opus declines,
 # and each response's `usage.models` says which (OF-BLD-012 §6).
 RUN = "claude-1"
-# `--save-fixture`: after a real call, write {raw, usage} to FIXTURE_DIR so a
-# fixture-mode service can replay it (§8.1). Off by default; never in
-# fixture mode, where there is no call to save.
-SAVE_RESPONSES = False
 
 # The response has to hold EVERY candidate for a paper, at roughly eighty
 # tokens each, and a review with many tables carries more than a hundred; a
@@ -607,28 +603,6 @@ def extract_paper(paper_id: str, *, force: bool = False) -> ExtractResponse:
             "sections " + ", ".join(got.truncatedSections) + " still hit the token limit after "
             "splitting and were not extracted; the rest of the paper was"
         )
-    if SAVE_RESPONSES and not collectors.fixtures_only():
-        # The candidates from every call, as one response: a fixture replays
-        # the RESULT, and a split is how it was obtained rather than what it
-        # was. A run that produced nothing is not saved at all.
-        FIXTURE_DIR.mkdir(parents=True, exist_ok=True)
-        (FIXTURE_DIR / f"{paper_id}.json").write_text(
-            json.dumps(
-                {
-                    "_note": (
-                        f"Saved response of {', '.join(got.usage.models) or 'the model'} for {paper_id}, "
-                        "for OPENFERMENT_FIXTURES=1 replay."
-                    ),
-                    "raw": {"candidates": got.raws},
-                    "usage": got.usage.model_dump(),
-                },
-                indent=2,
-                ensure_ascii=False,
-            )
-            + "\n",
-            encoding="utf-8",
-        )
-
     usage = got.usage
     anchored = anchor_all(got.raws, sections, paper_id=paper_id)
 
@@ -675,7 +649,7 @@ def extract_paper(paper_id: str, *, force: bool = False) -> ExtractResponse:
 
 
 def add_candidate(paper_id: str, raw: dict[str, Any], *, who: str) -> tuple[Candidate | None, str | None, str | None]:
-    """One candidate a model wrote by hand (OF-BLD-015 §7.3), held to §2.4
+    """One candidate a model wrote by hand, held to §2.4
     like one the extractor emitted: anchored to a sentence of the fetched
     paper, refused with the rule it broke, and appended to the paper's
     hand-written candidates under the lock, with an audit line naming `who`.
@@ -755,9 +729,7 @@ def load_env(path: Path | None = None) -> None:
 
 def main(argv: list[str]) -> int:
     load_env()
-    global SAVE_RESPONSES
     force = "--force" in argv
-    SAVE_RESPONSES = "--save-fixture" in argv
     if "--all" in argv:
         # Exit 1 when any paper could not be extracted (no key, an outage, a
         # paper too long even split), so the nightly log shows a failed night
@@ -769,7 +741,7 @@ def main(argv: list[str]) -> int:
         return 1 if failed else 0
     ids = [a for a in argv if not a.startswith("--")]
     if not ids:
-        print("usage: python -m openferment_core.extract --all [--force] [--save-fixture] | <paperId> [...]")
+        print("usage: python -m openferment_core.extract --all [--force] | <paperId> [...]")
         return 2
     results = []
     for paper_id in ids:

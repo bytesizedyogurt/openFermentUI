@@ -1,4 +1,4 @@
-"""A run's train, read into the Builder (OF-BLD-020 §5.3, D9).
+"""A run's train, read into the Builder.
 
     from_run(artifact_id, train_id=None) -> TrainFromRun
 

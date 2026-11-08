@@ -1,4 +1,4 @@
-"""The plan Postdoc answers in (OF-BLD-007 §6): its system prompt, its schema
+"""The plan Postdoc answers in: its system prompt, its schema
 and the shape evidence takes in a tool's result.
 
 The bounded loop in `postdoc_agent.py` builds on this prompt and adds its

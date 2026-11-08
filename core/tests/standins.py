@@ -566,9 +566,9 @@ VESSEL_FIXTURE_RTOL = 1e-6
 # §8.1: the fixtures that need BioSTEAM, which are the toy flowsheet's: one
 # evaluation, a small grid and a seeded sample, made by the real Proforma
 # worker. `pnpm test:sim` regenerates them and fails when they drift;
-# write `sim_fixtures()` over the file to refresh it (the note keeps its old words: they are part of the file).
+# write `sim_fixtures()` over the file to refresh it; the note is part of the file, and names its maker.
 SIM_FIXTURES = CORE / "tests" / "fixtures" / "sim" / "toy.json"
-SIM_NOTE = "TEST FIXTURE: the toy flowsheet (a mixer and a splitter) through the real BioSTEAM worker; made by `python -m openferment_core.demo --sim`."
+SIM_NOTE = "TEST FIXTURE: the toy flowsheet (a mixer and a splitter) through the real BioSTEAM worker; made by `standins.sim_fixtures()` under `pnpm test:sim`."
 
 
 def sim_fixtures() -> dict[str, Any]:

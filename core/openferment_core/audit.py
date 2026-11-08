@@ -1,4 +1,4 @@
-"""The audit log (OF-BLD-015 §7.3; execution prompt §7.3): every write a model
+"""The audit log (execution prompt §7.3): every write a model
 makes, and every proposal a person carries out or dismisses, one row each in
 the `audit` table, under the project it was made in.
 

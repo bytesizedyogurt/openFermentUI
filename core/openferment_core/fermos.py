@@ -1,5 +1,5 @@
-"""fermOS fits what a run measured (OF-BLD-014 §7.2), and simulates a run
-from its sources (OF-BLD-020 §3.1).
+"""fermOS fits what a run measured, and simulates a run
+from its sources.
 
 THE RULE, AS OF-BLD-020 D1 AMENDS IT. A *fit* takes only a deposition's
 measured series: the page sends a deposition's own readings, the way
@@ -10,7 +10,7 @@ its note is hashed into the fit's id, and keeps its alpha 1.0 words). A *simulat
 parameters from records through the aggregate gate, a fit or forecast, a
 kept simulation, a named person's assumption or a stated convention, each
 named in its basis, and its provenance is basis_provenance over them
-(BINDING below, OF-BLD-020 §3.2).
+(BINDING below).
 
 GROWTH FIT. For a biomass series of four or more readings: least squares of
 ln X on t over every contiguous window of four or more readings. Among the
@@ -49,9 +49,9 @@ fit's own first estimates read off the readings (_batch_start says why not
 its final curve), with the terms one batch's readings cannot pin held as
 conventions named in the basis (no death, no maintenance, Ki and Pmax off,
 anaerobic). It keeps a `kinetic_fit` whose `model` is the family; with no
-biomass series μmax is reported unidentified (OF-BLD-018 D4).
+biomass series μmax is reported unidentified.
 
-THE GAUGE (OF-BLD-020 §3.R, findings 0 and 8). With no biomass series the
+THE GAUGE. With no biomass series the
 scale of the cells is free: X0, Yx/s, α and β are known only together. The
 fit holds X0 at a gauge, X0_GAUGE, named as a convention in its basis, and
 keeps it among its parameters (identified false, said a gauge), so a
@@ -62,7 +62,7 @@ and product are the fit's, the cells the person's scale. Each parameter the
 fit reports unidentified carries why (FitParam.unidentifiedBy), and every
 reader says that reason, never one the interval beside it contradicts.
 
-BINDING (OF-BLD-020 §3.2, D6). `bind_parameters` gives each spec its value
+BINDING. `bind_parameters` gives each spec its value
 by its `sourceRule`, in order: the parameter of the fit a person chose (a
 `kinetic_fit` of the same family, or a `logistic_v0` fit or its forecast for
 what it carries: μ, α, β, the start values, and Yp/s through its forecast as
@@ -80,7 +80,7 @@ waits, and a run refuses naming it and the field that would bind it. Every
 record that is left out is counted and said: another strain or none, no
 carbon source or another one, a unit units.py cannot convert.
 
-NAMED RECORDS (OF-BLD-020 §3.4, D13). A request may bind a parameter to
+NAMED RECORDS. A request may bind a parameter to
 exactly the records it names (`recordsByParam`, spec key to record ids):
 what Postdoc's `fermos_simulate` sends, ids and never values. Each must be
 in the evidence pool, a record of a field the spec binds from, through the
@@ -100,7 +100,7 @@ with their sources, the time course by state, OUR(t), the end state, the
 hour the sugar runs out, the harvest, the mass balance, Yp/s beside the
 newest stored geneOS ceiling of the strain's host models (read, never
 clamped), and its flags. `harvest(artifact, hour)` reads one's broth at an
-hour from the series it keeps (OF-BLD-020 §6.2, D10): never integrated
+hour from the series it keeps: never integrated
 again, nothing kept; pureOS's simulation inlet reads through it.
 """
 from __future__ import annotations
@@ -454,7 +454,7 @@ def unidentified_words(p: FitParam) -> str:
     kept (FitParam.unidentifiedBy); for a fit that kept none (a logistic
     fit, or one kept before reasons were), its interval reaching zero when it
     does, else that the fit gave no reason. Never a reason the interval
-    contradicts (OF-BLD-020 §3.R, finding 3)."""
+    contradicts."""
     if p.unidentifiedBy:
         return "; ".join(X0_GAUGE_WORDS if r == "gauge" and p.name == "x0" else UNIDENTIFIED_WORDS[r]
                          for r in p.unidentifiedBy)
@@ -821,7 +821,7 @@ def _forecast_inputs(fit_artifact: str | None, fit_inline: KineticFit | None, st
     `start_units`) and the length one set (`length`, `duration` in hours),
     each written as every typed value is (basis.override_source: who set it,
     the day it was set and what it rests on), so the forecast is assumed
-    (OF-BLD-020 §3.R; D3, E.2‴; alpha 2.2 D1's amendment at C.2). A length
+    (D3, E.2‴; alpha 2.2 D1's amendment at C.2). A length
     the calling code asks for as its own setting (`duration_h`: a stand-in,
     a fixed check), with nobody named for it, is a convention, as asked."""
     inputs: list[BasisInput] = []
@@ -1356,7 +1356,7 @@ def _source_words(v: ParameterValue) -> str:
 
 def run_refusal(fam: kinetics.Family, specs: list[ParameterSpec], values: list[ParameterValue]) -> str | None:
     """What a simulation of these values would be refused for though
-    nothing waits (OF-BLD-020 §8.R, findings 12 and 14), in the words the run
+    nothing waits, in the words the run
     refuses with, or None when it would go ahead. One function for the run
     (`simulate`), the panel's resolve (a 422) and `bind` (its `refused`, so
     Simulate holds its button): a start value below zero names its key, its
@@ -1633,7 +1633,7 @@ def _record_fields(spec: ParameterSpec, ctx: _Context) -> tuple[list[str], list[
 
 def _named_records(spec: ParameterSpec, ids: list[str], ctx: _Context, pool: Any) -> ParameterValue:
     """A parameter bound to exactly the records a request named for it
-    (`recordsByParam`, OF-BLD-020 §3.4, D13): each must be in the evidence
+    (`recordsByParam`): each must be in the evidence
     pool, be a record of a field the spec binds from, pass
     the aggregate gate and convert into the spec's unit; any one that does
     not refuses the request, naming the record and why. Their value is
@@ -1722,7 +1722,7 @@ def _fit_candidates(fit_id: str, fam: kinetics.Family, specs: dict[str, Paramete
     reason the fit kept); and what it could not give, in words. A fit of
     another family is refused.
 
-    A forecast chosen as the fit (OF-BLD-020 §3.R, finding 13) gives what it
+    A forecast chosen as the fit gives what it
     holds: the start values and length it was drawn under, each credited to
     it with the person its basis names, and its Yp/s as kept; the rates it
     took unchanged from the kinetic fit it rests on are credited to that fit.
@@ -2231,8 +2231,7 @@ def _why_unidentified(v: ParameterValue) -> str:
 
 
 def _steady_state(fam: kinetics.ChemostatV1, p: dict[str, Any], traj: kinetics.Trajectory) -> SteadyState:
-    """chemostat_v1's steady state with the service's numbers in its words
-    (OF-BLD-020 §3.R, findings 1 and 17): the culture's X, S, P and D·P, or
+    """chemostat_v1's steady state with the service's numbers in its words: the culture's X, S, P and D·P, or
     washout; whether washout is a second stable state; which one this run's
     path reached by its end. A steady state the solver cannot find is a
     refusal in words, never a 500 (finding 2)."""
@@ -2434,7 +2433,7 @@ def harvest(simulation_artifact: Any, hour: float | None = None) -> FermosHarves
     is integrated again and nothing is kept. Refused in words: an hour
     outside the simulated span, a simulation that keeps no product series
     in the broth (P), a file whose series cannot be read, and, at its own harvest hour, one kept
-    before that hour was a kept point (OF-BLD-020 §6.R)."""
+    before that hour was a kept point."""
     art = kept_simulation(simulation_artifact)
     o = art.output if isinstance(art.output, dict) else {}
     family = str(o.get("family") or "")

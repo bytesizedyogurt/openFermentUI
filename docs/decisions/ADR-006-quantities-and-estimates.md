@@ -201,10 +201,9 @@ task (development plan §8).
   record with its class for a reader to weigh (`core/tests/test_basis.py` holds the rule). The prompt's §3 words a measured
   run as one resting on "measurements and records alone"; the owner may settle that wording
   against §6.3's, and the rule moves with a new note (`docs/PROGRESS.md`, Departures).
-- `basis.SET_KINDS` names the source kinds of a value a run sets: a person's assumption, a model's
-  estimate and a deposition, of which the one a run sets is a reading (a deposition naming a whole
-  series is the record a kinetic fit rests on); every reader asks `basis.is_set`, which holds a
-  deposition to being a reading (`is_measurement`). `SET_ORIGINS` and `SET_PARAM_ORIGINS` name the
+- `basis.is_set` says whether a basis source is a value a run sets: a person's assumption, a model's
+  estimate or a deposition's reading (a deposition naming a whole series is the record a kinetic fit
+  rests on); every reader asks it, and it holds a deposition to being a reading (`is_measurement`). `SET_ORIGINS` and `SET_PARAM_ORIGINS` name the
   same three as an origin and a parameter's value name them. Every reader of "a value this run set"
   reads them: the values a library run hands its worker, its regression gate and its SFF file, a
   run's parameters, the comparisons, Proforma's sampling, fermOS's, pureOS's and the vessel's

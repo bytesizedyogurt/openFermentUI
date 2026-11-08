@@ -20,7 +20,7 @@ stream defaults as test_train's does):
   scenario with no run is refused; the shelf's broth streams are the ids
   each flowsheet file gives its fermenter's outlet.
 - `GET /api/fermos/harvest` answers the read, 404 for a simulation not on
-  file, 409 for one damaged on disk and 422 in words for the refusals.
+  file, 409 for one damaged in its row and 422 in words for the refusals.
 
 Marked `sim` (the real Proforma worker): a scenario's newest run of the
 glucose-to-ethanol flowsheet gives a train the stream its shelf entry names
@@ -317,7 +317,7 @@ def test_the_harvest_endpoint_reads_the_kept_series_and_refuses_in_words(client,
     assert r.status_code == 422 and "keeps no product series (P" in r.json()["detail"]
     plant_damaged("9" * 16)
     r = client.get(f"/api/fermos/harvest?simulation={'9' * 16}")
-    assert r.status_code == 409 and "damaged on disk" in r.json()["detail"]
+    assert r.status_code == 409 and "damaged in its row" in r.json()["detail"]
     assert client.get("/api/fermos/harvest").status_code == 422
 
 

@@ -1,4 +1,4 @@
-"""`search_records`: the records and candidates Postdoc may cite, found by words (OF-BLD-014 §3.4).
+"""`search_records`: the records and candidates Postdoc may cite, found by words.
 
 It searches `ctx.pool`: the project's candidates as reviewers' decisions
 leave them (evidence_pool.py). Each hit names its kind, record or candidate,

@@ -112,7 +112,7 @@ class NetworkRefused(RuntimeError):
 
 class Transient(RuntimeError):
     """The network's condition, not the paper's: a 5xx that survived the one
-    retry. Never cached — the next run asks again (OF-BLD-012.1 §6.9)."""
+    retry. Never cached — the next run asks again."""
 
 
 def fixtures_only() -> bool:

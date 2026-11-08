@@ -1,4 +1,4 @@
-"""Guild — the competence ledger, and the only functions that write it (OF-BLD-013 §1.2, §2.1, §3.1).
+"""Guild — the competence ledger, and the only functions that write it.
 
 A project's ledger is its rows in `guild_people` and `guild_evidence`, with
 the lead's policy in the project's settings: the people on the team and
@@ -372,7 +372,7 @@ def write_evidence(entry: GuildEvidence, *, dry_run: bool = False) -> GuildEvide
     every rule runs and nothing is written, so asking and deciding are the
     same code. An entry with a check as its source is refused here: it is
     written by running the check (`checks.record`), which calls every
-    criterion first (OF-BLD-013 §5.5).
+    criterion first.
     """
     return _write_entries([entry], dry_run=dry_run, from_check=None)[0]
 

@@ -847,7 +847,7 @@ Write to Home, through the module's own write function. Actions — note: propos
 | `fields` | map to string | yes | What the action needs, by the names in the tool's description, as words and ids; a value copied from a quote is a string. Empty when the action takes none. |
 | `note` | string | yes | Why, in your own words; kept on the audit line and the proposal. |
 
-## The gates (OF-BLD-015 §7.4)
+## The gates
 
 A write tool whose module and action a gate names writes nothing: the call becomes a proposal with `state: proposed`, and Home shows it with the one button a person presses (`core/openferment_core/tools/gates.py`).
 

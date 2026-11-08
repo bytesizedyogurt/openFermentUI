@@ -1,5 +1,4 @@
-"""pureOS's train: data, checked, resolved, run, and kept (OF-BLD-020 §5.2;
-D9, D10, E.2‴, E.3‴).
+"""pureOS's train: data, checked, resolved, run, and kept (D9, D10, E.2‴, E.3‴).
 
 A TRAIN IS DATA (D9). `TrainSpec` (models.py; src/lib/pureos.ts) is an id,
 a name, a program, a product, an inlet, and units in order: each a catalogue
@@ -229,7 +228,7 @@ _ABS_P = "a physical limit: an absolute pressure is above none"
 class TrainRefused(ValueError):
     """A train that cannot run, in words (a 422). `places` holds each
     refusal with the place it belongs to (a unit's id, `inlet`, or `train`),
-    so the Builder can say a unit's on its card (OF-BLD-020 §5.3); one raised
+    so the Builder can say a unit's on its card; one raised
     with words alone is the train's."""
 
     def __init__(self, words: str, places: list[tuple[str, str]] | None = None):
@@ -591,7 +590,7 @@ def _vessel_flow(spec: TrainSpec, sim: Artifact) -> ParameterValue:
 
 def _scenario_run(scenario: str, stream_id: str | None) -> tuple[Artifact, str, tuple[str, str]]:
     """A scenario's newest run on file and the stream the inlet takes from
-    it (OF-BLD-020 §6.2): the one the train names, else the broth its
+    it: the one the train names, else the broth its
     flowsheet names on the shelf (`brothStream`, read from the shelf entry,
     never guessed); refused in words naming the streams the run holds when
     the flowsheet names none, and when the scenario has no run on file."""
@@ -746,7 +745,7 @@ def _inlet_read(spec: TrainSpec) -> _InletRead:
                  f"{catalogue.SOLVENT} is the balance, read from the mixture's density in the worker. A component left "
                  "untyped is absent.")
     def absent(values: list[ParameterValue]) -> dict[str, str]:
-        return {v.key: "absent from the inlet: a component nobody typed is not in it" for v in values
+        return {v.key: "absent from the inlet: the inlet carries the components a person typed" for v in values
                 if v.key.startswith(f"conc{catalogue.SEP}")}
 
     return _InletRead(params.Provided(title=f"Inlet of train {spec.name}: typed", specs=specs, sources=sources,
@@ -1232,7 +1231,7 @@ def unit_scope(spec: TrainSpec, unit: TrainUnitSpec, chemicals: list[str], pool:
         for v in values:
             base = v.key.partition(catalogue.SEP)[0]
             if base in sides:
-                out[v.key] = f"absent from the {base} inlet: a component nobody typed is not in it"
+                out[v.key] = f"absent from the {base} inlet: the inlet carries the components a person typed"
             elif v.key == water and moisture is not None:
                 out[v.key] = _moisture_words(e, moisture)
             elif base == "split" and any(k.startswith(f"split{catalogue.SEP}") and x is not None
@@ -1632,7 +1631,7 @@ def run_train(spec: TrainSpec, inputs: Iterable[EngineInput] | None = None, by: 
 
 
 def check_train(spec: TrainSpec, inputs: Iterable[EngineInput] | None = None, by: str | None = None) -> TrainValidation:
-    """POST /api/pureos/train/check (OF-BLD-020 §5.3): everything a run of the
+    """POST /api/pureos/train/check: everything a run of the
     train with these inputs would refuse, at once, in the run's words, each
     by its place (`_prepared`); runs no train and keeps nothing. The Builder
     holds Run on it."""

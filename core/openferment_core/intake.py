@@ -1,5 +1,4 @@
-"""Intake: what a project reads, collected into Sci RAG Kit (ADR-002;
-OF-BLD-012 §5).
+"""Intake: what a project reads, collected into Sci RAG Kit (ADR-002).
 
 A person names a paper, a report or a strain entry by its identifier, uploads
 a file or pastes text; `collect` hands it to the collector that serves it

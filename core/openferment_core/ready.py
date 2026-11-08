@@ -1,4 +1,4 @@
-"""Is this machine ready for the live loop? (OF-BLD-012 §B.9)
+"""Is this machine ready for the live loop?
 
     pnpm ready                 every check
     pnpm ready --no-network    only what needs no network
@@ -25,7 +25,7 @@ The last line is the lane (OF-BLD-014 A.4), what this machine can run:
 ran and no model answered it. The `huggingface` row is a
 warning at most, and it never changes the exit code: FastEmbed's model file
 comes from there once (the `embedder` row). Nor does the
-`graphviz` row (OF-BLD-019 D8): without `dot`, Proforma lists a flowsheet's
+`graphviz` row: without `dot`, Proforma lists a flowsheet's
 units where its diagram would be.
 """
 from __future__ import annotations
@@ -375,7 +375,7 @@ def check_engines() -> list[Check]:
 
 
 def check_graphviz() -> Check:
-    """Whether Graphviz's `dot` is on the path (OF-BLD-019 D8). Optional, so
+    """Whether Graphviz's `dot` is on the path. Optional, so
     a warning at most: without it Proforma lists a flowsheet's units in run
     order where the diagram would be, and nothing else changes."""
     import shutil
@@ -485,7 +485,7 @@ def _said(e: Exception) -> str:
 
 
 def check_roles(have_key: bool, client_factory: Callable[[], object] | None = None) -> Check:
-    """Each role's models (OF-BLD-014 §3.3, E.7), whether the Models API lists
+    """Each role's models, whether the Models API lists
     them for this key, and today's spend against the daily cap."""
     try:
         cap = spend.daily_budget()
@@ -528,11 +528,8 @@ def check_roles(have_key: bool, client_factory: Callable[[], object] | None = No
 
 
 def _regains(said: str) -> str:
-    """The date the API names for the account's access to return, as it wrote it."""
-    import re
-
-    m = re.search(r"regain access on ([0-9]{4}-[0-9]{2}-[0-9]{2}(?: at [0-9]{2}:[0-9]{2} UTC)?)", said)
-    return f" until {m.group(1)}" if m else ""
+    """The date the API names for the account's access to return (`llm.regains`)."""
+    return llm.regains(said)
 
 
 def check_probe(have_key: bool, client_factory: Callable[[], object] | None = None) -> Check:
@@ -548,7 +545,7 @@ def check_probe(have_key: bool, client_factory: Callable[[], object] | None = No
         result = llm.call(system="", user=MODEL_PROBE_ASK, schema=None, max_tokens=MODEL_PROBE_TOKENS,
                           client_factory=client_factory, label="ready probe: ", family="index")
     except llm.UsageLimitReached as e:
-        return Check("probe", "fail", f"the Anthropic account's usage limit is reached{_regains(str(e))}, so no model "
+        return Check("probe", "fail", f"the Anthropic account's usage limit is reached{getattr(e, 'until', '') or _regains(str(e))}, so no model "
                      "answers; the account's owner raises it in the Anthropic console (Settings, Limits), a limit "
                      "separate from openFerment's daily cap")
     except llm.ModelUnavailable as e:  # the daily cap among them

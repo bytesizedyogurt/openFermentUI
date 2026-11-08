@@ -606,10 +606,10 @@ def test_converse_builds_strict_tools_the_plan_schema_and_top_level_caching():
 def test_converse_returns_tool_calls_and_keeps_every_block_as_returned():
     blocks = [
         SimpleNamespace(type="thinking", thinking="…", signature="sig"),
-        SimpleNamespace(type="tool_use", id="tu_1", name="search_records", input={"query": "PHB"}),
+        SimpleNamespace(type="tool_use", id="tu_1", name="search_records", input={"query": "ethanol yield"}),
     ]
     turn = _converse(lambda r: _turn(blocks, stop="tool_use"))
-    assert [(c.id, c.name, c.input) for c in turn.toolCalls] == [("tu_1", "search_records", {"query": "PHB"})]
+    assert [(c.id, c.name, c.input) for c in turn.toolCalls] == [("tu_1", "search_records", {"query": "ethanol yield"})]
     assert turn.data is None and turn.stopReason == "tool_use"
     assert turn.content[0] == {"type": "thinking", "thinking": "…", "signature": "sig"}
     assert turn.content[1]["type"] == "tool_use"
@@ -827,6 +827,30 @@ def test_an_account_past_its_usage_limit_is_said_so_and_never_called_malformed()
     said = str(e.value)
     assert "usage limit is reached" in said and "2026-12-01" in said and "Anthropic console" in said
     assert "malformed" not in said
+
+
+def test_the_usage_limit_is_said_from_its_date_and_the_api_body_goes_to_the_log(caplog):
+    """Seen on the sweep: the refusal carried the SDK's whole message, its
+    Python dict and request id with it, onto the screen twice. The words name
+    the date alone; the raw message is kept in the log."""
+    import anthropic
+    import httpx
+
+    raw = ("Error code: 400 - {'type': 'error', 'error': {'type': 'invalid_request_error', 'message': '"
+           + USAGE_LIMIT_SAID + "'}, 'request_id': 'req_standin0001'}")
+    refusal = anthropic.BadRequestError(message=raw, response=httpx.Response(400, request=httpx.Request("POST", "https://x")),
+                                        body=None)
+
+    def ask(request):
+        raise refusal
+
+    with caplog.at_level("WARNING", logger="openferment.llm"), pytest.raises(llm.UsageLimitReached) as e:
+        _converse(ask)
+    said = str(e.value)
+    assert said.startswith("The Anthropic account's usage limit is reached until 2026-12-01 at 00:00 UTC, so no model "
+                           "can answer;")
+    assert "Error code" not in said and "req_standin0001" not in said and "{" not in said
+    assert any("req_standin0001" in r.getMessage() for r in caplog.records)
 
 
 def test_any_other_malformed_request_is_unavailable_as_before():

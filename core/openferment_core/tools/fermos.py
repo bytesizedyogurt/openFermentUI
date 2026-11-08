@@ -1,5 +1,4 @@
-"""fermOS's tools: `growth_forecast` (OF-BLD-014 §7.3), `fermos_simulate`
-(OF-BLD-020 §3.4) and `fermos_vessel` (OF-BLD-020 §4.2).
+"""fermOS's tools: `growth_forecast`, `fermos_simulate` and `fermos_vessel`.
 
 `growth_forecast`: a band for the next run, from a fitted one. Ids in: a
 kept kinetic fit's artifact id. The forecast runs under the fitted run's own

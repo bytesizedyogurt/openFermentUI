@@ -1,4 +1,4 @@
-"""A protein product's properties from its sequence (OF-BLD-020 §7.1, D12).
+"""A protein product's properties from its sequence.
 
 Biopython is an open-source library of tools for biological sequences. Its
 ProtParam module (`Bio.SeqUtils.ProtParam.ProteinAnalysis`) computes, from a
