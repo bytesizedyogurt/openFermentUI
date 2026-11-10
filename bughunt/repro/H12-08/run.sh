@@ -6,7 +6,8 @@
 #        refuses a blank X-OpenFerment-Key (api.py:364-365) before it reaches request_key.
 # In a worktree of 2047f5a of this run's own: a probe of each rule on the tree as it stands, then each rule dropped
 # in turn, the probe again (the break is real) and the tests that hold the override and the guard
-# (test_key_override.py, test_request_guard.py, test_llm.py). A green run under a real break is the defect.
+# (test_key_override.py, test_request_guard.py, test_llm.py). A green run under a real break is the defect. A control
+# drops guard.refusal's Funnel rule, which test_request_guard holds, so a red run there shows the tests read the worktree.
 # Keyless: the worktree carries no core/.env and the stand-in clients make no call. A fresh database of its own
 # (bh_r_h12_08_db) serves the probe; the tests' session databases are made under bh_r_h12_08_t; all are dropped,
 # and the worktree removed, at the end.
@@ -114,14 +115,26 @@ P2=$(probe m28); echo "$P2" | sed 's/^/   /'
 R2=$(tests); echo "   pytest ${TESTS[*]}: $R2"
 restore
 
+# The control: guard.refusal's own Funnel rule dropped, a rule test_request_guard holds; the same selection fails,
+# so the tests above ran on the worktree's mutated code.
+C_OLD='    if FUNNEL in headers:
+        return "a request through Tailscale Funnel comes from the public internet and may not change anything"'
+C_NEW='    if False:
+        return "a request through Tailscale Funnel comes from the public internet and may not change anything"'
+mutate core/openferment_core/guard.py "$C_OLD" "$C_NEW" || fail "the control does not apply"
+echo "3. control, guard.refusal's Funnel rule dropped: $(git -C "$WT" diff --stat | tail -1 | sed 's/^ *//')"
+RC=$(tests); echo "   pytest ${TESTS[*]}: $RC"
+restore
+
 green() { echo "$1" | grep -qE '^[0-9]+ passed' && ! echo "$1" | grep -qE 'failed|error'; }
 B_FUN=$(echo "$P0" | grep -c "^funnel GET /api/audit naming a key: 403 .*Funnel.*may not name a key.* key_held=False key_override_rows=\[\]")
 B_KEY=$(echo "$P0" | grep -c "^request_key('  '): key_named()=False")
 M_FUN=$(echo "$P1" | grep -c "^funnel GET /api/audit naming a key: 200 .* key_held=True key_override_rows=\['GET /api/audit'\]")
 M_KEY=$(echo "$P2" | grep -c "^request_key('  '): key_named()=True")
 echo "EXPECTED: guard.py:95-99 refuses a key named through Tailscale Funnel on a read or a change alike, and llm.py:693-698 takes an empty key as none; so with either rule dropped a test of the override fails: a GET naming a key through Funnel answered 403, and request_key('  ') leaving key_named() False"
-echo "OBSERVED: on the tree, the Funnel GET is $(echo "$P0" | grep -oP '^funnel GET /api/audit naming a key: \K[0-9]+') and request_key('  ') gives $(echo "$P0" | grep -oP "^request_key\('  '\): \Kkey_named\(\)=\w+"); with the Funnel rule dropped (M31) the Funnel GET is answered $(echo "$P1" | grep -oP '^funnel GET /api/audit naming a key: \K[0-9]+'), the key held for the request and an override row kept ($(echo "$P1" | grep -oP 'key_override_rows=\K.*')), and the tests give $R1; with the blank-key rule dropped (M28) request_key('  ') gives $(echo "$P2" | grep -oP "^request_key\('  '\): \Kkey_named\(\)=\w+") and $(echo "$P2" | grep -oP "^request_key\('  '\): key_named\(\)=\w+ \Kwhose=.*"), and the tests give $R2"
-if [ "$B_FUN" = 1 ] && [ "$B_KEY" = 1 ] && [ "$M_FUN" = 1 ] && [ "$M_KEY" = 1 ] && green "$R1" && green "$R2"; then
+echo "OBSERVED: on the tree, the Funnel GET is $(echo "$P0" | grep -oP '^funnel GET /api/audit naming a key: \K[0-9]+') and request_key('  ') gives $(echo "$P0" | grep -oP "^request_key\('  '\): \Kkey_named\(\)=\w+"); with the Funnel rule dropped (M31) the Funnel GET is answered $(echo "$P1" | grep -oP '^funnel GET /api/audit naming a key: \K[0-9]+'), the key held for the request and an override row kept ($(echo "$P1" | grep -oP 'key_override_rows=\K.*')), and the tests give $R1; with the blank-key rule dropped (M28) request_key('  ') gives $(echo "$P2" | grep -oP "^request_key\('  '\): \Kkey_named\(\)=\w+") and $(echo "$P2" | grep -oP "^request_key\('  '\): key_named\(\)=\w+ \Kwhose=.*"), and the tests give $R2; the control (guard.refusal's Funnel rule dropped) gives $RC"
+if [ "$B_FUN" = 1 ] && [ "$B_KEY" = 1 ] && [ "$M_FUN" = 1 ] && [ "$M_KEY" = 1 ] && green "$R1" && green "$R2" \
+   && echo "$RC" | grep -qE '[0-9]+ failed'; then
   echo "RESULT: DEFECT"
 else
   echo "RESULT: NO-DEFECT"

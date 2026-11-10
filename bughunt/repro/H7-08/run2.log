@@ -1,0 +1,11 @@
+EXPECTED: inside a project (#/p/h7-08/...) the rail's logo is a link to a plain path like every other rail link, so it stays inside the project (ADR-009 7.1, docs/decisions/ADR-009-ui.md:21): it opens #/p/h7-08, the project's home, and the rail's links after it keep #/p/h7-08/.
+OBSERVED: src/App.tsx logo anchor: 498:            <a href="#/" className="flex items-center gap-2 min-w-0">
+OBSERVED: src/App.tsx rail anchors: 517:                  href={href(item.to)}
+OBSERVED: bundles in dist/assets carrying the logo as href "#/": 1
+SETUP: the service holds the projects [h7-08]
+OBSERVED: start address #/p/h7-08/runbooks; top bar "H7-08 repro"; the logo's href #/; 13 of the 13 other rail links keep #/p/h7-08/ (#/p/h7-08 #/p/h7-08/intake #/p/h7-08/biorepo ...)
+OBSERVED: the rail's own Home entry (src/data/nav.ts, to '/') reads #/p/h7-08; the logo, aimed at the same '/', reads #/
+OBSERVED: after the logo: address #/; top bar "H7-08 repro"; localStorage openferment.project 'h7-08'; the screen: "OPENFERMENT Bioprocess literature you can operate on Ask Postdoc about the documents your "
+OBSERVED: after the logo: 13 of the 13 rail links are plain paths (#/ #/intake #/biorepo #/postdoc ...)
+OBSERVED: after the rail's Intake link: address #/intake; top bar "H7-08 repro"
+RESULT: DEFECT

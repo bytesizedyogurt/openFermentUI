@@ -1,0 +1,10 @@
+EXPECTED: POST /api/intake/catalogue with the CSV 'id,name / S5,First / S5,Second' keeps every row that is an
+EXPECTED: entry and refuses every other row with its reason (docs/api/intake.md:104): each row the answer counts
+EXPECTED: as kept is held after the request, so the second S5 row is refused in words (or the answer names the
+EXPECTED: replacement), and the answer's kept list names S5 once
+NOTICE:  database "bh_r_h8_10_svc" does not exist, skipping
+OBSERVED: HTTP 200, answer {"kind": "strain", "kept": ["S5", "S5"], "refused": []}
+OBSERVED: the strain catalogue holds [('S5', 'Second')]
+OBSERVED: 2 keep_catalogue audit rows on strain/S5, states ['kept', 'kept']
+OBSERVED: rows of the file whose entry the catalogue does not hold: ['First']
+RESULT: DEFECT

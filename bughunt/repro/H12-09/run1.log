@@ -1,0 +1,31 @@
+worktree /tmp/claude-0/-home-user-openFermentUI/cfbc5c9f-640a-5002-a705-5ceaf850fdc6/scratchpad/bh/work/H12-09/wt-22431 at 2047f5a
+contract, core/openferment_core/guard.py:22-26:
+  | A host this service answers to: an IP address, a name with no dot, a `.local`
+  | name (Bonjour), a `.ts.net` name (Tailscale's names for the owner's devices),
+  | or one listed in OPENFERMENT_ALLOWED_HOSTS. Each of these is answered by the
+  | owner's own network or by Tailscale; a rebinding attack needs a public domain
+  | whose DNS the attacker answers, and none of these is one.
+the line under test, guard.py:78: return "." not in host or host.endswith(OWN_SUFFIXES)
+1. refused on the head: test_key_override.py:131 Host 'evil.example' (ends .example)
+1. refused on the head: test_request_guard.py:38 Host 'rebind.evil.example.com:8000' (ends .com)
+1. refused on the head: test_request_guard.py:73 Host 'rebind.evil.example.com' (ends .com)
+1. refused on the head: test_request_guard.py:115 Host 'rebind.evil.example.com' (ends .com)
+1. refused on the head: test_request_guard.py:120 Host 'openferment.example.org' (ends .org)
+1. refused on the head: test_request_guard.py:165 Host 'rebind.evil.example.com' (ends .com)
+1. every Host value ending in .net: ['test_request_guard.py:52 mini.tail1234.ts.net', 'test_request_guard.py:62 mini.tail1234.ts.net', 'test_request_guard.py:95 mini.tail1234.ts.net']
+2. head: guard.answers_to('rebind.evil.example.net') = False
+2. head: guard.refusal('POST', Host and Origin rebind.evil.example.net:8000) = "this service does not answer to 'rebind.evil.example.net'. Add the name to OPENFERMENT_ALLOWED_HOSTS if it is yours"
+2. head: POST /api/projects under Host rebind.evil.example.net:8000 -> 403 {"detail":"this service does not answer to 'rebind.evil.example.net'. Add the name to OPENFERMENT_ALLOWED_HOSTS if it is yours"}
+2. head: projects the database holds after it: []
+3. control (every .com name answered), test_request_guard.py: exit 1; 2 failed, 37 passed in 4.04s
+3.   FAILED tests/test_request_guard.py::test_a_rebound_hostile_name_is_refused
+3.   FAILED tests/test_request_guard.py::test_a_forwarded_name_cannot_launder_a_hostile_host
+4. mutation applied: return "." not in host or host.endswith((*OWN_SUFFIXES, ".net"))
+4. mutated tree, test_request_guard.py test_key_override.py test_projects.py: exit 0; 58 passed in 4.63s
+5. mutant: guard.answers_to('rebind.evil.example.net') = True
+5. mutant: guard.refusal('POST', Host and Origin rebind.evil.example.net:8000) = None
+5. mutant: POST /api/projects under Host rebind.evil.example.net:8000 -> 201 {"id":"made-through-a-rebound-name","name":"Made through a rebound name","description":"","createdBy":"a hostile page","createdAt":"2026-11-10T23:48:27.461240+0
+5. mutant: projects the database holds after it: ['made-through-a-rebound-name']
+EXPECTED: a guard test sends a public name outside .local, .localhost and .ts.net that ends in .net (such as rebind.evil.example.net) and asserts a 403, so a guard that answers to every .net name fails a test, as the control's .com guard does
+OBSERVED: the tests' refused Hosts number 6, 0 of them .net; the control's .com guard: pytest exit 1; the .net guard (M32): pytest exit 0 (58 passed in 4.63s), and under it POST /api/projects with Host and Origin rebind.evil.example.net answered 201 (the head: 403)
+RESULT: DEFECT

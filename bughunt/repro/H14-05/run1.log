@@ -1,0 +1,12 @@
+service http://127.0.0.1:9780 over fresh database bh_r_h14_05_home, no key
+step 1: pasted document 2c154d1ca78446f182758b5b7e98798d
+step 2: its passage p0
+step 3: candidate written by hand through the tool door: mw1-2c154d1ca78446f182758b5b7e98798d-0000
+step 4: promoted to the gold set: mw1-2c154d1ca78446f182758b5b7e98798d-0000 verified provenance gold gold {'value': 41.7, 'unit': 'g/L'}
+step 5: GET /api/biorepo/overlay holds 1 record(s) with a gold value
+step 6: Home of the built app in Chromium (project h14-05): {"goldTile":["GOLD SET","1","across 1 paper · the evaluation baseline"],"bioRepo":["BioRepo","records, artifacts, provenance","1 paper · gold set not yet annotated"]}
+step 7: the line's source at 2047f5a, written for every count:
+  src/screens/Home.tsx:284:    BioRepo: { now: `${n.papers} paper${n.papers === 1 ? '' : 's'} · gold set not yet annotated`, built: true },
+EXPECTED: with one gold value on the Gold set tile, the BioRepo destination line counts the gold values or leaves the gold set out (Home.tsx:235-237: "What each destination actually has, right now ... Counted from the store's lists")
+OBSERVED: Gold set tile "1" with "across 1 paper · the evaluation baseline"; BioRepo destination line "1 paper · gold set not yet annotated"
+RESULT: DEFECT

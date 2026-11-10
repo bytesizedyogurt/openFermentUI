@@ -1,0 +1,29 @@
+NOTICE:  database "bh_r_h1_08_svc" does not exist, skipping
+== the service on http://127.0.0.1:9760 over bh_r_h1_08_svc, the stand-in engine h108 on PYTHONPATH
+== GET /api/engines: h108's thing cfg as listed
+[200]
+h108: things=[('cfg', ['one', ' two '], 'one')] error=''
+== control: POST /api/engines/h108/run {thing: cfg, configuration: "one"}
+200 {"run":{"id":"7bab70faa9c3ad49","engine":"h108","plant":"cfg","configuration":"one","status":"done","tool":"engine.h108","toolVersion":"engine run 1 · h108 · openferment-engine-h108 0.1.0","inpu
+== the case: POST /api/engines/h108/run {thing: cfg, configuration: " two "} (the name as listed)
+422 {"detail":"cfg runs in one,  two ; 'two' is none of them"}
+== and with the name stripped: POST /api/engines/h108/run {thing: cfg, configuration: "two"}
+422 {"detail":"cfg runs in one,  two ; 'two' is none of them"}
+== the case: GET /api/engines/h108/parameters?thing=cfg&configuration=%20two%20
+422 {"detail":"cfg runs in one,  two ; 'two' is none of them"}
+== the case: POST /api/tools/engine_run {engine: h108, plant: cfg, configuration: " two "}
+[200]
+error: engine_run refused: cfg runs in one,  two ; 'two' is none of them
+the run and parameters ops the worker received, by configuration: [('parameters', 'one'), ('run', 'one')]
+runs rows kept for h108 (configuration:status): one:done
+
+EXPECTED: docs/api/engines.md:231-232 holds each of a thing's configurations to "each name 1 to 80 characters", and engines.md:242-248 refuses only "a configuration the thing does not name", at every door; so either h108's things answer naming the configuration " two " is refused (the thing set aside in words), or " two ", a name the thing lists, runs at the run route and is read at the parameters route and the engine_run tool
+OBSERVED: listing: h108: things=[('cfg', ['one', ' two '], 'one')] error=''
+OBSERVED: run in " two ": 422 {"detail":"cfg runs in one,  two ; 'two' is none of them"}
+OBSERVED: run in "two": 422 {"detail":"cfg runs in one,  two ; 'two' is none of them"}
+OBSERVED: parameters in " two ": 422 {"detail":"cfg runs in one,  two ; 'two' is none of them"}
+OBSERVED: engine_run tool in " two ": error: engine_run refused: cfg runs in one,  two ; 'two' is none of them
+OBSERVED: worker ops received: [('parameters', 'one'), ('run', 'one')]; runs rows: one:done
+CONTROL:  run in "one": 200 {"run":{"id":"7bab70faa9c3ad49","engine":"h108","plant":"cfg","configuration":"one","status":"done","tool":"engine.h ...
+checks: listed=1 control=1 run_refused=1 bare_refused=1 params_refused=1 tool_refused=1 worker_saw_two=0
+RESULT: DEFECT

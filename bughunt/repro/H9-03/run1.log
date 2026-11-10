@@ -1,0 +1,25 @@
+worktree: /tmp/claude-0/-home-user-openFermentUI/cfbc5c9f-640a-5002-a705-5ceaf850fdc6/scratchpad/bh/work/H9-03/wt-1794354502-24899 at 2047f5a
+databases: bh_r_h9_03_cfg made fresh and migrated; each pytest session makes and drops its own bh_r_h9_03_t_* database
+== the code the candidate names (2047f5a)
+   core/tests/test_writes.py:364:        raise llm.BudgetExhausted("today's budget is spent")
+   core/tests/test_writes.py:366:    monkeypatch.setattr(extract, "extract_paper", broke)
+   core/tests/test_proposals_review.py:75:        raise llm.BudgetExhausted("Today's model spend is $4.20 of the $5.00 daily cap, and this call could pass it.")
+   core/tests/test_proposals_review.py:77:    monkeypatch.setattr(extract, "extract_paper", broke)
+   core/openferment_core/llm.py:438:class BudgetExhausted(ModelUnavailable):
+   core/openferment_core/extract.py:340:    except llm.ModelUnavailable as e:
+   core/openferment_core/extract.py:342:        raise ExtractUnavailable(f"{e}{spent}") from e
+   core/openferment_core/tools/writes.py:1171:    except llm.BudgetExhausted:
+== 1. the tree as it is (2047f5a)
+   pytest: 2 failed, 2 passed in 4.33s
+   T1 passed | T2 passed | P1 failed | P2 failed
+   P1 extract_paper under the cap: raised ExtractUnavailable (BudgetExhausted: False; from BudgetExhausted): "Today's model spend is $0.00 of the $0.00 daily cap, and this call could pass it. Raise OPENFERMENT_DAILY_BUDGET_USD in core/.env, or wait for the next UTC day."; module /tmp/claude-0/-home-user-openFermentUI/cfbc5c9f-640a-5002-a705-5ceaf850fdc6/scratchpad/bh/work/H9-03/wt-1794354502-24899/core/openferment_core/extract.py
+   P2 intake_write extract under the cap: error "intake_write could not extract X1: Today's model spend is $0.00 of the $0.00 daily cap, and this call could pass it. Raise OPENFERMENT_DAILY_BUDGET_USD in core/.env, or wait for the next UTC day." | summary {} | proposals kept 0
+== 2. control: extract.call_model re-raises llm.BudgetExhausted before its ModelUnavailable branch
+    1 file changed, 2 insertions(+)
+   pytest: 4 passed in 5.92s
+   T1 passed | T2 passed | P1 passed | P2 passed
+   P1 extract_paper under the cap: raised BudgetExhausted (BudgetExhausted: True; from None): "Today's model spend is $0.00 of the $0.00 daily cap, and this call could pass it. Raise OPENFERMENT_DAILY_BUDGET_USD in core/.env, or wait for the next UTC day."; module /tmp/claude-0/-home-user-openFermentUI/cfbc5c9f-640a-5002-a705-5ceaf850fdc6/scratchpad/bh/work/H9-03/wt-1794354502-24899/core/openferment_core/extract.py
+   P2 intake_write extract under the cap: error None | summary {'state': 'proposed', 'proposalId': 'pr-b473f777b683', 'gate': 'spend', 'gateCovers': 'spend past the ask or the daily budget', 'how': 'extract it when the budget allows', 'meaning': 'nothing was written: this action waits for a person, who sees it as a card on Home with one button. Say so in gaps.'} | proposals kept 1
+EXPECTED: the spend gate's two tests (test_writes.py:360, test_proposals_review.py:73) fail on a tree whose real extraction path keeps no spend proposal when the daily cap refuses: they pass only where the budget refusal through extract_paper becomes a proposal, as P2 asks
+OBSERVED: on 2047f5a T1 and T2 pass while the real extract_paper under the cap raises ExtractUnavailable (from BudgetExhausted) and intake_write extract answers an error with no proposal kept (P1, P2 fail); with call_model letting BudgetExhausted through, P1 and P2 pass and T1 and T2 pass alike, so their outcome does not depend on whether the gate works
+RESULT: DEFECT

@@ -1,6 +1,7 @@
 #!/usr/bin/env bash
 # H7-06: with the service stopped, the runbook, deposition, paper, Guild skill and Postdoc conversation pages say the
-# project keeps no such row, while the strain, lesson and protocol pages say the service is not running.
+# project keeps no such row. The strain, lesson and protocol pages, reading the same failed loads, say the service is
+# not running.
 #
 #   bash bughunt/repro/H7-06/run.sh        (from the repository root)
 #
@@ -76,9 +77,11 @@ print(f"OBSERVED: with the service stopped the pages made {down['apiRequests']} 
 def shown(name, state):
     return (up if state == "up" else down)["pages"][name]
 
-def snippet(text, at, width=150):
-    i = text.find(at)
-    return text[:width] if i < 0 else text[max(0, i - 40):i + width]
+def words(text, at=None, width=200):
+    """The main region's first words, and from `at` on when it stands further in."""
+    head = text[:width]
+    i = text.find(at) if at else -1
+    return head if i < 0 or i + len(at) <= width else f"{head} ... {text[i:i + 160]}"
 
 held_up, said_none, named = {}, {}, {}
 for name, (row, none) in UNDER_TEST.items():
@@ -87,15 +90,16 @@ for name, (row, none) in UNDER_TEST.items():
     said_none[name] = none in d["main"] and row not in d["main"]
     named[name] = [w for w in SERVICE if w in d["body"]]
     print(f"OBSERVED: under test {name} {u['path']}: service up, the row shows: {held_up[name]}; service stopped: "
-          f"\"{snippet(d['main'], none)}\"; says the project holds no such row: {said_none[name]}; names the service: "
+          f"\"{words(d['main'], 'Postdoc needs the service' if named[name] else none)}\"; says the project holds no such row: "
+          f"{said_none[name]}; names the service: "
           f"{named[name] or 'nothing'}")
 controls_held = {}
 for name, row in CONTROLS.items():
     u, d = shown(name, "up"), shown(name, "stopped")
-    words = [w for w in SERVICE if w in d["main"]]
+    said = [w for w in SERVICE if w in d["main"]]
     controls_held[name] = row in u["main"] and "The service is not running" in d["main"]
     print(f"OBSERVED: control {name} {u['path']}: service up, the row shows: {row in u['main']}; service stopped: "
-          f"\"{snippet(d['main'], 'The service is not running')}\"; names the service: {words or 'nothing'}")
+          f"\"{words(d['main'], 'The service is not running')}\"; names the service: {said or 'nothing'}")
 silent = [n for n in UNDER_TEST if not named[n]]
 print(f"OBSERVED: {sum(said_none.values())} of {len(UNDER_TEST)} pages under test say the project holds no such row "
       f"with the service stopped, {len(silent)} of them ({', '.join(silent) or 'none'}) say nothing of the service; "
