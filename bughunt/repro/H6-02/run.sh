@@ -64,9 +64,7 @@ echo "  POST /api/biorepo/check with the same decision: ok rule | why: $CHECK"
 
 echo "EXPECTED: the importer refuses the directory as biorepo.write refuses the decision (rule estimate): a model's estimate never enters a record store (CLAUDE.md:54)"
 echo "OBSERVED: import exit $IMPORT_EXIT into project $PID; BioRepo serves cl1-P1-0001 as '$OVERLAY'; the store's own door answers '$CHECK'"
-set -- $OVERLAY
-if [ "${1:-}" = verified ] && [ "${2:-}" = gold ] && [ "${5:-}" = model-estimate ] && [ "${CHECK%% *}" = False ] \
-   && [ "$(echo "$CHECK" | awk '{print $2}')" = estimate ]; then
+if [[ "$OVERLAY" == "verified gold "*" model-estimate "* ]] && [[ "$CHECK" == "False estimate |"* ]]; then
   verdict DEFECT
 fi
 verdict NO-DEFECT

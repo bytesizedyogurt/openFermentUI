@@ -1,0 +1,21 @@
+core/uv.lock: the same file at 112eb8b and 2047f5a (one venv runs both trees)
+database bh_r_h6_01_upgrade (fresh): openferment at 0007, alpha 2.1's migrations
+alpha 2.1's service (112eb8b): http://127.0.0.1:9930
+alpha 2.1 POST /api/catalogues/product kept ethanol category 'biofuel' by Ada Moreno
+alpha 2.1 POST /api/catalogues/product kept cellulase category 'industrial_enzyme' by Ada Moreno
+alpha 2.1 catalogue_write kept xylitol error None
+alpha 2.1 GET /api/catalogues/product: [('cellulase', 'industrial_enzyme'), ('ethanol', 'biofuel'), ('xylitol', 'sugar alcohol')]
+head migrate: postgresql+asyncpg://openferment:***@127.0.0.1:5432/bh_r_h6_01_upgrade: openferment at 0010, sci_rag at 0006
+the head's service (2047f5a): http://127.0.0.1:9931
+head log, times: 5 WARNING openferment_core.catalogues: the product catalogue's row ethanol does not read as an entry and is left out: category: a product's category is one of the classes p
+head log, times: 5 WARNING openferment_core.catalogues: the product catalogue's row xylitol does not read as an entry and is left out: category: a product's category is one of the classes p
+the screen's subtitle: src/screens/Catalogues.tsx:570 "Every entry stays once kept"
+head GET /api/catalogues/product: a list of 1 -> [('cellulase', 'industrial_enzyme')]
+head GET /api/catalogues/product/ethanol: 404 the project's product catalogue holds no ethanol
+head GET /api/catalogues/product/xylitol: 404 the project's product catalogue holds no xylitol
+head GET /api/catalogues/product/cellulase: 200 category 'industrial_enzyme'
+head catalogue_read: matched 1 ['cellulase']
+openferment.catalogue rows: [('product/cellulase', 'industrial_enzyme', 'Ada Moreno'), ('product/ethanol', 'biofuel', 'Ada Moreno'), ('product/xylitol', 'sugar alcohol', 'Ada Moreno')]
+EXPECTED: the three products alpha 2.1 listed (['cellulase', 'ethanol', 'xylitol']) still listed and read by id at the head, or each one the head cannot read named to the person with why (as GET /api/state names a row it cannot read in `refused`)
+OBSERVED: the head lists ['cellulase'] (a bare list naming nothing left out); GET ethanol answers 404 "the project's product catalogue holds no ethanol", GET xylitol answers 404 "the project's product catalogue holds no xylitol"; catalogue_read matched 1; the database still holds 3 rows, ['ethanol', 'xylitol'] among them
+RESULT: DEFECT

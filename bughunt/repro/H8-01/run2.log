@@ -1,0 +1,17 @@
+service: http://127.0.0.1:10240  database: bh_r_h8_01_case (fresh)
+ra pasted:               The biorefinery processes 2000 Mg of dry corn stover per day in the H8-01 repro.
+rb pasted:               The biorefinery processes 2000 mg of dry corn stover per day in the H8-01 repro.
+ra's outcome:            ingested de622e366ba34a0c8c1227288bfe5f07
+rb's outcome:            linked de622e366ba34a0c8c1227288bfe5f07 (same document as ra's)
+rb's passage reads:      The biorefinery processes 2000 Mg of dry corn stover per day in the H8-01 repro.
+rb's search hits read:   ['The biorefinery processes 2000 Mg of dry corn stover per day in the H8-01 repro.', 'The biorefinery processes 2000 kg of dry corn stover per day in the H8-01 repro.']
+control, rb pasted:      The biorefinery processes 2000 kg of dry corn stover per day in the H8-01 repro.
+control outcome:         ingested dc74692f0dc54ba0a7233e44c162ed62 | its passage: The biorefinery processes 2000 kg of dry corn stover per day in the H8-01 repro.
+VERDICT: DEFECT | control (one word apart ingested as its own): yes
+the kit's chunk rows (sci_rag.chunks) naming 2000 of a gram unit:
+  2000 Mg | 1
+  2000 kg | 1
+chunk rows holding rb's own words "2000 mg": 0
+EXPECTED: rb's "... 2000 mg ..." is other text from ra's "... 2000 Mg ..." (docs/api/intake.md:53, linked means the kit held the same text): rb's paste is ingested as a document of its own and rb's passage reads "2000 mg".
+OBSERVED: rb's paste is answered linked to ra's document; rb's passage and search read ra's "2000 Mg" (a unit 10^9 times rb's), and no chunk row holds rb's "2000 mg"; the control one word apart ("2000 kg") is ingested as its own.
+RESULT: DEFECT

@@ -24,4 +24,4 @@ NOTICE:  database "bh_r_h6_02_import" does not exist, skipping
   POST /api/biorepo/check with the same decision: ok rule | why: False estimate | cl1-P1-0001: BioRepo keeps records, and gold.origin is a model's estimate or rests on an assumption: an estimate may reach a scenario or a run, never 
 EXPECTED: the importer refuses the directory as biorepo.write refuses the decision (rule estimate): a model's estimate never enters a record store (CLAUDE.md:54)
 OBSERVED: import exit 0 into project alpha-1-0-estimate; BioRepo serves cl1-P1-0001 as 'verified gold 3.0 mg L-1 model-estimate claude-x'; the store's own door answers 'False estimate | cl1-P1-0001: BioRepo keeps records, and gold.origin is a model's estimate or rests on an assumption: an estimate may reach a scenario or a run, never '
-RESULT: NO-DEFECT
+RESULT: DEFECT

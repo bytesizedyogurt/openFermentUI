@@ -1,0 +1,28 @@
+NOTICE:  database "bh_r_h13_02_demo" does not exist, skipping
+worktree: /tmp/claude-0/-home-user-openFermentUI/cfbc5c9f-640a-5002-a705-5ceaf850fdc6/scratchpad/bh/work/H13-02/wt at 2047f5a
+   openferment_core: /tmp/claude-0/-home-user-openFermentUI/cfbc5c9f-640a-5002-a705-5ceaf850fdc6/scratchpad/bh/work/H13-02/wt/core/openferment_core/__init__.py
+   report.OUT: /tmp/claude-0/-home-user-openFermentUI/cfbc5c9f-640a-5002-a705-5ceaf850fdc6/scratchpad/bh/work/H13-02/wt/docs/reports/literature-retrieval
+
+== 1. the contract and the generator, as 2047f5a holds them
+   docs/reports/literature-retrieval.md:1: <!-- Written by `pnpm lit:report` (core/openferment_core/literature/report.py); regenerate, do not edit. -->
+   docs/reports/literature-retrieval.md:91: <!-- Added by hand at alpha 2.2 F.5 (docs/PROGRESS.md, stage F's log): the next `pnpm lit:report --project ethanol ... --render` writes this project's part whole from its own run, these two sections with it. -->
+   CLAUDE.md:106: - C: The local embedder serves a project's corpus at this scale; `pnpm lit:report` measures retrieval against the kit's 
+   the committed file: 126 lines; its '### What this run measured' at line 93, '### What waits on the account' at line 109
+   the sections report.render() writes (core/openferment_core/literature/report.py:732-822):
+      report.py:746 ### The corpus
+      report.py:752 ### The ground truth
+      report.py:759 ### Retrieval
+      report.py:785 ### The judge's relevance
+      report.py:795 ### Answers
+      report.py:809 ### Routes
+      report.py:813 ### Cost
+   lines of report.py naming 'What this run measured': 0; naming 'What waits on the account': 0
+
+== 2. a project render (report.write of the committed JSON's own part), no database
+   rendered parts: ethanol
+   the rendered file: 89 lines; against the committed file 37 lines gone, 0 added; the JSON unchanged: yes
+   diff hunks: 90,126d89 
+   '### What this run measured' in it: 0; '### What waits on the account' in it: 0
+
+== 3. `pnpm lit:report` (the kit's demo, offline, keyless), its database a fresh bh_r_h13_02_demo
+NOTICE:  database "bh_r_h13_02_demo" does not exist, skipping

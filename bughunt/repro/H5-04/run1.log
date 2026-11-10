@@ -1,0 +1,23 @@
+NOTICE:  database "bh_r_h5_04_locked" does not exist, skipping
+service: http://127.0.0.1:9630 over a fresh bh_r_h5_04_locked (keyless)
+commit: 6a32507; core/ as at 2047f5a: yes
+project 201
+kinetics run 3c8d443a7fca6d7c done
+make rb-study-cc42c7ff6fb1 lockedAt None
+lock ('2026-11-10T23:13:54.128414Z', 'a09f34dfc59233bc') predictions [('p1', 10.577647058823533, 'g L⁻¹')]
+DELETE /api/state/runbookLocks/rb-study-cc42c7ff6fb1: 422 {'detail': 'a runbookLock is kept as it was made, and never taken back'}
+DELETE /api/state/runbooks/rb-study-cc42c7ff6fb1: 200 {'kind': 'runbooks', 'id': 'rb-study-cc42c7ff6fb1', 'removed': True}
+  GET /api/studies/runbooks/rb-study-cc42c7ff6fb1: 404 {'detail': 'the project holds no runbook rb-study-cc42c7ff6fb1'}
+  GET /api/studies/runbooks lists: []
+  GET /api/state runbooks: [] | runbookLocks[rid]: {'lockedAt': '2026-11-10T23:13:54.128414Z', 'lockHash': 'a09f34dfc59233bc'}
+  PUT /api/state/runbooks/rb-study-cc42c7ff6fb1 with a moved prediction (the lock left behind still guards a write): 422 {'detail': 'rb-study-cc42c7ff6fb1 is locked: its predictions and measures are kept as they were frozen under a09f34dfc59233bc, and a change is a new runbook'}
+POST /api/studies/runbooks again: 200 id rb-study-cc42c7ff6fb1 lockedAt None lockHash None
+  GET /api/studies/runbooks/rb-study-cc42c7ff6fb1: 200 lockedAt 2026-11-10T23:13:54.128414Z lockHash a09f34dfc59233bc
+  GET /api/studies/runbooks lists: [('rb-study-cc42c7ff6fb1', '2026-11-10T23:13:54.128414Z', 'a09f34dfc59233bc')]
+  audit: [('keep_runbooks', 'alice', 'kept'), ('lock', 'alice', 'locked'), ('remove_runbooks', 'alice', 'removed'), ('keep_runbooks', 'alice', 'kept')]
+
+EXPECTED: (1) DELETE /api/state/runbooks/<id> of a locked runbook refused in words (422), as DELETE /api/state/runbookLocks/<id> is (422), the runbook still served with its frozen predictions; (2) a make of the same run and outputs answering the runbook with its lock, as GET and the listing do
+OBSERVED: (1) DELETE 200 {'kind': 'runbooks', 'id': 'rb-study-cc42c7ff6fb1', 'removed': True}; GET /api/studies/runbooks/rb-study-cc42c7ff6fb1 404; the lock still kept in runbookLocks: {'lockedAt': '2026-11-10T23:13:54.128414Z', 'lockHash': 'a09f34dfc59233bc'}
+OBSERVED: (2) the make again answers lockedAt None lockHash None; GET answers lockedAt 2026-11-10T23:13:54.128414Z lockHash a09f34dfc59233bc
+part 1 (taken back, lock left behind): DEFECT; part 2 (make answers unlocked, reads answer locked): DEFECT
+RESULT: DEFECT

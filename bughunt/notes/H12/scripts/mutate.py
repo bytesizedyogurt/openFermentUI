@@ -11,13 +11,14 @@ from __future__ import annotations
 
 import difflib
 import json
+import os
 import shutil
 import subprocess
 import sys
 import time
 from pathlib import Path
 
-WT = Path("/tmp/claude-0/-home-user-openFermentUI/cfbc5c9f-640a-5002-a705-5ceaf850fdc6/scratchpad/bh/work/H12/wt")
+WT = Path(os.environ.get("WT", "/tmp/claude-0/-home-user-openFermentUI/cfbc5c9f-640a-5002-a705-5ceaf850fdc6/scratchpad/bh/work/H12/wt"))
 NOTES = Path("/home/user/openFermentUI/bughunt/notes/H12")
 RUN = NOTES / "scripts" / "wtpytest.sh"
 OUT = NOTES / "mutations"

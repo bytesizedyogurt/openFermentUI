@@ -1,0 +1,24 @@
+EXPECTED: with OPENFERMENT_ROUTES moving explain and extract to claude-haiku-4-5-20251001 and judge to
+EXPECTED: claude-opus-4-8, neither listed for the key, the model and roles rows name the routes' models
+EXPECTED: and mark ! or ✗ for the two the key cannot use (docs/runbooks/live-host-install.md:170-171
+EXPECTED: "`model` and `roles`, the routes' models through the Models API"; CLAUDE.md:29 "says in rows
+EXPECTED: whether the service can run: ... the model routes"), as they do when the plan route moves.
+NOTICE:  database "bh_r_h13_03_ready" does not exist, skipping
+CASE control (plan moved): ✗ model: no model in the chain is available to this key (claude-opus-4-8). Set OPENFERMENT_MODEL in core/.env to one that is
+CASE control (plan moved): ! roles: answer: claude-opus-4-8; index: claude-haiku-5-5; claude-opus-4-8 not listed for this key; today $0.00 of the $25.00 daily cap
+CASE control (plan moved): a row names claude-opus-4-8 with ! or ✗: True
+CASE moved: routing table read back: {"plan": [["claude-opus-5-5", "claude-sonnet-5-5"], "high"], "explain": [["claude-haiku-4-5-20251001"], "high"], "extract": [["claude-haiku-4-5-20251001"], "high"], "index": [["claude-haiku-5-5"], "low"], "judge": [["claude-opus-4-8"], "max"]}
+CASE moved: ✓ model: the key is accepted; claude-opus-5-5 then claude-sonnet-5-5 on the plan route, effort high
+CASE moved: ✓ roles: answer: claude-opus-5-5 → claude-sonnet-5-5; index: claude-haiku-5-5; every model listed for this key; today $0.00 of the $25.00 daily cap
+CASE moved: models the rows asked the Models API about: ['claude-haiku-5-5', 'claude-opus-5-5', 'claude-sonnet-5-5']
+CASE moved: moved routes' models the rows never asked about: ['claude-haiku-4-5-20251001', 'claude-opus-4-8']
+CASE moved: moved routes' models either row names: []
+CASE live call on extract: ModelUnavailable: claude-haiku-4-5-20251001 is not available to this key (404)
+CASE live call on judge: ModelUnavailable: claude-opus-4-8 is not available to this key (404)
+CASE guard: non-loopback connections refused: none
+VERDICT: DEFECT (control caught True; both rows ✓ True; unasked ['claude-haiku-4-5-20251001', 'claude-opus-4-8']; live extract and judge fail True)
+OBSERVED: CASE moved: ✓ model: the key is accepted; claude-opus-5-5 then claude-sonnet-5-5 on the plan route, effort high
+OBSERVED: CASE moved: ✓ roles: answer: claude-opus-5-5 → claude-sonnet-5-5; index: claude-haiku-5-5; every model listed for this key; today $0.00 of the $25.00 daily cap
+OBSERVED: CASE moved: moved routes' models the rows never asked about: ['claude-haiku-4-5-20251001', 'claude-opus-4-8']
+OBSERVED: CASE live call on extract: ModelUnavailable: claude-haiku-4-5-20251001 is not available to this key (404)
+RESULT: DEFECT

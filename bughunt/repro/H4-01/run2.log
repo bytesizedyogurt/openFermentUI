@@ -1,0 +1,36 @@
+NOTICE:  database "bh_r_h4_01_card" does not exist, skipping
+service: http://127.0.0.1:10220 over a fresh bh_r_h4_01_card (keyless), tree at 6a32507; files of core, src, scripts and examples differing from 2047f5a: 0
+runs: cornstover=bfda026530692adc cellulosic_ethanol_v0=e7efa2505b4633de
+runs: cornstover bfda026530692adc, cellulosic_ethanol_v0 e7efa2505b4633de; overrides set: {} and {}; inputs sent: none
+streams: 118 and 118, differing in flow: 0 []
+units: 68 and 68, differing in cost or duty: 0 []
+TEA totals differing (FCI, TCI, FOC, installedEquipmentCost, materialCost, utilityCost, operatingHours, basisFlow): []; IRR 0.1 and 0.1
+solvedPrice (the base-case price): cornstover 0.658813642, cellulosic_ethanol_v0 0.658813642
+packagePrice (the product's set price): cornstover 0.658813642, cellulosic_ethanol_v0 0.7198608115
+price block NPV at the set price: cornstover 0.0, cellulosic_ethanol_v0 81182947.4 USD
+stream table, the ethanol row's price: cornstover 0.658813642, cellulosic_ethanol_v0 0.7198608115
+
+cost card line (USD per kg ethanol)      cornstover  cellulosic_ethanol_v0
+  Main feedstock                           0.244649               0.244649
+  Other materials                          0.200479               0.200479
+  Utilities                               -0.060538              -0.060538
+  Fixed operating, labour included         0.049282               0.049282
+  Capital recovery                         0.224941               0.285989
+  closing row (tea.productPrice)           0.658814               0.719861
+  base-case price (price.solvedPrice)      0.658814               0.658814
+  sum of the lines                         0.658814               0.719861
+
+cellulosic_ethanol_v0: closing row less base-case price = 0.061047 USD/kg; its capital recovery less cornstover's = 0.061047 USD/kg; lines other than capital recovery that differ: []
+cellulosic_ethanol_v0's capital recovery read at its own solved price would be 0.224941 USD/kg (cornstover's card: 0.224941)
+[screen cornstover] base case: Base case, every input at its value: 0.6588 USD per kg of ethanol.
+[screen cornstover] rows: Main feedstock 0.2446 || Other materials 0.2005 || Utilities -0.0605 || Fixed operating, labour included 0.0493 || Capital recovery 0.2249 || Base-case price 0.6588
+[screen cornstover] price note: None
+[screen cellulosic_ethanol_v0] base case: Base case, every input at its value: 0.6588 USD per kg of ethanol.
+[screen cellulosic_ethanol_v0] rows: Main feedstock 0.2446 || Other materials 0.2005 || Utilities -0.0605 || Fixed operating, labour included 0.0493 || Capital recovery 0.286 || Price the lines are read at 0.7199
+[screen cellulosic_ethanol_v0] price note: The breakdown is read at the product's set price, 0.7199 USD per kg of the ethanol stream, and its lines sum to that price. The TEA solves the price at its internal rate of return to 0.6588 USD per kg of the ethanol stream, the run's base-case price.
+[screen] Capital recovery row as drawn: cornstover 'Capital recovery 0.2249', cellulosic_ethanol_v0 'Capital recovery 0.286'
+
+the capital recovery line takes the whole gap: True
+EXPECTED: cellulosic_ethanol_v0 at its default (dilute acid, IB), with no value set, is the package's own cellulosic plant unit for unit (its recipe's words), so its cost card is cornstover's card: lines that close on the solved price 0.658814 USD/kg, capital recovery 0.224941 USD/kg, as the recipe's own load() prices the ethanol at the TEA's IRR as the package's Biorefinery does
+OBSERVED: equal plants (118 streams and 68 units equal, the same solved price and capital); cornstover's card closes on 0.658814 with capital recovery 0.224941 USD/kg, cellulosic_ethanol_v0's closes on 0.719861 (its set price) with capital recovery 0.285989 USD/kg, the line 0.061047 USD/kg larger, the whole gap between its closing row and its base-case price; the screens draw 'Capital recovery 0.2249' and 'Capital recovery 0.286'
+RESULT: DEFECT

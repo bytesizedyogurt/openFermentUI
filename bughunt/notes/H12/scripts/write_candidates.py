@@ -280,8 +280,9 @@ candidates = [
                      "on Python 3.12.3 four tests fail. The local gate this container runs holds less than CI's.",
         "contract": "collectors.py:283-285 'An IPv4-mapped IPv6 address is read as its IPv4 address'; CLAUDE.md:20 "
                     "'this container runs Python 3.13.17, and CI the Python its runner holds'",
-        "reproCommand": f"cd $WT2 && git apply /home/user/openFermentUI/bughunt/notes/H12/mutations/M57.patch; WT2=$WT2 {S}/pyver.sh 3.12 "
-                        f"tests/test_sff_url.py; WT2=$WT2 {S}/pyver.sh 3.13 tests/test_sff_url.py (WT2 a worktree of 2047f5a)",
+        "reproCommand": "cd $WT2 && git apply /home/user/openFermentUI/bughunt/notes/H12/mutations/M57.patch; WT2=$WT2 "
+                        "/home/user/openFermentUI/bughunt/notes/H12/scripts/pyver.sh 3.12 tests/test_sff_url.py; WT2=$WT2 "
+                        "/home/user/openFermentUI/bughunt/notes/H12/scripts/pyver.sh 3.13 tests/test_sff_url.py (WT2 a worktree of 2047f5a)",
         "expected": "the same tests fail on both Pythons",
         "observed": "3.12: 4 failed, 83 passed ([::ffff:127.0.0.1-a loopback address] and [::ffff:10.0.0.5-a private "
                     "address], by digits and by name); 3.13: 87 passed",

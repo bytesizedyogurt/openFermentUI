@@ -76,6 +76,7 @@ print(f"units: {len(uc)} and {len(uv)}, differing in cost or duty: {len(unit_dif
 print(f"TEA totals differing ({', '.join(cap_keys)}): {cap_diff}; IRR {pc.get('IRR')} and {pv.get('IRR')}")
 print(f"solvedPrice (the base-case price): cornstover {pc['solvedPrice']}, cellulosic_ethanol_v0 {pv['solvedPrice']}")
 print(f"packagePrice (the product's set price): cornstover {pc['packagePrice']}, cellulosic_ethanol_v0 {pv['packagePrice']}")
+print(f"price block NPV at the set price: cornstover {pc.get('NPV')}, cellulosic_ethanol_v0 {pv.get('NPV')} USD")
 eth_c, eth_v = sc.get(tc["product"], {}), sv.get(tv["product"], {})
 print(f"stream table, the {tc['product']} row's price: cornstover {eth_c.get('price')}, "
       f"cellulosic_ethanol_v0 {eth_v.get('price')}")
@@ -133,5 +134,6 @@ print(f"EXPECTED: cellulosic_ethanol_v0 at its default (dilute acid, IB), with n
 print(f"OBSERVED: equal plants ({len(sc)} streams and {len(uc)} units equal, the same solved price and capital); "
       f"cornstover's card closes on {tc['productPrice']:.6f} with capital recovery {cr_c:.6f} USD/kg, "
       f"cellulosic_ethanol_v0's closes on {tv['productPrice']:.6f} (its set price) with capital recovery {cr_v:.6f} USD/kg, "
-      f"the line {cr_v - cr_c:.6f} USD/kg larger, the whole gap between its closing row and its base-case price")
+      f"the line {cr_v - cr_c:.6f} USD/kg larger, the whole gap between its closing row and its base-case price; "
+      f"the screens draw {shown.get('cornstover')!r} and {shown.get('cellulosic_ethanol_v0')!r}")
 print("RESULT: DEFECT" if defect_b else "RESULT: NO-DEFECT")

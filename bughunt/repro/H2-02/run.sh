@@ -1,7 +1,7 @@
 #!/usr/bin/env bash
 # H2-02: a Proforma scenario run of ethanol_glucose_v0 (the biosteam engine states its precision as rtol 0,
 # atol 0) replays identically in the worker that computed it and with last-digit differences once the
-# service restarts over the same database.
+# service restarts over the same database, when the worker built a library plant before the scenario plant.
 #   bash bughunt/repro/H2-02/run.sh        (from the repository root; exits 0 either way)
 set -u
 source /home/user/openFermentUI/bughunt/lib/env.sh
@@ -36,7 +36,10 @@ inputs = [{"name": k, "quantity": {"value": v, "unit": u, "origin": o}} for k, (
 json.dump({"scenarioId": "ethanol_glucose_v0", "flowsheet": "ethanol_glucose_v0", "inputs": inputs,
            "by": "Repro H2-02", "samples": 20}, open(sys.argv[1] + "/req.json", "w"))
 PY
-if [ "${LIB:-0}" = 1 ]; then api POST /api/library/cornstover/run '{"by":"Repro H2-02"}' > "$W/lib.json"; echo "library run first (LIB=1)"; fi
+# The worker builds a library plant first (as a live service does), then the scenario plant: a scenario
+# plant the worker builds first keeps the digits a fresh worker gives, and its replay holds after a restart.
+api POST /api/library/cornstover/run '{"by":"Repro H2-02"}' > "$W/lib.json"
+echo "library run first: $(python3 -I -c "import json,sys; r=json.load(open(sys.argv[1]))['run']; print('run', r['id'], 'of', r.get('thing') or r.get('plant') or 'cornstover', 'on engine', r.get('engine'))" "$W/lib.json" 2>/dev/null || echo 'no answer')"
 api POST /api/proforma/run "@$W/req.json" > "$W/run.json"
 AID=$(python3 -I -c "import json,sys; print(json.load(open(sys.argv[1]))['artifactId'])" "$W/run.json" 2>/dev/null)
 [ -n "$AID" ] || { echo "the Proforma run did not answer an artifact:"; head -c 600 "$W/run.json"; echo; echo "RESULT: NO-DEFECT"; exit 0; }

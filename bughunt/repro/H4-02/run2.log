@@ -1,0 +1,18 @@
+NOTICE:  database "bh_r_h4_02_card" does not exist, skipping
+service: http://127.0.0.1:9030 over a fresh bh_r_h4_02_card (keyless), tree at 6a32507; files of core, src, scripts and examples differing from 2047f5a: 0
+[chain.py] simulation 589fc71aab9ab5ed
+[chain.py] vessel 23f089f842c6aabd
+[chain.py] ethanol_glucose_v0 run 08d3c7475775c19e
+[chain.py] train run 793b3c8bbfe2597b (11 units)
+composite run: 15b34d70b7e48a76
+[screen.mjs] ["Main feedstock 2.8848","Other materials 0","Utilities 1.0575","Fixed operating, labour included 3.9195","Capital recovery 1.2928","Price the lines are read at 9.0791"]
+run 15b34d70b7e48a76: flowsheet custom_train_v1, basis 'kg of Ethanol contained in the train's product stream', basisFlow 122.429856 kg/h
+lines (perUnit): feedstock 2.8848, otherMaterials 0.0000, utilities 1.0575, fixedOperating 3.9195, capitalRecovery 1.2928; their sum 9.1545818834
+basePrice 9.1545818834; tea.productPrice 9.0790885100 (the tables route: 9.0790885100)
+product stream T304_outlet: 123.447870 kg/h holding {'Water': 1.0180143968406299, 'Ethanol': 122.42985573212205}
+tea.productPrice x stream mass / basisFlow = 9.1545818834
+page: closing row 'Price the lines are read at 9.0791'; note 'The breakdown is read at the product's set price, 9.0791 USD per kg of Ethanol contained in the train's product stream, and its lines sum to that price. The TEA solves the price at its internal rate of return to 9.1546 USD per kg of Ethanol contained in the train's product stream, the run's base-case price.'; base line 'Base case, every input at its value: 9.1546 USD per kg of Ethanol contained in the train's product stream.'
+checks: lines sum to basePrice True; productPrice differs from basePrice True; productPrice on the stream's basis is basePrice True; closing row at productPrice True; note says the lines sum to productPrice True
+EXPECTED: the cost card's closing row is 9.1546 USD per kg of Ethanol contained in the train's product stream (the sum of its lines, the run's base-case price), labelled 'Base-case price', with no note of a second price (flowsheets/__init__.py:20-21: `price` per kg of the product stream, `basis_flow` the kg/hr the price is per; CostWaterfall.tsx:7-9: the lines sum to the last row by construction in the service)
+OBSERVED: tea.productPrice 9.0791 is the TEA's price per kg of the T304_outlet stream (123.448 kg/h) while basisFlow is the 122.430 kg/h of product it contains; the lines sum to 9.1546 = basePrice; the page closes on 'Price the lines are read at 9.0791' and its note says the lines sum to 9.0791 and the TEA solved another price, 9.1546
+RESULT: DEFECT

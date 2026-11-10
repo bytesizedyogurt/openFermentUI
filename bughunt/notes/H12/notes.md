@@ -46,7 +46,7 @@ Survivors and what they mean:
 ## Python 3.12 and 3.13
 
 `pyver.sh 3.12|3.13` over H12's 95 test files in the second worktree: 2273 passed and 3 failed on both, the same
-tests (test_host's three, from the worktree having no core/.venv for scripts/host/lib.sh), 2276 rows identical.
+tests (test_host's three, from the worktree having no core/.venv for scripts/host/lib.sh; 52 of 52 pass once it has one), 2276 rows identical.
 `ipclass.py` reads the same refusal class for 36 addresses on both. No 3.13-only API is used in the service. The one
 difference is H12-15: Python 3.13's ipaddress reads an IPv4-mapped loopback as loopback, so on 3.13 no test holds
 `_v4`. The 3.12 here is Ubuntu's 3.12.3 (base prefix /usr), as the runner's is.
@@ -84,3 +84,11 @@ them; the engine pins hash outputs computed through the code on stand-in inputs,
 
 test:sim, test:lit and verify whole (the brief); the TS guard scripts that need tsx (check-guild, check-state,
 check-figures, check-reconcile-kinds).
+
+## Running the scripts
+
+H12's two worktrees are removed. `survivor.sh ID` and `probe_with.sh ID PROBE` make one of their own
+(`$BH_WORK/H12/repro-wt`, 2047f5a with the scratch rename) when none stands; `seed_probe.sh WT` and `lock_drift.sh WT`
+take a worktree; `pyver.sh` and `offline.sh` read `WT2`, `wtpytest.sh` and `mutate.py` read `WT` (each a worktree of
+2047f5a with mutations/BASE-scratch-name.patch applied and test:core's generated fixtures copied in).
+`spend_nan.sh` runs on the main tree's code over a database of its own. Every database is bh_h12_*, dropped after.

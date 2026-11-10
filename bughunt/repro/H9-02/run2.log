@@ -1,0 +1,16 @@
+NOTICE:  database "bh_r_h9_02_gate" does not exist, skipping
+document: a09f53eb0b1241db98eb13efceb21f2a
+## intake_write extract, ?by=Alice Person
+  summary.state=None gate=None proposalId=None auditIds=[]
+  error="intake_write could not extract a09f53eb0b1241db98eb13efceb21f2a: Today's model spend is $0.00 of the $0.00 daily cap, and this call could pass it. Raise OPENFERMENT_DAILY_BUDGET_USD in core/.env, or wait for the next UTC day."
+## intake_write extract, X-OpenFerment-Assistant: bughunt-client/0.1
+  summary.state=None gate=None proposalId=None auditIds=[]
+  error="intake_write could not extract a09f53eb0b1241db98eb13efceb21f2a: Today's model spend is $0.00 of the $0.00 daily cap, and this call could pass it. Raise OPENFERMENT_DAILY_BUDGET_USD in core/.env, or wait for the next UTC day."
+## GET /api/proposals: []
+## model requests that reached the stand-in: 0
+## the cause: BudgetExhausted is a ModelUnavailable, so extract.call_model's except clause takes it
+  issubclass(llm.BudgetExhausted, llm.ModelUnavailable) = True
+  call_model re-raises ModelUnavailable as ExtractUnavailable: True
+EXPECTED: with the daily cap at 0.001 USD, each call answers summary.state 'proposed', gate 'spend', a proposalId and no error; GET /api/proposals lists the spend proposal Home shows with its button; no model request is sent
+OBSERVED: person: state=None gate=None error=set (the error names the daily cap); assistant: state=None gate=None error=set (the error names the daily cap); spend proposals listed: 0 of 0; model requests sent: 0
+RESULT: DEFECT

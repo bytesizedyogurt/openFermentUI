@@ -1,0 +1,2 @@
+NOTICE:  database "bh_r_h4_02_card" does not exist, skipping
+service: http://127.0.0.1:9030 over a fresh bh_r_h4_02_card (keyless), tree at 6a32507; files of core, src, scripts and examples differing from 2047f5a: 0

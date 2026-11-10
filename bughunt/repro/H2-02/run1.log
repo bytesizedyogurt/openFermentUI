@@ -1,0 +1,19 @@
+service: http://127.0.0.1:9020  database: bh_r_h2_02_rep (fresh)
+library run first: run bfda026530692adc of cornstover on engine biosteam
+Proforma run kept: artifact 1b467e933631368e (tool proforma.run)
+service restarted: http://127.0.0.1:9020  (same database)
+GET /api/engines: biosteam thing ethanol_glucose_v0 (kind scenario) precision {'rtol': 0.0, 'atol': 0.0}
+replay in the worker that ran it: identical True, withinTolerance True, tolerance None, 0 differences
+replay after the service restarts: identical False, withinTolerance False, tolerance None, 9 differences
+    tea.FCI: stored 21777995.078954738 replayed 21777995.078954734  (relative 1.7e-16)
+    tea.TCI: stored 22866894.832902476 replayed 22866894.832902472  (relative 1.6e-16)
+    tea.installedEquipmentCost: stored 21777995.078954738 replayed 21777995.078954734  (relative 1.7e-16)
+    tea.lines[2].perUnit: stored 0.06557432396553078 replayed 0.06557432396553077  (relative 2.1e-16)
+    tea.lines[2].usdPerYear: stored 3286450.470487281 replayed 3286450.4704872807  (relative 1.4e-16)
+    tea.purchaseCost: stored 5444498.769738684 replayed 5444498.7697386835  (relative 1.7e-16)
+    tea.utilityCost: stored 3286450.470487281 replayed 3286450.4704872807  (relative 1.4e-16)
+    utilities.electricityConsumption: stored 0.20499867830909335 replayed 0.20499867830909338  (relative 1.4e-16)
+    utilities.heating: stored 56.53739792060041 replayed 56.53739792060042  (relative 1.3e-16)
+EXPECTED: the engine states rtol 0.0, atol 0.0 for ethanol_glucose_v0 and the docs say its replay holds every output identically, so each replay answers identical true (withinTolerance true)
+OBSERVED: same worker identical True; after a restart identical False, withinTolerance False, 9 differences at paths tea.FCI, tea.TCI, tea.installedEquipmentCost, tea.lines[2].perUnit, tea.lines[2].usdPerYear, tea.purchaseCost, tea.utilityCost, utilities.electricityConsumption, utilities.heating
+RESULT: DEFECT
