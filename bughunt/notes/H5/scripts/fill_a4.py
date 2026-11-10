@@ -30,9 +30,9 @@ if False:
     print("outputs", json.dumps(outs)[:600])
 rb = ok("runbook", call("POST", "/api/studies/runbooks", A, json={
     "title": "A's runbook", "runId": ids["run"], "by": "alice",
-    "predict": [{"label": "end titre", "output": "end.P"}]}), 300)
+    "predict": [{"label": "end titre", "output": "values.end.P"}]}), 300)
 ids["runbook"] = rb.get("id")
 lock = ok("lock", call("POST", f"/api/studies/runbooks/{ids['runbook']}/lock", A, json={"by": "alice"}), 300)
-sff = ok("sff library", call("POST", "/api/flowsheets/library/SF_BST_01", A, json={"by": "alice"}), 300)
-ids["flowsheet"] = sff.get("id") if isinstance(sff, dict) else None
+0 and ok("sff library", call("POST", "/api/flowsheets/library/SF_BST_01", A, json={"by": "alice"}), 300)
+ids["flowsheet"] = "sff-f9d0ac8162d24c6f"
 json.dump(ids, open(f"{OUT}/a_ids.json", "w"), indent=1)

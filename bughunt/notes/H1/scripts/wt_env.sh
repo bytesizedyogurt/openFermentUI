@@ -28,3 +28,11 @@ wt_svc_start() {
 # j METHOD PATH [BODY]: one JSON call to the service at $O in project $P.
 j() { curl -s --noproxy '*' -X "$1" "$O$2" -H 'content-type: application/json' -H "X-OpenFerment-Project: $P" \
         ${3:+-d "$3"} -w '\n[%{http_code}]\n'; }
+# wt_conform DB ENGINE ARGS...: conform from the worktree, its verdict kept in bh_h1_* database DB,
+# with H1's private data directory (the library shelf, the SFF reference files).
+wt_conform() {
+  local n="$1"; shift; local data; data=$(bh_data "$n")
+  case "$n" in bh_h1_*) ;; *) echo "refusing $n" >&2; return 2;; esac
+  (cd "$WT/core" && bh_env OPENFERMENT_DATABASE_URL="$BH_SERVER/$n" OPENFERMENT_DATA_DIR="$data" \
+     OPENFERMENT_SFF_LIBRARY="$data/sff-library" .venv/bin/python -m openferment_core.engine.conform "$@")
+}
