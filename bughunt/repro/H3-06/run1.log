@@ -1,0 +1,13 @@
+service: http://127.0.0.1:9096 over a fresh bh_r_h3_06_svc (keyless), tree at a667bbc, core/ as at 2047f5a: yes
+1. deposit depK (nine confirmed readings, by Ada Lovelace): 200
+   kinetics run batch_v1 on the nine readings: 200, run 90e308503f0ddc1c, provenance measured
+2. before the correction, GET /api/runs/90e308503f0ddc1c: provenance measured; runs list: measured; its mu_max input's origin: measurement depK/k0
+3. correct depK/k0 (0.0125 min⁻¹) by a later entry depK/k0fix (0.00125 min⁻¹): 200
+4. after the correction, GET /api/runs/90e308503f0ddc1c: provenance measured; runs list: measured; its mu_max input's origin: measurement depK/k0
+5. the same run asked again: 422 {"detail":"mu_max: reading depK/k0 was corrected by depK/k0fix, the reading that stands for its measure now"}
+6. depK/k0 at the Proforma resolve door: 422 {"detail":"titre: reading depK/k0 was corrected by depK/k0fix, the reading that stands for its measure now"}
+   GET /api/depositions/readings?unit=h⁻¹: 200, offers ['depK/k0fix']
+checks: re-ask refused in words naming the correction: True; kept row before ('measured', 'measured'), after ('measured', 'measured')
+EXPECTED: by the contract's words: the same run asked again after depK/k0 is corrected is refused in words naming the correction (ADR-006:238, studies.md:106-107); runs.md:22 moves a held row's provenance for a record reviewed or demoted since, and a reading is a measurement (runs.md:21), so no line moves the kept row's label on a reading's correction
+OBSERVED: the kept row reads measured before and after the correction (GET /api/runs/{id} and the runs list, as the candidate says); the same run asked again is a 422 naming depK/k0fix, the Proforma door refuses depK/k0 and the readings list leaves it out, so every line of the contract holds
+RESULT: NO-DEFECT

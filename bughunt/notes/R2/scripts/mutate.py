@@ -6,6 +6,7 @@ replaces, and the tests the claim rests on. The runner applies one mutation, run
 `git checkout` in the worktree. Never point it at the main checkout.
 
 Usage: python mutate.py <worktree root> [ids...]   (writes mutations.json beside this script's notes)
+No test that binds a port outside 8970-8979 runs (the served-app test of test_mcp_service.py is deselected).
 The tests make their databases under OPENFERMENT_TEST_DATABASE_URL=.../bh_r2_test (named bh_r2_test_<pid>_<hex>).
 """
 from __future__ import annotations
@@ -75,17 +76,27 @@ M = [
      "        if False:", ["tests/test_protocols.py"]),
     ("M16", "6f85338: --service relays through no proxy",
      "core/openferment_core/mcp_server.py", "httpx.Client(base_url=origin, trust_env=False, follow_redirects=False,",
-     "httpx.Client(base_url=origin, trust_env=True, follow_redirects=False,", ["tests/test_mcp_service.py"]),
+     "httpx.Client(base_url=origin, trust_env=True, follow_redirects=False,", ["tests/test_mcp_service.py", "-k", "not test_the_server_started_with_service_writes_through_it"]),
     ("M17", "6f85338: --service follows no redirect",
      "core/openferment_core/mcp_server.py", "httpx.Client(base_url=origin, trust_env=False, follow_redirects=False,",
-     "httpx.Client(base_url=origin, trust_env=False, follow_redirects=True,", ["tests/test_mcp_service.py"]),
+     "httpx.Client(base_url=origin, trust_env=False, follow_redirects=True,", ["tests/test_mcp_service.py", "-k", "not test_the_server_started_with_service_writes_through_it"]),
     ("M18", "dc02f20: GET /api/audit leaves a row's null fields out",
      "core/openferment_core/api.py",
      '@app.get("/api/audit", response_model=list[AuditRow], response_model_exclude_none=True)',
-     '@app.get("/api/audit", response_model=list[AuditRow])', ["tests/test_agent_interface.py", "tests/test_mcp_service.py"]),
+     '@app.get("/api/audit", response_model=list[AuditRow])', ["tests/test_agent_interface.py", "tests/test_mcp_service.py", "-k", "not test_the_server_started_with_service_writes_through_it"]),
     ("M19", "2047f5a: a dump is written beside its name and moved into place once whole",
      "scripts/host/lib.sh", '--file="$file.part" openferment); then', '--file="$file" openferment); then',
      ["tests/test_host.py"]),
+    ("M20", "f5405f8 (C.6 fix): import-url's pinned fetch skips a proxy (trust_env off)",
+     "core/openferment_core/literature/collectors.py",
+     "async with httpx.AsyncClient(transport=_Pinned(pins, network), timeout=TIMEOUT_S, trust_env=False,",
+     "async with httpx.AsyncClient(transport=_Pinned(pins, network), timeout=TIMEOUT_S, trust_env=True,",
+     ["tests/test_sff_url.py", "tests/test_collectors.py"]),
+    ("M21", "f5405f8 (C.6 fix): import-url's network transport reads no proxy setting",
+     "core/openferment_core/literature/collectors.py",
+     "network = network or httpx.AsyncHTTPTransport(trust_env=False,",
+     "network = network or httpx.AsyncHTTPTransport(trust_env=True,",
+     ["tests/test_sff_url.py", "tests/test_collectors.py"]),
 ]
 
 

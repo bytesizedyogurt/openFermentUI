@@ -1,9 +1,8 @@
 # H12-06: no test keeps biorefineries out of the service process
 
-**Statement.** A function-level `import biorefineries` in `proforma.retired_entry_of`, a service module the run
-readers, the Proforma tools and pureOS call, passes `test_workers.py`, `test_boundaries.py`, `test_proforma.py`,
-`test_proforma_runs.py` and `test_engines.py`, and leaves biorefineries, BioSTEAM and thermosteam loaded in the
-service's own process.
+**Statement.** A function-level `import biorefineries` in `proforma.retired_entry_of`, a service function that
+proforma's kept-run readers, the Proforma tools and pureOS call, passes `test_workers.py`, `test_boundaries.py`, `test_proforma.py`,
+`test_proforma_runs.py` and `test_engines.py`, and leaves biorefineries loaded in the service's own process.
 
 **Contract.**
 
@@ -42,8 +41,9 @@ the same line fails test_workers.py's grep; the service process holds none of th
   test_boundaries.py `NEVER`: `['db', 'engine', 'literature', 'projects', 'studies']`, top-level modules absent.
 - Head probe: the service imported and `retired_entry_of` called, worker libraries loaded `[]`.
 - Control: `test_workers.py -k heavy_libraries` exit 1, "biosteam is imported outside its worker: ['proforma.py']".
-- Plant: the five files exit 0 (RESULT_COUNTS); the planted probe lists RESULT_SEEN in the service process after
-  `retired_entry_of`.
+- Plant: the five files exit 0, "198 passed, 6 deselected" in each run; the planted probe lists `['biorefineries']`
+  in the service process after `retired_entry_of` (before the call, `[]`).
+- Both runs print `RESULT: DEFECT`.
 
 **Likely cause** (confidence high).
 
@@ -57,9 +57,13 @@ the same line fails test_workers.py's grep; the service process holds none of th
   subprocess checks (`test_workers.py:196-213`, `test_train.py:1092-1112`, `test_custom_train.py:382-395`) list
   `sys.modules` after paths that never reach `retired_entry_of`.
 
-The fix is small: a `"biorefineries"` row in `ALLOWED` naming `workers/library_plants.py` (the one worker module
-importing it at the top today), with `flowsheets/` skipped as biosteam's row skips it.
+The fix is small: a `"biorefineries"` row in `ALLOWED` naming the two worker modules that import it today
+(`workers/library_plants.py:58` at the top, `workers/kept_references.py:65,78,119,198` inside functions), with
+`flowsheets/` skipped as biosteam's row skips it.
 
-**Severity.** S3: a hollow guard on an R rule; the tree at 2047f5a imports no biorefineries in the service, and a
-break would cost the service a cold BioSTEAM import (about 31 s) on a read path and the process isolation §7.1
-asks for.
+**Severity.** S3: a hollow guard on an R rule. The tree at 2047f5a imports no biorefineries in the service, so
+nothing is broken today; the guard the rule cites lets such a break through unseen. The planted top-level import
+loads biorefineries alone (its package `__init__.py` holds a version string and nothing else). A plant import in the
+same place (`from biorefineries import cornstover`, whose modules import `biorefineries.cellulosic`) would load the
+plant code in the service and meet the same five green files, since neither test file looks for the name
+`biorefineries` outside its five packages; that wider case is read from the code and was left unrun here.

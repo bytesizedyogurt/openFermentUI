@@ -1,0 +1,59 @@
+worktree: /tmp/claude-0/-home-user-openFermentUI/cfbc5c9f-640a-5002-a705-5ceaf850fdc6/scratchpad/bh/work/H5-08/wt at 2047f5a; core/.env there: no
+database: bh_r_h5_08_mcp (fresh, migrated to head)
+made project 'bh-a' in the database (no document, no passage)
+
+--project (none)
+  openferment literature_sources         is_error=False {"error": "This openFerment server acts in no project. Start it with --project <id>, or set OPENFERMENT_PROJECT (in the environment or core/.env) to the project's id."}
+  sci-rag     corpus_stats               is_error=True  Error executing tool corpus_stats: This Sci RAG Kit server acts in no project. Start it with --project <id>, or set OPENFERMENT_PROJECT (in the environment or core/.env) to the project's id.
+  sci-rag     list_sources               is_error=True  Error executing tool list_sources: This Sci RAG Kit server acts in no project. Start it with --project <id>, or set OPENFERMENT_PROJECT (in the environment or core/.env) to the project's id.
+  sci-rag     get_document               is_error=True  Error executing tool get_document: This Sci RAG Kit server acts in no project. Start it with --project <id>, or set OPENFERMENT_PROJECT (in the environment or core/.env) to the project's id.
+  sci-rag     get_citations              is_error=True  Error executing tool get_citations: This Sci RAG Kit server acts in no project. Start it with --project <id>, or set OPENFERMENT_PROJECT (in the environment or core/.env) to the project's id.
+  sci-rag     search_entities            is_error=True  Error executing tool search_entities: This Sci RAG Kit server acts in no project. Start it with --project <id>, or set OPENFERMENT_PROJECT (in the environment or core/.env) to the project's id.
+  sci-rag     get_entity_relationships   is_error=True  Error executing tool get_entity_relationships: This Sci RAG Kit server acts in no project. Start it with --project <id>, or set OPENFERMENT_PROJECT (in the environment or core/.env) to the project's id.
+
+--project bh-a
+  openferment literature_sources         is_error=False {"summary":{"matched":0,"documents":[],"note":"Read one with literature_document; search them with search_passages."},"evidence":[],"recordIds":[],"passages":[],"usage":{"inputTokens":0,"outputTokens":0,"cacheReadTokens":0,"cacheW...
+  sci-rag     corpus_stats               is_error=False {   "domain": "openFerment bioprocess literature",   "documents": 0,   "chunks": 0,   "citations": 0,   "entities": 0,   "relationships": 0,   "communities": 0,   "license_classes": {},   "sources": {},   "embedding_versions": {} ...
+  sci-rag     list_sources               is_error=False {   "sources": {},   "license_classes": {},   "note": "Pass these values to search_corpus filters." }
+  sci-rag     get_document               is_error=True  Error executing tool get_document: No such document: 0123456789abcdef0123456789abcdef
+  sci-rag     get_citations              is_error=True  Error executing tool get_citations: No such document: 0123456789abcdef0123456789abcdef
+  sci-rag     search_entities            is_error=True  Error executing tool search_entities: The project bh-a holds no passage yet: its documents enter on Intake, and `pnpm lit:graph --project bh-a --by <name>` then builds the concept graph over their passages.
+  sci-rag     get_entity_relationships   is_error=True  Error executing tool get_entity_relationships: The project bh-a holds no passage yet: its documents enter on Intake, and `pnpm lit:graph --project bh-a --by <name>` then builds the concept graph over their passages.
+
+--project bh-zzz
+  openferment literature_sources         is_error=False {"error": "The database bh_r_h5_08_mcp on 127.0.0.1:5432 holds no project named 'bh-zzz'. Start this server with --project naming a project it holds, or with --service <origin> to act through a running service that holds it."}
+  sci-rag     corpus_stats               is_error=False {   "domain": "openFerment bioprocess literature",   "documents": 0,   "chunks": 0,   "citations": 0,   "entities": 0,   "relationships": 0,   "communities": 0,   "license_classes": {},   "sources": {},   "embedding_versions": {} ...
+  sci-rag     list_sources               is_error=False {   "sources": {},   "license_classes": {},   "note": "Pass these values to search_corpus filters." }
+  sci-rag     get_document               is_error=True  Error executing tool get_document: No such document: 0123456789abcdef0123456789abcdef
+  sci-rag     get_citations              is_error=True  Error executing tool get_citations: No such document: 0123456789abcdef0123456789abcdef
+  sci-rag     search_entities            is_error=True  Error executing tool search_entities: The project bh-zzz holds no passage yet: its documents enter on Intake, and `pnpm lit:graph --project bh-zzz --by <name>` then builds the concept graph over their passages.
+  sci-rag     get_entity_relationships   is_error=True  Error executing tool get_entity_relationships: The project bh-zzz holds no passage yet: its documents enter on Intake, and `pnpm lit:graph --project bh-zzz --by <name>` then builds the concept graph over their passages.
+
+--project ../bh-a
+  openferment literature_sources         is_error=False {"error": "The database bh_r_h5_08_mcp on 127.0.0.1:5432 holds no project named '../bh-a'. Start this server with --project naming a project it holds, or with --service <origin> to act through a running service that holds it."}
+  sci-rag     corpus_stats               is_error=False {   "domain": "openFerment bioprocess literature",   "documents": 0,   "chunks": 0,   "citations": 0,   "entities": 0,   "relationships": 0,   "communities": 0,   "license_classes": {},   "sources": {},   "embedding_versions": {} ...
+  sci-rag     list_sources               is_error=False {   "sources": {},   "license_classes": {},   "note": "Pass these values to search_corpus filters." }
+  sci-rag     get_document               is_error=True  Error executing tool get_document: No such document: 0123456789abcdef0123456789abcdef
+  sci-rag     get_citations              is_error=True  Error executing tool get_citations: No such document: 0123456789abcdef0123456789abcdef
+  sci-rag     search_entities            is_error=True  Error executing tool search_entities: The project ../bh-a holds no passage yet: its documents enter on Intake, and `pnpm lit:graph --project ../bh-a --by <name>` then builds the concept graph over their passages.
+  sci-rag     get_entity_relationships   is_error=True  Error executing tool get_entity_relationships: The project ../bh-a holds no passage yet: its documents enter on Intake, and `pnpm lit:graph --project ../bh-a --by <name>` then builds the concept graph over their passages.
+
+--project BH-A
+  openferment literature_sources         is_error=False {"error": "The database bh_r_h5_08_mcp on 127.0.0.1:5432 holds no project named 'BH-A'. Start this server with --project naming a project it holds, or with --service <origin> to act through a running service that holds it."}
+  sci-rag     corpus_stats               is_error=False {   "domain": "openFerment bioprocess literature",   "documents": 0,   "chunks": 0,   "citations": 0,   "entities": 0,   "relationships": 0,   "communities": 0,   "license_classes": {},   "sources": {},   "embedding_versions": {} ...
+  sci-rag     list_sources               is_error=False {   "sources": {},   "license_classes": {},   "note": "Pass these values to search_corpus filters." }
+  sci-rag     get_document               is_error=True  Error executing tool get_document: No such document: 0123456789abcdef0123456789abcdef
+  sci-rag     get_citations              is_error=True  Error executing tool get_citations: No such document: 0123456789abcdef0123456789abcdef
+  sci-rag     search_entities            is_error=True  Error executing tool search_entities: The project BH-A holds no passage yet: its documents enter on Intake, and `pnpm lit:graph --project BH-A --by <name>` then builds the concept graph over their passages.
+  sci-rag     get_entity_relationships   is_error=True  Error executing tool get_entity_relationships: The project BH-A holds no passage yet: its documents enter on Intake, and `pnpm lit:graph --project BH-A --by <name>` then builds the concept graph over their passages.
+
+bh-zzz: openferment server names the missing project: True; sci-rag tools naming it: none; sci-rag answers identical to held empty bh-a's: 6/6 (corpus_stats, list_sources, get_document, get_citations, search_entities, get_entity_relationships); answers saying documents enter on Intake: search_entities, get_entity_relationships
+../bh-a: openferment server names the missing project: True; sci-rag tools naming it: none; sci-rag answers identical to held empty bh-a's: 6/6 (corpus_stats, list_sources, get_document, get_citations, search_entities, get_entity_relationships); answers saying documents enter on Intake: search_entities, get_entity_relationships
+BH-A: openferment server names the missing project: True; sci-rag tools naming it: none; sci-rag answers identical to held empty bh-a's: 6/6 (corpus_stats, list_sources, get_document, get_citations, search_entities, get_entity_relationships); answers saying documents enter on Intake: search_entities, get_entity_relationships
+control, no project: sci-rag refuses every call in words: True
+the projects the database holds:
+  bh-a
+
+EXPECTED: started with --project naming a project the database does not hold (bh-zzz, ../bh-a, BH-A), the sci-rag server refuses every call in words saying the database holds no such project, as the openferment server does for the same ids
+OBSERVED: the openferment server refuses each id in words naming the database and the project; the sci-rag server answers 3 of 3 such ids (bh-zzz, ../bh-a, BH-A) as a held empty project (documents 0, sources {}, 'No such document') and its graph tools say 'The project <id> holds no passage yet: its documents enter on Intake', with no word that the project is missing
+RESULT: DEFECT

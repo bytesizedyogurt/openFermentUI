@@ -1,0 +1,19 @@
+TREE: core/, src/, scripts/ and examples/ match 2047f5a
+EXPECTED: at every ask budget, the question's total cost stays at or under OPENFERMENT_ASK_BUDGET_USD whenever
+EXPECTED: each turn costs at most the code's own worst case for it (llm.worst_case_usd: its request at two
+EXPECTED: characters a token, every output token its max_tokens allows); ADR-008:101-102 'the loop stops asking
+EXPECTED: for tools when what it spent and what the answer could cost reach the question's budget, so the answer
+EXPECTED: is paid for within it'; postdoc_agent.py:545-546 'so the answer is always paid for within the question's
+EXPECTED: budget'. At a zero budget the loop asks for no tools, so at most the one answer turn is made.
+NOTICE:  database "bh_r_h9_05_ask" does not exist, skipping
+model claude-opus-5-5; prices (4.0, 20.0) USD per million in/out; MIN_TOKENS 8000; plan route Route(models=('claude-opus-5-5', 'claude-sonnet-5-5'), effort='high')
+{"askBudgetUsd": "0", "modelTurns": 2, "spentUsd": 0.5233, "pastTheBudget": true, "stopped": "cost", "everyTurnAtOrUnderItsWorstCase": true, "roundsWorstCaseUsd": 0.3628, "roundsChargedUsd": 0.2614, "turns": [{"tool_choice": "auto", "max_tokens": 8000, "costUsd": 0.2614, "worstUsd": 0.3628}, {"tool_choice": "none", "max_tokens": 8000, "costUsd": 0.2619, "worstUsd": 0.3639}]}
+{"askBudgetUsd": "0.75", "modelTurns": 2, "spentUsd": 0.9105, "pastTheBudget": true, "stopped": "cost", "everyTurnAtOrUnderItsWorstCase": true, "roundsWorstCaseUsd": 0.75, "roundsChargedUsd": 0.6486, "turns": [{"tool_choice": "auto", "max_tokens": 27360, "costUsd": 0.6486, "worstUsd": 0.75}, {"tool_choice": "none", "max_tokens": 8000, "costUsd": 0.2619, "worstUsd": 0.3639}]}
+{"askBudgetUsd": "2.00", "modelTurns": 4, "spentUsd": 2.1605, "pastTheBudget": true, "stopped": "cost", "everyTurnAtOrUnderItsWorstCase": true, "roundsWorstCaseUsd": 2.2032, "roundsChargedUsd": 1.8978, "turns": [{"tool_choice": "auto", "max_tokens": 32000, "costUsd": 0.7414, "worstUsd": 0.8428}, {"tool_choice": "auto", "max_tokens": 32000, "costUsd": 0.7418, "worstUsd": 0.8436}, {"tool_choice": "auto", "max_tokens": 15622, "costUsd": 0.4146, "worstUsd": 0.5168}, {"tool_choice": "none", "max_tokens": 8000, "costUsd": 0.2627, "worstUsd": 0.3654}]}
+SUMMARY 3 budget(s) spent past
+OBSERVED: budget 0 USD: 2 model turns (auto, 8000 tokens, 0.2614 USD), (none, 8000 tokens, 0.2619 USD); total 0.5233 USD; stopped 'cost'; every turn at or under its worst case: True
+OBSERVED: budget 0.75 USD: 2 model turns (auto, 27360 tokens, 0.6486 USD), (none, 8000 tokens, 0.2619 USD); total 0.9105 USD; stopped 'cost'; every turn at or under its worst case: True
+OBSERVED: budget 2.00 USD: 4 model turns (auto, 32000 tokens, 0.7414 USD), (auto, 32000 tokens, 0.7418 USD), (auto, 15622 tokens, 0.4146 USD), (none, 8000 tokens, 0.2627 USD); total 2.1605 USD; stopped 'cost'; every turn at or under its worst case: True
+OBSERVED: 3 of 3 budgets ended past the cap; at budget 0 the first turn asked for tools: True
+TREE: 0 file(s) under core/, src/, scripts/ or examples/ written during the run
+RESULT: DEFECT

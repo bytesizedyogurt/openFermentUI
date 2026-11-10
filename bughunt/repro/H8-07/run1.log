@@ -1,0 +1,23 @@
+database: bh_r_h8_07_title (fresh, migrated to head); service: http://127.0.0.1:10330
+project: 201
+doc A 74615e11f56d4403835d41509a50ef44 status=ingested title='Strain report'
+doc B 3b8c81f4561c44aea1e87893f867d003 status=ingested title='Strain report'
+candidate: mw1-74615e11f56d4403835d41509a50ef44-0000 refused: None None
+report: questions 1 stopped None usd 0
+questions built: 1
+question lq-001: 'What ethanol titre is reported?'; its document 74615e11f56d4403835d41509a50ef44, its passage (chunk) eecd3699735f4243b6b2763f45f27ba1, its evidence phrases ['The batch fermentation reached an ethanol titre of 41 g/L after 48 h in the H8 lane probe.']
+  document 74615e11f56d4403835d41509a50ef44 titled 'Strain report'
+  document 3b8c81f4561c44aea1e87893f867d003 titled 'Strain report'
+[interactive] kit rule relevant ranks [1, 2] (first 1); passage rule relevant ranks [2] (first 2); kit MRR {'mean': 1.0, 'lo': 1.0, 'hi': 1.0, 'n': 1.0}, passage MRR {'mean': 0.5, 'lo': 0.5, 'hi': 0.5, 'n': 1.0}
+    rank 1: chunk a2a0f19f8a5f4f5598eb391cbbd429f7 of document 3b8c81f4561c44aea1e87893f867d003 (titled 'Strain report'); the question's document: False; holds an evidence phrase (the quote): False
+    rank 2: chunk eecd3699735f4243b6b2763f45f27ba1 of document 74615e11f56d4403835d41509a50ef44 (titled 'Strain report'); the question's document: True; holds an evidence phrase (the quote): True
+[vector_only] kit rule relevant ranks [1, 2] (first 1); passage rule relevant ranks [2] (first 2); kit MRR {'mean': 1.0, 'lo': 1.0, 'hi': 1.0, 'n': 1.0}, passage MRR {'mean': 0.5, 'lo': 0.5, 'hi': 0.5, 'n': 1.0}
+    rank 1: chunk a2a0f19f8a5f4f5598eb391cbbd429f7 of document 3b8c81f4561c44aea1e87893f867d003 (titled 'Strain report'); the question's document: False; holds an evidence phrase (the quote): False
+    rank 2: chunk eecd3699735f4243b6b2763f45f27ba1 of document 74615e11f56d4403835d41509a50ef44 (titled 'Strain report'); the question's document: True; holds an evidence phrase (the quote): True
+[keyword_only] kit rule relevant ranks [1, 2] (first 1); passage rule relevant ranks [2] (first 2); kit MRR {'mean': 1.0, 'lo': 1.0, 'hi': 1.0, 'n': 1.0}, passage MRR {'mean': 0.5, 'lo': 0.5, 'hi': 0.5, 'n': 1.0}
+    rank 1: chunk a2a0f19f8a5f4f5598eb391cbbd429f7 of document 3b8c81f4561c44aea1e87893f867d003 (titled 'Strain report'); the question's document: False; holds an evidence phrase (the quote): False
+    rank 2: chunk eecd3699735f4243b6b2763f45f27ba1 of document 74615e11f56d4403835d41509a50ef44 (titled 'Strain report'); the question's document: True; holds an evidence phrase (the quote): True
+
+EXPECTED: the kit rule counts only a passage of the question's document or one holding its candidate's quote, so document B's passage (another document, no quote) is irrelevant and the kit rule's first relevant rank is A's passage, as the passage rule's is
+OBSERVED: the kit rule counts document B's passage as relevant (it shares only the title 'Strain report' with A): interactive ranks [1]; vector_only ranks [1]; keyword_only ranks [1]
+RESULT: DEFECT

@@ -9,3 +9,11 @@ contract, CLAUDE.md:41: - R: BioSTEAM, thermosteam, biorefineries, the vendored 
 3. control (import biosteam in proforma.retired_entry_of), test_workers.py -k heavy_libraries: exit 1, 1 failed, 4 passed, 12 deselected in 2.00s
 3.   biosteam is imported outside its worker: ['proforma.py']
 4. planted: import biorefineries  # noqa: F401  (the retired entries are the library's plants)
+4. test_workers, test_boundaries, test_proforma, test_proforma_runs, test_engines on the planted tree: exit 0, 198 passed, 6 deselected in 50.98s
+5. planted: probe: openferment_core from /tmp/claude-0/-home-user-openFermentUI/cfbc5c9f-640a-5002-a705-5ceaf850fdc6/scratchpad/bh/work/H12-06/wt-26793/core/openferment_core/__init__.py
+5. planted: probe: worker libraries after importing the service: []
+5. planted: probe: retired entry of a kept reference run: corn_drygrind
+5. planted: probe: worker libraries after retired_entry_of: ['biorefineries']
+EXPECTED: a service module (proforma.py) importing biorefineries fails a boundary test, as the control's import of biosteam fails test_workers.py's grep; the service process holds none of the worker libraries
+OBSERVED: control exit 1; planted tree exit 0 (198 passed, 6 deselected in 50.98s); worker libraries in the service process after retired_entry_of: head [], planted [biorefineries]
+RESULT: DEFECT

@@ -164,5 +164,80 @@
   "result": "caught",
   "seconds": 7.8,
   "tail": "FAILED tests/test_protocols.py::test_a_protocol_is_made_once_and_a_kept_version_stays_as_it_was_kept | !!!!!!!!!!!!!!!!!!!!!!!!!! stopping after 1 failures !!!!!!!!!!!!!!!!!!!!!!!!!!! | 1 failed, 2 passed in 6.23s"
+ },
+ {
+  "id": "M16",
+  "claim": "6f85338: --service relays through no proxy",
+  "file": "core/openferment_core/mcp_server.py",
+  "tests": [
+   "tests/test_mcp_service.py",
+   "-k",
+   "not test_the_server_started_with_service_writes_through_it"
+  ],
+  "result": "survived",
+  "seconds": 10.2,
+  "tail": "..................................................                       [100%] | 50 passed, 1 deselected in 8.46s"
+ },
+ {
+  "id": "M17",
+  "claim": "6f85338: --service follows no redirect",
+  "file": "core/openferment_core/mcp_server.py",
+  "tests": [
+   "tests/test_mcp_service.py",
+   "-k",
+   "not test_the_server_started_with_service_writes_through_it"
+  ],
+  "result": "caught",
+  "seconds": 8.0,
+  "tail": "FAILED tests/test_mcp_service.py::test_a_redirect_the_service_answers_is_followed_nowhere | !!!!!!!!!!!!!!!!!!!!!!!!!! stopping after 1 failures !!!!!!!!!!!!!!!!!!!!!!!!!!! | 1 failed, 37 passed, 1 deselected in 6.36s"
+ },
+ {
+  "id": "M18",
+  "claim": "dc02f20: GET /api/audit leaves a row's null fields out",
+  "file": "core/openferment_core/api.py",
+  "tests": [
+   "tests/test_agent_interface.py",
+   "tests/test_mcp_service.py",
+   "-k",
+   "not test_the_server_started_with_service_writes_through_it"
+  ],
+  "result": "caught",
+  "seconds": 8.7,
+  "tail": "FAILED tests/test_agent_interface.py::test_the_http_audit_leaves_null_fields_out_as_mcp_does | !!!!!!!!!!!!!!!!!!!!!!!!!! stopping after 1 failures !!!!!!!!!!!!!!!!!!!!!!!!!!! | 1 failed, 8 passed, 1 deselected in 7.10s"
+ },
+ {
+  "id": "M19",
+  "claim": "2047f5a: a dump is written beside its name and moved into place once whole",
+  "file": "scripts/host/lib.sh",
+  "tests": [
+   "tests/test_host.py"
+  ],
+  "result": "caught",
+  "seconds": 5.3,
+  "tail": "FAILED tests/test_host.py::test_the_night_dumps_openferment_with_the_kegs_pg_dump_and_keeps_the_newest_seven | !!!!!!!!!!!!!!!!!!!!!!!!!! stopping after 1 failures !!!!!!!!!!!!!!!!!!!!!!!!!!! | 1 failed, 45 passed in 3.91s"
+ },
+ {
+  "id": "M20",
+  "claim": "f5405f8 (C.6 fix): import-url's pinned fetch skips a proxy (trust_env off)",
+  "file": "core/openferment_core/literature/collectors.py",
+  "tests": [
+   "tests/test_sff_url.py",
+   "tests/test_collectors.py"
+  ],
+  "result": "survived",
+  "seconds": 14.3,
+  "tail": "........................................................................ [ 55%] | ..........................................................               [100%] | 130 passed in 12.42s"
+ },
+ {
+  "id": "M21",
+  "claim": "f5405f8 (C.6 fix): import-url's network transport reads no proxy setting",
+  "file": "core/openferment_core/literature/collectors.py",
+  "tests": [
+   "tests/test_sff_url.py",
+   "tests/test_collectors.py"
+  ],
+  "result": "survived",
+  "seconds": 22.0,
+  "tail": "........................................................................ [ 55%] | ..........................................................               [100%] | 130 passed in 19.26s"
  }
 ]

@@ -1,0 +1,12 @@
+EXPECTED: at 810x1080 every target in the Deposition takeover measures at least 44 x 44 px, the Next step button and the staged run's runbook link among them, and no affordance appears on hover alone (CLAUDE.md:59; src/screens/Deposition.tsx:9-12).
+SOURCE: 958: aria-label="Next step"
+SOURCE: 351: <a className="text-accent hover:underline" href={href(`/runbooks/${runbook.id}`)}>
+SOURCE: 371- border: 1px solid rgb(var(--line));;373- padding: 6px 12px;
+OBSERVED: staged view #/p/h7-07/runbooks/protocols/h7-07-protocol/run/run-2: the runbook link "H7-07 placeholder runbook" (class "text-accent hover:underline", display inline) measures 174.1 x 18 px; Begin recording measures 171.1 x 56 px.
+OBSERVED: the link's underline at rest: none; under a hover: underline; the :hover rules that match it: ['.hover\\:underline:hover { text-decoration-line: underline; }'].
+OBSERVED: the run's footer: Back 96 x 56 px; Mark step completespace 527.9 x 56 px; Skip 75.1 x 56 px; Next step 43 x 56 px.
+OBSERVED: step 1: Next step measures 43 x 56 px (min-width auto, enabled).
+OBSERVED: step 2: Next step measures 43 x 56 px (min-width auto, enabled).
+OBSERVED: step 3: Next step measures 43 x 56 px (min-width auto, disabled).
+OBSERVED: Next step under 44 px on every step: True; the runbook link under 44 px: True; its underline on hover alone: True.
+RESULT: DEFECT
