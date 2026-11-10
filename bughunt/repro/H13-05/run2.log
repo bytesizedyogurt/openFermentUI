@@ -11,3 +11,57 @@ line 9's command:  ../../../core/.venv/bin/python -m pytest
 line 10's command: cd core && uv run python -m openferment_core.engine.conform mirror
 
 == line 9, from the directory it names (examples/engines/openferment-engine-mirror)
+============================== 30 passed in 1.85s ==============================
+
+== line 10 as written, from line 9's directory (examples/engines/openferment-engine-mirror)
+bash: line 1: cd: core: No such file or directory
+exit 1
+== line 10 as written, from line 8's directory (core/)
+bash: line 1: cd: core: No such file or directory
+exit 1
+== line 10 as written, from the repository root (a directory no line of the page names)
+(uv reached, from /tmp/claude-0/-home-user-openFermentUI/cfbc5c9f-640a-5002-a705-5ceaf850fdc6/scratchpad/bh/work/H13-05/run-23468/wt/core: uv run python -m openferment_core.engine.conform mirror)
+exit 0
+
+== line 10's check from the root, `uv run python` stood in by core/.venv/bin/python: python -m openferment_core.engine.conform mirror
+-- the clean checkout holds no core/.env and the page names no setting
+✗ the checks run on a database of their own, made on the PostgreSQL server the setting names: OPENFERMENT_DATABASE_URL is not set. Put it in core/.env: postgresql://openferment:openferment@127.0.0.1:5432/openferment_dev for `pnpm db:up`, then run `pnpm db:migrate`; on the live host scripts/host/install.sh writes it (the database openferment).
+exit 2
+-- with OPENFERMENT_DATABASE_URL naming a fresh migrated database (bh_r_h13_05_cfg), the checks' own database
+   named bh_r_h13_05_conform... in memory (the hunt's naming rule)
+NOTICE:  database "bh_r_h13_05_cfg" does not exist, skipping
+mirror (engine run 1 · mirror · openferment-engine-mirror 0.1.0): every check holds
+✓ 1  a JSON number outside a quantity is refused in words before the worker is reached
+✓ 2  every default carries an origin naming what it rests on (a library-default, a record or an artifact its ref, a convention its note, a
+✓ 3  a run writes one runs row keyed by its basis, and the same request twice is that one row, with its diagnostics in their shape when it
+✓ 4  a replay holds every output within the precision the thing states
+✓ 5  the run's SFF file validates and scores, or sffRefused holds words
+✓ 6  importing the module the entry point names imports neither the worker module nor what the engine computes with
+✓ 7  a request the engine refuses is kept as a receipt in its words, with no traceback
+✓ 8  created_by on every run is the person or the model that asked for it
+exit 0
+
+== what the mirror page names for line 10 and for line 8's "then restart the service"
+lines naming the database setting, its setup or the repository root: 0
+lines naming a command that starts the service: 0 (line 8 says "then restart the service")
+the page names its contract page on line 3;
+that page holds the setting and the root-relative form of line 10:
+129:  --port 8000`. It reads `OPENFERMENT_DATABASE_URL` (the environment, then `core/.env`) naming a
+802:registered. Run it as `cd core && uv run python -m openferment_core.engine.conform <name>`. It
+804:`OPENFERMENT_DATABASE_URL` names (the environment first, then `core/.env`), needs no running
+
+== the record-reader page (examples/agents/record-reader/README.md)
+- `uv run examples/agents/record-reader/record_reader.py --project proof --service http://127.0.0.1:<port>` started the `openferment` server
+lines naming --project proof: 1; lines naming how the project or the service comes to be: 0
+where `pnpm prove --keep` (the kept service and its project) is named:
+docs/BASE.md:99:   pnpm build && pnpm prove --keep   # prints the service's address, its project and its database
+docs/TOOLS.md:900:- The server has no offline stand-in: a client is checked against a migrated store, and `pnpm prove --
+
+OBSERVED: line 10 from line 9's directory: bash: line 1: cd: core: No such file or directory (exit 1)
+OBSERVED: line 10 from line 8's directory core/: bash: line 1: cd: core: No such file or directory (exit 1)
+OBSERVED: line 10 from the repository root reaches uv: yes
+OBSERVED: line 10's check with no database named: ✗ the checks run on a database of their own, made on the PostgreSQL server the setting names: OPENFERMENT_DATABASE_URL is not set. Put it in core/.env: postgr... (exit 2)
+OBSERVED: line 10's check with bh_r_h13_05_cfg named: mirror (engine run 1 · mirror · openferment-engine-mirror 0.1.0): every check holds (exit 0)
+OBSERVED: the mirror page names the database setting on 0 lines and a start command on 0; it names docs/api/engines.md, which holds both
+OBSERVED: the record-reader page names --project proof on 1 line and its source on 0
+RESULT: DEFECT

@@ -1,0 +1,20 @@
+database: bh_r_h3_13_catalogue (fresh, migrated to head)
+service: http://127.0.0.1:9700 over bh_r_h3_13_catalogue
+project made: 201
+control, summary sent as the JSON number 45: 200 error: catalogue_write refused: a number was typed into summary. Tool inputs carry ids, words and quantities; name a record, an artifact, a model, a field or a scenario, and the service looks the value up. A number stands only inside a quantity (value and unit, low and high) where a tool asks for one, and k and limit are counts.
+catalogue_write, the measured values in words: 200 error: None
+  the service's own number finder (validate.find_number) on each word field sent:
+    name: 'Strain making 45 g/L' -> '4'
+    summary: 'reaches a titre of 45 g/L at 30 °C in 48 h' -> '4'
+    note: 'read from a paper: 0.45 g/g yield' -> '0'
+GET /api/catalogues/strain/hunt-agent.0.1-s1: 200
+  kept: {"id": "hunt-agent.0.1-s1", "name": "Strain making 45 g/L", "summary": "reaches a titre of 45 g/L at 30 °C in 48 h", "note": "read from a paper: 0.45 g/g yield", "by": "hunt-agent/0.1", "agent": "model", "via": "http", "source": "hunt-agent/0.1, at the HTTP endpoint"}
+
+the row openferment.catalogue keeps (id | created_by | agent | via | name | summary | note):
+strain/hunt-agent.0.1-s1 | hunt-agent/0.1 | model | http | Strain making 45 g/L | reaches a titre of 45 g/L at 30 °C in 48 h | read from a paper: 0.45 g/g yield
+the audit row of the write (module | action | state | target | who | agent):
+geneos | catalogue_write | open | strain/hunt-agent.0.1-s1 | hunt-agent/0.1 | model
+
+EXPECTED: catalogue_write refused in words naming the field that states a number (name, summary, note each hold one validate.find_number finds), as the same door refuses summary sent as a JSON number, and nothing kept: 'Names and words only, never a measured value: a number a paper reports is a record'
+OBSERVED: control refused=True; the words write answered 200 with error None, and the catalogue holds hunt-agent.0.1-s1 in the model's lane (agent='model', via='http', by='hunt-agent/0.1') with name 'Strain making 45 g/L', summary 'reaches a titre of 45 g/L at 30 °C in 48 h' and note 'read from a paper: 0.45 g/g yield'
+RESULT: DEFECT

@@ -1,1 +1,17 @@
 NOTICE:  database "bh_r_h1_05_svc" does not exist, skipping
+service http://127.0.0.1:9360 over fresh database bh_r_h1_05_svc
+GET /api/engines -> HTTP 200 in 0 s: a list of 3
+listed configurations of biosteam/cellulosic_ethanol_v0: ['dilute acid, IB', 'dilute acid, SCF', 'hot water, IB', 'hot water, SCF'] default: dilute acid, IB
+lactic listed among biosteam's things: False
+POST /api/engines/biosteam/run -> HTTP 422 in 0 s: openferment_core.flowsheets.cellulosic_ethanol_v0 names no configuration 'dilute acid, SSCF'; it names dilute acid, IB, dilute acid, SCF, hot water, IB, hot water, SCF, AFEX, IB, AFEX, SCF, alkaline, IB, alkaline, SCF
+POST /api/engines/biosteam/run -> HTTP 422 in 16 s: cellulosic_ethanol_v0 AFEX, IB is infeasible here (BioSTEAM's InfeasibleRegion): <Mixer: M207> conversion of 'NH3' is over 100%; reaction conversion is infeasible
+GET /api/engines/biosteam/parameters?thing=cellulosic_ethanol_v0&configuration=AFEX,%20IB -> HTTP 422 in 1 s: cellulosic_ethanol_v0 AFEX, IB is infeasible here (BioSTEAM's InfeasibleRegion): <Mixer: M207> conversion of 'NH3' is over 100%; reaction conversion is infeasible
+POST /api/engines/biosteam/run -> HTTP 422 in 0 s: biorefineries.lactic could not be built under biosteam 2.54.0: IndexError: list assignment index out of range
+GET /api/runs -> HTTP 200 in 0 s: a list of 2
+  kept row eaf032f1c7918eaa: engine biosteam, plant lactic, configuration None, status refused, refused 'biorefineries.lactic could not be built under biosteam 2.54.0: IndexError: list assignment index out of range'
+  kept row a9c4e1880088113d: engine biosteam, plant cellulosic_ethanol_v0, configuration 'AFEX, IB', status refused, refused "cellulosic_ethanol_v0 AFEX, IB is infeasible here (BioSTEAM's InfeasibleRegion): <Mixer: M207> conversion of 'NH3' is ov"
+EXPECTED: the listing names ['dilute acid, IB', 'dilute acid, SCF', 'hot water, IB', 'hot water, SCF']; a run or a parameters read naming 'AFEX, IB' is a 422 naming those configurations, said before anything is built, and keeps no row
+OBSERVED: run route HTTP 422 after 16 s in BioSTEAM's words "cellulosic_ethanol_v0 AFEX, IB is infeasible here (BioSTEAM's InfeasibleRegion): <Mixer: M207> conversion of 'NH3' is over 100%; reaction conversion is infeasib", 1 refused row(s) kept for 'AFEX, IB' (a9c4e1880088113d); parameters route HTTP 422 after 1 s: "cellulosic_ethanol_v0 AFEX, IB is infeasible here (BioSTEAM's InfeasibleRegion): <Mixer: M207> conversion of 'NH3' is over 100%; reaction conversion is infeasib"
+OBSERVED (beside it, not in the verdict): lactic run HTTP 422, 1 refused row(s) kept (eaf032f1c7918eaa); the control 'dilute acid, SSCF' HTTP 422: "openferment_core.flowsheets.cellulosic_ethanol_v0 names no configuration 'dilute acid, SSCF'; it names dilute acid, IB, dilute acid, SCF, hot water, IB, hot water, SCF, AFEX, IB, AFEX, SCF, alkaline, "
+DOORS: run route built and kept a row: True; parameters route built: True
+RESULT: DEFECT

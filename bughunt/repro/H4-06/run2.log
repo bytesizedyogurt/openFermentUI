@@ -1,0 +1,2 @@
+NOTICE:  database "bh_r_h4_06_run" does not exist, skipping
+service: http://127.0.0.1:9710 over a fresh bh_r_h4_06_run (keyless), tree at cda418a; files of core, src, scripts and examples differing from 2047f5a: 0

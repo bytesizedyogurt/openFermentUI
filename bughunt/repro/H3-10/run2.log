@@ -1,0 +1,25 @@
+database: bh_r_h3_10_claims (fresh, migrated to head)
+== the rule as written (core/openferment_core/validate.py) ==
+342:            value, unit = estimate.get("value"), str(estimate.get("unit") or "").strip()
+348:                return [], f"value {n} ({label}): an estimate names its unit"
+356:                return [], f"value {n} ({label}): an estimate's basis holds a number ({found!r})"
+
+== the answer path with a stand-in model ==
+INFO openferment.api: serving the built app from /home/user/openFermentUI/dist at /
+WARNING openferment.postdoc_agent: agent: validator dropped 1/3 claims: c2: value 1 (the selling price): an estimate's basis holds a number ('4')
+stand-in calls: 1; conversation lc-217a492716c9, turn turn-f3b3ffe1589b
+plan: 2 kept, 1 dropped
+  dropped  c2: value 1 (the selling price): an estimate's basis holds a number ('4')
+  kept     c1 (assumed) | value 2.1 unit 'USD/gal, about 40 cents above the 2011 design' origin model-estimate by h3-10-standin note "the design report's price structure"
+  kept     c3 (assumed) | value 2.1 unit 'USD/gal' origin model-estimate by h3-10-standin note "the design report's price structure"
+the conversation store's turn turn-f3b3ffe1589b (answered) keeps c1: yes; its value's unit as kept: 'USD/gal, about 40 cents above the 2011 design'
+the unit table reads c1's unit as: None; it reads 'USD/gal' as 'USD gal⁻¹'
+find_number on c1's unit finds: '4'; on c2's basis: '4'
+
+the turn row the answer left (openferment.turns, c1's first value as kept):
+turn-f3b3ffe1589b | answered | c1 | assumed | USD/gal, about 40 cents above the 2011 design
+turn-f3b3ffe1589b | answered | c3 | assumed | USD/gal
+
+EXPECTED: c1 dropped and counted like c2 (its estimate's unit holds a number in words, '40' and '2011', and the unit table reads no unit there); c3 kept; plan: 1 kept, 2 dropped
+OBSERVED: c1 KEPT with unit 'USD/gal, about 40 cents above the 2011 design' in the conversation store; c2 dropped (basis holds a number); c3 kept; plan: 2 kept, 1 dropped
+RESULT: DEFECT

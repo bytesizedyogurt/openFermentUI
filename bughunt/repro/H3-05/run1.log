@@ -1,0 +1,18 @@
+service: http://127.0.0.1:10280 over a fresh bh_r_h3_05_svc (keyless), tree at cda418a, core/ as at 2047f5a: yes
+[1 runbook rb1, measure m1 ethanol titre g/L] 200 {"kind": "runbooks", "id": "rb1", "value": {"id": "rb1", "ki
+== A. a reading in a series ==
+[2 deposit dep9: s1 4.0 g/L at 5 h, confirmed] 200 {"kind": "depositions", "id": "dep9", "value": {"id": "dep9"
+[3 correct s1 by s2 40.0 g/L, the 5 h carried across] 200 {"kind": "depositions", "id": "dep9", "value": {"id": "dep9"
+[4 resolve titre on dep9/s1] 422 {"detail": "titre: reading dep9/s1 was corrected by dep9/s2, the reading that stands for its measure now"}
+   readings offered for a titre from dep9: [('dep9/s2', 40.0, 5.0)]
+[5 move s2 to 6 h, dep9 still running] 200 {"kind": "depositions", "id": "dep9", "value": {"id": "dep9"
+[6 resolve titre on dep9/s1 again] 200; titre (value, origin, source kind, source id) = (4.0, 'measurement', 'deposition', 'dep9/s1')
+   readings offered for a titre from dep9: [('dep9/s1', 4.0, 5.0), ('dep9/s2', 40.0, 6.0)]
+[7 take s1's sample time away] 200 {"kind": "depositions", "id": "dep9", "value": {"id": "dep9"; resolve on dep9/s1 200 titre = (4.0, 'measurement', 'deposition', 'dep9/s1')
+== B. a correction with no time, then given a sample time ==
+[8 dep10: s1 4.0 g/L, corrected by s2 40.0 g/L, neither timed] 200 {"kind": "depositions", "id": "dep10", "value": {"id": "dep1; resolve on dep10/s1 422 {"detail": "titre: reading dep10/s1 was corrected by dep10/s2, the reading that stands for its measure now"}
+[9 give s2 alone its 5 h] 200 {"kind": "depositions", "id": "dep10", "value": {"id": "dep1; resolve on dep10/s1 200 titre = (4.0, 'measurement', 'deposition', 'dep10/s1'); offered [('dep10/s1', 4.0, None), ('dep10/s2', 40.0, 5.0)]
+checks: DEFECT (A: refused while corrected True, taken after the move True; B: taken after a time is given True)
+EXPECTED: once s2 corrects s1, dep9/s1 stays corrected whatever later writes do to the sample times while dep9 is open: the move of s2 to 6 h (step 5) is refused in words, or the resolve on dep9/s1 (step 6) is still a 422 and the readings list still leaves dep9/s1 out
+OBSERVED: the move is a 200; the resolve on dep9/s1 is a 200 that sets the titre to the mis-read 4.0 g/L with origin measurement, and the readings list offers dep9/s1 4.0 g/L at 5 h beside dep9/s2 40.0 g/L at 6 h
+RESULT: DEFECT

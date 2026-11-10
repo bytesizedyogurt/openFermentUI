@@ -29,7 +29,7 @@ configurations, said before anything is built, and the run keeps no row.
 **Observed** (`run1.log`, `run2.log`, the same in both):
 
 - The listing: `['dilute acid, IB', 'dilute acid, SCF', 'hot water, IB', 'hot water, SCF']`.
-- The run route: HTTP 422 after 17 to 18 s on a cold worker, in BioSTEAM's words from a build
+- The run route: HTTP 422 after 16 to 19 s on a cold worker, in BioSTEAM's words from a build
   ("cellulosic_ethanol_v0 AFEX, IB is infeasible here (BioSTEAM's InfeasibleRegion): <Mixer: M207>
   conversion of 'NH3' is over 100%"), and a refused row `a9c4e1880088113d` kept with configuration
   `AFEX, IB`.

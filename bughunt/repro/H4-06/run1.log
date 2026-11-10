@@ -1,0 +1,12 @@
+NOTICE:  database "bh_r_h4_06_run" does not exist, skipping
+service: http://127.0.0.1:9710 over a fresh bh_r_h4_06_run (keyless), tree at cda418a; files of core, src, scripts and examples differing from 2047f5a: 0
+run e7efa2505b4633de: plant cellulosic_ethanol_v0, configuration dilute acid, IB
+ethanol stream: massFlow 21978.3753 kg/hr; Ethanol 21314.5947; the rest {'Water': 177.23, 'NH3': 13.45, 'Denaturant': 473.1}
+outputs: ethanolKgPerH 21978.3753 kg/hr, dryFeedKgPerH 83158.8023, ethanolKgPerKgDryFeed 0.264294 kg/kg
+Comparison screen words: outputs.ethanolKgPerH -> 'Ethanol made per hour'; outputs.ethanolKgPerKgDryFeed -> 'Ethanol per kg of dry feed'
+cellulosic_ethanol_v0.py:334: "ethanolKgPerH": float(ethanol.F_mass),
+cellulosic_ethanol_v0.py:336: "ethanolKgPerKgDryFeed": float(ethanol.F_mass) / dry if dry else None,
+the same key elsewhere, ethanol_glucose_v0.py:287: "ethanolKgPerH": float(product.imass["Ethanol"]),
+EXPECTED: 'Ethanol made per hour' reads the ethanol in the product, 21314.6 kg/hr, and 'Ethanol per kg of dry feed' 0.2563 kg/kg, as ethanol_glucose_v0's ethanolKgPerH reads product.imass['Ethanol']; or the two outputs named for the denatured product stream they measure
+OBSERVED: ethanolKgPerH 21978.4 kg/hr is the whole product stream (21978.4: Ethanol 21314.6 plus {'Water': 177.23, 'NH3': 13.45, 'Denaturant': 473.1}), 3.11 % above the ethanol; ethanolKgPerKgDryFeed 0.2643 against 0.2563 kg/kg of ethanol, 3.11 % high; the screen names both 'Ethanol'
+RESULT: DEFECT

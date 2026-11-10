@@ -1,0 +1,18 @@
+EXPECTED: with no database line in core/.env, install.sh names a database there (the live address, or the value the
+EXPECTED:   shell exports), as ensure_database's comment says (scripts/host/lib.sh:122-124 'its address in core/.env.
+EXPECTED:   Makes what is missing') and the runbook says (live-host-install.md:137-139 'when no database is named in
+EXPECTED:   core/.env, ... makes the database openferment and names it there'), so the service the LaunchDaemon
+EXPECTED:   starts reads its database from core/.env and GET /api/projects answers 200.
+setup: the service's code is the worktree's: /tmp/claude-0/-home-user-openFermentUI/cfbc5c9f-640a-5002-a705-5ceaf850fdc6/scratchpad/bh/work/H11-03/wt/core/openferment_core/__init__.py
+OBSERVED: [control: shell exports no database] ensure_database said: Database openferment is ready, and its address is in core/.env.
+OBSERVED: [control] core/.env's database afterwards, as python-dotenv reads it: postgresql://owner@127.0.0.1:5432/openferment
+setup: step 1's core/.env holds a database line: 0
+OBSERVED: the shell exports OPENFERMENT_DATABASE_URL=postgresql://openferment@127.0.0.1:5432/bh_r_h11_03_live; install.sh exit 0
+OBSERVED: install.sh said about the database: OPENFERMENT_DATABASE_URL names the database.
+OBSERVED: install.sh's wait_for_health printed: {"ok":true,"service":"openferment-core","model":"claude-opus-5-5","fallbackModel":"claude-
+OBSERVED: core/.env's database after install.sh, as python-dotenv reads it (the service's load_dotenv): None
+OBSERVED: the installed server job's EnvironmentVariables: HOME,PATH,PYTHONUNBUFFERED
+OBSERVED: pnpm ready's rows from the install shell: ok data: 0 projects, 0 review decisions, at revision 0010;ok service: answers on 127.0.0.1:9370;
+OBSERVED: the job's service: GET /api/health -> 200; GET /api/projects -> 503 {"detail":"OPENFERMENT_DATABASE_URL is not set. Put it in core/.env: postgresql://openferment:openferment@127.0.0.1:5432/openferment_dev for `pnpm db:up`, then run `pnpm db:migrate`; on the live host scripts/host/install.sh writes
+OBSERVED: [also: the example's address exported] ensure_database's refusal says 'Delete that line from core/.env and run this again'; core/.env's database lines: 0
+RESULT: DEFECT

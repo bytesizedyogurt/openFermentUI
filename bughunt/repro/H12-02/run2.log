@@ -1,0 +1,22 @@
+worktree: /tmp/claude-0/-home-user-openFermentUI/cfbc5c9f-640a-5002-a705-5ceaf850fdc6/scratchpad/bh/work/H12-02/wt-1794353497-400 at 2047f5a
+the worktree's only change to the code:  1 file changed, 1 insertion(+), 1 deletion(-)
+databases: bh_r_h12_02_cfg made fresh and migrated; the tests make and drop their own bh_r_h12_02_t_* database
+== 1. unmutated: tests/test_engines.py tests/test_engine_diagnostics.py tests/test_measurements.py tests/test_train.py tests/test_pureos_build_tool.py tests/test_finite_inputs.py
+   365 passed, 12 deselected in 54.55s
+   conform imported from: /tmp/claude-0/-home-user-openFermentUI/cfbc5c9f-640a-5002-a705-5ceaf850fdc6/scratchpad/bh/work/H12-02/wt-1794353497-400/core/openferment_core/engine/conform.py
+   15 tests reach conform._bare_number
+   19 tests reach conform._origins
+   18 tests reach conform._run_twice
+   15 tests reach conform._replayed
+   15 tests reach conform._asked_by
+   5 passed in 3.09s
+   suite: 365 passed, 0 failed; probes on the tree as it is: 5 of 5 pass
+== 2. one mutation at a time (mutate.py), conform.py restored after each
+   M52 check 1 (conform._bare_number): suite tests reaching it 15 passed, 0 failed; probe FAILED: check 1 held a door that reached the engine: the route answered 422 and 422 (a number for a quantity, a stray number) and the tool refused; the engine was reached; 0 run kept
+     pytest: 1 failed, 15 passed in 25.12s
+   M51 check 3 (conform._run_twice): suite tests reaching it 18 passed, 0 failed; probe FAILED: check 3 held a run no row keeps: run e067248c61c709e3 of placeholder, asked twice, is 0 rows; engine sample, status done; its id the artifact id of its basis
+     pytest: 1 failed, 18 passed in 23.18s
+   M50 check 4 (conform._replayed): suite tests reaching it 15 passed, 0 failed; probe FAILED: check 4 held a replay that differs: outside the precision (rtol 0, atol 0); 1 difference
+     pytest: 1 failed, 15 passed in 23.75s
+   M53 check 5 (conform._replayed): suite tests reaching it 15 passed, 0 failed; probe FAILED: check 5 held an SFF file that does not validate: record run-e067248c61c709e3: not valid, score 0.5
+     pytest: 1 failed, 15 passed in 24.84s

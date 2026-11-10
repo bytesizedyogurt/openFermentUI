@@ -1,0 +1,17 @@
+service: http://127.0.0.1:9980  database: bh_r_h2_05_export (fresh)
+fit: POST /api/fermos/fit 200, kinetic fit e79f2b2f29fbaba2
+forecast: POST /api/fermos/forecast 200, run 5f835aff5c573839; GET /api/runs/5f835aff5c573839 200
+export: GET /api/studies/export 200, 12704 bytes
+python -I -S, site imported: False
+package members: ['manifest.json', 'study.json', 'study.md', 'versions.json']
+study.json runs: ['5f835aff5c573839']; run 5f835aff5c573839: engine kinetics, configuration e79f2b2f29fbaba2, artifactId 5f835aff5c573839
+study.json artifacts: [('5f835aff5c573839', 'growth_forecast')]
+the run's artifact 5f835aff5c573839 (growth_forecast): basis [('kinetic fit', 'e79f2b2f29fbaba2', {'by': None, 'id': 'e79f2b2f29fbaba2', 'kind': 'artifact', 'note': None})]
+artifacts a kept artifact's basis names (source kind 'artifact'): ['e79f2b2f29fbaba2']; absent from study.json: ['e79f2b2f29fbaba2']
+times the fit's id e79f2b2f29fbaba2 appears, member by member: {'study.json': 5, 'study.md': 4, 'versions.json': 0, 'manifest.json': 0}
+the fit as the service kept it: params {'X0': 0.09999970223737452, 'mu': 0.4000002994694886, 'Xmax': 4.999999260821493, 'P0': 1.212172618635481e-06, 'alpha': 3.999998882203371, 'beta': 1.230919819561332e-07, 'S0': 59.9999965373369, 'gamma': 9.999997687100347, 'delta': 1.4676938107646856e-07}
+each fitted parameter's value found anywhere in the package (repr or .10g): {'X0': False, 'mu': False, 'Xmax': False, 'P0': False, 'alpha': False, 'beta': False, 'S0': False, 'gamma': False, 'delta': False}
+the run's inputs as GET /api/runs/5f835aff5c573839 serves them: [['kinetic fit', 'e79f2b2f29fbaba2']]; configuration e79f2b2f29fbaba2
+EXPECTED: study.json's artifacts hold the kinetic fit e79f2b2f29fbaba2 the forecast run's basis names (input 'kinetic fit', source artifact), with its parameters, covariance and the readings it was fitted on, so the forecast's band traces back to its source and calculation in the package alone (CLAUDE.md:8; docs/api/studies.md:234)
+OBSERVED: study.json's artifacts hold ['5f835aff5c573839']; the forecast's basis names ['e79f2b2f29fbaba2'], which no member of the package holds: the fit's id appears only as a reference (9 times), and of its parameters ['X0', 'mu', 'Xmax', 'P0', 'alpha', 'beta', 'S0', 'gamma', 'delta'] appear nowhere in the package
+RESULT: DEFECT

@@ -1,0 +1,24 @@
+EXPECTED: capture.ts:9-13 keeps a doubtful line as words ("when in doubt this returns null and the text is kept
+EXPECTED: verbatim as an Observation"), so "titre came in at 7,4 g/L" is kept as an observation, or filed as 7.4 g/L;
+EXPECTED: no reading of "7,4" (a decimal comma, or a thousands group, which holds three digits) is 74.
+step 1: the path from the capture box to the filed entry
+  src/engine/capture.ts:28:    .replace(/[,]/g, '')
+  src/engine/capture.ts:100:  const numbers = [...text.matchAll(/(-?\d+(?:\.\d+)?)/g)];
+  src/components/DepositionPanel.tsx:47:    () => (text.trim() ? matchToSchema(text, schema) : null),
+  src/components/DepositionPanel.tsx:65:    capture(deposition.id, stepId, raw, preview);
+  src/store.ts:2136:                value: match.value,
+  src/components/DepositionPanel.tsx:141:                    {e.value} {e.unit}
+  src/components/DepositionPanel.tsx:146:                  you said: &ldquo;{e.raw}&rdquo;
+  src/components/DepositionPanel.tsx:223:                    {e.value} {e.unit}
+  the built app's bundle with the same normalise: dist/assets/index--9-JuXoK.js
+step 2: matchToSchema and readBackText over a g/L measure labelled "Ethanol titre" (a runbook's harvest measure)
+  {"raw":"titre came in at 7.4 g/L","match":{"measureId":"m1","value":7.4,"unit":"g/L","matchedOn":"g/l, titre"},"readBack":"7.4 g/L"}
+  {"raw":"titre came in at 7,4 g/L","match":{"measureId":"m1","value":74,"unit":"g/L","matchedOn":"g/l, titre"},"readBack":"74 g/L"}
+  {"raw":"titre came in at 0,74 g/L","match":{"measureId":"m1","value":74,"unit":"g/L","matchedOn":"g/l, titre"},"readBack":"74 g/L"}
+  {"raw":"titre came in at 1,250 g/L","match":{"measureId":"m1","value":1250,"unit":"g/L","matchedOn":"g/l, titre"},"readBack":"1250 g/L"}
+OBSERVED: "titre came in at 7.4 g/L" files as 7.4 g/L (the control: a decimal point reads right)
+OBSERVED: "titre came in at 7,4 g/L" files as 74 g/L; the read-back beat shows "Ethanol titre = 74 g/L" over
+OBSERVED: "you said: 7,4 g/L", and "That is right" keeps it as the reading a scenario's measurement origin names
+OBSERVED: "titre came in at 0,74 g/L" files as 74 g/L; "titre came in at 1,250 g/L" files as 1250 g/L
+OBSERVED: the comma strip at capture.ts:28 (1), the panel files its preview (1), the entry takes match.value (1)
+RESULT: DEFECT
