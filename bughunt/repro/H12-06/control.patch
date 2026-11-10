@@ -1,0 +1,11 @@
+--- a/core/openferment_core/proforma.py
++++ b/core/openferment_core/proforma.py
+@@ -149,6 +149,8 @@
+     if art.tool == BENCHMARK:
+         return BENCHMARK_ENTRY
+     if art.tool == REFERENCE:
++        import biosteam  # noqa: F401  (control: the same import, of BioSTEAM)
++
+         entry = str(_named(art.inputs, "flowsheet") or (art.output or {}).get("flowsheet") or "")
+         return entry if entry in RETIRED else None
+     return None

@@ -1,0 +1,14 @@
+NOTICE:  database "bh_r_h4_05_svc" does not exist, skipping
+service: http://127.0.0.1:9410 over a fresh bh_r_h4_05_svc (keyless), tree at 3af2f53; files of core, src, scripts and examples differing from 2047f5a: 0
+the refusal in the tree:
+  kinetics.py:1210:            raise FamilyRefused("μmax is zero, so the cells never grow and the sugar never runs out: name a run length")
+case beta: μmax 0, β 0.1, m 0.0, X0 2.0, Yp/s 0.5, S0 20.0 -> by hand the sugar falls at 0.4 g/L/h and runs out at 49.95 h
+  until the sugar runs out: HTTP 422 μmax is zero, so the cells never grow and the sugar never runs out: name a run length
+  run length 60 h: HTTP 200 sugarRunsOutH 49.95000000025453 harvestH 49.95000000025453 end S 0.0
+case maint: μmax 0, β 0.0, m 0.1, X0 2.0, Yp/s 0.5, S0 20.0 -> by hand the sugar falls at 0.2 g/L/h and runs out at 99.9 h
+  until the sugar runs out: HTTP 422 μmax is zero, so the cells never grow and the sugar never runs out: name a run length
+  run length 120 h: HTTP 200 sugarRunsOutH 99.89999999999999 harvestH 99.89999999999999 end S 0.0
+control: μmax 0, β 0, m 0 (the sugar never falls), until the sugar runs out: HTTP 422 μmax is zero, so the cells never grow and the sugar never runs out: name a run length
+EXPECTED: asked to run until the sugar runs out, a batch whose sugar falls at a constant rate ends at its run-out hour (49.95 h for β 0.1, 99.9 h for m 0.1), or is refused only where the sugar stops falling (kinetics.py:59-61); the control, whose sugar never falls, may be refused
+OBSERVED: both draining cases are refused with 'the sugar never runs out', and the same family, given a run length, reports the run-out hour the hand computes
+RESULT: DEFECT

@@ -3,19 +3,20 @@ EXPECTED:   before it writes a wider address (CLAUDE.md:52 'The service binds 12
 EXPECTED:   condition, 'the service keeps its loopback bind'; live-host-install.md:146 'binds 127.0.0.1 and nothing else').
 EXPECTED: the tree's own rule for the knob: an install with OPENFERMENT_HOST unset writes --host 127.0.0.1, a reinstall
 EXPECTED:   without it returns to loopback, and a wider address comes only from the person installing setting
-EXPECTED:   OPENFERMENT_HOST that time (lib.sh:37-39; test_host.py:160-172; PROGRESS.md:3432-3435).
+EXPECTED:   OPENFERMENT_HOST that time (lib.sh:37-39; test_host.py:160-170; PROGRESS.md:3432-3435).
 EXPECTED: the verdict is DEFECT when a wider address reaches the job with OPENFERMENT_HOST unset (A or C), or when the
 EXPECTED:   knob is nowhere recorded as the install's explicit choice.
 OBSERVED: [A first install] OPENFERMENT_HOST=<unset>; install.sh exit 0; the server job's --host --port: 127.0.0.1 8000
 OBSERVED: [A first install] what install.sh said about the address:   On this Mac:      http://127.0.0.1:8000
-OBSERVED: [B reinstall, wide] OPENFERMENT_HOST=0.0.0.0; install.sh exit 0; the server job's --host --port: 0.0.0.0 8000
-OBSERVED: [B reinstall, wide] what install.sh said about the address:   The server listened on 127.0.0.1 and will now listen on 0.0.0.0. Set OPENFERMENT_HOST to choose otherwise.|  The server listens on 0.0.0.0:8000 (OPENFERMENT_HOST), so Tailscale is left alone.|  On this Mac:      http://127.0.0.1:8000
+OBSERVED: install.sh --uninstall exit 0; server jobs left in the daemons folder: <none>
+OBSERVED: [B install, OPENFERMENT_HOST set] OPENFERMENT_HOST=0.0.0.0; install.sh exit 0; the server job's --host --port: 0.0.0.0 8000
+OBSERVED: [B install, OPENFERMENT_HOST set] what install.sh said about the address:   The server listens on 0.0.0.0:8000 (OPENFERMENT_HOST), so Tailscale is left alone.|  On this Mac:      http://127.0.0.1:8000
 OBSERVED: [C reinstall after B] OPENFERMENT_HOST=<unset>; install.sh exit 0; the server job's --host --port: 127.0.0.1 8000
 OBSERVED: [C reinstall after B] what install.sh said about the address:   The server listened on 0.0.0.0 and will now listen on 127.0.0.1. Set OPENFERMENT_HOST to choose otherwise.|  On this Mac:      http://127.0.0.1:8000
-OBSERVED: guard on the service: POST /api/projects with Host 192.168.1.20:8000, no Origin -> 201 {"id":"bh-lan-write","name":"bh-lan-write","description":"","createdBy":"bughunt","createdAt":"2026-11-10T23:33:54.715785+00:00"}
-OBSERVED: guard on the service: POST /api/projects with Host mini.local:8000, no Origin -> 201 {"id":"bh-bonjour-write","name":"bh-bonjour-write","description":"","createdBy":"bughunt","createdAt":"2026-11-10T23:33:54.735764+00:00"}
+OBSERVED: guard on the service: POST /api/projects with Host 192.168.1.20:8000, no Origin -> 201 {"id":"bh-lan-write","name":"bh-lan-write","description":"","createdBy":"bughunt","createdAt":"2026-11-10T23:36:28.974096+00:00"}
+OBSERVED: guard on the service: POST /api/projects with Host mini.local:8000, no Origin -> 201 {"id":"bh-bonjour-write","name":"bh-bonjour-write","description":"","createdBy":"bughunt","createdAt":"2026-11-10T23:36:29.014207+00:00"}
 OBSERVED: guard on the service: POST /api/projects with Host attacker.example.com:8000, no Origin -> 403 {"detail":"this service does not answer to 'attacker.example.com'. Add the name to OPENFERMENT_ALLOWED_HOSTS if it is yours"}
-OBSERVED: guard.py's own rule for the hosts it answers to (guard.py:22-26): A host this service answers to: an IP address, a name with no dot, a `.local` name (Bonjour), a `.ts.net` name (Tailscale's names for the owner's devices),
+OBSERVED: guard.py's own rule for the hosts it answers to (guard.py:22-26): A host this service answers to: an IP address, a name with no dot, a `.local` name (Bonjour), a `.ts.net` name (Tailscale's names for the owner's devices), or one listed in OPENFERMENT_ALLOWED_HOSTS. Each of these is answered by the owner's own network or by Tailscale; a rebinding attack needs a public domain whose DNS the attacker answers, and none of these is one.
 OBSERVED: lib.sh:37-39: # install.sh only. The host is what OPENFERMENT_HOST says this time, else # loopback; never what an earlier install was given, because listening wider # than loopback is a choice made each time, never a default that lingers.
 OBSERVED: test_host.py:160 holds (None -> 127.0.0.1) and (0.0.0.0 -> 0.0.0.0): 1 match
 OBSERVED: PROGRESS.md:3432-3435:   - Left for the owner: `has_key` reads an unquoted `ANTHROPIC_API_KEY=sk-ant-` line; python-dotenv reads a quoted or     `export` line too, and widening `has_key` changes how the key line is read, a stop condition. This commit changed     its placeholder pattern's `\s` to `[[:space:]]`, and the review put `\s` back (below). `OPENFERMENT_HOST` stays     an install's explicit choice, default loopback.

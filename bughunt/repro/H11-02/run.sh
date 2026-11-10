@@ -40,7 +40,7 @@ echo "EXPECTED:   before it writes a wider address (CLAUDE.md:52 'The service bi
 echo "EXPECTED:   condition, 'the service keeps its loopback bind'; live-host-install.md:146 'binds 127.0.0.1 and nothing else')."
 echo "EXPECTED: the tree's own rule for the knob: an install with OPENFERMENT_HOST unset writes --host 127.0.0.1, a reinstall"
 echo "EXPECTED:   without it returns to loopback, and a wider address comes only from the person installing setting"
-echo "EXPECTED:   OPENFERMENT_HOST that time (lib.sh:37-39; test_host.py:160-172; PROGRESS.md:3432-3435)."
+echo "EXPECTED:   OPENFERMENT_HOST that time (lib.sh:37-39; test_host.py:160-170; PROGRESS.md:3432-3435)."
 echo "EXPECTED: the verdict is DEFECT when a wider address reaches the job with OPENFERMENT_HOST unset (A or C), or when the"
 echo "EXPECTED:   knob is nowhere recorded as the install's explicit choice."
 

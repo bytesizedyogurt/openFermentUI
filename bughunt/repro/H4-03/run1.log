@@ -1,8 +1,8 @@
 NOTICE:  database "bh_r_h4_03_feed" does not exist, skipping
-service: http://127.0.0.1:10300 over a fresh bh_r_h4_03_feed (keyless), tree at cda418a; files of core, src, scripts and examples differing from 2047f5a: 0
+service: http://127.0.0.1:10300 over a fresh bh_r_h4_03_feed (keyless), tree at 3af2f53; files of core, src, scripts and examples differing from 2047f5a: 0
 library default of stream.cornstover.price: 0.05158816935126135 USD/kg (origin library-default), read from GET /api/library/cornstover/parameters
 run A (nothing set): run bfda026530692adc, artifact bfda026530692adc, overrides {}, basis precision '10 significant digits'
-run B (stream.cornstover.price = its default): run fa7cc9f08dcd8c09, artifact fa7cc9f08dcd8c09, overrides {'stream.cornstover.price': 0.05158816935}, basis precision '10 significant digits', stream.cornstover.price read back 0.05158816935
+run B (stream.cornstover.price = its default): run fa7cc9f08dcd8c09, artifact fa7cc9f08dcd8c09, overrides {'stream.cornstover.price': 0.05158816935}, basis precision '10 significant digits', stream.cornstover.price in the basis 0.05158816935126135 and read back 0.05158816935
                                 A nothing set      B default set    B/A - 1
 price.solvedPrice                 0.658813642       0.6588285541   2.26e-05
 price.packagePrice                0.658813642        0.658813642   0.00e+00
@@ -20,5 +20,5 @@ tea.capitalRecovery               41575770.25         41573039.7  -6.57e-05
 tea line capitalRecovery         0.2249413923       0.2249266189  -6.57e-05
 stream ethanol massFlow           21978.37533        21978.37533   0.00e+00
 EXPECTED: run B sets stream.cornstover.price to the library's own default (0.05158816935126135 USD/kg), so it prices ethanol at run A's 0.658813642 USD/kg within the basis's ten significant digits (rtol 1e-09), with A's NPV 0.0 USD
-OBSERVED: run B prices ethanol at 0.6588285541 USD/kg (relative difference 2.26e-05, 22635 times the stated rtol) with NPV -20477.5 USD; stream.cornstover.price read back unlike the default; capital recovery 41573039.7 against 41575770.25 USD/yr
-RESULT: NO-DEFECT
+OBSERVED: run B prices ethanol at 0.6588285541 USD/kg (relative difference 2.26e-05, 22635 times the stated rtol) with NPV -20477.5 USD; stream.cornstover.price in its basis equal to the default; capital recovery 41573039.7 against 41575770.25 USD/yr; material cost moved +3722.63 USD/yr where the price set moves it 0.0 USD/yr, and the utility cost, which no feed price enters, moved -992.21 USD/yr: the process itself was simulated again
+RESULT: DEFECT

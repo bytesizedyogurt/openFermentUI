@@ -1,0 +1,24 @@
+NOTICE:  database "bh_r_h5_05_forecast" does not exist, skipping
+service: http://127.0.0.1:10310 over a fresh bh_r_h5_05_forecast (keyless)
+commit: 3af2f53; core/ as at 2047f5a: yes
+project h505-a: 201
+project h505-b: 201
+A kept kinetic fit 47f69f1f59ee0243 (POST /api/fermos/fit: 200)
+
+EXPECTED: each forecast of a fit the acting project does not hold answers a 404 or 422 with a `detail` in words naming the fit (fermos.py:928's own words: 'there is no kept fit <id>'), as the forecast scope's read and the other fit doors answer; the tool door's refusal says the same in words
+contrast: GET /api/params/fermos:forecast:0123456789abcdef in h505-a -> 404 'there is no kept kinetic fit 0123456789abcdef: fermOS keeps a fit when it fits a deposited run'
+check 1 (unknown id): POST /api/fermos/forecast in h505-a fitArtifactId=0123456789abcdef -> 500 'Internal Server Error'
+check 2 (A's fit asked from B): POST /api/fermos/forecast in h505-b fitArtifactId=47f69f1f59ee0243 -> 500 'Internal Server Error'
+check 3 (tool door): POST /api/tools/growth_forecast in h505-a -> 200 error="growth_forecast refused: '0123456789abcdef'"
+control: POST /api/fermos/forecast in h505-a fitArtifactId=47f69f1f59ee0243 (A's own) -> 200 artifactId=61894186ef225b16
+
+OBSERVED: check 1 (unknown id): NOT in words (500 'Internal Server Error'); check 2 (A's fit asked from B): NOT in words (500 'Internal Server Error'); check 3 (tool door): NOT in words (200 "growth_forecast refused: '0123456789abcdef'")
+http 500 on the REST door: 2 of 2
+
+service log (/tmp/claude-0/-home-user-openFermentUI/cfbc5c9f-640a-5002-a705-5ceaf850fdc6/scratchpad/bh/work/svc-10310.log), the exception raised through the forecast route:
+      4   File "/home/user/openFermentUI/core/openferment_core/api.py", line 735, in fermos_forecast
+      4   File "/home/user/openFermentUI/core/openferment_core/fermos.py", line 926, in forecast_run
+        2 openferment_core.artifacts.ArtifactNotFound: '0123456789abcdef'
+        2 openferment_core.artifacts.ArtifactNotFound: '47f69f1f59ee0243'
+  the log holds openferment_core.artifacts.ArtifactNotFound (a KeyError), past fermos.py:927's except FileNotFoundError
+RESULT: DEFECT

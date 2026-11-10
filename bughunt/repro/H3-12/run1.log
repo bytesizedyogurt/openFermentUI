@@ -1,0 +1,74 @@
+database: bh_r_h3_12_anchor (fresh, migrated to head); tree at 3af2f53, core/ as at 2047f5a: yes
+
+== the contract lines, as written ==
+54:- R: A record's value stands inside the verbatim quote it anchors to, in a unit its field is denominated in; a model estimate never enters a record store, and each store refuses one (ADR-006; `core/tests/test_estimates.py`, acceptance A6).
+ 962:     # OF-BLD-014 §2.1. `organism` is the strain id when anchoring resolved the
+ 963:     # extractor's wording to one (`validate.strain_id`), the wording otherwise;
+ 964:     # `organismText` keeps the wording when it was resolved.
+ 965:     organism: str | None = None
+ 966:     organismText: str | None = None
+ 967:     # What the cells were fed, in the paper's words. Kept only when the words
+ 968:     # stand in the cited section and carry no number; dropped otherwise, with
+ 969:     # the candidate kept and the drop counted (`ExtractResponse.fieldDrops`).
+ 970:     carbonSource: str | None = None
+859:FIELD_DROP_REASONS = ("carbonSource",)
+1055:     A candidate that anchors may still lose a field: a
+1056:     carbon source whose words are not in the cited section, or carry a number,
+1057:     is dropped and the candidate kept. Each drop is appended to `field_drops`
+1058:     as (reason, detail) when the caller passes a list to count them in.
+1152:     # 6. A field that needs a method has one. 'undetermined' is a legitimate
+1153:     #    answer — the analysis was not done — and is not the same as absent.
+1154:     method = raw.get("method")
+1155:     method = str(method).strip() if method is not None else ""
+1156:     if spec.get("requiresMethod") and not method:
+1157:         return None, "method", f"{field_id} requires a method and none was given"
+1164: 
+1165:     # OF-BLD-014 §2.1 — the organism, resolved to a strain id where the
+1166:     # wording names one (an exact alias, or an alias standing in it as a
+1167:     # whole word). The id is what every screen matches on; the wording stays
+1168:     # beside it. No match leaves the wording as the paper wrote it.
+1169:     organism_text = (str(raw["organism"]).strip() or None) if raw.get("organism") else None
+1170:     resolved_strain = strain_id(organism_text) if organism_text else None
+ 107: A field marked requiresMethod needs the analytical method the paper used. \
+ 108: Name it as the paper does; if the paper reports the value without saying how \
+ 109: it was measured, write "undetermined".
+ 200: def test_wording_that_names_two_strains_is_not_resolved_to_either():
+ 201:     c = _anchored("AB12 crossed with CD34")
+ 202:     assert c.organism == "AB12 crossed with CD34" and c.organismText is None
+
+== 1. the behaviour, on the candidate's inputs ==
+anchored: True None None
+value: 45.0 g L⁻¹ | the value stands in the quote: True
+method kept: 'HPLC; a repeat at 30 °C reached 85 g/L in 48 h'
+organism kept: 'a strain that made 85 g/L in fed-batch' | organismText: None
+carbonSource kept: None | drops: [('carbonSource', "carbonSource 'glucose at 120 g/L' contains a number ('1')")]
+behaviour as the candidate states it (method and organism kept, carbonSource dropped): True
+
+== 2. the contract as the tree writes it ==
+validate.FIELD_DROP_REASONS (the fields anchoring may drop from a kept candidate): ('carbonSource',)
+anchor_candidate's docstring: 'A candidate that anchors may still lose a field: a carbon source whose words are not in the cited section, or carry a number, is dropped and the candidate kept'
+models.Candidate on organism: "OF-BLD-014 §2.1. `organism` is the strain id when anchoring resolved the extractor's wording to one (`validate.strain_id`), the wording otherwise; `organismText` keeps the wording when it was resolved."
+models.Candidate on carbonSource: "What the cells were fed, in the paper's words. Kept only when the words stand in the cited section and carry no number; dropped otherwise, with the candidate kept and the drop counted (`ExtractResponse.fieldDrops`)."
+models.Candidate comments naming method: none
+the tree holds method or organism to the section or the number rule: False
+
+== 3. find_number (the rule carbonSource passes) on wordings a paper writes ==
+  organism 'Saccharomyces cerevisiae 424A(LNH-ST)'       find_number -> '4'
+  organism 'Zymomonas mobilis 8b'                        find_number -> '8'
+  organism 'Pseudomonas putida KT2440'                   find_number -> None
+  method   'HPLC (Aminex HPX-87H, 65 °C)'                find_number -> '6'
+  method   'absorbance at 600 nm'                        find_number -> '6'
+  method   'HPLC with refractive index detection'        find_number -> None
+
+
+== the tree's own tests of the organism and carbon-source rules (pure functions) ==
+......                                                                   [100%]
+6 passed in 1.73s
+the tests pin organism wording kept as written (CD34 stands outside the section) and the carbon-source drop: yes
+
+files written under core/, src/, scripts/, examples/ during the run: none
+
+EXPECTED (the candidate): method and organism dropped and counted as carbonSource is, when they hold a number or stand outside the cited section
+EXPECTED (the tree's contract): the value 45 g/L inside its quote (CLAUDE.md:54); carbonSource dropped and counted (models.py:967-970, validate.py:859 FIELD_DROP_REASONS == ('carbonSource',)); organism kept as the extractor's wording when no strain resolves (models.py:962-964 'the wording otherwise'); method kept as given, held to presence alone where the field requires one (validate.py:1152-1157)
+OBSERVED: anchored True; value 45.0 g L⁻¹ in the quote True; method kept 'HPLC; a repeat at 30 °C reached 85 g/L in 48 h'; organism kept 'a strain that made 85 g/L in fed-batch'; carbonSource dropped True (carbonSource 'glucose at 120 g/L' contains a number ('1')); the tree holds method or organism to the section or the number rule: False
+RESULT: NO-DEFECT

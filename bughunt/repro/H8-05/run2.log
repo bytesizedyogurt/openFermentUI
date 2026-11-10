@@ -1,0 +1,16 @@
+database: bh_r_h8_05_importurl (fresh, migrated to head)
+project h8-05: POST /api/projects -> 201
+POST /api/flowsheets/import-url https://public.test/to-http (302 Location: 'http://public.test/x') -> 422 {"detail":"https://public.test/to-http redirected to http://public.test/x, which is not an https address; a redirect is followed to another https address alone"}
+POST /api/flowsheets/import-url https://public.test/bad-location (302 Location: 'https:127.0.0.1/x') -> 500 Internal Server Error
+POST /api/flowsheets/import-url https://public.test/js-location (302 Location: 'javascript:alert(1)') -> 500 Internal Server Error
+requests the stand-in network answered:
+    93.184.216.34 Host=public.test path=/to-http
+    93.184.216.34 Host=public.test path=/bad-location
+    93.184.216.34 Host=public.test path=/js-location
+fetch_file(https://public.test/bad-location) raised httpx.InvalidURL: For absolute URLs, path must be empty or begin with '/'
+   an httpx.HTTPError: False; one of the four refusals fetch_file documents (AddressRefused, TooLarge, HostFailed, NetworkRefused): False
+openferment.flowsheets rows in project h8-05 (nothing should be kept): 0
+
+EXPECTED: each redirect to a malformed Location ('https:127.0.0.1/x', 'javascript:alert(1)') answered 502 (or 422) with words naming the address, as the control redirect to http:// is answered (control: 422 {"detail":"https://public.test/to-http redirected to http://public.test/x, which is not an https address; a redirect is ); nothing kept
+OBSERVED: /bad-location -> 500 'Internal Server Error'; /js-location -> 500 'Internal Server Error'; fetch_file raised httpx.InvalidURL (an httpx.HTTPError: False; one of the four refusals fetch_file documents (AddressRefused, TooLarge, HostFailed, NetworkRefused): False)
+RESULT: DEFECT

@@ -1,0 +1,25 @@
+database: bh_r_h3_14_released (fresh, migrated to head)
+service: http://127.0.0.1:10000 over bh_r_h3_14_released, serving /home/user/openFermentUI/dist
+project: {"id":"h3-14","name":"H3-14","description":"","createdBy":"bughunt","createdAt":"2026-11-10T23:36:29.847527+00:00"}
+SEED: PUT runbooks/rb1 -> 200
+SEED: PUT depositions/dep1 -> 200
+SEED: PUT depositions/dep1 -> 200
+CLICK: Record as inconclusive
+SERVICE: kept measuredEvidence me-mwbbx2zi-1 label="Titre read back" value=48 g/L confirmed=true provenance=measured
+SERVICE: kept measuredEvidence me-mwbbx2zi-2 label="Titre never read back" value=55 g/L confirmed=false provenance=measured
+SERVICE: runbooks_read runbooks/measured-evidence/me-mwbbx2zi-1 provenance=measured confirmed=true
+SERVICE: runbooks_read runbooks/measured-evidence/me-mwbbx2zi-2 provenance=unverified confirmed=false
+SCREEN: band badge "Measured · first-party"
+SCREEN: "Titre read back" tick=tick-measured sr="Measured · first-party." title="Measured · first-party" caption="with no protocol’s steps"
+SCREEN: "Titre never read back" tick=tick-measured sr="Measured · first-party." title="Measured · first-party" caption="with no protocol’s steps · unconfirmed"
+the rows openferment.measured_evidence keeps for the project (id | created_by | confirmed | provenance in the body):
+me-mwbbx2zi-2 | this browser | false | measured
+me-mwbbx2zi-1 | this browser | true | measured
+the screen's source for the band:
+511:              <ProvenanceBadge p="measured" />
+516:                  <Tick p="measured">
+534:                      {!e.confirmed && ' · unconfirmed'}
+
+EXPECTED: the value nobody read back (me-mwbbx2zi-2) drawn with the class the service gives it, runbooks_read provenance=unverified, a tick-unverified tick; the read-back one (me-mwbbx2zi-1) as the service gives it, measured
+OBSERVED: unread me-mwbbx2zi-2: service unverified, screen tick-measured ("Measured · first-party.") under the band badge "Measured · first-party"; read-back me-mwbbx2zi-1: service measured, screen tick-measured
+RESULT: DEFECT

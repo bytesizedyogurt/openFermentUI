@@ -64,6 +64,13 @@ def precision(d):
     return None
 
 
+def basis_value(d):
+    for i in d["artifact"].get("inputs", []):
+        if i.get("name") == KEY:
+            return i.get("value")
+    return None
+
+
 def readback(o):
     for q in o.get("parameters", []):
         if q.get("key") == KEY:
@@ -82,7 +89,8 @@ def stream(o, sid):
 print(f"run A (nothing set): run {a['run']['id']}, artifact {a['artifact']['id']}, overrides {oa.get('overrides')}, "
       f"basis precision {precision(a)!r}")
 print(f"run B ({KEY} = its default): run {b['run']['id']}, artifact {b['artifact']['id']}, "
-      f"overrides {ob.get('overrides')}, basis precision {precision(b)!r}, {KEY} read back {readback(ob)!r}")
+      f"overrides {ob.get('overrides')}, basis precision {precision(b)!r}, {KEY} in the basis {basis_value(b)!r} "
+      f"and read back {readback(ob)!r}")
 print(f"{'':26s} {'A nothing set':>18s} {'B default set':>18s} {'B/A - 1':>10s}")
 
 
@@ -103,10 +111,19 @@ sa, sb = pa.get("solvedPrice"), pb.get("solvedPrice")
 if not isinstance(sa, (int, float)) or not isinstance(sb, (int, float)):
     fail(f"a solved price is missing: {sa!r}, {sb!r}")
 rel = abs(sb / sa - 1)
-same_value = readback(ob) is not None and math.isclose(readback(ob), default, rel_tol=1e-12)
+bv = basis_value(b)
+same_value = (bv is not None and float(bv) == float(default) and readback(ob) is not None
+              and math.isclose(readback(ob), default, rel_tol=RTOL))
+# The feed's price enters the material cost alone: what B's material cost may move by from the price it set.
+hours = ta.get("operatingHours")
+feed_gap = abs(float(bv) - float(default)) * pa["feedstockKgPerH"] * hours if bv is not None and hours else None
+mat_gap = pb["material_cost"] - pa["material_cost"]
+util_gap = pb["utility_cost"] - pa["utility_cost"]
 print(f"EXPECTED: run B sets {KEY} to the library's own default ({default!r} {unit}), so it prices ethanol at run "
       f"A's {sa} USD/kg within the basis's ten significant digits (rtol {RTOL:g}), with A's NPV {pa.get('NPV')} USD")
 print(f"OBSERVED: run B prices ethanol at {sb} USD/kg (relative difference {rel:.2e}, {rel / RTOL:.0f} times the "
-      f"stated rtol) with NPV {pb.get('NPV')} USD; {KEY} read back {'equal to' if same_value else 'unlike'} the "
-      f"default; capital recovery {tb.get('capitalRecovery')} against {ta.get('capitalRecovery')} USD/yr")
+      f"stated rtol) with NPV {pb.get('NPV')} USD; {KEY} in its basis {'equal to' if same_value else 'unlike'} the "
+      f"default; capital recovery {tb.get('capitalRecovery')} against {ta.get('capitalRecovery')} USD/yr; material "
+      f"cost moved {mat_gap:+.2f} USD/yr where the price set moves it {feed_gap!r} USD/yr, and the utility cost, "
+      f"which no feed price enters, moved {util_gap:+.2f} USD/yr: the process itself was simulated again")
 print("RESULT: DEFECT" if same_value and rel > RTOL else "RESULT: NO-DEFECT")

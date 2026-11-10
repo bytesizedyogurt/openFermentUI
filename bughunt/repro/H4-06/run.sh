@@ -20,7 +20,7 @@ done
 cleanup() {
   bh_svc_stop "$PORT"
   bh_db_drop "$DB"
-  rm -rf "$BH_WORK/data-$DB" "$OUT"
+  rm -rf "$BH_WORK/data-$DB" "$OUT"; rmdir "$BH_WORK/H4-06" 2>/dev/null
 }
 trap cleanup EXIT
 rm -rf "$OUT"; mkdir -p "$OUT"

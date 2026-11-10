@@ -1,0 +1,11 @@
+worktree /tmp/claude-0/-home-user-openFermentUI/cfbc5c9f-640a-5002-a705-5ceaf850fdc6/scratchpad/bh/work/H12-06/wt-26793 at 2047f5a; database bh_r_h12_06_db (fresh)
+contract, CLAUDE.md:41: - R: BioSTEAM, thermosteam, biorefineries, the vendored SFF toolkit and cobra run in worker processes (`core/openferment_core/workers/`), one JSON request a line; the service process imports none of them (§7.1; `core/tests/test_b
+1. test_workers.py ALLOWED (the grep's libraries): ['biosteam', 'cobra', 'pisces_sff', 'scipy', 'thermosteam'] | biorefineries among them: False
+1. test_boundaries.py NEVER (the packages held from SIMULATION): ['db', 'engine', 'literature', 'projects', 'studies'] | proforma.py's top level among them: False
+2. head: probe: openferment_core from /tmp/claude-0/-home-user-openFermentUI/cfbc5c9f-640a-5002-a705-5ceaf850fdc6/scratchpad/bh/work/H12-06/wt-26793/core/openferment_core/__init__.py
+2. head: probe: worker libraries after importing the service: []
+2. head: probe: retired entry of a kept reference run: corn_drygrind
+2. head: probe: worker libraries after retired_entry_of: []
+3. control (import biosteam in proforma.retired_entry_of), test_workers.py -k heavy_libraries: exit 1, 1 failed, 4 passed, 12 deselected in 2.00s
+3.   biosteam is imported outside its worker: ['proforma.py']
+4. planted: import biorefineries  # noqa: F401  (the retired entries are the library's plants)

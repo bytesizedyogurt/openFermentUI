@@ -1,5 +1,5 @@
 NOTICE:  database "bh_r_h4_06_run" does not exist, skipping
-service: http://127.0.0.1:9710 over a fresh bh_r_h4_06_run (keyless), tree at cda418a; files of core, src, scripts and examples differing from 2047f5a: 0
+service: http://127.0.0.1:9710 over a fresh bh_r_h4_06_run (keyless), tree at 3af2f53; files of core, src, scripts and examples differing from 2047f5a: 0
 run e7efa2505b4633de: plant cellulosic_ethanol_v0, configuration dilute acid, IB
 ethanol stream: massFlow 21978.3753 kg/hr; Ethanol 21314.5947; the rest {'Water': 177.23, 'NH3': 13.45, 'Denaturant': 473.1}
 outputs: ethanolKgPerH 21978.3753 kg/hr, dryFeedKgPerH 83158.8023, ethanolKgPerKgDryFeed 0.264294 kg/kg

@@ -1,0 +1,61 @@
+service: http://127.0.0.1:9390 over bh_r_h3_07_svc (fresh, migrated to head)
+
+== Part A: the unit engine (core/openferment_core/units.py) ==
+controls:
+  normalize('mg'      ) = 'mg'             family mass
+  normalize('mL'      ) = 'mL'             family volume
+  normalize('mm'      ) = 'mm'             family length
+  normalize('s'       ) = 's'              family time
+  normalize('g'       ) = 'g'              family mass
+  normalize('t d⁻¹'   ) = 't d⁻¹'          family massFlow
+  normalize('Mg/d'    ) = None             family None
+  normalize('ML/d'    ) = None             family None
+  normalize('furlongs') = None             family None
+  normalize('G L-1'   ) = 'g L⁻¹'          family massConc
+  normalize('KDa'     ) = 'kDa'            family molarMass
+probes (each names a unit the table does not hold):
+  normalize('Mg'      ) = 'mg'             family mass      (Mg is megagram (10^6 g, a tonne))
+  normalize('MG'      ) = 'mg'             family mass      (MG is megagram, upper case)
+  normalize('ML'      ) = 'mL'             family volume    (ML is megalitre (10^6 L))
+  normalize('Mm'      ) = 'mmol L⁻¹'       family molar     (Mm is megametre (10^6 m))
+  normalize('MM'      ) = 'mmol L⁻¹'       family molar     (MM is megamolar)
+  normalize('S'       ) = 's'              family time      (S is siemens)
+  normalize('G'       ) = 'g'              family mass      (G is gauss, or the giga prefix alone)
+conversions:
+  convert(1, 'Mg', 'kg')       = 1e-06   (a megagram is 1000 kg)
+  convert(2, 'Mg', 'g')        = 0.002   (2 Mg is 2e6 g)
+  convert(1, 'ML', 'L')        = 0.001   (a megalitre is 1e6 L)
+  convert(1, 'Mg/d', 'kg d⁻¹') = UnitError(Unknown unit: Mg/d)
+checkpoint grading (units.quantity_equals, the Python twin of src/engine/units.ts quantityEquals):
+  quantity_equals((2000, 'kg'), (2, 'Mg'), 5) = False   (2000 kg is 2 Mg)
+  quantity_equals((2, 'mg'),    (2, 'Mg'), 5) = True   (2 mg is 2e-9 Mg)
+
+== Part B: the lesson catalogue's door (POST /api/catalogues/lesson) ==
+  keep a lesson whose answer is 2 Mg:   HTTP 200
+  read it back: HTTP 200, answer unit kept 'Mg', which the engine reads as 'mg'
+  control, an answer of 2 Mg/d:         HTTP 422  {"detail":[{"type":"value_error","loc":["body","entry","checkpoint",0,"answer","unit"],"msg":"Value error, a numeric answer's unit is one the unit converter reads, or empty for a pure number, and the converter reads no '
+
+== Part C: the browser's engine (src/engine/units.ts) and the Primer's grading ==
+BROWSER control normalizeUnit("Mg/d") = null
+BROWSER control normalizeUnit("G L-1") = "g L⁻¹"
+BROWSER control normalizeUnit("KDa") = "kDa"
+BROWSER probe   normalizeUnit("Mg") = "mg"
+BROWSER probe   normalizeUnit("MG") = "mg"
+BROWSER probe   normalizeUnit("ML") = "mL"
+BROWSER probe   normalizeUnit("Mm") = "mmol L⁻¹"
+BROWSER probe   normalizeUnit("MM") = "mmol L⁻¹"
+BROWSER probe   normalizeUnit("S") = "s"
+BROWSER probe   normalizeUnit("G") = "g"
+BROWSER convert(1, "Mg", "kg") = 0.000001
+BROWSER convert(1, "ML", "L") = 0.001
+BROWSER Primer grade: a learner types "2000 kg" against the answer 2 Mg -> wrong
+BROWSER Primer grade: a learner types "2 mg" against the answer 2 Mg -> correct
+
+EXPECTED: 'Mg', 'MG', 'ML', 'Mm', 'MM', 'S' and 'G' name units the table holds no key for, so normalize returns None for each and convert raises UnitError ('Unknown unit'), as it does for 'Mg/d' (units.py:24-27 'An unknown unit is UnitError ... Nothing here invents a conversion factor'); the lesson door refuses a 2 Mg answer with a 422, as it refuses 2 Mg/d
+EXPECTED: were megagram held, convert(1, 'Mg', 'kg') = 1000.0 and 2000 kg grades as 2 Mg
+OBSERVED: 7 of 7 probes fold onto another unit: Mg->mg, MG->mg, ML->mL, Mm->mmol L⁻¹, MM->mmol L⁻¹, S->s, G->g
+OBSERVED: convert(1, 'Mg', 'kg') = 1e-06; convert(1, 'ML', 'L') = 0.001; convert(1, 'Mg/d', 'kg d⁻¹') = UnitError(Unknown unit: Mg/d)
+OBSERVED: quantity_equals((2000,'kg'),(2,'Mg'),5) = False; quantity_equals((2,'mg'),(2,'Mg'),5) = True
+OBSERVED: POST /api/catalogues/lesson keeps an answer of 2 Mg (HTTP 200, unit kept 'Mg') and refuses 2 Mg/d (HTTP 422)
+OBSERVED: the browser's normalizeUnit folds 7 of 7 probes the same way (src/engine/units.ts:377-389), and the Primer grades '2000 kg' wrong and '2 mg' correct against an answer of 2 Mg
+RESULT: DEFECT

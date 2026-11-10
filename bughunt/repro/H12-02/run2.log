@@ -20,3 +20,15 @@ databases: bh_r_h12_02_cfg made fresh and migrated; the tests make and drop thei
      pytest: 1 failed, 15 passed in 23.75s
    M53 check 5 (conform._replayed): suite tests reaching it 15 passed, 0 failed; probe FAILED: check 5 held an SFF file that does not validate: record run-e067248c61c709e3: not valid, score 0.5
      pytest: 1 failed, 15 passed in 24.84s
+   M54 check 8 (conform._asked_by): suite tests reaching it 15 passed, 0 failed; probe FAILED: check 8 held a row whose created_by is not the asker: the checks' run: created_by 'someone else', its by 'conformance test', asked by 'conformance test'; a model's run of placeholder-configured (one way) through the engine_run tool (7d99adc6ace24cb8): created_by 'conformance-model', asked by 'conformance-model'
+     pytest: 1 failed, 15 passed in 21.43s
+   C2 check 2 (conform._origins): suite tests reaching it 17 passed, 2 failed [control] test_a_check_that_fails_says_which_and_why test_a_contract_engines_parameter_with_no_default_waits_for_the_run_to_set_it
+   conform.py restored
+== 3. core/tests/test_engines_sim.py (marker sim, not run here): its assertions on conform.checks
+   41-    assert [c.number for c in found] == list(range(1, 9))
+   42-    assert all(c.ok for c in found), [(c.number, c.said) for c in found if not c.ok]
+   103-    assert [c.number for c in found] == list(range(1, 9))
+   104-    assert all(c.ok for c in found), [(c.number, c.said) for c in found if not c.ok]
+EXPECTED: under each of the five mutations (check 1 ignoring that the engine was reached, check 3 ignoring the row count, check 4 ignoring the replay, check 5 ignoring an invalid SFF file, check 8 ignoring created_by), some test that reaches the mutated function fails, as test_engines.py:571 does for check 2
+OBSERVED: all five survive: every suite test reaching each mutated function passes, while a probe shows each mutated check holding an engine or service that breaks it: M52(check 1) M51(check 3) M50(check 4) M53(check 5) M54(check 8); the control mutation of check 2 is caught
+RESULT: DEFECT

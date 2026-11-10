@@ -1,0 +1,28 @@
+module: /tmp/claude-0/-home-user-openFermentUI/cfbc5c9f-640a-5002-a705-5ceaf850fdc6/scratchpad/bh/work/H6-03/wt-20668/core/openferment_core/import_alpha1.py
+alpha 1.0 data written: dup/candidates/P1 copy.json, dup/candidates/P1.json, one/candidates/P1.json
+alpha 1.0 data dup: the two files hold the same bytes (paperId P1)
+database bh_r_h6_03_dup (fresh): openferment at 0010
+database bh_r_h6_03_absent on the server: 0 (none held)
+
+== 1. two extraction files of one paper, into bh_r_h6_03_dup
+import dup: exit 1; 0 refused: lines; 3 tracebacks; last line: (Background on this error at: https://sqlalche.me/e/21/gkpj)
+  the import's last frame: File "core/openferment_core/import_alpha1.py", line 211, in _write
+  the error: asyncpg.exceptions.UniqueViolationError: duplicate key value violates unique constraint "pk_candidates"
+  DETAIL:  Key (project_id, document_id, source)=(repro-h6-03-dup, P1, model) already exists.
+  rows written: 0 projects, 0 candidate rows
+  control, the same directory without the copy:
+import one: exit 0; 0 refused: lines; 0 tracebacks; last line: The files under data/one are left as they were; move them aside once the project reads right.
+  carried data/one into project repro-h6-03-one:
+
+== 2. a database the server does not hold (postgresql://openferment:openferment@127.0.0.1:5432/bh_r_h6_03_absent)
+import absent: exit 1; 0 refused: lines; 3 tracebacks; last line: (Background on this error at: https://sqlalche.me/e/21/dbapi)
+  the error: asyncpg.exceptions.InvalidCatalogNameError: database "bh_r_h6_03_absent" does not exist
+  pnpm db:migrate on the same address: exit 2: refused: the server at 127.0.0.1:5432 holds no database bh_r_h6_03_absent (database "bh_r_h6_03_absent" does not exist): pnpm db:reset <name> makes a database of that name there and migrates it
+
+== 3. a server that does not answer (127.0.0.1:9729)
+import dead: exit 1; 0 refused: lines; 1 tracebacks; last line: ConnectionRefusedError: [Errno 111] Connect call failed ('127.0.0.1', 9729)
+  pnpm db:migrate on the same address: exit 2: refused: the database bh_r_h6_03_x on 127.0.0.1:9729 could not be reached: ConnectionRefusedError: [Errno 111] Connect call failed ('127.0.0.1', 9729)
+
+EXPECTED: each of the three answers one line beginning refused: in words and exits 2, writing nothing (docs/runbooks/live-host-install.md:218-219 'A line beginning `refused:` says why, and the import has written nothing'); the duplicate named by its second file, the database and the server named as pnpm db:migrate names them
+OBSERVED: two files of one paper: exit 1, 0 refused: lines, 3 tracebacks (DEFECT); no database: exit 1, 0 refused: lines, 3 tracebacks (DEFECT); no server: exit 1, 0 refused: lines, 1 tracebacks (DEFECT); control (one file): exit 0
+RESULT: DEFECT

@@ -1,0 +1,168 @@
+[
+ {
+  "id": "M01",
+  "claim": "8bde8ab: the state door keeps a reading's own unit on a Proforma scope alone",
+  "file": "core/openferment_core/project_state.py",
+  "tests": [
+   "tests/test_project_state.py"
+  ],
+  "result": "caught",
+  "seconds": 13.7,
+  "tail": "FAILED tests/test_project_state.py::test_what_is_not_a_row_of_its_kind_is_refused_in_words[overrides-pureos:unit:tr-1:u-1-value9-which a Proforma scenario's scope alone keeps] | !!!!!!!!!!!!!!!!!!!!!!!!!! stopping after 1 failures !!!!!!!!!!!!!!!!!!!!!!!!!!! | 1 failed, 14 passed in 11.59s"
+ },
+ {
+  "id": "M02",
+  "claim": "2ed7dac: OPENFERMENT_EFFORT lays over plan, explain and extract; judge keeps its effort",
+  "file": "core/openferment_core/llm.py",
+  "tests": [
+   "tests/test_llm.py"
+  ],
+  "result": "caught",
+  "seconds": 7.2,
+  "tail": "FAILED tests/test_llm.py::test_a_plain_setting_lays_over_the_families_it_covers_when_it_is_set | !!!!!!!!!!!!!!!!!!!!!!!!!! stopping after 1 failures !!!!!!!!!!!!!!!!!!!!!!!!!!! | 1 failed, 60 passed in 6.11s"
+ },
+ {
+  "id": "M03",
+  "claim": "2ed7dac: OPENFERMENT_INDEX_MODEL moves index's first model, index keeps its effort",
+  "file": "core/openferment_core/llm.py",
+  "tests": [
+   "tests/test_llm.py"
+  ],
+  "result": "caught",
+  "seconds": 7.9,
+  "tail": "FAILED tests/test_llm.py::test_a_plain_setting_lays_over_the_families_it_covers_when_it_is_set | !!!!!!!!!!!!!!!!!!!!!!!!!! stopping after 1 failures !!!!!!!!!!!!!!!!!!!!!!!!!!! | 1 failed, 60 passed in 6.63s"
+ },
+ {
+  "id": "M04",
+  "claim": "dc02f20: GET /api/audit takes who beside action and target",
+  "file": "core/openferment_core/api.py",
+  "tests": [
+   "tests/test_agent_interface.py"
+  ],
+  "result": "caught",
+  "seconds": 8.6,
+  "tail": "FAILED tests/test_agent_interface.py::test_the_audit_is_read_by_action_target_and_who_and_a_write_of_any_age_is_found | !!!!!!!!!!!!!!!!!!!!!!!!!! stopping after 1 failures !!!!!!!!!!!!!!!!!!!!!!!!!!! | 1 failed, 7 passed in 7.00s"
+ },
+ {
+  "id": "M05",
+  "claim": "2047f5a: the backup folder is 700",
+  "file": "scripts/host/lib.sh",
+  "tests": [
+   "tests/test_host.py"
+  ],
+  "result": "caught",
+  "seconds": 5.4,
+  "tail": "FAILED tests/test_host.py::test_the_night_dumps_openferment_with_the_kegs_pg_dump_and_keeps_the_newest_seven | !!!!!!!!!!!!!!!!!!!!!!!!!! stopping after 1 failures !!!!!!!!!!!!!!!!!!!!!!!!!!! | 1 failed, 45 passed in 4.27s"
+ },
+ {
+  "id": "M06",
+  "claim": "2047f5a: the newest seven dumps are kept",
+  "file": "scripts/host/lib.sh",
+  "tests": [
+   "tests/test_host.py"
+  ],
+  "result": "caught",
+  "seconds": 5.2,
+  "tail": "FAILED tests/test_host.py::test_the_night_dumps_openferment_with_the_kegs_pg_dump_and_keeps_the_newest_seven | !!!!!!!!!!!!!!!!!!!!!!!!!! stopping after 1 failures !!!!!!!!!!!!!!!!!!!!!!!!!!! | 1 failed, 45 passed in 3.98s"
+ },
+ {
+  "id": "M07",
+  "claim": "2047f5a: the dump files are 600 (umask 077)",
+  "file": "scripts/host/lib.sh",
+  "tests": [
+   "tests/test_host.py"
+  ],
+  "result": "caught",
+  "seconds": 5.3,
+  "tail": "FAILED tests/test_host.py::test_the_night_dumps_openferment_with_the_kegs_pg_dump_and_keeps_the_newest_seven | !!!!!!!!!!!!!!!!!!!!!!!!!! stopping after 1 failures !!!!!!!!!!!!!!!!!!!!!!!!!!! | 1 failed, 45 passed in 4.16s"
+ },
+ {
+  "id": "M08",
+  "claim": "8d0c2a2: a plan turn's room is 128,000 at max",
+  "file": "core/openferment_core/postdoc/plan.py",
+  "tests": [
+   "tests/test_postdoc_agent.py"
+  ],
+  "result": "caught",
+  "seconds": 8.6,
+  "tail": "FAILED tests/test_postdoc_agent.py::test_the_plan_routes_effort_sets_the_ceiling_a_turn_may_write_to | !!!!!!!!!!!!!!!!!!!!!!!!!! stopping after 1 failures !!!!!!!!!!!!!!!!!!!!!!!!!!! | 1 failed, 12 passed in 7.06s"
+ },
+ {
+  "id": "M09",
+  "claim": "744e32e: a run's IRR is cited with the unit fraction",
+  "file": "core/openferment_core/tools/engine.py",
+  "tests": [
+   "tests/test_tools_study.py"
+  ],
+  "result": "caught",
+  "seconds": 7.8,
+  "tail": "FAILED tests/test_tools_study.py::test_a_runs_rate_of_return_is_cited_with_its_unit | !!!!!!!!!!!!!!!!!!!!!!!!!! stopping after 1 failures !!!!!!!!!!!!!!!!!!!!!!!!!!! | 1 failed, 4 passed in 6.22s"
+ },
+ {
+  "id": "M10",
+  "claim": "4143de3: --limit counts one at least",
+  "file": "core/openferment_core/literature/report.py",
+  "tests": [
+   "tests/test_literature_report.py",
+   "tests/test_literature_live.py"
+  ],
+  "result": "survived",
+  "seconds": 6.7,
+  "tail": ".........................                                                [100%] | 25 passed in 5.53s"
+ },
+ {
+  "id": "M11",
+  "claim": "4143de3: KIT_ROOM at max is 32,000, held equal to JUDGE_TOKENS by a test",
+  "file": "core/openferment_core/llm.py",
+  "tests": [
+   "tests/test_llm.py"
+  ],
+  "result": "caught",
+  "seconds": 6.3,
+  "tail": "FAILED tests/test_llm.py::test_a_kit_call_has_room_for_its_thinking - Asserti... | !!!!!!!!!!!!!!!!!!!!!!!!!! stopping after 1 failures !!!!!!!!!!!!!!!!!!!!!!!!!!! | 1 failed, 86 passed in 5.20s"
+ },
+ {
+  "id": "M12",
+  "claim": "6f85338: a NaN or infinite input is refused in words at every door",
+  "file": "core/openferment_core/models.py",
+  "tests": [
+   "tests/test_finite_inputs.py"
+  ],
+  "result": "caught",
+  "seconds": 8.3,
+  "tail": "FAILED tests/test_finite_inputs.py::test_every_door_refuses_a_number_that_is_nan_or_infinite_in_words_before_anything_runs[NaN-value-/api/engines/sample/run] | !!!!!!!!!!!!!!!!!!!!!!!!!! stopping after 1 failures !!!!!!!!!!!!!!!!!!!!!!!!!!! | 1 failed in 6.76s"
+ },
+ {
+  "id": "M13",
+  "claim": "c34c8c9: a row kept earlier that does not read is named in refused while the rest load",
+  "file": "core/openferment_core/project_state.py",
+  "tests": [
+   "tests/test_project_state.py"
+  ],
+  "result": "caught",
+  "seconds": 8.9,
+  "tail": "FAILED tests/test_project_state.py::test_a_row_kept_before_its_kind_had_a_model_that_does_not_read_is_named_and_the_rest_load | !!!!!!!!!!!!!!!!!!!!!!!!!! stopping after 1 failures !!!!!!!!!!!!!!!!!!!!!!!!!!! | 1 failed, 51 passed in 7.23s"
+ },
+ {
+  "id": "M14",
+  "claim": "448adbb: a person's catalogue keep writes a keep_catalogue audit row",
+  "file": "core/openferment_core/catalogues.py",
+  "tests": [
+   "tests/test_catalogues.py"
+  ],
+  "result": "caught",
+  "seconds": 8.2,
+  "tail": "FAILED tests/test_catalogues.py::test_a_persons_keep_writes_its_audit_row_as_a_persons_other_writes_do | !!!!!!!!!!!!!!!!!!!!!!!!!! stopping after 1 failures !!!!!!!!!!!!!!!!!!!!!!!!!!! | 1 failed, 5 passed in 6.75s"
+ },
+ {
+  "id": "M15",
+  "claim": "37addaf: a version the protocol holds already is refused",
+  "file": "core/openferment_core/protocols.py",
+  "tests": [
+   "tests/test_protocols.py"
+  ],
+  "result": "caught",
+  "seconds": 7.8,
+  "tail": "FAILED tests/test_protocols.py::test_a_protocol_is_made_once_and_a_kept_version_stays_as_it_was_kept | !!!!!!!!!!!!!!!!!!!!!!!!!! stopping after 1 failures !!!!!!!!!!!!!!!!!!!!!!!!!!! | 1 failed, 2 passed in 6.23s"
+ }
+]

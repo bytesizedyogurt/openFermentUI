@@ -18,9 +18,9 @@ probes (each names a unit the table does not hold):
   normalize('MG'      ) = 'mg'             family mass      (MG is megagram, upper case)
   normalize('ML'      ) = 'mL'             family volume    (ML is megalitre (10^6 L))
   normalize('Mm'      ) = 'mmol L⁻¹'       family molar     (Mm is megametre (10^6 m))
-  normalize('MM'      ) = 'mmol L⁻¹'       family molar     (MM is ?)
+  normalize('MM'      ) = 'mmol L⁻¹'       family molar     (MM is megamolar)
   normalize('S'       ) = 's'              family time      (S is siemens)
-  normalize('G'       ) = 'g'              family mass      (G is gauss / giga)
+  normalize('G'       ) = 'g'              family mass      (G is gauss, or the giga prefix alone)
 conversions:
   convert(1, 'Mg', 'kg')       = 1e-06   (a megagram is 1000 kg)
   convert(2, 'Mg', 'g')        = 0.002   (2 Mg is 2e6 g)
