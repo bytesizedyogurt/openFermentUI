@@ -1,0 +1,18 @@
+EXPECTED: over runbook step 1's core/.env (the example's placeholder on its key line) every door reads 'no key':
+EXPECTED:   install.sh's has_key false (it prints 'core/.env holds no key yet. The app runs; Postdoc and extraction
+EXPECTED:   wait for one.'), pnpm ready's key row fail, the nightly's 'checks brief --missing' prints that the checks
+EXPECTED:   wait (nightly.sh:50-51), and GET /api/health hasKey false, so the Postdoc screen shows its no-key callout
+EXPECTED:   (api.py:471-472: hasKey tells 'the service is down' from 'the service is up but has no key').
+setup: the doors' code and the file they read: /tmp/claude-0/-home-user-openFermentUI/cfbc5c9f-640a-5002-a705-5ceaf850fdc6/scratchpad/bh/work/H11-01/wt/core/openferment_core/api.py /tmp/claude-0/-home-user-openFermentUI/cfbc5c9f-640a-5002-a705-5ceaf850fdc6/scratchpad/bh/work/H11-01/wt/core/.env
+setup: step 1's core/.env key line: 6:ANTHROPIC_API_KEY=sk-ant-...
+OBSERVED: [runbook step 1's core/.env] has_key: no-key
+OBSERVED: [runbook step 1's core/.env] pnpm ready key row: no-key (✗ key              core/.env holds no key. Postdoc and extraction need one: se)
+OBSERVED: [runbook step 1's core/.env] checks brief --missing: drafts-briefs (exit 0; output: <none>)
+OBSERVED: [runbook step 1's core/.env] GET /api/health: hasKey=True
+OBSERVED: [control: key line emptied] has_key: no-key
+OBSERVED: [control: key line emptied] pnpm ready key row: no-key (✗ key              core/.env holds no key. Postdoc and extraction need one: se)
+OBSERVED: [control: key line emptied] checks brief --missing: waits (exit 0; output: 0 check(s) without a brief; no key in core/.env, so they wait)
+OBSERVED: [control: key line emptied] GET /api/health: hasKey=False
+OBSERVED: src/screens/Postdoc.tsx shows the no-key callout only on hasKey false: 144:      {health && health.ok && !health.hasKey && (
+OBSERVED: summary (has_key|ready|brief|health): step 1 = no-key|no-key|drafts-briefs|hasKey=True; control = no-key|no-key|waits|hasKey=False
+RESULT: DEFECT

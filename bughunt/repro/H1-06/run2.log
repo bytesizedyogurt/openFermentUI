@@ -1,0 +1,24 @@
+NOTICE:  database "bh_r_h1_06_svc" does not exist, skipping
+== the service on http://127.0.0.1:9660 over bh_r_h1_06_svc, the stand-in engines on PYTHONPATH
+== GET /api/engines: the stand-ins as listed
+[200]
+h106: things=[('fine', {'rtol': 0.0, 'atol': 0.0}), ('infprec', {'rtol': 0.0, 'atol': None})] error=''
+h106neg: things=[] error="its things could not be listed: EngineBroken: the h106neg worker's things op answered things outside their shape: precision.atol: Input should be greater than or equal to 0"
+docs/api/openapi.json EnginePrecision.atol: number minimum 0.0
+== control: POST /api/engines/h106/run {thing: fine}
+200 application/json {"run":{"id":"418df1e73ce7f05d","engine":"h106","plant":"fine","configuration":null,"status":"done","tool":"engine.h106","toolVersion":"engine run 1 · h106 · openferment-engine-
+== the case: POST /api/engines/h106/run {thing: infprec}
+500 text/plain; charset=utf-8 Internal Server Error
+== control: POST /api/engines/h106neg/run {thing: negprec}
+503 application/json {"detail":"the h106neg worker's things op answered things outside their shape: precision.atol: Input should be greater than or equal to 0"}
+runs rows kept: infprec 0, fine 1
+service log, the last exception: ValueError: Out of range float values are not JSON compliant: inf
+service log, its last two openferment_core frames: openferment_core/artifacts.py", line 148, in artifact_id openferment_core/artifacts.py", line 130, in canonical 
+
+EXPECTED: h106's things answer, holding a precision whose atol is infinite (docs/api/workers.md:62-68: "a number that is NaN or infinite ... breaks the contract: the service raises EngineBroken, keeps no runs row and answers 503 in words"), is refused as outside the protocol: h106 is listed with that in words (as h106neg is for its negative atol), and POST /api/engines/h106/run answers 503 in words with no runs row (docs/api/engines.md:517-520)
+OBSERVED: listing: h106: things=[('fine', {'rtol': 0.0, 'atol': 0.0}), ('infprec', {'rtol': 0.0, 'atol': None})] error=''
+OBSERVED: run of infprec: 500 text/plain; charset=utf-8 Internal Server Error (content-type and body above), 0 runs row(s) kept; the log: ValueError: Out of range float values are not JSON compliant: inf
+CONTROL:  run of fine in the same engine: 200 application/json {"run":{"id":"418df1e73ce7f05d","engine ...
+CONTROL:  listing: h106neg: things=[] error="its things could not be listed: EngineBroken: the h106neg worker's things op answered things outside their shape: precision.atol: Input should be greater than or equal to 0"
+CONTROL:  run of negprec: 503 application/json {"detail":"the h106neg worker's things op answered things outside their shape: precision.atol: Input should be greater than or equal to 0"}
+RESULT: DEFECT

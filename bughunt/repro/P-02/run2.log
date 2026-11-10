@@ -1,0 +1,27 @@
+== 1. the rule alone: biorepo.provenance_of
+SERVICE provenance_of(verified, label 'verified', gold None) = verified
+SERVICE provenance_of(verified, label 'gold', gold None) = gold
+SERVICE provenance_of(verified, label 'curated', gold None) = verified
+SERVICE provenance_of(verified, label 'unverified', gold None) = verified
+== 2. the service over a fresh database (bh_r_p_02_main) on 10250, fixture collectors, keyless
+
+upload: 200 ingested
+extract: 1 candidate(s) {'field': 0, 'section': 0, 'quote': 0, 'value': 0, 'unit': 0, 'method': 0}
+check, verified, label 'verified', gold null -> {"ok": true, "rule": null, "why": null}
+check, verified, label 'gold', gold null -> {"ok": true, "rule": null, "why": null}
+decision answered: 200 {'status': 'verified', 'provenance': 'gold', 'gold': None}
+biorepo_read: [('cl1-5369f5ef71e64e9db5b147da3eb8e783-185687c0', 'record', 'gold')]
+overlay decision: {'status': 'verified', 'provenance': 'gold', 'gold': None}
+record: cl1-5369f5ef71e64e9db5b147da3eb8e783-185687c0
+== 3. the records table's row for it
+openferment.records (version|status|provenance|gold): 1|verified|gold|null
+== 4. the browser's provenanceOf on the decision the overlay serves
+BROWSER provenanceOf(overlay decision: status verified, label gold, gold null) = verified
+BROWSER gold-set count for it (Intake: rows with r.gold) = 0
+== 5. the Intake screen in Chromium (the built app in dist/)
+SCREEN row: …185687c0 | Time to colony | 120 | d | [Central Valley residue…] | “Digesters below 500,000 gallons of working volume follow a streamlined county-level permit path…” | 0.90 | Verified | Ada Moreno | —
+SCREEN gold set: 0 in the gold set
+
+EXPECTED: a verified decision with gold null is verified whatever its label (ADR-006 §8.5: 'gold' for a verified decision with a gold value, 'verified' for any other verified one, stored 'whatever label the request carried'); the stored decision, the records row, biorepo_read and the browser's provenanceOf all say verified
+OBSERVED: provenance_of(verified, gold None) is gold under label gold and verified under label verified; POST /api/biorepo/decisions (label gold, gold null) answered provenance gold; openferment.records provenance gold with gold null; biorepo_read provenance gold; overlay decision provenance gold with gold None; browser provenanceOf on it verified; Intake screen: row: …185687c0 | Time to colony | 120 | d | [Central Valley residue…] | “Digesters below 500,000 gallons of working volume follow a streamlined county-level permit path…” | 0.90 | Verified | Ada Moreno | —;gold set: 0 in the gold set
+RESULT: DEFECT

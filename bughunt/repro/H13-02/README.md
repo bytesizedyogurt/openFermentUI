@@ -33,7 +33,7 @@ sections.
 
 **Observed.** The committed file has 126 lines. A project render of its own committed part gives 89: lines 90 to 126
 go (37 lines), nothing is added, and the JSON stays byte for byte. `report.py` names neither section. `pnpm lit:report`
-exits 0 in about 15 s and leaves 89 lines. The demo's numbers come back unchanged: the date line moves in the
+exits 0 in 6 to 16 s (9 s in run1.log, 6 s in run2.log) and leaves 89 lines. The demo's numbers come back unchanged: the date line moves in the
 Markdown, and `generated_at`, `git_commit` and `latest_ingested_at` move in the JSON. The hand's comment and both
 sections are deleted, the graph dry run's measured figures among them (814 passages, 92 batches, 1,758,899
 characters, 0.2199 and 2.3239 USD), along with the account's waiting lanes and their commands. The main checkout's

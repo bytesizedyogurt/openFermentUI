@@ -1,0 +1,33 @@
+EXPECTED: after a reload while the service is away, the bench shows the deposition with its queued reading laid over it, and once the service answers the queue is sent with no further reload (ADR-014: "a decision made while the service is away survives a reload and is sent when the service answers"; src/lib/projectState.ts: "a deposition at the bench survives a reload while the service is away and is sent when it answers again").
+== refuse: service on 9040 over bh_r_h7_02_refuse
+- deposition begun at the bench with the service answering; the service holds it: {"entries":[],"observations":0,"state":"staged"}
+- service away: "the browser refuses /api"
+- the bench after a reading and an observation, service away: "H7-02 placeholder runbook Deposition dep-mwbbhkag-1 · the readings alone · 1 measured · 1 observed Exit Read each measure and say what it came to, with its unit. Every number is read back before it is kept. A placeholder output (USD/kg · harvest) 4.4 USD/kg Record what happened 1 measured · 1 observ"
+- the queue in IndexedDB: [{"kind":"depositions","id":"dep-mwbbhkag-1","entries":["4.4 USD/kg"],"observations":1}]
+- after a reload, service still away: the bench data-state: "missing"
+- and says: "Deposition not found This project holds no deposition dep-mwbbhkag-1, or its rows have not loaded from the service yet. The project’s depositions"
+- the queue in IndexedDB after the reload: [{"kind":"depositions","id":"dep-mwbbhkag-1","entries":["4.4 USD/kg"],"observations":1}]
+- service answers again; waiting 45 s with no reload (the queue retries every 15 s): {"entries":[],"observations":0,"state":"running"}
+- what the service holds of the deposition 45 s after it answers, no reload: {"entries":[],"observations":0,"state":"running"}
+- the bench data-state meanwhile: "missing"
+- the queue in IndexedDB meanwhile: [{"kind":"depositions","id":"dep-mwbbhkag-1","entries":["4.4 USD/kg"],"observations":1}]
+- what the service holds within 30 s of a second reload: {"entries":["4.4 USD/kg"],"observations":1,"state":"running"}
+- the bench data-state and the queue after the second reload: {"state":"running","outbox":[]}
+== dbaway: service on 9041 over bh_r_h7_02_dbaway
+- deposition begun at the bench with the service answering; the service holds it: {"entries":[],"observations":0,"state":"running"}
+- service away: {"error":503}
+- the bench after a reading and an observation, service away: "H7-02 placeholder runbook Deposition dep-mwbbixyq-1 · the readings alone · 1 measured · 1 observed Exit Read each measure and say what it came to, with its unit. Every number is read back before it is kept. A placeholder output (USD/kg · harvest) 4.4 USD/kg Record what happened 1 measured · 1 observ"
+- the queue in IndexedDB: [{"kind":"depositions","id":"dep-mwbbixyq-1","entries":["4.4 USD/kg"],"observations":1}]
+- after a reload, service still away: the bench data-state: "missing"
+- and says: "Deposition not found This project holds no deposition dep-mwbbixyq-1, or its rows have not loaded from the service yet. The project’s depositions"
+- the queue in IndexedDB after the reload: [{"kind":"depositions","id":"dep-mwbbixyq-1","entries":["4.4 USD/kg"],"observations":1}]
+- service answers again; waiting 45 s with no reload (the queue retries every 15 s): {"entries":[],"observations":0,"state":"running"}
+- what the service holds of the deposition 45 s after it answers, no reload: {"entries":[],"observations":0,"state":"running"}
+- the bench data-state meanwhile: "missing"
+- the queue in IndexedDB meanwhile: [{"kind":"depositions","id":"dep-mwbbixyq-1","entries":["4.4 USD/kg"],"observations":1}]
+- what the service holds within 30 s of a second reload: {"entries":["4.4 USD/kg"],"observations":1,"state":"running"}
+- the bench data-state and the queue after the second reload: {"state":"running","outbox":[]}
+OBSERVED: [refuse] before the reload, service away, the bench said: "H7-02 placeholder runbook Deposition dep-mwbbhkag-1 · the readings alone · 1 measured · 1 observed Exit Read each measure and say what it came to, with its unit" (words about a write waiting for the service: none). After a reload, service still away: bench data-state=missing, "Deposition not found This project holds no deposition dep-mwbbhkag-1, or its rows have not loaded from the service yet. The project’s depositions"; the IndexedDB queue held dep-mwbbhkag-1 with ['4.4 USD/kg'] and 1 observation(s). 45 s after the service answered, no reload: the service held no entries (bench data-state=missing, queue 1 entr(y/ies) for it). Within 30 s of a second reload: the service held ['4.4 USD/kg'] with 1 observation(s); queue after: [].
+OBSERVED: [dbaway] before the reload, service away, the bench said: "H7-02 placeholder runbook Deposition dep-mwbbixyq-1 · the readings alone · 1 measured · 1 observed Exit Read each measure and say what it came to, with its unit" (words about a write waiting for the service: none). After a reload, service still away: bench data-state=missing, "Deposition not found This project holds no deposition dep-mwbbixyq-1, or its rows have not loaded from the service yet. The project’s depositions"; the IndexedDB queue held dep-mwbbixyq-1 with ['4.4 USD/kg'] and 1 observation(s). 45 s after the service answered, no reload: the service held no entries (bench data-state=missing, queue 1 entr(y/ies) for it). Within 30 s of a second reload: the service held ['4.4 USD/kg'] with 1 observation(s); queue after: [].
+OBSERVED: the defect shows with /api refused at the browser: yes; with the service up and its database away (the one-origin deployment): yes.
+RESULT: DEFECT

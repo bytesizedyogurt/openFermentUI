@@ -1,0 +1,24 @@
+EXPECTED: `pnpm eval seed` and `pnpm eval summary` asked with no OPENFERMENT_PROJECT, or with one the
+EXPECTED: database does not hold, exit 2 with words naming the project and nothing written, as
+EXPECTED: `pnpm lit:graph --project nope --dry-run` ("The store holds no project 'nope'.") and
+EXPECTED: `conform train --project nope` ("holds no project 'nope': name a project it holds") answer
+EXPECTED: (projects/__init__.py:10-11 "A command ... names it once, in OPENFERMENT_PROJECT. A store call
+EXPECTED: that names none is refused in words."; evaluation.py:38-39 "... exits 2 in words, having asked nothing.")
+NOTICE:  database "bh_r_h13_04_eval" does not exist, skipping
+NOTE: module /tmp/claude-0/-home-user-openFermentUI/cfbc5c9f-640a-5002-a705-5ceaf850fdc6/scratchpad/bh/work/H13-04/run/wt/core/openferment_core/evaluation.py
+NOTE: project made h13-held
+OBSERVED: 1. eval seed, no project: exit 1, 1 traceback(s), 17 lines; last line:
+OBSERVED:    openferment_core.projects.ProjectRequired: This names no project. A request sends the X-OpenFerment-Project header (or ?project= on an event stream); a command sets OPENFERMENT_PROJECT.
+OBSERVED: 2. eval seed, OPENFERMENT_PROJECT=nope: exit 1, 3 traceback(s), 180 lines; rows kept for nope: 0; lines:
+OBSERVED:    asyncpg.exceptions.ForeignKeyViolationError: insert or update on table "eval_questions" violates foreign key constraint "fk_eval_questions_project_id"
+OBSERVED:    sqlalchemy.dialects.postgresql.asyncpg.AsyncAdapt_asyncpg_dbapi.ForeignKeyViolationError: insert or update on table "eval_questions" violates foreign key constraint "fk_eval_questions_project_id"
+OBSERVED:    sqlalchemy.exc.IntegrityError: (sqlalchemy.dialects.postgresql.asyncpg.ForeignKeyViolationError) insert or update on table "eval_questions" violates foreign key constraint "fk_eval_questions_project_i
+OBSERVED:    [SQL: INSERT INTO openferment.eval_questions (project_id, id, body, created_by) VALUES ($1::VARCHAR, $2::VARCHAR, $3::JSON, $4::VARCHAR) ON CONFLICT (project_id, id) DO UPDATE SET body = excluded.body
+OBSERVED:    [parameters: ('nope', 'eq-price', '{"id": "eq-price", "question": "What selling price does the library\'s sugarcane plant solve for its ethanol at the package\'s own values?", "tools": ... (49 charact
+OBSERVED: 3. eval summary, OPENFERMENT_PROJECT=nope: exit 0, stderr 0 bytes, stdout: {"suite": "default", "tags": {}, "judgesDisagree": []}
+OBSERVED: 3b. eval summary, no project: exit 1, 1 traceback(s); last line: openferment_core.projects.ProjectRequired: This names no project. A request sends the X-OpenFerment-Project header (or ?
+OBSERVED: control, project h13-held: seed exit 0 {"seeded": ["eq-price", "eq-dearer"]}; summary exit 0 {"suite": "default", "tags": {}, "judgesDisagree": []}
+OBSERVED: lit:graph --project nope --dry-run: exit 2: The store holds no project 'nope'.
+OBSERVED: conform train --project nope: exit 2: ✗ database 'bh_r_h13_04_eval' holds no project 'nope': name a project it holds
+NOTE: seed-none=1 seed-nope=1 summary-nope=1 other-doors-refuse=1 control=1
+RESULT: DEFECT

@@ -1,0 +1,17 @@
+service: http://127.0.0.1:9680  database: bh_r_h2_03_lock (fresh)
+fit: ecea13d1e8ead451  forecast run: d762d52b13c7077b
+runbook: rb-study-5aa7a6f268cd  made 200, locked 200
+POST /api/studies/runbooks/rb-study-5aa7a6f268cd/lock: lockedAt 2026-11-10T23:27:43.529626Z, lockHash 40c4821139dbb97f
+A. PUT /api/state/runbooks/rb-study-5aa7a6f268cd with the frozen predictions and measures, lockedAt 2020-01-01T00:00:00Z and lockHash 0000000000000000: 200
+   GET /api/studies/runbooks/rb-study-5aa7a6f268cd: 200 lockedAt 2020-01-01T00:00:00Z, lockHash 0000000000000000; predictions and measures the frozen ones: True
+   GET /api/state: runbookLocks[rb-study-5aa7a6f268cd] = 2026-11-10T23:27:43.529626Z, 40c4821139dbb97f; the row's lockedAt 2020-01-01T00:00:00Z, lockHash 0000000000000000
+   src/engine/lock.ts lockIntact on the served row: lock broken
+B. PUT /api/state/runbooks/rb-study-5aa7a6f268cd with the frozen predictions and measures, lockedAt 2020-01-01T00:00:00Z, lockHash the frozen one: 200
+   GET /api/studies/runbooks/rb-study-5aa7a6f268cd: 200 lockedAt 2020-01-01T00:00:00Z, lockHash 40c4821139dbb97f; predictions and measures the frozen ones: True
+   GET /api/state: runbookLocks[rb-study-5aa7a6f268cd] = 2026-11-10T23:27:43.529626Z, 40c4821139dbb97f; the row's lockedAt 2020-01-01T00:00:00Z, lockHash 40c4821139dbb97f
+   src/engine/lock.ts lockIntact on the served row: locked
+GET /api/audit?target=rb-study-5aa7a6f268cd: [('keep_runbooks', 'kept'), ('lock', 'locked')]
+export study.md, the runbook's lock line: Locked 2020-01-01T00:00:00Z under `40c4821139dbb97f`.
+EXPECTED: each PUT refused in words (a lock is kept as it was made), or the lock runbook_locks keeps (2026-11-10T23:27:43.529626Z, 40c4821139dbb97f) laid over the row's, so GET answers 2026-11-10T23:27:43.529626Z and 40c4821139dbb97f and the page reads the frozen predictions as locked at 2026-11-10T23:27:43.529626Z
+OBSERVED: A kept 200, GET answers 2020-01-01T00:00:00Z, 0000000000000000 and the page reads 'lock broken' over the frozen predictions; B kept 200, GET answers 2020-01-01T00:00:00Z, 40c4821139dbb97f and the page reads 'locked' at a moment before the lock was made; runbook_locks still holds 2026-11-10T23:27:43.529626Z, 40c4821139dbb97f
+RESULT: DEFECT

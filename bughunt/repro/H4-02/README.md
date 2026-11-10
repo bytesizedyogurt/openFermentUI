@@ -21,7 +21,7 @@ It makes a fresh database `bh_r_h4_02_card`, starts a keyless service on 127.0.0
 makes one project, and with person-assumptions typed in `chain.py` makes a fermOS `batch_v1` simulation, its vessel
 design, an `ethanol_glucose_v0` run read into a train (`/api/pureos/train/from-run`) and the train run, then the
 composite run (`POST /api/proforma/run`, flowsheet `custom_train_v1`) from the vessel and the train run. It reads
-the run's page in Chromium (`screen.mjs`), compares the card with the service's numbers, and cleans up. The page's
+the run's page in Chromium (`screen.mjs`), compares the card with the service's numbers, and cleans up. The card's
 screenshot is kept as `screen-composite.png`.
 
 **Expected.** The closing row is 9.1546 USD per kg of Ethanol contained in the train's product stream (the sum of

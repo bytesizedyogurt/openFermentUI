@@ -1,0 +1,51 @@
+## commit under test: d06e5c8; core/ against 2047f5a: unchanged
+NOTICE:  database "bh_r_h9_04_loop" does not exist, skipping
+{"pasted": "720f5d4281754211b9de66933843da00"}
+agent: validator dropped 3/12 claims: k1: claim text contains a number ('twofold') — values come from the record; k2: claim text contains a number ('tenfold') — values come from the record; k3: claim text contains a number ('7') — values come from the record
+{"passageCited": "720f5d4281754211b9de66933843da00:p0:0", "declined": null, "kept": 9, "rejected": 3}
+{"keptClaimShownAs": {"id": "d1", "text": "Ethanol titre roughly doubled under anaerobic conditions", "support": "direct", "provenance": "unverified", "paperIds": ["720f5d4281754211b9de66933843da00"], "quote": "Saccharomyces cerevisiae ferments glucose to ethanol under anaerobic conditions.", "values": []}}
+{"claim": "d1", "text": "Ethanol titre roughly doubled under anaerobic conditions", "kept": true, "reason": null}
+{"claim": "d2", "text": "The yield halved on xylose", "kept": true, "reason": null}
+{"claim": "d3", "text": "The titre quadrupled in the evolved strain", "kept": true, "reason": null}
+{"claim": "d4", "text": "Table IV lists the yields of the strains", "kept": true, "reason": null}
+{"claim": "d5", "text": "A x10 rise in productivity followed the change", "kept": true, "reason": null}
+{"claim": "d6", "text": "The strain grew best at pH7 in the cited batch", "kept": true, "reason": null}
+{"claim": "d7", "text": "The titre fell at pH-4 in the cited batch", "kept": true, "reason": null}
+{"claim": "k1", "text": "Ethanol titre rose twofold under anaerobic conditions", "kept": false, "reason": "k1: claim text contains a number ('twofold') \u2014 values come from the record"}
+{"claim": "k2", "text": "A tenfold rise in productivity followed the change", "kept": false, "reason": "k2: claim text contains a number ('tenfold') \u2014 values come from the record"}
+{"claim": "k3", "text": "The strain grew best at pH 7 in the cited batch", "kept": false, "reason": "k3: claim text contains a number ('7') \u2014 values come from the record"}
+{"claim": "s1", "text": "The phase 3 fermentation reached its titre", "kept": true, "reason": null}
+{"claim": "s2", "text": "The phase III fermentation reached its titre", "kept": true, "reason": null}
+{"gap": "Whether the titre doubled at pH7 is measured nowhere in the project", "kept": true}
+{"gap": "Whether the titre rose twofold is measured nowhere in the project", "kept": false}
+{"practice": "d1", "refused": true}
+{"practice": "d2", "refused": true}
+{"practice": "d3", "refused": true}
+{"practice": "d4", "refused": false}
+{"practice": "d5", "refused": true}
+{"practice": "d6", "refused": true}
+{"practice": "d7", "refused": true}
+{"planPromptListsDoubledAsBad": true, "agentRule9NamesPhAndTableNumber": true}
+SUMMARY {"defectKept": 7, "defectTotal": 7, "byDesignKept": 2, "controlDropped": 3, "controlTotal": 3, "gapDoubledKept": true, "gapTwofoldDropped": true, "passageCited": true}
+## the contract
+55:- R: A number in a Postdoc claim or a tool input stands only in a typed quantity with its origin; a claim with a number in its words is dropped and counted (ADR-006).
+51:NEVER WRITE A NUMBER IN CLAIM TEXT. Not in digits, not in words, not as \
+54:record beside your sentence. A claim containing a number is discarded whole — \
+59:  bad:   "Ethanol titre roughly doubled under anaerobic conditions"
+145:window, a year, a percentage, a pH, a rate of return, a table or figure \
+146:number or a concentration in claim text or in a gap discards it, even when \
+## the validator: validate_plan's number rule, the word list, the identifier carve-out
+416:        if found := find_number(text):
+72:    "once twice thrice"
+105:_IDENTIFIER = re.compile(r"(?<![0-9.])[A-Za-z][A-Za-z]*(?:[-\u2013][A-Za-z]*)*\d[A-Za-z0-9-]*")
+139:STEP_WORDS = ("stage", "step", "day", "phase", "round", "pass")
+  doubled    in validate.py: 0
+  halved     in validate.py: 0
+  quadrupled in validate.py: 0
+## the practice drafts' extra check, which says find_number lets these through
+73:# What validate.find_number lets through and a bench conversation reaches for:
+78:    r"(?<![A-Za-z])(?:pH\s*-?\s*\d|[x×]\s?\d|double[sd]?|triple[sd]?|quadruple[sd]?|halve[sd]?|single)(?![a-z])",
+169:def test_bench_quantities_the_shared_validator_lets_through_are_refused_here(said):
+EXPECTED: each of the 7 claims whose words state a quantity (doubled, halved, quadrupled, Table IV, x10, pH7, pH-4) dropped and counted, rejected 7, its reason naming the word, as the 3 controls (twofold, tenfold, pH 7) are; the gap saying "doubled at pH7" dropped as the gap saying "twofold" is
+OBSERVED: 7 of 7 such claims kept, each citing the project's passage with no typed value; 3 of 3 controls dropped; the "doubled at pH7" gap kept=true; passage cited=true; for reference, 2 of 2 phase-label claims (phase 3, phase III) kept, as the step-label rule means
+RESULT: DEFECT

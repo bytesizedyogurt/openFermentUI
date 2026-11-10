@@ -1,0 +1,13 @@
+EXPECTED: each command line of the mirror's README runs from the directory the page leaves the reader
+EXPECTED: in (line 8: "from the repository's `core/`"; line 9: "Test from this directory"): line 10,
+EXPECTED: "Check it against the contract on a PostgreSQL server: `cd core && uv run ...`", reaches uv from
+EXPECTED: the package's directory where line 9 leaves the reader.
+
+== the page, lines 8 to 10 (examples/engines/openferment-engine-mirror/README.md)
+- Install (PEP 660 editable: uv's `pip install -e`, held to `core/uv.lock`) from the repository's `core/` in bash or zsh, then restart the s
+- Test from this directory, with no database: `../../../core/.venv/bin/python -m pytest`
+- Check it against the contract on a PostgreSQL server: `cd core && uv run python -m openferment_core.engine.conform mirror`
+line 9's command:  ../../../core/.venv/bin/python -m pytest
+line 10's command: cd core && uv run python -m openferment_core.engine.conform mirror
+
+== line 9, from the directory it names (examples/engines/openferment-engine-mirror)

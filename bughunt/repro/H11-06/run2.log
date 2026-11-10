@@ -1,0 +1,58 @@
+worktree: /tmp/claude-0/-home-user-openFermentUI/cfbc5c9f-640a-5002-a705-5ceaf850fdc6/scratchpad/bh/work/H11-06/wt at 2047f5a
+
+== 1. the contract and the code, as 2047f5a holds them
+   scripts/session-start.sh:18: #   4. the database (ADR-001): when PostgreSQL answers on 127.0.0.1 and
+   scripts/session-start.sh:19: #      core/.env names none, the development address (compose.yaml's) joins
+   scripts/session-start.sh:20: #      core/.env; then pnpm db:migrate, whatever it exits with
+   scripts/session-start.sh:62: if [ -e core/.env ] && ! grep -q '^OPENFERMENT_DATABASE_URL=' core/.env && command -v pg_isready >/dev/null && pg_isready -q -h 127.0.0.1; then
+   scripts/session-start.sh:63:   printf 'OPENFERMENT_DATABASE_URL=postgresql://openferment:openferment@127.0.0.1:5432/openferment_dev\n' >> core/.env
+   scripts/host/lib.sh:97: # the environment's value as it stands when it has one, else the file's last
+   scripts/host/lib.sh:98: # line for it, in the forms of python-dotenv these settings take: an `export`
+   scripts/host/lib.sh:99: # before the name, blanks around `=`, one pair of quotes, a ` #` comment after
+   scripts/host/lib.sh:100: # a bare value and a carriage return, each taken off. Three forms read here as
+   scripts/host/lib.sh:110:   elif [ -f "$REPO/core/.env" ]; then
+   core/tests/test_host.py:195:     "export OPENFERMENT_PROJECT=ethanol\n",
+   core/tests/test_host.py:196:     "OPENFERMENT_PROJECT = ethanol\n",
+   core/openferment_core/api.py:178: load_dotenv(Path(__file__).parent.parent / ".env", override=False)
+
+== 2. a fresh test database for core/.env to name
+   bh_r_h11_06_named made and migrated; pg_isready -h 127.0.0.1: 127.0.0.1:5432 - accepting connections
+
+== case 0: core/.env's database line: OPENFERMENT_DATABASE_URL=postgresql://openferment:openferment@127.0.0.1:5432/bh_r_h11_06_named
+   before: the service's reading names bh_r_h11_06_named; it connects to bh_r_h11_06_named
+   before: lib.sh env_setting reads postgresql://openferment:openferment@127.0.0.1:5432/bh_r_h11_06_named
+   session-start exit 0; its database lines: (none)
+   stand-in calls: pnpm install --frozen-lockfile;uv sync --all-extras;pnpm --silent db:migrate;pnpm --silent ready
+   core/.env after:
+      # the database this checkout serves
+      OPENFERMENT_DATABASE_URL=postgresql://openferment:openferment@127.0.0.1:5432/bh_r_h11_06_named
+   after: the service's reading names bh_r_h11_06_named; it connects to bh_r_h11_06_named
+   after: lib.sh env_setting reads postgresql://openferment:openferment@127.0.0.1:5432/bh_r_h11_06_named
+
+== case A: core/.env's database line: export OPENFERMENT_DATABASE_URL=postgresql://openferment:openferment@127.0.0.1:5432/bh_r_h11_06_named
+   before: the service's reading names bh_r_h11_06_named; it connects to bh_r_h11_06_named
+   before: lib.sh env_setting reads postgresql://openferment:openferment@127.0.0.1:5432/bh_r_h11_06_named
+   session-start exit 0; its database lines: OPENFERMENT_DATABASE_URL added to core/.env (the development address)
+   stand-in calls: pnpm install --frozen-lockfile;uv sync --all-extras;pnpm --silent db:migrate;pnpm --silent ready
+   core/.env after:
+      # the database this checkout serves
+      export OPENFERMENT_DATABASE_URL=postgresql://openferment:openferment@127.0.0.1:5432/bh_r_h11_06_named
+      OPENFERMENT_DATABASE_URL=postgresql://openferment:openferment@127.0.0.1:5432/openferment_dev
+   after: the service's reading names openferment_dev; it connects to (not connected: openferment_dev is outside the test databases)
+   after: lib.sh env_setting reads postgresql://openferment:openferment@127.0.0.1:5432/openferment_dev
+
+== case B: core/.env's database line: OPENFERMENT_DATABASE_URL = postgresql://openferment:openferment@127.0.0.1:5432/bh_r_h11_06_named
+   before: the service's reading names bh_r_h11_06_named; it connects to bh_r_h11_06_named
+   before: lib.sh env_setting reads postgresql://openferment:openferment@127.0.0.1:5432/bh_r_h11_06_named
+   session-start exit 0; its database lines: OPENFERMENT_DATABASE_URL added to core/.env (the development address)
+   stand-in calls: pnpm install --frozen-lockfile;uv sync --all-extras;pnpm --silent db:migrate;pnpm --silent ready
+   core/.env after:
+      # the database this checkout serves
+      OPENFERMENT_DATABASE_URL = postgresql://openferment:openferment@127.0.0.1:5432/bh_r_h11_06_named
+      OPENFERMENT_DATABASE_URL=postgresql://openferment:openferment@127.0.0.1:5432/openferment_dev
+   after: the service's reading names openferment_dev; it connects to (not connected: openferment_dev is outside the test databases)
+   after: lib.sh env_setting reads postgresql://openferment:openferment@127.0.0.1:5432/openferment_dev
+
+EXPECTED: a core/.env that names bh_r_h11_06_named in a form python-dotenv reads (export NAME=..., NAME = ...) is left as it is by session-start (session-start.sh:18-20: the development address joins core/.env only when core/.env names none), so the service reads bh_r_h11_06_named after the session start as before it.
+OBSERVED: control (NAME=url): before bh_r_h11_06_named, added 0 line(s), after bh_r_h11_06_named. export form: before bh_r_h11_06_named, added 1 line(s), after openferment_dev. spaced form: before bh_r_h11_06_named, added 1 line(s), after openferment_dev.
+RESULT: DEFECT

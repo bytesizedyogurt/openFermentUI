@@ -35,13 +35,15 @@ import json, sys
 f = json.load(open(sys.argv[1]))
 s = f["seconds"]
 for k in ("held", "unknown"):
-    v = f[k]
-    print(f"OBSERVED: {k} project '{v['projectId']}': {v['loads']} page loads and {v['projects']} GET /api/projects in {s} s, "
-          f"{v['loadsInNext2s']} more loads in the 2 s after; address {v['hash']}; localStorage openferment.project "
-          f"{v['stored']!r}; screen: \"{v['screen'][:120]}\"")
+    v = f[k]; w = v["inWindow"]
+    print(f"OBSERVED: {k} project '{v['projectId']}': {w['loads']} page loads and {w['projects']} GET /api/projects in "
+          f"{w['ms']/1000:.1f} s from the first navigation; {v['after']['loads']} more loads in the 2 s after; address "
+          f"{v['address']}; localStorage openferment.project {v['stored']!r}; 'Opening project' shown: {v['opening']}; "
+          f"main: \"{v['main'][:100]}\"")
 h, u = f["held"], f["unknown"]
 # The control settles: its first load and the one reload a project switch makes. The unknown address keeps reloading.
-defect = h["loads"] <= 2 and h["loadsInNext2s"] == 0 and u["loads"] >= 10 and u["loadsInNext2s"] >= 1
+defect = (h["inWindow"]["loads"] <= 2 and h["after"]["loads"] == 0
+          and u["inWindow"]["loads"] >= 10 and u["after"]["loads"] >= 1)
 print("RESULT: " + ("DEFECT" if defect else "NO-DEFECT"))
 PY
 exit 0

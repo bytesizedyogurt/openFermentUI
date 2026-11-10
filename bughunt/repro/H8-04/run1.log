@@ -1,0 +1,12 @@
+service: http://127.0.0.1:9050  database: bh_r_h8_04_latin1 (fresh)
+the file: assay.xml, ISO-8859-1 declared and used; its bytes for the units: b'5 \xb5g' and b'30 \xb0'
+the XML parser given the file's bytes reads: The supernatant held 5 µg/L of furfural at 30 °C after 48 h in the H8-04 repro.
+upload of assay.xml (ISO-8859-1): ingested | no reason given
+  the project keeps: 'The supernatant held 5 \ufffdg/L of furfural at 30 \ufffdC after 48 h in the H8-04 repro.'
+the same sentence in Latin-1 as assay.md: failed | the kit did not store it: parse error: 'utf-8' codec can't decode byte 0xb5 in position 32: invalid start byte
+control, the same article in UTF-8 as assay-utf8.xml: ingested | kept: 'The supernatant held 5 \xb5g/L of furfural at 30 \xb0C after 48 h in the H8-04 UTF-8 repro.'
+VERDICT: DEFECT
+the kit's chunk rows (sci_rag.chunks) of the sentence: with U+FFFD before g/L: 1; with the micro sign: 1
+EXPECTED: the XML read in the encoding it declares, its passage keeping "5 µg/L of furfural at 30 °C", or the file refused in words (status failed with a reason) as the Markdown door refuses the same Latin-1 bytes (docs/api/intake.md:17, :52-54).
+OBSERVED: assay.xml is answered ingested with no reason, and the project and the kit's chunk rows keep "5 \ufffdg/L of furfural at 30 \ufffdC" (the units lost); the same bytes as assay.md are answered failed in words; the UTF-8 control keeps "5 µg/L".
+RESULT: DEFECT

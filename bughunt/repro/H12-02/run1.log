@@ -1,0 +1,11 @@
+worktree: /tmp/claude-0/-home-user-openFermentUI/cfbc5c9f-640a-5002-a705-5ceaf850fdc6/scratchpad/bh/work/H12-02/wt-1794353258-18325 at 2047f5a
+the worktree's only change to the code:  1 file changed, 1 insertion(+), 1 deletion(-)
+databases: bh_r_h12_02_cfg made fresh and migrated; the tests make and drop their own bh_r_h12_02_t_* database
+== 1. unmutated: tests/test_engines.py tests/test_engine_diagnostics.py tests/test_measurements.py tests/test_train.py tests/test_pureos_build_tool.py tests/test_finite_inputs.py
+   365 passed, 12 deselected in 57.72s
+   conform imported from: /tmp/claude-0/-home-user-openFermentUI/cfbc5c9f-640a-5002-a705-5ceaf850fdc6/scratchpad/bh/work/H12-02/wt-1794353258-18325/core/openferment_core/engine/conform.py
+   15 tests reach conform._bare_number
+   19 tests reach conform._origins
+   18 tests reach conform._run_twice
+   15 tests reach conform._replayed
+   15 tests reach conform._asked_by

@@ -1,0 +1,15 @@
+EXPECTED: the comment in .github/workflows/verify.yml that says which browser script honours CHROMIUM_PATH
+EXPECTED: names a script the tree holds: scripts/smoke.ts, the script package.json's "smoke" runs
+EXPECTED: ("smoke": "tsx scripts/smoke.ts"), which reads CHROMIUM_PATH (scripts/walk.ts reads it too).
+OBSERVED: 2047f5a:.github/workflows/verify.yml:15:#     one first (smoke.mjs also honours CHROMIUM_PATH) and fall back to Playwright's
+OBSERVED: the checkout's verify.yml is byte for byte the commit's: yes
+OBSERVED: files named smoke.* in 2047f5a's tree: scripts/smoke.ts (smoke.mjs: 0)
+OBSERVED: `ls scripts/smoke.*` in the checkout: scripts/smoke.ts 
+OBSERVED: 2047f5a:package.json:41: "smoke": "tsx scripts/smoke.ts",
+OBSERVED: 2047f5a:scripts/smoke.ts:167: const executablePath = process.env.CHROMIUM_PATH ?? '/opt/pw-browsers/chromium';
+OBSERVED: 2047f5a:scripts/walk.ts:170: const executablePath = process.env.CHROMIUM_PATH ?? '/opt/pw-browsers/chromium';
+OBSERVED: scripts/smoke.mjs deleted in 20bd36d alpha2: 1.1 — delete the demo infrastructure (5.3) and the bespoke retrieval stack (5.4)
+OBSERVED: scripts/smoke.ts added in d4c7ea6 alpha2: 1.6 — the stage 1 gate: a smoke over the real service opens every rail entry
+OBSERVED: the comment written in 22a4eea OF-BLD-012 §8: the demo cannot orphan its service, and the docs match
+OBSERVED: other lines naming smoke.mjs outside docs/history/ and bughunt/: 0
+RESULT: DEFECT
