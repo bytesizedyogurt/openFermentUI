@@ -1,0 +1,24 @@
+service: http://127.0.0.1:9790  database: bh_r_h2_07_scenarios (fresh)
+GET /api/engines 200
+cane on the biosteam engine: defaultConfiguration S1
+POST /api/studies/scenarios (no configuration) 200
+POST /api/studies/scenarios (configuration S1) 200
+POST /api/studies/scenarios (no configuration, asked again) 200
+  scenario A ssc-05e8da8f647f configuration None; scenario B ssc-d32a80c42165 configuration S1; A asked again ssc-05e8da8f647f
+POST /api/studies/scenarios/ssc-05e8da8f647f/run 200
+POST /api/studies/scenarios/ssc-d32a80c42165/run 200
+GET /api/runs 200
+GET /api/studies/scenarios 200
+GET /api/studies/scenarios/ssc-d32a80c42165 200
+scenario A ssc-05e8da8f647f: plant cane, configuration None, values [('tea.IRR', 0.12)]
+scenario B ssc-d32a80c42165: plant cane, configuration 'S1', values [('tea.IRR', 0.12)]
+the same ask as A made again: ssc-05e8da8f647f (one scenario with A: True)
+A's run: 882cd0100f8b6ea0, configuration S1, scenarioId ssc-05e8da8f647f, status done
+B's run: 882cd0100f8b6ea0, configuration S1, scenarioId ssc-05e8da8f647f, status done
+GET /api/runs: [('882cd0100f8b6ea0', 'S1', 'ssc-05e8da8f647f')]
+GET /api/studies/scenarios: [('ssc-d32a80c42165', 'S1', ['882cd0100f8b6ea0']), ('ssc-05e8da8f647f', None, ['882cd0100f8b6ea0'])]
+GET /api/studies/scenarios/ssc-d32a80c42165: runIds ['882cd0100f8b6ea0']
+scenarios.scenario_id on A's kept values: configuration as made ssc-05e8da8f647f, configuration its run resolved to (S1) ssc-d32a80c42165
+EXPECTED: the same values on the same plant in the configuration a run resolves to (S1) are one scenario (docs/api/studies.md:14): asked with no configuration and asked naming S1, one id, one scenario listed, and the run's scenarioId that scenario
+OBSERVED: two scenarios, ssc-05e8da8f647f (configuration None) and ssc-d32a80c42165 (configuration 'S1'); both ran as the one run 882cd0100f8b6ea0 in configuration S1, whose scenarioId names ssc-05e8da8f647f alone, and ssc-d32a80c42165's runIds list it too; the id keyed on the resolved configuration would be ssc-d32a80c42165
+RESULT: DEFECT

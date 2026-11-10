@@ -1,0 +1,25 @@
+== worktree /tmp/claude-0/-home-user-openFermentUI/cfbc5c9f-640a-5002-a705-5ceaf850fdc6/scratchpad/bh/work/H12-11/wt-8290 at 2047f5a, diff: 
+== 1. callers of ready.check_literature under core/tests/
+core/tests/test_ready.py:399:    check = ready.check_literature()
+   the data row's behind-head test, for comparison:
+   core/tests/test_ready.py:433:def test_data_reports_a_database_behind_the_newest_schema(monkeypatch, test_database):
+== 2. check_literature on bh_r_h12_11_kit with sci_rag taken back to 0005
+NOTICE:  database "bh_r_h12_11_kit" does not exist, skipping
+   revisions (at, head): {'openferment': ('0010', '0010'), 'sci_rag': ('0005', '0006')}
+   as it stands:  fail | Sci RAG Kit's schema is at revision 0005 of 0006. Run: pnpm db:migrate
+   (module /tmp/claude-0/-home-user-openFermentUI/cfbc5c9f-640a-5002-a705-5ceaf850fdc6/scratchpad/bh/work/H12-11/wt-8290/core/openferment_core/ready.py)
+   M65 applied:   - if at != head or width is None: + if width is None:
+   with M65:      ok | pgvector 0.6.0, revision 0006, 0 documents, 0 chunks
+== 3. pytest test_ready.py test_db.py test_import_alpha1.py with M65
+   95 passed in 18.69s
+== 4. control: pytest test_ready.py with M64 (data row's at != head dropped)
+   FAILED tests/test_ready.py::test_data_reports_a_database_behind_the_newest_schema
+   1 failed, 64 passed in 12.35s
+
+EXPECTED: with sci_rag at 0005 of 0006 the literature row fails (it does: 'fail'), and some test holds that,
+          so M65 turns at least one of test_ready/test_db/test_import_alpha1 red, as M64 does for the data row
+OBSERVED: with M65 the row reads 'ok' and says 'pgvector 0.6.0, revision 0006, 0 documents, 0 chunks' on a schema at 0005;
+          the three files with M65: '95 passed in 18.69s' (exit 0); 1 test line(s) call check_literature;
+          control M64: '1 failed, 64 passed in 12.35s' (exit 1)
+NOTE: the control M64 is caught: test_data_reports_a_database_behind_the_newest_schema holds the data row's revision check
+RESULT: DEFECT

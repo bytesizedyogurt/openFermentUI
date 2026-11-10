@@ -1,0 +1,13 @@
+before: conversations=0 turns=0 tool_calls=0 turn_events=0
+MCP ask_postdoc answered: {"question": "What does the project hold?", "declined": "ANTHROPIC_API_KEY is not set. Put it in core/.env (gitignored) and restart the service.", "conversationId": null, "turnId": null}
+after the MCP ask: conversations=0 turns=0 tool_calls=0 turn_events=0
+POST /api/ask answered: {"question": "What does the project hold?", "declined": "ANTHROPIC_API_KEY is not set. Put it in core/.env (gitignored) and restart the service.", "conversationId": "lc-400ba3ef845e", "turnId": "turn-06b38ceba9a9"}
+after POST /api/ask: conversations=1 turns=1 tool_calls=0 turn_events=5
+mcp_server.py, the in-process ask:
+  417:                return _plan(postdoc_agent.ask(question, ctx=tools.ToolContext(project=acting)))
+api.py, the HTTP ask:
+  510:        cid, tid, seq = _conversations.begin(question, conversation_id=request.conversationId, turn_id=request.turnId,
+  538:        plan = _ask_agent(question, on_step=step, cancelled=cancelled, history=history, on_call=call, on_result=result,
+EXPECTED: the MCP ask kept as the REST ask is: one conversation and one turn after it, and turn events on the project's stream
+OBSERVED: MCP ask -> conversations 0->0, turns 0->0, turn events 0; REST ask -> conversations 0->1, turns 0->1, turn events 5
+RESULT: DEFECT

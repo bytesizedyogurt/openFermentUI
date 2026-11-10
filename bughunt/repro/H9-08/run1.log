@@ -1,0 +1,40 @@
+NOTICE:  database "bh_r_h9_08_caps" does not exist, skipping
+## A. OPENFERMENT_DAILY_BUDGET_USD: the call gate (llm._reserve, a 1000 USD worst case) and ready's spend row
+OPENFERMENT_DAILY_BUDGET_USD=-1: refused in words: OPENFERMENT_DAILY_BUDGET_USD in core/.env is -1, and a budget cannot be negative
+    gate: a 1000.00 USD call refused (BudgetSettingInvalid): OPENFERMENT_DAILY_BUDGET_USD in core/.env is -1, and a budget cannot be negative; reservedUsd now 0
+    ready: [fail] spend OPENFERMENT_DAILY_BUDGET_USD in core/.env is -1, and a budget cannot be negative
+OPENFERMENT_DAILY_BUDGET_USD=1.00: cap read as 1.0
+    gate: a 1000.00 USD call refused (BudgetExhausted): Today's model spend is $0.00 of the $1.00 daily cap, and this call could pass it. Raise OPENFERMENT_; reservedUsd now 0
+    ready: [ok] spend $0.00 of the $1.00 daily cap spent today (2026-11-10, UTC)
+OPENFERMENT_DAILY_BUDGET_USD=nan: cap read as nan
+    gate: a 1000.00 USD call HELD (reservation c6fdb09cf266); reservedUsd now 1000.000128
+    ready: [ok] spend $0.00 of the $nan daily cap spent today (2026-11-10, UTC)
+    DEFECT: nan is taken as a number of dollars
+OPENFERMENT_DAILY_BUDGET_USD=inf: cap read as inf
+    gate: a 1000.00 USD call HELD (reservation 4081407245e4); reservedUsd now 1000.000128
+    ready: [ok] spend $0.00 of the $inf daily cap spent today (2026-11-10, UTC)
+    DEFECT: inf is taken as a number of dollars
+## B. OPENFERMENT_ASK_BUDGET_USD: Postdoc's loop (postdoc_agent.ask), a stand-in model that records each call
+OPENFERMENT_ASK_BUDGET_USD=-1: a plan, declined='OPENFERMENT_ASK_BUDGET_USD in core/.env is -1, and a budget cannot be negative'; stand-in model calls 0
+OPENFERMENT_ASK_BUDGET_USD=nan: RAISED ValueError: cannot convert float NaN to integer; stand-in model calls 0
+    DEFECT: the ask raised where the loop promises a plan with declined set
+OPENFERMENT_ASK_BUDGET_USD=inf: RAISED OverflowError: cannot convert float infinity to integer; stand-in model calls 0
+    DEFECT: the ask raised where the loop promises a plan with declined set
+DEFECTS 4
+NOTICE:  database "bh_r_h9_08_askneg" does not exist, skipping
+NOTICE:  database "bh_r_h9_08_askinf" does not exist, skipping
+## POST /api/ask, OPENFERMENT_ASK_BUDGET_USD=-1: HTTP 200
+    answer: declined='OPENFERMENT_ASK_BUDGET_USD in core/.env is -1, and a budget cannot be negative'
+    turn kept: status='answered' error=None
+## POST /api/ask, OPENFERMENT_ASK_BUDGET_USD=inf: HTTP 500
+    answer: 'Internal Server Error'
+    turn kept: status='failed' error='Postdoc failed while answering: OverflowError.'
+## the service's log on 9151 (the exception the 500 hides):
+        | OverflowError: cannot convert float infinity to integer
+    OverflowError: cannot convert float infinity to integer
+## the cause: spend._setting checks a parsed float for value < 0 alone, and nan < 0 and inf < 0 are both false
+    _setting tests finiteness: False
+    float("nan") < 0 = False ; float("inf") < 0 = False
+EXPECTED: a daily cap or an ask budget of nan or inf is refused as BudgetSettingInvalid in words, as -1 is: no call held against it, ready's spend row failing, the ask a 200 plan with declined set.
+OBSERVED: in process 4 of 4 nan/inf cases taken as numbers of dollars (daily cap nan and inf each hold a 1000 USD call and ready marks the row ok; ask budget nan and inf raise ValueError and OverflowError); POST /api/ask answers HTTP 200 (declined: True) at -1 and HTTP 500 at inf.
+RESULT: DEFECT

@@ -1,0 +1,10 @@
+service: http://127.0.0.1:10390 over a fresh bh_r_h3_15_svc (keyless), tree at 14e7caa, core/ as at 2047f5a: yes
+depD first write, one reading d1 (10 g/L on mz): 200
+depD second write appends another entry under d1 (99 g/L on other): 200
+depD entries kept: [('d1', 10.0, 'mz'), ('d1', 99.0, 'other')]
+depD readings offered in g/L: [('depD/d1', 10.0, 'mz')]
+also, depE: d1 at 10 g/L, then d1 again at 12 g/L on mz: 200; kept [('d1', 10.0, 'mz'), ('d1', 12.0, 'mz')]; readings offered []
+also, depF made in one write with two entries under d1: 200; kept [('d1', 10.0, 'mz'), ('d1', 20.0, 'other')]
+EXPECTED: the second write of depD refused in words (a 422): an entry's id is one the deposition holds, so its ref would name two readings; depD keeps one entry under d1
+OBSERVED: (second write 200, entries under d1 kept: 2); depD entries kept: [('d1', 10.0, 'mz'), ('d1', 99.0, 'other')]; depD readings offered in g/L: [('depD/d1', 10.0, 'mz')]
+RESULT: DEFECT

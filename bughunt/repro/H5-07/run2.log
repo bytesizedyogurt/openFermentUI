@@ -1,0 +1,36 @@
+service: http://127.0.0.1:9800 over a fresh bh_r_h5_07_skillwords (keyless)
+commit: 14e7caa; core/ src/ docs/ as at 2047f5a: yes
+
+setup: project bh-a: 201
+setup: skill SK-A kept in bh-a's skill catalogue: 200
+setup: GET /api/catalogues/skill in bh-a: 200 ['SK-A']
+
+control: POST /api/guild/check naming SK-A (kept): 200 {"ok": false, "rule": "source", "why": "Primer has no lesson lesson-a"}
+  the skill rule passes for a skill the catalogue holds: yes
+sibling: POST /api/protocols with a step naming SK-NONE: 422 step s1 of version 1.0 needs SK-NONE, which the project's skill catalogue does not hold; a step names the skills it needs from that catalogue, so keep the skill there first (/catalogues)
+  names the project's skill catalogue and /catalogues: yes
+
+POST /api/guild/evidence naming SK-NONE: 422 {"detail": "skill: 'SK-NONE' is not a skill Guild holds (none ship with alpha 2.0)"}
+  names alpha 2.0: yes; names the skill catalogue or /catalogues: no
+POST /api/guild/check naming SK-NONE: 200 {"ok": false, "rule": "skill", "why": "'SK-NONE' is not a skill Guild holds (none ship with alpha 2.0)"}
+  names alpha 2.0: yes; names the skill catalogue or /catalogues: no
+POST /api/practice/draft naming SK-NONE: 422 {"detail": "skill: 'SK-NONE' is not a skill Guild holds (none ship with alpha 2.0)"}
+  names alpha 2.0: yes; names the skill catalogue or /catalogues: no
+
+
+the words in the tree at 2047f5a (grep -rn 'none ship with alpha 2.0'):
+  core/openferment_core/guild.py:395:        raise GuildRefused("skill", f"{entry.skillId!r} is not a skill Guild holds (none ship with alpha 2.0)")
+  core/openferment_core/practice.py:487:        raise PracticeRefused("skill", f"{skill_id!r} is not a skill Guild holds (none ship with alpha 2.0)")
+  core/openferment_core/models.py:1426:    (Guild's skills; none ship with alpha 2.0)."""
+  src/api/types.gen.ts:3528:         *     (Guild's skills; none ship with alpha 2.0).
+  docs/api/openapi.json:2053:        "description": "One of a skill's mastery criteria, by its place in the skill's list\n(Guild's skills; none ship with alpha 2.0).",
+the protocol keep's words for the same fact (protocols.py):
+  98:                    f"step {st.id} of version {v.version} needs {missing[0]}, which the project's skill catalogue "
+  99-                    "does not hold; a step names the skills it needs from that catalogue, so keep the skill there "
+  100-                    "first (/catalogues)")
+  101-
+
+EXPECTED: a skill the project's skill catalogue lacks is refused in words naming that catalogue and where a skill is kept (/catalogues), as the protocol keep's refusal words it (CLAUDE.md:15; protocols.py:97-100)
+OBSERVED: 3 of 3 refusals name alpha 2.0 and no catalogue: POST /api/guild/evidence 422 "skill: 'SK-NONE' is not a skill Guild holds (none ship with alpha 2.0)"; POST /api/guild/check 200 "'SK-NONE' is not a skill Guild holds (none ship with alpha 2.0)"; POST /api/practice/draft 422 "skill: 'SK-NONE' is not a skill Guild holds (none ship with alpha 2.0)". Control (SK-A from the catalogue passes the skill rule): yes; sibling (protocol refusal names the catalogue): yes
+the tree: 5 lines carry 'none ship with alpha 2.0' (guild.py, practice.py, models.py, and the generated openapi.json and types.gen.ts)
+RESULT: DEFECT

@@ -1,0 +1,154 @@
+{
+ "candidates": [
+  {
+   "id": "R2-01",
+   "title": "The concept graph's dry run prices its 92 requests as one prompt, so the recorded input and ceiling are five times what the build costs",
+   "severity": "S3",
+   "kind": "Wrong number",
+   "area": "literature_live graph --dry-run; the F.5 records (commit 0dd8415, docs/reports/literature-retrieval.md, docs/PROGRESS.md)",
+   "statement": "literature_live.graph_command adds every batch's prompt characters into one count and prices that count with llm.cost_usd, so the Haiku 5.5 long-prompt tier (past 100,000 tokens) applies to all 92 batches, and the records' '0.2199 USD of input' and 'at most 2.3239 USD' stand where 92 requests at their own tier come to 0.0440 and 0.4648 USD.",
+   "contract": "core/openferment_core/llm.py:340-345 'A model whose price rises with the prompt: past the threshold (in prompt tokens, cache reads and writes included) the whole request pays the second pair'; core/openferment_core/literature_live.py:11-13 'what their input and the most a build could cost come to on the route's first model (each batch's whole answer, the figure the day's cap holds against)'; the build sends one request a batch (literature/graph.py:15 'one model call on the client the caller hands in', graph.build:172), each held against the cap at its own size (llm.worst_case_usd:568-573). Recorded at docs/reports/literature-retrieval.md:115-117, docs/PROGRESS.md:609 and 3372, commit 0dd8415 ('at most 2.3239 USD on claude-haiku-5-5').",
+   "reproCommand": "cd core && .venv/bin/python ../bughunt/notes/R2/scripts/graph_dry_cost.py",
+   "expected": "The dry run prices each batch as the request it is (about 19,100 characters, 4,779 kit tokens, under the 100,000-token threshold): input 0.0440 USD, the most the 92 holds sum to 0.4648 USD.",
+   "observed": "graph_command's own dry-run branch, fed 92 prompts summing to the recorded 1,758,899 characters, prints inputUsd 0.219862 and mostUsd 2.32393, the records' numbers to the digit: every token priced at the long tier (0.50 and 2.50 USD a million) where each request pays 0.10 and 0.50.",
+   "cause": "core/openferment_core/literature_live.py:105-112 (chars = sum of every prompt; cost_usd(model, round(chars / 4), 0) and cost_usd(model, chars // 2 + len(prompts), answer * len(prompts)) price the sum as one request)",
+   "confidence": "high",
+   "fixSize": "small",
+   "evidence": "Ran bughunt/notes/R2/scripts/graph_dry_cost.py (stand-ins for the database read only; the code's own arithmetic): 'graph_command's dry run prints: ... \"inputUsd\": 0.219862, \"mostUsd\": 2.32393'; 'one request a batch: largest prompt 19119 characters, about 4779 kit tokens (the long-prompt threshold is 100000 tokens)'; 'input of the 92 requests at their own tier: 0.0440 USD (dry run says 0.2199)'; 'the most, each request's hold summed: 0.4648 USD (dry run says 2.3239)'. git grep shows 2.3239 and 0.2199 in docs/reports/literature-retrieval.md:116-117 and docs/PROGRESS.md:609, 3372."
+  },
+  {
+   "id": "R2-02",
+   "title": "conform against a database the server lacks runs every check and exits 0, where migrations refuse it in words with exit 2",
+   "severity": "S4",
+   "kind": "Inconsistency",
+   "area": "python -m openferment_core.engine.conform; D.0's claim (commit 6f85338)",
+   "statement": "With OPENFERMENT_DATABASE_URL naming a database the PostgreSQL server does not hold, `conform biosteam` makes its checks, prints the driver's error and a sqlalche.me link for the verdict it could not keep, says 'every check holds' and exits 0, while `migrations migrate` refuses the same address in words with exit 2 and `conform train --project` exits 2 telling the person to start a server that is running.",
+   "contract": "Commit 6f85338 (D.0): 'conform and migrations say a missing database in words (exit 2)'. docs/api/engines.md:805-807 'keeps its verdict in that address's database's engine_checks, with --project or without, once that database is migrated (pnpm db:migrate); a verdict it cannot keep is printed with the words why'.",
+   "reproCommand": "bash bughunt/notes/R2/scripts/conform_missing_db.sh <a worktree of 2047f5a with its own core/.venv>",
+   "expected": "conform refuses an address whose database is missing in words naming it and the command that makes it, exit 2, as migrations does ('the server at 127.0.0.1:5432 holds no database bh_r2_missing ...: pnpm db:reset <name> makes a database of that name there').",
+   "observed": "migrations: 'refused: the server at 127.0.0.1:5432 holds no database bh_r2_missing ...' exit 2. conform biosteam: '! the verdict could not be kept for GET /api/engines: DBAPIError: (sqlalchemy.dialects.postgresql.asyncpg.Error) database \"bh_r2_missing\" does not exist (Background on this error at: https://sqlalche.me/e/21/dbapi)', then 'every check holds', exit 0; GET /api/engines on any database then shows no verdict. conform train --project p: '... could not read project 'p' from its database: DBAPIError ... does not exist ... Start it (pnpm db:up), on the live host with sudo brew services start ...', exit 2.",
+   "cause": "core/openferment_core/engine/conform.py:1120-1124 (keep(v) failing is printed with the driver's words and the command returns 0 if v.ok) and conform.py's _unanswered words (a database error read as a server that does not answer)",
+   "confidence": "high",
+   "fixSize": "small",
+   "evidence": "bughunt/notes/R2/scripts/conform_missing_db.sh run from my worktree at 2047f5a (scratch prefix renamed to bh_r2_conform); its output kept in bughunt/notes/R2/conform_missing_db.out: the three blocks and exit codes 2, 0, 2 above."
+  },
+  {
+   "id": "R2-03",
+   "title": "No test holds the MCP --service relay's 'no proxy' rule: trust_env=True leaves the suite green",
+   "severity": "S4",
+   "kind": "Hollow test",
+   "area": "mcp_server.Service (the --service relay of D.0, commit 6f85338) and tests/test_mcp_service.py",
+   "statement": "Flipping the relay's httpx.Client to trust_env=True keeps test_mcp_service.py green, because its relay tests hand the client a stand-in transport and httpx reads no proxy from the environment once a transport is given; the service's own relay is built with no transport, so with the mutant every relayed tool call, project and assistant name goes through HTTP_PROXY.",
+   "contract": "Commit 6f85338: '`--service <origin>` (a loopback address alone, no proxy, no redirect) relays each call to the running service's tool door'; core/openferment_core/mcp_server.py:231-234 'Through no proxy: the call is a loopback one, and a cloud container's HTTPS_PROXY names a proxy elsewhere.'",
+   "reproCommand": "python3 bughunt/notes/R2/scripts/mutate.py <worktree of 2047f5a> M16 M17; core/.venv/bin/python bughunt/notes/R2/scripts/proxy_mounts.py",
+   "expected": "A test fails when the relay reads the environment's proxy settings, as test_a_redirect_the_service_answers_is_followed_nowhere fails for follow_redirects=True (M17 caught).",
+   "observed": "M16 (trust_env=False to True in mcp_server.py:239) survived: test_mcp_service.py passed. proxy_mounts.py: 'MCP --service relay, trust_env=True: HTTPTransport through URL(scheme=b'http', host=b'127.0.0.1', port=8979 ...)' with HTTP_PROXY set and NO_PROXY unset; with trust_env=False the relay keeps its own transport.",
+   "cause": "core/tests/test_mcp_service.py (the relay is tested through mcp_server.build(..., transport=<stand-in>), which disables httpx's environment proxies whatever trust_env says); the one served test (test_the_server_started_with_service_writes_through_it_...) runs where NO_PROXY covers loopback or no proxy is set",
+   "confidence": "medium",
+   "fixSize": "small",
+   "evidence": "bughunt/notes/R2/mutations.json M16 'survived' (the served-app test deselected, since it binds an ephemeral port outside 8970-8979; in this container NO_PROXY lists 127.0.0.1 and HTTP_PROXY is unset, and CI sets no proxy, so it passes there too by reading); M17 'caught'. bughunt/notes/R2/scripts/proxy_mounts.py output quoted above. The import-url fetch's trust_env (M20, M21) also survives, and proxy_mounts.py shows why it changes nothing there: that client is always handed its pinned transport."
+  },
+  {
+   "id": "R2-04",
+   "title": "The handoff report says the agent builder read docs/TOOLS.md whole at 838 lines; at CORE it held 837",
+   "severity": "S4",
+   "kind": "Drift",
+   "area": "docs/reports/handoff-2026-11.md",
+   "statement": "The handoff report gives the TOOLS.md the agent builder read at CORE=6f85338 as 838 lines, and that file holds 837 lines ending in a newline.",
+   "contract": "docs/reports/handoff-2026-11.md:82 '`.mcp.json`, `docs/TOOLS.md` whole (838 lines)'",
+   "reproCommand": "git show 6f85338:docs/TOOLS.md | wc -l; git show 6f85338:docs/TOOLS.md | awk 'END{print NR}'; git show 6f85338:docs/TOOLS.md | tail -c 1 | od -c",
+   "expected": "838 lines, as the report says",
+   "observed": "837 (wc -l), 837 (awk NR), the last byte a newline; 84,382 bytes, which the report's '84 KB' matches",
+   "cause": "docs/reports/handoff-2026-11.md:82",
+   "confidence": "high",
+   "fixSize": "small",
+   "evidence": "git show 6f85338:docs/TOOLS.md | wc -lc printed '837 84382'; the same at 37e6bd0, the commit that wrote the report."
+  }
+ ],
+ "suspected": [
+  {
+   "title": "The stage D strangers' transcripts (what each read and where each stalled) are not in the tree",
+   "tried": "Searched the tree for transcripts or logs of the two rounds; the report's 'What it read' and 'Where it stalled' paragraphs rest on transcripts outside git, so they stand as claims only."
+  },
+  {
+   "title": "The routing report's per-question scores and the judge's self-disagreement floor (0.023, 0.041, 0.032, 0.045)",
+   "tried": "Checked the report's internal arithmetic (differences, means, costs: all consistent); the per-run rows live in openferment_dev, which this hunt may not read, so the source numbers stay unchecked."
+  }
+ ],
+ "needsLiveModel": [
+  "The concept graph build's real spend on the index route, to set beside the dry run's 2.3239 USD and R2-01's 0.4648 USD (pnpm lit:graph --project ethanol spends on Haiku).",
+  "pnpm ready --probe's one call on the index route (commits 6a7ae97 and 7f813cd record 0.000004 USD each).",
+  "F.1's extraction counts (457 kept, 54 refused by the unit rule, nine Opus declines answered by Sonnet) and the routing comparison's answers and judgements, all recorded from live calls.",
+  "pnpm prove --live (the records say it waits on the account)."
+ ],
+ "held": [
+  "handoff report: git diff --stat 6f85338 37e6bd0 -- core/openferment_core core/tests core/pyproject.toml src scripts prints nothing (no core file changed in the rounds); CLAUDE.md, the four engine pages, TOOLS.md and .mcp.json unchanged between CORE and bde178d, engines.md alone changed at D.4 (the six points).",
+  "handoff report: 112eb8b holds no docs/api/engines.md (git cat-file fails).",
+  "handoff report: the mirror is seven files, pyproject registers mirror = openferment_engine_mirror.engine:ENGINE with no licence and no dependency, a 10-line README, 30 tests (pytest --collect-only 30; all 30 pass with the package on the path).",
+  "handoff report: reflect's two placeholder parameters, outputs in key order then 'values set' unit '', diagnostic 'time taken' ms, precision rtol 0 atol 0, SFF refusal words 'the mirror engine has no plant, so it writes no SFF file' (worker.py 19-100).",
+  "handoff report: installed with the page's command (uv pip install -c <(uv export --frozen ...) -e) into my worktree's venv, the registry lists biosteam, kinetics, mirror and train; conform mirror holds all eight checks on bh_r2_conform_cfg (exit 0).",
+  "handoff report: the record-reader is record_reader.py with a PEP 723 header naming mcp>=2.3,<3 (mcp 2.3.0 in core/uv.lock) and a 6-line README; run against my service (bh_svc_start, project r2p) it exits 0, the server lists 50 tools (48 registry tools and ask_postdoc, get_artifact), the entry reads by example-agent/0.1, agent model, via http, source 'example-agent/0.1, at the HTTP endpoint', the audit row who example-agent/0.1, module guild, action catalogue_write, detail.via http.",
+  "handoff report: at CORE GET /api/audit took limit alone (6f85338 api.py 2598-2599, MAX_READ 500); the six engines.md points stand at docs/api/engines.md 41, 95, 456, 465, 951-954; TOOLS.md at CORE advised env=dict(os.environ) (line 826) and now pops VIRTUAL_ENV (line 889).",
+  "E.16 (dc02f20): a tool write's answer names auditIds (['3'] on an assistant's catalogue_write); GET /api/audit takes action, target and who and leaves null fields out (curl on my service; M04 and M18 caught).",
+  "B.2 (61aaeda): runs.engine with server default 'biosteam' and the (project_id, engine) index exist after migrate (information_schema and pg_indexes on bh_r2_svc); GET /api/runs takes engine (openapi.json).",
+  "B.1-B.3 (e375ede) and ADR-015: the tool registry holds 48 tools (len(tools.REGISTRY)); engines register by core/pyproject.toml entry points biosteam, kinetics, train.",
+  "B.5 (7342514): EngineRunRequest refuses a stray field ('Extra inputs are not permitted'), EngineInput a stray field and a quantity's stray field in words, true or false as a value ('never true or false'), a value with no origin.at in words (curl POST /api/engines/kinetics/run, each 422).",
+  "B.5: test_engines.py runs every top-level import line of engines.md and validates its five examples under ### headings (the sixth JSON block is a template).",
+  "B.6 (ed33c02): the engine routes declare 404, 422 and 503; Quantity, ScenarioValue and ReviewDecision are one schema each in openapi.json (no -Input/-Output twins); a write tool at POST /api/tools/{name} with no ?by= and no assistant header is refused in words, and naming both is refused in words.",
+  "D.0 (6f85338): a NaN or infinite value, value as a string 'NaN', a NaN high and 1e400 are refused in words at POST /api/engines/kinetics/run, /api/fermos/simulate, /api/params/fermos.simulation/resolve, /api/library/cornstover/run and /api/studies/scenarios (scripts/nan_doors.py; M12 caught).",
+  "D.0: migrations migrate refuses a missing database and an unreachable server in words with exit 2; conform refuses an unreachable server with exit 2 (the missing-database case is R2-02).",
+  "D.0: the MCP server refuses --service naming 192.0.2.1, localhost. or an origin with a path, in words; it follows no redirect (M17 caught).",
+  "E.0a (0d70450): 189 schemas before, 255 after, 66 new and none gone (openapi.json at 0d70450^ and 0d70450); the tables and checks reads exist; every JSON route's 200 names a schema except GET /api/flowsheets/{record_id}/file, which test_route_models.py lists among the file routes.",
+  "E.0b (c34c8c9): a runbooks row kept with a body of the wrong shape is left out of GET /api/state and named in refused with why ('kind: Field required; title: Input should be a valid string; status: Field required'); PUT and DELETE answer StateKept and StateTakenBack (openapi.json); M13 caught.",
+  "E.6 (13381a0): POST /api/thermo/props answers ThermoPropsAnswer (openapi.json).",
+  "E.8 (50a4f96): a product's category is one of twelve classes (CatalogueEntry enum); the chord g then a goes to Catalogues (src/data/shortcuts.ts, nav.ts key 'a').",
+  "E.12a (37addaf): migration 0010 makes protocols (table present at revision 0010); GET and POST /api/protocols, GET /api/protocols/{id} and POST /api/protocols/{id}/versions exist; a version held already is refused (M15 caught).",
+  "ADR-018: the nine embeds named in the ADR are catalogues.LessonEmbedName's nine and LessonEmbeds.tsx's nine cases.",
+  "E.15 (8281f5e): grep -rn data/types src scripts finds nothing; COMPONENTS.md lists src/data/'s nine files, the nine in the tree.",
+  "E.17 and E.debts (7e178bb, 8bde8ab): a person's override naming a unit is refused at PUT /api/state/overrides, and a reading's own unit on a scope other than proforma: is refused, each in words (curl); M01 caught.",
+  "E.20 (448adbb): a person's catalogue keep writes keep_catalogue (M14 caught).",
+  "F.2c/F.2g/F.5.1/landing (cc40959, 8d0c2a2, 2795aa7, 4143de3): JUDGE_TOKENS 32000; plan ceiling MAX_TOKENS 32000 with ROOM xhigh 64000 and max 128000; KIT_ROOM {low 0, medium 4096, high 8192, xhigh 12000, max 32000}; M08 and M11 caught.",
+  "F.2e (2ed7dac): llm.routes() defaults are plan, explain and extract Opus then Sonnet at high, index Haiku alone at low, judge Opus then Sonnet at max; OPENFERMENT_MODEL, OPENFERMENT_FALLBACK_MODEL and OPENFERMENT_EFFORT move plan, explain and extract alone, OPENFERMENT_INDEX_MODEL index's first model, judge untouched (run with the four set; M02 and M03 caught).",
+  "ADR-008 Implementations 15-17: 4.6846/14 = 0.3346 and 4.0988/14 = 0.2928 per judgement; 32,000 tokens at Opus 5.5's 20 USD a million is 0.64 USD; 14+14+14+4 = 46 judgements; every B-A difference in the rule's table is the difference of the report's rounded means (0.787-0.601 = 0.186, 0.760-0.589 = 0.171, ...); per-question costs 6.5359/14, 0.2780/14, 2.4974/14 match 0.4669, 0.0199, 0.1784.",
+  "ae6f74c Spend: 1+31+94+14 = 140 calls and 0.000004+5.377950+4.376768+4.684600 = 14.439322 USD on 5 November; 75+92+41 = 208 calls and 25.284480 on 8 November; 348 + A's 1 = 349 calls, 39.723802 + 0.000004 = 39.723806 USD.",
+  "ae6f74c: Known debts hold 33 paid, 11 open and 18 left by decision rows (rows under each heading less the header).",
+  "ae6f74c and 2047f5a: CLAUDE.md is 148 lines at ae6f74c and 149 at 2047f5a; test:core collects 3061 of 3236 with 175 deselected (3060 passed + 1 skipped), test:sim 142, test:lit 10.",
+  "2047f5a: test_host.py gains three tests; test_host.py and test_guidance.py 58 passed (52 + 6); 39 test files import standins; backup_database keeps 7, makes the folder 700 and files 600 through umask 077, writes $file.part and moves it (M05, M06, M07, M19 caught); launchd.py's docstring and the runbook's steps 3, 6 and 7 name the dump.",
+  "311990d: pnpm ready, geneos:fetch, prove, db:migrate and db:import-alpha1 run uv run --frozen; deploy.sh runs pnpm verify under UV_FROZEN=1.",
+  "3cd2919 and 744e32e: validate_claims, atomic.held, library_flowsheets, package_test_name, is_share, SHARE_NAMES, proposals.as_rows, spend.would_pass, witness.new_candidates, SET_KINDS, PRESETS and --save-fixture appear nowhere in code; ADR lines that name them say they are gone. BLANK_UNITS gives IRR the unit fraction (M09 caught).",
+  "744e32e's 'spend-lock test removed' is test_the_spend_lock_is_ignored, a git check-ignore of core/data/spend.json.lock, unrelated to spend.reserve's lock.",
+  "0bd047e/a9da26c: Result.refused, spentAtStopUsd, _chosen and restartCount exist where the messages say.",
+  "0dd8415 and 9b6e5c7: the retrieval report's 130 questions from 457 of 457 candidates, 20 of 22 documents, 814 chunks; questions by field sum to 130; keyword_only's 102 + 22 + 1 + 5 = 130 (docs/reports/literature-retrieval.json and .md).",
+  "C.1 and later: test_engine_pins.py holds 17 pins (16 at C.1, the changed-start forecast added at C.2).",
+  "ADR-015: test_workers.py allows scipy in kinetics.py and fermos.py alone; workers.withheld's prefixes and words match the ADR's list; conform kinetics --inputs holds all eight on bh_r2_conform_cfg (exit 0).",
+  "ADR-002: llm.KIT_ROLES is answer->explain, extraction->index, judge->judge.",
+  "E.13/E.14 counts: check:state prints 96 passes (95 checks and its closing line), check:guild 147 (146 and its closing line), check:figures 13, test:reconcile 10, check:plan green, run in my worktree.",
+  "4143de3 '--limit counts one at least' holds at the command (test_a_limit_counts_one_at_least, graph.pending's guard tested); report.truth's own guard (report.py:332) has no test (M10 survived), unreachable from the command since argparse refuses first."
+ ],
+ "unexamined": [
+  {
+   "item": "pnpm verify (sixteen stages, 12 min 11 s) and pnpm prove (99 of 99, 203 s) at 2047f5a",
+   "reason": "full runs exceed the shared machine's limits, and prove and smoke bind ports outside 8970-8979; the parts they name were checked one by one above"
+  },
+  {
+   "item": "The per-commit test counts of the intermediate commits (2397 at ed33c02 to 3066 at 744e32e) and the Python 3.12 runs each message names",
+   "reason": "each needs its own checkout and a full collection; the final tree's counts were checked"
+  },
+  {
+   "item": "CI run ids 41865693107 and 41878467102",
+   "reason": "outside the tree; no request to GitHub's API was made"
+  },
+  {
+   "item": "The served-app MCP test test_the_server_started_with_service_writes_through_it_and_the_audit_names_the_client",
+   "reason": "it binds an ephemeral loopback port outside the hunt's range, so it was deselected from every run here"
+  },
+  {
+   "item": "docs/PROGRESS.md beyond the sections the commit messages name (Spend, Known debts, the stage logs quoted)",
+   "reason": "the file is 3,618 lines; R2's brief is the commit messages, the handoff report and the ADRs' alpha 2.2 notes"
+  },
+  {
+   "item": "smoke's 20 of 20 screens and the bundle-byte-for-byte claims of E.2, E.13, E.14 and E.15",
+   "reason": "a build in the main tree is forbidden; the screens are other hunts' area"
+  }
+ ]
+}

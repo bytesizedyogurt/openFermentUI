@@ -1,0 +1,41 @@
+worktree /tmp/claude-0/-home-user-openFermentUI/cfbc5c9f-640a-5002-a705-5ceaf850fdc6/scratchpad/bh/work/H12-10/wt-7434 at 2047f5a; a fresh database bh_r_h12_10_cfg
+contract, core/openferment_core/engine/runs.py:433-446:
+  |     The same run kept twice is one row, answered as it was first kept: a
+  |     held row that is done with its file or its words, or a held receipt, is
+  |     answered from the store, and nothing is written or said. A held row
+  |     with neither is written whole again with its first asker's `by`, `at`
+  |     and scenario. The row's versions are `versions` when the keeper gives
+  |     them (the distributions that thing's computation ran on), else the
+  |     distributions its basis names, or the engine's own `version()` for a
+  |     basis that names no simulator. `by` is who asked, `this browser` when
+  |     the request names no one; `scenario_id` the study scenario that asked
+  |     for it. `diagnostics` are what the computation reported about itself
+  |     beside its outputs (a contract engine's worker's, `run_engine`), each a
+  |     name, a value and a unit, kept on a row that is done: a held row's own
+  |     stand when it has some, so the same request again is the run with its
+  |     first computation's diagnostics. A receipt keeps none."""
+line 464: if held is not None and (held.status == "refused" or held.sff is not None or held.sffRefused is not None):
+line 467: first, when, asked = (held.by, held.at, held.scenarioId) if held is not None else (who, _now(), scenario_id)
+line 477: reported = (held.diagnostics if held is not None and held.diagnostics else
+tests in core/tests that write a runs row through runs._put: 0
+1. the head
+  head probe: by-at-scenario by='First Person' at='2026-11-01T00:00:00Z' scenarioId='first-scenario' sffRefused='the placeholder engine has no plant'
+  head probe: diagnostics [('time taken', 1.0, 'placeholder-ms')] sffRefused='the placeholder engine has no plant'
+  head probe: exit 0; 2 passed in 2.06s
+2. M21
+M21 applied, line 467 now: first, when, asked = (who, _now(), scenario_id)
+  M21 five files: exit 0; 208 passed, 1 deselected in 60.07s (0:01:00)
+  M21 probe: by-at-scenario by='Second Person' at='2026-11-10T23:54:18.932524Z' scenarioId='second-scenario' sffRefused='the placeholder engine has no plant'
+  M21 probe: diagnostics [('time taken', 1.0, 'placeholder-ms')] sffRefused='the placeholder engine has no plant'
+  M21 probe FAILED tests/test_h12_10_probe.py::test_a_held_row_with_neither_is_written_again_under_its_first_askers_by_at_and_scenario
+  M21 probe: exit 1; 1 failed, 1 passed in 3.39s
+3. M24
+M24 applied, line 477 now: reported = (None if False else
+  M24 five files: exit 0; 208 passed, 1 deselected in 49.54s
+  M24 probe: by-at-scenario by='First Person' at='2026-11-01T00:00:00Z' scenarioId='first-scenario' sffRefused='the placeholder engine has no plant'
+  M24 probe: diagnostics [('time taken', 9.0, 'placeholder-ms')] sffRefused='the placeholder engine has no plant'
+  M24 probe FAILED tests/test_h12_10_probe.py::test_a_held_row_with_neither_keeps_its_own_diagnostics
+  M24 probe: exit 1; 1 failed, 1 passed in 2.19s
+EXPECTED: a test plants a done runs row with neither sff nor sffRefused and keeps the run again, so M21 (the second asker's by, at and scenario written over the first's) and M24 (the second computation's diagnostics over the row's own) each fail a test among test_runs, test_engines, test_engine_diagnostics, test_proforma_runs and test_events, as each fails the probe
+OBSERVED: the probe on the head: exit 0 (2 passed in 2.06s); M21: the five files exit 0 (208 passed, 1 deselected in 60.07s (0:01:00)), the probe exit 1 (1 failed, 1 passed in 3.39s; by='Second Person' at='2026-11-10T23:54:18.932524Z' scenarioId='second-scenario' sffRefused='the placeholder engine has no plant'); M24: the five files exit 0 (208 passed, 1 deselected in 49.54s), the probe exit 1 (1 failed, 1 passed in 2.19s; [('time taken', 9.0, 'placeholder-ms')] sffRefused='the placeholder engine has no plant')
+RESULT: DEFECT

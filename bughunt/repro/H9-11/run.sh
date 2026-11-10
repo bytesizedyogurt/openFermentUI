@@ -7,7 +7,7 @@
 #   bash bughunt/repro/H9-11/run.sh        (from the repository root)
 set -u
 source /home/user/openFermentUI/bughunt/lib/env.sh
-export PYTHONDONTWRITEBYTECODE=1
+export PYTHONDONTWRITEBYTECODE=1 PGOPTIONS='-c client_min_messages=warning'
 DB=bh_r_h9_11_mcpask; PORT=10051; P=h911
 Q="What does the project hold?"
 T=$(mktemp -d "$BH_WORK/h9-11-XXXXXX"); EV=""
