@@ -1,0 +1,11 @@
+--- a/core/openferment_core/basis.py
++++ b/core/openferment_core/basis.py
+@@ -172,7 +172,7 @@
+         raise InputRefused(f"{name}: a value a run sets says when it was set (quantity.origin.at)")
+     if q.unit != unit:
+         raise InputRefused(f"{name} is set in {q.unit!r}, and the parameter's unit is {unit!r}")
+-    if q.basis is not None:
++    if False:
+         raise InputRefused(f"{name}: a value a run sets is in its parameter's own unit, which says what it is "
+                            f"reckoned on; this quantity also carries the basis {q.basis!r}")
+     return Override(scope=scope, key=name, value=q.value, low=q.low, high=q.high, by=origin.by or "", at=origin.at,

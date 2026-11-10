@@ -1,0 +1,122 @@
+{"kind": "file", "item": "core/openferment_core/db/alembic/versions/0008_run_engine.py", "method": "executed", "findings": [], "note": "alpha 2.1 db (5 runs) upgraded: every row engine biosteam; a head kinetics row kept its engine through 0010 -> 0007 -> 0010"}
+{"kind": "file", "item": "core/openferment_core/db/alembic/versions/0009_engine_checks.py", "method": "executed", "findings": [], "note": "made on upgrade and on an empty db; dropped and remade by down/up; schema equal to the models"}
+{"kind": "file", "item": "core/openferment_core/db/alembic/versions/0010_protocols.py", "method": "executed", "findings": [], "note": "made on upgrade; GET /api/protocols [] after it; on an unmigrated db the route answers 500 while ready names the revision"}
+{"kind": "file", "item": "core/openferment_core/db/engine.py", "method": "executed", "findings": [], "note": "no address, missing database and dead server each refused in words by db:migrate"}
+{"kind": "file", "item": "core/openferment_core/db/models.py", "method": "executed", "findings": ["H6-05"], "note": "alembic compare_metadata on a migrated db: 0 differences; columns are json where ADR-001 says JSONB"}
+{"kind": "file", "item": "core/openferment_core/db/rows.py", "method": "read", "findings": [], "note": "columns() and put_first() read; exercised through the head's runs list and SFF import over the upgraded db"}
+{"kind": "file", "item": "core/openferment_core/import_alpha1.py", "method": "fuzzed", "findings": ["H6-02", "H6-03", "H6-04"], "note": "pnpm db:import-alpha1 on the tag's biorepo.json and 12 alpha-1.0-shaped directories written by alpha 1.0's own models"}
+{"kind": "file", "item": "core/openferment_core/migrations.py", "method": "executed", "findings": ["H6-03"], "note": "empty->head twice (no change), base->head, 0007->head, kit 0006->base->head; refusals in words"}
+{"kind": "operation", "item": "GET /api/audit", "method": "executed", "findings": [], "note": "read over a database alpha 2.1 filled and the head migrated; answers 200"}
+{"kind": "operation", "item": "GET /api/biorepo/artifacts", "method": "executed", "findings": [], "note": "read over a database alpha 2.1 filled and the head migrated; answers 200"}
+{"kind": "operation", "item": "GET /api/biorepo/artifacts/{artifact_id}", "method": "executed", "findings": [], "note": "read over a database alpha 2.1 filled and the head migrated; answers 200"}
+{"kind": "operation", "item": "GET /api/biorepo/artifacts/{artifact_id}/checks", "method": "executed", "findings": [], "note": "read over a database alpha 2.1 filled and the head migrated; answers 200,422"}
+{"kind": "operation", "item": "GET /api/biorepo/artifacts/{artifact_id}/tables", "method": "executed", "findings": [], "note": "read over a database alpha 2.1 filled and the head migrated; answers 200,422"}
+{"kind": "operation", "item": "GET /api/biorepo/overlay", "method": "executed", "findings": [], "note": "read over a database alpha 2.1 filled and the head migrated; answers 200"}
+{"kind": "operation", "item": "GET /api/catalogues/{kind}", "method": "executed", "findings": ["H6-01"], "note": "read over a database alpha 2.1 filled and the head migrated; answers 200"}
+{"kind": "operation", "item": "GET /api/catalogues/{kind}/{entry_id}", "method": "executed", "findings": ["H6-01"], "note": "read over a database alpha 2.1 filled and the head migrated; answers 200"}
+{"kind": "operation", "item": "GET /api/conversations", "method": "executed", "findings": [], "note": "read over a database alpha 2.1 filled and the head migrated; answers 200"}
+{"kind": "operation", "item": "GET /api/conversations/{conversation_id}", "method": "executed", "findings": [], "note": "read over a database alpha 2.1 filled and the head migrated; answers 200"}
+{"kind": "operation", "item": "GET /api/conversations/{conversation_id}/turns/{turn_id}/calls", "method": "executed", "findings": [], "note": "read over a database alpha 2.1 filled and the head migrated; answers 200"}
+{"kind": "operation", "item": "GET /api/depositions/readings", "method": "executed", "findings": [], "note": "read over a database alpha 2.1 filled and the head migrated; answers 200"}
+{"kind": "operation", "item": "GET /api/engines", "method": "executed", "findings": [], "note": "read over a database alpha 2.1 filled and the head migrated; answers 200"}
+{"kind": "operation", "item": "GET /api/fermos/families", "method": "executed", "findings": [], "note": "read over a database alpha 2.1 filled and the head migrated; answers 200"}
+{"kind": "operation", "item": "GET /api/fermos/fits", "method": "executed", "findings": [], "note": "read over a database alpha 2.1 filled and the head migrated; answers 200"}
+{"kind": "operation", "item": "GET /api/fermos/simulations", "method": "executed", "findings": [], "note": "read over a database alpha 2.1 filled and the head migrated; answers 200"}
+{"kind": "operation", "item": "GET /api/fermos/vessels", "method": "executed", "findings": [], "note": "read over a database alpha 2.1 filled and the head migrated; answers 200"}
+{"kind": "operation", "item": "GET /api/flowsheets", "method": "executed", "findings": [], "note": "read over a database alpha 2.1 filled and the head migrated; answers 200"}
+{"kind": "operation", "item": "GET /api/flowsheets/{record_id}", "method": "executed", "findings": [], "note": "read over a database alpha 2.1 filled and the head migrated; answers 200"}
+{"kind": "operation", "item": "GET /api/flowsheets/{record_id}/file", "method": "executed", "findings": [], "note": "read over a database alpha 2.1 filled and the head migrated; answers 200"}
+{"kind": "operation", "item": "GET /api/geneos/models", "method": "executed", "findings": [], "note": "read over a database alpha 2.1 filled and the head migrated; answers 200"}
+{"kind": "operation", "item": "GET /api/guild", "method": "executed", "findings": [], "note": "read over a database alpha 2.1 filled and the head migrated; answers 200"}
+{"kind": "operation", "item": "GET /api/guild/checks", "method": "executed", "findings": [], "note": "read over a database alpha 2.1 filled and the head migrated; answers 200"}
+{"kind": "operation", "item": "GET /api/health", "method": "executed", "findings": [], "note": "read over a database alpha 2.1 filled and the head migrated; answers 200"}
+{"kind": "operation", "item": "GET /api/library", "method": "executed", "findings": [], "note": "read over a database alpha 2.1 filled and the head migrated; answers 200"}
+{"kind": "operation", "item": "GET /api/literature/documents", "method": "executed", "findings": [], "note": "read over a database alpha 2.1 filled and the head migrated; answers 200"}
+{"kind": "operation", "item": "GET /api/literature/stats", "method": "executed", "findings": [], "note": "read over a database alpha 2.1 filled and the head migrated; answers 200"}
+{"kind": "operation", "item": "GET /api/practice", "method": "executed", "findings": [], "note": "read over a database alpha 2.1 filled and the head migrated; answers 200"}
+{"kind": "operation", "item": "GET /api/proforma/runs", "method": "executed", "findings": [], "note": "read over a database alpha 2.1 filled and the head migrated; answers 200"}
+{"kind": "operation", "item": "GET /api/proforma/scenarios", "method": "executed", "findings": [], "note": "read over a database alpha 2.1 filled and the head migrated; answers 200"}
+{"kind": "operation", "item": "GET /api/proforma/shelf", "method": "executed", "findings": [], "note": "read over a database alpha 2.1 filled and the head migrated; answers 200"}
+{"kind": "operation", "item": "GET /api/proforma/status", "method": "executed", "findings": [], "note": "read over a database alpha 2.1 filled and the head migrated; answers 200"}
+{"kind": "operation", "item": "GET /api/projects", "method": "executed", "findings": [], "note": "read over a database alpha 2.1 filled and the head migrated; answers 200"}
+{"kind": "operation", "item": "GET /api/projects/{project_id}", "method": "executed", "findings": [], "note": "read over a database alpha 2.1 filled and the head migrated; answers 200"}
+{"kind": "operation", "item": "GET /api/proposals", "method": "executed", "findings": [], "note": "read over a database alpha 2.1 filled and the head migrated; answers 200"}
+{"kind": "operation", "item": "GET /api/protocols", "method": "executed", "findings": [], "note": "read over a database alpha 2.1 filled and the head migrated; answers 200"}
+{"kind": "operation", "item": "GET /api/pureos/train-runs", "method": "executed", "findings": [], "note": "read over a database alpha 2.1 filled and the head migrated; answers 200"}
+{"kind": "operation", "item": "GET /api/pureos/trains", "method": "executed", "findings": [], "note": "read over a database alpha 2.1 filled and the head migrated; answers 200"}
+{"kind": "operation", "item": "GET /api/pureos/trains-kept", "method": "executed", "findings": [], "note": "read over a database alpha 2.1 filled and the head migrated; answers 200"}
+{"kind": "operation", "item": "GET /api/runs", "method": "executed", "findings": [], "note": "read over a database alpha 2.1 filled and the head migrated; answers 200"}
+{"kind": "operation", "item": "GET /api/runs/{run_id}", "method": "executed", "findings": [], "note": "read over a database alpha 2.1 filled and the head migrated; answers 200"}
+{"kind": "operation", "item": "GET /api/state", "method": "executed", "findings": [], "note": "read over a database alpha 2.1 filled and the head migrated; answers 200"}
+{"kind": "operation", "item": "GET /api/studies/comparisons", "method": "executed", "findings": [], "note": "read over a database alpha 2.1 filled and the head migrated; answers 200"}
+{"kind": "operation", "item": "GET /api/studies/comparisons/{comparison_id}", "method": "executed", "findings": [], "note": "read over a database alpha 2.1 filled and the head migrated; answers 200"}
+{"kind": "operation", "item": "GET /api/studies/runbooks", "method": "executed", "findings": [], "note": "read over a database alpha 2.1 filled and the head migrated; answers 200"}
+{"kind": "operation", "item": "GET /api/studies/runbooks/{runbook_id}", "method": "executed", "findings": [], "note": "read over a database alpha 2.1 filled and the head migrated; answers 200"}
+{"kind": "operation", "item": "GET /api/studies/scenarios", "method": "executed", "findings": [], "note": "read over a database alpha 2.1 filled and the head migrated; answers 200"}
+{"kind": "operation", "item": "GET /api/studies/scenarios/{scenario_id}", "method": "executed", "findings": [], "note": "read over a database alpha 2.1 filled and the head migrated; answers 200"}
+{"kind": "operation", "item": "GET /api/tools", "method": "executed", "findings": [], "note": "read over a database alpha 2.1 filled and the head migrated; answers 200"}
+{"kind": "operation", "item": "GET /api/witness/runs", "method": "executed", "findings": [], "note": "read over a database alpha 2.1 filled and the head migrated; answers 200"}
+{"kind": "operation", "item": "POST /api/biorepo/artifacts/{artifact_id}/replay", "method": "executed", "findings": [], "note": "every alpha 2.1 artifact replayed at the head: all identical but the three proforma.run (1-ulp, also so at alpha 2.1)"}
+{"kind": "operation", "item": "PUT /api/state/{kind}/{item_id}", "method": "executed", "findings": [], "note": "a reading appended at the head to a deposition alpha 2.1 kept"}
+{"kind": "operation", "item": "POST /api/fermos/simulate", "method": "executed", "findings": [], "note": "alpha 2.1's simulation asked again at the head found its artifact and kept its kinetics row"}
+{"kind": "operation", "item": "POST /api/proforma/run", "method": "executed", "findings": [], "note": "a head run over the upgraded db; it replays identically twice"}
+{"kind": "operation", "item": "POST /api/tools/{name}", "method": "executed", "findings": ["H6-01"], "note": "catalogue_read at the head lists one of three products alpha 2.1 kept"}
+{"kind": "rail", "item": "Home", "method": "browser", "findings": [], "note": "opened in Chromium over the upgraded db: no console error, no failed request"}
+{"kind": "rail", "item": "Intake", "method": "browser", "findings": [], "note": "opened in Chromium over the upgraded db: no console error, no failed request"}
+{"kind": "rail", "item": "BioRepo", "method": "browser", "findings": [], "note": "opened in Chromium over the upgraded db: no console error, no failed request"}
+{"kind": "rail", "item": "Postdoc", "method": "browser", "findings": [], "note": "opened in Chromium over the upgraded db: no console error, no failed request"}
+{"kind": "rail", "item": "geneOS", "method": "browser", "findings": [], "note": "opened in Chromium over the upgraded db: no console error, no failed request"}
+{"kind": "rail", "item": "fermOS", "method": "browser", "findings": [], "note": "opened in Chromium over the upgraded db: no console error, no failed request"}
+{"kind": "rail", "item": "pureOS", "method": "browser", "findings": [], "note": "opened in Chromium over the upgraded db: no console error, no failed request"}
+{"kind": "rail", "item": "Proforma", "method": "browser", "findings": [], "note": "opened in Chromium over the upgraded db: no console error, no failed request"}
+{"kind": "rail", "item": "Runbooks", "method": "browser", "findings": [], "note": "opened in Chromium over the upgraded db: no console error, no failed request"}
+{"kind": "rail", "item": "Primer", "method": "browser", "findings": [], "note": "opened in Chromium over the upgraded db: no console error, no failed request"}
+{"kind": "rail", "item": "Guild", "method": "browser", "findings": [], "note": "opened in Chromium over the upgraded db: no console error, no failed request"}
+{"kind": "rail", "item": "Catalogues", "method": "browser", "findings": ["H6-01"], "note": "opened in Chromium over the upgraded db: no console error, no failed request"}
+{"kind": "screen", "item": "src/screens/BioRepo.tsx", "method": "browser", "findings": [], "note": "over the upgraded db, alpha 2.1's rows on it (screens.cjs)"}
+{"kind": "screen", "item": "src/screens/BioRepoArtifacts.tsx", "method": "browser", "findings": [], "note": "over the upgraded db, alpha 2.1's rows on it (screens.cjs)"}
+{"kind": "screen", "item": "src/screens/Catalogues.tsx", "method": "browser", "findings": ["H6-01"], "note": "over the upgraded db, alpha 2.1's rows on it (screens.cjs)"}
+{"kind": "screen", "item": "src/screens/Compare.tsx", "method": "browser", "findings": [], "note": "over the upgraded db, alpha 2.1's rows on it (screens.cjs)"}
+{"kind": "screen", "item": "src/screens/DepositionDetail.tsx", "method": "browser", "findings": [], "note": "over the upgraded db, alpha 2.1's rows on it (screens.cjs)"}
+{"kind": "screen", "item": "src/screens/Depositions.tsx", "method": "browser", "findings": [], "note": "over the upgraded db, alpha 2.1's rows on it (screens.cjs)"}
+{"kind": "screen", "item": "src/screens/FermOS.tsx", "method": "browser", "findings": [], "note": "over the upgraded db, alpha 2.1's rows on it (screens.cjs)"}
+{"kind": "screen", "item": "src/screens/FermOSForecast.tsx", "method": "browser", "findings": [], "note": "over the upgraded db, alpha 2.1's rows on it (screens.cjs)"}
+{"kind": "screen", "item": "src/screens/FermOSSimulate.tsx", "method": "browser", "findings": [], "note": "over the upgraded db, alpha 2.1's rows on it (screens.cjs)"}
+{"kind": "screen", "item": "src/screens/FermOSVessel.tsx", "method": "browser", "findings": [], "note": "over the upgraded db, alpha 2.1's rows on it (screens.cjs)"}
+{"kind": "screen", "item": "src/screens/FlowsheetPage.tsx", "method": "browser", "findings": [], "note": "over the upgraded db, alpha 2.1's rows on it (screens.cjs)"}
+{"kind": "screen", "item": "src/screens/Flowsheets.tsx", "method": "browser", "findings": [], "note": "over the upgraded db, alpha 2.1's rows on it (screens.cjs)"}
+{"kind": "screen", "item": "src/screens/GeneOS.tsx", "method": "browser", "findings": [], "note": "over the upgraded db, alpha 2.1's rows on it (screens.cjs)"}
+{"kind": "screen", "item": "src/screens/GeneOSModel.tsx", "method": "browser", "findings": [], "note": "over the upgraded db, alpha 2.1's rows on it (screens.cjs)"}
+{"kind": "screen", "item": "src/screens/Guild.tsx", "method": "browser", "findings": [], "note": "over the upgraded db, alpha 2.1's rows on it (screens.cjs)"}
+{"kind": "screen", "item": "src/screens/GuildChecks.tsx", "method": "browser", "findings": [], "note": "over the upgraded db, alpha 2.1's rows on it (screens.cjs)"}
+{"kind": "screen", "item": "src/screens/GuildMatrix.tsx", "method": "browser", "findings": [], "note": "over the upgraded db, alpha 2.1's rows on it (screens.cjs)"}
+{"kind": "screen", "item": "src/screens/GuildPeople.tsx", "method": "browser", "findings": [], "note": "over the upgraded db, alpha 2.1's rows on it (screens.cjs)"}
+{"kind": "screen", "item": "src/screens/GuildSkills.tsx", "method": "browser", "findings": [], "note": "over the upgraded db, alpha 2.1's rows on it (screens.cjs)"}
+{"kind": "screen", "item": "src/screens/Home.tsx", "method": "browser", "findings": [], "note": "over the upgraded db, alpha 2.1's rows on it (screens.cjs)"}
+{"kind": "screen", "item": "src/screens/Intake.tsx", "method": "browser", "findings": [], "note": "over the upgraded db, alpha 2.1's rows on it (screens.cjs)"}
+{"kind": "screen", "item": "src/screens/IntakeIngest.tsx", "method": "browser", "findings": [], "note": "over the upgraded db, alpha 2.1's rows on it (screens.cjs)"}
+{"kind": "screen", "item": "src/screens/PaperReader.tsx", "method": "browser", "findings": [], "note": "over the upgraded db, alpha 2.1's rows on it (screens.cjs)"}
+{"kind": "screen", "item": "src/screens/Postdoc.tsx", "method": "browser", "findings": [], "note": "over the upgraded db, alpha 2.1's rows on it (screens.cjs)"}
+{"kind": "screen", "item": "src/screens/Primer.tsx", "method": "browser", "findings": [], "note": "over the upgraded db, alpha 2.1's rows on it (screens.cjs)"}
+{"kind": "screen", "item": "src/screens/PrimerLesson.tsx", "method": "browser", "findings": [], "note": "over the upgraded db, alpha 2.1's rows on it (screens.cjs)"}
+{"kind": "screen", "item": "src/screens/PrimerPath.tsx", "method": "browser", "findings": [], "note": "over the upgraded db, alpha 2.1's rows on it (screens.cjs)"}
+{"kind": "screen", "item": "src/screens/PrimerPractice.tsx", "method": "browser", "findings": [], "note": "over the upgraded db, alpha 2.1's rows on it (screens.cjs)"}
+{"kind": "screen", "item": "src/screens/Proforma.tsx", "method": "browser", "findings": [], "note": "over the upgraded db, alpha 2.1's rows on it (screens.cjs)"}
+{"kind": "screen", "item": "src/screens/ProformaComparison.tsx", "method": "browser", "findings": [], "note": "over the upgraded db, alpha 2.1's rows on it (screens.cjs)"}
+{"kind": "screen", "item": "src/screens/ProformaReference.tsx", "method": "browser", "findings": [], "note": "over the upgraded db, alpha 2.1's rows on it (screens.cjs)"}
+{"kind": "screen", "item": "src/screens/ProformaRun.tsx", "method": "browser", "findings": [], "note": "over the upgraded db, alpha 2.1's rows on it (screens.cjs)"}
+{"kind": "screen", "item": "src/screens/ProformaScenario.tsx", "method": "browser", "findings": [], "note": "over the upgraded db, alpha 2.1's rows on it (screens.cjs)"}
+{"kind": "screen", "item": "src/screens/ProformaStudies.tsx", "method": "browser", "findings": [], "note": "over the upgraded db, alpha 2.1's rows on it (screens.cjs)"}
+{"kind": "screen", "item": "src/screens/Protocols.tsx", "method": "browser", "findings": [], "note": "over the upgraded db, alpha 2.1's rows on it (screens.cjs)"}
+{"kind": "screen", "item": "src/screens/PureOS.tsx", "method": "browser", "findings": [], "note": "over the upgraded db, alpha 2.1's rows on it (screens.cjs)"}
+{"kind": "screen", "item": "src/screens/PureOSBuilder.tsx", "method": "browser", "findings": [], "note": "over the upgraded db, alpha 2.1's rows on it (screens.cjs)"}
+{"kind": "screen", "item": "src/screens/PureOSTrain.tsx", "method": "browser", "findings": [], "note": "over the upgraded db, alpha 2.1's rows on it (screens.cjs)"}
+{"kind": "screen", "item": "src/screens/RunbookDetail.tsx", "method": "browser", "findings": [], "note": "over the upgraded db, alpha 2.1's rows on it (screens.cjs)"}
+{"kind": "screen", "item": "src/screens/RunbookLedger.tsx", "method": "browser", "findings": [], "note": "over the upgraded db, alpha 2.1's rows on it (screens.cjs)"}
+{"kind": "screen", "item": "src/screens/Runbooks.tsx", "method": "browser", "findings": [], "note": "over the upgraded db, alpha 2.1's rows on it (screens.cjs)"}
+{"kind": "screen", "item": "src/screens/Settings.tsx", "method": "browser", "findings": [], "note": "over the upgraded db, alpha 2.1's rows on it (screens.cjs)"}
+{"kind": "screen", "item": "src/screens/StrainPage.tsx", "method": "browser", "findings": [], "note": "over the upgraded db, alpha 2.1's rows on it (screens.cjs)"}
+{"kind": "screen", "item": "src/screens/Witness.tsx", "method": "browser", "findings": [], "note": "over the upgraded db, alpha 2.1's rows on it (screens.cjs)"}
+{"kind": "engine", "item": "biosteam", "method": "executed", "findings": [], "note": "alpha 2.1 runs and artifacts of the engine read and replayed at the head after the upgrade"}
+{"kind": "engine", "item": "kinetics", "method": "executed", "findings": [], "note": "alpha 2.1 runs and artifacts of the engine read and replayed at the head after the upgrade"}
+{"kind": "engine", "item": "train", "method": "executed", "findings": [], "note": "alpha 2.1 runs and artifacts of the engine read and replayed at the head after the upgrade"}

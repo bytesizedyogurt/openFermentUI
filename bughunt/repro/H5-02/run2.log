@@ -1,0 +1,19 @@
+NOTICE:  database "bh_r_h5_02_shared" does not exist, skipping
+service: http://127.0.0.1:9010 over a fresh bh_r_h5_02_shared (keyless, collectors offline)
+paste A1 as h502-a: status=ingested title='A confidential draft title' licenceClass=open_commercial documentId=759310e53de74625a841bfb377819a87
+paste B1 as h502-b: status=linked title="B's own title" licenceClass=restricted documentId=759310e53de74625a841bfb377819a87
+paste A2 as h502-a: status=ingested title="A's second title" licenceClass=restricted documentId=61cfbbacd58e42f0a244a9ec5a6ec15f
+paste B2 as h502-b: status=linked title="B's second title" licenceClass=open_commercial documentId=61cfbbacd58e42f0a244a9ec5a6ec15f
+B's documents are A's (one kit row each): True; B's statuses: linked, linked
+B GET /api/literature/documents, text 1: {"title": "A confidential draft title", "citation": "A confidential draft title. https://example.org/a-private-place", "source": "project:h502-a:paste", "sourceRef": "https://example.org/a-private-place", "licenceClass": "open_commercial", "selection.licence": {"href": null, "text": "all rights reserved as B states it"}, "selection.url": null}
+B GET /api/biorepo/overlay, text 1: {"title": "A confidential draft title", "url": "https://example.org/a-private-place", "license": "all rights reserved as B states it", "licenceClass": "open_commercial", "section headings": ["A confidential draft title"]}
+B GET /api/literature/search, text 1: [{"title": "A confidential draft title", "sectionPath": null, "citation": "A confidential draft title. https://example.org/a-private-place", "licenceClass": "open_commercial"}]
+B GET /api/literature/documents, text 2: {"title": "A's second title", "citation": "A's second title.", "source": "project:h502-a:paste", "sourceRef": "paste:A's second title", "licenceClass": "restricted", "selection.licence": null, "selection.url": null}
+B GET /api/biorepo/overlay, text 2: {"title": "A's second title", "url": "paste:A's second title", "license": "A's words: internal use alone", "licenceClass": "restricted", "section headings": ["A's second title"]}
+B GET /api/literature/search, text 2: [{"title": "A's second title", "sectionPath": null, "citation": "A's second title.", "licenceClass": "restricted"}]
+B GET /api/literature/stats: {"sources": {"project:h502-a:paste": 2}, "license_classes": {"open_commercial": 1, "restricted": 1}}
+EXPECTED: B's paste answers 'linked' with B's own title and class, and B's every read of the two documents serves B's own selection (its titles, its stated classes restricted and open_commercial, its licence words or none, no url): no title, url, licence words or project id A typed.
+OBSERVED: B's paste answers: (linked, "B's own title", restricted) and (linked, "B's second title", open_commercial).
+OBSERVED: A's words in B's reads (12): documents carries 'A confidential draft title'; documents carries 'https://example.org/a-private-place'; documents carries "A's second title"; documents carries 'project:h502-a:'; overlay carries 'A confidential draft title'; overlay carries 'https://example.org/a-private-place'; overlay carries "A's second title"; overlay carries "A's words: internal use alone"; search carries 'A confidential draft title'; search carries 'https://example.org/a-private-place'; search carries "A's second title"; stats carries 'project:h502-a:'
+OBSERVED: licence class in B's reads against B's statement (6): text 1: B stated restricted, its documents read serves open_commercial; text 1: B stated restricted, its overlay read serves open_commercial; text 1: B stated restricted, its search read serves open_commercial; text 2: B stated open_commercial, its documents read serves restricted; text 2: B stated open_commercial, its overlay read serves restricted; text 2: B stated open_commercial, its search read serves restricted
+RESULT: DEFECT

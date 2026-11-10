@@ -1,0 +1,13 @@
+--- a/core/openferment_core/proforma.py
++++ b/core/openferment_core/proforma.py
+@@ -40,6 +40,10 @@
+ def _installed(dist: str) -> str:
+     from importlib.metadata import PackageNotFoundError, version
+ 
++    if dist == "biorefineries":
++        import biorefineries
++
++        return getattr(biorefineries, "__version__", None) or version(dist)
+     try:
+         return version(dist)
+     except PackageNotFoundError:

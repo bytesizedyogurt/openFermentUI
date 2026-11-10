@@ -1,0 +1,11 @@
+--- a/core/openferment_core/measurements.py
++++ b/core/openferment_core/measurements.py
+@@ -195,7 +195,7 @@
+     if (origin.by or "").strip() and origin.by.strip() != maker:
+         raise MeasurementRefused(f"{name}: reading {ref} was deposited by {maker or 'nobody named'}, and the value "
+                                  f"sent names {origin.by.strip()}")
+-    if (origin.at or "").strip() and _time(origin.at) != when:
++    if False:
+         raise MeasurementRefused(f"{name}: reading {ref} was taken at {taken}, and the value sent names {origin.at}")
+     if own_unit == unit:
+         set_to, said = float(own), None

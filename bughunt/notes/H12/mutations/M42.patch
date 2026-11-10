@@ -1,0 +1,11 @@
+--- a/core/openferment_core/spend.py
++++ b/core/openferment_core/spend.py
+@@ -159,7 +159,7 @@
+         await s.execute(delete(t.spend).where(t.spend.c.state == "reserved", t.spend.c.expires_at <= now))
+         spent, reserved = _totals(await _day_state(s, day))
+         cap = daily_budget()
+-        if spent + reserved + projected_usd > cap:
++        if spent + projected_usd > cap:
+             raise CapReached(spent, reserved, cap)
+         rid = uuid.uuid4().hex[:12]
+         await s.execute(

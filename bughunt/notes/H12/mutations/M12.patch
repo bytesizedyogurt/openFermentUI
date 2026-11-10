@@ -1,0 +1,11 @@
+--- a/core/openferment_core/project_state.py
++++ b/core/openferment_core/project_state.py
+@@ -226,7 +226,7 @@
+         raise StateRefused(f"this {kind} row is over {MAX_BYTES // 1_000_000} MB; a page sends less")
+     if kind in RECORD_KINDS:
+         try:
+-            refuse_estimates(value, f"a project's {kind}")
++            pass
+         except EstimateRefused as e:
+             raise StateRefused(str(e)) from None
+     if kind == OVERRIDES:

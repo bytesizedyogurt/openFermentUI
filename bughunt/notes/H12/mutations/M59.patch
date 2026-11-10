@@ -1,0 +1,11 @@
+--- a/core/openferment_core/project_state.py
++++ b/core/openferment_core/project_state.py
+@@ -314,7 +314,7 @@
+     if why:
+         return why
+     for old, new in zip(old_entries, new_entries):
+-        if old.get("confirmed") is True and new.get("confirmed") is not True:
++        if False:
+             return f"{item_id}: reading {old.get('id')} was read back and confirmed, and a confirmation stays"
+     if before.get("reconciliation") is not None and before.get("reconciliation") != after.get("reconciliation"):
+         return f"{item_id} was reconciled, and a reconciliation stays as it was made"

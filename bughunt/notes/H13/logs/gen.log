@@ -1,0 +1,49 @@
+
+> openferment@0.1.0 gen:api /tmp/claude-0/-home-user-openFermentUI/cfbc5c9f-640a-5002-a705-5ceaf850fdc6/scratchpad/bh/work/H13/wt
+> cd core && uv run --all-extras python ../scripts/gen-api.py
+
+wrote docs/api/openapi.json and src/api/types.gen.ts
+gen:api exit 0
+
+> openferment@0.1.0 gen:tools /tmp/claude-0/-home-user-openFermentUI/cfbc5c9f-640a-5002-a705-5ceaf850fdc6/scratchpad/bh/work/H13/wt
+> cd core && uv run --all-extras python ../scripts/gen-tools.py
+
+wrote docs/TOOLS.md (979 lines)
+gen:tools exit 0
+
+> openferment@0.1.0 gen:components /tmp/claude-0/-home-user-openFermentUI/cfbc5c9f-640a-5002-a705-5ceaf850fdc6/scratchpad/bh/work/H13/wt
+> cd core && uv run --all-extras python ../scripts/gen-components.py
+
+wrote COMPONENTS.md (253 lines)
+gen:components exit 0
+
+> openferment@0.1.0 export:unit-fixtures /tmp/claude-0/-home-user-openFermentUI/cfbc5c9f-640a-5002-a705-5ceaf850fdc6/scratchpad/bh/work/H13/wt
+> tsx scripts/export-unit-fixtures.ts
+
+
+openFerment unit fixtures
+─────────────────────────
+  normalize    82 (4 unknown)
+  conversions  25 (6 refused)
+  toSI         8
+  refusals     14 (8 carry a reason)
+  equals       7
+  pairs        136 recorded from the TypeScript engine
+  resolvers    13 strain wordings, 12 carbon wordings
+
+✓ core/tests/fixtures/units.json
+✓ core/tests/fixtures/resolvers.json
+unit exit 0
+
+> openferment@0.1.0 export:competence-fixtures /tmp/claude-0/-home-user-openFermentUI/cfbc5c9f-640a-5002-a705-5ceaf850fdc6/scratchpad/bh/work/H13/wt
+> tsx scripts/export-competence-fixtures.ts
+
+✓ core/tests/fixtures/competence.json — 826 statuses over 7 ledgers
+✓ core/tests/fixtures/competence-unrated.json — 96 statuses over 2 ledgers with a skill kept with no policy
+comp exit 0
+
+> openferment@0.1.0 export:lock-fixtures /tmp/claude-0/-home-user-openFermentUI/cfbc5c9f-640a-5002-a705-5ceaf850fdc6/scratchpad/bh/work/H13/wt
+> tsx scripts/export-lock-fixtures.ts
+
+✓ core/tests/fixtures/lock-digests.json — 10 digests from the browser's lock
+lock exit 0

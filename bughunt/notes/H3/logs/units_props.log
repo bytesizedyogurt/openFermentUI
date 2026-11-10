@@ -1,0 +1,155 @@
+..F..EDGE convert(0.0, 'kg', 'mg') = 0.0
+.EDGE convert(-0.0, 'kg', 'mg') = 0.0
+.EDGE convert(-5.0, 'kg', 'mg') = -5000000.0
+.EDGE convert(1e+308, 'kg', 'mg') = inf
+FEDGE convert(-1e+308, 'kg', 'mg') = -inf
+FEDGE convert(5e-324, 'kg', 'mg') = 4.940656e-318
+.EDGE convert(nan, 'kg', 'mg') = nan
+.EDGE convert(inf, 'kg', 'mg') = inf
+.EDGE convert(-inf, 'kg', 'mg') = -inf
+.EDGE convert(0.0, 'µg', 'kg') = 0.0
+.EDGE convert(-0.0, 'µg', 'kg') = 0.0
+.EDGE convert(-5.0, 'µg', 'kg') = -4.999999999999999e-09
+.EDGE convert(1e+308, 'µg', 'kg') = 9.999999999999999e+298
+.EDGE convert(-1e+308, 'µg', 'kg') = -9.999999999999999e+298
+.EDGE convert(5e-324, 'µg', 'kg') = 0.0
+.EDGE convert(nan, 'µg', 'kg') = nan
+.EDGE convert(inf, 'µg', 'kg') = inf
+.EDGE convert(-inf, 'µg', 'kg') = -inf
+.EDGE convert(0.0, 'K', '°C') = -273.15
+.EDGE convert(-0.0, 'K', '°C') = -273.15
+.EDGE convert(-5.0, 'K', '°C') = -278.15
+.EDGE convert(1e+308, 'K', '°C') = 1e+308
+.EDGE convert(-1e+308, 'K', '°C') = -1e+308
+.EDGE convert(5e-324, 'K', '°C') = -273.15
+.EDGE convert(nan, 'K', '°C') = nan
+.EDGE convert(inf, 'K', '°C') = inf
+.EDGE convert(-inf, 'K', '°C') = -inf
+.EDGE convert(0.0, '°F', 'K') = 255.3722222222222
+.EDGE convert(-0.0, '°F', 'K') = 255.3722222222222
+.EDGE convert(-5.0, '°F', 'K') = 252.59444444444443
+.EDGE convert(1e+308, '°F', 'K') = 5.555555555555556e+307
+.EDGE convert(-1e+308, '°F', 'K') = -5.555555555555556e+307
+.EDGE convert(5e-324, '°F', 'K') = 255.3722222222222
+.EDGE convert(nan, '°F', 'K') = nan
+.EDGE convert(inf, '°F', 'K') = inf
+.EDGE convert(-inf, '°F', 'K') = -inf
+.EDGE convert(0.0, 't d⁻¹', 'g h⁻¹') = 0.0
+.EDGE convert(-0.0, 't d⁻¹', 'g h⁻¹') = 0.0
+.EDGE convert(-5.0, 't d⁻¹', 'g h⁻¹') = -208333.3333333333
+.EDGE convert(1e+308, 't d⁻¹', 'g h⁻¹') = inf
+FEDGE convert(-1e+308, 't d⁻¹', 'g h⁻¹') = -inf
+FEDGE convert(5e-324, 't d⁻¹', 'g h⁻¹') = 2.0751e-319
+.EDGE convert(nan, 't d⁻¹', 'g h⁻¹') = nan
+.EDGE convert(inf, 't d⁻¹', 'g h⁻¹') = inf
+.EDGE convert(-inf, 't d⁻¹', 'g h⁻¹') = -inf
+.
+=================================== FAILURES ===================================
+________________________ test_self_is_identity_exactly _________________________
+
+    @settings(max_examples=300)
+>   @given(key=st.sampled_from(list(TABLE)), x=finite)
+                   ^^^
+
+/home/user/openFermentUI/bughunt/notes/H3/scripts/units_props.py:51: 
+_ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ 
+
+key = 'mg dL⁻¹', x = 201.0
+
+    @settings(max_examples=300)
+    @given(key=st.sampled_from(list(TABLE)), x=finite)
+    def test_self_is_identity_exactly(key, x):
+>       assert units.convert(x, key, key) == x, (key, x, units.convert(x, key, key))
+E       AssertionError: ('mg dL⁻¹', 201.0, 201.00000000000003)
+E       assert 201.00000000000003 == 201.0
+E        +  where 201.00000000000003 = <function convert at 0x7f9628a700e0>(201.0, 'mg dL⁻¹', 'mg dL⁻¹')
+E        +    where <function convert at 0x7f9628a700e0> = units.convert
+E       Failing test case: test_self_is_identity_exactly(
+E           key='mg dL⁻¹',
+E           x=201.0,
+E       )
+
+/home/user/openFermentUI/bughunt/notes/H3/scripts/units_props.py:53: AssertionError
+_______________________ test_edges_report[kg-mg-1e+308] ________________________
+
+x = 1e+308, a = 'kg', b = 'mg'
+
+    @pytest.mark.parametrize("x", [0.0, -0.0, -5.0, 1e308, -1e308, 5e-324, float("nan"), float("inf"), float("-inf")])
+    @pytest.mark.parametrize("a,b", [("kg", "mg"), ("µg", "kg"), ("K", "°C"), ("°F", "K"), ("t d⁻¹", "g h⁻¹")])
+    def test_edges_report(x, a, b):
+        """Records what convert answers at the edges (no assertion beyond: it never answers a finite
+        number for a non-finite input, and never a non-finite number for a finite one without saying so)."""
+        y = units.convert(x, a, b)
+        print(f"EDGE convert({x!r}, {a!r}, {b!r}) = {y!r}")
+        if math.isfinite(x):
+>           assert math.isfinite(y), f"a finite {x} {a} becomes {y} {b} with no refusal"
+E           AssertionError: a finite 1e+308 kg becomes inf mg with no refusal
+E           assert False
+E            +  where False = <built-in function isfinite>(inf)
+E            +    where <built-in function isfinite> = math.isfinite
+
+/home/user/openFermentUI/bughunt/notes/H3/scripts/units_props.py:79: AssertionError
+_______________________ test_edges_report[kg-mg--1e+308] _______________________
+
+x = -1e+308, a = 'kg', b = 'mg'
+
+    @pytest.mark.parametrize("x", [0.0, -0.0, -5.0, 1e308, -1e308, 5e-324, float("nan"), float("inf"), float("-inf")])
+    @pytest.mark.parametrize("a,b", [("kg", "mg"), ("µg", "kg"), ("K", "°C"), ("°F", "K"), ("t d⁻¹", "g h⁻¹")])
+    def test_edges_report(x, a, b):
+        """Records what convert answers at the edges (no assertion beyond: it never answers a finite
+        number for a non-finite input, and never a non-finite number for a finite one without saying so)."""
+        y = units.convert(x, a, b)
+        print(f"EDGE convert({x!r}, {a!r}, {b!r}) = {y!r}")
+        if math.isfinite(x):
+>           assert math.isfinite(y), f"a finite {x} {a} becomes {y} {b} with no refusal"
+E           AssertionError: a finite -1e+308 kg becomes -inf mg with no refusal
+E           assert False
+E            +  where False = <built-in function isfinite>(-inf)
+E            +    where <built-in function isfinite> = math.isfinite
+
+/home/user/openFermentUI/bughunt/notes/H3/scripts/units_props.py:79: AssertionError
+____________ test_edges_report[t d\u207b\xb9-g h\u207b\xb9-1e+308] _____________
+
+x = 1e+308, a = 't d⁻¹', b = 'g h⁻¹'
+
+    @pytest.mark.parametrize("x", [0.0, -0.0, -5.0, 1e308, -1e308, 5e-324, float("nan"), float("inf"), float("-inf")])
+    @pytest.mark.parametrize("a,b", [("kg", "mg"), ("µg", "kg"), ("K", "°C"), ("°F", "K"), ("t d⁻¹", "g h⁻¹")])
+    def test_edges_report(x, a, b):
+        """Records what convert answers at the edges (no assertion beyond: it never answers a finite
+        number for a non-finite input, and never a non-finite number for a finite one without saying so)."""
+        y = units.convert(x, a, b)
+        print(f"EDGE convert({x!r}, {a!r}, {b!r}) = {y!r}")
+        if math.isfinite(x):
+>           assert math.isfinite(y), f"a finite {x} {a} becomes {y} {b} with no refusal"
+E           AssertionError: a finite 1e+308 t d⁻¹ becomes inf g h⁻¹ with no refusal
+E           assert False
+E            +  where False = <built-in function isfinite>(inf)
+E            +    where <built-in function isfinite> = math.isfinite
+
+/home/user/openFermentUI/bughunt/notes/H3/scripts/units_props.py:79: AssertionError
+____________ test_edges_report[t d\u207b\xb9-g h\u207b\xb9--1e+308] ____________
+
+x = -1e+308, a = 't d⁻¹', b = 'g h⁻¹'
+
+    @pytest.mark.parametrize("x", [0.0, -0.0, -5.0, 1e308, -1e308, 5e-324, float("nan"), float("inf"), float("-inf")])
+    @pytest.mark.parametrize("a,b", [("kg", "mg"), ("µg", "kg"), ("K", "°C"), ("°F", "K"), ("t d⁻¹", "g h⁻¹")])
+    def test_edges_report(x, a, b):
+        """Records what convert answers at the edges (no assertion beyond: it never answers a finite
+        number for a non-finite input, and never a non-finite number for a finite one without saying so)."""
+        y = units.convert(x, a, b)
+        print(f"EDGE convert({x!r}, {a!r}, {b!r}) = {y!r}")
+        if math.isfinite(x):
+>           assert math.isfinite(y), f"a finite {x} {a} becomes {y} {b} with no refusal"
+E           AssertionError: a finite -1e+308 t d⁻¹ becomes -inf g h⁻¹ with no refusal
+E           assert False
+E            +  where False = <built-in function isfinite>(-inf)
+E            +    where <built-in function isfinite> = math.isfinite
+
+/home/user/openFermentUI/bughunt/notes/H3/scripts/units_props.py:79: AssertionError
+=========================== short test summary info ============================
+FAILED ../..::test_self_is_identity_exactly - AssertionError: ('mg dL⁻¹', 201...
+FAILED ../..::test_edges_report[kg-mg-1e+308] - AssertionError: a finite 1e+3...
+FAILED ../..::test_edges_report[kg-mg--1e+308] - AssertionError: a finite -1e...
+FAILED ../..::test_edges_report[t d\u207b\xb9-g h\u207b\xb9-1e+308] - Asserti...
+FAILED ../..::test_edges_report[t d\u207b\xb9-g h\u207b\xb9--1e+308] - Assert...
+5 failed, 45 passed in 0.50s

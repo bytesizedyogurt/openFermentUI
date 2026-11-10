@@ -1,0 +1,24 @@
+gamma paste: ingested c15f02b674bf493aa4a1a8f2ebedce66 restricted
+gamma private: ingested 0a362fec5abd4036bcba492b70ef7175
+delta paste of other text (unit case changed, upper-cased): linked c15f02b674bf493aa4a1a8f2ebedce66 outcome licenceClass: open_commercial title: Delta's title
+
+== gamma: 2 documents
+   0a362fec5abd4036bcba492b70ef7175 | title: Gamma private | class: unknown | source: project:gamma:paste | sourceRef: paste:Gamma private | linkedBy: gamma-person | selection licence: None
+   c15f02b674bf493aa4a1a8f2ebedce66 | title: Gamma's own title for the stover note | class: restricted | source: project:gamma:paste | sourceRef: paste:Gamma's own title for the stover note | linkedBy: gamma-person | selection licence: {'href': None, 'text': "Gamma's licence words: internal use alone"}
+   overlay 0a362fec5abd4036bcba492b70ef7175 | license: None | licenceClass: unknown | text: ['Gamma keeps this alone: the H8 private passage about xylanase loading in gamma.']
+   overlay c15f02b674bf493aa4a1a8f2ebedce66 | license: Gamma's licence words: internal use alone | licenceClass: restricted | text: ['The biorefinery processes 2000 Mg of dry corn stover per day, and the saccharification ste']
+   search 'corn stover saccharification glucose': [('c15f02b674bf493aa4a1a8f2ebedce66', 'restricted', 'The biorefinery processes 2000 Mg of dry corn stov'), ('0a362fec5abd4036bcba492b70ef7175', 'unknown', 'Gamma keeps this alone: the H8 private passage abo')] degraded: []
+   search 'xylanase loading private passage': [('0a362fec5abd4036bcba492b70ef7175', 'unknown', 'Gamma keeps this alone: the H8 private passage abo'), ('c15f02b674bf493aa4a1a8f2ebedce66', 'restricted', 'The biorefinery processes 2000 Mg of dry corn stov')] degraded: []
+   stats: {"documents": 2, "chunks": 2, "citations": 0, "entities": 0, "relationships": 0, "communities": 0, "license_classes": {"restricted": 1, "unknown": 1}, "sources": {"project:gamma:paste": 2}, "embedding_versions": {"fastembed:BAAI/bge-small-en-v1.5@384": 2}}
+
+== delta: 1 documents
+   c15f02b674bf493aa4a1a8f2ebedce66 | title: Gamma's own title for the stover note | class: restricted | source: project:gamma:paste | sourceRef: paste:Gamma's own title for the stover note | linkedBy: delta-person | selection licence: None
+   overlay c15f02b674bf493aa4a1a8f2ebedce66 | license: Gamma's licence words: internal use alone | licenceClass: restricted | text: ['The biorefinery processes 2000 Mg of dry corn stover per day, and the saccharification ste']
+   search 'corn stover saccharification glucose': [('c15f02b674bf493aa4a1a8f2ebedce66', 'restricted', 'The biorefinery processes 2000 Mg of dry corn stov')] degraded: []
+   search 'xylanase loading private passage': [('c15f02b674bf493aa4a1a8f2ebedce66', 'restricted', 'The biorefinery processes 2000 Mg of dry corn stov')] degraded: []
+   stats: {"documents": 1, "chunks": 1, "citations": 0, "entities": 0, "relationships": 0, "communities": 0, "license_classes": {"restricted": 1}, "sources": {"project:gamma:paste": 1}, "embedding_versions": {"fastembed:BAAI/bge-small-en-v1.5@384": 1}}
+
+== nothing: 0 documents
+   search 'corn stover saccharification glucose': [] degraded: []
+   search 'xylanase loading private passage': [] degraded: []
+   stats: {"documents": 0, "chunks": 0, "citations": 0, "entities": 0, "relationships": 0, "communities": 0, "license_classes": {}, "sources": {}, "embedding_versions": {}}

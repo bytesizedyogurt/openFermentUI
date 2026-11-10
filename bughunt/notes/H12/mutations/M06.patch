@@ -1,0 +1,11 @@
+--- a/core/openferment_core/basis.py
++++ b/core/openferment_core/basis.py
+@@ -215,7 +215,7 @@
+     model, and the day stamped in its note."""
+     stamped = _STAMPED.match(source.note or "")
+     kind = "measurement" if is_measurement(source) else _ORIGIN_KINDS[source.kind]
+-    return Origin(kind=kind, ref=source.id, by=source.by, at=stamped.group(1) if stamped else None,
++    return Origin(kind=kind, ref=source.id, by=source.by, at=None,
+                   note=source.note)
+ 
+ 

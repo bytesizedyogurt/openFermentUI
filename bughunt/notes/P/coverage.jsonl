@@ -1,0 +1,113 @@
+{"kind": "file", "item": "core/tests/test_agent_interface.py", "method": "executed", "findings": [], "note": "row 1: 13 passed"}
+{"kind": "file", "item": "core/openferment_core/audit.py", "method": "read", "findings": [], "note": "row 1: audit filters and ids"}
+{"kind": "file", "item": "core/openferment_core/api.py", "method": "read", "findings": ["P-01"], "note": "rows 1, 2, 4, 10, 26: audit route, key middleware, /rag mount, proforma scenarios, state routes"}
+{"kind": "file", "item": "core/openferment_core/module_stores.py", "method": "read", "findings": [], "note": "rows 1, 9: RECORD, PARTIAL, DETAIL"}
+{"kind": "file", "item": "core/openferment_core/llm.py", "method": "executed", "findings": ["P-01"], "note": "row 2: request_key, _default_client before the route's provider; local route needs an Anthropic key"}
+{"kind": "file", "item": "core/tests/test_llm.py", "method": "read", "findings": ["P-01"], "note": "row 2: the local-model test passes client_factory and so never reaches _default_client"}
+{"kind": "file", "item": "core/openferment_core/literature_live.py", "method": "executed", "findings": [], "note": "row 3: graph --dry-run and report --project, offline lanes 0 calls"}
+{"kind": "file", "item": "core/openferment_core/literature/report.py", "method": "read", "findings": [], "note": "row 3: PROJECT_CONFIGS"}
+{"kind": "file", "item": "core/openferment_core/literature/graph.py", "method": "executed", "findings": [], "note": "row 4: entities and relationships under the project's documents"}
+{"kind": "file", "item": "core/openferment_core/literature_mcp.py", "method": "executed", "findings": [], "note": "row 4: sci-rag server over stdio in two projects"}
+{"kind": "file", "item": "core/openferment_core/literature/kit.py", "method": "read", "findings": [], "note": "rows 2, 4: kit key refusal, /rag routes"}
+{"kind": "file", "item": "core/tests/test_literature_report.py", "method": "executed", "findings": [], "note": "row 3"}
+{"kind": "file", "item": "core/tests/test_literature_graph.py", "method": "executed", "findings": [], "note": "row 4"}
+{"kind": "file", "item": "core/openferment_core/catalogues.py", "method": "executed", "findings": [], "note": "row 5 through the API"}
+{"kind": "file", "item": "core/openferment_core/protocols.py", "method": "executed", "findings": [], "note": "rows 5, 7 through the API and the screen"}
+{"kind": "file", "item": "core/tests/test_catalogues.py", "method": "executed", "findings": [], "note": "row 5"}
+{"kind": "file", "item": "core/tests/test_protocols.py", "method": "executed", "findings": [], "note": "rows 5, 7"}
+{"kind": "file", "item": "core/tests/test_competence.py", "method": "executed", "findings": [], "note": "row 6"}
+{"kind": "file", "item": "scripts/export-competence-fixtures.ts", "method": "executed", "findings": [], "note": "row 6: exported into scratch; both fixtures byte for byte"}
+{"kind": "file", "item": "scripts/check-guild.ts", "method": "executed", "findings": [], "note": "row 6: green"}
+{"kind": "file", "item": "scripts/check-state.ts", "method": "executed", "findings": [], "note": "rows 13, 14, 15, 21, 22, 25: green, 0 failures"}
+{"kind": "file", "item": "src/engine/competence.ts", "method": "read", "findings": [], "note": "row 6"}
+{"kind": "file", "item": "core/openferment_core/project_state.py", "method": "executed", "findings": [], "note": "rows 9, 26: put/remove, deposition append-only"}
+{"kind": "file", "item": "core/tests/test_project_state.py", "method": "executed", "findings": [], "note": "row 26"}
+{"kind": "file", "item": "core/tests/test_route_models.py", "method": "executed", "findings": [], "note": "row 26"}
+{"kind": "file", "item": "core/tests/test_module_tools.py", "method": "executed", "findings": [], "note": "row 9"}
+{"kind": "file", "item": "core/tests/test_tools.py", "method": "executed", "findings": [], "note": "row 8: stream tests"}
+{"kind": "file", "item": "core/openferment_core/proforma.py", "method": "executed", "findings": [], "note": "rows 10, 23, 25, 28: scenarios, retired entries, bind"}
+{"kind": "file", "item": "core/openferment_core/measurements.py", "method": "executed", "findings": [], "note": "rows 18, 25: reading lookup at the kinetics and Proforma doors"}
+{"kind": "file", "item": "core/tests/test_measurements.py", "method": "executed", "findings": [], "note": "rows 9, 25"}
+{"kind": "file", "item": "core/openferment_core/pureos/engine.py", "method": "executed", "findings": [], "note": "row 19: rests_on; dropped depositions with a plugin and the completeness test failed"}
+{"kind": "file", "item": "core/tests/test_engines.py", "method": "fuzzed", "findings": [], "note": "row 19: run with rests_on mutated; it caught the change"}
+{"kind": "file", "item": "core/tests/test_workers.py", "method": "executed", "findings": [], "note": "rows 23, 24"}
+{"kind": "file", "item": "core/tests/test_proforma.py", "method": "executed", "findings": [], "note": "rows 23, 24"}
+{"kind": "file", "item": "core/openferment_core/biorepo.py", "method": "executed", "findings": ["P-02"], "note": "rows 17, 36: records versions, undo, provenance_of follows a gold label"}
+{"kind": "file", "item": "core/openferment_core/evidence_pool.py", "method": "executed", "findings": ["P-02"], "note": "row 37: biorepo_read and search_records apply standing decisions"}
+{"kind": "file", "item": "core/openferment_core/import_alpha1.py", "method": "read", "findings": ["P-02"], "note": "row 36: computes provenance with the same provenance_of"}
+{"kind": "file", "item": "core/tests/test_biorepo.py", "method": "read", "findings": ["P-02"], "note": "row 36: gold label with no value used as gold on purpose"}
+{"kind": "file", "item": "src/store.ts", "method": "executed", "findings": ["P-02"], "note": "rows 13-15, 36: provenanceOf run under tsx; timeId"}
+{"kind": "file", "item": "src/lib/review.ts", "method": "read", "findings": ["P-03"], "note": "row 31: paperHeld; the comment on a paper with no identifier"}
+{"kind": "file", "item": "src/lib/intake.ts", "method": "read", "findings": [], "note": "row 36: overlay load"}
+{"kind": "file", "item": "src/data/nav.ts", "method": "read", "findings": [], "note": "row 29: DESTINATIONS"}
+{"kind": "file", "item": "scripts/walk.ts", "method": "read", "findings": [], "note": "row 33"}
+{"kind": "file", "item": "scripts/smoke.ts", "method": "read", "findings": [], "note": "row 33: not run, it picks its own port and database name"}
+{"kind": "file", "item": "src/api/types.gen.ts", "method": "executed", "findings": [], "note": "row 12: gen:api --check, tsc --noEmit exit 0"}
+{"kind": "file", "item": "docs/api/openapi.json", "method": "executed", "findings": [], "note": "row 12: gen:api --check"}
+{"kind": "file", "item": "docs/TOOLS.md", "method": "executed", "findings": [], "note": "row 1: gen:tools --check"}
+{"kind": "file", "item": "core/openferment_core/mcp_server.py", "method": "executed", "findings": [], "note": "row 34: connects in 2.3 s over stdio"}
+{"kind": "file", "item": "core/openferment_core/fermos_engine.py", "method": "executed", "findings": [], "note": "rows 18, 21: kinetics run with a measured input, configuration titles"}
+{"kind": "file", "item": "core/openferment_core/engine/library.py", "method": "executed", "findings": [], "note": "rows 20, 30: a cornstover run"}
+{"kind": "file", "item": "core/openferment_core/pureos/train_spec.py", "method": "read", "findings": [], "note": "row 24"}
+{"kind": "file", "item": "core/openferment_core/workers/proforma_worker.py", "method": "read", "findings": [], "note": "row 24: grid and montecarlo pass structure"}
+{"kind": "operation", "item": "GET /api/audit", "method": "fuzzed", "findings": [], "note": "row 1: action, target, who, limit 0/-1, project scope"}
+{"kind": "operation", "item": "POST /api/tools/{name}", "method": "executed", "findings": [], "note": "rows 1, 5, 9, 17, 30"}
+{"kind": "operation", "item": "GET /api/tools", "method": "executed", "findings": []}
+{"kind": "operation", "item": "POST /api/ask", "method": "executed", "findings": [], "note": "row 2: on a named key through a local stub"}
+{"kind": "operation", "item": "POST /api/ask/stream", "method": "executed", "findings": [], "note": "row 2"}
+{"kind": "operation", "item": "GET /api/events", "method": "executed", "findings": [], "note": "row 2: no key in the stream"}
+{"kind": "operation", "item": "POST /api/projects", "method": "executed", "findings": []}
+{"kind": "operation", "item": "POST /api/catalogues/{kind}", "method": "executed", "findings": [], "note": "row 5"}
+{"kind": "operation", "item": "GET /api/catalogues/{kind}", "method": "executed", "findings": [], "note": "row 5: per project"}
+{"kind": "operation", "item": "GET /api/catalogues/{kind}/{entry_id}", "method": "executed", "findings": [], "note": "row 5"}
+{"kind": "operation", "item": "POST /api/intake/catalogue", "method": "executed", "findings": [], "note": "row 5"}
+{"kind": "operation", "item": "GET /api/protocols", "method": "executed", "findings": [], "note": "rows 5, 7"}
+{"kind": "operation", "item": "POST /api/protocols", "method": "executed", "findings": [], "note": "row 5: a skill another project keeps refused"}
+{"kind": "operation", "item": "GET /api/protocols/{protocol_id}", "method": "executed", "findings": [], "note": "row 7"}
+{"kind": "operation", "item": "POST /api/protocols/{protocol_id}/versions", "method": "browser", "findings": [], "note": "row 7: through the editor"}
+{"kind": "operation", "item": "GET /api/state", "method": "executed", "findings": [], "note": "row 26"}
+{"kind": "operation", "item": "PUT /api/state/{kind}/{item_id}", "method": "fuzzed", "findings": [], "note": "rows 9, 10, 26: runbook, deposition append-only, scenarios"}
+{"kind": "operation", "item": "DELETE /api/state/{kind}/{item_id}", "method": "executed", "findings": [], "note": "row 26"}
+{"kind": "operation", "item": "GET /api/depositions/readings", "method": "executed", "findings": [], "note": "rows 9, 25"}
+{"kind": "operation", "item": "POST /api/biorepo/decisions", "method": "fuzzed", "findings": ["P-02"], "note": "rows 17, 36: labels gold, assumed, unverified; undo"}
+{"kind": "operation", "item": "POST /api/biorepo/check", "method": "executed", "findings": ["P-02"], "note": "row 36"}
+{"kind": "operation", "item": "GET /api/biorepo/overlay", "method": "executed", "findings": ["P-02"], "note": "row 36"}
+{"kind": "operation", "item": "GET /api/proforma/scenarios", "method": "executed", "findings": [], "note": "row 10: broken composite listed with words"}
+{"kind": "operation", "item": "GET /api/proforma/bind", "method": "fuzzed", "findings": [], "note": "row 25: reading in its unit, another unit, another project"}
+{"kind": "operation", "item": "GET /api/proforma/ceiling-check", "method": "executed", "findings": [], "note": "rows 18, 25"}
+{"kind": "operation", "item": "GET /api/proforma/shelf", "method": "executed", "findings": [], "note": "row 23"}
+{"kind": "operation", "item": "GET /api/engines", "method": "executed", "findings": [], "note": "row 21: configurationTitles per project"}
+{"kind": "operation", "item": "GET /api/engines/{name}/parameters", "method": "executed", "findings": [], "note": "row 18"}
+{"kind": "operation", "item": "POST /api/engines/{name}/run", "method": "executed", "findings": [], "note": "rows 18, 20: kinetics with a measured input; biosteam cornstover"}
+{"kind": "operation", "item": "GET /api/runs/{run_id}", "method": "executed", "findings": [], "note": "row 18: engine kinetics, origins kept, pb 404"}
+{"kind": "operation", "item": "GET /api/pureos/train/{key}", "method": "executed", "findings": [], "note": "row 20: a library run read as a train; pb 404"}
+{"kind": "operation", "item": "POST /api/intake/upload", "method": "executed", "findings": [], "note": "row 3: the kit's demo corpus"}
+{"kind": "operation", "item": "POST /api/intake/{paper_id}/extract", "method": "executed", "findings": [], "note": "row 3: fixture extraction"}
+{"kind": "tool", "item": "catalogue_write", "method": "executed", "findings": [], "note": "row 1"}
+{"kind": "tool", "item": "catalogue_read", "method": "executed", "findings": [], "note": "row 5"}
+{"kind": "tool", "item": "runbooks_read", "method": "executed", "findings": [], "note": "row 9"}
+{"kind": "tool", "item": "biorepo_read", "method": "executed", "findings": ["P-02"], "note": "rows 1, 37"}
+{"kind": "tool", "item": "search_records", "method": "executed", "findings": [], "note": "rows 1, 37"}
+{"kind": "tool", "item": "selling_price", "method": "executed", "findings": [], "note": "row 30"}
+{"kind": "tool", "item": "stream_table", "method": "executed", "findings": [], "note": "row 8"}
+{"kind": "tool", "item": "search_entities", "method": "executed", "findings": [], "note": "row 4: sci-rag server"}
+{"kind": "tool", "item": "get_entity_relationships", "method": "executed", "findings": [], "note": "row 4: sci-rag server"}
+{"kind": "rail", "item": "Catalogues", "method": "browser", "findings": [], "note": "row 5"}
+{"kind": "rail", "item": "Postdoc", "method": "browser", "findings": [], "note": "row 32"}
+{"kind": "rail", "item": "Intake", "method": "browser", "findings": ["P-02"], "note": "row 36"}
+{"kind": "screen", "item": "src/screens/Catalogues.tsx", "method": "browser", "findings": [], "note": "row 5"}
+{"kind": "screen", "item": "src/screens/GeneOS.tsx", "method": "browser", "findings": [], "note": "row 5: Hosts names catalogue strains per project"}
+{"kind": "screen", "item": "src/screens/Protocols.tsx", "method": "browser", "findings": [], "note": "row 7"}
+{"kind": "screen", "item": "src/screens/ProtocolEditor.tsx", "method": "browser", "findings": [], "note": "rows 5, 7"}
+{"kind": "screen", "item": "src/screens/Settings.tsx", "method": "browser", "findings": [], "note": "the name"}
+{"kind": "screen", "item": "src/screens/GuildSkills.tsx", "method": "browser", "findings": [], "note": "row 6"}
+{"kind": "screen", "item": "src/screens/Guild.tsx", "method": "read", "findings": ["P-03"], "note": "row 31: the review strip's words"}
+{"kind": "screen", "item": "src/screens/Postdoc.tsx", "method": "browser", "findings": [], "note": "row 32"}
+{"kind": "screen", "item": "src/screens/RunbookDetail.tsx", "method": "browser", "findings": [], "note": "row 13"}
+{"kind": "screen", "item": "src/screens/PureOSTrain.tsx", "method": "browser", "findings": [], "note": "row 20"}
+{"kind": "screen", "item": "src/screens/ProformaRun.tsx", "method": "browser", "findings": [], "note": "row 21"}
+{"kind": "screen", "item": "src/screens/ProformaStudies.tsx", "method": "browser", "findings": [], "note": "row 21"}
+{"kind": "screen", "item": "src/screens/Intake.tsx", "method": "browser", "findings": ["P-02"], "note": "row 36: Verified and 0 in the gold set for a record the service keeps gold"}
+{"kind": "engine", "item": "kinetics", "method": "executed", "findings": [], "note": "rows 18, 21"}
+{"kind": "engine", "item": "biosteam", "method": "executed", "findings": [], "note": "rows 20, 30"}
+{"kind": "engine", "item": "train", "method": "executed", "findings": [], "note": "row 19: rests_on and its test"}

@@ -1,0 +1,14 @@
+NOTICE:  database "bh_r_h14_02_alias" does not exist, skipping
+step 1: pasted document c98a620849084cb3b697b769f48cf843
+step 2: strain kept: ethanol-red aliases ['Ethanol Red', 'Saccharomyces cerevisiae Ethanol Red']
+step 3: section p0
+step 4: candidate through the tool door:  {"state": "proposed", "ref": "biorepo/candidate/mw1-c98a620849084cb3b697b769f48cf843-0000", "candidateId": "mw1-c98a620849084cb3b697b769f48cf843-0000", "field": "ethanol_titre", "provenance": "unverif
+step 5: the candidate as GET /api/biorepo/overlay serves it: {"organism": "Saccharomyces cerevisiae Ethanol Red", "organismText": null, "strainId": null}
+step 6: GET /api/catalogues/strain ids: ['ethanol-red']
+step 7: catalogues.as_strain_aliases(): {'ethanol red': 'ethanol-red', 'saccharomyces cerevisiae ethanol red': 'ethanol-red'}
+step 7: validate.vocabulary()['strains'] (what anchoring reads): {}
+step 7: validate.strain_id('Saccharomyces cerevisiae Ethanol Red') -> None
+step 7: control, validate.match_whole_word('Saccharomyces cerevisiae Ethanol Red', catalogue aliases) -> ethanol-red
+EXPECTED: the candidate's strainId is ethanol-red (organism resolved through the kept alias "Saccharomyces cerevisiae Ethanol Red"), so the strain page and Hosts counts name it
+OBSERVED: strainId=None organism="Saccharomyces cerevisiae Ethanol Red"; the anchoring vocabulary's strains: {}
+RESULT: DEFECT

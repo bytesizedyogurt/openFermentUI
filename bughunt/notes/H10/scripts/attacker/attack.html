@@ -1,0 +1,65 @@
+<!doctype html>
+<meta charset="utf-8">
+<title>another site</title>
+<body>
+<!-- A page on another origin (127.0.0.1:8901) that tries to change the service at SVC through the
+     owner's browser, by every door a page has without a preflight, and to read what it answers. -->
+<iframe name="sink" style="display:none"></iframe>
+<form id="f1" target="sink" method="POST" enctype="text/plain">
+  <input type="hidden" id="f1i">
+</form>
+<script>
+const SVC = new URLSearchParams(location.search).get('svc');
+const results = {};
+window.results = results;
+const body = (id) => JSON.stringify({ id, name: 'from another site', by: 'attacker' });
+async function run() {
+  // A1: a no-cors fetch with a simple content type: no preflight.
+  try {
+    await fetch(SVC + '/api/projects', { method: 'POST', mode: 'no-cors', headers: { 'Content-Type': 'text/plain' }, body: body('pwn-fetch') });
+    results.a1 = 'sent';
+  } catch (e) { results.a1 = 'error ' + e; }
+  // A2: a form POST, enctype text/plain, its body made to read as JSON.
+  const f = document.getElementById('f1');
+  f.action = SVC + '/api/projects';
+  const i = document.getElementById('f1i');
+  i.name = '{"id":"pwn-form","name":"from another site","by":"attacker","pad":"';
+  i.value = '"}';
+  f.submit();
+  results.a2 = 'submitted';
+  // A3: sendBeacon.
+  results.a3 = navigator.sendBeacon(SVC + '/api/projects', new Blob([body('pwn-beacon')], { type: 'text/plain' }));
+  // A4: a JSON fetch: needs a preflight.
+  try {
+    const r = await fetch(SVC + '/api/projects', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: body('pwn-json') });
+    results.a4 = 'answered ' + r.status;
+  } catch (e) { results.a4 = 'blocked ' + e.name; }
+  // A5: a PUT to the project's state with the project header: needs a preflight.
+  try {
+    const r = await fetch(SVC + '/api/state/scenario/pwn?project=p1', { method: 'PUT', headers: { 'Content-Type': 'text/plain' }, body: '{}' });
+    results.a5 = 'answered ' + r.status;
+  } catch (e) { results.a5 = 'blocked ' + e.name; }
+  // A6: read Guild's people with ?project= (no custom header, so no preflight): can the page read the answer?
+  try {
+    const r = await fetch(SVC + '/api/guild?project=p1');
+    results.a6 = 'read ' + r.status + ' ' + (await r.text()).slice(0, 200);
+  } catch (e) { results.a6 = 'blocked ' + e.name; }
+  // A7: a no-cors POST to the tool door (writes through a tool) with ?project=.
+  try {
+    await fetch(SVC + '/api/tools/keep_catalogue_entry?project=p1', { method: 'POST', mode: 'no-cors', headers: { 'Content-Type': 'text/plain' }, body: '{}' });
+    results.a7 = 'sent';
+  } catch (e) { results.a7 = 'error ' + e; }
+  // A8: a no-cors DELETE is not a simple method: the browser refuses it outright.
+  try {
+    await fetch(SVC + '/api/state/scenario/x?project=p1', { method: 'DELETE', mode: 'no-cors' });
+    results.a8 = 'sent';
+  } catch (e) { results.a8 = 'error ' + e.name; }
+  // A9: the kit's REST under /rag, a no-cors POST.
+  try {
+    await fetch(SVC + '/rag/v1/query?project=p1', { method: 'POST', mode: 'no-cors', headers: { 'Content-Type': 'text/plain' }, body: '{"query":"x"}' });
+    results.a9 = 'sent';
+  } catch (e) { results.a9 = 'error ' + e; }
+  results.done = true;
+}
+run();
+</script>

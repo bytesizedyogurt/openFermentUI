@@ -15,6 +15,8 @@ import { writeFileSync } from 'node:fs';
 const [origin, project, runbook, db, port, scenario, out] = process.argv.slice(2);
 const ENV = '/home/user/openFermentUI/bughunt/lib/env.sh';
 const sh = (cmd) => execFileSync('bash', ['-c', `source ${ENV}; ${cmd}`], { encoding: 'utf8', timeout: 300000 }).trim();
+// Starting the service: its background process keeps no pipe of ours open.
+const start = (cmd) => execFileSync('bash', ['-c', `source ${ENV}; ${cmd}`], { stdio: 'ignore', timeout: 300000 });
 const report = { scenario, steps: [] };
 const note = (what, data) => {
   report.steps.push({ what, ...(data === undefined ? {} : { data }) });
@@ -120,7 +122,7 @@ try {
     note('the snapshot outbox in IndexedDB', await snapshotOutbox(page));
     await page.waitForTimeout(16000);
     note('the outbox after a 16 s retry with the service still stopped', await snapshotOutbox(page));
-    sh(`BH_KEEP_DB=1 bh_svc_start ${db} ${port} >/dev/null`);
+    start(`BH_KEEP_DB=1 bh_svc_start ${db} ${port}`);
     note('service started again', true);
     const held = await waitFor(() => depositionHeld(dep).then((d) => (d && d.entries.length >= 3 ? d : null)), 40000);
     note('what the service holds of the deposition within 40 s of starting, with no reload', held ?? (await depositionHeld(dep)));
@@ -187,6 +189,37 @@ try {
     await page.waitForTimeout(20000);
     note('what the service holds of tab A\'s deposition after the refusals lifted and a reload', await depositionHeld(depA));
     note('what the service holds of tab B\'s deposition', await depositionHeld(depB));
+  }
+  if (scenario === 'sameonline') {
+    const dep = await beginDeposition(page);
+    note('tab A: deposition begun and running', dep);
+    const pageB = await context.newPage();
+    watch(pageB, 'B');
+    const puts = [];
+    pageB.on('response', async (r) => {
+      if (r.request().method() === 'PUT' && r.url().includes('/api/state/')) puts.push(`${r.status()} ${(await r.text().catch(() => '')).slice(0, 300)}`);
+    });
+    report.putsB = puts;
+    await at(pageB, `/runbooks/depositions/${encodeURIComponent(dep)}/bench`);
+    await pageB.locator('[data-testid="deposition-bench"][data-state="running"]').waitFor({ timeout: 30000 });
+    note('tab B: the same deposition open at its bench', dep);
+    await page.bringToFront();
+    await record(page, 'tab A came in at 7.7 USD/kg');
+    note('the service after tab A wrote', await waitFor(() => depositionHeld(dep).then((d) => (d?.entries.length ? d : null)), 10000));
+    await pageB.bringToFront();
+    await record(pageB, 'tab B came in at 8.8 USD/kg');
+    await pageB.waitForTimeout(600);
+    note('tab B right after its write: the measures and any alert', {
+      measures: (await pageB.locator('[data-testid="deposition-bench-measures"]').innerText().catch(() => '')).replace(/\s+/g, ' '),
+      toasts: await pageB.locator('[aria-live="polite"]').allInnerTexts().catch(() => []),
+    });
+    await pageB.waitForTimeout(2400);
+    note('the service after tab B wrote', await depositionHeld(dep));
+    note('tab B shows', (await pageB.locator('[data-testid="deposition-bench"] header').innerText()).replace(/\s+/g, ' '));
+    note('tab B toasts and words', { said: await said(pageB), toasts: await pageB.locator('[aria-live="polite"]').allInnerTexts().catch(() => []), puts });
+    await pageB.reload({ waitUntil: 'load' });
+    await pageB.waitForTimeout(4000);
+    note('tab B after a reload shows', (await pageB.locator('[data-testid="deposition-bench"] header').innerText().catch(() => '')).replace(/\s+/g, ' '));
   }
 } catch (e) {
   note('stopped', String(e).slice(0, 400));

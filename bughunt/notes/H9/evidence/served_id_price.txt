@@ -1,0 +1,2 @@
+{"askedOn": "claude-opus-5-5", "servedAs": "claude-opus-5-5", "resultCostUsd": 0.8, "chargedToTheDayUsd": 0.8, "sameTokensAtOpusPrice": 0.8}
+{"askedOn": "claude-opus-5-5", "servedAs": "claude-opus-5-5-20261101", "resultCostUsd": 0.0, "chargedToTheDayUsd": 0.0, "sameTokensAtOpusPrice": 0.8}

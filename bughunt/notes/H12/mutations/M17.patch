@@ -1,0 +1,11 @@
+--- a/core/openferment_core/api.py
++++ b/core/openferment_core/api.py
+@@ -396,7 +396,7 @@
+         known = await db.arun(projects.held(named))
+     except Exception as e:  # the database is down or unset: say so, never 500
+         return JSONResponse(status_code=503, content={"detail": _database_down(e)})
+-    if not known:
++    if False:
+         return JSONResponse(status_code=404, content={"detail": f"no project named {named!r}"})
+     with projects.using(named):
+         return await call_next(request)

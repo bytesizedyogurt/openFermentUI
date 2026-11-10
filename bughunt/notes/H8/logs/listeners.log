@@ -1,0 +1,9 @@
+22:05:29 listening on 127.0.0.1:8882
+22:05:29 could not bind ::1:8882: [Errno 97] Address family not supported by protocol
+22:05:29 listening on 127.0.0.1:8883
+22:05:29 could not bind ::1:8883: [Errno 97] Address family not supported by protocol
+22:05:29 listening on 127.0.0.1:8884
+22:05:29 could not bind ::1:8884: [Errno 97] Address family not supported by protocol
+22:05:29 listening on 127.0.0.1:8885
+22:05:29 could not bind ::1:8885: [Errno 97] Address family not supported by protocol
+22:05:31 CONNECTION on 127.0.0.1:8882 from ('127.0.0.1', 53166): b'GET /selftest HTTP/1.1\r\nHost: 127.0.0.1:8882\r\nUser-Agent: curl/8.5.0\r\nAccept: */*\r\n\r\n'

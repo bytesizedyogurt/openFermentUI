@@ -1,0 +1,71 @@
+{"kind": "file", "item": "core/openferment_core/fermos.py", "method": "executed", "findings": ["H4-04"], "note": "simulate, bind, fit, forecast, harvest, fits through the routes; productivity counts P0 (suspected)"}
+{"kind": "file", "item": "core/openferment_core/flowsheets/__init__.py", "method": "read", "findings": ["H4-02"], "note": "its parts() contract: price per kg of stream, basis_flow the flow the price is per"}
+{"kind": "file", "item": "core/openferment_core/flowsheets/corn_drygrind.py", "method": "left", "findings": [], "note": "deleted at alpha 2.2 D8; the corn plant runs as the library plant corn, compared with the direct route"}
+{"kind": "file", "item": "core/openferment_core/flowsheets/cornstover_benchmark.py", "method": "left", "findings": [], "note": "deleted at alpha 2.2 D8; the cornstover library plant is compared with the direct route"}
+{"kind": "file", "item": "core/openferment_core/flowsheets/custom_train_v1.py", "method": "executed", "findings": ["H4-02", "H4-07"], "note": "a composite run from a vessel design and a train run"}
+{"kind": "file", "item": "core/openferment_core/flowsheets/ethanol_glucose_v0.py", "method": "executed", "findings": ["H4-07"], "note": "a scenario run through the biosteam engine; cost lines and grid lines summed"}
+{"kind": "file", "item": "core/openferment_core/flowsheets/shelf.py", "method": "read", "findings": []}
+{"kind": "file", "item": "core/openferment_core/flowsheets/toy.py", "method": "read", "findings": []}
+{"kind": "file", "item": "core/openferment_core/flowsheets/train.py", "method": "executed", "findings": [], "note": "a train run; per-unit mass balance closes"}
+{"kind": "file", "item": "core/openferment_core/flowsheets/vessel.py", "method": "executed", "findings": [], "note": "one anaerobic NREL design at a plant scale"}
+{"kind": "file", "item": "core/openferment_core/kinetics.py", "method": "executed", "findings": ["H4-04", "H4-05"], "note": "eight hand-solvable cases plus fed-batch and chemostat extras"}
+{"kind": "file", "item": "core/openferment_core/pureos/__init__.py", "method": "executed", "findings": [], "note": "train_of recovery, cumulative, productLost recomputed from the stream table"}
+{"kind": "file", "item": "core/openferment_core/pureos/build.py", "method": "read", "findings": []}
+{"kind": "file", "item": "core/openferment_core/pureos/catalogue.py", "method": "executed", "findings": [], "note": "catalogue and one type's specs through the routes"}
+{"kind": "file", "item": "core/openferment_core/pureos/from_run.py", "method": "executed", "findings": [], "note": "from a scenario run and from the cornstover run (suspected: the latter cannot run)"}
+{"kind": "file", "item": "core/openferment_core/pureos/inhouse.py", "method": "read", "findings": []}
+{"kind": "file", "item": "core/openferment_core/pureos/kept.py", "method": "read", "findings": []}
+{"kind": "file", "item": "core/openferment_core/pureos/proposer.py", "method": "executed", "findings": [], "note": "propose refused for a host no strain names; rules not exercised"}
+{"kind": "file", "item": "core/openferment_core/pureos/train_spec.py", "method": "executed", "findings": [], "note": "run, check, validate; vessel broth flow read (suspected 1 % gap)"}
+{"kind": "file", "item": "core/openferment_core/thermo.py", "method": "executed", "findings": [], "note": "azeotrope preset, a stream of corn, ethanol_glucose_v0 and cornstover runs, volatility"}
+{"kind": "file", "item": "core/openferment_core/engine/library.py", "method": "executed", "findings": ["H4-03"], "note": "library runs of cornstover, corn, cellulosic, cellulosic_ethanol_v0 against the direct route"}
+{"kind": "file", "item": "core/openferment_core/workers/library_plants.py", "method": "executed", "findings": ["H4-01", "H4-03"]}
+{"kind": "file", "item": "core/openferment_core/workers/proforma_worker.py", "method": "executed", "findings": ["H4-01", "H4-02"], "note": "tea_breakdown, tables, run, grid, montecarlo read; outputs compared"}
+{"kind": "file", "item": "core/openferment_core/proforma.py", "method": "executed", "findings": [], "note": "scenario run, specs, quantiles, fit feeds read"}
+{"kind": "file", "item": "core/openferment_core/fermos_engine.py", "method": "executed", "findings": ["H4-04"], "note": "POST /api/engines/kinetics/run for each hand case"}
+{"kind": "file", "item": "core/openferment_core/vessel.py", "method": "executed", "findings": [], "note": "one design; plant-scale arithmetic checked"}
+{"kind": "file", "item": "core/openferment_core/composite.py", "method": "executed", "findings": ["H4-02"]}
+{"kind": "file", "item": "core/openferment_core/pureos/engine.py", "method": "read", "findings": [], "note": "train runs made through POST /api/pureos/train/run"}
+{"kind": "file", "item": "src/lib/proforma.ts", "method": "browser", "findings": ["H4-01", "H4-02"], "note": "runViewOfRun basePrice, the cost grid"}
+{"kind": "file", "item": "src/components/figures/CostWaterfall.tsx", "method": "browser", "findings": ["H4-01", "H4-02"], "note": "bars, waterfallTotal, priceNote rendered in Chromium"}
+{"kind": "file", "item": "src/screens/ProformaBiosteam.tsx", "method": "browser", "findings": ["H4-01", "H4-02"], "note": "CostBreakdown and the sliders' lines"}
+{"kind": "file", "item": "src/screens/ProformaComparison.tsx", "method": "read", "findings": ["H4-06"], "note": "OUTPUT_WORDS labels"}
+{"kind": "file", "item": "src/components/Dossier.tsx", "method": "read", "findings": [], "note": "same waterfallTotal and priceNote use"}
+{"kind": "operation", "item": "GET /api/fermos/bind", "method": "executed", "findings": []}
+{"kind": "operation", "item": "GET /api/fermos/families", "method": "executed", "findings": []}
+{"kind": "operation", "item": "GET /api/fermos/families/{family_id}", "method": "executed", "findings": []}
+{"kind": "operation", "item": "POST /api/fermos/fit", "method": "executed", "findings": [], "note": "exact logistic and Luedeking-Piret data recovered"}
+{"kind": "operation", "item": "GET /api/fermos/fits", "method": "executed", "findings": []}
+{"kind": "operation", "item": "POST /api/fermos/forecast", "method": "executed", "findings": [], "note": "median final biomass equals the logistic's X(24 h)"}
+{"kind": "operation", "item": "GET /api/fermos/harvest", "method": "executed", "findings": []}
+{"kind": "operation", "item": "POST /api/fermos/simulate", "method": "executed", "findings": ["H4-04", "H4-05"]}
+{"kind": "operation", "item": "GET /api/fermos/simulations", "method": "executed", "findings": []}
+{"kind": "operation", "item": "POST /api/fermos/vessel", "method": "executed", "findings": []}
+{"kind": "operation", "item": "GET /api/fermos/vessel/specs", "method": "executed", "findings": []}
+{"kind": "operation", "item": "GET /api/fermos/vessels", "method": "executed", "findings": []}
+{"kind": "operation", "item": "GET /api/pureos/catalogue", "method": "executed", "findings": []}
+{"kind": "operation", "item": "GET /api/pureos/catalogue/{type_id}/specs", "method": "executed", "findings": []}
+{"kind": "operation", "item": "POST /api/pureos/propose", "method": "executed", "findings": [], "note": "refused: no strain on file; rules not reached"}
+{"kind": "operation", "item": "GET /api/pureos/train-runs", "method": "executed", "findings": []}
+{"kind": "operation", "item": "POST /api/pureos/train/check", "method": "executed", "findings": []}
+{"kind": "operation", "item": "POST /api/pureos/train/from-run", "method": "executed", "findings": []}
+{"kind": "operation", "item": "POST /api/pureos/train/run", "method": "executed", "findings": [], "note": "mass balance of every unit closes"}
+{"kind": "operation", "item": "POST /api/pureos/train/validate", "method": "executed", "findings": []}
+{"kind": "operation", "item": "GET /api/pureos/train/{key}", "method": "executed", "findings": []}
+{"kind": "operation", "item": "GET /api/pureos/trains", "method": "executed", "findings": []}
+{"kind": "operation", "item": "GET /api/pureos/trains-kept", "method": "executed", "findings": []}
+{"kind": "operation", "item": "GET /api/thermo/props", "method": "executed", "findings": []}
+{"kind": "operation", "item": "POST /api/thermo/props", "method": "executed", "findings": []}
+{"kind": "operation", "item": "GET /api/thermo/volatility", "method": "executed", "findings": []}
+{"kind": "operation", "item": "POST /api/thermo/volatility", "method": "executed", "findings": []}
+{"kind": "operation", "item": "POST /api/library/{plant}/run", "method": "executed", "findings": ["H4-01", "H4-03", "H4-06"], "note": "cornstover, corn, cellulosic, cellulosic_ethanol_v0 against the direct route"}
+{"kind": "operation", "item": "GET /api/library/{plant}/parameters", "method": "executed", "findings": []}
+{"kind": "operation", "item": "GET /api/runs/{run_id}", "method": "executed", "findings": []}
+{"kind": "operation", "item": "GET /api/runs", "method": "executed", "findings": []}
+{"kind": "operation", "item": "GET /api/biorepo/artifacts/{artifact_id}/tables", "method": "executed", "findings": []}
+{"kind": "operation", "item": "POST /api/engines/{name}/run", "method": "executed", "findings": ["H4-04"], "note": "biosteam scenario flowsheet and kinetics families"}
+{"kind": "operation", "item": "POST /api/proforma/run", "method": "executed", "findings": ["H4-02"]}
+{"kind": "operation", "item": "GET /api/proforma/bind", "method": "executed", "findings": []}
+{"kind": "engine", "item": "biosteam", "method": "executed", "findings": ["H4-01", "H4-02", "H4-03", "H4-06", "H4-07"]}
+{"kind": "engine", "item": "kinetics", "method": "executed", "findings": ["H4-04", "H4-05"]}
+{"kind": "engine", "item": "train", "method": "executed", "findings": [], "note": "through POST /api/pureos/train/run; the engine's own route not called"}

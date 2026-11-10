@@ -1,0 +1,11 @@
+--- a/core/openferment_core/validate.py
++++ b/core/openferment_core/validate.py
+@@ -208,8 +208,6 @@
+     if m := _DIGIT.search(masked):
+         return m.group(0)
+     if m := _WORD_NUMBER.search(masked):
+-        return m.group(0)
+-    if m := _MAGNITUDE.search(masked):
+         return m.group(0)
+     return None
+ 

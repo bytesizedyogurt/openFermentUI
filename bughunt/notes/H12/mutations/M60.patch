@@ -1,0 +1,11 @@
+--- a/core/openferment_core/project_state.py
++++ b/core/openferment_core/project_state.py
+@@ -316,7 +316,7 @@
+     for old, new in zip(old_entries, new_entries):
+         if old.get("confirmed") is True and new.get("confirmed") is not True:
+             return f"{item_id}: reading {old.get('id')} was read back and confirmed, and a confirmation stays"
+-    if before.get("reconciliation") is not None and before.get("reconciliation") != after.get("reconciliation"):
++    if False:
+         return f"{item_id} was reconciled, and a reconciliation stays as it was made"
+     if was == "closed":
+         if len(new_entries) > len(old_entries) or len(_listed(after, "observations")) > len(_listed(before, "observations")):

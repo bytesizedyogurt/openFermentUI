@@ -1,0 +1,11 @@
+--- a/core/openferment_core/project_state.py
++++ b/core/openferment_core/project_state.py
+@@ -322,7 +322,7 @@
+         if len(new_entries) > len(old_entries) or len(_listed(after, "observations")) > len(_listed(before, "observations")):
+             return (f"{item_id} is closed, and closing stops new readings and observations; a new reading belongs in "
+                     "a new deposition")
+-        if (before.get("sampleTimes") or {}) != (after.get("sampleTimes") or {}):
++        if False:
+             return f"{item_id} is closed, and its readings keep the sample times they had when it closed"
+         if before.get("operatorId") != after.get("operatorId"):
+             return f"{item_id} is closed, and it keeps the operator it closed with"

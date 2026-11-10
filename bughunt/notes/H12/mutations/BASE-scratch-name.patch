@@ -1,0 +1,13 @@
+diff --git a/core/openferment_core/engine/conform.py b/core/openferment_core/engine/conform.py
+index 44a4eb2..50a876a 100644
+--- a/core/openferment_core/engine/conform.py
++++ b/core/openferment_core/engine/conform.py
+@@ -83,7 +83,7 @@ MODEL = "conformance-model"
+ # The name of every database the checks make begins with this, and as much of
+ # the engine's name joins it as a PostgreSQL name of 63 characters holds
+ # beside eight hex digits of its own.
+-SCRATCH = "openferment_conform"
++SCRATCH = "bh_h12_conform"
+ SCRATCH_NAME_MAX = 32
+ # The signals a person or a supervisor ends a command with (a terminal that closes, `kill`, a process manager's
+ # stop): the checks turn each into SystemExit while their own database stands, so it is dropped as they end.

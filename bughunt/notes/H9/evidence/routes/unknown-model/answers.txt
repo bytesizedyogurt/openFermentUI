@@ -1,0 +1,35 @@
+## table: {"plan": {"models": ["claude-nonexistent-9"]}}
+## GET /api/health
+{"ok":true,"service":"openferment-core","model":"claude-nonexistent-9","fallbackModel":"","hasKey":true} [200]
+## POST /api/ask
+{"question":"What does the yeast ferment?","claims":[],"gaps":[],"declined":"There is no price on file for claude-nonexistent-9, so the daily cap cannot hold for a call on it. Add it to PRICES in core/openferment_core/llm.py, or choose a priced model in core/.env.","usage":{"inputTokens":0,"outputTokens":0,"cacheReadTokens":0,"cacheWriteTokens":0,"costUsd":0.0,"models":[]},"rejected":0,"rejectionReasons":[],"evidence":[],"passages":[],"trace":[{"n":1,"kind":"coverage","tool":null,"input":{"modules":["Runbooks · 0","geneOS · 0","fermOS · 0","pureOS · 0","Proforma · 0","BioRepo · 0 · read in part","Guild · 0","Primer · 0","Intake · 0","Home · 0"]},"summary":"Swept the modules for wh
+
+## POST /api/ask/stream
+yet wait in that browser", "error": null}, {"module": "guild", "label": "Guild", "count": 0, "hits": [], "named": false, "partial": null, "error": null}, {"module": "primer", "label": "Primer", "count": 0, "hits": [], "named": false, "partial": null, "error": null}, {"module": "intake", "label": "Intake", "count": 0, "hits": [], "named": false, "partial": null, "error": null}, {"module": "home", "label": "Home", "count": 0, "hits": [], "named": false, "partial": null, "error": null}]}, "rows": [], "runbookDraft": null, "conversationId": "lc-49948df0af52", "turnId": "turn-5cf22340d5ee"}
+
+ [200]
+## POST /api/intake/cc87e3ef7cce4ecba58543f6805251fb/extract
+{"detail":"The Anthropic API refused the request as malformed: Error code: 400 - {'type': 'error', 'error': {'type': 'invalid_request_error', 'message': 'the bughunt stand-in answers no model call'}}"} [503]
+
+## POST /api/literature/answer
+didates": 0}]}
+
+event: compression_done
+data: {"enabled": false, "source_count_before": 1, "source_count_after": 1, "failure_count": 0, "dropped_count": 0, "prompt_tokens_before": 194, "prompt_tokens_after": 194}
+
+event: generation_started
+data: {"model": "claude-opus-5-5"}
+
+event: error
+data: {"code": "generation_failed", "message": "ModelUnavailable: generation failed (see server logs)"}
+
+ [200]
+## GET /api/literature/search deep
+{"query":"xylose","profile":"deep","hits":[{"documentId":"cc87e3ef7cce4ecba58543f6805251fb","passageId":"p0","title":"Notes","text":"Yeast ferments glucose to ethanol. Xylose is not consumed.","sectionPath":null,"citation":"Notes.","licenceClass":"unknown","year":null,"score":0.04098360655737705,"la
+
+## POST /api/tools/intake_write extract (assistant)
+{"summary":{},"evidence":[],"recordIds":[],"passages":[],"error":"intake_write could not extract cc87e3ef7cce4ecba58543f6805251fb: The Anthropic API refused the request as malformed: Error code: 400 - {'type': 'error', 'error': {'type': 'invalid_request_error', 'message': 'the bughunt stand-in answers no model call'}}","usage":{"inputTokens":0,"outputTokens":0,"cacheReadTokens":0,"cacheWriteTokens":0,"costUsd":0.0,"models":[]},"draft":null,"rows":[],"data":null,"auditIds":[]} [200]
+
+## POST /api/tools/home_write note (assistant)
+{"summary":{"state":"proposed","proposalId":"pr-a19338351f5c","gate":"notebook","gateCovers":"write a note under a person's name","how":"accept the note; it is kept under your name","meaning":"nothing was written: this action waits for a person, who sees it as a card on Home with one button. Say so in gaps."},"evidence":[],"recordIds":[],"passages":[],"error":null,"usage":{"inputTokens":0,"outputT
+

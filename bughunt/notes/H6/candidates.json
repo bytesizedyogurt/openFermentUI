@@ -1,0 +1,134 @@
+{
+ "candidates": [
+  {
+   "id": "H6-01",
+   "title": "A product alpha 2.1 kept with a category in its own words vanishes from every head door after the upgrade",
+   "severity": "S2",
+   "kind": "Contract break",
+   "area": "upgrade path: catalogues (alpha 2.1 rows read at the head)",
+   "statement": "After the upgrade the head leaves out, with no word to the person, every product alpha 2.1 kept with a category outside the twelve classes the head now types, so the catalogue list, the entry's own read, the catalogues screen and Postdoc's catalogue_read all answer as if the entry were never kept.",
+   "contract": "docs/api/intake.md:101 \"GET /api/catalogues/{kind} | The entries of strain, product, skill or lesson, by id\"; src/screens/Catalogues.tsx:570 \"Every entry stays once kept\"; docs/decisions/ADR-010-deletions.md:10-11 \"a person's entry, decision or artifact on a live instance is never deleted by this build\"",
+   "reproCommand": "bash bughunt/notes/H6/scripts/repro_h6_01.sh (needs the wt-main worktree at 112eb8b with its venv, as notes.md says)",
+   "expected": "The three products alpha 2.1 listed (cellulase, ethanol with category biofuel, xylitol with category sugar alcohol written by alpha 2.1's own catalogue_write tool) still listed and readable by id at the head, or each named with why on the screen as GET /api/state names a row it cannot read in `refused`.",
+   "observed": "alpha 2.1 lists ['cellulase','ethanol','xylitol']; after pnpm db:migrate the head lists ['cellulase']; GET /api/catalogues/product/ethanol and /xylitol answer 404 \"the project's product catalogue holds no ethanol\"; catalogue_read matched 1; the three rows are still in openferment.catalogue; the only trace is a WARNING in the service log. The Products tab draws cellulase alone with no notice (catalogue-products-after-upgrade.png), while the same page's toast names the one state row that does not read. A second project's product (butanol, category solvent) vanished the same way.",
+   "cause": "core/openferment_core/catalogues.py:217 and :277 (alpha 2.2 E.8.2 made `category` a Literal of twelve classes, alpha 2.1 kept any word up to 80 characters) with :401-415 (`_readable` drops a row that does not read and logs it); no migration among 0008-0010 carries or flags the old categories",
+   "confidence": "high",
+   "fixSize": "medium",
+   "evidence": "Filled bh_h6_a21 through alpha 2.1's API (its prove.py steps 2-7 plus fill_extra*.py), snapshot.py of every read at alpha 2.1, head migrate, snapshot.py at the head, compare.py/deepdiff.py: the product list is the only read whose rows moved (3 -> 1); repro_h6_01.sh from a fresh database shows the same, log in bughunt/notes/H6/logs/repro_h6_01.log; screens.cjs screenshot 037."
+  },
+  {
+   "id": "H6-02",
+   "title": "db:import-alpha1 carries a model's estimate into the record store and BioRepo reads it verified, gold",
+   "severity": "S2",
+   "kind": "Contract break",
+   "area": "upgrade path: pnpm db:import-alpha1",
+   "statement": "An alpha 1.0 biorepo.json whose verified decision carries a gold value typed as a model's estimate is carried whole, and BioRepo then serves the record as verified with provenance gold, while the record store's own door refuses the same decision by rule estimate.",
+   "contract": "CLAUDE.md:54 (R) \"a model estimate never enters a record store, and each store refuses one (ADR-006; core/tests/test_estimates.py, acceptance A6)\"; core/openferment_core/import_alpha1.py docstring \"The stores' rules are not run again on old records ...; each ran when its record was written\" (alpha 1.0's write had no estimate rule to run)",
+   "reproCommand": "bash bughunt/notes/H6/scripts/repro_import.sh (case estimate; needs the wt-head worktree at 2047f5a with its venv)",
+   "expected": "refused: naming biorepo.json and the decision, nothing written, as biorepo.write refuses it (rule estimate)",
+   "observed": "exit 0, 3 decisions carried; GET /api/biorepo/overlay reads cl1-P1-0001 status verified, provenance gold, gold {value 3, unit mg L-1, origin {kind model-estimate, by claude-x}}; POST /api/biorepo/check with the same decision answers ok false, rule estimate",
+   "cause": "core/openferment_core/import_alpha1.py:174-180 inserts each decision with only provenance_of recomputed; biorepo.write calls basis.refuse_estimates (core/openferment_core/biorepo.py:305) and the import calls nothing of it",
+   "confidence": "high",
+   "fixSize": "small",
+   "evidence": "gen_alpha1.py writes the directory with alpha 1.0's own models (git show alpha-1.0:core/openferment_core/models.py), the estimate case adding an origin to one gold value; run_imports.sh and repro_import.sh run package.json's exact command from a head worktree; logs/imports.log, logs/repro_import.log. A verified decision naming no reviewer is carried the same way (gold, reviewer None), which biorepo.write refuses by rule reviewer."
+  },
+  {
+   "id": "H6-03",
+   "title": "db:import-alpha1 answers a traceback with no refused: line for a duplicated paper, a missing database and a dead server",
+   "severity": "S3",
+   "kind": "Inconsistency",
+   "area": "upgrade path: pnpm db:import-alpha1",
+   "statement": "The import prints a Python traceback and exits 1, with no line beginning refused:, when two extraction files name one paper, when the server holds no database of the configured name, and when the server does not answer, where pnpm db:migrate names the last two in words.",
+   "contract": "docs/runbooks/live-host-install.md:218-219 \"A line beginning `refused:` says why, and the import has written nothing\"; core/openferment_core/import_alpha1.py read() docstring \"refuse the whole directory, naming the file, when one cannot be read\"; core/openferment_core/migrations.py docstring \"A command that cannot run says why in words and exits 2\"",
+   "reproCommand": "bash bughunt/notes/H6/scripts/repro_import.sh (cases dup-paper, a database the server does not hold, a server that does not answer)",
+   "expected": "refused: in words, exit 2, naming the second extraction file for the paper, or the database and server as db:migrate names them",
+   "observed": "dup-paper: exit 1, 3 tracebacks ending in UniqueViolationError pk_candidates (project, P1, model); missing database: exit 1, DBAPIError traceback; dead server: exit 1, ConnectionRefusedError traceback. pnpm db:migrate on the same two addresses answers \"refused: the server at 127.0.0.1:5432 holds no database bh_h6_nothere ...\" and \"refused: the database bh_h6_x on 127.0.0.1:8869 could not be reached\". Nothing is written in any case (the transaction rolls back).",
+   "cause": "core/openferment_core/import_alpha1.py:242 catches ImportRefused, ProjectRefused and DatabaseUnavailable alone, read() never checks paperIds across candidates/*.json, and alpha 2.2's _unreadable words (migrations.py) were given to db:migrate alone",
+   "confidence": "high",
+   "fixSize": "small",
+   "evidence": "logs/imports.log and logs/repro_import.log; the duplicated paper is a copy of candidates/P1.json under another file name, as a file manager's duplicate makes it"
+  },
+  {
+   "id": "H6-04",
+   "title": "db:import-alpha1 prints and audits a count of rows its upsert did not keep",
+   "severity": "S4",
+   "kind": "Wrong number",
+   "area": "upgrade path: pnpm db:import-alpha1",
+   "statement": "For a guild.json naming one person twice under one id the import prints and audits 3 people carried while the project keeps 2, the second entry replacing the first; an artifact held by two files is likewise counted 2 and kept once.",
+   "contract": "docs/runbooks/live-host-install.md:217 \"The import prints the new project's id and what it carried, one count a kind\"",
+   "reproCommand": "bash bughunt/notes/H6/scripts/repro_import.sh (case dup-person)",
+   "expected": "a count of the rows carried (2 people), or the duplicate refused in words",
+   "observed": "printed \"3  people\"; kept 2 (p-ada Ada Moreno, p-ben Ben Ortiz (again)); the import_alpha1 audit row's detail.counts.people is 3",
+   "cause": "core/openferment_core/import_alpha1.py:79 counts the entries of each file; rows.put (db/rows.py) upserts by (project_id, id)",
+   "confidence": "high",
+   "fixSize": "small",
+   "evidence": "logs/repro_import.log; logs/imports.log (dup-artifact: \"2 artifacts\", 1 row)"
+  },
+  {
+   "id": "H6-05",
+   "title": "ADR-001 and CLAUDE.md say a row's body is JSONB; every content column is json",
+   "severity": "S4",
+   "kind": "Drift",
+   "area": "migrations and table models",
+   "statement": "ADR-001's implementation note and CLAUDE.md's architecture line say the Pydantic model is kept as a JSONB body, and the migrations make every content column (34 of them) of type json, as models.py's own docstring says it chose.",
+   "contract": "docs/decisions/ADR-001-postgresql.md:62 \"the rest of the row is `body`, the Pydantic model of `models.py` dumped as JSONB\"; CLAUDE.md:66 \"the Pydantic model as JSONB `body` (ADR-001)\"",
+   "reproCommand": "bash bughunt/notes/H6/scripts/check_jsonb.sh",
+   "expected": "jsonb columns, or the two documents saying json as core/openferment_core/db/models.py:6-9 does",
+   "observed": "json|34|body,input,record,result,selection,settings",
+   "cause": "core/openferment_core/db/models.py:36 imports postgresql JSON; db/alembic/versions/0001_initial.py and 0006-0010 make postgresql.JSON columns",
+   "confidence": "high",
+   "fixSize": "small",
+   "evidence": "check_jsonb.sh on a database migrated from empty; compare_metadata shows the models and migrations agree with each other (migrate_checks.log)"
+  }
+ ],
+ "suspected": [
+  {
+   "title": "alpha 2.1's Proforma runs never replay identically at the head (1 ulp), and runs.md:143 says they replay as they were",
+   "tried": "replay_all.py: every alpha 2.1 artifact replayed at the head; all identical but the three proforma.run artifacts (tea.FCI 31220166.41394996 vs 31220166.413949955; withinTolerance false, since a Proforma run registers no tolerance). The same three replayed on a cold alpha 2.1 service also differ, and a Proforma run the head made over the upgraded database replays identically twice, so this reads as BioSTEAM's worker-state dependence (the known A-B-A drift); nothing here ties it to the upgrade."
+  },
+  {
+   "title": "a model's write to an id held by an unreadable catalogue row is refused with words pointing at the catalogues screen, which does not show the row",
+   "tried": "read catalogues.py _keep (the refusal names 'a person keeps it afresh on the catalogues screen'); the head's /api/tools door is a person's, and no Postdoc or MCP model door was driven, keyless"
+  },
+  {
+   "title": "the head's service answers a bare 500 for a route whose table a skipped migration left out",
+   "tried": "head service over an alpha 2.1 database left at 0007: GET /api/protocols answers 500 Internal Server Error with a ProgrammingError in the log; pnpm ready names the database \"at revision 0007 of 0010. Run: pnpm db:migrate\" and deploy.sh migrates before it restarts, so this needs a person to skip both"
+  }
+ ],
+ "needsLiveModel": [
+  "an alpha 2.1 product kept by a model through Postdoc's loop or the MCP door, then written again by the model at the head (the refusal's words over a row the screen hides)"
+ ],
+ "held": [
+  "head migrations from empty: twice in a row change nothing (schema dump equal), and alembic compare_metadata finds 0 differences from the table models",
+  "0010 -> 0007 -> head and head -> base -> head both restore the schema exactly; the kit's 0006 -> base -> 0006 too",
+  "0008 on an upgraded database: all five alpha 2.1 runs read engine biosteam; a kinetics row the head kept stays kinetics through a downgrade to 0007 and back",
+  "every read alpha 2.1 answered for its project answers the same values at the head (deepdiff.py over 143 reads), but the products list and the shelf's two retired entries; runs, artifacts, flowsheets, scenarios, comparisons, the locked runbook, depositions, measured evidence, overrides, fits, trains, conversations, turns, tool calls, guild, checks, audit and literature read as they were",
+  "GET /api/state over the upgraded database serves every realistic alpha 2.1 page row; a row that does not read is named in refused with why and the screen's toast says so",
+  "the second project's rows stay its own after the upgrade (same strain id in both projects, each project reads its own)",
+  "every alpha 2.1 artifact replays at the head identical, kept benchmark and kept corn_drygrind reference among them, but the three proforma.run (see suspected)",
+  "alpha 2.1's fermOS simulation asked again at the head finds its artifact (same id) and keeps its kinetics runs row, as runs.md says",
+  "a reading appended at the head to a deposition alpha 2.1 kept is accepted; the deposition, its runbook lock and its readings list read back",
+  "the retired reference entries: /proforma/reference/corn_drygrind lands on the corn plant's page and lists the run kept from the retired entry",
+  "every rail entry and 112 more screens of the built app open over the upgraded database with no console error and no failed request",
+  "db:import-alpha1 on the tag's own core/data/biorepo.json (empty) and on a full alpha 1.0 directory written by alpha 1.0's own models: every store lands and reads back, demo reads assumed with the output hash recomputed, the files are left byte for byte, a database behind the newest schema is refused in words",
+  "db:import-alpha1 refuses a truncated biorepo.json, an empty one and a decision whose status is no status, in words, writing nothing; 30000 decisions carry in 18 s",
+  "a second import of the same directory under the same name makes project alpha-1-0-full-2 with the same rows: it makes a new project as its docstring says, and the runbook says to run it once",
+  "pnpm db:import-alpha1's uv run --frozen without --all-extras changes no package in the environment",
+  "pnpm db:migrate and db:reset (package.json's commands) run from a head worktree; db:migrate refuses in words a missing address, a missing database and a dead server, exit 2",
+  "pnpm ready names a database behind the head: \"is at revision 0007 of 0010. Run: pnpm db:migrate\""
+ ],
+ "unexamined": [
+  {
+   "item": "alpha 2.1 practice scenarios and sessions, proposals and a Live conversation's model-written turns at the upgrade",
+   "reason": "each needs a model to make at alpha 2.1; the alpha 1.0 import carried a practice scenario, a session and a proposal and they read back"
+  },
+  {
+   "item": "the alpha 2.1 dev databases (openferment_dev_alpha21) as an upgrade input",
+   "reason": "the brief gave no leave to copy one; every row here came through alpha 2.1's API"
+  },
+  {
+   "item": "the browser's Durable queue: writes an alpha 2.1 page held unsent when the service moved to the head",
+   "reason": "needs alpha 2.1's built app in a browser across the switch; the head's projectState.ts names refused queued writes, read only"
+  }
+ ]
+}

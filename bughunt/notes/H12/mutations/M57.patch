@@ -1,0 +1,11 @@
+--- a/core/openferment_core/literature/collectors.py
++++ b/core/openferment_core/literature/collectors.py
+@@ -284,7 +284,7 @@
+     """Why a fetch by address does not connect to `address`, in words, or
+     None for a public address. An IPv4-mapped IPv6 address is read as its
+     IPv4 address."""
+-    seen = _v4(address)
++    seen = address
+     for test, said in _REFUSED:
+         if getattr(seen, test, False):
+             return said

@@ -4,7 +4,7 @@ build-backend = "setuptools.build_meta"
 
 [project]
 name = "openferment-engine-h1probe"
-version = "0.1.0"
+version = "0.1.2"
 description = "H1's stand-in engines: a worker that misbehaves on purpose, and entry points that fail"
 requires-python = ">=3.12"
 
@@ -19,6 +19,8 @@ h1c-sysexit = "h1probe.sysexit:ENGINE"
 h1d-nomethod = "h1probe.engine:NOMETHOD"
 h1e-misnamed = "h1probe.engine:MISNAMED"
 h1z-heavy-unseen = "h1probe.heavy_unseen:ENGINE"
+h1f-asks-registry = "h1probe.asks_registry:ENGINE"
+h1g-things-are = "h1probe.things_are:ENGINE"
 H1Upper = "h1probe.engine:ENGINE"
 
 [tool.setuptools]

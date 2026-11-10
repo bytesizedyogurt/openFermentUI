@@ -1,0 +1,11 @@
+--- a/core/openferment_core/literature/collectors.py
++++ b/core/openferment_core/literature/collectors.py
+@@ -397,7 +397,7 @@
+     data = bytearray()
+     async for chunk in response.aiter_bytes():
+         data += chunk
+-        if len(data) > limit:
++        if len(data) > limit * 2:
+             raise TooLarge(f"the file at {at} is larger than the {_size(limit)} an import takes")
+     return bytes(data)
+ 

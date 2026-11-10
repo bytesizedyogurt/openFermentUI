@@ -1,0 +1,390 @@
+== Home (no project)
+OPENFERMENT
+Bioprocess literature you can operate on
+Ask Postdoc about the documents your project holds, verify every extracted number against the span it came from, turn verified parameters into runnable protocols, and model what they cost at scale.
+Your projects
+Ethanol
+ethanol
+NEW PROJECT
+Make it
+Ask Postdoc
+Ask
+What if the organism fermented glucose alone? Propose a scenario, run it, and say what changed and what the change rests
+1 question · 2026-11-08 04:26 UTC
+What if the organism fermented glucose alone? Propose a scenario, run it, and say what changed and what the change rests
+1 question · 2026-11-08 04:22 UTC
+What does the reference cellulosic ethanol plant in the library assume about its feedstock, and where do those numbers c
+2 questions · 2026-11-08 04:06 UTC
+What strains of Saccharomyces cerevisiae appear in the project's documents, and which documents describe each?
+1 question · 2026-11-08 04:00 UTC
+Which of the project's documents report an ethanol titre, and under what conditions does each report it?
+1 question · 2026-11-08 03:53 UTC
+Running now
+AS IT HAPPENS
+
+Runs, tool calls, artifacts and Postdoc's turns show here as they happen.
+
+Project vitals
+?
+User-entered.
+DOCUMENTS HELD
+22
+814 passages, each searchable and quotable
+Extracted · unverified.
+EXTRACTION RECORDS
+457
+verified
+2
+unverified
+454
+rejected
+1
+Gold · a value a reviewer typed.
+GOLD SET
+0
+No gold values yet — promote a record with g in review
+Assumed · rests on an assumption.
+PROTOCOLS PUBLISHED
+0
+0 versions in total
+Measured · first-party
+Gold · a value a reviewer typed
+Verified against source
+Curated · written by hand
+Computed · basis attached
+Extracted · unverified
+Industry estimate · a vendor’s figure
+User-entered
+Assumed · rests on an assumption
+?
+Runbooks
+?
+Assumed · rests on an assumption.
+RUNBOOKS
+0
+0 running · 0 waiting on a person
+Your work
+User-entered.
+LAST CONVERSATION
+What if the organism fermented glucose alone? Propose a scenario, run it, and say what changed and what the change rests
+1 question · 2026-11-08 04:26 UTC
+Extracted · unverified.
+REVIEW QUEUE
+454 unverified records waiting
+Start a queue and triage them one span at a time.
+The destinations
+11/11 with something behind them
+
+Everything this platform does lives inside one of these 11.
+
+Intake
+documents in, anchored to source
+457 extraction records
+BioRepo
+records, artifacts, provenance
+22 papers · gold set not yet annotated
+Postdoc
+ask, plan, answer from records
+live through openferment-core, on the model it is configured with
+geneOS
+host, construct, pathway, design
+0 hosts · no sequence tooling
+fermOS
+reactor, kinetics, scale
+0 deposited runs it can fit · fits, forecasts, simulations and vessel designs kept with the project
+pureOS
+harvest, capture, recovery
+45 unit operations · no process model
+Proforma
+cost, scale, uncertainty
+2 scenarios · 6 runs · 3 comparisons
+Runbooks
+claims to be tested
+0 runbooks · 0 protocols
+Primer
+how the system works
+0 lessons
+Guild
+who may verify
+review queue and roles
+Catalogues
+strains, products, skills, lessons
+kept on the service, each entry in its keeper’s name
+Start something
+Postdoc
+Ask a question
+Get a cited answer with the plan, tool calls and retrieved passages shown.
+Guild
+Review extractions
+Triage machine-extracted parameters against the span they came from.
+Protocols → Deposition
+Run a protocol
+Scale a verified procedure to your batch size and execute it at the bench.
+Proforma
+Model a process
+Run a scenario on BioSTEAM and see where the cost per kilogram goes.
+Runbooks
+Open a runbook
+A synthesised answer to "how would we make this", with the stages it took to get there.
+What is this platform?
+The map behind these names
+Workforce
+Nobody is on Guild’s ledger yet. Start it
+Predictions
+Locked
+0
+Tested
+0
+Held
+0
+Missed
+0
+Inconclusive runs
+0
+
+Too few tested for a hit rate; one is shown from 5. Open the ledger
+
+Recent activity
+Nothing has happened since this page opened
+What a person does here is listed as it happens: a paper fetched, a record reviewed, a run deposited, a runbook adopted. To start, review the next record in Guild or fetch a paper in Intake.
+
+Activity is session-only and resets on refresh.
+
+
+== /p/ethanol/proforma/studies
+PROFORMA · STUDIES
+Studies
+What this project asked of its plants and kept of the answers: engine runs, the scenarios that asked for them, comparisons and runbooks, each as the service holds it.
+The export package
+SFF flowsheets
+Proforma
+Run a plant
+Engine
+biosteam
+kinetics
+train
+
+Any plant the installed package holds, or openFerment’s composed flowsheet, run whole by BioSTEAM on the package’s own values in a configuration it built in here, and kept with its basis, its artifact and its SFF file.
+
+Plant
+cane (Cane Biorefineries and Benchmarks)
+cellulosic
+corn (corn: Conventional dry grind process)
+cornstover (cornstover: 2nd Generation Ethanol Production from Corn Stover)
+lipidcane (lipidcane: Co-production of Ethanol and Biodiesel from Lipid-cane)
+milk (ARPA-E)
+oilcane (oilcane: Oilcane Biorefineries and Benchmarks)
+sugarcane (sugarcane: Ethanol production from Sugarcane)
+cellulosic_ethanol_v0 (openFerment, composed from biorefineries.cellulosic)
+Configuration
+dilute acid, IB
+dilute acid, SCF
+hot water, IB
+hot water, SCF
+Run it
+
+Did not build here, so not offered: AFEX, IB; AFEX, SCF; alkaline, IB; alkaline, SCF.
+
+A run is asked for in a person’s name: set yours in Settings first.
+
+BioSTEAM also runs the shelf’s scenario flowsheets (Glucose to ethanol, draft v0): a run of one is a Proforma scenario’s, with the values a person sets on it. Make one with Proforma → New scenario; its runs are listed with the project’s runs below.
+
+Engine runs
+
+Newest first. Choose two or more in the order a comparison should read them: each change is reckoned from the first chosen.
+
+Engine
+every engine
+biosteam
+	Run	Engine	What it ran	Status	Provenance	Scenario	By	At
+	e9384e8b0265df2e	biosteam	cellulosic_ethanol_v0 (hot water, SCF)	done	
+Computed · basis attached	—	claude-opus-5-5	2026-11-08 03:27 UTC
+	a9d40f9b35fc62a3	biosteam	cellulosic_ethanol_v0 (dilute acid, SCF)	done	
+Computed · basis attached	—	claude-opus-5-5	2026-11-08 03:27 UTC
+	5ec8feb8615b34df	biosteam	cellulosic_ethanol_v0 (dilute acid, IB)	done	
+Assumed · rests on an assumption	Cellulosic ethanol flowsheet with the fermenting organism converting no xylose (glucose-only fermentation)	claude-opus-5-5	2026-11-08 03:23 UTC
+	784c94d9bd67d20e	biosteam	cellulosic_ethanol_v0 (hot water, IB)	done	
+Computed · basis attached	—	Claude Code (build session)	2026-11-05 09:17 UTC
+	e7efa2505b4633de	biosteam	cellulosic_ethanol_v0 (dilute acid, IB)	done	
+Computed · basis attached	—	Claude Code (build session)	2026-11-05 09:17 UTC
+	bfda026530692adc	biosteam	cornstover	done	
+Computed · basis attached	—	Claude Code (build session)	2026-11-05 09:17 UTC
+Compare the chosen runs
+A comparison is made in a person’s name: set yours in Settings first.
+Scenarios
+Cellulosic ethanol flowsheet with the fermenting organism converting no xylose (glucose-only fermentation)
+ssc-6468dc71ae63 · on cellulosic_ethanol_v0 (dilute acid, IB) · made by claude-opus-5-5, 2026-11-08 04:28 UTC · What-if: the fermenting organism converts glucose and no xylose. Every xylose reaction of the organism is set to zero in both the cofermentation reactor and the seed train; the glucose reactions, the saccharification, and the contamination losses (lactic acid from each sugar) stay at the package defaults, since contamination is not the organism. Default configuration of the composed corn stover flowsheet, so it compares directly against the package-default run of the same configuration.
+Run
+rxn.R303.cofermentation.4	0	a model’s estimate	claude-opus-5-5	Glucose-only organism: no xylose to ethanol in the cofermentation reactor. This is the what-if itself, a model estimate, not a measurement of any strain.
+rxn.R303.cofermentation.5	0	a model’s estimate	claude-opus-5-5	Glucose-only organism: no xylose to cell mass in the cofermentation reactor; the organism takes up no xylose at all. Model estimate.
+rxn.R303.cofermentation.6	0	a model’s estimate	claude-opus-5-5	Glucose-only organism: no xylose to glycerol in the cofermentation reactor. Model estimate.
+rxn.R303.cofermentation.7	0	a model’s estimate	claude-opus-5-5	Glucose-only organism: no xylose to xylitol in the cofermentation reactor. Model estimate.
+rxn.R303.cofermentation.8	0	a model’s estimate	claude-opus-5-5	Glucose-only organism: no xylose to succinic acid in the cofermentation reactor. Model estimate.
+rxn.R302.reactions.4	0	a model’s estimate	claude-opus-5-5	Same organism in the seed train: no xylose to ethanol. Model estimate.
+rxn.R302.reactions.5	0	a model’s estimate	claude-opus-5-5	Same organism in the seed train: no xylose to cell mass. Model estimate.
+rxn.R302.reactions.6	0	a model’s estimate	claude-opus-5-5	Same organism in the seed train: no xylose to glycerol. Model estimate.
+rxn.R302.reactions.7	0	a model’s estimate	claude-opus-5-5	Same organism in the seed train: no xylose to xylitol. Model estimate.
+rxn.R302.reactions.8	0	a model’s estimate	claude-opus-5-5	Same organism in the seed train: no xylose to succinic acid. Model estimate.
+
+Its runs: none yet. A run is asked for in a person’s name: set yours in Settings first.
+
+Cellulosic ethanol flowsheet with the fermenting organism converting no xylose (glucose-only fermentation)
+ssc-70124aa84460 · on cellulosic_ethanol_v0 (dilute acid, IB) · made by claude-opus-5-5, 2026-11-08 03:23 UTC · What-if: the organism ferments glucose alone. Every xylose reaction the organism carries out in the cofermentation reactor R303 and the seed train R302 (to ethanol, to cells, to glycerol, xylitol and succinic acid) is set to zero conversion; glucose reactions, saccharification, pretreatment and the contamination loss of xylose to lactic acid keep the package's defaults. Compared against the kept run of the same flowsheet and configuration at package defaults (e7efa2505b4633de).
+Run
+rxn.R303.cofermentation.4	0	a model’s estimate	claude-opus-5-5	Organism does not ferment xylose to ethanol: a what-if, not a measurement; package default is cofermentation by Z. mobilis.
+rxn.R303.cofermentation.5	0	a model’s estimate	claude-opus-5-5	No growth on xylose: what-if assumption.
+rxn.R303.cofermentation.6	0	a model’s estimate	claude-opus-5-5	No xylose to glycerol: what-if assumption.
+rxn.R303.cofermentation.7	0	a model’s estimate	claude-opus-5-5	No xylose to xylitol: what-if assumption.
+rxn.R303.cofermentation.8	0	a model’s estimate	claude-opus-5-5	No xylose to succinic acid: what-if assumption.
+rxn.R302.reactions.4	0	a model’s estimate	claude-opus-5-5	Seed train: no xylose to ethanol, what-if assumption.
+rxn.R302.reactions.5	0	a model’s estimate	claude-opus-5-5	Seed train: no growth on xylose, what-if assumption.
+rxn.R302.reactions.6	0	a model’s estimate	claude-opus-5-5	Seed train: no xylose to glycerol, what-if assumption.
+rxn.R302.reactions.7	0	a model’s estimate	claude-opus-5-5	Seed train: no xylose to xylitol, what-if assumption.
+rxn.R302.reactions.8	0	a model’s estimate	claude-opus-5-5	Seed train: no xylose to succinic acid, what-if assumption.
+
+Its runs: 5ec8feb8615b34df. A run is asked for in a person’s name: set yours in Settings first.
+
+Comparisons
+Dilute-acid versus hot-water pretreatment in the composed corn stover flowsheet, SCF configuration, package defaults
+Computed · basis attached
+2 runs · claude-opus-5-5, 2026-11-08 03:27 UTC
+Cellulosic ethanol flowsheet (dilute acid, IB): package-default cofermentation versus glucose-only fermentation
+Assumed · rests on an assumption
+2 runs · claude-opus-5-5, 2026-11-08 03:23 UTC
+Hot-water versus dilute-acid pretreatment, integrated bioprocess, package defaults: uncertainty review
+Computed · basis attached
+2 runs · claude-sonnet-5-5, 2026-11-08 02:38 UTC
+Runbooks
+
+No study has made a runbook: a run’s page makes one from its numbers.
+[failed] GET http://127.0.0.1:8941/api/events?project=ethanol net::ERR_ABORTED
+
+== /p/ethanol/proforma
+COST AND SCALE
+Proforma
+Techno-economics on BioSTEAM: published plants of the library shelf run whole on their package's own values, and scenarios made from a flowsheet on the shelf, each input bound to records or to a named person's assumption.
+Studies
+Compare
+New scenario
+Reference runs
+
+Published biorefineries from the BioSTEAM project’s own biorefineries package, on the library shelf, run whole with every setting the package’s own, before Proforma prices anything new. Each run is held to the values the package’s own test asserts, and its card says how many of them it holds: how close this installation comes to the plant as its authors built it. Studies runs every other plant of the shelf.
+
+cornstover
+reference
+cornstover: 2nd Generation Ethanol Production from Corn Stover
+
+From biorefineries 2.35.1, biorefineries.cornstover · held to test_cornstover
+
+A plant of the library shelf, run whole by BioSTEAM on the package’s own values, and held to the values its package’s own test asserts.
+
+Computed · basis attached.
+0.6588
+USD/kg of ethanol; the price its TEA solves at the package’s rate of return
+
+9 of 11 values of test_cornstover within the package’s tolerance on this run.
+
+Computed · basis attached
+Ran
+2026-11-05 09:17 UTC
+· kept as
+bfda026530692adc
+
+Rerun
+Its page
+The simulator has not started on this service yet. A run is asked for in a person’s name: set yours in Settings first.
+corn
+reference
+corn: Conventional dry grind process
+
+From biorefineries 2.35.1, biorefineries.corn · held to test_corn
+
+A plant of the library shelf, run whole by BioSTEAM on the package’s own values, and held to the values its package’s own test asserts.
+
+Not run in this project yet.
+
+Run
+Its page
+The simulator has not started on this service yet. A run is asked for in a person’s name: set yours in Settings first.
+Flowsheets
+
+The flowsheets a scenario can run. Records bind each flowsheet’s process inputs, and a named person types the rest.
+
+ethanol_glucose_v0
+Glucose to ethanol, draft v0
+
+From this repository
+
+A glucose solution into a batch fermenter, then the ethanol purification train of the BioSTEAM reference designs (beer column, rectifier, molecular sieves), giving fuel-grade ethanol. The fermenter turns glucose into ethanol at the bound yield as a share of the theoretical yield, for a batch time of titre over productivity. Chemicals and finance are the dry-grind corn ethanol plant's; equipment and thermodynamics are BioSTEAM's own; no number is the flowsheet's.
+
+INPUTS
+glucose in the fermenter's feed (g L-1): binds to records of medium_component_conc
+ethanol titre at harvest (g L-1): binds to records of ethanol_titre
+ethanol yield on glucose (g g-1): binds to records of ethanol_yield_substrate
+ethanol volumetric productivity (g L-1 h-1): binds to records of ethanol_productivity
+ethanol fermented in a year (t yr-1): a named person's assumption
+price of glucose (USD kg-1): a named person's assumption
+ethanol purity: a convention the run states
+
+The price is USD per kg of fuel-grade ethanol, as the product leaves its tank.
+
+New scenario from this
+custom_train_v1
+A vessel and a train, priced
+
+From this repository
+
+A glucose solution into the fermenter fermOS designed (a kept fermos.vessel design: BioSTEAM's AeratedBioreactor or NREL batch fermenter, rebuilt as the same class with every design parameter as the design holds it, running the reaction the design was built on), its beer through the units of a train pureOS ran (a kept pureos.train_run: each unit the same catalogue type, class and values as that run held them), priced with the dry-grind corn ethanol plant's TEA (biorefineries.corn.create_tea, ConventionalEthanolTEA), its financial parameters in the panel's Finance group as the package's defaults until a person sets one. A scenario on it names the vessel design and the train run. The train's own inlet is not an input: the fermenter's beer is its inlet. Only the yeast program has a chemical set, so a vessel or a train of another program is refused.
+
+INPUTS
+glucose in the fermenter's feed (g L-1): binds to records of medium_component_conc
+ethanol titre at harvest (g L-1): binds to records of ethanol_titre
+ethanol yield on glucose (g g-1): binds to records of ethanol_yield_substrate
+ethanol volumetric productivity (g L-1 h-1): binds to records of ethanol_productivity
+ethanol fermented in a year (t yr-1): a named person's assumption
+price of glucose (USD kg-1): a named person's assumption
+
+The price is USD per kg of the product the train traces (ethanol, for the yeast program), contained in the train's product stream as it leaves the train's last unit.
+
+New scenario from this
+Scenarios
+No Proforma scenario yet
+The project's studies hold 2 scenarios, listed on Studies. A Proforma scenario runs one flowsheet from the shelf above: New scenario picks the flowsheet, names it and opens it, with its inputs listed.
+New scenario
+Studies
+
+
+== /p/ethanol/runbooks/depositions
+RUNBOOKS
+Depositions
+What happened at the bench, beside what a runbook predicted. A deposition starts from a locked runbook, on one of its protocols or on its measures alone, and closes when its readings are reconciled with the runbook's predictions.
+Runbooks
+Protocols
+Depositions
+Ledger
+No depositions in this project yet
+Depositions are written at the bench and kept with the project on the service; one written while the service is away waits in this browser until it is sent. Open a locked runbook and start a deposition, against one of its protocols or against its measures alone, and the record appears here. With no runbook on the board yet, ask Postdoc to draft one and turn it into a runbook, or make one from a run's numbers on its page (Studies lists the runs).
+Draft a runbook in Postdoc
+A run’s runbook, from Studies
+Open the runbook board
+Produced by
+Deposition
+·
+0 in this project
+
+
+== /p/ethanol/runbooks/protocols
+RUNBOOKS
+Protocols
+Executable bench procedures whose quantities are bound to materials, so a batch-size change rewrites every number. 0 protocols across 0 versions. Each capability icon is computed from the protocol’s content.
+Begin a protocol
+Cards
+Table
+Runbooks
+Protocols
+Depositions
+Ledger
+No protocols yet
+A protocol enters the project in a person’s name, begun here, and appears with its steps, materials and the records its quantities cite.
+Begin a protocol
+

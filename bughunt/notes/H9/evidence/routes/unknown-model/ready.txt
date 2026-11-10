@@ -1,0 +1,26 @@
+openFerment: is this machine ready for the live loop?
+
+· key              --offline: this run makes no model call, so it asks for no key
+✓ app              built; the service serves it at /
+✓ data             1 project, 0 review decisions, at revision 0010
+✓ intake           1 document held (1 link to projects), 0 extracted
+✓ literature       pgvector 0.6.0, revision 0006, 1 documents, 1 chunks
+✓ embedder         BAAI/bge-small-en-v1.5, from /root/.cache/fastembed
+! rag              /rag refuses every request: no OPENFERMENT_RAG_KEY in core/.env. Set one to search the literature from another program; the app itself does not need it
+✓ models           iMM904 present, sha256 a4bcff4f8f22 matches; Yeast9 present, sha256 30842b15eefb matches
+✓ artifacts        0 kept
+✓ spend            $0.00 of the $150.00 daily cap spent today (2026-11-10, UTC)
+· workers          --no-workers
+! graphviz         Graphviz's dot is not on the path, so Proforma lists each flowsheet's units in run order instead of drawing it. Install: brew install graphviz
+! engine biosteam  engine run 1 · biosteam · biorefineries 2.35.1 · biosteam 2.54.0 · thermosteam 0.54.2; worker openferment_core.workers.proforma_worker (cold); never checked here: python -m openferment_core.engine.conform biosteam
+! engine kinetics  engine run 1 · kinetics · biosteam 2.54.0 · numpy 2.5.2 · scipy 1.18.1 · thermosteam 0.54.2; no worker: it computes in the service's process; a vessel design runs in the Proforma worker; never checked here: python -m openferment_core.engine.conform kinetics --inputs <file>, the file openferment_core.fermos_engine.write_placeholder_inputs(<file>, by=<your name>) writes
+! engine train     engine run 1 · train · biorefineries 2.35.1 · biosteam 2.54.0 · thermosteam 0.54.2 · train run 2; worker openferment_core.workers.proforma_worker (cold); never checked here: python -m openferment_core.engine.conform train --project <id>, naming a project of this database that holds one of its things (a project's trains, each saved in pureOS's Builder or built by a model); the checks run on a copy of it
+· model            --no-network
+· roles            --no-network
+· europepmc        --no-network
+· huggingface      --no-network
+! service          nothing answers on 127.0.0.1:8893. Expected before install.sh; after it: sudo launchctl kickstart -k system/com.umutuzo.openferment
+
+Ready.
+lane: none
+exit 0

@@ -1,0 +1,11 @@
+--- a/core/openferment_core/engine/registry.py
++++ b/core/openferment_core/engine/registry.py
+@@ -149,7 +149,7 @@
+     try:
+         why = _why_not(ep.name, ep.value, obj)
+         if why is None:
+-            wrong = _imported_in_service(obj, set(sys.modules) - before)
++            wrong = []
+             if wrong:
+                 why = f"importing {ep.value} imported {', '.join(wrong[:8])}, which belong in its worker"
+                 for m in wrong:

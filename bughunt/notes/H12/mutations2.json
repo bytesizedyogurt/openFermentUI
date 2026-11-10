@@ -1,0 +1,140 @@
+[
+ {
+  "id": "M21b",
+  "target": "runs.keep_run",
+  "file": "openferment_core/engine/runs.py",
+  "old": "    first, when, asked = (held.by, held.at, held.scenarioId) if held is not None else (who, _now(), scenario_id)",
+  "new": "    first, when, asked = (who, _now(), scenario_id)",
+  "tests": [
+   "tests/test_runs.py",
+   "tests/test_engines.py",
+   "tests/test_engine_diagnostics.py",
+   "tests/test_proforma_runs.py",
+   "tests/test_events.py",
+   "-k",
+   "not sigterm_ends_the_command"
+  ],
+  "why": "a held row with neither file nor words is rewritten under the second asker's name, time and scenario"
+ },
+ {
+  "id": "M24b",
+  "target": "runs.keep_run",
+  "file": "openferment_core/engine/runs.py",
+  "old": "    reported = (held.diagnostics if held is not None and held.diagnostics else",
+  "new": "    reported = (None if False else",
+  "tests": [
+   "tests/test_runs.py",
+   "tests/test_engines.py",
+   "tests/test_engine_diagnostics.py",
+   "tests/test_proforma_runs.py",
+   "tests/test_events.py",
+   "-k",
+   "not sigterm_ends_the_command"
+  ],
+  "why": "a held row's own diagnostics give way to the second computation's"
+ },
+ {
+  "id": "N01",
+  "target": "llm.kit_client",
+  "file": "openferment_core/llm.py",
+  "old": "            result = await asyncio.to_thread(\n                call, system=system or \"\", user=prompt, schema=None, max_tokens=max(max_tokens, room),\n                family=family, label=\"sci-rag-kit: \",\n            )",
+  "new": "            result = await asyncio.get_running_loop().run_in_executor(None, lambda: call(\n                system=system or \"\", user=prompt, schema=None, max_tokens=max(max_tokens, room),\n                family=family, label=\"sci-rag-kit: \"))",
+  "tests": [
+   "tests/test_key_override.py",
+   "tests/test_llm.py",
+   "tests/test_api_intake.py",
+   "tests/test_literature_kit.py",
+   "tests/test_literature_graph.py"
+  ],
+  "why": "the kit's model calls run on a thread that does not copy the request's context, so on core/.env's key"
+ },
+ {
+  "id": "N02",
+  "target": "llm._default_client",
+  "file": "openferment_core/llm.py",
+  "old": "def key_named() -> bool:\n    \"\"\"Whether this request's model calls run on a key the request named.\"\"\"\n    return _REQUEST_KEY.get() is not None",
+  "new": "def key_named() -> bool:\n    \"\"\"Whether this request's model calls run on a key the request named.\"\"\"\n    return False",
+  "tests": [
+   "tests/test_key_override.py",
+   "tests/test_llm.py"
+  ],
+  "why": "a failure on a named key is said to be core/.env's"
+ },
+ {
+  "id": "N03",
+  "target": "events.recent",
+  "file": "openferment_core/events.py",
+  "old": "        return [e for e in _kept if e.project == project and e.id > after]",
+  "new": "        return [e for e in _kept if e.id > after]",
+  "tests": [
+   "tests/test_events.py",
+   "tests/test_projects.py"
+  ],
+  "why": "a page reconnecting reads every project's kept events"
+ },
+ {
+  "id": "N04",
+  "target": "events.reader",
+  "file": "openferment_core/events.py",
+  "old": "        _readers[rid] = (project, inbox)",
+  "new": "        _readers[rid] = (None, inbox)",
+  "tests": [
+   "tests/test_events.py",
+   "tests/test_projects.py"
+  ],
+  "why": "a page's inbox is filled with every project's events"
+ },
+ {
+  "id": "N05",
+  "target": "collectors._redirect",
+  "file": "openferment_core/literature/collectors.py",
+  "old": "    if following.scheme != \"https\" or not following.host:",
+  "new": "    if not following.host:",
+  "tests": [
+   "tests/test_sff_url.py",
+   "tests/test_collectors.py"
+  ],
+  "why": "a redirect to plain http is followed"
+ },
+ {
+  "id": "N06",
+  "target": "collectors._fetch",
+  "file": "openferment_core/literature/collectors.py",
+  "old": "            try:\n                pins[(url.raw_host.decode(\"ascii\"), url.port or 443)] = await anyio.to_thread.run_sync(\n                    public_addresses, url, resolve, abandon_on_cancel=True)",
+  "new": "            try:\n                pins[(url.raw_host.decode(\"ascii\"), url.port or 443)] = await anyio.to_thread.run_sync(\n                    public_addresses, url, resolve, abandon_on_cancel=True) if not came_from else tuple(\n                    a for a in resolve(url.raw_host.decode(\"ascii\"), url.port or 443))",
+  "tests": [
+   "tests/test_sff_url.py",
+   "tests/test_collectors.py"
+  ],
+  "why": "a redirect's host is pinned unchecked"
+ },
+ {
+  "id": "N07",
+  "target": "collectors._whole",
+  "file": "openferment_core/literature/collectors.py",
+  "old": "        if len(data) > limit:\n            raise TooLarge(",
+  "new": "        if len(data) > limit * 2:\n            raise TooLarge(",
+  "tests": [
+   "tests/test_sff_url.py",
+   "tests/test_collectors.py"
+  ],
+  "why": "a file twice the limit is taken"
+ },
+ {
+  "id": "N08",
+  "target": "the worker boundary (proforma._installed)",
+  "file": "openferment_core/proforma.py",
+  "old": "def _installed(dist: str) -> str:\n    from importlib.metadata import PackageNotFoundError, version\n\n    try:",
+  "new": "def _installed(dist: str) -> str:\n    from importlib.metadata import PackageNotFoundError, version\n\n    if dist == \"biorefineries\":\n        import biorefineries\n\n        return getattr(biorefineries, \"__version__\", None) or version(dist)\n    try:",
+  "tests": [
+   "tests/test_workers.py",
+   "tests/test_boundaries.py",
+   "tests/test_proforma.py",
+   "tests/test_ready.py",
+   "tests/test_engines.py",
+   "-k",
+   "not sigterm_ends_the_command"
+  ],
+  "why": "the service process imports biorefineries (and with it BioSTEAM) to read its version"
+ }
+]

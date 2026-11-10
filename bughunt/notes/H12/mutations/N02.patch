@@ -1,0 +1,11 @@
+--- a/core/openferment_core/llm.py
++++ b/core/openferment_core/llm.py
+@@ -705,7 +705,7 @@
+ 
+ def key_named() -> bool:
+     """Whether this request's model calls run on a key the request named."""
+-    return _REQUEST_KEY.get() is not None
++    return False
+ 
+ 
+ def _whose_key() -> str:

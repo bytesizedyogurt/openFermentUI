@@ -1,0 +1,11 @@
+--- a/core/openferment_core/models.py
++++ b/core/openferment_core/models.py
+@@ -382,7 +382,7 @@
+         for p in provenances
+     ]
+     worst = max(ranked)
+-    return PROVENANCE_ORDER[worst] if worst < len(PROVENANCE_ORDER) else "assumed"
++    return PROVENANCE_ORDER[worst] if worst < len(PROVENANCE_ORDER) else "unverified"
+ 
+ 
+ class PriorTurn(BaseModel):

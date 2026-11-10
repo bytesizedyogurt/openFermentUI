@@ -1,0 +1,48 @@
+NOTICE:  database "bh_h6_empty" does not exist, skipping
+== first migrate (empty -> head)
+postgresql+asyncpg://openferment:***@127.0.0.1:5432/bh_h6_empty: openferment at 0010, sci_rag at 0006
+exit 0
+== second migrate
+postgresql+asyncpg://openferment:***@127.0.0.1:5432/bh_h6_empty: openferment at 0010, sci_rag at 0006
+exit 0
+== schema diff between the two runs (empty = nothing changed):
+1c1
+< \restrict u3uRXL1pgEl10aAbkpXDbCqbON27cJwRg9ogs8M8MmrlHcMu8oIhWL1339IyfBN
+---
+> \restrict dlpVBlcjeauHbM78TjVDe89yVLfZffiLOxPBLd4h3PqIN92AgqPu8zMiygKQbdc
+655c655
+< \unrestrict u3uRXL1pgEl10aAbkpXDbCqbON27cJwRg9ogs8M8MmrlHcMu8oIhWL1339IyfBN
+---
+> \unrestrict dlpVBlcjeauHbM78TjVDe89yVLfZffiLOxPBLd4h3PqIN92AgqPu8zMiygKQbdc
+openferment|0010
+sci_rag|0006
+== the migrated schema against the table models (alembic compare_metadata):
+0 differences
+== downgrade to 0007 (alpha 2.1's head) and up again
+downgraded to 0007
+||0
+postgresql+asyncpg://openferment:***@127.0.0.1:5432/bh_h6_empty: openferment at 0010, sci_rag at 0006
+exit 0
+== schema diff after down and up again (empty = the same):
+1c1
+< \restrict u3uRXL1pgEl10aAbkpXDbCqbON27cJwRg9ogs8M8MmrlHcMu8oIhWL1339IyfBN
+---
+> \restrict ogcYbI3j2qTDQaR001b72mPZGOqU0vbLhsi8blIb6pj7zxZUxjIGIOTOewZeDN1
+655c655
+< \unrestrict u3uRXL1pgEl10aAbkpXDbCqbON27cJwRg9ogs8M8MmrlHcMu8oIhWL1339IyfBN
+---
+> \unrestrict ogcYbI3j2qTDQaR001b72mPZGOqU0vbLhsi8blIb6pj7zxZUxjIGIOTOewZeDN1
+== downgrade below 0007 (base) and up again
+downgraded to None
+postgresql+asyncpg://openferment:***@127.0.0.1:5432/bh_h6_empty: openferment at 0010, sci_rag at 0006
+exit 0
+== schema diff after base and up again:
+1c1
+< \restrict u3uRXL1pgEl10aAbkpXDbCqbON27cJwRg9ogs8M8MmrlHcMu8oIhWL1339IyfBN
+---
+> \restrict vrVDcwtlVC7jyn3edUML5LGflNOS8PuRWE2eAA1JpTcvK8BlTulJ2uEqjdosiyq
+655c655
+< \unrestrict u3uRXL1pgEl10aAbkpXDbCqbON27cJwRg9ogs8M8MmrlHcMu8oIhWL1339IyfBN
+---
+> \unrestrict vrVDcwtlVC7jyn3edUML5LGflNOS8PuRWE2eAA1JpTcvK8BlTulJ2uEqjdosiyq
+openferment at 0010, sci_rag at 0006

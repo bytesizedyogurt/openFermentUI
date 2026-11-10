@@ -1,0 +1,179 @@
+{
+ "candidates": [
+  {
+   "id": "H5-01",
+   "title": "B's literature searches return documents A ingests while the search runs",
+   "severity": "S1",
+   "kind": "Contract break",
+   "area": "literature: kit.ProjectService narrowing (/api/literature/search, /api/literature/answer, search_passages, /rag/v1/query, the sci-rag server's search_corpus and answer_question)",
+   "statement": "Once project B holds one document whose kit source is project A's (a text or paper A collected first, which B then collects), every search B runs while A ingests a new document under that source can return A's new document, its words and a citable passage id, because B's exclusion list is read before the retrieval runs.",
+   "contract": "docs/decisions/ADR-002-sci-rag-kit.md:84-85: \"so a shared document is visible to each project that linked it and to no other\"; CLAUDE.md:56: \"every route beside health and the projects list acts in one project\"",
+   "reproCommand": "bughunt/notes/H5/scripts/run_all.sh race race_tool (a service on 127.0.0.1:8851 over a fresh bh_h5_fresh; fill.py makes bh-a and bh-b; race.py: A and B paste one seed text, then A pastes 40 private notes while B searches /api/literature/search; race_tool.py the same through POST /api/tools/search_passages)",
+   "expected": "Every hit B receives is a passage of a document B holds; none of A's private notes, during A's ingestion or after it.",
+   "observed": "First pass (bh_h5_main): B searched 106 times while A pasted 40 notes, and 8 distinct A-only notes ('A race 7', 'A race 8', ... text 'RACEMARKZQ appears in A's private race note number 7') came back in B's hits; through search_passages 6 of 30, each with a passageId B could cite. Fresh database: 6 of 40 and 8 of 40. A search from B after A stopped finds none.",
+   "cause": "core/openferment_core/literature/kit.py:353-372 (visible: the exclusion list is the documents of the shared sources B does not hold, read at that moment) and kit.py:405-411 (_narrowed hands the kit the sources allowlist and that list); the retrieval itself runs afterwards (kit.py:429-437, the answer stream at kit.py:453), so a document A commits under a shared source in between passes both filters (sci_rag retrieve/types.py scope_conditions: source IN allowlist AND id NOT IN exclusions).",
+   "confidence": "high",
+   "fixSize": "small",
+   "evidence": "race.py and race_tool.py run twice (bh_h5_main and a fresh bh_h5_fresh), outputs in the scratch work dir race.out, race_tool.out and fresh/race.log, fresh/race_tool.log; each leaked hit's documentId is absent from B's GET /api/literature/documents."
+  },
+  {
+   "id": "H5-02",
+   "title": "A document two projects hold reads in B with A's title, private url, source and licence class",
+   "severity": "S1",
+   "kind": "Contract break",
+   "area": "literature: shared kit documents (Intake paste/upload/collect, /api/literature/documents, /api/literature/search, /api/biorepo/overlay, /api/literature/stats, literature tools, /rag, the sci-rag server)",
+   "statement": "When B collects a text A collected first, B's every read of that document shows A's title, A's url (sourceRef and citation), a source naming project A and A's licence class, while the paste's own answer told B its own title and licence class.",
+   "contract": "docs/decisions/ADR-002-sci-rag-kit.md:78-80: \"`documents_link` holds a row per project that holds it, with the selection (collector, identifier, licence as stated, reason, who)\"; ADR-002:84-85: \"a shared document is visible to each project that linked it and to no other\"",
+   "reproCommand": "bughunt/notes/H5/scripts/run_all.sh shared_doc (A pastes a text titled 'A confidential draft title', licenceClass open_commercial, url https://example.org/a-private-place; B pastes the identical text titled \"B's own title\", licenceClass restricted)",
+   "expected": "B's reads show B's own selection (its title, its stated licence class, no url) and nothing of A's: no title, url or project id A gave.",
+   "observed": "B's paste answers status linked, title \"B's own title\", licenceClass restricted. Then B's GET /api/literature/documents: title 'A confidential draft title', citation 'A confidential draft title. https://example.org/a-private-place', source 'project:bh-a:paste', sourceRef 'https://example.org/a-private-place', licenceClass 'open_commercial'; B's overlay paper: the same title, url and licenceClass open_commercial beside B's own licence words 'all rights reserved as B states it'; B's search hits ('A confidential draft title', 'open_commercial'); the seed B pasted as 'seed by bob' lists as 'seed by alice'; the sci-rag server's list_sources and corpus_stats for B name 'project:bh-a:paste'.",
+   "cause": "The kit keeps one Document per content hash with the first collector's metadata (core/openferment_core/literature/kit.py:584-606, _store links B with its selection and leaves the row as A wrote it); every read serves that row: core/openferment_core/api.py:2105-2107 (title, source, sourceRef, licenceClass from the kit's row), core/openferment_core/intake.py:154-161 (overlay title, url falling back to document.source_ref, licenceClass), tools/literature.py:74, and ProjectService.stats/list_documents.",
+   "confidence": "high",
+   "fixSize": "medium",
+   "evidence": "shared_doc.py run on bh_h5_main and on a fresh bh_h5_fresh (fresh/shared_doc.log), the same answers both times; the probe_tools sci-rag rows for bh-b show source project:bh-a:paste."
+  },
+  {
+   "id": "H5-03",
+   "title": "An /api/state write under another kind's id replaces a study scenario or a model's kept train",
+   "severity": "S2",
+   "kind": "Broken use",
+   "area": "project_state: PUT /api/state/{kind}/{item_id} (scenarios, trains)",
+   "statement": "PUT /api/state/scenarios/{id} naming a study scenario's id, and PUT /api/state/trains/{id} naming a train a model kept, answer 200 and overwrite that row in place, so the study scenario (its plant, values and runs) and the model's kept train are lost.",
+   "contract": "docs/TOOLS.md:48-49: \"pureOS's kept trains hold a model's work alone, and a person's call to keep one is refused in the store's words\"; core/openferment_core/db/models.py:214-216: two kinds of scenario share the table, `proforma` and `engine`",
+   "reproCommand": "bughunt/notes/H5/scripts/run_all.sh kind_collision train_collision",
+   "expected": "The write refused in words naming the row another kind keeps under that id; the study scenario and the kept train as they were.",
+   "observed": "kind_collision.py: PUT /api/state/scenarios/ssc-21b4b9fdadce 200; GET /api/studies/scenarios/ssc-21b4b9fdadce then 404 'the project holds no scenario ssc-21b4b9fdadce' and GET /api/studies/scenarios []; a DELETE then removes the row. train_collision.py: pureos_build new keeps tr-9e1f5791be0b as the model's; PUT /api/state/trains/tr-9e1f5791be0b 200; GET /api/pureos/trains-kept goes from one train to [].",
+   "cause": "core/openferment_core/project_state.py:522-531 (_held reads only the kind's own rows: scenarios where kind = proforma, trains where kind = made, so the other kind's row is not seen) and project_state.py:611 (rows.put upserts on (project_id, id), db/rows.py:61-64, replacing body and kind).",
+   "confidence": "high",
+   "fixSize": "small",
+   "evidence": "Run on bh_h5_main and again on a fresh bh_h5_fresh (fresh/kind_collision.log, fresh/train_collision.log), the same results."
+  },
+  {
+   "id": "H5-04",
+   "title": "DELETE /api/state/runbooks takes back a locked runbook and leaves its lock behind",
+   "severity": "S2",
+   "kind": "Contract break",
+   "area": "project_state: DELETE /api/state/{kind}/{item_id} (runbooks), study runbooks and their locks",
+   "statement": "A runbook locked through POST /api/studies/runbooks/{id}/lock is removed by DELETE /api/state/runbooks/{id}: the frozen predictions and measures are gone while the lock row stays, pointing at nothing.",
+   "contract": "docs/api/studies.md:170-175: \"Locking freezes the predictions and measures under the digest ... From then on the store (`project_state.py`) refuses a runbook row whose predictions or measures are not the ones frozen\"; core/openferment_core/db/rows.py:92-93: \"Only for what a person's own undo takes back; a record of what was decided or done is never removed.\"",
+   "reproCommand": "bughunt/notes/H5/scripts/run_all.sh kind_collision (part 2)",
+   "expected": "A locked runbook refused in words, as a lock, a deposition and a conversation are.",
+   "observed": "DELETE /api/state/runbooks/rb-study-cc42c7ff6fb1?by=alice 200 {\"removed\": true}; GET /api/studies/runbooks/rb-study-cc42c7ff6fb1 404; GET /api/state runbookLocks still holds {lockedAt, lockHash a09f34dfc59233bc}; the audit reads keep_runbooks, lock, remove_runbooks.",
+   "cause": "core/openferment_core/project_state.py:662-670 (remove refuses the lock kind and the non-removable kinds); the runbooks kind is removable (project_state.py:144) and _remove (project_state.py:646-660) drops the row without reading its lock (_frozen, project_state.py:534).",
+   "confidence": "high",
+   "fixSize": "small",
+   "evidence": "Run on bh_h5_main and on a fresh bh_h5_fresh (fresh/kind_collision.log)."
+  },
+  {
+   "id": "H5-05",
+   "title": "POST /api/fermos/forecast answers 500 for a fit artifact the project does not hold",
+   "severity": "S3",
+   "kind": "Broken use",
+   "area": "fermOS forecast (POST /api/fermos/forecast; growth_forecast and fermos_write forecast at the tool door)",
+   "statement": "A forecast naming a fitArtifactId the project does not hold (another project's, or none) is an unhandled ArtifactNotFound: HTTP 500 'Internal Server Error' with no words, and the tool door's refusal is the bare id.",
+   "contract": "core/openferment_core/api.py:208 and docs/api/openapi.json info.description: \"A refusal is a status with its reason in `detail`, in words.\"; CLAUDE.md:87: \"a refusal is a 422 in words\"",
+   "reproCommand": "KEEP=1 bughunt/notes/H5/scripts/run_all.sh sse; bughunt/notes/H5/scripts/words.sh (H5-05 lines); or against any service: curl --noproxy '*' -H 'X-OpenFerment-Project: <id>' -H 'content-type: application/json' -X POST <origin>/api/fermos/forecast -d '{\"by\":\"bob\",\"fitArtifactId\":\"0123456789abcdef\"}'",
+   "expected": "A 404 or 422 in words: the project holds no kept fit of that id.",
+   "observed": "500 Internal Server Error in bh-a and in bh-b (A's own fit id sent from B gives the same); the service log shows openferment_core.artifacts.ArtifactNotFound raised through fermos.forecast_run; POST /api/tools/growth_forecast answers error \"growth_forecast refused: '0123456789abcdef'\".",
+   "cause": "core/openferment_core/api.py:734-738 catches fermos.FitRefused alone; core/openferment_core/fermos.py:926 artifacts.get(fit_artifact) raises artifacts.ArtifactNotFound.",
+   "confidence": "high",
+   "fixSize": "small",
+   "evidence": "probe_ops.py B variant (status 500, svc-8850.log traceback), then words.sh on the fresh service."
+  },
+  {
+   "id": "H5-06",
+   "title": "A request naming no project is answered as an empty project by catalogue readers and the tool door",
+   "severity": "S3",
+   "kind": "Contract break",
+   "area": "the project rule for requests that name none: catalogue readers (protparam, thermo volatility, pureos propose, guild check and evidence, the train engine's things) and POST /api/tools/{name}",
+   "statement": "With no X-OpenFerment-Project header, several routes answer as if the project's catalogue were empty (a 404 saying the product is not in the catalogue, a 200 check saying the skill is not held, the train engine listing no things) and the tool door answers 200 with '<tool> failed: ProjectRequired', where every other route answers the 422 that names the header.",
+   "contract": "docs/decisions/ADR-005-projects.md:28-29: \"a store call in a request that names none is a 422 that says which header to send\"",
+   "reproCommand": "KEEP=1 bughunt/notes/H5/scripts/run_all.sh sse; bughunt/notes/H5/scripts/words.sh (H5-06 lines)",
+   "expected": "422 with the words naming X-OpenFerment-Project, as GET /api/audit answers with no header.",
+   "observed": "No header: GET /api/protparam?product=product-a 404 'there is no product 'product-a' in the products catalogue'; GET /api/thermo/volatility 404; POST /api/pureos/propose 404 'there is no product ... in the products catalogue'; POST /api/guild/check 200 {ok:false, why: \"'SK-A' is not a skill Guild holds (none ship with alpha 2.0)\"}; POST /api/guild/evidence 422 about the skill; GET /api/engines 200 with the train engine's things []; POST /api/tools/catalogue_read 200 error 'catalogue_read failed: ProjectRequired: This names no project...'; POST /api/tools/literature_document 200 error \"the project holds no readable document '...' (ProjectRequired)\". GET /api/audit with no header: 422 naming the header.",
+   "cause": "core/openferment_core/catalogues.py:585-590 (_entries returns [] on ProjectRequired) and core/openferment_core/protocols.py:291-296 (held, the same), which the catalogue readers and Guild call; core/openferment_core/tools/__init__.py:558 turns the exception into '<name> failed: <class>: <words>' inside a 200; core/openferment_core/tools/literature.py:52-56 catches every exception as a document not held.",
+   "confidence": "high",
+   "fixSize": "small",
+   "evidence": "probe_ops.py 'none' variant: of the project-scoped operations that answered with no header, the ones reading the project's catalogue, skills or made trains answered as an empty project (the list above); the rest read no store. Then words.sh on the fresh service."
+  },
+  {
+   "id": "H5-07",
+   "title": "Guild's and Practice's unknown-skill refusal says none ship with alpha 2.0",
+   "severity": "S4",
+   "kind": "Drift",
+   "area": "Guild evidence and check, Practice drafts: refusal words",
+   "statement": "A skill the project's skill catalogue lacks is refused as \"'X' is not a skill Guild holds (none ship with alpha 2.0)\", while skills come from the project's catalogue, kept on /catalogues.",
+   "contract": "CLAUDE.md:15: \"A project's catalogues (strains with their aliases, products, Guild's skills, Primer's lessons) have a screen at `/catalogues` ... and Guild's protocol steps name skills from the skill catalogue\"",
+   "reproCommand": "bughunt/notes/H5/scripts/words.sh (H5-07 line: POST /api/guild/evidence in bh-b with skillId SK-NONE)",
+   "expected": "Words saying the project's skill catalogue holds no such skill, and where one is kept.",
+   "observed": "422 {\"detail\": \"skill: 'SK-NONE' is not a skill Guild holds (none ship with alpha 2.0)\"}",
+   "cause": "core/openferment_core/guild.py:395 and core/openferment_core/practice.py:487 (and the models.py:1426 docstring)",
+   "confidence": "high",
+   "fixSize": "small",
+   "evidence": "probe_ops.py and words.sh."
+  },
+  {
+   "id": "H5-08",
+   "title": "The sci-rag MCP server serves a project the database lacks as an empty project",
+   "severity": "S3",
+   "kind": "Inconsistency",
+   "area": "MCP: the sci-rag server (literature_mcp.py) against the openferment server",
+   "statement": "Started with --project naming a project the database does not hold (bh-zzz), a malformed id (../bh-a) or upper case (BH-A), the sci-rag server answers every call as an empty corpus and tells the client the project's documents enter on Intake, while the openferment server refuses the same ids in words naming the database and the project.",
+   "contract": "CLAUDE.md:98: \"both in `.mcp.json`, each acting in the project `--project` names and refusing in words without one\"; docs/TOOLS.md:888 (the openferment server): \"With no project, or one its store does not hold, the server connects and answers every call with words saying which, and nothing is read or made\"",
+   "reproCommand": "bughunt/notes/H5/scripts/words.sh (H5-08 lines); probe_tools.py rows rag-mcp-unknown, rag-mcp-malformed, rag-mcp-upper",
+   "expected": "Every sci-rag call refused in words naming the project the database does not hold, as the openferment server answers.",
+   "observed": "openferment server literature_sources: \"The database bh_h5_fresh on 127.0.0.1:5432 holds no project named 'bh-zzz'...\"; sci-rag server list_sources {sources: {}}, corpus_stats documents 0, search_corpus results [], get_document 'No such document', search_entities \"The project bh-zzz holds no passage yet: its documents enter on Intake, and `pnpm lit:graph --project bh-zzz --by <name>` then builds the concept graph\"; the same for ../bh-a and BH-A.",
+   "cause": "core/openferment_core/literature_mcp.py:68-70 (_named checks that a project is named, never that the database holds it or that it is a project id) and literature/graph.py's NO_PASSAGES, which covers 'a store that holds no project of the id'.",
+   "confidence": "high",
+   "fixSize": "small",
+   "evidence": "probe_tools.py (bh_h5_main) and words.sh (bh_h5_fresh)."
+  }
+ ],
+ "suspected": [
+  {
+   "title": "Audit ids and event ids count across projects, so B learns how much A does",
+   "tried": "GET /api/audit from A and B: ids interleave (B 32-34, A 37-39); SSE ids likewise (events.py says ids count up in this process). B can count A's rows between two of its own. Not filed: no contract names the id space."
+  },
+  {
+   "title": "Two X-OpenFerment-Project headers are accepted, the first acting",
+   "tried": "http.client with two headers: first bh-b then bh-a acts in bh-b, the reverse in bh-a; 'bh-b, bh-a' in one header is a 422. No contract line on duplicates; not filed."
+  },
+  {
+   "title": "DELETE /api/state/scenarios/{id} of a study scenario says removed: true while the study scenario stays",
+   "tried": "Before H5-03's overwrite, DELETE of a study scenario's id is a no-op answered {removed: true}; StateTakenBack reads 'removed says the project holds no such row now', true of the Proforma kind alone. Folded into H5-03's area, not filed."
+  }
+ ],
+ "needsLiveModel": [
+  "H5-01 through /api/literature/answer and the sci-rag answer_question: the same narrowing, and the answer's citations may name A's passage; the keyless service refuses before generating, so only search was raced.",
+  "A Postdoc turn in B citing a passage that H5-01 returns (search_passages in the loop) and the claim's later reads.",
+  "The concept-graph build (pnpm lit:graph) over a shared document: the kit matches names against aliases across the store, which literature/graph.py says it leaves to the build; the reads were checked over hand-written rows alone.",
+  "The kit's graph stage under the deep profile (an entity extraction call), scoped by eligible documents."
+ ],
+ "held": [
+  "133 operations from B with A's ids in paths, queries and bodies (1,614 requests): no row of A read, listed, changed or deleted; A's 19 reads and its audit identical before and after, on two databases.",
+  "Malformed headers (upper case, unicode hyphen, 200 characters, a path, a tab) are 422 in words and an unknown project 404, before any route; the header wins over ?project=; spaces are stripped by the server to an empty header.",
+  "B makes rows under every id A uses (dep-a, tr-a, lc-a and turn-a, strain-a, p-a, ssc-..., sff-...), each its own under (project_id, id); deterministic ids (artifact and run hashes, scenario ids) stay per project.",
+  "A measurement origin naming A's reading is refused from B ('the project holds no deposition dep-a, so it holds no reading dep-a/de-a1'); A's record, run, comparison, runbook, protocol, check and proposal ids are refused from B in words (convert_units, engine_report, flowsheets/export, comparisons, runbooks, protocols, Guild checks, proposals).",
+  "Every registry tool from B through the HTTP door, the openferment MCP server in its own process and through --service: no A word or id; A unchanged; B's gated proposals naming A's ids carry out on nothing of A's.",
+  "The openferment MCP server refuses unknown, malformed and upper-case projects in words in both modes.",
+  "SSE: B's stream carries no event of A's; replays with Last-Event-ID 0, one below A's first id, after=0 and after=-5 replay B's alone.",
+  "/rag with a test key: status, manifest, documents, a document of A's (404 from B), query; 422 in the kit's shape with no project.",
+  "Concept-graph reads over hand-written rows: B lists no A-only entity or edge, a description only where every naming document is B's, an A-only quote withheld.",
+  "B's export package holds nothing of A's.",
+  "Audit filters (who, action, target) from B find none of A's rows."
+ ],
+ "unexamined": [
+  {
+   "item": "Screens and the browser's project switching (lib/project.ts, durable.ts)",
+   "reason": "outside H5's code list; the brief names the service, tools, MCP, SSE, graph and /rag"
+  },
+  {
+   "item": "pnpm lit:graph, pnpm lit:report --project and pnpm eval as commands",
+   "reason": "the build and the report need a model or the fastembed lane; their project reads (graph.pending, kit.visible) were read and the reads exercised"
+  },
+  {
+   "item": "A service whose environment sets OPENFERMENT_PROJECT",
+   "reason": "the middleware sets no project for every /api and /rag request, so the fallback reaches no route; a fresh-context thread calling a store was looked for and none found"
+  }
+ ]
+}

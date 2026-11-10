@@ -1,0 +1,15 @@
+service: http://127.0.0.1:9903 over a fresh bh_r_h3_03_svc (keyless), commit ae13efe
+[1 runbook rb1] 200
+[2 deposition dep1, closed and reconciled, reading e1 40 g/L] 200
+[3 contrast: rewrite dep1's reading e1 to 400 g/L by Someone Else] 422 {"detail": "dep1: reading e1 keeps the value it was taken with (40.0), and this write sets 400.0; a correction is a new reading"}
+[4 release measured evidence me1, 40 g/L, by Ada Lovelace] 200 value 40.0
+[5 write me1 again, 400 g/L, by Someone Else] 200 {"kind": "measuredEvidence", "id": "me1", "value": {"id": "me1", "depositionId": "dep1", "runbookId": "rb1", "productId": null, "predictionId": "p1", "label": "Ethanol titre", "value": 400.0, "unit": "g/L", "provenance":
+[6 GET /api/state] me1 value 400.0 provenance measured confirmed True; dep1 reading e1 [40.0], its reconciliation observed [40.0]
+[7 GET /api/audit?target=me1] 1 row(s): [('keep_measuredEvidence', 'Ada Lovelace', 'me1')]
+[8 runbooks_read runbooks/measured-evidence/me1] provenance measured value 400.0 g/L
+[9 DELETE me1] 422 {"detail": "a measuredEvidence is kept as it was made, and never taken back"}
+EXPECTED: the second write of me1 (40 to 400 g/L, by another person) is refused in words with a 422, as the deposition's own reading is at step 3, or at the least it leaves an audit row naming who changed it; the reads keep 40 g/L, the value the reconciliation observed
+OBSERVED: deposition rewrite refused 422; me1 rewrite answered 200; GET /api/state keeps me1 at 400.0 g/L marked measured; audit for me1 holds [('keep_measuredEvidence', 'Ada Lovelace', 'me1')]; runbooks_read serves me1 as measured 400.0 g/L; dep1's reconciliation still says observed [40.0]
+[10 deposition screen] SCREEN_BAND: Released to BioRepo 1 Measured · first-party Measured · first-party. Ethanol titre 400 g/L with no protocol’s steps Evidence, not an override These are records 
+checks: DEFECT (overwrote=True unaudited=True served_as_measured=True)
+RESULT: DEFECT

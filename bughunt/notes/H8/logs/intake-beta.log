@@ -1,0 +1,66 @@
+[upload] empty .md: 200 {"status": "failed", "reason": "empty.md is empty", "documentId": null, "title": "", "identifier": "empty.md", "chunks": 0, "licenceClass": "unknown"}
+[upload] whitespace-only .md: 200 {"status": "failed", "reason": "the kit did not store it: no extractable text", "documentId": null, "title": "blank", "identifier": "blank.md", "chunks": 0, "licenceClass": "unknown"}
+[upload] heading-only .md: 200 {"status": "failed", "reason": "the kit did not store it: no extractable text", "documentId": null, "title": "Only a title", "identifier": "heading-only.md", "chunks": 0, "licenceClass": "unknown"}
+[upload] UTF-16 .md: 200 {"status": "failed", "reason": "the kit did not store it: parse error: 'utf-8' codec can't decode byte 0xff in position 0: invalid start byte", "documentId": null, "title": "utf16", "identifier": "utf16.md", "chunks": 0, "licenceClass": "unknown"}
+[upload] Latin-1 .txt: 200 {"status": "failed", "reason": "the kit did not store it: parse error: 'utf-8' codec can't decode byte 0xe9 in position 26: invalid continuation byte", "documentId": null, "title": "latin1", "identifier": "latin1.txt", "chunks": 0, "licenceClass": "unknown"}
+[upload] invalid UTF-8 .md: 200 {"status": "failed", "reason": "the kit did not store it: parse error: 'utf-8' codec can't decode byte 0xff in position 14: invalid start byte", "documentId": null, "title": "H8 bad", "identifier": "badutf8.md", "chunks": 0, "licenceClass": "unknown"}
+[upload] PDF with no text layer: 200 {"status": "failed", "reason": "the PDF has no text layer on any of its 2 pages", "documentId": null, "title": "", "identifier": "blank.pdf", "chunks": 0, "licenceClass": "unknown"}
+[upload] damaged PDF: 200 {"status": "failed", "reason": "the PDF did not parse: Stream has ended unexpectedly", "documentId": null, "title": "", "identifier": "damaged.pdf", "chunks": 0, "licenceClass": "unknown"}
+[upload] PDF with text: 200 {"status": "linked", "reason": null, "documentId": "f457c9e3c8cf4464b23c70f2c7daecd9", "title": "H8 text PDF", "identifier": "text.pdf", "chunks": 0, "licenceClass": "unknown"}
+[upload] PDF with text, again (same bytes): 200 {"status": "held", "reason": null, "documentId": "f457c9e3c8cf4464b23c70f2c7daecd9", "title": "H8 text PDF", "identifier": "text.pdf", "chunks": 0, "licenceClass": "unknown"}
+[upload] JATS UTF-8: 200 {"status": "linked", "reason": null, "documentId": "480be5f27747431fbf0a711a2af9a1f8", "title": "H8 JATS café study", "identifier": "jats.xml", "chunks": 0, "licenceClass": "unknown"}
+[upload] JATS UTF-16: 200 {"status": "failed", "reason": "XML did not parse: not well-formed (invalid token): line 1, column 0", "documentId": null, "title": "", "identifier": "jats-utf16.xml", "chunks": 0, "licenceClass": "unknown"}
+[upload] JATS Latin-1: 200 {"status": "held", "reason": null, "documentId": "480be5f27747431fbf0a711a2af9a1f8", "title": "H8 JATS caf� study", "identifier": "jats-latin1.xml", "chunks": 0, "licenceClass": "unknown"}
+[upload] non-JATS XML: 200 {"status": "failed", "reason": "no <article> element (root is <root>)", "documentId": null, "title": "", "identifier": "x.xml", "chunks": 0, "licenceClass": "unknown"}
+[upload] XML entity bomb: 200 {"status": "failed", "reason": "XML did not parse: limit on input amplification factor (from DTD and entities) breached: line 1, column 342", "documentId": null, "title": "", "identifier": "bomb.xml", "chunks": 0, "licenceClass": "unknown"}
+[upload] XML external entity: 200 {"status": "failed", "reason": "XML did not parse: undefined entity &x;: line 1, column 122", "documentId": null, "title": "", "identifier": "xxe.xml", "chunks": 0, "licenceClass": "unknown"}
+[upload] wrong suffix .docx: 200 {"status": "failed", "reason": "paper.docx is not one of .pdf, .md, .markdown, .txt, .html, .htm, .xml", "documentId": null, "title": "", "identifier": "paper.docx", "chunks": 0, "licenceClass": "unknown"}
+[upload] no suffix: 200 {"status": "failed", "reason": "README is not one of .pdf, .md, .markdown, .txt, .html, .htm, .xml", "documentId": null, "title": "", "identifier": "README", "chunks": 0, "licenceClass": "unknown"}
+[upload] HTML with script: 200 {"status": "linked", "reason": null, "documentId": "fb047f57442b43dba92889acaed248f1", "title": "H8 page", "identifier": "page.html", "chunks": 0, "licenceClass": "unknown"}
+[upload] same identifier, other bytes (1): 200 {"status": "linked", "reason": null, "documentId": "4e43f52344c24c278194859b1c1589da", "title": "Same name", "identifier": "same-name.md", "chunks": 0, "licenceClass": "unknown"}
+[upload] same identifier, other bytes (2): 200 {"status": "linked", "reason": null, "documentId": "569f9f08c1bd4ff180f32bfe5b81279a", "title": "Same name", "identifier": "same-name.md", "chunks": 0, "licenceClass": "unknown"}
+[upload] dot-dot name: 200 {"status": "linked", "reason": null, "documentId": "dc038a3d36be4c9b9c5e605b4cf3e8c0", "title": "Traversal", "identifier": "passwd.md", "chunks": 0, "licenceClass": "unknown"}
+[upload] percent-encoded dot-dot name: 200 {"status": "linked", "reason": null, "documentId": "8afb4cca5437409dac81791ea3799f4b", "title": "Traversal two", "identifier": "passwd2.md", "chunks": 0, "licenceClass": "unknown"}
+[upload] very long name: 200 {"status": "linked", "reason": null, "documentId": "ee17b330a1d14b4d84a644fd21cda2ac", "title": "Long name", "identifier": "nnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnn
+[upload] unicode name: 200 {"status": "linked", "reason": null, "documentId": "c7a96beef7e847dfb5cc83bcc453faec", "title": "Unicode name", "identifier": "résumé ✓ 文献.md", "chunks": 0, "licenceClass": "unknown"}
+[upload] HTML in the name: 200 {"status": "linked", "reason": null, "documentId": "a5251ff5fba8436cabb6ff2f600b0e19", "title": "HTML name", "identifier": "<img src=x onerror=alert(1)>.md", "chunks": 0, "licenceClass": "unknown"}
+[upload] script in the name: 200 {"status": "linked", "reason": null, "documentId": "deb2c9710efb4d2cac8ece282f11abe3", "title": "Script name", "identifier": "script>.md", "chunks": 0, "licenceClass": "unknown"}
+[upload] NUL in the name: 200 {"status": "linked", "reason": null, "documentId": "eb592f951680406180e9c09aeba21aec", "title": "NUL name", "identifier": "nul\u0000byte.md", "chunks": 0, "licenceClass": "unknown"}
+[upload] licence class not a class: 200 {"status": "failed", "reason": "'cc-by' is not a licence class; the classes are public, open_commercial, open_noncommercial, restricted, unknown", "documentId": null, "title": "", "identifier": "lc.md", "chunks": 0, "licenceClass": "unknown"}
+[upload] licence class empty: 200 {"status": "ingested", "reason": null, "documentId": "1f91d25046fc4299a6c64c388a503f5e", "title": "LC2", "identifier": "lc2.md", "chunks": 1, "licenceClass": "unknown"}
+[upload] by empty: 422 {"detail": [{"type": "missing", "loc": ["body", "by"], "msg": "Field required", "input": null}]}
+[upload] 51 MB text (past 50 MB): 413 {"detail": "big.txt is larger than 50 MB"}
+[paste] empty text: 422 {"detail": [{"type": "string_too_short", "loc": ["body", "text"], "msg": "String should have at least 1 character", "input": "", "ctx": {"min_length": 1}}]}
+[paste] whitespace text: 200 {"status": "failed", "reason": "nothing was pasted", "documentId": null, "title": "", "identifier": "T", "chunks": 0, "licenceClass": "unknown"}
+[paste] empty title: 422 {"detail": [{"type": "string_too_short", "loc": ["body", "title"], "msg": "String should have at least 1 character", "input": "", "ctx": {"min_length": 1}}]}
+[paste] whitespace title: 200 {"status": "failed", "reason": "pasted text needs a title", "documentId": null, "title": "", "identifier": "", "chunks": 0, "licenceClass": "unknown"}
+[paste] title with markup: 200 {"status": "ingested", "reason": null, "documentId": "11179ef8f0464df99080cc39c0bad1b1", "title": "<img src=x onerror=alert(1)>", "identifier": "<img src=x onerror=alert(1)>", "chunks": 1, "licenceClass": "unknown"}
+[paste] javascript url: 200 {"status": "ingested", "reason": null, "documentId": "9885f92af8f04c8ebfb75e6f3670742b", "title": "JS url", "identifier": "JS url", "chunks": 1, "licenceClass": "open_commercial"}
+[paste] text past the limit: 422 {"detail": [{"type": "string_too_long", "loc": ["body", "text"], "msg": "String should have at most 2000000 characters", "input": "xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx
+[paste] same text as the text PDF: 200 {"status": "held", "reason": null, "documentId": "f457c9e3c8cf4464b23c70f2c7daecd9", "title": "Pasted twin", "identifier": "Pasted twin", "chunks": 0, "licenceClass": "unknown"}
+[collect] '': 422 {"detail": [{"type": "string_too_short", "loc": ["body", "identifier"], "msg": "String should have at least 1 character", "input": "", "ctx": {"min_length": 1}}]}
+[collect] '   ': 200 {"status": "failed", "reason": "no identifier given", "documentId": null, "title": "", "identifier": "", "chunks": 0, "licenceClass": "unknown"}
+[collect] '12345': 200 {"status": "failed", "reason": "12345 could be a PMID or an OSTI id; write PMID:12345 or OSTI:12345", "documentId": null, "title": "", "identifier": "12345", "chunks": 0, "licenceClass": "unknown"}
+[collect] 'PMID:': 200 {"status": "failed", "reason": "'PMID:' is not a PMCID, a DOI or a PMID", "documentId": null, "title": "", "identifier": "PMID:", "chunks": 0, "licenceClass": "unknown"}
+[collect] 'OSTI:abc': 200 {"status": "failed", "reason": "'OSTI:abc' is not a PMCID, a DOI or a PMID", "documentId": null, "title": "", "identifier": "OSTI:abc", "chunks": 0, "licenceClass": "unknown"}
+[collect] 'https://www.osti.gov/biblio/notdigits': 200 {"status": "failed", "reason": "'https://www.osti.gov/biblio/notdigits' names no OSTI report", "documentId": null, "title": "", "identifier": "https://www.osti.gov/biblio/notdigits", "chunks": 0, "licenceClass": "unknown"}
+[collect] 'http://127.0.0.1:8885/x.yeastgenome.org': 200 {"status": "failed", "reason": "'http://127.0.0.1:8885/x.yeastgenome.org' is not a PMCID, a DOI or a PMID", "documentId": null, "title": "", "identifier": "http://127.0.0.1:8885/x.yeastgenome.org", "chunks": 0, "licenceClass": "unknown"}
+[collect] 'https://yeastgenome.org@127.0.0.1:8885/': 200 {"status": "failed", "reason": "'https://yeastgenome.org@127.0.0.1:8885/' is not a PMCID, a DOI or a PMID", "documentId": null, "title": "", "identifier": "https://yeastgenome.org@127.0.0.1:8885/", "chunks": 0, "licenceClass": "unknown"}
+[collect] 'javascript:alert(1)': 200 {"status": "failed", "reason": "'javascript:alert(1)' is not a PMCID, a DOI or a PMID", "documentId": null, "title": "", "identifier": "javascript:alert(1)", "chunks": 0, "licenceClass": "unknown"}
+
+DOCUMENTS HELD: 15
+  9885f92af8f04c8ebfb75e6f3670742b | JS url | paste | 1 chunks | open_commercial | project:beta:paste | javascript:alert(1)
+  11179ef8f0464df99080cc39c0bad1b1 | <img src=x onerror=alert(1)> | paste | 1 chunks | unknown | project:beta:paste | paste:<img src=x onerror=alert(1)>
+  1f91d25046fc4299a6c64c388a503f5e | LC2 | upload | 1 chunks | unknown | project:beta:upload | upload:lc2.md
+  eb592f951680406180e9c09aeba21aec | NUL name | upload | 1 chunks | unknown | project:alpha:upload | /tmp/openferment-collected-7ajm5d04/nul-byte.md.md
+  deb2c9710efb4d2cac8ece282f11abe3 | Script name | upload | 1 chunks | unknown | project:alpha:upload | upload:script>.md
+  a5251ff5fba8436cabb6ff2f600b0e19 | HTML name | upload | 1 chunks | unknown | project:alpha:upload | upload:<img src=x onerror=alert(1)>.md
+  c7a96beef7e847dfb5cc83bcc453faec | Unicode name | upload | 1 chunks | unknown | project:alpha:upload | upload:résumé ✓ 文献.md
+  ee17b330a1d14b4d84a644fd21cda2ac | Long name | upload | 1 chunks | unknown | project:alpha:upload | upload:nnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnn.md
+  8afb4cca5437409dac81791ea3799f4b | Traversal two | upload | 1 chunks | unknown | project:alpha:upload | upload:passwd2.md
+  dc038a3d36be4c9b9c5e605b4cf3e8c0 | Traversal | upload | 1 chunks | unknown | project:alpha:upload | upload:passwd.md
+  569f9f08c1bd4ff180f32bfe5b81279a | Same name | upload | 1 chunks | unknown | project:alpha:upload | upload:same-name.md
+  4e43f52344c24c278194859b1c1589da | Same name | upload | 1 chunks | unknown | project:alpha:upload | upload:same-name.md
+  fb047f57442b43dba92889acaed248f1 | H8 page | upload | 1 chunks | unknown | project:alpha:upload | upload:page.html
+  480be5f27747431fbf0a711a2af9a1f8 | H8 JATS café study | upload | 2 chunks | unknown | project:alpha:upload | upload:jats.xml
+  f457c9e3c8cf4464b23c70f2c7daecd9 | H8 text PDF | upload | 1 chunks | unknown | project:alpha:upload | upload:text.pdf

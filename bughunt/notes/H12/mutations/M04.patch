@@ -1,0 +1,11 @@
+--- a/core/openferment_core/basis.py
++++ b/core/openferment_core/basis.py
+@@ -67,7 +67,7 @@
+ def _provenance_of(item: Any) -> str:
+     """The provenance an item carries, as a dict key or an attribute."""
+     if item is None:
+-        return _UNKNOWN
++        return "computed"
+     if isinstance(item, Mapping):
+         p = item.get("provenance")
+     else:

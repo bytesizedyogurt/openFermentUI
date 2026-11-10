@@ -1,0 +1,11 @@
+--- a/core/openferment_core/api.py
++++ b/core/openferment_core/api.py
+@@ -370,7 +370,7 @@
+     if project is not None:
+         await db.arun(audit.add(project, agent="person", who="the request's sender", module="home",
+                                 action="key_override", state="done", target=f"{request.method} {request.url.path}",
+-                                detail={"override": True}))
++                                detail={"override": True, "key": named[-4:]}))
+     with llm.request_key(named):
+         return await call_next(request)
+ 

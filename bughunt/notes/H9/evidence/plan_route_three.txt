@@ -1,0 +1,17 @@
+{
+ "route": [
+  "claude-opus-5-5",
+  "claude-sonnet-5-5",
+  "claude-haiku-5-5"
+ ],
+ "asked": [
+  "claude-opus-5-5",
+  "claude-sonnet-5-5"
+ ],
+ "declined": "claude-sonnet-5-5 answered 529: overloaded",
+ "steps": [
+  "Swept the modules for what the question names \u00b7 searched ten, found in none",
+  "claude-opus-5-5 was unavailable; asked again on claude-sonnet-5-5",
+  "No answer: claude-sonnet-5-5 answered 529: overloaded"
+ ]
+}

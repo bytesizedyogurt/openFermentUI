@@ -1,0 +1,24 @@
+422 | empty file | {"detail": "e.csv is a CSV with no 'id' and 'name' columns"}
+422 | whitespace | {"detail": "w.csv is a CSV with no 'id' and 'name' columns"}
+200 | CSV with BOM | {"kind": "strain", "kept": ["S1"], "refused": []}
+422 | UTF-16 CSV | {"detail": "u16.csv is not UTF-8 text; a catalogue file is JSON or CSV"}
+422 | Latin-1 CSV | {"detail": "l1.csv is not UTF-8 text; a catalogue file is JSON or CSV"}
+422 | invalid UTF-8 | {"detail": "bad.csv is not UTF-8 text; a catalogue file is JSON or CSV"}
+200 | duplicate id in one file | {"kind": "strain", "kept": ["S5", "S5"], "refused": []}
+200 | row naming another keeper and lane | {"kind": "strain", "kept": ["S6"], "refused": []}
+422 | JSON null row | {"detail": "n.json holds no list of entries (a list of objects, or one under 'entries')"}
+422 | JSON number | {"detail": "num.json is a CSV with no 'id' and 'name' columns"}
+200 | JSON under entries | {"kind": "strain", "kept": ["S7"], "refused": []}
+422 | 2001 rows | {"detail": "many.csv holds 2001 rows; a file takes 2000 at most"}
+413 | past 4 MB | {"detail": "big.csv is larger than 4 MB"}
+404 | kind not a catalogue | {"detail": "there is no catalogue of 'bogus': the catalogues are strain, product, skill, lesson"}
+422 | by empty | {"detail": [{"type": "missing", "loc": ["body", "by"], "msg": "Field required", "input": null}]}
+422 | by whitespace | {"detail": "a catalogue file is taken in a person's name"}
+200 | hostile file name | {"kind": "strain", "kept": ["S11"], "refused": []}
+200 | formula in a cell | {"kind": "strain", "kept": ["S12"], "refused": []}
+200 | id with a slash | {"kind": "strain", "kept": [], "refused": ["row 1: id: an entry's id starts with a letter or a digit, then holds letters, digits, '.', '_', ':' or '-', at most 80 characters in all, and 'a/b' does not"]}
+200 | product with a number in its words | {"kind": "product", "kept": ["P1"], "refused": []}
+
+strain: [('S1', 'Strain one', 'h8', 'person', 'the file bom.csv'), ('S11', 'Eleven', 'h8', 'person', 'the file ../<script>alert(1)</script>.csv'), ('S12', '=HYPERLINK("x")', 'h8', 'person', 'the file f.csv'), ('S5', 'Second', 'h8', 'person', 'the file dup.csv'), ('S6', 'Six', 'h8', 'person', "a row's own words"), ('S7', 'Seven', 'h8', 'person', 'the file ent.json')] (6 in all)
+
+product: [('P1', 'Prod', 'h8', 'person', 'the file p.csv')] (1 in all)

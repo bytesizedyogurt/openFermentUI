@@ -1,0 +1,14 @@
+--- a/core/openferment_core/literature/collectors.py
++++ b/core/openferment_core/literature/collectors.py
+@@ -259,10 +259,7 @@
+         return ipaddress.ip_address(host)
+     except ValueError:
+         pass
+-    try:
+-        return ipaddress.IPv4Address(socket.inet_aton(host))
+-    except (OSError, ValueError):
+-        return None
++    return None
+ 
+ 
+ def _v4(address: IPAddress) -> IPAddress:

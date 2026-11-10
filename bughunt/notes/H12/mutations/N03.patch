@@ -1,0 +1,11 @@
+--- a/core/openferment_core/events.py
++++ b/core/openferment_core/events.py
+@@ -100,7 +100,7 @@
+ def recent(project: str, after: int = 0) -> list[Event]:
+     """The kept events of a project after `after`, oldest first."""
+     with _lock:
+-        return [e for e in _kept if e.project == project and e.id > after]
++        return [e for e in _kept if e.id > after]
+ 
+ 
+ @contextmanager

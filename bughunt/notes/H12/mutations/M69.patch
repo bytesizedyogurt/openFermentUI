@@ -1,0 +1,11 @@
+--- a/core/openferment_core/biorepo.py
++++ b/core/openferment_core/biorepo.py
+@@ -276,7 +276,7 @@
+     a rejection or a correction left unverified among them. The client's
+     `provenanceOf` reads a decided record the same way."""
+     if d.status == "verified":
+-        return "gold" if _is_gold(d) else "verified"
++        return "verified" if _is_gold(d) else "gold"
+     return "unverified"
+ 
+ 

@@ -1,0 +1,11 @@
+--- a/core/openferment_core/engine/conform.py
++++ b/core/openferment_core/engine/conform.py
+@@ -488,7 +488,7 @@
+     except Exception as e:
+         four = (False, f"the replay failed: {type(e).__name__}: {_words(e)}")
+     if run.sff is not None:
+-        return four, (bool(run.sff.valid and run.sff.score is not None),
++        return four, (run.sff.score is not None,
+                       f"record {run.sff.recordId}: {'valid' if run.sff.valid else 'not valid'}, score {run.sff.score}")
+     said = (run.sffRefused or "").strip()
+     return four, (_traceless(said), f"no file, in words: {_cut(said, 200)}" if said else "no file, and no words for why")

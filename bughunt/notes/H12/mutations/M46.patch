@@ -1,0 +1,11 @@
+--- a/core/openferment_core/engine/registry.py
++++ b/core/openferment_core/engine/registry.py
+@@ -91,7 +91,7 @@
+         return (f"the entry point's name {name!r} is no engine name: lowercase letters, digits and -, starting "
+                 "with a letter")
+     own = getattr(obj, "name", None)
+-    if own != name:
++    if False:
+         return f"the object at {entry} names itself {own!r} where its entry point names {name!r}"
+     worker = getattr(obj, "worker", None)
+     if worker is not None and not (isinstance(worker, str) and worker.strip()):

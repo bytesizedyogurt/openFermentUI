@@ -1,0 +1,222 @@
+{
+ "candidates": [
+  {
+   "id": "H1-01",
+   "title": "Identical runs asked at once keep one row whose by and created_by name different askers",
+   "severity": "S2",
+   "kind": "Contract break",
+   "area": "engine runs: keep_run, run_engine, compute_kept",
+   "statement": "When the same run request arrives more than once at the same moment, every ask computes, every ask is told the run is its own, and the one row keeps the first insert's created_by beside the last writer's body by and at.",
+   "contract": "docs/api/engines.md:541-544: \"The same request twice is one row, answered as it was first kept: its `by` and `created_by` are the first asker's, whoever asks again. `created_by` is the `runs` table's column for the asker ... served on every run as `EngineRun.by`, and check 8 reads both\"",
+   "reproCommand": "bughunt/notes/H1/scripts/repro_h1_01.sh (kinetics, the head's own service on bh_h1_r1); bughunt/notes/H1/scripts/concurrent_same.py ORIGIN PROJECT DB VALUE 4 for the mirror engine",
+   "expected": "One row whose body by and created_by both name the first asker, and every asker answered with that asker's name.",
+   "observed": "kinetics: run 7bae0ae9211431bf created_by asker-2, body by asker-0; 6cfdda5438758bf7 created_by asker-0, by asker-3; 5ee04828025b6941 created_by asker-3, by asker-2. mirror: run cd9933cb5a7834e9 answered asker-0, asker-1 and asker-2 each by its own name; the row then held created_by asker-1, body by asker-2, and GET /api/runs served asker-2.",
+   "cause": "core/openferment_core/engine/runs.py:463-467 and 484 (keep_run reads the held row, then writes with rows.put, an upsert that keeps the first created_by and replaces the body: core/openferment_core/db/rows.py:61-66); the check-then-compute window is runs.py:867-875 (run_engine) and 546-561 (compute_kept), with no lock or insert-once write",
+   "confidence": "high",
+   "fixSize": "small",
+   "evidence": "Four threads behind a barrier POST the same body with by asker-0..3; three kinetics values and five mirror values each gave one row whose created_by and body by differ (psql on openferment.runs)."
+  },
+  {
+   "id": "H1-02",
+   "title": "An engine set aside for its name or a failed import leaves cobra in the service process",
+   "severity": "S3",
+   "kind": "Contract break",
+   "area": "engine discovery: registry._load",
+   "statement": "An entry module that imports a worker library and is then set aside for another reason (an object misnamed, an import that raises) leaves that library in the service's process, its words never name it, and a later engine whose entry module imports the same library loads with no word said.",
+   "contract": "CLAUDE.md:41: \"BioSTEAM, thermosteam, biorefineries, the vendored SFF toolkit and cobra run in worker processes ...; the service process imports none of them\"; docs/api/engines.md:141-144: \"An entry module whose import brings into the service's process ... one of `biosteam`, `thermosteam`, `biorefineries`, `pisces_sff` and `cobra` is set aside, those modules named.\"",
+   "reproCommand": "bughunt/notes/H1/scripts/repro_probe.sh (H1-02 section: bughunt/notes/H1/scripts/heavy_left.py over the stand-in package bughunt/notes/H1/scripts/probe-engine)",
+   "expected": "cobra out of the service's process after discovery; h1z-heavy-unseen, whose entry module imports cobra, set aside with cobra named, as it is when it loads alone.",
+   "observed": "h1z-heavy-unseen alone: set aside, cobra named, cobra out after discovery. With h1a-misnamed-heavy (set aside for its name) or h1b-fails-heavy (ImportError after importing cobra) loaded first: h1z-heavy-unseen LOADED with no error, and cobra in sys.modules after discovery; the running service listed h1z-heavy-unseen with 18 things and its worker ready.",
+   "cause": "core/openferment_core/engine/registry.py:246-267: the modules an import added are counted and taken out of sys.modules only when _why_not passes (255-260); the failed-load return at 251-252 and a _why_not refusal both leave them, so the next entry point's `before` already holds cobra",
+   "confidence": "high",
+   "fixSize": "small",
+   "evidence": "heavy_left.py narrows registry.entry_points to the names given, imports openferment_core.api as the service does, and prints each h1 engine's verdict and whether cobra stands in sys.modules."
+  },
+  {
+   "id": "H1-03",
+   "title": "The documented conform command for a scenario flowsheet fails with ProjectRequired",
+   "severity": "S2",
+   "kind": "Broken use",
+   "area": "conformance: conform._inside",
+   "statement": "`python -m openferment_core.engine.conform biosteam --thing ethanol_glucose_v0 --inputs <file>` stops with `ProjectRequired: This names no project` and keeps no verdict, with the values set or without them; the same command with OPENFERMENT_PROJECT set to any id makes the eight checks.",
+   "contract": "docs/api/engines.md:670-672: \"`python -m openferment_core.engine.conform biosteam --thing ethanol_glucose_v0 --inputs <file>`. Named with a value it waits for left unset, the thing cannot run as it stands (the engine's `unready`), and the command refuses it in words\"; docs/BASE.md:44: \"`biosteam --thing <a scenario flowsheet> --inputs <file>`, the values a scenario flowsheet waits for\"",
+   "reproCommand": "bughunt/notes/H1/scripts/repro_h1_03.sh",
+   "expected": "The eight checks made on ethanol_glucose_v0 with the file's values; with no file, the refusal naming the six values that wait.",
+   "observed": "\"✗ the checks could not be made on biosteam: openferment_core.projects.ProjectRequired: This names no project. ...\", exit 1, both with the six values set and with none; with OPENFERMENT_PROJECT=any-id the checks ran and the no-file case gave the documented words.",
+   "cause": "core/openferment_core/engine/conform.py:1046-1053: _inside asks the engine's unready (BiosteamEngine.unready, engine/biosteam.py:284-305, which reads the Proforma provider's parameters and needs a current project) before the checks' project is made and entered at 1054-1055",
+   "confidence": "high",
+   "fixSize": "small",
+   "evidence": "Ran the command from the head's venv on a fresh bh_h1_r3 with a six-value inputs file; then again with OPENFERMENT_PROJECT set."
+  },
+  {
+   "id": "H1-04",
+   "title": "A scenario flowsheet run keeps a base price its own samples contradict, and its replay differs",
+   "severity": "S1",
+   "kind": "Wrong number",
+   "area": "biosteam engine: scenario flowsheets (Proforma worker)",
+   "statement": "The first case ethanol_glucose_v0 evaluates after the Proforma worker builds it prices at 6.360 USD/kg and every later case of the same six inputs at 7.372 USD/kg, so a run with fixed values keeps price.solvedPrice 6.36 beside quantiles p5 to p95 all at 7.37, and its replay answers 7.37 with 51 differences where the stated precision is rtol 0, atol 0.",
+   "contract": "docs/api/engines.md:616-618: \"A scenario flowsheet's is `rtol` 0, `atol` 0: `proforma.run` registers no tolerance, so its replay holds every output identically.\"; engines.md:936 (check 4); core/openferment_core/flowsheets/ethanol_glucose_v0.py:222: \"Empty it, so a case gives one answer whatever came first\"",
+   "reproCommand": "bughunt/notes/H1/scripts/repro_h1_03.sh (writes the inputs file), then bughunt/notes/H1/scripts/repro_h1_scenario_path.sh",
+   "expected": "With low = value = high on every input, every one of the 500 samples prices as the base case does, and a replay is identical.",
+   "observed": "run 4db3686888f39a7d: basePrice 6.36040554632803, quantiles p5/p25/p50/p75/p95 all 7.371976772110385; replay in the worker the run warmed: identical false, withinTolerance false, 51 differences, basePrice 6.36040554632803 -> 7.371976772110385, streams[12].P 162120.0 -> 212782.5; replay in a freshly started worker: basePrice identical, one difference in utilities.electricityConsumption's last digit, still withinTolerance false. conform biosteam --thing ethanol_glucose_v0 (run with OPENFERMENT_PROJECT set) fails check 4: \"different, where the thing's precision asks for identical outputs; 51 differences\".",
+   "cause": "core/openferment_core/workers/proforma_worker.py:180-202 keeps one built system per flowsheet (_BUILT) and evaluates every case on it in turn; core/openferment_core/flowsheets/ethanol_glucose_v0.py:199-230 empties the recycles and resets the TEA's secant, and the first simulate of a fresh build still lands in another state (stream 12's pressure among the differences). Cause in the flowsheet's carried state: medium confidence; the numbers: high",
+   "confidence": "high",
+   "fixSize": "medium",
+   "evidence": "POST /api/engines/biosteam/run {thing: ethanol_glucose_v0, six person-assumption values} on the head's service (fresh bh_h1_rs), then POST /api/biorepo/artifacts/{id}/replay twice; the same on H1's worktree service after a restart to give the replay a fresh worker."
+  },
+  {
+   "id": "H1-05",
+   "title": "The biosteam engine runs, and keeps receipts for, things and configurations its listing omits",
+   "severity": "S3",
+   "kind": "Contract break",
+   "area": "biosteam engine doors: run and parameters routes, engine tools",
+   "statement": "GET /api/engines lists cellulosic_ethanol_v0 in four configurations and lists no lactic, yet POST /api/engines/biosteam/run builds cellulosic_ethanol_v0 in 'AFEX, IB' and builds lactic, each kept as a refused runs row, and the parameters route builds 'AFEX, IB' too.",
+   "contract": "docs/api/engines.md:242-248: \"so is a configuration the thing does not name ... The rule holds at every door: the run route, the parameters route and the engine tools ... BioSTEAM's library plants follow it at their own doors too\"; engines.md:611: configurations \"those it built in here\"",
+   "reproCommand": "bughunt/notes/H1/scripts/repro_h1_04.sh",
+   "expected": "A 422 naming the four configurations cellulosic_ethanol_v0 runs in, and one naming the things the engine runs for lactic, each before anything is built, with nothing kept.",
+   "observed": "422 \"cellulosic_ethanol_v0 AFEX, IB is infeasible here (BioSTEAM's InfeasibleRegion): <Mixer: M207> conversion of 'NH3' is over 100%\" after a build, receipt a9c4e1880088113d kept (configuration 'AFEX, IB'); 422 \"biorefineries.lactic could not be built under biosteam 2.54.0: IndexError: list assignment index out of range\", receipt eaf032f1c7918eaa kept. GET /api/engines/biosteam/parameters?thing=cellulosic_ethanol_v0&configuration=AFEX, IB also built it (14 s) and answered BioSTEAM's words.",
+   "cause": "core/openferment_core/engine/biosteam.py:160-169 (default_configuration passes any named configuration) and 108-117 (unknown holds every shelf id); core/openferment_core/engine/library.py:111-126 (_runnable checks the shelf's configurations, every one the package names, where the engine's thing lists the built ones, biosteam.py:129-131)",
+   "confidence": "high",
+   "fixSize": "small",
+   "evidence": "Head's service on fresh bh_h1_r4: GET /api/engines, two POSTs, psql on openferment.runs."
+  },
+  {
+   "id": "H1-06",
+   "title": "A thing stating an infinite precision answers 500 and is listed with atol null",
+   "severity": "S3",
+   "kind": "Contract break",
+   "area": "contract engines: EngineThing shape, run_engine",
+   "statement": "A worker whose things answer gives a thing the precision atol Infinity passes the shape check; GET /api/engines then serves its atol as null against the schema's number, and POST /api/engines/{name}/run answers a plain-text 500 Internal Server Error from json.dumps.",
+   "contract": "docs/api/workers.md:62-67: \"An answer outside the shapes below (... a number that is NaN or infinite ...) breaks the contract: the service raises `EngineBroken`, keeps no runs row and answers 503 in words\"; docs/api/engines.md:516-520: \"503 for ... a worker that answers outside the protocol, with no run kept\"",
+   "reproCommand": "bughunt/notes/H1/scripts/repro_probe.sh (thing infprec of the stand-in engine probe)",
+   "expected": "The things answer refused as outside the protocol (EngineBroken): the engine listed with those words, and its routes 503 in words.",
+   "observed": "GET /api/engines: ('infprec', {'rtol': 0.0, 'atol': None}); POST /api/engines/probe/run {thing: infprec}: \"Internal Server Error\" [500]; the service log ends in ValueError: Out of range float values are not JSON compliant: inf, from artifacts.canonical.",
+   "cause": "core/openferment_core/models.py:4504-4509 (EnginePrecision: Field(ge=0) admits infinity); core/openferment_core/engine/runs.py:865 (artifact_id over a basis holding inf, artifacts.py:128-130 allow_nan=False) with no handler for ValueError in api.py engine_run",
+   "confidence": "high",
+   "fixSize": "small",
+   "evidence": "Stand-in worker writes its things line by hand with \"atol\": Infinity; service from H1's worktree."
+  },
+  {
+   "id": "H1-07",
+   "title": "Two things of one id are both listed and every run takes the last one's precision",
+   "severity": "S4",
+   "kind": "Inconsistency",
+   "area": "contract engines: things answer, thing_of",
+   "statement": "A things answer holding two things with the id dup (precisions 0/0 and 1/1) is accepted: GET /api/engines lists both, and every run of dup keeps precision.rtol 1 and precision.atol 1 in its basis, so its replay holds outputs to 100 percent with no word said.",
+   "contract": "docs/api/engines.md:229-230: \"`id`: ... A run names it as its `plant`.\" (one id names one thing); docs/api/workers.md:62-67 (an answer outside the shapes breaks the contract)",
+   "reproCommand": "bughunt/notes/H1/scripts/repro_probe.sh (thing dup)",
+   "expected": "Two things of one id refused as a things answer outside the protocol, or one thing listed and run.",
+   "observed": "GET /api/engines: ('dup', 'the first of two things of one id', {'rtol': 0.0, 'atol': 0.0}), ('dup', 'the second ...', {'rtol': 1.0, 'atol': 1.0}); the run's basis: precision.rtol 1.0, precision.atol 1.0.",
+   "cause": "core/openferment_core/engine/contract.py:161-167 (things kept as answered) and core/openferment_core/engine/runs.py:792 (a dict by id keeps the last)",
+   "confidence": "high",
+   "fixSize": "small",
+   "evidence": "Stand-in worker's things answer lists dup twice; service from H1's worktree."
+  },
+  {
+   "id": "H1-08",
+   "title": "A configuration listed with spaces around its name can never be run or read",
+   "severity": "S4",
+   "kind": "Inconsistency",
+   "area": "contract engines: EngineThing configurations, thing_of",
+   "statement": "A thing whose configurations are ['one', ' two '] passes the shape and is listed so, and the run route, the parameters route and engine_run each strip the configuration a request names, then refuse 'two' as none of them.",
+   "contract": "docs/api/engines.md:231-232: \"`configurations`: the configurations it runs in, each name 1 to 80 characters\"; engines.md:242-248 (the configuration rule holds at every door)",
+   "reproCommand": "bughunt/notes/H1/scripts/repro_probe.sh (thing cfg)",
+   "expected": "Either the listed name ' two ' runs, or the things answer is refused for a configuration name with spaces around it.",
+   "observed": "POST run {thing: cfg, configuration: ' two '}: 422 \"cfg runs in one,  two ; 'two' is none of them\"; the same from GET /api/engines/probe/parameters and from engine_run.",
+   "cause": "core/openferment_core/engine/runs.py:797 (configuration stripped) against core/openferment_core/models.py:4487 (ConfigurationName holds any 1 to 80 characters)",
+   "confidence": "high",
+   "fixSize": "small",
+   "evidence": "Stand-in worker; service from H1's worktree."
+  },
+  {
+   "id": "H1-09",
+   "title": "An output carrying a stray number is accepted and kept in the run's artifact",
+   "severity": "S4",
+   "kind": "Contract break",
+   "area": "contract engines: contract._typed",
+   "statement": "A run op whose output is {name, value, unit, stray: 42} is accepted as in shape, and the artifact keeps the stray number in its output, its hash and its replay.",
+   "contract": "docs/api/workers.md:62-63: \"An answer outside the shapes below (a result key missing, outputs that are no list of names, values and units, ...) breaks the contract\"; docs/api/engines.md:456: outputs `[{\"name\", \"value\", \"unit\"}, …]`",
+   "reproCommand": "bughunt/notes/H1/scripts/repro_probe.sh (thing extra)",
+   "expected": "The output refused as no name, value and unit (EngineBroken, 503), or kept as its three fields alone.",
+   "observed": "status done; artifact output values [{'name': 'x', 'value': 1.0, 'unit': 'u', 'stray': 42}].",
+   "cause": "core/openferment_core/engine/contract.py:177-197 (_typed checks the three keys are present and returns each item whole)",
+   "confidence": "high",
+   "fixSize": "small",
+   "evidence": "Stand-in worker; service from H1's worktree; conform probe --thing extra holds check 3 with it."
+  },
+  {
+   "id": "H1-10",
+   "title": "GET /api/engines says the Proforma worker is ready after it died",
+   "severity": "S4",
+   "kind": "Inconsistency",
+   "area": "GET /api/engines workerStatus: simulator.status",
+   "statement": "Once the Proforma worker has answered, GET /api/engines lists biosteam's and train's workerStatus as ready whatever becomes of the process; after it is killed no worker process lives and both still read ready, where a WorkerEngine whose worker died reads cold.",
+   "contract": "docs/api/engines.md:504-505 (GET /api/engines lists `worker` and `workerStatus`); core/openferment_core/engine/contract.py:104-106: \"`ready` while the worker's process answers, `cold` before its first use\"",
+   "reproCommand": "bughunt/notes/H1/scripts/repro_h1_09.sh",
+   "expected": "A status that reads cold (or failed) while no Proforma worker process lives.",
+   "observed": "\"Proforma workers alive under the service: 0\", then \"biosteam workerStatus ready\", \"train workerStatus ready\".",
+   "cause": "core/openferment_core/engine/simulator.py:43-44 (status() answers the last state kept; nothing reads worker().alive) through engine/biosteam.py:228-230 and pureos/engine.py:222-224",
+   "confidence": "high",
+   "fixSize": "small",
+   "evidence": "Head's service on fresh bh_h1_r9: a corn run warms the worker, SIGKILL its pid, read GET /api/engines."
+  }
+ ],
+ "suspected": [
+  {
+   "title": "Two requests whose `at` and note differ can share one run id",
+   "tried": "Read basis.assumption_source (core/openferment_core/basis.py:78-84): the basis note is `typed on <at>: <note>`, so at '2026-11-10: x' with no note and at '2026-11-10' with note 'x' write one note and one id. Not run; `at` accepts any words (a value at 'whenever' ran, run 1d6e388bfc6027ab)."
+  },
+  {
+   "title": "The Proforma worker, the worker the biosteam and train engines name, keeps the service's secrets in its environment",
+   "tried": "simulator.worker() builds SimWorker with withhold_secrets False (engine/simulator.py:35-40), and a crash's stderr tail reaches the 503 detail. engines.md's worker rule is written for contract engines; no leak was produced."
+  },
+  {
+   "title": "Output strings have no length bound",
+   "tried": "A 10,000,000-character output string was kept done; the runs row held it (115 kB compressed) and GET /api/runs answered 10 MB. The contract states no bound, so it stays a note."
+  },
+  {
+   "title": "The path dependence of H1-04 may reach custom_train_v1 and other cached shelf flowsheets",
+   "tried": "Only ethanol_glucose_v0 was run; custom_train_v1 needs a kept vessel design and a kept train run, and H1 made neither."
+  }
+ ],
+ "needsLiveModel": [],
+ "held": [
+  "Run id: recomputed with no openFerment code from engines.md's formula (sha256 of canonical {tool, toolVersion, inputs}, ensure_ascii off), it matched run 23aad3d656855f71 (scripts/id_check.py).",
+  "The same request twice, one after the other, is one row with the first asker's by; the same request in another project is that project's own row and artifact, and neither project reads the other's run (404).",
+  "Eight different mirror requests at once: eight rows, each answer echoing its own value, each with its own diagnostics.",
+  "Malformed and boundary requests at POST /api/engines/{name}/run and the parameters route (bare number, stray field, NaN, Infinity, 1e999, a 400-digit integer, true, low/high/basis on a contract run, unknown key, a key twice, wrong unit, words for a number, origin library-default/convention/none, no at, by blank, stray origin field, an unheld reading, configuration rules, 81-character configuration, 201-character name): each refused 422 in words or field errors, nothing kept; a value at its max runs and past it is refused.",
+  "Worker garbage: a line that is no JSON, NaN in an output, ok with no result, a things answer of another op: 503 in words, no row, the next ask restarts the worker; an answer for another request id is skipped and the right one taken, and one alone times out at the engine's timeout_s and is stopped.",
+  "Worker killed mid-run (probe worker and the Proforma worker during a cellulosic_ethanol_v0 build): 503 naming the worker, no runs row, and the next ask restarts the worker and computes.",
+  "sff_export answering a list: 503, the artifact kept and no row, as documented.",
+  "Discovery: a name claimed by two packages sets both aside; a package claiming biosteam is set aside beside the core's; SystemExit, ImportError, a misnamed object, a missing replay and an upper-case entry name each listed with words while the service runs on; an entry module asking the registry is answered [] at once from its own thread and after 10.0 s from a thread it starts.",
+  "Conformance: mirror, biosteam (no --thing), kinetics (--inputs from write_placeholder_inputs) and train (--project, a train made through from-run, check and PUT /api/state/trains) each hold all eight checks; a nondeterministic thing fails check 4 and an engine computing an unknown thing fails check 7; the refusal paths (things_are with no rests_on, --project on an engine without things_are, train without --project, an unknown project, a project with no train, an option with no value, an unknown option) answer in words, exit 2, and leave no openferment_conform_* database.",
+  "Version moves: reinstalling the probe at 0.1.1 gave new run ids, and a replay of a 0.1.0 run named toolVersion first; pnpm ready said the probe's verdict was made at an earlier version.",
+  "An uninstalled engine: its runs stay listed and readable, replay answers 409 in words, its run route 404, and engine_plants lists its runs under its name with 'no engine of this name is registered here now'.",
+  "engine_run through the tool: ?by= and X-OpenFerment-Assistant audit rows as engines.md says (module proforma, action engine_run, state open, detail.via http); diagnostics named in words.",
+  "Worker environment: every name workers.withheld covers (KEY, TOKEN, SECRET, PASSWORD, PASSWD, DATABASE_URL, CREDENTIAL anywhere, ANTHROPIC_ and SCI_RAG_ prefixes) stayed out of the sample worker's environment.",
+  "The mirror's own tests pass from its directory with the service's interpreter (30 passed), and the BASE.md install line installs it into a worktree's venv.",
+  "Provenance: computed at defaults, assumed for a person's value and for a model's estimate (with no by the row is kept as 'this browser')."
+ ],
+ "unexamined": [
+  {
+   "item": "A contract engine run that sets a deposition's reading (provenance measured)",
+   "reason": "needs a confirmed deposition entry, which the hunt did not build; the code path (basis.resolved before check_inputs) was read"
+  },
+  {
+   "item": "keep_run_file with a valid SFF document from a contract engine",
+   "reason": "no stand-in thing answered a real SFF document; the not-an-object and refusal paths were run"
+  },
+  {
+   "item": "pnpm prove step 9 and 10 with the mirror",
+   "reason": "a full proof is outside the hunt's resource limits; conform was run on each engine directly"
+  },
+  {
+   "item": "workers/proforma_worker.py, library_plants.py, geneos_worker.py, sff_toolkit.py, kept_references.py beyond their dispatch and the ops the runs exercised",
+   "reason": "read in part; their science and replays belong to the Proforma and geneOS hunts"
+  },
+  {
+   "item": "examples/agents/record-reader",
+   "reason": "an MCP client outside the engine contract; read and left unrun"
+  }
+ ]
+}

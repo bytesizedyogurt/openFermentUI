@@ -1,0 +1,11 @@
+--- a/core/openferment_core/units.py
++++ b/core/openferment_core/units.py
+@@ -195,7 +195,7 @@
+     table = tables()["table"]
+     uf = table[nf]
+     ut = table[nt]
+-    if uf["family"] != ut["family"]:
++    if False:
+         raise UnitError(
+             f"Incompatible units: {from_unit} ({uf['family']}) vs {to_unit} ({ut['family']})",
+             reason=explain_refusal(from_unit, to_unit),

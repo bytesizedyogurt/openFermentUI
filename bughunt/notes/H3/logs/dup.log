@@ -1,0 +1,6 @@
+first 200
+before: [('depD/d1', 10.0)]
+append a second entry under the id d1 (value 99, another measure): 200 {"kind":"depositions","id":"depD","value":{"id":"depD","runbookId":"rbD","protocolId":null,"operatorId":null,"startedAt":"2026-11-09T10:00:00Z","closedAt":null,"state":"running","observations":[],"rec
+after: [('depD/d1', 10.0, 'mz')]
+resolve on depD/d1 at 99: 422 {"detail":"titre: reading depD/d1 is 10 g/L, and the value sent is 99.0 g/L: a measurement carries its reading's own value and unit"}
+resolve on depD/d1 at 10: 200 {"scope":"proforma:sc-h3","values":[{"key":"feed_glucose_conc","value":null,"low":null,"high":null,"source":null,"origin":"waiting","identified":null,"overriddenBy":null,"libraryDefault":null,"recordI

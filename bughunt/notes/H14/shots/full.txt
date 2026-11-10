@@ -1,0 +1,2009 @@
+== Home (no project)
+OPENFERMENT
+Bioprocess literature you can operate on
+Ask Postdoc about the documents your project holds, verify every extracted number against the span it came from, turn verified parameters into runnable protocols, and model what they cost at scale.
+Your projects
+Ethanol
+ethanol
+NEW PROJECT
+Make it
+Ask Postdoc
+Ask
+What if the organism fermented glucose alone? Propose a scenario, run it, and say what changed and what the change rests
+1 question · 2026-11-08 04:26 UTC
+What if the organism fermented glucose alone? Propose a scenario, run it, and say what changed and what the change rests
+1 question · 2026-11-08 04:22 UTC
+What does the reference cellulosic ethanol plant in the library assume about its feedstock, and where do those numbers c
+2 questions · 2026-11-08 04:06 UTC
+What strains of Saccharomyces cerevisiae appear in the project's documents, and which documents describe each?
+1 question · 2026-11-08 04:00 UTC
+Which of the project's documents report an ethanol titre, and under what conditions does each report it?
+1 question · 2026-11-08 03:53 UTC
+Running now
+AS IT HAPPENS
+
+Runs, tool calls, artifacts and Postdoc's turns show here as they happen.
+
+Project vitals
+?
+User-entered.
+DOCUMENTS HELD
+22
+814 passages, each searchable and quotable
+Extracted · unverified.
+EXTRACTION RECORDS
+457
+verified
+0
+unverified
+457
+rejected
+0
+Gold · a value a reviewer typed.
+GOLD SET
+0
+No gold values yet — promote a record with g in review
+Assumed · rests on an assumption.
+PROTOCOLS PUBLISHED
+0
+0 versions in total
+Measured · first-party
+Gold · a value a reviewer typed
+Verified against source
+Curated · written by hand
+Computed · basis attached
+Extracted · unverified
+Industry estimate · a vendor’s figure
+User-entered
+Assumed · rests on an assumption
+?
+Runbooks
+?
+Assumed · rests on an assumption.
+RUNBOOKS
+0
+0 running · 0 waiting on a person
+Your work
+User-entered.
+LAST CONVERSATION
+What if the organism fermented glucose alone? Propose a scenario, run it, and say what changed and what the change rests
+1 question · 2026-11-08 04:26 UTC
+Extracted · unverified.
+REVIEW QUEUE
+457 unverified records waiting
+Start a queue and triage them one span at a time.
+The destinations
+11/11 with something behind them
+
+Everything this platform does lives inside one of these 11.
+
+Intake
+documents in, anchored to source
+457 extraction records
+BioRepo
+records, artifacts, provenance
+22 papers · gold set not yet annotated
+Postdoc
+ask, plan, answer from records
+live through openferment-core, on the model it is configured with
+geneOS
+host, construct, pathway, design
+0 hosts · no sequence tooling
+fermOS
+reactor, kinetics, scale
+0 deposited runs it can fit · fits, forecasts, simulations and vessel designs kept with the project
+pureOS
+harvest, capture, recovery
+45 unit operations · no process model
+Proforma
+cost, scale, uncertainty
+2 scenarios · 6 runs · 3 comparisons
+Runbooks
+claims to be tested
+0 runbooks · 0 protocols
+Primer
+how the system works
+0 lessons
+Guild
+who may verify
+review queue and roles
+Catalogues
+strains, products, skills, lessons
+kept on the service, each entry in its keeper’s name
+Start something
+Postdoc
+Ask a question
+Get a cited answer with the plan, tool calls and retrieved passages shown.
+Guild
+Review extractions
+Triage machine-extracted parameters against the span they came from.
+Protocols → Deposition
+Run a protocol
+Scale a verified procedure to your batch size and execute it at the bench.
+Proforma
+Model a process
+Run a scenario on BioSTEAM and see where the cost per kilogram goes.
+Runbooks
+Open a runbook
+A synthesised answer to "how would we make this", with the stages it took to get there.
+What is this platform?
+The map behind these names
+Workforce
+Nobody is on Guild’s ledger yet. Start it
+Predictions
+Locked
+0
+Tested
+0
+Held
+0
+Missed
+0
+Inconclusive runs
+0
+
+Too few tested for a hit rate; one is shown from 5. Open the ledger
+
+Recent activity
+Nothing has happened since this page opened
+What a person does here is listed as it happens: a paper fetched, a record reviewed, a run deposited, a runbook adopted. To start, review the next record in Guild or fetch a paper in Intake.
+
+Activity is session-only and resets on refresh.
+
+
+== /p/ethanol
+PROJECT
+Ethanol
+Its documents, records, flowsheets, runs, studies, conversations and ledger.
+Literature
+Records
+Proforma
+SFF flowsheets
+Runs and studies
+fermOS
+pureOS
+geneOS
+Runbooks
+Guild
+Primer
+Catalogues
+Settings
+New conversation
+What if the organism fermented glucose alone? Propose a scenario, run it, and say what changed and what the change rests
+2026-11-08 04:26 UTC · 1 question
+What if the organism fermented glucose alone? Propose a scenario, run it, and say what changed and what the change rests
+2026-11-08 04:22 UTC · 1 question
+What does the reference cellulosic ethanol plant in the library assume about its feedstock, and where do those numbers c
+2026-11-08 04:06 UTC · 2 questions
+What strains of Saccharomyces cerevisiae appear in the project's documents, and which documents describe each?
+2026-11-08 04:00 UTC · 1 question
+Which of the project's documents report an ethanol titre, and under what conditions does each report it?
+2026-11-08 03:53 UTC · 1 question
+Which engines are registered here, what does each take and give, and which of this project's runs came from each?
+2026-11-08 03:48 UTC · 1 question
+What is the theoretical ceiling for ethanol on glucose according to the genome-scale models on the shelf, and how do the
+2026-11-08 03:45 UTC · 1 question
+Import this SFF file and tell me what plant it describes: the toolkit reference file SF_BST_15.
+2026-11-08 03:43 UTC · 1 question
+Which documents in the project were refused or partly ingested, and why?
+2026-11-08 03:41 UTC · 1 question
+Which records in this project are verified, and which candidates wait for review?
+2026-11-08 03:39 UTC · 1 question
+Compare dilute-acid and hot-water pretreatment in the composed flowsheet, with the package's own defaults.
+2026-11-08 03:27 UTC · 2 questions
+What if the organism fermented glucose alone? Propose a scenario, run it, and say what changed and what the change rests
+2026-11-08 03:22 UTC · 3 questions
+What does the reference cellulosic ethanol plant in the library assume about its feedstock, and where do those numbers c
+2026-11-08 03:12 UTC · 2 questions
+What strains of Saccharomyces cerevisiae appear in the project's documents, and which documents describe each?
+2026-11-08 03:07 UTC · 1 question
+Which of the project's documents report an ethanol titre, and under what conditions does each report it?
+2026-11-08 03:01 UTC · 1 question
+Which engines are registered here, what does each take and give, and which of this project's runs came from each?
+2026-11-08 02:57 UTC · 1 question
+What is the theoretical ceiling for ethanol on glucose according to the genome-scale models on the shelf, and how do the
+2026-11-08 02:54 UTC · 1 question
+Import this SFF file and tell me what plant it describes: the toolkit reference file SF_BST_15.
+2026-11-08 02:53 UTC · 1 question
+Which documents in the project were refused or partly ingested, and why?
+2026-11-08 02:50 UTC · 1 question
+Which records in this project are verified, and which candidates wait for review?
+2026-11-08 02:48 UTC · 1 question
+Compare dilute-acid and hot-water pretreatment in the composed flowsheet, with the package's own defaults.
+2026-11-08 02:38 UTC · 2 questions
+What if the organism fermented glucose alone? Propose a scenario, run it, and say what changed and what the change rests
+2026-11-08 02:35 UTC · 3 questions
+What does the reference cellulosic ethanol plant in the library assume about its feedstock, and where do those numbers c
+2026-11-08 02:29 UTC · 2 questions
+What strains of Saccharomyces cerevisiae appear in the project's documents, and which documents describe each?
+2026-11-08 02:27 UTC · 1 question
+Which of the project's documents report an ethanol titre, and under what conditions does each report it?
+2026-11-08 02:23 UTC · 1 question
+Which engines are registered here, what does each take and give, and which of this project's runs came from each?
+2026-11-05 11:31 UTC · 1 question
+What is the theoretical ceiling for ethanol on glucose according to the genome-scale models on the shelf, and how do the
+2026-11-05 11:28 UTC · 1 question
+Import this SFF file and tell me what plant it describes: the toolkit reference file SF_BST_15.
+2026-11-05 11:26 UTC · 1 question
+Which documents in the project were refused or partly ingested, and why?
+2026-11-05 11:22 UTC · 1 question
+Which records in this project are verified, and which candidates wait for review?
+2026-11-05 11:20 UTC · 1 question
+Compare dilute-acid and hot-water pretreatment in the composed flowsheet, with the package's own defaults.
+2026-11-05 11:10 UTC · 2 questions
+What if the organism fermented glucose alone? Propose a scenario, run it, and say what changed and what the change rests
+2026-11-05 11:07 UTC · 3 questions
+What does the reference cellulosic ethanol plant in the library assume about its feedstock, and where do those numbers c
+2026-11-05 11:01 UTC · 2 questions
+What strains of Saccharomyces cerevisiae appear in the project's documents, and which documents describe each?
+2026-11-05 10:57 UTC · 1 question
+Which of the project's documents report an ethanol titre, and under what conditions does each report it?
+2026-11-05 10:52 UTC · 1 question
+What if the organism fermented glucose alone? Propose a scenario, run it, and say what changed and what the change rests
+Postdoc is running without an API key
+
+Write the key on its line in core/.env, the line core/.env.example holds for it (when core/.env is absent, copy the example, leaving out its database line on the live host), and restart the service. That file is gitignored, and the key never reaches the browser, which is why the service holds it.
+
+ASKED
+
+What if the organism fermented glucose alone? Propose a scenario, run it, and say what changed and what the change rests on.
+
+2026-11-08 04:26 UTC
+WHAT POSTDOC DID
+Swept the modules for what the question names · searched ten, found in none
+559 ms
+Read the library shelf · 10 plants
+31 ms
+Read the project's studies · 4 rows
+190 ms
+Read Proforma · 6 rows
+1 ms
+Read the parameters of cornstover · 0 parameters
+27.1 s
+Read the parameters of cellulosic_ethanol_v0 · 21 parameters
+380 ms
+Read the parameters of cornstover · 40 parameters
+1 ms
+Read the parameters of cellulosic_ethanol_v0 · 11 parameters
+3 ms
+Read the parameters of cornstover · 0 parameters
+2 ms
+Read the parameters of cornstover · 0 parameters
+2 ms
+Read the parameters of cornstover · 0 parameters
+3 ms
+Read the parameters of cornstover · 40 parameters
+1 ms
+Kept scenario ssc-6468dc71ae63 on cellulosic_ethanol_v0 · 10 values of yours Open Studies
+15 ms
+Searched the papers for "xylose to ethanol conversion cofermentation Zymomonas mobilis design assumption" · 6 passages
+5.2 s
+Looked up records of xylose ethanol conversion fermentation · 10 records
+2 ms
+claude-opus-5-5 was unavailable; asked again on claude-sonnet-5-5
+No answer: The Anthropic account's usage limit is reached, so no model can answer: Error code: 400 - {'type': 'error', 'error': {'type': 'invalid_request_error', 'message'
+Postdoc could not answer this
+
+The Anthropic account's usage limit is reached, so no model can answer: Error code: 400 - {'type': 'error', 'error': {'type': 'invalid_request_error', 'message': 'You have reached your specified API usage limits. You will regain access on 2026-12-01 at 00:00 UTC.'}, 'request_id': 'req_011Cgpq5KGpFH6bwXAKbqH6F'} The account's owner raises the limit in the Anthropic console; openFerment's daily cap is a separate limit.
+
+Produced by
+Postdoc
+·
+no answer
+claude-opus-5-5
+·
+14 tokens in / 7,151 out
+·
+94% of the prompt cached
+·
+$0.282
+·
+14 tool calls; no answer came back
+Searched ten modules, found it in none · read in part: BioRepo
+Send
+Enter send · ⇧Enter newline
+AS IT HAPPENS
+
+Runs, tool calls, artifacts and Postdoc's turns show here as they happen.
+[failed] GET http://127.0.0.1:8941/api/events?project=ethanol net::ERR_ABORTED
+
+== /p/ethanol/intake
+DOCUMENTS IN, ANCHORED TO SOURCE
+Intake
+Every quantitative claim the pipeline has pulled out of the corpus, with the span it came from. Nothing here is trusted until a reviewer says so.
+Start review session
+(457)
+Export CSV
+Open Witness
+Extract
+Ingest
+457 records
+457 awaiting review
+0 in the gold set
+Measured · first-party
+Gold · a value a reviewer typed
+Verified against source
+Curated · written by hand
+Computed · basis attached
+Extracted · unverified
+Industry estimate · a vendor’s figure
+User-entered
+Assumed · rests on an assumption
+?
+FILTERS
+Field
+Specific growth rate (μ)
+190
+Medium component concentration
+62
+Substrate saturation constant (Ks)
+45
+Ethanol titre
+40
+Ethanol yield on substrate (Yp/s)
+32
+Biomass yield on substrate (Yx/s)
+26
+Ethanol volumetric productivity
+18
+Minimum ethanol selling price
+15
+Final biomass density
+10
+Substrate inhibition constant (KiS)
+6
+Maximum ethanol concentration (Pmax)
+4
+Cake moisture
+2
+Fold improvement
+2
+Secreted titer
+2
+Product purity
+1
+Step recovery
+1
+Time to colony
+1
+17 values: the list scrolls for the rest
+Organism
+Not stated
+83
+Saccharomyces cerevisiae AFY
+32
+Saccharomyces cerevisiae BY4743
+25
+Saccharomyces cerevisiae Ethanol Red
+22
+Saccharomyces cerevisiae
+18
+TEFmut7
+14
+TEFmut2
+12
+Saccharomyces cerevisiae LALVIN DV10
+11
+Trichoderma reesei
+9
+CEN.PK113-7D (WT)
+7
+IMX1438
+7
+IMX585
+7
+S. cerevisiae CEN.PK 113-7D wild type
+7
+S. cerevisiae IMX585
+7
+Saccharomyces cerevisiae CEN.PK113-7D
+7
+IMK870
+5
+Z. mobilis strain 8b
+5
+glucose-xylose-arabinose fermenting bacteria
+3
+S. cerevisiae BV37
+3
+S. cerevisiae C73
+3
+S. cerevisiae Calsa
+3
+S. cerevisiae CEN.PK113-7D (naive reference)
+3
+S. cerevisiae CEN.PK113-7D parental
+3
+S. cerevisiae IME324, IMX773, IMX774, IMX949, IMX1443
+3
+S. cerevisiae IME369, IMX1489
+3
+S. cerevisiae IMX2538 (minimal CCM)
+3
+S. cerevisiae IMX756
+3
+S. cerevisiae IMX860
+3
+S. cerevisiae LC376
+3
+S. cerevisiae Le155
+3
+S. cerevisiae Le384
+3
+S. cerevisiae LF256
+3
+S. cerevisiae LF84
+3
+S. cerevisiae M53
+3
+S. cerevisiae M57
+3
+S. cerevisiae SB31
+3
+S. cerevisiae SR350
+3
+S. cerevisiae SR8
+3
+S. cerevisiae T415
+3
+S. cerevisiae
+2
+S. cerevisiae CEN.PK113-7D evolved clone E1
+2
+S. cerevisiae IME324 and IMX774 chemostat
+2
+S. cerevisiae IME611
+2
+S. cerevisiae IMX2506
+2
+S. cerevisiae IMX705
+2
+S. cerevisiae IMX888
+2
+Zymomonas mobilis
+2
+engineered fermentative bacterium
+1
+IME324 (reference strain)
+1
+IMX1489 (0.05 h-1 column); IME324 0.084
+1
+Recombinant Zymomonas mobilis
+1
+reverse-engineered S. cerevisiae mutants
+1
+S. cerevisiae CEN.PK113-7D evolved clone E2
+1
+S. cerevisiae CEN.PK113-7D evolved on 9% ethanol
+1
+S. cerevisiae HF strain AX (winery A), 0% ethanol, 25°C
+1
+S. cerevisiae HF strain AX (winery A), 0% ethanol, 28°C
+1
+S. cerevisiae HF strain AX (winery A), 0% ethanol, 30°C
+1
+S. cerevisiae HF strain AX (winery A), 0% ethanol, 35°C
+1
+S. cerevisiae HF strain AX (winery A), 3% v/v ethanol
+1
+S. cerevisiae HF strain AX (winery A), 5% v/v ethanol
+1
+S. cerevisiae HF strain AX (winery A), 7% v/v ethanol
+1
+S. cerevisiae HF strain BII (winery B), 0% ethanol
+1
+S. cerevisiae HF strain BII (winery B), 0% ethanol, 25°C
+1
+S. cerevisiae HF strain BII (winery B), 0% ethanol, 30°C
+1
+S. cerevisiae HF strain BII (winery B), 0% ethanol, 35°C
+1
+S. cerevisiae HF strain BII (winery B), 3% v/v ethanol
+1
+S. cerevisiae HF strain BII (winery B), 5% v/v ethanol
+1
+S. cerevisiae HF strain BII (winery B), 7% v/v ethanol
+1
+S. cerevisiae HF strain CIII (winery C), 0% ethanol
+1
+S. cerevisiae HF strain CIII (winery C), 0% ethanol, 25°C
+1
+S. cerevisiae HF strain CIII (winery C), 0% ethanol, 30°C
+1
+S. cerevisiae HF strain CIII (winery C), 0% ethanol, 35°C
+1
+S. cerevisiae HF strain CIII (winery C), 3% v/v ethanol
+1
+S. cerevisiae HF strain CIII (winery C), 5% v/v ethanol
+1
+S. cerevisiae HF strain CIII (winery C), 7% v/v ethanol
+1
+S. cerevisiae HF strain DIV (winery D), 0% ethanol
+1
+S. cerevisiae HF strain DIV (winery D), 0% ethanol, 25°C
+1
+S. cerevisiae HF strain DIV (winery D), 0% ethanol, 30°C
+1
+S. cerevisiae HF strain DIV (winery D), 0% ethanol, 35°C
+1
+S. cerevisiae HF strain DIV (winery D), 3% v/v ethanol
+1
+S. cerevisiae HF strain DIV (winery D), 5% v/v ethanol
+1
+S. cerevisiae HF strain DIV (winery D), 7% v/v ethanol
+1
+S. cerevisiae HF strain EI (winery E), 0% ethanol
+1
+S. cerevisiae HF strain EI (winery E), 0% ethanol, 25°C
+1
+S. cerevisiae HF strain EI (winery E), 0% ethanol, 30°C
+1
+S. cerevisiae HF strain EI (winery E), 0% ethanol, 35°C
+1
+S. cerevisiae HF strain EI (winery E), 3% v/v ethanol
+1
+S. cerevisiae HF strain EI (winery E), 5% v/v ethanol
+1
+S. cerevisiae HF strain EI (winery E), 7% v/v ethanol
+1
+S. cerevisiae HF strain FIV (winery F), 0% ethanol
+1
+S. cerevisiae HF strain FIV (winery F), 0% ethanol, 25°C
+1
+S. cerevisiae HF strain FIV (winery F), 0% ethanol, 30°C
+1
+S. cerevisiae HF strain FIV (winery F), 0% ethanol, 35°C
+1
+S. cerevisiae HF strain FIV (winery F), 3% v/v ethanol
+1
+S. cerevisiae HF strain FIV (winery F), 5% v/v ethanol
+1
+S. cerevisiae HF strain FIV (winery F), 7% v/v ethanol
+1
+S. cerevisiae IME611 and IMX2506
+1
+S. cerevisiae IMX706
+1
+S. cerevisiae IMX707
+1
+S. cerevisiae IMX774
+1
+S. cerevisiae LF strain AI (winery A), 0% ethanol, 25°C
+1
+S. cerevisiae LF strain AI (winery A), 0% ethanol, 28°C
+1
+S. cerevisiae LF strain AI (winery A), 0% ethanol, 30°C
+1
+S. cerevisiae LF strain AI (winery A), 0% ethanol, 35°C
+1
+S. cerevisiae LF strain AI (winery A), 3% v/v ethanol
+1
+S. cerevisiae LF strain AI (winery A), 5% v/v ethanol
+1
+S. cerevisiae LF strain BI (winery B), 0% ethanol
+1
+S. cerevisiae LF strain BI (winery B), 0% ethanol, 25°C
+1
+S. cerevisiae LF strain BI (winery B), 0% ethanol, 30°C
+1
+S. cerevisiae LF strain BI (winery B), 0% ethanol, 35°C
+1
+S. cerevisiae LF strain BI (winery B), 3% v/v ethanol
+1
+S. cerevisiae LF strain BI (winery B), 5% v/v ethanol
+1
+S. cerevisiae LF strain BI (winery B), 7% v/v ethanol
+1
+S. cerevisiae LF strain CVI (winery C), 0% ethanol
+1
+S. cerevisiae LF strain CVI (winery C), 0% ethanol, 25°C
+1
+S. cerevisiae LF strain CVI (winery C), 0% ethanol, 30°C
+1
+S. cerevisiae LF strain CVI (winery C), 0% ethanol, 35°C
+1
+S. cerevisiae LF strain CVI (winery C), 3% v/v ethanol
+1
+S. cerevisiae LF strain CVI (winery C), 5% v/v ethanol
+1
+S. cerevisiae LF strain CVI (winery C), 7% v/v ethanol
+1
+S. cerevisiae LF strain DXI (winery D), 0% ethanol
+1
+S. cerevisiae LF strain DXI (winery D), 0% ethanol, 25°C
+1
+S. cerevisiae LF strain DXI (winery D), 0% ethanol, 30°C
+1
+S. cerevisiae LF strain DXI (winery D), 0% ethanol, 35°C
+1
+S. cerevisiae LF strain DXI (winery D), 3% v/v ethanol
+1
+S. cerevisiae LF strain DXI (winery D), 5% v/v ethanol
+1
+S. cerevisiae LF strain DXI (winery D), 7% v/v ethanol
+1
+S. cerevisiae LF strain EVI (winery E), 0% ethanol, 25°C
+1
+S. cerevisiae LF strain EVI (winery E), 0% ethanol, 30°C
+1
+S. cerevisiae LF strain EVI (winery E), 0% ethanol, 35°C
+1
+S. cerevisiae LF strain EVI (winery E), 3% v/v ethanol
+1
+S. cerevisiae LF strain EVI (winery E), 5% v/v ethanol
+1
+S. cerevisiae LF strain EVI (winery E), 7% v/v ethanol
+1
+S. cerevisiae LF strain FV (winery F), 0% ethanol, 25°C
+1
+S. cerevisiae LF strain FV (winery F), 0% ethanol, 30°C
+1
+S. cerevisiae LF strain FV (winery F), 0% ethanol, 35°C
+1
+S. cerevisiae LF strain FV (winery F), 3% v/v ethanol
+1
+S. cerevisiae LF strain FV (winery F), 5% v/v ethanol
+1
+S. cerevisiae LF strain FV (winery F), 7% v/v ethanol
+1
+ST9675
+1
+ST9675 (RKI1 I208V)
+1
+ST9676
+1
+ST9676 (CYC2 N342A)
+1
+ST9681
+1
+144 values: the list scrolls for the rest
+Status
+Unverified
+457
+Paper
+Quantifying the Effects of Ethanol and…
+84
+Bioethanol production from sugarcane le…
+58
+Selection of highly stress-tolerant yea…
+42
+Growth characteristics of freeze-tolera…
+32
+Process Design and Economics for Bioche…
+29
+Modelling of Molasses Fermentation for…
+28
+Vacuum-Assisted Gas Stripping Extractiv…
+23
+Quantitative evaluation of yeast's requ…
+22
+The metabolic costs of improving ethano…
+20
+Squalene-Tetrahymanol Cyclase Expressio…
+19
+Improving ethanol yield in acetate-redu…
+19
+NREL 2012 Achievement of Ethanol Cost T…
+16
+Adaptive laboratory evolution of Saccha…
+14
+Adaptation of Saccharomyces to High Glu…
+11
+Optimizing anaerobic growth rate and fe…
+9
+An engineered non-oxidative glycolytic…
+8
+Oxygen availability strongly affects ch…
+7
+A New Model of Alcoholic Fermentation u…
+6
+Top-Down, Knowledge-Based Genetic Reduc…
+6
+Quantification and mitigation of byprod…
+4
+20 values: the list scrolls for the rest
+Confidence
+0.7–0.85
+293
+>0.85
+126
+<0.7
+38
+Unit family
+Rate (h⁻¹)
+190
+Mass concentration (g L⁻¹)
+169
+Yield (g g⁻¹)
+58
+Volumetric productivity
+18
+Price per volume (USD gal⁻¹)
+15
+Percent (%)
+4
+Fold change (×)
+2
+Time (h)
+1
+Units
+As published
+SI
+457 rows
+Columns
+Record	Field	Value (as published)	Unit	Source	Quoted span	Conf.	Status	Reviewer	Updated
+
+…386c6002	
+Minimum ethanol selling price
+	2.15	USD gal⁻¹	[Tao et al. 2014]	
+“The SOT case meets the cost target for FY 2012 with a modeled MESP of $2.15/gal ethanol using $…”
+	
+0.95
+	Unverified	—	—
+
+…3dea80e8	
+Minimum ethanol selling price
+	2.56	USD gal⁻¹	[Tao et al. 2014]	
+“Minimum Ethanol Selling Price $3.64 $3.57 $3.18 $2.77 $2.56 $2.15”
+	
+0.70
+	Unverified	—	—
+
+…48c25ed9	
+Minimum ethanol selling price
+	2.36	USD gal⁻¹	[Tao et al. 2014]	
+“2 81% 86% 33 85% 86% 62% 73.0 $2.36”
+	
+0.85
+	Unverified	—	—
+
+…c5a43ddd	
+Minimum ethanol selling price
+	2.32	USD gal⁻¹	[Tao et al. 2014]	
+“3c 88% 92% 26 89% 58% 56% 70.4 $2.32”
+	
+0.85
+	Unverified	—	—
+
+…f25a8b10	
+Minimum ethanol selling price
+	2.15	USD gal⁻¹	[Tao et al. 2014]	
+“4 81% 95% 19 78% 93% 54% 70.9 $2.15”
+	
+0.85
+	Unverified	—	—
+
+…cf828863	
+Minimum ethanol selling price
+	2.13	USD gal⁻¹	[Tao et al. 2014]	
+“5 82% 91% 19 82% 91% 51% 72.5 $2.13”
+	
+0.85
+	Unverified	—	—
+
+…db8b3544	
+Ethanol titre
+	74	g L⁻¹	[Tao et al. 2014]	
+“20% TS, 1.5 days 92%d 95% 93% 54% 74”
+	
+0.90
+	Unverified	—	—
+
+…f2e7bcd4	
+Ethanol titre
+	73.5	g L⁻¹	[Tao et al. 2014]	
+“Runs 2, 4, and 5 all performed well, achieving final ethanol titers of 71–76 g/L in less than 2…”
+	
+0.90
+	Unverified	—	—
+
+…f3ff9fc9	
+Ethanol titre
+	45	g L⁻¹	[Tao et al. 2014]	
+“Run 1 was most impacted by the contamination as the ethanol concentration reached only 45 g/L”
+	
+0.85
+	Unverified	—	—
+
+…3798314b	
+Ethanol titre
+	70	g L⁻¹	[Tao et al. 2014]	
+“Run 3 was slightly affected (7 g/L lactic acid), but 70 g/L of ethanol was still produced.”
+	
+0.85
+	Unverified	—	—
+
+…7b00bcb1	
+Medium component concentration
+	10	g L⁻¹	[Tao et al. 2014]	
+“Yeast extract 10 5”
+	
+0.85
+	Unverified	—	—
+
+…50beda48	
+Medium component concentration
+	5	g L⁻¹	[Tao et al. 2014]	
+“Yeast extract 10 5”
+	
+0.85
+	Unverified	—	—
+
+…72ae1abd	
+Medium component concentration
+	2	g L⁻¹	[Tao et al. 2014]	
+“KH2PO4 2 1”
+	
+0.85
+	Unverified	—	—
+
+…4425849d	
+Medium component concentration
+	1	g L⁻¹	[Tao et al. 2014]	
+“KH2PO4 2 1”
+	
+0.85
+	Unverified	—	—
+
+…14059060	
+Medium component concentration
+	2	g L⁻¹	[Tao et al. 2014]	
+“Sorbitol 2* –”
+	
+0.80
+	Unverified	—	—
+
+…0068045f	
+Medium component concentration
+	150	g L⁻¹	[Tao et al. 2014]	
+“Glucose 150 –”
+	
+0.85
+	Unverified	—	—
+
+…4e3ff803	
+Specific growth rate (μ)
+	0.52	h⁻¹	[Ji et al. 2016]	
+“| 5.0 | 0.1–2.6 | 0.52 | 0.58 | 2.44 | −0.44 | 5.78 | −0.58 |”
+	
+0.80
+	Unverified	—	—
+
+…5e1097a6	
+Specific growth rate (μ)
+	0.98	h⁻¹	[Ji et al. 2016]	
+“| 10.0 | 0.2–5.0 | 0.98 | 2.97 | 1.06 | −0.02 | 3.70 | −0.11 |”
+	
+0.80
+	Unverified	—	—
+
+…c30cc2ea	
+Specific growth rate (μ)
+	0.99	h⁻¹	[Ji et al. 2016]	
+“| 40.0 | 2.5–30.0 | 0.99 | 10.80 | 5.67 | −1.72 | 3.57 | 0.31 |”
+	
+0.80
+	Unverified	—	—
+
+…beba7426	
+Specific growth rate (μ)
+	0.11	h⁻¹	[Ji et al. 2016]	
+“| 1.3 | 0.1–0.5 | 0.11 | 0.47 | 0.06 | 0.07 |”
+	
+0.80
+	Unverified	—	—
+
+…489b2c2b	
+Specific growth rate (μ)
+	0.06	h⁻¹	[Ji et al. 2016]	
+“| 3.0 | 0.7–2.0 | 0.06 | 0.67 | 1.96 | 0.03 |”
+	
+0.80
+	Unverified	—	—
+
+…499b113c	
+Specific growth rate (μ)
+	0.07	h⁻¹	[Ji et al. 2016]	
+“| 16.0 | 0.1–2.6 | 0.07 | 1.34 | 1.13 | 0.02 |”
+	
+0.80
+	Unverified	—	—
+
+…e2805bd4	
+Substrate saturation constant (Ks)
+	0.58	g L⁻¹	[Ji et al. 2016]	
+“| 5.0 | 0.1–2.6 | 0.52 | 0.58 | 2.44 | −0.44 | 5.78 | −0.58 |”
+	
+0.90
+	Unverified	—	—
+
+…d5ba9292	
+Substrate saturation constant (Ks)
+	2.97	g L⁻¹	[Ji et al. 2016]	
+“| 10.0 | 0.2–5.0 | 0.98 | 2.97 | 1.06 | −0.02 | 3.70 | −0.11 |”
+	
+0.90
+	Unverified	—	—
+
+…42a8f19d	
+Substrate saturation constant (Ks)
+	10.8	g L⁻¹	[Ji et al. 2016]	
+“| 40.0 | 2.5–30.0 | 0.99 | 10.80 | 5.67 | −1.72 | 3.57 | 0.31 |”
+	
+0.90
+	Unverified	—	—
+
+…26b66d68	
+Substrate saturation constant (Ks)
+	0.47	g L⁻¹	[Ji et al. 2016]	
+“| 1.3 | 0.1–0.5 | 0.11 | 0.47 | 0.06 | 0.07 |”
+	
+0.90
+	Unverified	—	—
+
+…3b27692d	
+Substrate saturation constant (Ks)
+	0.67	g L⁻¹	[Ji et al. 2016]	
+“| 3.0 | 0.7–2.0 | 0.06 | 0.67 | 1.96 | 0.03 |”
+	
+0.90
+	Unverified	—	—
+
+…a9a592e9	
+Substrate saturation constant (Ks)
+	1.34	g L⁻¹	[Ji et al. 2016]	
+“| 16.0 | 0.1–2.6 | 0.07 | 1.34 | 1.13 | 0.02 |”
+	
+0.90
+	Unverified	—	—
+
+…eccaa634	
+Biomass yield on substrate (Yx/s)
+	0.41	g g⁻¹	[Ji et al. 2016]	
+“At the initial glucose concentration of 1.0 g/L, YC1 was 0.41 g/g, and YE1 was 0.22 g/g.”
+	
+0.90
+	Unverified	—	—
+
+…4ada95ca	
+Ethanol yield on substrate (Yp/s)
+	0.22	g g⁻¹	[Ji et al. 2016]	
+“At the initial glucose concentration of 1.0 g/L, YC1 was 0.41 g/g, and YE1 was 0.22 g/g.”
+	
+0.90
+	Unverified	—	—
+
+…c9bb6fd6	
+Biomass yield on substrate (Yx/s)
+	0.2	g g⁻¹	[Ji et al. 2016]	
+“When the initial glucose concentration increased to 40.0 g/L, YC1 decreased to 0.20 g/g, while …”
+	
+0.90
+	Unverified	—	—
+
+…146e942e	
+Ethanol yield on substrate (Yp/s)
+	0.4	g g⁻¹	[Ji et al. 2016]	
+“When the initial glucose concentration increased to 40.0 g/L, YC1 decreased to 0.20 g/g, while …”
+	
+0.90
+	Unverified	—	—
+
+…00a9c7fc	
+Biomass yield on substrate (Yx/s)
+	0.7	g g⁻¹	[Ji et al. 2016]	
+“At the initial ethanol concentration of 0.4 g/L, YC2 was 0.70 g/g.”
+	
+0.85
+	Unverified	—	—
+
+…0a599e16	
+Biomass yield on substrate (Yx/s)
+	0.28	g g⁻¹	[Ji et al. 2016]	
+“When the initial ethanol concentration increased to 16.0 g/L, YC2 decreased to 0.28 g/g.”
+	
+0.85
+	Unverified	—	—
+
+↑ ↓ navigate
+Enter open
+Intake subsystems
+1 named, 0 built
+
+Named parts of Intake that have no implementation. Each one states what is true of the code.
+
+Instrument ingest
+not built
+intake.instrument
+Instrument ingest has no implementation
+Not built. Nothing here computes, stores or retrieves anything yet.
+
+Double-click a row (or press Enter) to open the quoted span inside the paper. “Export CSV” writes both the as-published and SI forms alongside each row’s provenance, so a downstream reader never has to guess which unit a number is in.
+[failed] GET http://127.0.0.1:8941/api/events?project=ethanol net::ERR_ABORTED
+
+== /p/ethanol/biorepo
+BIOREPO
+Papers
+Papers that arrived through Intake: 22 papers carrying 457 extraction records. Filters combine with AND across groups and OR inside a group.
+Ingest papers
+Papers
+Search
+Compare
+Witness
+Artifacts
+Measured · first-party
+Gold · a value a reviewer typed
+Verified against source
+Curated · written by hand
+Computed · basis attached
+Extracted · unverified
+Industry estimate · a vendor’s figure
+User-entered
+Assumed · rests on an assumption
+?
+FILTERS
+Year
+2026
+2
+2025
+1
+2024
+1
+2023
+1
+2022
+2
+2021
+1
+2020
+1
+2019
+2
+2018
+2
+2016
+2
+2015
+1
+2014
+1
+2013
+1
+2011
+1
+2010
+1
+15 values: the list scrolls for the rest
+Ingest status
+In corpus
+22
+Gold set
+No gold records
+22
+22 rows
+Columns
+CSV
+CSV exports carry the provenance disclosure header, with a note on each provenance class saying what its values are worth.
+	ID	Title	Authors	Year	Extractions	Status
+	
+Extracted · unverified.
+4c301e53	
+An engineered non-oxidative glycolytic bypass based on Calvin-cycle enzymes enables anaerobic co-fermentation of glucose and sorbitol by Saccharomyces cerevisiae
+	
+Aafke C A van Aalst, Robert Mans et al.
+	2022	8	Full text
+	
+Extracted · unverified.
+c426fdfc	
+Adaptation of Saccharomyces to High Glucose Concentrations and Its Impact on Growth Kinetics of Alcoholic Fermentations
+	
+Marta Ginovart, Rosa Carbó et al.
+	2024	11	Full text
+	
+Extracted · unverified.
+b0c928b3	
+Selection of highly stress-tolerant yeast strains relevant for bioethanol fermentation using predictive growth models
+	
+María Alejandra Canseco Grellet, Joaquín Bautista-Gallego et al.
+	2026	42	Full text
+	
+Extracted · unverified.
+82def68e	
+Quantifying the Effects of Ethanol and Temperature on the Fitness Advantage of Predominant Saccharomyces cerevisiae Strains Occurring in Spontaneous Wine Fermentations
+	
+Donatella Ganucci, Simona Guerrini et al.
+	2018	84	Full text
+	
+Extracted · unverified.
+c23cb18f	
+Adaptive laboratory evolution of Saccharomyces cerevisiae CEN.PK 113-7D to enhance ethanol tolerance
+	
+Fatemeh Sheikhi, Mahsa Babaei et al.
+	2025	14	Full text
+	
+Extracted · unverified.
+849e9bc9	
+Oxygen availability strongly affects chronological lifespan and thermotolerance in batch cultures of Saccharomyces cerevisiae
+	
+Markus M Bisschops, Tim Vos et al.
+	2015	7	Full text
+	
+Extracted · unverified.
+f8ab68ff	
+Squalene-Tetrahymanol Cyclase Expression Enables Sterol-Independent Growth of Saccharomyces cerevisiae
+	
+Sanne J Wiersma, Christiaan Mooiman et al.
+	2020	19	Full text
+	
+Extracted · unverified.
+b81ce7db	
+Quantification and mitigation of byproduct formation by low-glycerol-producing Saccharomyces cerevisiae strains containing Calvin-cycle enzymes
+	
+Aafke C. A. van Aalst, Mickel L. A. Jansen et al.
+	2023	4	Full text
+	
+Extracted · unverified.
+dfd23a34	
+Vacuum-Assisted Gas Stripping Extractive Fermentation for Process Intensification of Sorghum-Based Bioethanol Production: An Experimental and Modeling Study
+	
+Letícia P Almeida, Mateus N Esperança et al.
+	2026	23	Full text
+	
+Extracted · unverified.
+925cdb6c	
+Bioethanol production from sugarcane leaf waste: Effect of various optimized pretreatments and fermentation conditions on process kinetics
+	
+Preshanthan Moodley, E.B. Gueguim Kana
+	2019	58	Full text
+	
+Extracted · unverified.
+b9212d01	
+Modelling of Molasses Fermentation for Bioethanol Production: A Comparative Investigation of Monod and Andrews Models Accuracy Assessment
+	
+Hamid Zentou, Zurina Zainal Abidin et al.
+	2019	28	Full text
+	
+Extracted · unverified.
+d3caf3af	
+Top-Down, Knowledge-Based Genetic Reduction of Yeast Central Carbon Metabolism
+	
+Eline D. Postma, Lucas G. F. Couwenberg et al.
+	2022	6	Full text
+	
+Extracted · unverified.
+e2049cf7	
+Optimizing anaerobic growth rate and fermentation kinetics in Saccharomyces cerevisiae strains expressing Calvin-cycle enzymes for improved ethanol yield
+	
+Ioannis Papapetridis, Maaike Goudriaan et al.
+	2018	9	Full text
+	
+Extracted · unverified.
+d74165d0	
+Quantitative evaluation of yeast's requirement for glycerol formation in very high ethanol performance fed-batch process
+	
+Julien Pagliardini, Georg Hubmann et al.
+	2010	22	Full text
+	
+Extracted · unverified.
+fe264b26	
+Improving ethanol yield in acetate-reducing Saccharomyces cerevisiae by cofactor engineering of 6-phosphogluconate dehydrogenase and deletion of ALD6
+	
+Ioannis Papapetridis, Marlous van Dijk et al.
+	2016	19	Full text
+	
+Extracted · unverified.
+593a39ea	
+The metabolic costs of improving ethanol yield by reducing glycerol formation capacity under anaerobic conditions in Saccharomyces cerevisiae
+	
+Julien Pagliardini, Georg Hubmann et al.
+	2013	20	Full text
+	
+Extracted · unverified.
+834f4df2	
+A New Model of Alcoholic Fermentation under a Byproduct Inhibitory Effect
+	
+Hamid Zentou, Zurina Zainal Abidin et al.
+	2021	6	Full text
+	
+Extracted · unverified.
+3a223464	
+Growth characteristics of freeze-tolerant baker’s yeast Saccharomyces cerevisiae AFY in aerobic batch culture
+	
+Meng Ji, Yelian Miao et al.
+	2016	32	Full text
+	
+Extracted · unverified.
+2b4c06f8	
+S288C (Saccharomyces Genome Database)
+	
+—
+	—	0	Full text
+	
+Extracted · unverified.
+2fc3d2a2	
+NREL 2012 Achievement of Ethanol Cost Targets: Biochemical Ethanol Fermentation via Dilute-Acid Pretreatment and Enzymatic Hydrolysis of Corn Stover
+	
+Tao, Ling, Schell, Dan et al.
+	2014	16	Full text
+	
+Extracted · unverified.
+d68e1b51	
+Process Design and Economics for Biochemical Conversion of Lignocellulosic Biomass to Ethanol: Dilute-Acid Pretreatment and Enzymatic Hydrolysis of Corn Stover
+	
+Humbird, D, Davis, R et al.
+	2011	29	Full text
+	
+Extracted · unverified.
+826d587b	
+CEN.PK (Saccharomyces Genome Database)
+	
+—
+	—	0	Full text
+↑ ↓ navigate
+Enter open
+e export
+
+
+== /p/ethanol/postdoc
+New conversation
+What if the organism fermented glucose alone? Propose a scenario, run it, and say what changed and what the change rests
+2026-11-08 04:26 UTC · 1 question
+What if the organism fermented glucose alone? Propose a scenario, run it, and say what changed and what the change rests
+2026-11-08 04:22 UTC · 1 question
+What does the reference cellulosic ethanol plant in the library assume about its feedstock, and where do those numbers c
+2026-11-08 04:06 UTC · 2 questions
+What strains of Saccharomyces cerevisiae appear in the project's documents, and which documents describe each?
+2026-11-08 04:00 UTC · 1 question
+Which of the project's documents report an ethanol titre, and under what conditions does each report it?
+2026-11-08 03:53 UTC · 1 question
+Which engines are registered here, what does each take and give, and which of this project's runs came from each?
+2026-11-08 03:48 UTC · 1 question
+What is the theoretical ceiling for ethanol on glucose according to the genome-scale models on the shelf, and how do the
+2026-11-08 03:45 UTC · 1 question
+Import this SFF file and tell me what plant it describes: the toolkit reference file SF_BST_15.
+2026-11-08 03:43 UTC · 1 question
+Which documents in the project were refused or partly ingested, and why?
+2026-11-08 03:41 UTC · 1 question
+Which records in this project are verified, and which candidates wait for review?
+2026-11-08 03:39 UTC · 1 question
+Compare dilute-acid and hot-water pretreatment in the composed flowsheet, with the package's own defaults.
+2026-11-08 03:27 UTC · 2 questions
+What if the organism fermented glucose alone? Propose a scenario, run it, and say what changed and what the change rests
+2026-11-08 03:22 UTC · 3 questions
+What does the reference cellulosic ethanol plant in the library assume about its feedstock, and where do those numbers c
+2026-11-08 03:12 UTC · 2 questions
+What strains of Saccharomyces cerevisiae appear in the project's documents, and which documents describe each?
+2026-11-08 03:07 UTC · 1 question
+Which of the project's documents report an ethanol titre, and under what conditions does each report it?
+2026-11-08 03:01 UTC · 1 question
+Which engines are registered here, what does each take and give, and which of this project's runs came from each?
+2026-11-08 02:57 UTC · 1 question
+What is the theoretical ceiling for ethanol on glucose according to the genome-scale models on the shelf, and how do the
+2026-11-08 02:54 UTC · 1 question
+Import this SFF file and tell me what plant it describes: the toolkit reference file SF_BST_15.
+2026-11-08 02:53 UTC · 1 question
+Which documents in the project were refused or partly ingested, and why?
+2026-11-08 02:50 UTC · 1 question
+Which records in this project are verified, and which candidates wait for review?
+2026-11-08 02:48 UTC · 1 question
+Compare dilute-acid and hot-water pretreatment in the composed flowsheet, with the package's own defaults.
+2026-11-08 02:38 UTC · 2 questions
+What if the organism fermented glucose alone? Propose a scenario, run it, and say what changed and what the change rests
+2026-11-08 02:35 UTC · 3 questions
+What does the reference cellulosic ethanol plant in the library assume about its feedstock, and where do those numbers c
+2026-11-08 02:29 UTC · 2 questions
+What strains of Saccharomyces cerevisiae appear in the project's documents, and which documents describe each?
+2026-11-08 02:27 UTC · 1 question
+Which of the project's documents report an ethanol titre, and under what conditions does each report it?
+2026-11-08 02:23 UTC · 1 question
+Which engines are registered here, what does each take and give, and which of this project's runs came from each?
+2026-11-05 11:31 UTC · 1 question
+What is the theoretical ceiling for ethanol on glucose according to the genome-scale models on the shelf, and how do the
+2026-11-05 11:28 UTC · 1 question
+Import this SFF file and tell me what plant it describes: the toolkit reference file SF_BST_15.
+2026-11-05 11:26 UTC · 1 question
+Which documents in the project were refused or partly ingested, and why?
+2026-11-05 11:22 UTC · 1 question
+Which records in this project are verified, and which candidates wait for review?
+2026-11-05 11:20 UTC · 1 question
+Compare dilute-acid and hot-water pretreatment in the composed flowsheet, with the package's own defaults.
+2026-11-05 11:10 UTC · 2 questions
+What if the organism fermented glucose alone? Propose a scenario, run it, and say what changed and what the change rests
+2026-11-05 11:07 UTC · 3 questions
+What does the reference cellulosic ethanol plant in the library assume about its feedstock, and where do those numbers c
+2026-11-05 11:01 UTC · 2 questions
+What strains of Saccharomyces cerevisiae appear in the project's documents, and which documents describe each?
+2026-11-05 10:57 UTC · 1 question
+Which of the project's documents report an ethanol titre, and under what conditions does each report it?
+2026-11-05 10:52 UTC · 1 question
+What if the organism fermented glucose alone? Propose a scenario, run it, and say what changed and what the change rests
+Postdoc is running without an API key
+
+Write the key on its line in core/.env, the line core/.env.example holds for it (when core/.env is absent, copy the example, leaving out its database line on the live host), and restart the service. That file is gitignored, and the key never reaches the browser, which is why the service holds it.
+
+ASKED
+
+What if the organism fermented glucose alone? Propose a scenario, run it, and say what changed and what the change rests on.
+
+2026-11-08 04:26 UTC
+WHAT POSTDOC DID
+Swept the modules for what the question names · searched ten, found in none
+559 ms
+Read the library shelf · 10 plants
+31 ms
+Read the project's studies · 4 rows
+190 ms
+Read Proforma · 6 rows
+1 ms
+Read the parameters of cornstover · 0 parameters
+27.1 s
+Read the parameters of cellulosic_ethanol_v0 · 21 parameters
+380 ms
+Read the parameters of cornstover · 40 parameters
+1 ms
+Read the parameters of cellulosic_ethanol_v0 · 11 parameters
+3 ms
+Read the parameters of cornstover · 0 parameters
+2 ms
+Read the parameters of cornstover · 0 parameters
+2 ms
+Read the parameters of cornstover · 0 parameters
+3 ms
+Read the parameters of cornstover · 40 parameters
+1 ms
+Kept scenario ssc-6468dc71ae63 on cellulosic_ethanol_v0 · 10 values of yours Open Studies
+15 ms
+Searched the papers for "xylose to ethanol conversion cofermentation Zymomonas mobilis design assumption" · 6 passages
+5.2 s
+Looked up records of xylose ethanol conversion fermentation · 10 records
+2 ms
+claude-opus-5-5 was unavailable; asked again on claude-sonnet-5-5
+No answer: The Anthropic account's usage limit is reached, so no model can answer: Error code: 400 - {'type': 'error', 'error': {'type': 'invalid_request_error', 'message'
+Postdoc could not answer this
+
+The Anthropic account's usage limit is reached, so no model can answer: Error code: 400 - {'type': 'error', 'error': {'type': 'invalid_request_error', 'message': 'You have reached your specified API usage limits. You will regain access on 2026-12-01 at 00:00 UTC.'}, 'request_id': 'req_011Cgpq5KGpFH6bwXAKbqH6F'} The account's owner raises the limit in the Anthropic console; openFerment's daily cap is a separate limit.
+
+Produced by
+Postdoc
+·
+no answer
+claude-opus-5-5
+·
+14 tokens in / 7,151 out
+·
+94% of the prompt cached
+·
+$0.282
+·
+14 tool calls; no answer came back
+Searched ten modules, found it in none · read in part: BioRepo
+Send
+Enter send · ⇧Enter newline
+
+
+== /p/ethanol/geneos
+HOST, CONSTRUCT, PATHWAY, DESIGN
+geneOS
+The organism as an engineered system. Host choice, genetic parts, pathway assembly, the genome-scale model and strain design — everything that decides what a cell can do, before any vessel is involved.
+Hosts
+0
+Pathway
+Model
+Hosts
+The project’s strain catalogue and its pages: each strain kept on the Catalogues screen, and the extraction records anchored to it, as a project’s records name them. Choosing a chassis is a genetic design decision — it sets whether the product is secreted, whether endotoxin clearance is mandatory, and what the entire downstream train will have to be, which is why it lives with geneOS.
+No strain is on file yet
+The project's strain catalogue holds no strain yet. Each strain kept there gets a card here, counting the papers, records, protocols and scenarios that stand behind it.
+Keep a strain on the Catalogues screen
+Where geneOS stops and fermOS starts
+
+geneOS is stoichiometry: what the engineered cell can do, at steady state, with no time axis and no vessel. A genome-scale model gives a yield ceiling. What a real fermenter achieves over ninety hours is a claim of another discipline, and it belongs to fermOS.
+
+Titre is fermOS’s output. The gap between the ceiling here and the titre achieved there is what reconciliation measures against a deposition, so every number on this screen reads as a ceiling of the cell, and a vessel’s output is fermOS’s to predict.
+
+geneOS subsystems
+5 named, 0 built
+
+Named parts of geneOS that have no implementation. Each one states what is true of the code.
+
+Parts
+not built
+geneos.parts
+Parts has no implementation
+Not built. Nothing here computes, stores or retrieves anything yet.
+Sequence search
+not built
+geneos.search
+Sequence search has no implementation
+Not built. Nothing here computes, stores or retrieves anything yet.
+Structure
+not built
+geneos.structure
+Structure has no implementation
+Not built. Nothing here computes, stores or retrieves anything yet.
+Function
+not built
+geneos.function
+Function has no implementation
+Not built. Nothing here computes, stores or retrieves anything yet.
+Strain design
+not built
+geneos.design
+Strain design has no implementation
+Not built. Nothing here computes, stores or retrieves anything yet.
+Produced by
+geneOS
+·
+0 hosts, no chassis recommendation
+
+
+== /p/ethanol/fermos
+REACTOR, KINETICS, SCALE
+fermOS
+The vessel. What a real reactor achieves over time: fitted to the runs deposited here, forecast from those fits, simulated from a model family whose every parameter names its source, and the vessel BioSTEAM sizes for a kept simulation, with its oxygen balance. Control is not built.
+Fits
+Simulate
+Vessel
+Forecast
+Model fitted
+logistic_v0: Logistic growth, Luedeking–Piret production and the sugar balance, in closed form
+batch_v1: The batch family: Monod growth with inhibition, integrated, fitted to product and sugar
+No run deposited yet
+fermOS fits what a run measured, and nothing else. Deposit a run in Runbooks → Depositions with these readings: the time of each sample, in hours into the run; a biomass reading at four or more of those times; and, for the production and uptake terms, a product reading and a substrate reading at the same times. On the deposition’s Time series panel, give each reading its hours and mark each series as biomass, product or substrate. The run then appears here to fit.
+Properties of a broth
+Titre record
+pick one
+74 g L⁻¹ · NREL 2012 Achievement of Ethanol Cost T…
+73.5 g L⁻¹ · NREL 2012 Achievement of Ethanol Cost T…
+45 g L⁻¹ · NREL 2012 Achievement of Ethanol Cost T…
+70 g L⁻¹ · NREL 2012 Achievement of Ethanol Cost T…
+139 g L⁻¹ · The metabolic costs of improving ethano…
+106 g L⁻¹ · The metabolic costs of improving ethano…
+57 g L⁻¹ · The metabolic costs of improving ethano…
+28.47 g L⁻¹ · Bioethanol production from sugarcane le…
+28.81 g L⁻¹ · Bioethanol production from sugarcane le…
+23.01 g L⁻¹ · Bioethanol production from sugarcane le…
+22.72 g L⁻¹ · Bioethanol production from sugarcane le…
+11.5 g L⁻¹ · Bioethanol production from sugarcane le…
+67 g L⁻¹ · Bioethanol production from sugarcane le…
+72.43 g L⁻¹ · Bioethanol production from sugarcane le…
+17.5 g L⁻¹ · Bioethanol production from sugarcane le…
+4.71 g L⁻¹ · Bioethanol production from sugarcane le…
+29 g L⁻¹ · Bioethanol production from sugarcane le…
+2.95 g L⁻¹ · Bioethanol production from sugarcane le…
+1.97 g L⁻¹ · Bioethanol production from sugarcane le…
+6.65 g L⁻¹ · Bioethanol production from sugarcane le…
+13.6 g L⁻¹ · Bioethanol production from sugarcane le…
+92.69 g L⁻¹ · Adaptive laboratory evolution of Saccha…
+94.5 g L⁻¹ · Adaptive laboratory evolution of Saccha…
+78.51 g L⁻¹ · Adaptive laboratory evolution of Saccha…
+91 g L⁻¹ · Adaptive laboratory evolution of Saccha…
+88 g L⁻¹ · Adaptive laboratory evolution of Saccha…
+52 g L⁻¹ · Process Design and Economics for Bioche…
+53 g L⁻¹ · Process Design and Economics for Bioche…
+49 g L⁻¹ · Process Design and Economics for Bioche…
+53 g L⁻¹ · Process Design and Economics for Bioche…
+50 g L⁻¹ · Process Design and Economics for Bioche…
+117 g L⁻¹ · Quantitative evaluation of yeast's requ…
+112 g L⁻¹ · Quantitative evaluation of yeast's requ…
+114 g L⁻¹ · Quantitative evaluation of yeast's requ…
+78.9 g L⁻¹ · Vacuum-Assisted Gas Stripping Extractiv…
+79.08 g L⁻¹ · Vacuum-Assisted Gas Stripping Extractiv…
+47.3 g L⁻¹ · Vacuum-Assisted Gas Stripping Extractiv…
+45.29 g L⁻¹ · Vacuum-Assisted Gas Stripping Extractiv…
+79.54 g L⁻¹ · Vacuum-Assisted Gas Stripping Extractiv…
+84.64 g L⁻¹ · Vacuum-Assisted Gas Stripping Extractiv…
+
+Density, heat capacity, viscosity, and bubble and dew points of water and ethanol at a titre a paper measured, as thermosteam (BioSTEAM’s property engine) computes them. The page names the record; the service reads its value, and nothing is typed. The beer’s cells, residual sugar and dissolved carbon dioxide are not in the mixture.
+
+Pick a titre record above to ask what thermosteam says of that beer.
+
+A fit takes only measurements; a simulation names every source
+
+mu_max, Xmax and the production and uptake coefficients of a fit are fitted to a real fermentation in a specific vessel, from a deposition and nothing else. A simulation may take a parameter from a paper’s records, a fit, a kept artifact, a person’s assumption or a stated convention, and it names which for every one: a number lifted from a paper about another strain in another reactor is labelled as that, and the simulation’s provenance follows the weakest of its sources. It is never a measurement.
+
+Titre is fermOS's output — and the seam on either side
+
+Upstream, geneOS is stoichiometry: a genome-scale model gives a yield ceiling with no time axis. fermOS is dynamics: the curve in a specific vessel. The gap between the ceiling and the titre actually achieved is exactly what reconciliation measures.
+
+Downstream, the seam to pureOS is the harvest step, and it carries a decision made back in geneOS: secreted or intracellular. A secreted product starts at centrifuge and filter; an intracellular one starts at lysis and inherits every problem after it. The handoff carries the product’s location beside its titre.
+
+fermOS subsystems
+1 named, 0 built
+
+Named parts of fermOS that have no implementation. Each one states what is true of the code.
+
+Control
+not built
+fermos.control
+Control has no implementation
+Not built. Nothing here computes, stores or retrieves anything yet. Dissolved oxygen as a state of the simulation with a control loop on it, and an instrument such as a Pioreactor sending its readings to fermOS, would build it.
+Produced by
+fermOS
+·
+kinetics, operating modes, transport and scale live; 1 subsystem named and unbuilt
+
+
+== /p/ethanol/pureos
+HARVEST, CAPTURE, RECOVERY
+pureOS
+Everything after the fermenter: harvest, disruption, capture, polishing, recovery and storage. pureOS builds a train unit by unit from a catalogue of BioSTEAM's units and runs it, and reads the train a flowsheet ran from the run Proforma priced; Proforma prices a train, pureOS decides it: whether centrifugation or filtration suits a cell-wall-deficient host is a process question.
+Trains
+Builder
+New train
+The train starts with a decision made in geneOS
+
+Secreted or intracellular is the single choice with the largest effect on downstream cost, and it is a genetic design choice — made in geneOS when the chassis and signal peptide are picked, long before anybody touches a column. A secreted product starts at centrifuge and filter. An intracellular one starts at lysis and inherits every problem after it. So the handoff from fermOS carries the product’s location beside its titre.
+
+Properties flow downstream and are stored once. Thermostability is predicted in geneOS and consumed here, where it decides whether a heat step can replace most of the capture chromatography. It stays a geneOS field, so one question keeps one answer.
+
+UNIT OPERATIONS
+45
+across 15 stages
+PRODUCTS ON FILE
+0
+0 with the class the proposer reads
+Trains built here
+0 saved
+
+No train is saved in this project yet.
+
+New train opens the Builder: choose where the broth comes from, add units from the catalogue in order, give each what it needs, run it, and Save.
+
+Made by Postdoc
+0 kept
+
+No train built by a model is kept on this service yet.
+
+Postdoc builds one with pureos_build when a question asks for a train, from unit type names and record ids; the service keeps it as the model’s, and it is listed here, ready to open as a copy you can change and save.
+
+Train runs on the service
+0 on file
+
+No train built in pureOS has run on this service yet.
+
+Trains read from Proforma’s runs
+6 on file
+e9384e8b0265df2e
+Computed · basis attached
+100.0% recovered
+64 units · product Ethanol · run 2026-11-08 03:27 UTC
+a9d40f9b35fc62a3
+Computed · basis attached
+100.0% recovered
+71 units · product Ethanol · run 2026-11-08 03:27 UTC
+Cellulosic ethanol flowsheet with the fermenting organism converting no xylose (glucose-only fermentation)
+Assumed · rests on an assumption
+100.0% recovered
+68 units · product Ethanol · run 2026-11-08 03:23 UTC
+784c94d9bd67d20e
+Computed · basis attached
+100.0% recovered
+61 units · product Ethanol · run 2026-11-05 09:17 UTC
+e7efa2505b4633de
+Computed · basis attached
+100.0% recovered
+68 units · product Ethanol · run 2026-11-05 09:17 UTC
+bfda026530692adc
+Computed · basis attached
+100.0% recovered
+68 units · product Ethanol · run 2026-11-05 09:17 UTC
+Propose a train
+Propose a train
+
+The service proposes a train for a product and a host by written rules, each naming the property it read: thermosteam's boiling points and azeotrope for a small molecule, ProtParam's isoelectric point and molecular weight on a protein's sequence, and where the product's entry says the product is. Every parameter stays at its library default or waits for you in the Builder.
+
+The vocabulary: names for the steps
+Everything below is a name for a step and the stage it belongs to, with the BioSTEAM classes that perform it. A train above is built by a person in the Builder or read from a run somebody made, and a proposed one is the service's rules, each naming the property it read. Judging whether a train is a good one is the piece still to build. What exists is the shared language the rest of the platform describes a train in.
+Harvest
+2 operations
+Centrifugation
+all
+disc-stack at production scale
+BioSTEAM: SolidsCentrifuge, LiquidsCentrifuge, LiquidsSplitCentrifuge, LiquidsRatioCentrifuge, SolidLiquidsSplitCentrifuge, SLLECentrifuge
+Microfiltration
+cell removal, secreted products
+Clarification
+4 operations
+Depth filtration
+Pressure filtration
+a filter press: solids stay as a cake, the filtrate passes
+BioSTEAM: PressureFilter
+Rotary vacuum filtration
+a turning drum under vacuum: the cake stays on the drum
+BioSTEAM: RotaryVacuumFilter
+Clarifier
+solids settle; the clear liquid overflows
+BioSTEAM: Clarifier
+Cell Disruption
+3 operations
+High-pressure homogenisation
+intracellular products
+Bead milling
+bench-pilot
+Cell disruption
+homogeniser or bead mill: the product the cells hold moves into the liquid
+Recovery
+1 operation
+Inclusion body solubilisation + refolding
+insoluble aggregates dissolve in a denaturant, and the protein folds again as the denaturant leaves
+Capture
+6 operations
+IMAC affinity
+His-tagged products
+Custom affinity chromatography
+Thermal clarification
+the stream is heated so host proteins denature and settle out, and a heat-stable product stays in solution
+Precipitation
+ammonium sulfate / PEG
+Liquid-liquid extraction
+the product moves from the broth into an immiscible solvent
+BioSTEAM: LLEUnit, LLESettler, LLECentrifuge, MixerSettler, LiquidsSettler, LiquidsSplitSettler, LiquidsPartitionSettler
+Counter-current extraction
+mixer-settlers in series, the solvent against the broth
+BioSTEAM: MultiStageMixerSettlers
+Capture/Polish
+2 operations
+Ion exchange chromatography
+Q / SP
+Chromatography
+a column step by its mode, with declared recovery and purity until a column model computes them
+Polish
+7 operations
+Hydrophobic interaction chromatography
+Size exclusion chromatography
+separates by molecular size through a porous bed
+Mixed-mode chromatography
+Protease tag cleavage
+Molecular sieve dehydration
+adsorbs the water distillation cannot take past the ethanol-water azeotrope
+BioSTEAM: MolecularSieve
+Endotoxin clearance
+lipopolysaccharide removed from the product stream
+Nuclease/residual-DNA clearance
+nucleic acid digested or bound and removed from the product stream
+Concentration
+4 operations
+Ultrafiltration / diafiltration
+buffer exchange + concentration
+Nanofiltration
+a tight membrane: water and small ions pass, larger solutes stay
+Flash
+part of the broth boils at a set pressure or temperature; vapour and liquid leave at equilibrium
+BioSTEAM: Flash
+Multi-effect evaporation
+water boiled off in effects at falling pressures
+BioSTEAM: MultiEffectEvaporator
+Desalting
+1 operation
+Electrodialysis
+ions leave the stream through charged membranes under an electric field
+Isolation
+1 operation
+Crystallisation
+BioSTEAM: BatchCrystallizer
+Purification
+3 operations
+Distillation / rectification
+separates by volatility; the beer column and rectifier of an ethanol plant
+BioSTEAM: Distillation, BinaryDistillation, MESHDistillation, AdiabaticMultiStageVLEColumn
+Distillation, shortcut column
+stages by the Fenske–Underwood–Gilliland shortcut
+BioSTEAM: ShortcutColumn
+Adsorption column
+a lead, guard and standby column swap as the bed loads
+BioSTEAM: SingleComponentAdsorptionColumn
+Drying
+3 operations
+Spray drying
+the liquid, atomised into hot gas, dries to a powder
+BioSTEAM: SprayDryer
+Lyophilisation
+water sublimes from the frozen product under vacuum
+Drum drying
+hot gas through a turning drum, the gas heated by burning fuel
+BioSTEAM: DrumDryer
+Formulation
+1 operation
+Granulation
+a powder bound into granules
+Finishing
+1 operation
+Sterile filtration
+Utility
+6 operations
+Heat exchange
+heats or cools a stream with a utility
+BioSTEAM: HXutility
+Storage tank
+holds a stream for a residence time
+BioSTEAM: StorageTank
+Mix tank
+mixes streams in a stirred tank
+BioSTEAM: MixTank
+Pump
+raises a stream's pressure
+BioSTEAM: Pump
+Mixer
+joins streams into one
+BioSTEAM: Mixer
+Splitter
+divides a stream by each component's split
+BioSTEAM: Splitter
+What pureOS will hold
+0/2 built
+
+The Builder, the trains on file and the vocabulary are the parts that exist. Everything here would need code, and none of it has any.
+
+Formulation and storage
+Which format a product survives in, and what that format costs in stability.
+Resin and consumable selection
+The chemistry behind a capture step, and what it rules out downstream.
+Produced by
+pureOS
+·
+45 operations; trains built here and read from runs
+
+
+== /p/ethanol/proforma
+COST AND SCALE
+Proforma
+Techno-economics on BioSTEAM: published plants of the library shelf run whole on their package's own values, and scenarios made from a flowsheet on the shelf, each input bound to records or to a named person's assumption.
+Studies
+Compare
+New scenario
+Reference runs
+
+Published biorefineries from the BioSTEAM project’s own biorefineries package, on the library shelf, run whole with every setting the package’s own, before Proforma prices anything new. Each run is held to the values the package’s own test asserts, and its card says how many of them it holds: how close this installation comes to the plant as its authors built it. Studies runs every other plant of the shelf.
+
+cornstover
+reference
+cornstover: 2nd Generation Ethanol Production from Corn Stover
+
+From biorefineries 2.35.1, biorefineries.cornstover · held to test_cornstover
+
+A plant of the library shelf, run whole by BioSTEAM on the package’s own values, and held to the values its package’s own test asserts.
+
+Computed · basis attached.
+0.6588
+USD/kg of ethanol; the price its TEA solves at the package’s rate of return
+
+9 of 11 values of test_cornstover within the package’s tolerance on this run.
+
+Computed · basis attached
+Ran
+2026-11-05 09:17 UTC
+· kept as
+bfda026530692adc
+
+Rerun
+Its page
+The simulator has not started on this service yet. A run is asked for in a person’s name: set yours in Settings first.
+corn
+reference
+corn: Conventional dry grind process
+
+From biorefineries 2.35.1, biorefineries.corn · held to test_corn
+
+A plant of the library shelf, run whole by BioSTEAM on the package’s own values, and held to the values its package’s own test asserts.
+
+Not run in this project yet.
+
+Run
+Its page
+The simulator has not started on this service yet. A run is asked for in a person’s name: set yours in Settings first.
+Flowsheets
+
+The flowsheets a scenario can run. Records bind each flowsheet’s process inputs, and a named person types the rest.
+
+ethanol_glucose_v0
+Glucose to ethanol, draft v0
+
+From this repository
+
+A glucose solution into a batch fermenter, then the ethanol purification train of the BioSTEAM reference designs (beer column, rectifier, molecular sieves), giving fuel-grade ethanol. The fermenter turns glucose into ethanol at the bound yield as a share of the theoretical yield, for a batch time of titre over productivity. Chemicals and finance are the dry-grind corn ethanol plant's; equipment and thermodynamics are BioSTEAM's own; no number is the flowsheet's.
+
+INPUTS
+glucose in the fermenter's feed (g L-1): binds to records of medium_component_conc
+ethanol titre at harvest (g L-1): binds to records of ethanol_titre
+ethanol yield on glucose (g g-1): binds to records of ethanol_yield_substrate
+ethanol volumetric productivity (g L-1 h-1): binds to records of ethanol_productivity
+ethanol fermented in a year (t yr-1): a named person's assumption
+price of glucose (USD kg-1): a named person's assumption
+ethanol purity: a convention the run states
+
+The price is USD per kg of fuel-grade ethanol, as the product leaves its tank.
+
+New scenario from this
+custom_train_v1
+A vessel and a train, priced
+
+From this repository
+
+A glucose solution into the fermenter fermOS designed (a kept fermos.vessel design: BioSTEAM's AeratedBioreactor or NREL batch fermenter, rebuilt as the same class with every design parameter as the design holds it, running the reaction the design was built on), its beer through the units of a train pureOS ran (a kept pureos.train_run: each unit the same catalogue type, class and values as that run held them), priced with the dry-grind corn ethanol plant's TEA (biorefineries.corn.create_tea, ConventionalEthanolTEA), its financial parameters in the panel's Finance group as the package's defaults until a person sets one. A scenario on it names the vessel design and the train run. The train's own inlet is not an input: the fermenter's beer is its inlet. Only the yeast program has a chemical set, so a vessel or a train of another program is refused.
+
+INPUTS
+glucose in the fermenter's feed (g L-1): binds to records of medium_component_conc
+ethanol titre at harvest (g L-1): binds to records of ethanol_titre
+ethanol yield on glucose (g g-1): binds to records of ethanol_yield_substrate
+ethanol volumetric productivity (g L-1 h-1): binds to records of ethanol_productivity
+ethanol fermented in a year (t yr-1): a named person's assumption
+price of glucose (USD kg-1): a named person's assumption
+
+The price is USD per kg of the product the train traces (ethanol, for the yeast program), contained in the train's product stream as it leaves the train's last unit.
+
+New scenario from this
+Scenarios
+No Proforma scenario yet
+The project's studies hold 2 scenarios, listed on Studies. A Proforma scenario runs one flowsheet from the shelf above: New scenario picks the flowsheet, names it and opens it, with its inputs listed.
+New scenario
+Studies
+
+
+== /p/ethanol/runbooks
+RUNBOOKS
+Runbooks
+A runbook is a synthesised, followable answer to a question about making something. Industrial runbooks output a process you could build and defend; research runbooks output a prediction and the experiments that would test it. Same toolchain, different question.
+Runbooks
+Protocols
+Depositions
+Ledger
+0
+runbooks
+0 industrial · 0 research
+0 waiting on a person
+$0.00
+modeled compute spend
+?
+The project keeps no runbook yet
+A runbook starts two ways: as a draft in Postdoc, which you ask to draft one from the evidence and then press Turn into a runbook; or from a run's numbers, on the run's page under A runbook from this run (Studies lists the runs). Either way it lands here.
+Draft a runbook in Postdoc
+A run’s runbook, from Studies
+
+
+== /p/ethanol/primer
+PRIMER
+Lessons
+Bioprocess taught through the live platform: the project's lessons, each with the skills it counts toward and its checkpoint.
+Lessons
+My path
+Practice
+No lesson yet
+No lesson ships with the app. A lesson the lab keeps in the lesson catalogue appears here, with the skills it counts toward and its checkpoint.
+
+
+== /p/ethanol/guild
+GUILD
+Review queue
+Judge each extraction against the sentence it was pulled from. Accept, correct, or reject — the audit trail keeps both the original and your correction.
+Prev
+k
+Next
+j
+Review
+Matrix
+People
+Skills
+PROGRESS
+1 / 457
+THIS QUEUE
+457 records · 20 papers · 17 fields
+Auto-filled with every unverified record the box below lets in.
+Papers the service can keep
+SESSION
+00:02
+Undo
+u
+
+Record 1 of 457. Minimum ethanol selling price, 2.15 USD gal⁻¹, confidence 0.95, from 2fc3d2a2a57446a6b9f1090a2a236bc6.
+
+Record …386c6002
+Extracted · unverified · 0.95
+Minimum ethanol selling price
+
+The ethanol price per US gallon at which a modelled plant breaks even over its life, as a techno-economic analysis states it. Its method is the costing basis the analysis names, such as a discounted cash flow analysis, or "undetermined" when it names none. A price per kilogram is minimum_selling_price; a price per litre belongs to no field.
+
+Canonical unit USD gal⁻¹
+
+AS PUBLISHED
+2.15USD gal⁻¹
+CONFIDENCE
+0.95
+[Tao et al. 2014]
+NREL 2012 Achievement of Ethanol Cost Targets: Biochemical Ethanol Fermentation via Dilute-Acid Pretreatment and Enzymatic Hydrolysis of Corn Stover · Page 29
+Open in the reader
+
+site enzyme production to compute enzyme costs. The SOT case meets the cost target for FY
+2012 with a modeled MESP of $2.15/gal ethanol using $58.50/dry ton feedstock cost. Cost
+
+Audit trail
+
+Nothing has happened to this record beyond the extraction that made it.
+
+WHERE THIS RECORD CAME FROM
+Extracted · unverified.
+Extracted from the project’s document
+field ethanol_mesp · confidence 0.95 · run claude-1
+
+One structured model response over the paper’s own text produced this candidate, and anchoring checked that its quote is verbatim in the section and holds the value. Accepting makes it a record; rejecting makes it a false positive in Witness.
+
+Accept
+a
+Reject
+r
+Edit value
+e
+Skip
+s
+Flag for gold
+g
+j / k move · u undo
+
+The service will keep no decision here: Set your reviewer name in Settings before deciding — the project records who decided what.
+
+
+== /p/ethanol/catalogues
+THE PROJECT'S CATALOGUES
+Catalogues
+The strains and the other names papers give them, the products, Guild's skills and Primer's lessons this project keeps, each entry in its keeper's name. Every entry stays once kept, and keeping a file under an entry's id replaces it.
+Strains
+Products
+Skills
+Lessons
+The strains the project keeps
+Add a strain
+
+A strain kept here is a host pureOS proposes a train in, and Postdoc reads it among geneOS’s hosts; its other names are the names papers give it.
+
+No strain yet
+Add one with the button above, or take in a file of strains below.
+Take in a file of strains
+
+JSON, a list of entries or one under entries, or CSV with id and name columns, a list’s items split by ;. Every row that is an entry is kept in your name with the file as its source, an entry under its id replaced; every other row is refused with its reason.
+
+Take it in
+
+A file is taken in a person’s name: set yours in Settings first.
+
+
+== /p/ethanol/settings
+SETTINGS
+Appearance
+Theme, density and motion. Changes apply immediately.
+Appearance
+Units & display
+Architecture
+Reviewer & ontology
+OWNER
+Guild policy
+OWNER
+Figure grammar
+Export center
+About & fidelity
+Theme
+applied live
+Bench
+Light. Paper-white panels on a faint engineering grid, for daylight lab work.
+Night Shift
+Dark. Same hierarchy at lower luminance, for fermentation halls and late runs.
+Density
+Comfortable
+40px rows, 14px table text. The default for reading and review.
+Dense
+30px rows, 13px table text. More rows per screen for triage. Shortcut: ⇧D.
+LIVE PREVIEW — REAL RECORDS
+Extracted · unverified.
+Minimum ethanol selling price
+	2.15 USD gal⁻¹
+
+Extracted · unverified.
+Minimum ethanol selling price
+	2.56 USD gal⁻¹
+
+Extracted · unverified.
+Minimum ethanol selling price
+	2.36 USD gal⁻¹
+Motion
+Reduce motion (override)
+Collapses every transition and entrance animation to near-zero, on top of your system preference. Progress bars, timers and job stages keep updating — only the easing disappears.
+Your system currently requests no motion preference. That preference is already honoured; this switch forces reduction regardless.
+

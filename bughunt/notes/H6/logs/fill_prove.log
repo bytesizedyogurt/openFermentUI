@@ -1,0 +1,46 @@
+step 2: a project made through the API
+  ✓ project proof made through the API and listed
+step 3: documents taken in, embedded and searched; a candidate extracted, anchored and accepted; the record in BioRepo
+  ✓ the kit's demo corpus taken in through Intake's upload: 5 documents, each ingested
+  ✓ the project holds 5 documents in 34 chunks, every chunk embedded: 34 by fastembed:BAAI/bge-small-en-v1.5@384
+  ✓ each by the title its manifest row gives
+  ✓ a search in words for each of the kit's 9 seed questions: 9 answered by a passage of the document that holds the answer in the top five, every hit with its passage id and citation
+  ✓ Demo Region Policy Landscape for Agricultural Residue Utilization: the words the stand-in quotes stand in its passage p4
+  ✓ extracted through the service: candidate cl1-4a8408843a6445b9a2df4103b7b4a5dd-c7281686 anchored to passage p4 of the stored text, in its words "a target decision time of 120 days"
+  ✓ the stand-in's second candidate, quoting words the document does not hold, refused: 1 refused, by rule quote
+  ✓ a decision carrying a model's estimate as its value refused at the record store: rule estimate
+  ✓ Proof Reviewer accepted it: record cl1-4a8408843a6445b9a2df4103b7b4a5dd-c7281686 in BioRepo, verified, verified, decided by Proof Reviewer, on "a target decision time of 120 days"
+step 4: the library's plants; the cellulosic ethanol reference plant held to its package's test
+  ✓ the library lists 16 plants under biorefineries 2.35.1 and biosteam 2.54.0, cornstover and cellulosic_ethanol_v0 among them
+  ✓ cornstover run bfda026530692adc: done, computed
+  ✓ held to the package's own test: 9 of 11 within its tolerance; 2 outside it as the package's own test is on this installation (ADR-013): tea.installed_equipment_cost 192647846.3 against 209112840.5, units.get_electricity_consumption() 20.91491945 against 22.05578512
+  ✓ its tables: 118 streams, 68 units, the TEA's breakdown
+  ✓ its 144 parameters read back from the plant, each with its origin
+  ✓ its versions: biorefineries 2.35.1, biosteam 2.54.0, thermosteam 0.54.2
+  ✓ its SFF file run-bfda026530692adc: valid, scored 0.7412104729927445
+step 5: the flowsheet on the library's defaults; A→B→A; a scenario, a comparison, a runbook, the export
+  ✓ cellulosic_ethanol_v0 run e7efa2505b4633de on the library's own defaults: computed, each of its 208 parameters library-default, its inputs convention and library-default
+  ✓ A→B→A: cellulosic_ethanol_v0, then sugarcane, then cellulosic_ethanol_v0 replayed: identical
+  ✓ scenario ssc-24763d420fea run b9382581572bd389: assumed, its price a person's assumption by Proof Reviewer, its residence time a model's estimate by claude-opus-5-5
+  ✓ comparison b6e05811fa2c5f2d: assumed, the selling price 0.6588 to 0.7946 USD/kg (+20.6%)
+  ✓ runbook rb-study-065a6e808885 predicting the scenario's selling price, locked under d6fb1114f9c01c63, the digest the browser's lock.ts writes
+  ✓ a second lock refused: 422, rb-study-065a6e808885 is locked already; a lock is kept as it was made, and a change is a 
+  ✓ the export package (339278 bytes) opened by the standard library alone
+  ✓ with every installed package off the path, and nothing of openFerment's loaded
+  ✓ it holds manifest.json, study.json, study.md, versions.json and 4 SFF files; study.md names every run, scenario, comparison and runbook, and each file has the size and sha256 its manifest gives
+  ✓ each run's SFF file in it is the project's, byte for byte (4 files)
+step 6: Postdoc: its evaluation set asked through the service's answer path and scored by code; a follow-up reads its history
+  ✓ the evaluation set kept in the project as rows: eq-price, eq-dearer
+  ✓ asked offline, through the service's answer path, of the stand-in openferment-standin; no model key
+  ✓ sugarcane's selling price: a claim kept, citing the run by evidence id; scored {'tools': 1.0, 'citations': 1.0, 'estimates': 1.0, 'bareNumbers': 1.0}
+  ✓ the follow-up asked in conversation lc-eval-f9a3ae9b408e: both turns kept on the service, and the stand-in handed the question it follows, read from the service
+  ✓ the dearer cane's claim states the stand-in's estimate as a labelled value, marked openferment-standin's, and is assumed
+  ✓ the scenario run f6c8a409dade4a81 (ssc-4cd0e8abe046, assumed), and the claim's selling price read from it by evidence id f6c8a409dade4a81:price.solvedPrice
+  ✓ a claim with a bare number dropped and counted: one dropped, the turn's bare-number score 0
+  ✓ the follow-up's tool calls kept with its turn: engine_parameters, study_scenario, engine_run
+  ✓ each question scored and kept: {'tools': 1.0, 'citations': 1.0, 'estimates': 1.0, 'bareNumbers': 0.5}
+step 7: a reference SFF file imported; it draws
+  ✓ the toolkit's reference files listed: 18, SF_BST_15 among them
+  ✓ SF_BST_15 (Sugarcane → Ethanol) imported as record sff-be74817c298f211b, origin library, its sha256 the manifest's
+  ✓ it draws: 54 units, 57 streams between them, 22 feeds and 17 products; not valid against SFF 0.2.4
+{"passed": 39, "failed": 0}

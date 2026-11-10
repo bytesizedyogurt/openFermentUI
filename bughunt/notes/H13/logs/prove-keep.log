@@ -1,0 +1,23 @@
+openFerment proof: steps 1, 2 on database bh_h13_proof_998435b7
+
+── the engines under examples/engines/, installed before the service starts
+  ✓ examples/engines/openferment-engine-mirror installed into core's environment (uv pip install -e, each package core/uv.lock pins held at its locked version), registering mirror
+
+── 1  a fresh database, migrated; ready green
+  ✓ database bh_h13_proof_998435b7 made on the tests' server: postgresql+asyncpg://openferment:***@127.0.0.1:5432/bh_h13_proof_998435b7 was made again: openferment at 0010, sci_rag at 0006
+  ✓ migrated to the head of each schema: openferment at 0010 of 0010, sci_rag at 0006 of 0006
+  ✓ the service answers at http://127.0.0.1:8933, on its own database and data directory
+  ✓ ready green (--offline: no network, no key): every row passes or warns
+  (24 s)
+
+── 2  a project made through the API
+  ✓ project proof made through the API and listed
+  (0 s)
+
+── the spend
+  ✓ no model call: the proof's spend table holds 0 calls, $0.0000
+
+kept: the service at http://127.0.0.1:8933 (project proof), database bh_h13_proof_998435b7, data /tmp/openferment-proof-ekpygu2o; stop it with kill -TERM -23164
+── core's environment as the proof found it
+  openferment-engine-mirror stays installed from examples/engines/openferment-engine-mirror while the kept service runs; cd core && uv pip uninstall openferment-engine-mirror takes it out
+7 checks in 26 s: every one holds.

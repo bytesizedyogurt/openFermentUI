@@ -1,0 +1,54 @@
+openFerment proof: steps 1, 2, 3, 8 on database bh_h13_proof_15d0c195
+
+── the engines under examples/engines/, installed before the service starts
+  ✓ examples/engines/openferment-engine-mirror installed into core's environment (uv pip install -e, each package core/uv.lock pins held at its locked version), registering mirror
+
+── 1  a fresh database, migrated; ready green
+  ✓ database bh_h13_proof_15d0c195 made on the tests' server: postgresql+asyncpg://openferment:***@127.0.0.1:5432/bh_h13_proof_15d0c195 was made again: openferment at 0010, sci_rag at 0006
+  ✓ migrated to the head of each schema: openferment at 0010 of 0010, sci_rag at 0006 of 0006
+  ✓ the service answers at http://127.0.0.1:8931, on its own database and data directory
+  ✓ ready green (--offline: no network, no key): every row passes or warns
+  (26 s)
+
+── 2  a project made through the API
+  ✓ project proof made through the API and listed
+  (0 s)
+
+── 3  documents taken in, embedded and searched; a candidate extracted, anchored and accepted; the record in BioRepo
+  ✓ the kit's demo corpus taken in through Intake's upload: 5 documents, each ingested
+  ✓ the project holds 5 documents in 34 chunks, every chunk embedded: 34 by fastembed:BAAI/bge-small-en-v1.5@384
+  ✓ each by the title its manifest row gives
+  ✓ a search in words for each of the kit's 9 seed questions: 9 answered by a passage of the document that holds the answer in the top five, every hit with its passage id and citation
+  ✓ Demo Region Policy Landscape for Agricultural Residue Utilization: the words the stand-in quotes stand in its passage p4
+  ✓ extracted through the service: candidate cl1-9a6ce09cf15d4523a91014bbd2f111ed-39f10c25 anchored to passage p4 of the stored text, in its words "a target decision time of 120 days"
+  ✓ the stand-in's second candidate, quoting words the document does not hold, refused: 1 refused, by rule quote
+  ✓ a decision carrying a model's estimate as its value refused at the record store: rule estimate
+  ✓ Proof Reviewer accepted it: record cl1-9a6ce09cf15d4523a91014bbd2f111ed-39f10c25 in BioRepo, verified, verified, decided by Proof Reviewer, on "a target decision time of 120 days"
+[11/10/26 22:49:32] INFO     Tool 'search_entities' failed: "Error server.py:453
+                             executing tool search_entities: No                 
+                             concept graph is built over this                   
+                             project's passages yet: `pnpm                      
+                             lit:graph --project proof --by                     
+                             <name>` builds it on the index                     
+                             route's model."                                    
+  ✓ the sci-rag server over stdio lists 8 tools, search_entities and get_entity_relationships among them
+  ✓ search_entities in the proof's project, whose passages no build has read, refused in words naming the command that builds its graph
+  ✓ corpus_stats there: the project's 5 documents and 34 passages, 0 entities
+  (8 s)
+
+── 8  the service restarted: everything reloads; an artifact replays within its tolerance
+  ✓ the service stopped, its workers with it
+  ✓ the service started again at http://127.0.0.1:8931 on the same database
+  ✓ project proof reloads
+  ✓ its 5 documents reload, and record cl1-9a6ce09cf15d4523a91014bbd2f111ed-39f10c25, verified and verified
+  ✓ its 0 engine runs reload: 
+  ✓ its 0 flowsheet records reload: 
+  (3 s)
+
+── the spend
+  ✓ no model call: the proof's spend table holds 0 calls, $0.0000
+
+── core's environment as the proof found it
+  openferment-engine-mirror stays installed from examples/engines/openferment-engine-mirror, as it was before the proof
+25 checks in 39 s: every one holds.
+exit 0 in 40 s

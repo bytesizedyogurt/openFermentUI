@@ -1,0 +1,62 @@
+LIST /api/audit: 18 -> 18; lost [None, None, None, None, None, None, None, None, None, None, None, None, None, None, None, None, None, None]; gained ['1', '2', '3', '4', '5', '6', '7', '8', '9', '10', '11', '12', '13', '14', '15', '16', '17', '18']
+STATUS /api/biorepo/artifacts/0670677d562f3d03/checks: 404 -> 200 [{'expression': 'tea.IRR', 'label': 'internal rate of return', 'unit': '', 'measured': 0.1376385666, 'package': 0.13927430031288052, 'rtol': 0.05, 'relDiff': 0.011744691656722164, 'within': True}, {'expression': 'feedstock.price', 'label': 
+STATUS /api/biorepo/artifacts/0670677d562f3d03/tables: 404 -> 200 {'flowsheet': None, 'tablesSource': 'BioSTEAM 2.54.0, thermosteam 0.54.2', 'tea': {'teaClass': 'ConventionalEthanolTEA', 'product': 'ethanol', 'feedstock': 'sugarcane', 'productPrice': 0.789, 'basisFlow': 23316.04651, 'basis': 'kg of the et
+STATUS /api/biorepo/artifacts/0d9bdb25c9bbb2bf/checks: 404 -> 422 {'detail': "0d9bdb25c9bbb2bf is a growth_forecast artifact; a run's tables are held by a Proforma run (proforma.run), a library plant's run (library.run) and a run kept from a retired reference entry (proforma.reference)"}
+STATUS /api/biorepo/artifacts/0d9bdb25c9bbb2bf/tables: 404 -> 422 {'detail': "0d9bdb25c9bbb2bf is a growth_forecast artifact; a run's tables are held by a Proforma run (proforma.run), a library plant's run (library.run) and a run kept from a retired reference entry (proforma.reference)"}
+STATUS /api/biorepo/artifacts/1b2f2c463c872086/checks: 404 -> 200 [{'expression': 'tea.IRR', 'label': 'internal rate of return', 'unit': '', 'measured': 0.0538147535, 'package': 0.05381572438333119, 'rtol': 0.05, 'relDiff': 1.8040885676336036e-05, 'within': True}, {'expression': 'feedstock.price', 'label'
+STATUS /api/biorepo/artifacts/1b2f2c463c872086/tables: 404 -> 200 {'flowsheet': 'corn_drygrind', 'tablesSource': 'BioSTEAM 2.54.0, thermosteam 0.54.2', 'tea': {'teaClass': 'ConventionalEthanolTEA', 'product': 'ethanol', 'feedstock': 'corn', 'productPrice': 0.4854791535, 'basisFlow': 15781.98654, 'basis': 
+STATUS /api/biorepo/artifacts/28d6cea915540ebb/checks: 404 -> 422 {'detail': "28d6cea915540ebb is a fermos.vessel artifact; a run's tables are held by a Proforma run (proforma.run), a library plant's run (library.run) and a run kept from a retired reference entry (proforma.reference)"}
+STATUS /api/biorepo/artifacts/28d6cea915540ebb/tables: 404 -> 422 {'detail': "28d6cea915540ebb is a fermos.vessel artifact; a run's tables are held by a Proforma run (proforma.run), a library plant's run (library.run) and a run kept from a retired reference entry (proforma.reference)"}
+STATUS /api/biorepo/artifacts/2e0c6c06ca0b2812/checks: 404 -> 200 []
+STATUS /api/biorepo/artifacts/2e0c6c06ca0b2812/tables: 404 -> 200 {'flowsheet': 'ethanol_glucose_v0', 'tablesSource': 'BioSTEAM 2.54.0, thermosteam 0.54.2', 'tea': {'teaClass': 'ConventionalEthanolTEA', 'product': 'ethanol', 'feedstock': 'glucose', 'productPrice': 1.0508725293953693, 'basisFlow': 12603.81
+STATUS /api/biorepo/artifacts/2f81abb0f2230fae/checks: 404 -> 422 {'detail': "2f81abb0f2230fae is a thermo_props artifact; a run's tables are held by a Proforma run (proforma.run), a library plant's run (library.run) and a run kept from a retired reference entry (proforma.reference)"}
+STATUS /api/biorepo/artifacts/2f81abb0f2230fae/tables: 404 -> 422 {'detail': "2f81abb0f2230fae is a thermo_props artifact; a run's tables are held by a Proforma run (proforma.run), a library plant's run (library.run) and a run kept from a retired reference entry (proforma.reference)"}
+STATUS /api/biorepo/artifacts/34ac828d7bc2f1a7/checks: 404 -> 422 {'detail': "34ac828d7bc2f1a7 is a pureos.train_run artifact; a run's tables are held by a Proforma run (proforma.run), a library plant's run (library.run) and a run kept from a retired reference entry (proforma.reference)"}
+STATUS /api/biorepo/artifacts/34ac828d7bc2f1a7/tables: 404 -> 422 {'detail': "34ac828d7bc2f1a7 is a pureos.train_run artifact; a run's tables are held by a Proforma run (proforma.run), a library plant's run (library.run) and a run kept from a retired reference entry (proforma.reference)"}
+STATUS /api/biorepo/artifacts/35e708d122a6b4fc/checks: 404 -> 422 {'detail': "35e708d122a6b4fc is a proforma_benchmark artifact; a run's tables are held by a Proforma run (proforma.run), a library plant's run (library.run) and a run kept from a retired reference entry (proforma.reference)"}
+STATUS /api/biorepo/artifacts/35e708d122a6b4fc/tables: 404 -> 422 {'detail': "35e708d122a6b4fc is a proforma_benchmark artifact; a run's tables are held by a Proforma run (proforma.run), a library plant's run (library.run) and a run kept from a retired reference entry (proforma.reference)"}
+STATUS /api/biorepo/artifacts/3cb486f9d063cc32/checks: 404 -> 422 {'detail': "3cb486f9d063cc32 is a kinetic_fit artifact; a run's tables are held by a Proforma run (proforma.run), a library plant's run (library.run) and a run kept from a retired reference entry (proforma.reference)"}
+STATUS /api/biorepo/artifacts/3cb486f9d063cc32/tables: 404 -> 422 {'detail': "3cb486f9d063cc32 is a kinetic_fit artifact; a run's tables are held by a Proforma run (proforma.run), a library plant's run (library.run) and a run kept from a retired reference entry (proforma.reference)"}
+STATUS /api/biorepo/artifacts/4c67eba59dabbca0/checks: 404 -> 422 {'detail': "4c67eba59dabbca0 is a growth_fit artifact; a run's tables are held by a Proforma run (proforma.run), a library plant's run (library.run) and a run kept from a retired reference entry (proforma.reference)"}
+STATUS /api/biorepo/artifacts/4c67eba59dabbca0/tables: 404 -> 422 {'detail': "4c67eba59dabbca0 is a growth_fit artifact; a run's tables are held by a Proforma run (proforma.run), a library plant's run (library.run) and a run kept from a retired reference entry (proforma.reference)"}
+STATUS /api/biorepo/artifacts/540dbc47d9be9a2d/checks: 404 -> 200 []
+STATUS /api/biorepo/artifacts/540dbc47d9be9a2d/tables: 404 -> 200 {'flowsheet': 'ethanol_glucose_v0', 'tablesSource': 'BioSTEAM 2.54.0, thermosteam 0.54.2', 'tea': {'teaClass': 'ConventionalEthanolTEA', 'product': 'ethanol', 'feedstock': 'glucose', 'productPrice': 1.0508725293953693, 'basisFlow': 12603.81
+STATUS /api/biorepo/artifacts/74b8a29194c7a763/checks: 404 -> 200 []
+STATUS /api/biorepo/artifacts/74b8a29194c7a763/tables: 404 -> 200 {'flowsheet': 'ethanol_glucose_v0', 'tablesSource': 'BioSTEAM 2.54.0, thermosteam 0.54.2', 'tea': {'teaClass': 'ConventionalEthanolTEA', 'product': 'ethanol', 'feedstock': 'glucose', 'productPrice': 1.0508725293953693, 'basisFlow': 12603.81
+STATUS /api/biorepo/artifacts/9993bc1fcab90e9d/checks: 404 -> 422 {'detail': "9993bc1fcab90e9d is a fermos.simulation artifact; a run's tables are held by a Proforma run (proforma.run), a library plant's run (library.run) and a run kept from a retired reference entry (proforma.reference)"}
+STATUS /api/biorepo/artifacts/9993bc1fcab90e9d/tables: 404 -> 422 {'detail': "9993bc1fcab90e9d is a fermos.simulation artifact; a run's tables are held by a Proforma run (proforma.run), a library plant's run (library.run) and a run kept from a retired reference entry (proforma.reference)"}
+STATUS /api/biorepo/artifacts/b6e05811fa2c5f2d/checks: 404 -> 422 {'detail': "b6e05811fa2c5f2d is a study.comparison artifact; a run's tables are held by a Proforma run (proforma.run), a library plant's run (library.run) and a run kept from a retired reference entry (proforma.reference)"}
+STATUS /api/biorepo/artifacts/b6e05811fa2c5f2d/tables: 404 -> 422 {'detail': "b6e05811fa2c5f2d is a study.comparison artifact; a run's tables are held by a Proforma run (proforma.run), a library plant's run (library.run) and a run kept from a retired reference entry (proforma.reference)"}
+STATUS /api/biorepo/artifacts/b9382581572bd389/checks: 404 -> 200 []
+STATUS /api/biorepo/artifacts/b9382581572bd389/tables: 404 -> 200 {'flowsheet': None, 'tablesSource': 'BioSTEAM 2.54.0, thermosteam 0.54.2', 'tea': {'teaClass': 'CellulosicEthanolTEA', 'product': 'ethanol', 'feedstock': 'cornstover', 'productPrice': 0.7198608115, 'basisFlow': 21978.37533, 'basis': 'kg of 
+STATUS /api/biorepo/artifacts/bfda026530692adc/checks: 404 -> 200 [{'expression': 'tea.IRR', 'label': 'internal rate of return', 'unit': '', 'measured': 0.1, 'package': 0.1, 'rtol': 0.05, 'relDiff': 0.0, 'within': True}, {'expression': 'feedstock.price', 'label': 'feedstock price', 'unit': 'USD/kg', 'meas
+STATUS /api/biorepo/artifacts/bfda026530692adc/tables: 404 -> 200 {'flowsheet': None, 'tablesSource': 'BioSTEAM 2.54.0, thermosteam 0.54.2', 'tea': {'teaClass': 'CellulosicEthanolTEA', 'product': 'ethanol', 'feedstock': 'cornstover', 'productPrice': 0.658813642, 'basisFlow': 21978.37533, 'basis': 'kg of t
+STATUS /api/biorepo/artifacts/d13905b95cfb80bf/checks: 404 -> 422 {'detail': "d13905b95cfb80bf is a volatility artifact; a run's tables are held by a Proforma run (proforma.run), a library plant's run (library.run) and a run kept from a retired reference entry (proforma.reference)"}
+STATUS /api/biorepo/artifacts/d13905b95cfb80bf/tables: 404 -> 422 {'detail': "d13905b95cfb80bf is a volatility artifact; a run's tables are held by a Proforma run (proforma.run), a library plant's run (library.run) and a run kept from a retired reference entry (proforma.reference)"}
+STATUS /api/biorepo/artifacts/e7efa2505b4633de/checks: 404 -> 200 []
+STATUS /api/biorepo/artifacts/e7efa2505b4633de/tables: 404 -> 200 {'flowsheet': None, 'tablesSource': 'BioSTEAM 2.54.0, thermosteam 0.54.2', 'tea': {'teaClass': 'CellulosicEthanolTEA', 'product': 'ethanol', 'feedstock': 'cornstover', 'productPrice': 0.7198608115, 'basisFlow': 21978.37533, 'basis': 'kg of 
+STATUS /api/biorepo/artifacts/f2940afbdc24a70e/checks: 404 -> 422 {'detail': "f2940afbdc24a70e is a protparam artifact; a run's tables are held by a Proforma run (proforma.run), a library plant's run (library.run) and a run kept from a retired reference entry (proforma.reference)"}
+STATUS /api/biorepo/artifacts/f2940afbdc24a70e/tables: 404 -> 422 {'detail': "f2940afbdc24a70e is a protparam artifact; a run's tables are held by a Proforma run (proforma.run), a library plant's run (library.run) and a run kept from a retired reference entry (proforma.reference)"}
+STATUS /api/biorepo/artifacts/f6c8a409dade4a81/checks: 404 -> 200 []
+STATUS /api/biorepo/artifacts/f6c8a409dade4a81/tables: 404 -> 200 {'flowsheet': None, 'tablesSource': 'BioSTEAM 2.54.0, thermosteam 0.54.2', 'tea': {'teaClass': 'ConventionalEthanolTEA', 'product': 'ethanol', 'feedstock': 'sugarcane', 'productPrice': 0.789, 'basisFlow': 23316.05407, 'basis': 'kg of the et
+LIST /api/catalogues/product: 3 -> 1; lost ['ethanol', 'xylitol']; gained []
+ONLY MAIN /api/catalogues/product/ethanol 200
+ONLY MAIN /api/catalogues/product/xylitol 200
+STATUS /api/depositions/readings: 404 -> 200 [{'ref': 'dep-h6-1/e-m-x-0', 'depositionId': 'dep-h6-1', 'entryId': 'e-m-x-0', 'runbookId': 'rb-page-1', 'runbook': 'Batch on hydrolysate', 'measureId': 'm-x', 'measure': 'Biomass', 'value': 0.5, 'unit': 'g/L', 'at': '2026-11-10T22:06:35Z',
+STATUS /api/engines: 404 -> 200 [{'name': 'biosteam', 'entryPoint': 'openferment_core.engine.biosteam:ENGINE', 'version': {'biosteam': '2.54.0', 'thermosteam': '0.54.2', 'biorefineries': '2.35.1'}, 'worker': 'openferment_core.workers.proforma_worker', 'workerStatus': 'col
+STATUS /api/proforma/benchmark: 200 -> 404 {'detail': 'Not Found'}
+STATUS /api/proforma/reference/corn_drygrind: 200 -> 404 {'detail': 'Not Found'}
+STATUS /api/proforma/reference/cornstover_benchmark: 200 -> 404 {'detail': 'Not Found'}
+LIST /api/proforma/shelf: 4 -> 2; lost ['cornstover_benchmark', 'corn_drygrind']; gained []
+VALUES /api/proforma/status: status: 'ready' -> 'cold'
+LIST /api/projects: 1 -> 2; lost []; gained ['other']
+STATUS /api/protocols: 404 -> 200 []
+LIST /api/pureos/trains: 2 -> 7; lost []; gained ['f6c8a409dade4a81', 'b9382581572bd389', '0670677d562f3d03', 'e7efa2505b4633de', 'bfda026530692adc']
+FIELD /api/state .runbooks: 2 -> 1 items; lost ['rb-page-1']
+HEAD state.refused: [
+ {
+  "kind": "runbooks",
+  "id": "rb-page-1",
+  "why": "kind: Input should be 'industrial' or 'research'"
+ }
+]

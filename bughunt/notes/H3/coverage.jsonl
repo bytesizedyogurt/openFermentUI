@@ -1,0 +1,50 @@
+{"kind": "file", "item": "core/openferment_core/basis.py", "method": "executed", "findings": ["H3-06"], "note": "basis_provenance against a hand table of 21 mixes (scripts/provenance_table.py): all agree with ADR-006 C.5; is_measurement, origin_of, override_of, resolved, estimate_in, refuse_estimates read and driven through the doors"}
+{"kind": "file", "item": "core/openferment_core/measurements.py", "method": "executed", "findings": ["H3-05", "H3-06"], "note": "every lookup rule driven through the Proforma resolve and the kinetics engine: held, confirmed, standing, named, its own, its maker, its unit; corrected_by keys on mutable sample times"}
+{"kind": "file", "item": "core/openferment_core/models.py", "method": "executed", "findings": [], "note": "Origin, Quantity, Override, EngineInput, ScenarioValue, ClaimValue, Deposition family, MeasuredEvidence, PROVENANCE_ORDER, weakest_provenance read; validators hit at the resolve door (record, artifact, library-default, convention origins refused)"}
+{"kind": "file", "item": "core/openferment_core/params.py", "method": "executed", "findings": [], "note": "overrides_of, _checked, _from_override, basis_inputs driven by POST /api/params/proforma:<id>/resolve with every origin kind"}
+{"kind": "file", "item": "core/openferment_core/units.py", "method": "fuzzed", "findings": ["H3-07", "H3-08", "H3-09", "H3-16"], "note": "Hypothesis: round trip, composition, identity, cross-family and unknown refusals, edge values (scripts/units_props.py); spelling probe (scripts/units_normalize_probe.py)"}
+{"kind": "file", "item": "core/openferment_core/validate.py", "method": "fuzzed", "findings": ["H3-01", "H3-02", "H3-10", "H3-12"], "note": "find_number on 41 sentences, validate_plan and claim_values on a stand-in pool, anchor_candidate on cross-family quotes and free-text fields"}
+{"kind": "file", "item": "core/openferment_core/biorepo.py", "method": "read", "findings": ["H3-01"], "note": "write re-anchors promotions through anchor_candidate; refuse_estimates before writing; provenance_of read"}
+{"kind": "file", "item": "core/openferment_core/binding.py", "method": "read", "findings": [], "note": "exclusion keeps assumed, computed, industry-estimate, rejected and non-primary records out; mirrors aggregateExclusion in src/store.ts"}
+{"kind": "file", "item": "core/openferment_core/catalogues.py", "method": "executed", "findings": ["H3-13", "H3-17"], "note": "POST /api/catalogues/{kind} with an estimate field and a lesson answer in Mg; catalogue_write in the model's lane"}
+{"kind": "file", "item": "core/openferment_core/project_state.py", "method": "executed", "findings": ["H3-03", "H3-04", "H3-05", "H3-15"], "note": "deposition_refusal, measuredEvidence writes, RECORD_KINDS estimate refusal, removal refusals driven through PUT and DELETE /api/state"}
+{"kind": "file", "item": "core/openferment_core/quotes.py", "method": "read", "findings": [], "note": "is_whole_sentence's run-of-sentences rule read; no natural fragment constructed (suspected)"}
+{"kind": "file", "item": "core/openferment_core/witness.py", "method": "read", "findings": [], "note": "agreement through quantity_equals at 2 %, range agreement, _number on strings"}
+{"kind": "file", "item": "core/openferment_core/protocols.py", "method": "read", "findings": [], "note": "a protocol holds no Quantity or Origin; ADR-006 names no protocol store among the record stores"}
+{"kind": "file", "item": "core/openferment_core/module_stores.py", "method": "executed", "findings": ["H3-04", "H3-14"], "note": "runbooks_read rows for readings and measured evidence through POST /api/tools/runbooks_read"}
+{"kind": "file", "item": "core/openferment_core/practice.py", "method": "read", "findings": ["H3-02"], "note": "PRACTICE_QUANTITY names what find_number lets through; Postdoc's claims lack it"}
+{"kind": "file", "item": "core/openferment_core/tools/catalogues.py", "method": "executed", "findings": ["H3-13"], "note": "catalogue_write with X-OpenFerment-Assistant, no model"}
+{"kind": "file", "item": "core/openferment_core/artifacts.py", "method": "read", "findings": ["H3-06"], "note": "compute brings a stored artifact's provenance up to date from records and artifacts alone"}
+{"kind": "file", "item": "core/openferment_core/extract.py", "method": "read", "findings": [], "note": "_put runs refuse_estimates on every candidate the store keeps, the hand candidates included"}
+{"kind": "file", "item": "core/openferment_core/studies/scenarios.py", "method": "read", "findings": [], "note": "_checked calls basis.resolved for a reading; not run (it starts the BioSTEAM worker)"}
+{"kind": "file", "item": "core/openferment_core/schema/fields.yaml", "method": "read", "findings": ["H3-01"], "note": "canonical units of the record fields read for the anchoring cases"}
+{"kind": "file", "item": "src/store.ts", "method": "read", "findings": [], "note": "PROVENANCE_RANK equals PROVENANCE_ORDER member for member; provenanceOf and aggregateExclusion read; setSampleTime and amendEntry read (H3-05's path)"}
+{"kind": "file", "item": "src/engine/units.ts", "method": "read", "findings": ["H3-07", "H3-08"], "note": "LABELLED_MASS_RATIO is the same two patterns as units.py"}
+{"kind": "file", "item": "src/screens/DepositionDetail.tsx", "method": "browser", "findings": ["H3-14"], "note": "Chromium on dist, deposition dep1 with released evidence"}
+{"kind": "file", "item": "docs/decisions/ADR-006-quantities-and-estimates.md", "method": "read", "findings": ["H3-03", "H3-04", "H3-05", "H3-10", "H3-11", "H3-14", "H3-15"], "note": "read whole, its notes included"}
+{"kind": "file", "item": "docs/decisions/ADR-016-bench-readings-alone.md", "method": "read", "findings": [], "note": "the readings-alone deposition was driven with protocolId null"}
+{"kind": "file", "item": "docs/api/runs.md", "method": "read", "findings": ["H3-06"], "note": "inputs, origins and provenance rows"}
+{"kind": "file", "item": "docs/api/studies.md", "method": "read", "findings": ["H3-05", "H3-15"], "note": "Measurements section and the rows a page keeps"}
+{"kind": "file", "item": "docs/api/intake.md", "method": "read", "findings": ["H3-17"], "note": "catalogue routes"}
+{"kind": "operation", "item": "GET /api/depositions/readings", "method": "executed", "findings": ["H3-05"], "note": "unit g L-1, g/L, °C, K, kg m-3, empty, none; another project's list"}
+{"kind": "operation", "item": "PUT /api/state/{kind}/{item_id}", "method": "executed", "findings": ["H3-03", "H3-04", "H3-05", "H3-15"], "note": "depositions, measuredEvidence and runbooks rows; estimates refused in words"}
+{"kind": "operation", "item": "GET /api/state", "method": "executed", "findings": ["H3-03"], "note": "read back the rewritten measured value"}
+{"kind": "operation", "item": "DELETE /api/state/{kind}/{item_id}", "method": "executed", "findings": [], "note": "measured evidence refused in words"}
+{"kind": "operation", "item": "POST /api/params/{scope}/resolve", "method": "executed", "findings": ["H3-05"], "note": "proforma:sc-h3 with every origin kind, readings held to each rule, another project's reading"}
+{"kind": "operation", "item": "POST /api/engines/{name}/run", "method": "executed", "findings": ["H3-06"], "note": "kinetics batch_v1 on readings, estimates and persons' values"}
+{"kind": "operation", "item": "GET /api/runs", "method": "executed", "findings": ["H3-06"], "note": "provenance of each kinetics run"}
+{"kind": "operation", "item": "GET /api/runs/{run_id}", "method": "executed", "findings": ["H3-06"], "note": "inputs read back as measurement origins with ref, by, at and the conversion note"}
+{"kind": "operation", "item": "GET /api/engines", "method": "executed", "findings": [], "note": "to find a thing that runs with no worker"}
+{"kind": "operation", "item": "GET /api/engines/{name}/parameters", "method": "executed", "findings": [], "note": "kinetics batch_v1 specs and units"}
+{"kind": "operation", "item": "POST /api/tools/{name}", "method": "executed", "findings": ["H3-04", "H3-13"], "note": "runbooks_read, engine_read, catalogue_write (assistant header)"}
+{"kind": "operation", "item": "POST /api/catalogues/{kind}", "method": "executed", "findings": ["H3-07", "H3-17"], "note": "strain with an estimate field; lesson answers in Mg and gal/g"}
+{"kind": "operation", "item": "GET /api/catalogues/{kind}/{entry_id}", "method": "executed", "findings": [], "note": "read back the strain"}
+{"kind": "operation", "item": "GET /api/audit", "method": "executed", "findings": ["H3-03"], "note": "no row for the measured value's rewrite"}
+{"kind": "operation", "item": "POST /api/studies/scenarios", "method": "left", "findings": [], "note": "starts the BioSTEAM worker; its lookup (basis.resolved) was run at the Proforma resolve and the kinetics engine"}
+{"kind": "operation", "item": "POST /api/studies/scenarios/{scenario_id}/run", "method": "left", "findings": [], "note": "starts the BioSTEAM worker"}
+{"kind": "operation", "item": "POST /api/proforma/run", "method": "left", "findings": [], "note": "starts the BioSTEAM worker; proforma.inputs_of and project_state.run_request read"}
+{"kind": "tool", "item": "runbooks_read", "method": "executed", "findings": ["H3-04", "H3-14"], "note": "measured-evidence rows: overwritten and orphan rows marked measured, an unconfirmed one unverified"}
+{"kind": "tool", "item": "catalogue_write", "method": "executed", "findings": ["H3-13"], "note": "numbers in name, summary and note kept"}
+{"kind": "tool", "item": "study_scenario", "method": "read", "findings": ["H3-11"], "note": "numbers_in and stamped run directly on its input shape; the tool itself starts the worker"}
+{"kind": "screen", "item": "src/screens/DepositionDetail.tsx", "method": "browser", "findings": ["H3-14", "H3-03"], "note": "screenshot bughunt/notes/H3/deposition-dep1.png"}
+{"kind": "engine", "item": "kinetics", "method": "executed", "findings": ["H3-06"], "note": "five runs on every mix of origins; provenance as ADR-006 says"}

@@ -1,0 +1,197 @@
+{
+  "candidates": [
+    {
+      "id": "H14-01",
+      "title": "A second comparison of the same runs rewrites the first comparison's title and keeps it in the first maker's name",
+      "severity": "S1",
+      "kind": "Contract break",
+      "area": "Proforma Studies: comparisons (POST /api/studies/comparisons, ProformaStudies, ProformaComparison, export)",
+      "statement": "When a person compares runs another maker already compared in the same order, the service replaces the kept comparison's title with the new one and keeps the row's by and at as the first maker's, so the first title is lost with no audit row and the new words stand in someone else's name, in the screens and in the export package.",
+      "contract": "docs/api/studies.md:127 \"the same runs in the same order are one comparison\"; CLAUDE.md:56 \"Every scientific row carries `project_id`, `created_by` and `created_at`\"; CLAUDE.md:8 \"every claim, number and result stays inspectable back to its source\"",
+      "reproCommand": "bughunt/notes/H14/scripts/repro_comparison_title.sh",
+      "expected": "The one comparison keeps the title its maker gave it (Ada's \"A\"), or the second ask is refused in words, or it is kept beside it in Ben's name; nothing a maker wrote is replaced without a trace.",
+      "observed": "Fresh database: Ada compares corn and sugarcane titled \"A: Ada's question\"; Ben compares the same two runs titled \"B: Ben's question\". The service answers and keeps {'id': 'abbdad1a765bffe6', 'title': \"B: Ben's question\", 'by': 'Ada', 'at': <Ada's time>}; the comparisons table row reads created_by Ada, title B; no audit row names a comparison. On the copy of the development database, comparing e7efa2505b4633de and 784c94d9bd67d20e from Studies as Hunt Fourteen replaced claude-sonnet-5-5's title \"Hot-water versus dilute-acid pretreatment, integrated bioprocess, package defaults: uncertainty review\" with mine; the comparison page then said \"2 runs set side by side for claude-sonnet-5-5, 2026-11-08 02:38 UTC\" under my title, and the export package's study.json carried my title with by claude-sonnet-5-5.",
+      "cause": "core/openferment_core/studies/comparisons.py:266-273 (make: the id is the artifact's, content-addressed; `held` keeps by and at, the title is the asker's; `_put` calls rows.put, core/openferment_core/db/rows.py:59-66, an upsert that replaces the body)",
+      "confidence": "high",
+      "fixSize": "small",
+      "evidence": "Ran repro_comparison_title.sh on bh_h14_cmp (port 8943): the second POST answered title B by Ada, GET listed one row title B by Ada, psql showed created_by Ada with body title B, GET /api/audit held no comparison row. In the browser (scripts/full4.mjs on bh_h14_full) the comparison page showed my title for claude-sonnet-5-5; shots/full4-comparison.png; export unzipped under the scratch export folder."
+    },
+    {
+      "id": "H14-02",
+      "title": "A kept strain's aliases never resolve a record's organism: every strain page and Hosts card counts no record",
+      "severity": "S2",
+      "kind": "Contract break",
+      "area": "geneOS Hosts and strain pages, Catalogues, anchoring (validate.strain_id), fermOS strain binding",
+      "statement": "Anchoring resolves a paper's organism wording through validate.vocabulary(), whose strain map is always empty in the service, so no record ever names a kept strain's id, and every strain page, the Hosts coverage counts and fermOS's strain filter find no record for any strain, while the tests that claim the resolution patch a vocabulary in.",
+      "contract": "docs/api/intake.md:94 \"`aliases`, the other names papers give it\" and intake.md:106 \"The readers that had read an empty list read these: geneOS's hosts and the strain aliases\"; src/screens/Organisms.tsx:46-47 \"anchoring resolves the wording a paper uses to a strain's id by the name and the other names its entry keeps (validate.strain_id on the service)\"; core/openferment_core/validate.py:1165-1167 \"the organism, resolved to a strain id where the wording names one (an exact alias, or an alias standing in it as a whole word)\"",
+      "reproCommand": "bughunt/notes/H14/scripts/repro_strain_alias.sh",
+      "expected": "With a strain kept under the alias \"Ethanol Red\" (and the paper's full wording), a candidate whose organism is \"Saccharomyces cerevisiae Ethanol Red\" is anchored with organism = the strain id and organismText = the wording, and the strain page lists it.",
+      "observed": "The candidate is kept with organism \"Saccharomyces cerevisiae Ethanol Red\", organismText None, strainId None; catalogues.as_strain_aliases() holds {'ethanol red': 'ethanol-red', 'saccharomyces cerevisiae ethanol red': 'ethanol-red'} while validate.vocabulary()['strains'] is {} and strain_id(...) is None. In the browser on the copy, a strain kept with alias \"Ethanol Red\" shows \"0 papers 0 records ... No record in this project carries an organism tag naming Ethanol Red (H14)\" while 22 records name \"Saccharomyces cerevisiae Ethanol Red\"; GET /api/fermos/bind?family=batch_v1&sugar=glucose&strain=h14-ethanol-red binds no growth record.",
+      "cause": "core/openferment_core/validate.py:874-891 (vocabulary() with no path returns strains = {}; nothing reads catalogues.as_strain_aliases, core/openferment_core/catalogues.py:600, except module_stores); readers match the anchoring-time id: src/screens/StrainPage.tsx:564-568, src/screens/Organisms.tsx:49-50, core/openferment_core/fermos.py:1507-1514. Hollow tests: core/tests/test_validate.py:160-169 and core/tests/test_fermos_bind.py:139-142 monkeypatch validate.vocabulary with a strain table the service never builds (2 passed here)",
+      "confidence": "high",
+      "fixSize": "medium",
+      "evidence": "repro_strain_alias.sh on bh_h14_alias (port 8942): candidate through POST /api/tools/biorepo_write?by=... (anchoring, no model), overlay row {'organism': 'Saccharomyces cerevisiae Ethanol Red', 'organismText': None, 'strainId': None}; Python in the service's venv printed the catalogue's aliases beside an empty anchoring vocabulary. Browser: scripts/full8.mjs, shots/full8-strain.png and full8-geneos.png. pytest tests/test_validate.py -k 'resolves or alias': 2 passed."
+    },
+    {
+      "id": "H14-03",
+      "title": "BioRepo Search's Answer with no key says \"ModelUnavailable: generation failed (see server logs)\" and names no key",
+      "severity": "S3",
+      "kind": "Contract break",
+      "area": "BioRepo Search, POST /api/literature/answer",
+      "statement": "With no key, the answer stream's error hides the service's own words (\"ANTHROPIC_API_KEY is not set ...\") behind the kit's generic \"generation failed (see server logs)\", where the route promises the stream says there is no key; the stream also carries four event kinds the contract leaves out.",
+      "contract": "core/openferment_core/api.py:2146-2150 (and docs/api/openapi.json for the route) \"One model call through llm.py, under the day's cap; with no key the stream says so in an `error`\"; the 200 response's description \"Server-sent events: `delta`, `citations`, `done`, or `error`\"",
+      "reproCommand": "bughunt/notes/H14/scripts/repro_screens.sh",
+      "expected": "event: error with words naming the missing key (the words Intake's Extract toast and Postdoc show: \"ANTHROPIC_API_KEY is not set. Put it in core/.env ...\").",
+      "observed": "event: error data {\"code\": \"generation_failed\", \"message\": \"ModelUnavailable: generation failed (see server logs)\"}; the service log holds detail='ANTHROPIC_API_KEY is not set. Put it in core/.env (gitignored) and restart the service.'; the screen shows \"ModelUnavailable: generation failed (see server logs) The service log says why.\" The stream also sends retrieval_started, retrieval_done, compression_done and generation_started.",
+      "cause": "core/.venv/.../sci_rag/answer/generator.py:300-311 replaces any exception's text with its class name; core/openferment_core/literature/kit.py:805-841 passes the kit's error event through, and openFerment's own ModelUnavailable words (llm.py) never reach it",
+      "confidence": "high",
+      "fixSize": "small",
+      "evidence": "curl -N POST /api/literature/answer on bh_h14_full and on a fresh bh_h14_scr (repro_screens.sh): the error event above, the log line above; browser scripts/full1.mjs, shots/full1-answer-nokey.png. No request left the machine: llm.py refuses before any call."
+    },
+    {
+      "id": "H14-04",
+      "title": "Witness shows PRECISION 0.0% under its own words that precision is undefined without a gold set",
+      "severity": "S3",
+      "kind": "Inconsistency",
+      "area": "BioRepo Witness",
+      "statement": "With no gold value and one rejected candidate, Witness draws PRECISION 0.0% wearing the gold tick while the callout above it says precision is undefined without a gold set, so one rejection reads as an extractor that is never right while the reviewer accepted the others.",
+      "contract": "src/screens/Witness.tsx:573-577 \"No gold annotations yet ... Precision and recall are undefined without a gold set\"; core/openferment_core/witness.py:24-28 (new candidates are not scored \"until a reviewer types a value\")",
+      "reproCommand": "bughunt/notes/H14/scripts/repro_witness.sh",
+      "expected": "With goldSize 0, the precision tile says undefined, as recall does.",
+      "observed": "After two acceptances and one rejection: GET /api/witness/runs has 0 results and 1 false positive; the screen shows the callout \"Precision and recall are undefined without a gold set\" and below it \"PRECISION 0.0%\" with \"tp 0 · fp 1 · fn 0\", the tile ticked \"Gold · a value a reviewer typed\".",
+      "cause": "src/screens/Witness.tsx:480 (precisionDefined = tp + fp > 0, true from a rejection alone, with no gold value) and :489 (the claude-1 headline tick is gold)",
+      "confidence": "high",
+      "fixSize": "small",
+      "evidence": "repro_witness.sh on bh_h14_wit, a pg_dump copy of the development database (port 8945): lines read off the screen in Chromium, shots/scr-witness-nogold.png; the same on bh_h14_full after the review session (shots/full9--biorepo-witness.png)."
+    },
+    {
+      "id": "H14-05",
+      "title": "Home's BioRepo destination says \"gold set not yet annotated\" beside a Gold set tile that counts one",
+      "severity": "S4",
+      "kind": "Inconsistency",
+      "area": "Home",
+      "statement": "The BioRepo destination's words on Home are fixed text, so after a record is flagged gold the same page says the gold set holds one value and that it is not yet annotated.",
+      "contract": "src/screens/Home.tsx:490-495 (the tiles \"wear the dominant tick of the data behind them\"); the Gold set tile on the same page",
+      "reproCommand": "bughunt/notes/H14/scripts/repro_screens.sh",
+      "expected": "The BioRepo destination counts the gold values, or leaves the gold set out of its line.",
+      "observed": "Home: \"GOLD SET | 1 | across 1 paper · the evaluation baseline\" and \"BioRepo ... 1 paper · gold set not yet annotated\".",
+      "cause": "src/screens/Home.tsx:284 (`gold set not yet annotated` written into the line for every count)",
+      "confidence": "high",
+      "fixSize": "small",
+      "evidence": "repro_screens.sh on bh_h14_scr (port 8944): a hand-written candidate flagged gold through POST /api/biorepo/decisions, Home read in Chromium (shots/scr-home-gold.png); the same on the copy after pressing g in Guild (shots/full10-home-after-gold.png)."
+    },
+    {
+      "id": "H14-06",
+      "title": "Home's Postdoc destination says \"live\" while the service holds no key",
+      "severity": "S4",
+      "kind": "Inconsistency",
+      "area": "Home, Postdoc",
+      "statement": "Home tells a new person Postdoc is \"live through openferment-core, on the model it is configured with\" while /api/health answers hasKey false and Postdoc's own screen says it is running without an API key.",
+      "contract": "src/screens/Postdoc.tsx:146 \"Postdoc is running without an API key\"; GET /api/health hasKey",
+      "reproCommand": "bughunt/notes/H14/scripts/repro_screens.sh",
+      "expected": "Home's line says Postdoc waits for a key when hasKey is false.",
+      "observed": "/api/health {\"hasKey\":false}; Home: \"Postdoc | ask, plan, answer from records | live through openferment-core, on the model it is configured with\".",
+      "cause": "src/screens/Home.tsx:285 (fixed words; the health answer is not read)",
+      "confidence": "high",
+      "fixSize": "small",
+      "evidence": "repro_screens.sh: health and Home lines printed together; fresh service Home in shots/f1-home-empty.png."
+    },
+    {
+      "id": "H14-07",
+      "title": "The bench files a decimal comma as a number ten times larger: \"7,4 g/L\" is kept as 74 g/L",
+      "severity": "S3",
+      "kind": "Wrong number",
+      "area": "Runbooks: Deposition bench capture (DepositionPanel, engine/capture.ts)",
+      "statement": "The capture box strips every comma before reading a number, so a reading said with a decimal comma (\"titre came in at 7,4 g/L\") is filed as a measurement of 74 g/L, where the matcher's own rule is to keep a doubtful line as words.",
+      "contract": "src/engine/capture.ts:8-12 \"matching is deliberately conservative: when in doubt this returns null and the text is kept verbatim as an Observation ... a false positive silently writes a number into a slot it does not belong in\"",
+      "reproCommand": "node_modules/.bin/tsx bughunt/notes/H14/scripts/capture_comma.ts",
+      "expected": "\"7,4 g/L\" kept as an observation (a comma between digits with one or two after it is doubtful), or filed as 7.4.",
+      "observed": "\"titre came in at 7,4 g/L\" -> {value: 74, unit: \"g/L\"}; \"1,250 g/L\" -> 1250. The read-back beat shows \"74 g/L, you said 7,4 g/L\", the one guard before a scenario may take the reading as a measurement.",
+      "cause": "src/engine/capture.ts:25-31 (normalise removes every comma before the number regex at :100)",
+      "confidence": "high",
+      "fixSize": "small",
+      "evidence": "Ran capture_comma.ts against the tree's capture.ts with tsx; the bench in Chromium filed \"20,500 kg/hr\" as 20500 (scripts/full6.mjs), the path that holds a thousands comma right."
+    },
+    {
+      "id": "H14-08",
+      "title": "Home says pureOS has \"no process model\" while pureOS builds and runs trains on BioSTEAM",
+      "severity": "S4",
+      "kind": "Drift",
+      "area": "Home, pureOS",
+      "statement": "Home's pureOS destination reads \"45 unit operations · no process model\" while pureOS's page says it builds a train unit by unit from BioSTEAM's units and runs it, and the train engine is registered.",
+      "contract": "src/screens/PureOS.tsx:409 \"pureOS builds a train unit by unit from a catalogue of BioSTEAM's units and runs it\"; CLAUDE.md:80 \"the core's `biosteam`, `kinetics` (fermOS) and `train` (pureOS)\"; core/pyproject.toml:55",
+      "reproCommand": "node bughunt/notes/H14/scripts/tour.mjs http://127.0.0.1:<port> <project> check  (any service; read the Home and /pureos sections of shots/check.txt)",
+      "expected": "Home's line names what pureOS holds (trains built and runs kept).",
+      "observed": "Home: \"pureOS harvest, capture, recovery 45 unit operations · no process model\"; pureOS: \"Trains read from Proforma's runs 6 on file\" and the Builder runs trains.",
+      "cause": "src/screens/Home.tsx:291 (fixed words)",
+      "confidence": "high",
+      "fixSize": "small",
+      "evidence": "scripts/tour.mjs on bh_h14_full: shots/full.txt, Home section and /p/ethanol/pureos section."
+    },
+    {
+      "id": "H14-09",
+      "title": "Studies says \"Ran cornstover\" for a run three days old by someone else",
+      "severity": "S4",
+      "kind": "Broken use",
+      "area": "Proforma Studies: Run a plant",
+      "statement": "Pressing Run it on a plant whose basis the project already ran answers at once with the kept row, and the card says \"Ran cornstover. Run bfda026530692adc\" with no word that the run is the earlier one, kept by another person at another time.",
+      "contract": "docs/api/runs.md:186-189 \"The same run kept twice is one row, answered as it was first kept ... so its `by`, `at` and `scenarioId` stay the first asker's\"",
+      "reproCommand": "node bughunt/notes/H14/scripts/full3.mjs http://127.0.0.1:<port> ethanol cornstover  (on a pg_dump copy of the development database)",
+      "expected": "The card says the project holds this run already, by whom and when.",
+      "observed": "After one second: \"Ran cornstover. Run bfda026530692adc\"; the runs table lists it by \"Claude Code (build session)\" at 2026-11-05 09:17 UTC.",
+      "cause": "src/screens/ProformaStudies.tsx:90 (\"Ran\" for every done answer)",
+      "confidence": "high",
+      "fixSize": "small",
+      "evidence": "scripts/full3.mjs on bh_h14_full: waited 1 s; shots/full3-ran-cornstover.png."
+    }
+  ],
+  "suspected": [
+    {
+      "title": "A composed cellulosic plant reports 0.6 to 0.8 s a run while cornstover reports 22 s, which may mean the worker reuses a built system where ADR-004 says each plant is built fresh",
+      "tried": "Read the durations on the run and reference pages (b0d811fe46589558 in 0.6 s, e7efa2505b4633de in 0.8 s, bfda026530692adc in 22.1 s), artifacts._run's timing (core/openferment_core/artifacts.py:267-273) and the worker's cache handling (workers/library_plants.py:335-410); found no reuse I could show."
+    },
+    {
+      "title": "Review decisions and comparisons leave no row in the audit log",
+      "tried": "GET /api/audit?limit=500 after accepting, rejecting and flagging gold in Guild and after two comparisons: no row of either action. No contract line I found requires an audit row for these writes, so I left it here."
+    },
+    {
+      "title": "A runbook made from a computed run wears \"Assumed · rests on an assumption\" and every prediction \"low confidence\"",
+      "tried": "Read core/openferment_core/studies/runbooks.py:1-12 and :130: the service writes confidence low by its own rule; the Assumed tick follows the same reading. A design choice, recorded here for the owner."
+    }
+  ],
+  "needsLiveModel": [
+    "Extract on a pasted document: whether its candidates' organisms ever resolve to a kept strain (H14-02 shows the anchoring vocabulary is empty, so they would not)",
+    "BioRepo Search's Answer with a key: the cited answer and its sources",
+    "Postdoc answering the Ethanol questions; the palette's Ask the agent",
+    "Primer Practice's drafting and tutor turns"
+  ],
+  "held": [
+    "Intake on the network: OSTI 1013269 (190 passages), Europe PMC PMC5574463 (34 passages, open licence) on a second try after a timeout said in words, SGD S000203483 (3 passages); a bare number refused with the PMID/OSTI words; a DOI with no open text refused in words; a paste stored in one passage; Extract with no key toasts the missing key",
+    "Review queue: accept, reject with a reason, skip, gold by keyboard; the service kept every decision across a reload and Home's counts followed (verified 2, rejected 1)",
+    "Library plant from Studies: corn ran in 17 s and was kept with its SFF file; a comparison's numbers match each run's page (0.658814 and 0.609832 USD/kg; per gallon by 2.98669 kg/gal)",
+    "pureOS's 100.0% recovered is 0.99983 of the ethanol entering the train (losses at D402 and D403)",
+    "Runbook from a run: made, locked, the lock kept across a reload; a deposition with the readings alone, a reading read back and kept across a reload; a scenario on that reading ran with the reading's origin and its deposition link (provenance measured, as ADR-006 states its rule)",
+    "Catalogues: strain, product and skill kept in the person's name; geneOS Hosts, Guild Skills and the palette (by alias) read them back",
+    "Postdoc with no key says so in words, on the screen and in the failed turn; ?q= leaves the address after an ask, so a reload does not ask again",
+    "The export package downloads with study.json, study.md, the SFF files and versions, and carries the deposition a run rests on",
+    "Unknown ids (protocol, lesson, deposition) say so in words; no request reached api.anthropic.com from any page or route I drove"
+  ],
+  "unexamined": [
+    {
+      "item": "src/screens/BenchCheck.tsx",
+      "reason": "needs a Guild ledger with an assessor and a scheduled check; not set up"
+    },
+    {
+      "item": "src/screens/ProtocolDetail.tsx and the editor's save path",
+      "reason": "no protocol in either project; Begin a protocol not driven"
+    },
+    {
+      "item": "pureOS Builder run, fermOS simulate and vessel runs",
+      "reason": "pages opened, no train or simulation run kept"
+    },
+    {
+      "item": "Two tabs, the outbox and the service going away mid-write",
+      "reason": "left to H7, whose scripts cover overrides in two tabs and reloads"
+    }
+  ]
+}

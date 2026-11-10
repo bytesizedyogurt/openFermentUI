@@ -1,0 +1,19 @@
+NOTICE:  database "bh_r_h1_03_verdict" does not exist, skipping
+== A: the documented command, every value set: conform biosteam --thing ethanol_glucose_v0 --inputs <file>
+✗ the checks could not be made on biosteam: openferment_core.projects.ProjectRequired: This names no project. A request sends the X-OpenFerment-Project header (or ?project= on an event stream); a command sets OPENFERMENT_PROJECT.
+exit 1
+== B: the documented command, no values set: conform biosteam --thing ethanol_glucose_v0
+✗ the checks could not be made on biosteam: openferment_core.projects.ProjectRequired: This names no project. A request sends the X-OpenFerment-Project header (or ?project= on an event stream); a command sets OPENFERMENT_PROJECT.
+exit 1
+== C (control): B again with OPENFERMENT_PROJECT naming an id no database holds
+✗ the checks could not be made on biosteam: ethanol_glucose_v0 cannot be checked as it stands: ethanol_glucose_v0 waits for 6 values its parameters give no default, which a run sets: feed_glucose_conc, glucose_price, plant_scale, productivity, titre, yield; set its values with --inputs <file>
+exit 1
+== the frames: the engine's unready, asked as conform's _inside asks it (no project entered yet)
+ProjectRequired via /<string>:8 <module> > engine/biosteam.py:296 unready > engine/biosteam.py:259 parameters > openferment_core/proforma.py:1490 thing_parameters > openferment_core/params.py:262 scope > openferment_core/params.py:244 _provided > openferment_core/params.py:698 _proforma > openferment_core/proforma.py:1097 held_scenarios > openferment_core/project_state.py:458 kept > projects/__init__.py:58 current
+
+EXPECTED: A makes the eight checks on ethanol_glucose_v0 with the file's six values: eight rows (each ✓ or ✗) and the verdict kept, one engine_checks row for biosteam in bh_r_h1_03_verdict
+OBSERVED: A printed 1 row(s), exit 1, 0 verdict row(s) kept: ✗ the checks could not be made on biosteam: openferment_core.projects.ProjectRequired: This names no project. A request sends the X-OpenFerment-Project header (or ?project= on an event stream); a command sets OPENFERMENT_PROJECT.
+EXPECTED: B refuses in words naming the values ethanol_glucose_v0 waits for (docs/api/engines.md:671-672), keeping no verdict
+OBSERVED: B: ✗ the checks could not be made on biosteam: openferment_core.projects.ProjectRequired: This names no project. A request sends the X-OpenFerment-Project header (or ?project= on an event stream); a command sets OPENFERMENT_PROJECT.
+CONTROL:  C, the same command with any project id set: ✗ the checks could not be made on biosteam: ethanol_glucose_v0 cannot be checked as it stands: ethanol_glucose_v0 waits for 6 values its parameters give no default, which a run sets: feed_glucose_conc, glucose_price, plant_scale, productivity, titre, yield; set its values with --inputs <file>
+RESULT: DEFECT

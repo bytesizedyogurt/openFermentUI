@@ -1,0 +1,37 @@
+{"kind": "file", "item": "core/openferment_core/intake.py", "method": "fuzzed", "findings": ["H8-02", "H8-03"], "note": "every door fed empty, large, wrong-encoding, duplicate, no-text PDF and hostile-name files; overlay falls back to the first project's licence words"}
+{"kind": "file", "item": "core/openferment_core/literature/collectors.py", "method": "fuzzed", "findings": ["H8-03", "H8-04", "H8-05"], "note": "fetch_file held every loopback, private and redirect form; a malformed Location escapes as 500; Latin-1 XML decoded with replacement; unquote of the upload name yields NUL"}
+{"kind": "file", "item": "core/openferment_core/literature/kit.py", "method": "executed", "findings": ["H8-01", "H8-02", "H8-03", "H8-09"], "note": "scope held for search, documents, get_document, citations, stats over two projects sharing a document and one with none; shared document carries the first project's metadata; source_ref update after the kit's commit"}
+{"kind": "file", "item": "core/openferment_core/literature/graph.py", "method": "executed", "findings": [], "note": "stand-in graph rows written to a test db, read through the MCP graph tools in gamma, delta and an empty project: scope, descriptions and edges held"}
+{"kind": "file", "item": "core/openferment_core/literature/report.py", "method": "executed", "findings": ["H8-07"], "note": "demo _run on a bh db matches the committed demo part; the committed ethanol part recomputes from its kept run; project lane run offline in three configurations"}
+{"kind": "file", "item": "core/openferment_core/literature/__init__.py", "method": "read", "findings": []}
+{"kind": "file", "item": "core/openferment_core/literature_live.py", "method": "executed", "findings": ["H8-07"], "note": "report --project with interactive, vector_only, keyword_only, no --render, data dir in scratch; graph build and --judge not run (they ask a model)"}
+{"kind": "file", "item": "core/openferment_core/literature_mcp.py", "method": "executed", "findings": [], "note": "built in-process over kit.service('free'); every tool called in three projects; refusals in words held"}
+{"kind": "file", "item": "core/openferment_core/extract.py", "method": "executed", "findings": [], "note": "extract route: 422 for a document the project lacks, 503 in words with no key; add_candidate used offline to seed a candidate; extraction itself needs a live model"}
+{"kind": "file", "item": "core/openferment_core/engine/sff.py", "method": "fuzzed", "findings": ["H8-12"], "note": "import and import-url fed every odd file and name; graph, title and source words held; BOM refused as not JSON"}
+{"kind": "file", "item": "core/openferment_core/quotes.py", "method": "read", "findings": [], "note": "read for the anchoring rule the report lane and extraction share"}
+{"kind": "file", "item": "core/openferment_core/witness.py", "method": "read", "findings": [], "note": "read its scoring rules; scoring itself is H5's"}
+{"kind": "file", "item": "core/openferment_core/api.py", "method": "fuzzed", "findings": ["H8-03", "H8-05", "H8-06", "H8-08"], "note": "intake, literature and flowsheet routes only"}
+{"kind": "operation", "item": "POST /api/intake/upload", "method": "fuzzed", "findings": ["H8-01", "H8-02", "H8-03", "H8-04"], "note": "empty, whitespace, UTF-16, Latin-1, invalid UTF-8, no-text and damaged PDF, JATS in three encodings, entity bomb, XXE, wrong suffix, duplicates, hostile names, 51 MB (413)"}
+{"kind": "operation", "item": "POST /api/intake/paste", "method": "fuzzed", "findings": ["H8-01", "H8-02"], "note": "empty, whitespace, past 2M characters, markup title, javascript: url, the same text as an upload"}
+{"kind": "operation", "item": "POST /api/intake/collect", "method": "fuzzed", "findings": [], "note": "offline identifiers refused in words; the SGD fixture collected by four identifier forms in fixture mode: ingested, held, linked"}
+{"kind": "operation", "item": "POST /api/intake/catalogue", "method": "fuzzed", "findings": ["H8-10", "H8-11"], "note": "empty, BOM, UTF-16, Latin-1, invalid UTF-8, duplicate id, keeper fields, 2001 rows, past 4 MB, bad kind, hostile name"}
+{"kind": "operation", "item": "POST /api/intake/{paper_id}/extract", "method": "executed", "findings": [], "note": "no key: 503 in words; unknown document 422"}
+{"kind": "operation", "item": "POST /api/literature/answer", "method": "executed", "findings": ["H8-08"], "note": "no key: the stream's error names no missing key; empty project: no_sources"}
+{"kind": "operation", "item": "GET /api/literature/documents", "method": "executed", "findings": ["H8-02"]}
+{"kind": "operation", "item": "GET /api/literature/search", "method": "fuzzed", "findings": ["H8-06"], "note": "topK 0, -5, 10000 clamp; bogus profile and blank q refused; two projects and an empty one stay apart"}
+{"kind": "operation", "item": "GET /api/literature/stats", "method": "executed", "findings": [], "note": "counts per project held, graph counts held with stand-in rows"}
+{"kind": "operation", "item": "POST /api/flowsheets/import", "method": "fuzzed", "findings": ["H8-12"], "note": "empty, whitespace, 17 MB (413), UTF-16, BOM, Latin-1, invalid UTF-8, not JSON, list, deep nesting, NaN, duplicates, hostile names, a reference file under a hostile name"}
+{"kind": "operation", "item": "POST /api/flowsheets/import-url", "method": "fuzzed", "findings": ["H8-05"], "note": "about 70 address forms at the service and 30 redirect and size cases under a stand-in network; listeners on 8882-8885 saw no request"}
+{"kind": "operation", "item": "GET /api/flowsheets", "method": "executed", "findings": []}
+{"kind": "operation", "item": "GET /api/flowsheets/{record_id}", "method": "executed", "findings": [], "note": "another project's record answers 404"}
+{"kind": "operation", "item": "GET /api/flowsheets/{record_id}/file", "method": "executed", "findings": [], "note": "byte for byte; another project's record 404"}
+{"kind": "operation", "item": "POST /api/flowsheets/export", "method": "executed", "findings": [], "note": "unknown artifact 404 only; a real export needs a run (H5)"}
+{"kind": "operation", "item": "POST /api/flowsheets/library/{file_id}", "method": "executed", "findings": [], "note": "unknown id 404, registry id 422; held SF_BST_01 imported through the upload door; nothing fetched from GitHub"}
+{"kind": "tool", "item": "search_entities", "method": "executed", "findings": [], "note": "sci-rag server in-process, three projects"}
+{"kind": "tool", "item": "get_entity_relationships", "method": "executed", "findings": [], "note": "sci-rag server in-process, three projects"}
+{"kind": "tool", "item": "get_document", "method": "executed", "findings": ["H8-02"], "note": "another project's private document refused in words"}
+{"kind": "tool", "item": "get_citations", "method": "executed", "findings": []}
+{"kind": "tool", "item": "search_corpus", "method": "executed", "findings": []}
+{"kind": "tool", "item": "list_sources", "method": "executed", "findings": ["H8-02"], "note": "a linked project lists the first project's source name"}
+{"kind": "tool", "item": "corpus_stats", "method": "executed", "findings": []}
+{"kind": "tool", "item": "answer_question", "method": "left", "findings": [], "note": "asks a model"}

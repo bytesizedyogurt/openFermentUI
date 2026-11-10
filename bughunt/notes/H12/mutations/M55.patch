@@ -1,0 +1,10 @@
+--- a/core/openferment_core/literature/collectors.py
++++ b/core/openferment_core/literature/collectors.py
+@@ -241,7 +241,6 @@
+     ("is_link_local", "a link-local address"),
+     ("is_multicast", "a multicast address"),
+     ("is_reserved", "a reserved address"),
+-    ("is_private", "a private address"),
+     ("is_site_local", "a private address"),
+ )
+ 

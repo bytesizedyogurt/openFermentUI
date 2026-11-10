@@ -1,0 +1,110 @@
+{"kind": "file", "item": "core/openferment_core/llm.py", "method": "executed", "findings": ["H9-01", "H9-06", "H9-10"], "note": "routes() under seven OPENFERMENT_ROUTES tables, the key override through a loopback stand-in model API, call/converse with stand-in clients; served-id pricing under suspected"}
+{"kind": "file", "item": "core/openferment_core/spend.py", "method": "executed", "findings": ["H9-08", "H9-09"], "note": "reserve at, under and over the cap, twenty concurrent holds, the UTC boundary, NaN/inf/-0 settings"}
+{"kind": "file", "item": "core/openferment_core/postdoc_agent.py", "method": "executed", "findings": ["H9-05", "H9-06", "H9-10"], "note": "ask with stand-in converse: ask cap 0/0.75/2/inf/nan, a three-model plan route"}
+{"kind": "file", "item": "core/openferment_core/mcp_server.py", "method": "fuzzed", "findings": ["H9-11", "H9-12", "H9-15"], "note": "2017 raw JSON-RPC calls over stdio in its own process; gated writes through it"}
+{"kind": "file", "item": "core/openferment_core/postdoc/__init__.py", "method": "read", "findings": []}
+{"kind": "file", "item": "core/openferment_core/postdoc/evaluate.py", "method": "read", "findings": [], "note": "scores, StandIn and judge read; the offline run needs the BioSTEAM worker and was left"}
+{"kind": "file", "item": "core/openferment_core/postdoc/plan.py", "method": "read", "findings": ["H9-04"], "note": "the prompt's own bad example kept by the validator"}
+{"kind": "file", "item": "core/openferment_core/tools/__init__.py", "method": "fuzzed", "findings": ["H9-12", "H9-13", "H9-14"], "note": "4278 REST calls over all 48 tools"}
+{"kind": "file", "item": "core/openferment_core/tools/gates.py", "method": "executed", "findings": ["H9-02"], "note": "every gated pair through three doors"}
+{"kind": "file", "item": "core/openferment_core/tools/writes.py", "method": "executed", "findings": ["H9-02", "H9-16"], "note": "gated writes, the spend gate under a tiny cap, the twin rule outside an ask"}
+{"kind": "file", "item": "core/openferment_core/tools/catalogues.py", "method": "fuzzed", "findings": [], "note": "fuzzed with missing, extra, wrongly typed and boundary arguments at REST and MCP; valid worker runs left to the engine hunts"}
+{"kind": "file", "item": "core/openferment_core/tools/engine.py", "method": "fuzzed", "findings": ["H9-14"], "note": "fuzzed with missing, extra, wrongly typed and boundary arguments at REST and MCP; valid worker runs left to the engine hunts"}
+{"kind": "file", "item": "core/openferment_core/tools/fermos.py", "method": "fuzzed", "findings": [], "note": "fuzzed with missing, extra, wrongly typed and boundary arguments at REST and MCP; valid worker runs left to the engine hunts"}
+{"kind": "file", "item": "core/openferment_core/tools/geneos.py", "method": "fuzzed", "findings": ["H9-13"], "note": "fuzzed with missing, extra, wrongly typed and boundary arguments at REST and MCP; valid worker runs left to the engine hunts"}
+{"kind": "file", "item": "core/openferment_core/tools/modules.py", "method": "fuzzed", "findings": [], "note": "fuzzed with missing, extra, wrongly typed and boundary arguments at REST and MCP; valid worker runs left to the engine hunts"}
+{"kind": "file", "item": "core/openferment_core/tools/proforma.py", "method": "fuzzed", "findings": ["H9-13"], "note": "fuzzed with missing, extra, wrongly typed and boundary arguments at REST and MCP; valid worker runs left to the engine hunts"}
+{"kind": "file", "item": "core/openferment_core/tools/pureos.py", "method": "fuzzed", "findings": [], "note": "fuzzed with missing, extra, wrongly typed and boundary arguments at REST and MCP; valid worker runs left to the engine hunts"}
+{"kind": "file", "item": "core/openferment_core/tools/records.py", "method": "fuzzed", "findings": ["H9-13"], "note": "fuzzed with missing, extra, wrongly typed and boundary arguments at REST and MCP; valid worker runs left to the engine hunts"}
+{"kind": "file", "item": "core/openferment_core/tools/reference.py", "method": "read", "findings": [], "note": "check:tools run: docs/TOOLS.md is the registry's"}
+{"kind": "file", "item": "core/openferment_core/tools/runbook.py", "method": "fuzzed", "findings": [], "note": "fuzzed with missing, extra, wrongly typed and boundary arguments at REST and MCP; valid worker runs left to the engine hunts"}
+{"kind": "file", "item": "core/openferment_core/tools/studies.py", "method": "fuzzed", "findings": ["H9-12"], "note": "fuzzed with missing, extra, wrongly typed and boundary arguments at REST and MCP; valid worker runs left to the engine hunts"}
+{"kind": "file", "item": "core/openferment_core/tools/thermo.py", "method": "fuzzed", "findings": [], "note": "fuzzed with missing, extra, wrongly typed and boundary arguments at REST and MCP; valid worker runs left to the engine hunts"}
+{"kind": "file", "item": "core/openferment_core/tools/units.py", "method": "fuzzed", "findings": [], "note": "fuzzed with missing, extra, wrongly typed and boundary arguments at REST and MCP; valid worker runs left to the engine hunts"}
+{"kind": "file", "item": "core/openferment_core/audit.py", "method": "executed", "findings": [], "note": "every gated write's row read back by its auditIds"}
+{"kind": "file", "item": "core/openferment_core/validate.py", "method": "executed", "findings": ["H9-04"], "note": "find_number sweep and validate_plan on eight claims"}
+{"kind": "file", "item": "core/openferment_core/evaluation.py", "method": "read", "findings": [], "note": "not run end to end (needs the BioSTEAM worker)"}
+{"kind": "file", "item": "core/openferment_core/literature/kit.py", "method": "executed", "findings": ["H9-01"], "note": "kit.answer's thread loses the request key"}
+{"kind": "file", "item": "core/openferment_core/extract.py", "method": "executed", "findings": ["H9-02", "H9-06"], "note": "call_model wraps BudgetExhausted; RoutesInvalid answers 500"}
+{"kind": "file", "item": "core/openferment_core/ready.py", "method": "executed", "findings": ["H9-07", "H9-08"], "note": "ready --offline --no-workers under seven tables and NaN/inf budgets"}
+{"kind": "file", "item": "core/openferment_core/api.py", "method": "executed", "findings": ["H9-01", "H9-06", "H9-08"], "note": "key middleware, _answer, ask, ask/stream, tools_run, audit_read"}
+{"kind": "file", "item": "core/openferment_core/proposals.py", "method": "executed", "findings": ["H9-16"], "note": "propose and the twin rule"}
+{"kind": "file", "item": "core/openferment_core/guard.py", "method": "read", "findings": [], "note": "key_refusal read; Funnel and hostile names covered by test_key_override"}
+{"kind": "file", "item": "core/openferment_core/literature_mcp.py", "method": "fuzzed", "findings": ["H9-14"], "note": "193 raw JSON-RPC calls"}
+{"kind": "file", "item": "core/tests/test_writes.py", "method": "executed", "findings": ["H9-03"]}
+{"kind": "file", "item": "docs/api/postdoc.md", "method": "read", "findings": ["H9-01", "H9-10", "H9-11"]}
+{"kind": "file", "item": "docs/TOOLS.md", "method": "read", "findings": ["H9-02", "H9-12", "H9-15"]}
+{"kind": "file", "item": "docs/decisions/ADR-008-postdoc-memory-routing.md", "method": "read", "findings": ["H9-05", "H9-06", "H9-07"]}
+{"kind": "operation", "item": "POST /api/ask", "method": "fuzzed", "findings": ["H9-05", "H9-06", "H9-08", "H9-11"], "note": "with and without X-OpenFerment-Key, under invalid tables, ask budget inf"}
+{"kind": "operation", "item": "POST /api/ask/stream", "method": "executed", "findings": ["H9-06"], "note": "key override reaches the stream's thread; RoutesInvalid answers an error event"}
+{"kind": "operation", "item": "GET /api/conversations", "method": "executed", "findings": [], "note": "per project; another project's ids invisible"}
+{"kind": "operation", "item": "GET /api/conversations/{conversation_id}", "method": "executed", "findings": [], "note": "404 in words for another project's id"}
+{"kind": "operation", "item": "GET /api/conversations/{conversation_id}/turns/{turn_id}/calls", "method": "executed", "findings": [], "note": "404 in words for another project's or an unknown turn"}
+{"kind": "operation", "item": "POST /api/tools/{name}", "method": "fuzzed", "findings": ["H9-02", "H9-12", "H9-13", "H9-14", "H9-16"]}
+{"kind": "operation", "item": "GET /api/tools", "method": "executed", "findings": []}
+{"kind": "operation", "item": "GET /api/audit", "method": "executed", "findings": [], "note": "rows read back by id, action, who"}
+{"kind": "operation", "item": "GET /api/events", "method": "executed", "findings": [], "note": "project isolation, after=, Last-Event-ID, unknown project 404, bad after 422"}
+{"kind": "operation", "item": "GET /api/health", "method": "executed", "findings": ["H9-10"], "note": "plain chain under a table that cannot route; fallbackModel names a third model the loop never asks"}
+{"kind": "operation", "item": "POST /api/literature/answer", "method": "executed", "findings": ["H9-01"]}
+{"kind": "operation", "item": "POST /api/intake/{paper_id}/extract", "method": "executed", "findings": ["H9-06"], "note": "key override held; RoutesInvalid answers 500"}
+{"kind": "operation", "item": "GET /api/literature/search", "method": "executed", "findings": [], "note": "profile deep: key override held"}
+{"kind": "operation", "item": "POST /api/intake/paste", "method": "executed", "findings": [], "note": "used to give projects a document offline"}
+{"kind": "operation", "item": "GET /api/proposals", "method": "executed", "findings": ["H9-02"]}
+{"kind": "tool", "item": "search_records", "method": "fuzzed", "findings": ["H9-13"], "note": "REST tool door (fuzz_rest.py) and the openferment MCP server (fuzz_mcp.py)"}
+{"kind": "tool", "item": "catalogue_read", "method": "fuzzed", "findings": [], "note": "REST tool door (fuzz_rest.py) and the openferment MCP server (fuzz_mcp.py)"}
+{"kind": "tool", "item": "catalogue_write", "method": "fuzzed", "findings": [], "note": "REST tool door (fuzz_rest.py) and the openferment MCP server (fuzz_mcp.py)"}
+{"kind": "tool", "item": "search_passages", "method": "fuzzed", "findings": ["H9-13"], "note": "REST tool door (fuzz_rest.py) and the openferment MCP server (fuzz_mcp.py)"}
+{"kind": "tool", "item": "literature_sources", "method": "fuzzed", "findings": [], "note": "REST tool door (fuzz_rest.py) and the openferment MCP server (fuzz_mcp.py)"}
+{"kind": "tool", "item": "literature_document", "method": "fuzzed", "findings": [], "note": "REST tool door (fuzz_rest.py) and the openferment MCP server (fuzz_mcp.py)"}
+{"kind": "tool", "item": "convert_units", "method": "fuzzed", "findings": [], "note": "REST tool door (fuzz_rest.py) and the openferment MCP server (fuzz_mcp.py)"}
+{"kind": "tool", "item": "engine_plants", "method": "fuzzed", "findings": [], "note": "REST tool door (fuzz_rest.py) and the openferment MCP server (fuzz_mcp.py)"}
+{"kind": "tool", "item": "engine_parameters", "method": "fuzzed", "findings": [], "note": "REST tool door (fuzz_rest.py) and the openferment MCP server (fuzz_mcp.py)"}
+{"kind": "tool", "item": "engine_run", "method": "fuzzed", "findings": ["H9-14"], "note": "REST tool door (fuzz_rest.py) and the openferment MCP server (fuzz_mcp.py)"}
+{"kind": "tool", "item": "engine_report", "method": "fuzzed", "findings": ["H9-14"], "note": "REST tool door (fuzz_rest.py) and the openferment MCP server (fuzz_mcp.py)"}
+{"kind": "tool", "item": "flowsheet_library", "method": "fuzzed", "findings": [], "note": "REST tool door (fuzz_rest.py) and the openferment MCP server (fuzz_mcp.py)"}
+{"kind": "tool", "item": "flowsheet_import", "method": "fuzzed", "findings": [], "note": "REST tool door (fuzz_rest.py) and the openferment MCP server (fuzz_mcp.py)"}
+{"kind": "tool", "item": "flowsheet_read", "method": "fuzzed", "findings": ["H9-14"], "note": "REST tool door (fuzz_rest.py) and the openferment MCP server (fuzz_mcp.py)"}
+{"kind": "tool", "item": "study_scenario", "method": "fuzzed", "findings": ["H9-12"], "note": "REST tool door (fuzz_rest.py) and the openferment MCP server (fuzz_mcp.py)"}
+{"kind": "tool", "item": "study_compare", "method": "fuzzed", "findings": [], "note": "REST tool door (fuzz_rest.py) and the openferment MCP server (fuzz_mcp.py)"}
+{"kind": "tool", "item": "study_read", "method": "fuzzed", "findings": [], "note": "REST tool door (fuzz_rest.py) and the openferment MCP server (fuzz_mcp.py)"}
+{"kind": "tool", "item": "selling_price", "method": "fuzzed", "findings": ["H9-13"], "note": "REST tool door (fuzz_rest.py) and the openferment MCP server (fuzz_mcp.py)"}
+{"kind": "tool", "item": "run_flowsheet", "method": "fuzzed", "findings": ["H9-13"], "note": "REST tool door (fuzz_rest.py) and the openferment MCP server (fuzz_mcp.py)"}
+{"kind": "tool", "item": "stream_table", "method": "fuzzed", "findings": [], "note": "REST tool door (fuzz_rest.py) and the openferment MCP server (fuzz_mcp.py)"}
+{"kind": "tool", "item": "growth_forecast", "method": "fuzzed", "findings": [], "note": "REST tool door (fuzz_rest.py) and the openferment MCP server (fuzz_mcp.py)"}
+{"kind": "tool", "item": "fermos_simulate", "method": "fuzzed", "findings": [], "note": "REST tool door (fuzz_rest.py) and the openferment MCP server (fuzz_mcp.py)"}
+{"kind": "tool", "item": "fermos_vessel", "method": "fuzzed", "findings": [], "note": "REST tool door (fuzz_rest.py) and the openferment MCP server (fuzz_mcp.py)"}
+{"kind": "tool", "item": "pureos_build", "method": "fuzzed", "findings": [], "note": "REST tool door (fuzz_rest.py) and the openferment MCP server (fuzz_mcp.py)"}
+{"kind": "tool", "item": "pureos_propose", "method": "fuzzed", "findings": [], "note": "REST tool door (fuzz_rest.py) and the openferment MCP server (fuzz_mcp.py)"}
+{"kind": "tool", "item": "yield_ceiling", "method": "fuzzed", "findings": ["H9-13"], "note": "REST tool door (fuzz_rest.py) and the openferment MCP server (fuzz_mcp.py)"}
+{"kind": "tool", "item": "thermo_props", "method": "fuzzed", "findings": [], "note": "REST tool door (fuzz_rest.py) and the openferment MCP server (fuzz_mcp.py)"}
+{"kind": "tool", "item": "draft_runbook", "method": "fuzzed", "findings": [], "note": "REST tool door (fuzz_rest.py) and the openferment MCP server (fuzz_mcp.py)"}
+{"kind": "tool", "item": "runbooks_read", "method": "fuzzed", "findings": [], "note": "REST tool door (fuzz_rest.py) and the openferment MCP server (fuzz_mcp.py)"}
+{"kind": "tool", "item": "geneos_read", "method": "fuzzed", "findings": [], "note": "REST tool door (fuzz_rest.py) and the openferment MCP server (fuzz_mcp.py)"}
+{"kind": "tool", "item": "fermos_read", "method": "fuzzed", "findings": [], "note": "REST tool door (fuzz_rest.py) and the openferment MCP server (fuzz_mcp.py)"}
+{"kind": "tool", "item": "pureos_read", "method": "fuzzed", "findings": [], "note": "REST tool door (fuzz_rest.py) and the openferment MCP server (fuzz_mcp.py)"}
+{"kind": "tool", "item": "proforma_read", "method": "fuzzed", "findings": [], "note": "REST tool door (fuzz_rest.py) and the openferment MCP server (fuzz_mcp.py)"}
+{"kind": "tool", "item": "biorepo_read", "method": "fuzzed", "findings": [], "note": "REST tool door (fuzz_rest.py) and the openferment MCP server (fuzz_mcp.py)"}
+{"kind": "tool", "item": "guild_read", "method": "fuzzed", "findings": [], "note": "REST tool door (fuzz_rest.py) and the openferment MCP server (fuzz_mcp.py)"}
+{"kind": "tool", "item": "primer_read", "method": "fuzzed", "findings": [], "note": "REST tool door (fuzz_rest.py) and the openferment MCP server (fuzz_mcp.py)"}
+{"kind": "tool", "item": "intake_read", "method": "fuzzed", "findings": [], "note": "REST tool door (fuzz_rest.py) and the openferment MCP server (fuzz_mcp.py)"}
+{"kind": "tool", "item": "home_read", "method": "fuzzed", "findings": [], "note": "REST tool door (fuzz_rest.py) and the openferment MCP server (fuzz_mcp.py)"}
+{"kind": "tool", "item": "runbooks_write", "method": "fuzzed", "findings": ["H9-16"], "note": "REST tool door (fuzz_rest.py) and the openferment MCP server (fuzz_mcp.py)"}
+{"kind": "tool", "item": "geneos_write", "method": "fuzzed", "findings": [], "note": "REST tool door (fuzz_rest.py) and the openferment MCP server (fuzz_mcp.py)"}
+{"kind": "tool", "item": "fermos_write", "method": "fuzzed", "findings": [], "note": "REST tool door (fuzz_rest.py) and the openferment MCP server (fuzz_mcp.py)"}
+{"kind": "tool", "item": "pureos_write", "method": "fuzzed", "findings": [], "note": "REST tool door (fuzz_rest.py) and the openferment MCP server (fuzz_mcp.py)"}
+{"kind": "tool", "item": "proforma_write", "method": "fuzzed", "findings": [], "note": "REST tool door (fuzz_rest.py) and the openferment MCP server (fuzz_mcp.py)"}
+{"kind": "tool", "item": "biorepo_write", "method": "fuzzed", "findings": [], "note": "REST tool door (fuzz_rest.py) and the openferment MCP server (fuzz_mcp.py)"}
+{"kind": "tool", "item": "guild_write", "method": "fuzzed", "findings": [], "note": "REST tool door (fuzz_rest.py) and the openferment MCP server (fuzz_mcp.py)"}
+{"kind": "tool", "item": "primer_write", "method": "fuzzed", "findings": [], "note": "REST tool door (fuzz_rest.py) and the openferment MCP server (fuzz_mcp.py)"}
+{"kind": "tool", "item": "intake_write", "method": "fuzzed", "findings": ["H9-02"], "note": "REST tool door (fuzz_rest.py) and the openferment MCP server (fuzz_mcp.py)"}
+{"kind": "tool", "item": "home_write", "method": "fuzzed", "findings": [], "note": "REST tool door (fuzz_rest.py) and the openferment MCP server (fuzz_mcp.py)"}
+{"kind": "tool", "item": "ask_postdoc", "method": "fuzzed", "findings": ["H9-11", "H9-15"], "note": "openferment MCP server: fuzz_mcp.py and an ask through the SDK client"}
+{"kind": "tool", "item": "get_artifact", "method": "fuzzed", "findings": ["H9-15"], "note": "openferment MCP server: fuzz_mcp.py and an ask through the SDK client"}
+{"kind": "tool", "item": "answer_question", "method": "fuzzed", "findings": [], "note": "sci-rag MCP server over stdio: fuzz_mcp.py with literature_mcp"}
+{"kind": "tool", "item": "corpus_stats", "method": "fuzzed", "findings": [], "note": "sci-rag MCP server over stdio: fuzz_mcp.py with literature_mcp"}
+{"kind": "tool", "item": "get_citations", "method": "fuzzed", "findings": ["H9-14"], "note": "sci-rag MCP server over stdio: fuzz_mcp.py with literature_mcp"}
+{"kind": "tool", "item": "get_document", "method": "fuzzed", "findings": ["H9-14"], "note": "sci-rag MCP server over stdio: fuzz_mcp.py with literature_mcp"}
+{"kind": "tool", "item": "get_entity_relationships", "method": "fuzzed", "findings": [], "note": "sci-rag MCP server over stdio: fuzz_mcp.py with literature_mcp"}
+{"kind": "tool", "item": "list_sources", "method": "fuzzed", "findings": [], "note": "sci-rag MCP server over stdio: fuzz_mcp.py with literature_mcp"}
+{"kind": "tool", "item": "search_corpus", "method": "fuzzed", "findings": [], "note": "sci-rag MCP server over stdio: fuzz_mcp.py with literature_mcp"}
+{"kind": "tool", "item": "search_entities", "method": "fuzzed", "findings": [], "note": "sci-rag MCP server over stdio: fuzz_mcp.py with literature_mcp"}

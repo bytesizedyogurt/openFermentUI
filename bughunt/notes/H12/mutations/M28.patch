@@ -1,0 +1,11 @@
+--- a/core/openferment_core/llm.py
++++ b/core/openferment_core/llm.py
+@@ -696,7 +696,7 @@
+     here on a thread that copies this context, as the threads a request starts
+     do. The key is held in this context alone: never stored, logged or
+     echoed. An empty key is none, and core/.env's serves."""
+-    token = _REQUEST_KEY.set((key or "").strip() or None)
++    token = _REQUEST_KEY.set(key)
+     try:
+         yield
+     finally:

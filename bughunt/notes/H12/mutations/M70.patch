@@ -1,0 +1,11 @@
+--- a/core/openferment_core/biorepo.py
++++ b/core/openferment_core/biorepo.py
+@@ -275,7 +275,7 @@
+     promoted against the paper's own words, and unverified for anything else,
+     a rejection or a correction left unverified among them. The client's
+     `provenanceOf` reads a decided record the same way."""
+-    if d.status == "verified":
++    if d.status in ("verified", "corrected"):
+         return "gold" if _is_gold(d) else "verified"
+     return "unverified"
+ 

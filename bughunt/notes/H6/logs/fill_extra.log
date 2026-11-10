@@ -1,0 +1,35 @@
+ok  200 intake paste POST /api/intake/paste (0.0s)
+ok  200 intake collect PMC9999999 POST /api/intake/collect (0.1s)
+ok  200 intake collect SGD:S000203483 POST /api/intake/collect (0.1s)
+ok  200 intake catalogue POST /api/intake/catalogue (0.0s)
+ok  200 catalogue strain ethanol-red POST /api/catalogues/strain (0.0s)
+ok  200 catalogue product ethanol POST /api/catalogues/product (0.0s)
+ok  200 catalogue product cellulase POST /api/catalogues/product (0.0s)
+ok  200 catalogue skill aseptic-sampling POST /api/catalogues/skill (0.0s)
+ok  200 catalogue lesson sampling-101 POST /api/catalogues/lesson (0.0s)
+NO  422 guild person POST /api/guild/people (0.0s): {'detail': 'added: the first person on the ledger is added by nobody'}
+NO  422 guild policy POST /api/guild/policy (0.0s): {'detail': "authority: only an active lead changes the team's gate and check rate"}
+NO  422 guild evidence POST /api/guild/evidence (0.0s): {'detail': [{'type': 'literal_error', 'loc': ['body', 'kind'], 'msg': "Input should be 'witnessed', 'supervised', 'independent', 'deviation', 'scenario', 'knowledge' or 'designation'", 'input': 'observed', 'ctx': {'expected': "'witnessed', 'supervised', 'independent', 'deviation', 'scenario', 'knowledge' or 'designation'"}}, {'type': 'model_attributes_type', 'loc': ['body', 'source'], 'msg': 'Inpu
+NO  422 guild check request POST /api/guild/checks/request (0.0s): {'detail': "person: 'p-ada' is not an active person who can hold skills"}
+ok  200 state runbooks PUT /api/state/runbooks/rb-page-1 (0.0s)
+ok  200 state runbookLocks PUT /api/state/runbookLocks/rb-page-1 (0.0s)
+ok  200 state runbooks PUT /api/state/runbooks/rb-page-1 (0.0s)
+ok  200 state depositions PUT /api/state/depositions/dep-h6-1 (0.0s)
+ok  200 state measuredEvidence PUT /api/state/measuredEvidence/me-1 (0.0s)
+NO  422 fermos fit POST /api/fermos/fit (0.0s): {'detail': [{'type': 'missing', 'loc': ['body', 'series', 0, 'points', 0, 'entryId'], 'msg': 'Field required', 'input': {'t': 0.0, 'value': 0.5}}, {'type': 'missing', 'loc': ['body', 'series', 0, 'points', 1, 'entryId'], 'msg': 'Field required', 'input': {'t': 4.0, 'value': 0.9}}, {'type': 'missing', 'loc': ['body', 'series', 0, 'points', 2, 'entryId'], 'msg': 'Field required', 'input': {'t': 8.0,
+NO  422 fermos simulate POST /api/fermos/simulate (0.0s): {'detail': 'there is no parameter Ks here; the parameters are mu_max, ks, kd, yxs, alpha, beta, yps, maintenance, p_max, n_inhibition, ki_substrate, yxo, mo, x0, s0, p0, v0, t_end'}
+NO  422 fermos simulate (fewer) POST /api/fermos/simulate (0.0s): {'detail': "batch_v1 cannot run yet: 9 parameters wait. mu_max (maximum specific growth rate) waits for a source: a fit a person chooses, a record of growth_rate_mu through the aggregate gate, a kept simulation, a named person's assumption. A record of growth_rate_mu binds on the sugar it names, and no sugar is named; ks (half-saturation constant) waits for a source: a fit a person chooses, a reco
+ok  200 state scenarios PUT /api/state/scenarios/sc-h6-glucose (0.0s)
+ok  200 state overrides PUT /api/state/overrides/proforma:sc-h6-glucose (0.0s)
+NO  422 proforma run POST /api/proforma/run (0.0s): {'detail': 'ethanol_glucose_v0 takes no input price.glucose'}
+NO  422 proforma run (assumptions) POST /api/proforma/run (0.0s): {'detail': 'ethanol_glucose_v0 takes no input price.glucose'}
+ok  200 proforma benchmark POST /api/proforma/benchmark (0.4s)
+ok  200 proforma reference corn_drygrind POST /api/proforma/reference/corn_drygrind (0.8s)
+reference keys: ['flowsheet', 'artifact', 'regression', 'simulator']
+ok  200 pureos propose POST /api/pureos/propose (0.0s)
+ok  200 thermo volatility POST /api/thermo/volatility (0.0s)
+ok  200 protparam POST /api/protparam (0.1s)
+ok  200 flowsheet upload POST /api/flowsheets/import (0.0s)
+ok  200 geneos models GET /api/geneos/models (0.0s)
+NO  422 state conversations PUT /api/state/conversations/lc-page-1 (0.0s): {'detail': 'a conversation row is a Live conversation: 1 validation error for LiveConversation'}
+{"ok": 23, "refused": ["guild person", "guild policy", "guild evidence", "guild check request", "fermos fit", "fermos simulate", "fermos simulate (fewer)", "proforma run", "proforma run (assumptions)", "state conversations"]}

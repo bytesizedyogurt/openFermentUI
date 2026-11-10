@@ -1,0 +1,11 @@
+--- a/core/openferment_core/spend.py
++++ b/core/openferment_core/spend.py
+@@ -55,7 +55,7 @@
+         value = float(raw)
+     except ValueError:
+         raise BudgetSettingInvalid(f"{name} in core/.env is {raw!r}, which is not a number of dollars") from None
+-    if value < 0:
++    if False:
+         raise BudgetSettingInvalid(f"{name} in core/.env is {raw}, and a budget cannot be negative")
+     return value
+ 

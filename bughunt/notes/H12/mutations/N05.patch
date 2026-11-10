@@ -1,0 +1,11 @@
+--- a/core/openferment_core/literature/collectors.py
++++ b/core/openferment_core/literature/collectors.py
+@@ -405,7 +405,7 @@
+ def _redirect(at: str, following: httpx.URL) -> str:
+     """The address a redirect from `at` names, held to the rules the first
+     address is held to; refused in words otherwise."""
+-    if following.scheme != "https" or not following.host:
++    if not following.host:
+         raise AddressRefused(f"{at} redirected to {following}, which is not an https address; a redirect is followed "
+                              "to another https address alone")
+     if following.userinfo:

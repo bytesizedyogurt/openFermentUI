@@ -5,153 +5,153 @@ file,COMPONENTS.md,M,H13,,,,
 file,README.md,M,H13,,,,
 file,THIRD_PARTY.md,M,H13,,,,
 file,core/.env.example,M,H13,,,,
-file,core/openferment_core/api.py,M,H5 H10,,,,
-file,core/openferment_core/artifacts.py,M,H5 H10,,,,
-file,core/openferment_core/atomic.py,M,H5 H10,,,,
-file,core/openferment_core/audit.py,M,H5 H10,,,,
-file,core/openferment_core/basis.py,M,H3,,,,
-file,core/openferment_core/binding.py,M,H5 H10,,,,
-file,core/openferment_core/biorepo.py,M,H5 H10,,,,
-file,core/openferment_core/catalogues.py,M,H5 H10,,,,
-file,core/openferment_core/checks.py,M,H5 H10,,,,
-file,core/openferment_core/competence.py,M,H5 H10,,,,
-file,core/openferment_core/composite.py,M,H5 H10,,,,
-file,core/openferment_core/db/alembic/versions/0008_run_engine.py,A,H6,,,,
-file,core/openferment_core/db/alembic/versions/0009_engine_checks.py,A,H6,,,,
-file,core/openferment_core/db/alembic/versions/0010_protocols.py,A,H6,,,,
-file,core/openferment_core/db/engine.py,M,H6,,,,
-file,core/openferment_core/db/models.py,M,H6,,,,
-file,core/openferment_core/db/rows.py,M,H6,,,,
-file,core/openferment_core/engine/__init__.py,M,H1 H2,,,,
-file,core/openferment_core/engine/biosteam.py,A,H1 H2,,,,
-file,core/openferment_core/engine/conform.py,A,H1 H2,,,,
-file,core/openferment_core/engine/contract.py,A,H1 H2,,,,
-file,core/openferment_core/engine/library.py,M,H1 H2,,,,
-file,core/openferment_core/engine/registry.py,A,H1 H2,,,,
-file,core/openferment_core/engine/runs.py,M,H1 H2,,,,
-file,core/openferment_core/engine/sample.py,A,H1 H2,,,,
-file,core/openferment_core/engine/sff.py,M,H1 H2,,,,
-file,core/openferment_core/engine/simulator.py,M,H1 H2,,,,
-file,core/openferment_core/evaluation.py,M,H5 H10,,,,
-file,core/openferment_core/evidence_pool.py,M,H5 H10,,,,
-file,core/openferment_core/extract.py,M,H8,,,,
-file,core/openferment_core/fermos.py,M,H4,,,,
-file,core/openferment_core/fermos_engine.py,A,H1 H2,,,,
-file,core/openferment_core/flowsheets/__init__.py,M,H4,,,,
-file,core/openferment_core/flowsheets/corn_drygrind.py,D,H4,,,,
-file,core/openferment_core/flowsheets/cornstover_benchmark.py,D,H4,,,,
-file,core/openferment_core/flowsheets/custom_train_v1.py,M,H4,,,,
-file,core/openferment_core/flowsheets/ethanol_glucose_v0.py,M,H4,,,,
-file,core/openferment_core/flowsheets/shelf.py,M,H4,,,,
-file,core/openferment_core/flowsheets/toy.py,M,H4,,,,
-file,core/openferment_core/flowsheets/train.py,M,H4,,,,
-file,core/openferment_core/flowsheets/vessel.py,M,H4,,,,
-file,core/openferment_core/geneos.py,M,H5 H10,,,,
-file,core/openferment_core/geneos_models.py,M,H5 H10,,,,
-file,core/openferment_core/guard.py,M,H5 H10,,,,
-file,core/openferment_core/guild.py,M,H5 H10,,,,
-file,core/openferment_core/import_alpha1.py,M,H6,,,,
-file,core/openferment_core/intake.py,M,H8,,,,
-file,core/openferment_core/kinetics.py,M,H4,,,,
-file,core/openferment_core/literature/__init__.py,M,H8,,,,
-file,core/openferment_core/literature/collectors.py,M,H8,,,,
-file,core/openferment_core/literature/graph.py,A,H8,,,,
-file,core/openferment_core/literature/kit.py,M,H8,,,,
-file,core/openferment_core/literature/report.py,M,H8,,,,
-file,core/openferment_core/literature_live.py,A,H8,,,,
-file,core/openferment_core/literature_mcp.py,M,H8,,,,
-file,core/openferment_core/llm.py,M,H9,,,,
-file,core/openferment_core/mcp_server.py,M,H9,,,,
-file,core/openferment_core/measurements.py,A,H3,,,,
-file,core/openferment_core/migrations.py,M,H6,,,,
-file,core/openferment_core/models.py,M,H3,,,,
-file,core/openferment_core/module_stores.py,M,H5 H10,,,,
-file,core/openferment_core/nightly_checks.py,M,H5 H10,,,,
-file,core/openferment_core/params.py,M,H3,,,,
-file,core/openferment_core/postdoc/__init__.py,M,H9,,,,
-file,core/openferment_core/postdoc/evaluate.py,M,H9,,,,
-file,core/openferment_core/postdoc/plan.py,M,H9,,,,
-file,core/openferment_core/postdoc_agent.py,M,H9,,,,
-file,core/openferment_core/practice.py,M,H5 H10,,,,
-file,core/openferment_core/proforma.py,M,H2,,,,
-file,core/openferment_core/project_state.py,M,H5 H10,,,,
-file,core/openferment_core/proposals.py,M,H5 H10,,,,
-file,core/openferment_core/protocols.py,A,H5 H10,,,,
-file,core/openferment_core/protparam.py,M,H5 H10,,,,
-file,core/openferment_core/pureos/__init__.py,M,H4,,,,
-file,core/openferment_core/pureos/build.py,M,H4,,,,
-file,core/openferment_core/pureos/catalogue.py,M,H4,,,,
-file,core/openferment_core/pureos/engine.py,A,H1 H2,,,,
-file,core/openferment_core/pureos/from_run.py,M,H4,,,,
-file,core/openferment_core/pureos/inhouse.py,M,H4,,,,
-file,core/openferment_core/pureos/kept.py,M,H4,,,,
-file,core/openferment_core/pureos/proposer.py,M,H4,,,,
-file,core/openferment_core/pureos/train_spec.py,M,H4,,,,
-file,core/openferment_core/quotes.py,M,H5 H10,,,,
-file,core/openferment_core/ready.py,M,H5 H10,,,,
-file,core/openferment_core/runbook_draft.py,M,H5 H10,,,,
-file,core/openferment_core/runbook_lock.py,M,H5 H10,,,,
-file,core/openferment_core/schema/fields.yaml,M,H5 H10,,,,
-file,core/openferment_core/schema/vocabulary.yaml,M,H5 H10,,,,
-file,core/openferment_core/spend.py,M,H9,,,,
-file,core/openferment_core/studies/__init__.py,M,H2,,,,
-file,core/openferment_core/studies/comparisons.py,M,H2,,,,
-file,core/openferment_core/studies/exports.py,M,H2,,,,
-file,core/openferment_core/studies/runbooks.py,M,H2,,,,
-file,core/openferment_core/studies/scenarios.py,M,H2,,,,
-file,core/openferment_core/thermo.py,M,H4,,,,
-file,core/openferment_core/tools/__init__.py,M,H9,,,,
-file,core/openferment_core/tools/catalogues.py,M,H9,,,,
-file,core/openferment_core/tools/engine.py,M,H9,,,,
-file,core/openferment_core/tools/fermos.py,M,H9,,,,
-file,core/openferment_core/tools/gates.py,M,H9,,,,
-file,core/openferment_core/tools/geneos.py,M,H9,,,,
-file,core/openferment_core/tools/modules.py,M,H9,,,,
-file,core/openferment_core/tools/proforma.py,M,H9,,,,
-file,core/openferment_core/tools/pureos.py,M,H9,,,,
-file,core/openferment_core/tools/records.py,M,H9,,,,
-file,core/openferment_core/tools/reference.py,M,H9,,,,
-file,core/openferment_core/tools/runbook.py,M,H9,,,,
-file,core/openferment_core/tools/studies.py,M,H9,,,,
-file,core/openferment_core/tools/thermo.py,M,H9,,,,
-file,core/openferment_core/tools/units.py,M,H9,,,,
-file,core/openferment_core/tools/writes.py,M,H9,,,,
-file,core/openferment_core/units.py,M,H3,,,,
-file,core/openferment_core/validate.py,M,H5 H10,,,,
-file,core/openferment_core/vessel.py,M,H5 H10,,,,
-file,core/openferment_core/witness.py,M,H5 H10,,,,
-file,core/openferment_core/workers/__init__.py,M,H1 H2,,,,
-file,core/openferment_core/workers/dot_names.py,M,H1 H2,,,,
-file,core/openferment_core/workers/echo_worker.py,M,H1 H2,,,,
-file,core/openferment_core/workers/geneos_worker.py,M,H1 H2,,,,
-file,core/openferment_core/workers/kept_references.py,A,H1 H2,,,,
-file,core/openferment_core/workers/library_plants.py,M,H1 H2,,,,
-file,core/openferment_core/workers/proforma_worker.py,M,H1 H2,,,,
-file,core/openferment_core/workers/sample_worker.py,A,H1 H2,,,,
-file,core/openferment_core/workers/sff_toolkit.py,M,H1 H2,,,,
+file,core/openferment_core/api.py,M,H5 H10,H10;H11;H2;H5;H8;H9;P,fuzzed;executed;read,H10-02;H11-01;H11-03;H2-06;H5-05;H5-06;H8-03;H8-05;H8-06;H8-08;H9-01;H9-06;H9-08;P-01,"read in full for middleware, handlers, the /rag mount and the dist mount; every route fuzzed"
+file,core/openferment_core/artifacts.py,M,H5 H10,H1;H10;H2;H3;H5,executed;left;read,H1-06;H2-02;H3-06,"artifact_id, compute, replay exercised"
+file,core/openferment_core/atomic.py,M,H5 H10,H10;H5,left;read,,"module logic is H5's half of this assignment; H10 reached it only through its routes in path_sweep.py and get_sweep.py, which found nothing in it"
+file,core/openferment_core/audit.py,M,H5 H10,H10;H5;H9;P,read;executed,H10-02,audit.read's filters bind; a NUL filter reaches the text column and answers 500
+file,core/openferment_core/basis.py,M,H3,H2;H3,read;executed,H3-06,"origin_of, is_measurement, basis_provenance read against runs.md"
+file,core/openferment_core/binding.py,M,H5 H10,H10;H3;H5,left;read,,"module logic is H5's half of this assignment; H10 reached it only through its routes in path_sweep.py and get_sweep.py, which found nothing in it"
+file,core/openferment_core/biorepo.py,M,H5 H10,H10;H2;H3;H5;P,left;read;executed,H3-01;P-02,"module logic is H5's half of this assignment; H10 reached it only through its routes in path_sweep.py and get_sweep.py, which found nothing in it"
+file,core/openferment_core/catalogues.py,M,H5 H10,H10;H14;H3;H5;P,executed;read,H14-02;H3-13;H3-17;H5-06,routes fuzzed; a NUL name keeps (json body)
+file,core/openferment_core/checks.py,M,H5 H10,H10;H11;H5,left;read,H11-01,"module logic is H5's half of this assignment; H10 reached it only through its routes in path_sweep.py and get_sweep.py, which found nothing in it"
+file,core/openferment_core/competence.py,M,H5 H10,H10;H5,left;read,,"module logic is H5's half of this assignment; H10 reached it only through its routes in path_sweep.py and get_sweep.py, which found nothing in it"
+file,core/openferment_core/composite.py,M,H5 H10,H10;H4;H5,left;executed;read,H4-02,"module logic is H5's half of this assignment; H10 reached it only through its routes in path_sweep.py and get_sweep.py, which found nothing in it"
+file,core/openferment_core/db/alembic/versions/0008_run_engine.py,A,H6,H6,executed,,alpha 2.1 db (5 runs) upgraded: every row engine biosteam; a head kinetics row kept its engine through 0010 -> 0007 -> 0010
+file,core/openferment_core/db/alembic/versions/0009_engine_checks.py,A,H6,H6,executed,,made on upgrade and on an empty db; dropped and remade by down/up; schema equal to the models
+file,core/openferment_core/db/alembic/versions/0010_protocols.py,A,H6,H6,executed,,made on upgrade; GET /api/protocols [] after it; on an unmigrated db the route answers 500 while ready names the revision
+file,core/openferment_core/db/engine.py,M,H6,H6,executed,,"no address, missing database and dead server each refused in words by db:migrate"
+file,core/openferment_core/db/models.py,M,H6,H5;H6,read;executed,H5-03;H6-05,"scenarios and trains each hold two kinds under one key (outside H5's assignment, in its brief)"
+file,core/openferment_core/db/rows.py,M,H6,H1;H5;H6,read,H1-01,put's upsert read for H1-01
+file,core/openferment_core/engine/__init__.py,M,H1 H2,H1;H2,read,,EngineBroken and EngineRefused as raised and caught at the routes; lazy WorkerEngine import held
+file,core/openferment_core/engine/biosteam.py,A,H1 H2,H1;H2,executed,H1-05;H1-10;H2-06;H2-07,"run route, parameters route, unready, default_configuration; unlisted configuration and plant run"
+file,core/openferment_core/engine/conform.py,A,H1 H2,H1;H2,executed;left,H1-03,"run on mirror, biosteam, kinetics --inputs, train --project, probe; every refusal path and exit code"
+file,core/openferment_core/engine/contract.py,A,H1 H2,H1;H2,fuzzed;executed,H1-06;H1-07;H1-09,"stand-in worker answering garbage, NaN, extra keys, infinite precision, duplicate things"
+file,core/openferment_core/engine/library.py,M,H1 H2,H1;H2;H4;P,executed,H1-05;H2-06;H4-03,_runnable against shelf configurations; library runs and kills mid-run
+file,core/openferment_core/engine/registry.py,A,H1 H2,H1;H2,fuzzed;read,H1-02,"eleven stand-in entry points: duplicate names, failed imports, SystemExit, misnamed, missing method, heavy imports, registry asked during import"
+file,core/openferment_core/engine/runs.py,M,H1 H2,H1;H2,fuzzed;executed,H1-01;H1-06;H1-07;H1-08;H2-01,"keep_run, run_engine, compute_kept, check_inputs, thing_of under concurrency and boundary values"
+file,core/openferment_core/engine/sample.py,A,H1 H2,H1;H2,executed,,the sample worker's environment op used to check withheld variables
+file,core/openferment_core/engine/sff.py,M,H1 H2,H1;H2;H8,read;executed;fuzzed,H8-12,keep_run_file and export read; the not-an-object and refusal paths run through badsff and the mirror
+file,core/openferment_core/engine/simulator.py,M,H1 H2,H1;H2,executed;read,H1-10,status after the Proforma worker was killed
+file,core/openferment_core/evaluation.py,M,H5 H10,H10;H5;H9,left;read,,"module logic is H5's half of this assignment; H10 reached it only through its routes in path_sweep.py and get_sweep.py, which found nothing in it"
+file,core/openferment_core/evidence_pool.py,M,H5 H10,H10;H5;P,left;read;executed,P-02,"module logic is H5's half of this assignment; H10 reached it only through its routes in path_sweep.py and get_sweep.py, which found nothing in it"
+file,core/openferment_core/extract.py,M,H8,H3;H8;H9,read;executed,H9-02;H9-06,"_put runs refuse_estimates on every candidate the store keeps, the hand candidates included"
+file,core/openferment_core/fermos.py,M,H4,H4,executed,H4-04,"simulate, bind, fit, forecast, harvest, fits through the routes; productivity counts P0 (suspected)"
+file,core/openferment_core/fermos_engine.py,A,H1 H2,H1;H2;H4;P,executed,H1-01;H2-01;H4-04,conform kinetics --inputs; engine route boundary cases; concurrent identical runs
+file,core/openferment_core/flowsheets/__init__.py,M,H4,H4,read,H4-02,"its parts() contract: price per kg of stream, basis_flow the flow the price is per"
+file,core/openferment_core/flowsheets/corn_drygrind.py,D,H4,H4,left,,"deleted at alpha 2.2 D8; the corn plant runs as the library plant corn, compared with the direct route"
+file,core/openferment_core/flowsheets/cornstover_benchmark.py,D,H4,H4,left,,deleted at alpha 2.2 D8; the cornstover library plant is compared with the direct route
+file,core/openferment_core/flowsheets/custom_train_v1.py,M,H4,H4,executed,H4-02;H4-07,a composite run from a vessel design and a train run
+file,core/openferment_core/flowsheets/ethanol_glucose_v0.py,M,H4,H1;H4,executed,H1-04;H4-07,simulate and evaluate read for H1-04
+file,core/openferment_core/flowsheets/shelf.py,M,H4,H4,read,,
+file,core/openferment_core/flowsheets/toy.py,M,H4,H4,read,,
+file,core/openferment_core/flowsheets/train.py,M,H4,H4,executed,,a train run; per-unit mass balance closes
+file,core/openferment_core/flowsheets/vessel.py,M,H4,H4,executed,,one anaerobic NREL design at a plant scale
+file,core/openferment_core/geneos.py,M,H5 H10,H10;H5,left;read,,"module logic is H5's half of this assignment; H10 reached it only through its routes in path_sweep.py and get_sweep.py, which found nothing in it"
+file,core/openferment_core/geneos_models.py,M,H5 H10,H10;H5,left;read,,"module logic is H5's half of this assignment; H10 reached it only through its routes in path_sweep.py and get_sweep.py, which found nothing in it"
+file,core/openferment_core/guard.py,M,H5 H10,H10;H11;H5;H9,executed;read,H10-05;H11-02,read; guard_matrix.py over raw HTTP and cross_site.mjs in Chromium
+file,core/openferment_core/guild.py,M,H5 H10,H10;H5,executed;read,H5-06;H5-07,a person kept through POST /api/guild/people and read back
+file,core/openferment_core/import_alpha1.py,M,H6,H6;P,fuzzed;read,H6-02;H6-03;H6-04;P-02,pnpm db:import-alpha1 on the tag's biorepo.json and 12 alpha-1.0-shaped directories written by alpha 1.0's own models
+file,core/openferment_core/intake.py,M,H8,H5;H8,read;fuzzed,H5-02;H8-02;H8-03,"overlay_papers takes title, url and licence class from the kit's document (outside H5's assignment, in its brief)"
+file,core/openferment_core/kinetics.py,M,H4,H4,executed,H4-04;H4-05,eight hand-solvable cases plus fed-batch and chemostat extras
+file,core/openferment_core/literature/__init__.py,M,H8,H8,read,,
+file,core/openferment_core/literature/collectors.py,M,H8,H8,fuzzed,H8-03;H8-04;H8-05,"fetch_file held every loopback, private and redirect form; a malformed Location escapes as 500; Latin-1 XML decoded with replacement; unquote of the upload name yields NUL"
+file,core/openferment_core/literature/graph.py,A,H8,H5;H8;P,executed,,"scoped reads held under hand-made graph rows (graph_reads.py) (outside H5's assignment, in its brief)"
+file,core/openferment_core/literature/kit.py,M,H8,H10;H14;H5;H8;H9;P,executed;read,H10-03;H14-03;H5-01;H5-02;H8-01;H8-02;H8-03;H8-09;H9-01,"the /rag key map, settings and rest_app read; /rag probed with the key set, wrong, empty and unset"
+file,core/openferment_core/literature/report.py,M,H8,H8;P,executed;read,H8-07,demo _run on a bh db matches the committed demo part; the committed ethanol part recomputes from its kept run; project lane run offline in three configurations
+file,core/openferment_core/literature_live.py,A,H8,H8;P,executed,H8-07,"report --project with interactive, vector_only, keyword_only, no --render, data dir in scratch; graph build and --judge not run (they ask a model)"
+file,core/openferment_core/literature_mcp.py,M,H8,H5;H8;H9;P,executed;fuzzed,H5-08;H9-14,"every tool called from bh-b and from unknown, malformed and upper-case projects (outside H5's assignment, in its brief)"
+file,core/openferment_core/llm.py,M,H9,H9;P,executed,H9-01;H9-06;H9-10;P-01,"routes() under seven OPENFERMENT_ROUTES tables, the key override through a loopback stand-in model API, call/converse with stand-in clients; served-id pricing under suspected"
+file,core/openferment_core/mcp_server.py,M,H9,H5;H9;P,executed;fuzzed,H9-11;H9-12;H9-15,"own process and --service, from bh-b and unknown, malformed, upper-case projects: refusals in words (outside H5's assignment, in its brief)"
+file,core/openferment_core/measurements.py,A,H3,H3;P,executed,H3-05;H3-06,"every lookup rule driven through the Proforma resolve and the kinetics engine: held, confirmed, standing, named, its own, its maker, its unit; corrected_by keys on mutable sample times"
+file,core/openferment_core/migrations.py,M,H6,H6,executed,H6-03,"empty->head twice (no change), base->head, 0007->head, kit 0006->base->head; refusals in words"
+file,core/openferment_core/models.py,M,H3,H3,executed,,"Origin, Quantity, Override, EngineInput, ScenarioValue, ClaimValue, Deposition family, MeasuredEvidence, PROVENANCE_ORDER, weakest_provenance read; validators hit at the resolve door (record, artifact"
+file,core/openferment_core/module_stores.py,M,H5 H10,H10;H3;H5;P,left;executed;read,H3-04;H3-14,"module logic is H5's half of this assignment; H10 reached it only through its routes in path_sweep.py and get_sweep.py, which found nothing in it"
+file,core/openferment_core/nightly_checks.py,M,H5 H10,H10;H2;H5,left;read,H2-02,"module logic is H5's half of this assignment; H10 reached it only through its routes in path_sweep.py and get_sweep.py, which found nothing in it"
+file,core/openferment_core/params.py,M,H3,H3,executed,,"overrides_of, _checked, _from_override, basis_inputs driven by POST /api/params/proforma:<id>/resolve with every origin kind"
+file,core/openferment_core/postdoc/__init__.py,M,H9,H9,read,,
+file,core/openferment_core/postdoc/evaluate.py,M,H9,H9,read,,"scores, StandIn and judge read; the offline run needs the BioSTEAM worker and was left"
+file,core/openferment_core/postdoc/plan.py,M,H9,H9,read,H9-04,the prompt's own bad example kept by the validator
+file,core/openferment_core/postdoc_agent.py,M,H9,H9,executed,H9-05;H9-06;H9-10,"ask with stand-in converse: ask cap 0/0.75/2/inf/nan, a three-model plan route"
+file,core/openferment_core/practice.py,M,H5 H10,H10;H3;H5,fuzzed;read,H10-02;H3-02;H5-07,POST /api/practice/record with a NUL sessionId answers 500
+file,core/openferment_core/proforma.py,M,H2,H2;H4;P,executed,H2-02,"keep_run, computed, run, run_thing, thing_list, basis_inputs read; route, engine and run_flowsheet doors one row; replay drift after a restart"
+file,core/openferment_core/project_state.py,M,H5 H10,H10;H2;H3;H5;P,executed;read,H2-03;H2-04;H3-03;H3-04;H3-05;H3-15;H5-03;H5-04,GET /api/state read; PUT and DELETE path-fuzzed
+file,core/openferment_core/proposals.py,M,H5 H10,H10;H5;H9,left;read;executed,H9-16,"module logic is H5's half of this assignment; H10 reached it only through its routes in path_sweep.py and get_sweep.py, which found nothing in it"
+file,core/openferment_core/protocols.py,A,H5 H10,H10;H3;H5;P,fuzzed;read;executed,H10-02;H5-06,GET /api/protocols/{id} with NUL answers 500
+file,core/openferment_core/protparam.py,M,H5 H10,H10;H5,left;read,,"module logic is H5's half of this assignment; H10 reached it only through its routes in path_sweep.py and get_sweep.py, which found nothing in it"
+file,core/openferment_core/pureos/__init__.py,M,H4,H4,executed,,"train_of recovery, cumulative, productLost recomputed from the stream table"
+file,core/openferment_core/pureos/build.py,M,H4,H4,read,,
+file,core/openferment_core/pureos/catalogue.py,M,H4,H4,executed,,catalogue and one type's specs through the routes
+file,core/openferment_core/pureos/engine.py,A,H1 H2,H1;H2;H4;P,executed;read,H1-10,conform train --project on a train made through the API; run route refusals
+file,core/openferment_core/pureos/from_run.py,M,H4,H4,executed,,from a scenario run and from the cornstover run (suspected: the latter cannot run)
+file,core/openferment_core/pureos/inhouse.py,M,H4,H4,read,,
+file,core/openferment_core/pureos/kept.py,M,H4,H4,read,,
+file,core/openferment_core/pureos/proposer.py,M,H4,H4,executed,,propose refused for a host no strain names; rules not exercised
+file,core/openferment_core/pureos/train_spec.py,M,H4,H4;P,executed;read,,"run, check, validate; vessel broth flow read (suspected 1 % gap)"
+file,core/openferment_core/quotes.py,M,H5 H10,H10;H3;H5;H8,left;read,,"module logic is H5's half of this assignment; H10 reached it only through its routes in path_sweep.py and get_sweep.py, which found nothing in it"
+file,core/openferment_core/ready.py,M,H5 H10,H10;H11;H5;H9,executed;read,H10-03;H11-01;H11-08;H9-07;H9-08,the rag row run with OPENFERMENT_RAG_KEY unset
+file,core/openferment_core/runbook_draft.py,M,H5 H10,H10;H5,left;read,,"module logic is H5's half of this assignment; H10 reached it only through its routes in path_sweep.py and get_sweep.py, which found nothing in it"
+file,core/openferment_core/runbook_lock.py,M,H5 H10,H10;H2;H5,left;fuzzed;read,,"module logic is H5's half of this assignment; H10 reached it only through its routes in path_sweep.py and get_sweep.py, which found nothing in it"
+file,core/openferment_core/schema/fields.yaml,M,H5 H10,H10;H3;H5,left;read,H3-01,"module logic is H5's half of this assignment; H10 reached it only through its routes in path_sweep.py and get_sweep.py, which found nothing in it"
+file,core/openferment_core/schema/vocabulary.yaml,M,H5 H10,H10;H5,left;read,,"module logic is H5's half of this assignment; H10 reached it only through its routes in path_sweep.py and get_sweep.py, which found nothing in it"
+file,core/openferment_core/spend.py,M,H9,H9,executed,H9-08;H9-09,"reserve at, under and over the cap, twenty concurrent holds, the UTC boundary, NaN/inf/-0 settings"
+file,core/openferment_core/studies/__init__.py,M,H2,H2,read,,
+file,core/openferment_core/studies/comparisons.py,M,H2,H14;H2,read;executed,H14-01;H2-01;H2-08,"library beside Proforma, two forecasts, measured beside default, a receipt, another project's runs"
+file,core/openferment_core/studies/exports.py,M,H2,H2,executed,H2-05,route and command line packages opened in python -I -S; byte-identical between exports
+file,core/openferment_core/studies/runbooks.py,M,H2,H2,executed,H2-03;H2-04,"made, locked, then every state-door write probed (lock_probe.py)"
+file,core/openferment_core/studies/scenarios.py,M,H2,H2;H3;H5,executed;read,H2-07;H5-03,made and run with assumptions and measurements; a corrected reading refused
+file,core/openferment_core/thermo.py,M,H4,H4,executed,,"azeotrope preset, a stream of corn, ethanol_glucose_v0 and cornstover runs, volatility"
+file,core/openferment_core/tools/__init__.py,M,H9,H5;H9,read;fuzzed,H5-06;H9-12;H9-13;H9-14,"tools.run sets the context's project; a ProjectRequired becomes '<tool> failed' (outside H5's assignment, in its brief)"
+file,core/openferment_core/tools/catalogues.py,M,H9,H3;H9,executed;fuzzed,H3-13,"catalogue_write with X-OpenFerment-Assistant, no model"
+file,core/openferment_core/tools/engine.py,M,H9,H1;H2;H9,executed;fuzzed,H9-14,the four engine tools exercised
+file,core/openferment_core/tools/fermos.py,M,H9,H9,fuzzed,,"fuzzed with missing, extra, wrongly typed and boundary arguments at REST and MCP; valid worker runs left to the engine hunts"
+file,core/openferment_core/tools/gates.py,M,H9,H9,executed,H9-02,every gated pair through three doors
+file,core/openferment_core/tools/geneos.py,M,H9,H9,fuzzed,H9-13,"fuzzed with missing, extra, wrongly typed and boundary arguments at REST and MCP; valid worker runs left to the engine hunts"
+file,core/openferment_core/tools/modules.py,M,H9,H9,fuzzed,,"fuzzed with missing, extra, wrongly typed and boundary arguments at REST and MCP; valid worker runs left to the engine hunts"
+file,core/openferment_core/tools/proforma.py,M,H9,H2;H9,executed;fuzzed,H9-13,"run_flowsheet, selling_price"
+file,core/openferment_core/tools/pureos.py,M,H9,H9,fuzzed,,"fuzzed with missing, extra, wrongly typed and boundary arguments at REST and MCP; valid worker runs left to the engine hunts"
+file,core/openferment_core/tools/records.py,M,H9,H9,fuzzed,H9-13,"fuzzed with missing, extra, wrongly typed and boundary arguments at REST and MCP; valid worker runs left to the engine hunts"
+file,core/openferment_core/tools/reference.py,M,H9,H9,read,,check:tools run: docs/TOOLS.md is the registry's
+file,core/openferment_core/tools/runbook.py,M,H9,H9,fuzzed,,"fuzzed with missing, extra, wrongly typed and boundary arguments at REST and MCP; valid worker runs left to the engine hunts"
+file,core/openferment_core/tools/studies.py,M,H9,H2;H9,executed;fuzzed,H2-01;H9-12,"study_scenario, study_compare, study_read"
+file,core/openferment_core/tools/thermo.py,M,H9,H9,fuzzed,,"fuzzed with missing, extra, wrongly typed and boundary arguments at REST and MCP; valid worker runs left to the engine hunts"
+file,core/openferment_core/tools/units.py,M,H9,H9,fuzzed,,"fuzzed with missing, extra, wrongly typed and boundary arguments at REST and MCP; valid worker runs left to the engine hunts"
+file,core/openferment_core/tools/writes.py,M,H9,H1;H2;H9,executed;read,H9-02;H9-16,run_engine exercised through engine_run
+file,core/openferment_core/units.py,M,H3,H3,fuzzed,H3-07;H3-08;H3-09;H3-16,"Hypothesis: round trip, composition, identity, cross-family and unknown refusals, edge values (scripts/units_props.py); spelling probe (scripts/units_normalize_probe.py)"
+file,core/openferment_core/validate.py,M,H5 H10,H10;H14;H3;H5;H9,left;executed;fuzzed;read,H14-02;H3-01;H3-02;H3-10;H3-12;H9-04,"module logic is H5's half of this assignment; H10 reached it only through its routes in path_sweep.py and get_sweep.py, which found nothing in it"
+file,core/openferment_core/vessel.py,M,H5 H10,H10;H4;H5,left;executed;read,,"module logic is H5's half of this assignment; H10 reached it only through its routes in path_sweep.py and get_sweep.py, which found nothing in it"
+file,core/openferment_core/witness.py,M,H5 H10,H10;H3;H5;H8,left;read,,"module logic is H5's half of this assignment; H10 reached it only through its routes in path_sweep.py and get_sweep.py, which found nothing in it"
+file,core/openferment_core/workers/__init__.py,M,H1 H2,H1;H2,fuzzed;left,,"SimWorker against a stand-in worker: no-JSON line, another request's id, timeout, exit mid-run, oversized line; withheld names"
+file,core/openferment_core/workers/dot_names.py,M,H1 H2,H1;H2,read;left,,pure text renaming; not exercised
+file,core/openferment_core/workers/echo_worker.py,M,H1 H2,H1;H2,read;left,,test worker; its ops mirror the protocol cases run with the probe
+file,core/openferment_core/workers/geneos_worker.py,M,H1 H2,H1;H2,read;left,,dispatch table read; geneOS ops belong to another hunt
+file,core/openferment_core/workers/kept_references.py,A,H1 H2,H1;H2,read;left,,head read; replay of retired reference runs not exercised
+file,core/openferment_core/workers/library_plants.py,M,H1 H2,H1;H2;H4,read;executed,H4-01;H4-03,run and NPV rounding read; library runs exercised through the engine route
+file,core/openferment_core/workers/proforma_worker.py,M,H1 H2,H1;H2;H4;P,executed;read,H1-04;H4-01;H4-02,built() cache and run(): base case against samples of one flowsheet
+file,core/openferment_core/workers/sample_worker.py,A,H1 H2,H1;H2,executed,,environment op: withheld names held
+file,core/openferment_core/workers/sff_toolkit.py,M,H1 H2,H1;H2,read;executed,,op paths read; validation and scoring reached through train and biosteam runs
 file,core/pyproject.toml,M,H13,,,,
 file,core/tests/fixtures/kept_bases.json,A,H12,,,,
 file,core/tests/fixtures/sim/toy.json,M,H12,,,,
 file,core/tests/standins.py,M,H12,,,,
-file,core/tests/test_agent_interface.py,A,H12,,,,
+file,core/tests/test_agent_interface.py,A,H12,P,executed,,row 1: 13 passed
 file,core/tests/test_api_intake.py,M,H12,,,,
 file,core/tests/test_artifacts.py,M,H12,,,,
 file,core/tests/test_basis.py,M,H12,,,,
-file,core/tests/test_biorepo.py,M,H12,,,,
+file,core/tests/test_biorepo.py,M,H12,P,read,P-02,row 36: gold label with no value used as gold on purpose
 file,core/tests/test_boundaries.py,M,H12,,,,
 file,core/tests/test_builder.py,M,H12,,,,
 file,core/tests/test_catalogue.py,M,H12,,,,
-file,core/tests/test_catalogues.py,M,H12,,,,
+file,core/tests/test_catalogues.py,M,H12,P,executed,,row 5
 file,core/tests/test_check_tools.py,M,H12,,,,
 file,core/tests/test_checks.py,M,H12,,,,
 file,core/tests/test_comparisons.py,M,H12,,,,
-file,core/tests/test_competence.py,M,H12,,,,
+file,core/tests/test_competence.py,M,H12,P,executed,,row 6
 file,core/tests/test_coverage.py,M,H12,,,,
 file,core/tests/test_custom_train.py,M,H12,,,,
 file,core/tests/test_db.py,M,H12,,,,
 file,core/tests/test_engine_diagnostics.py,A,H12,,,,
 file,core/tests/test_engine_pins.py,A,H12,,,,
-file,core/tests/test_engines.py,A,H12,,,,
+file,core/tests/test_engines.py,A,H12,P,fuzzed,,row 19: run with rests_on mutated; it caught the change
 file,core/tests/test_engines_sim.py,A,H12,,,,
 file,core/tests/test_evaluate.py,M,H12,,,,
 file,core/tests/test_events.py,M,H12,,,,
@@ -164,20 +164,20 @@ file,core/tests/test_fermos_vessel_tool.py,M,H12,,,,
 file,core/tests/test_finite_inputs.py,A,H12,,,,
 file,core/tests/test_guidance.py,M,H12,,,,
 file,core/tests/test_guild.py,M,H12,,,,
-file,core/tests/test_host.py,M,H12,,,,
+file,core/tests/test_host.py,M,H12,H11,executed,H11-07,52 passed at the head; mutation of nightly.sh's dump call keeps the three dump tests green
 file,core/tests/test_import_alpha1.py,M,H12,,,,
 file,core/tests/test_library.py,M,H12,,,,
 file,core/tests/test_licences.py,M,H12,,,,
-file,core/tests/test_literature_graph.py,A,H12,,,,
+file,core/tests/test_literature_graph.py,A,H12,P,executed,,row 4
 file,core/tests/test_literature_kit.py,M,H12,,,,
 file,core/tests/test_literature_live.py,A,H12,,,,
 file,core/tests/test_literature_mcp.py,M,H12,,,,
-file,core/tests/test_literature_report.py,A,H12,,,,
-file,core/tests/test_llm.py,M,H12,,,,
+file,core/tests/test_literature_report.py,A,H12,P,executed,,row 3
+file,core/tests/test_llm.py,M,H12,P,read,P-01,row 2: the local-model test passes client_factory and so never reaches _default_client
 file,core/tests/test_mcp.py,M,H12,,,,
 file,core/tests/test_mcp_service.py,A,H12,,,,
-file,core/tests/test_measurements.py,A,H12,,,,
-file,core/tests/test_module_tools.py,M,H12,,,,
+file,core/tests/test_measurements.py,A,H12,P,executed,,"rows 9, 25"
+file,core/tests/test_module_tools.py,M,H12,P,executed,,row 9
 file,core/tests/test_nightly_checks.py,M,H12,,,,
 file,core/tests/test_number_rule_fold.py,M,H12,,,,
 file,core/tests/test_openapi.py,M,H12,,,,
@@ -185,7 +185,7 @@ file,core/tests/test_params.py,M,H12,,,,
 file,core/tests/test_phase3_review.py,M,H12,,,,
 file,core/tests/test_phase7_review.py,M,H12,,,,
 file,core/tests/test_postdoc_agent.py,M,H12,,,,
-file,core/tests/test_proforma.py,M,H12,,,,
+file,core/tests/test_proforma.py,M,H12,P,executed,,"rows 23, 24"
 file,core/tests/test_proforma_ceiling.py,M,H12,,,,
 file,core/tests/test_proforma_cold_start.py,M,H12,,,,
 file,core/tests/test_proforma_ethanol.py,M,H12,,,,
@@ -195,10 +195,10 @@ file,core/tests/test_proforma_runs.py,M,H12,,,,
 file,core/tests/test_proforma_shelf.py,M,H12,,,,
 file,core/tests/test_proforma_slow.py,M,H12,,,,
 file,core/tests/test_proforma_worker.py,M,H12,,,,
-file,core/tests/test_project_state.py,M,H12,,,,
+file,core/tests/test_project_state.py,M,H12,P,executed,,row 26
 file,core/tests/test_projects.py,M,H12,,,,
 file,core/tests/test_propose.py,M,H12,,,,
-file,core/tests/test_protocols.py,A,H12,,,,
+file,core/tests/test_protocols.py,A,H12,P,executed,,"rows 5, 7"
 file,core/tests/test_protparam.py,M,H12,,,,
 file,core/tests/test_prove_examples.py,A,H12,,,,
 file,core/tests/test_pureos.py,M,H12,,,,
@@ -208,7 +208,7 @@ file,core/tests/test_restart.py,M,H12,,,,
 file,core/tests/test_review_6ra_composite.py,M,H12,,,,
 file,core/tests/test_review_6ra_seam.py,M,H12,,,,
 file,core/tests/test_review_8r.py,M,H12,,,,
-file,core/tests/test_route_models.py,A,H12,,,,
+file,core/tests/test_route_models.py,A,H12,P,executed,,row 26
 file,core/tests/test_runbooks.py,M,H12,,,,
 file,core/tests/test_runs.py,M,H12,,,,
 file,core/tests/test_runs_sim.py,M,H12,,,,
@@ -219,41 +219,41 @@ file,core/tests/test_sff_url.py,A,H12,,,,
 file,core/tests/test_spend.py,M,H12,,,,
 file,core/tests/test_studies.py,M,H12,,,,
 file,core/tests/test_thermo.py,M,H12,,,,
-file,core/tests/test_tools.py,M,H12,,,,
+file,core/tests/test_tools.py,M,H12,P,executed,,row 8: stream tests
 file,core/tests/test_tools_flowsheets.py,M,H12,,,,
 file,core/tests/test_tools_study.py,M,H12,,,,
 file,core/tests/test_train.py,M,H12,,,,
 file,core/tests/test_units_minus.py,M,H12,,,,
 file,core/tests/test_validate.py,M,H12,,,,
 file,core/tests/test_vessel.py,M,H12,,,,
-file,core/tests/test_workers.py,M,H12,,,,
-file,core/tests/test_writes.py,M,H12,,,,
-file,docs/BASE.md,A,H13,,,,
+file,core/tests/test_workers.py,M,H12,P,executed,,"rows 23, 24"
+file,core/tests/test_writes.py,M,H12,H9,executed,H9-03,
+file,docs/BASE.md,A,H13,H1,read,H1-03,install line and conform commands followed
 file,docs/PROGRESS.md,M,H13,,,,
-file,docs/TOOLS.md,M,H13,,,,
-file,docs/api/engines.md,A,H13,,,,
-file,docs/api/intake.md,M,H13,,,,
-file,docs/api/openapi.json,M,H13,,,,
-file,docs/api/postdoc.md,M,H13,,,,
-file,docs/api/runs.md,M,H13,,,,
-file,docs/api/sff.md,M,H13,,,,
-file,docs/api/studies.md,M,H13,,,,
-file,docs/api/workers.md,M,H13,,,,
+file,docs/TOOLS.md,M,H13,H9;P,read;executed,H9-02;H9-12;H9-15,row 1: gen:tools --check
+file,docs/api/engines.md,A,H13,H1;H2,read,H1-01;H1-02;H1-03;H1-04;H1-05;H1-06;H2-02;H2-06,every claim of What the service does with an engine and Conformance checked
+file,docs/api/intake.md,M,H13,H3,read,H3-17,catalogue routes
+file,docs/api/openapi.json,M,H13,P,executed,,row 12: gen:api --check
+file,docs/api/postdoc.md,M,H13,H9,read,H9-01;H9-10;H9-11,
+file,docs/api/runs.md,M,H13,H1;H2;H3,read,H2-02;H3-06,read for the run's shape
+file,docs/api/sff.md,M,H13,H2,read,,a run file's openferment metadata block checked in exported files
+file,docs/api/studies.md,M,H13,H2;H3,read,H2-01;H2-03;H2-04;H2-05;H2-07;H3-05;H3-15,Measurements section and the rows a page keeps
+file,docs/api/workers.md,M,H13,H1,read,H1-06;H1-09,Lines and Engine ops checked against a stand-in worker
 file,docs/decisions/ADR-000-fresh-slate.md,M,H13,,,,
 file,docs/decisions/ADR-001-postgresql.md,M,H13,,,,
 file,docs/decisions/ADR-002-sci-rag-kit.md,M,H13,,,,
 file,docs/decisions/ADR-003-sff.md,M,H13,,,,
 file,docs/decisions/ADR-004-biosteam-adapter.md,M,H13,,,,
 file,docs/decisions/ADR-005-projects.md,M,H13,,,,
-file,docs/decisions/ADR-006-quantities-and-estimates.md,M,H13,,,,
+file,docs/decisions/ADR-006-quantities-and-estimates.md,M,H13,H3,read,H3-03;H3-04;H3-05;H3-10;H3-11;H3-14;H3-15,"read whole, its notes included"
 file,docs/decisions/ADR-007-schema-source.md,M,H13,,,,
-file,docs/decisions/ADR-008-postdoc-memory-routing.md,M,H13,,,,
+file,docs/decisions/ADR-008-postdoc-memory-routing.md,M,H13,H9,read,H9-05;H9-06;H9-07,
 file,docs/decisions/ADR-009-ui.md,M,H13,,,,
 file,docs/decisions/ADR-010-deletions.md,M,H13,,,,
 file,docs/decisions/ADR-011-guards.md,M,H13,,,,
 file,docs/decisions/ADR-014-durable-write-queue.md,M,H13,,,,
-file,docs/decisions/ADR-015-engine-contract.md,A,H13,,,,
-file,docs/decisions/ADR-016-bench-readings-alone.md,A,H13,,,,
+file,docs/decisions/ADR-015-engine-contract.md,A,H13,H2,read,,
+file,docs/decisions/ADR-016-bench-readings-alone.md,A,H13,H3,read,,the readings-alone deposition was driven with protocolId null
 file,docs/decisions/ADR-017-project-protocols.md,A,H13,,,,
 file,docs/decisions/ADR-018-lesson-body.md,A,H13,,,,
 file,docs/reports/handoff-2026-11.md,A,H13,,,,
@@ -261,459 +261,459 @@ file,docs/reports/literature-retrieval.json,M,H13,,,,
 file,docs/reports/literature-retrieval.md,M,H13,,,,
 file,docs/reports/live-questions-2026-11.md,M,H13,,,,
 file,docs/reports/model-routing-2026-11.md,M,H13,,,,
-file,docs/runbooks/live-host-install.md,M,H13,,,,
-file,examples/agents/record-reader/README.md,A,H13 H1,,,,
-file,examples/agents/record-reader/record_reader.py,A,H13 H1,,,,
-file,examples/engines/openferment-engine-mirror/README.md,A,H13 H1,,,,
-file,examples/engines/openferment-engine-mirror/openferment_engine_mirror/__init__.py,A,H13 H1,,,,
-file,examples/engines/openferment-engine-mirror/openferment_engine_mirror/engine.py,A,H13 H1,,,,
-file,examples/engines/openferment-engine-mirror/openferment_engine_mirror/worker.py,A,H13 H1,,,,
-file,examples/engines/openferment-engine-mirror/pyproject.toml,A,H13 H1,,,,
-file,examples/engines/openferment-engine-mirror/tests/test_engine.py,A,H13 H1,,,,
-file,examples/engines/openferment-engine-mirror/tests/test_worker.py,A,H13 H1,,,,
-file,package.json,M,H13,,,,
+file,docs/runbooks/live-host-install.md,M,H13,H11,read,H11-02;H11-03,"every command, flag and path checked against the tree; step 1's core/.env built and used; step 7's restore run on test databases"
+file,examples/agents/record-reader/README.md,A,H13 H1,H1,read,,an MCP client outside the engine contract; read and left unrun
+file,examples/agents/record-reader/record_reader.py,A,H13 H1,H1,read,,structure read; not run (needs a running service's MCP server)
+file,examples/engines/openferment-engine-mirror/README.md,A,H13 H1,H1,executed,,install line and test command followed in a worktree
+file,examples/engines/openferment-engine-mirror/openferment_engine_mirror/__init__.py,A,H13 H1,H1,read,,
+file,examples/engines/openferment-engine-mirror/openferment_engine_mirror/engine.py,A,H13 H1,H1,executed,,loaded by discovery; conform check 6 held
+file,examples/engines/openferment-engine-mirror/openferment_engine_mirror/worker.py,A,H13 H1,H1,fuzzed,H1-01,"door battery, concurrency, conform eight checks held"
+file,examples/engines/openferment-engine-mirror/pyproject.toml,A,H13 H1,H1,executed,,editable install held to the lock
+file,examples/engines/openferment-engine-mirror/tests/test_engine.py,A,H13 H1,H1,executed,,30 passed with the worktree's interpreter
+file,examples/engines/openferment-engine-mirror/tests/test_worker.py,A,H13 H1,H1,executed,,30 passed with the worktree's interpreter
+file,package.json,M,H13,H10,read,,"every start (dev, prototype:up, prove, smoke) binds loopback"
 file,scripts/check-figures.ts,M,H13,,,,
-file,scripts/check-guild.ts,M,H13,,,,
+file,scripts/check-guild.ts,M,H13,P,executed,,row 6: green
 file,scripts/check-licences.py,M,H13,,,,
 file,scripts/check-plan.mjs,M,H13,,,,
 file,scripts/check-reconcile-kinds.ts,M,H13,,,,
-file,scripts/check-state.ts,M,H13,,,,
+file,scripts/check-state.ts,M,H13,P,executed,,"rows 13, 14, 15, 21, 22, 25: green, 0 failures"
 file,scripts/check-tools.py,M,H13,,,,
-file,scripts/engines-local.sh,A,H13,,,,
-file,scripts/export-competence-fixtures.ts,M,H13,,,,
+file,scripts/engines-local.sh,A,H13,H11,executed,,read; run under deploy.sh and session-start.sh with a stand-in uv and no core/engines.local; ShellCheck clean
+file,scripts/export-competence-fixtures.ts,M,H13,P,executed,,row 6: exported into scratch; both fixtures byte for byte
 file,scripts/export-lock-fixtures.ts,M,H13,,,,
-file,scripts/host/deploy.sh,M,H11,,,,
-file,scripts/host/install.sh,M,H11,,,,
-file,scripts/host/launchd.py,M,H11,,,,
-file,scripts/host/lib.sh,M,H11,,,,
-file,scripts/host/nightly.sh,M,H11,,,,
+file,scripts/host/deploy.sh,M,H11,H11,executed,,"every refusal, --no-pull/--no-restart, --verify's tests' server from each source, on stand-ins; ShellCheck; the pull-before-verify order kept under suspected"
+file,scripts/host/install.sh,M,H11,H11,executed,H11-02;H11-03;H11-09,"run twice on stand-ins (checkout and HOME with spaces), with OPENFERMENT_HOST, with an exported database URL, with CDPATH; ShellCheck -o all; read against bash 3.2 and BSD tools"
+file,scripts/host/launchd.py,M,H11,H10;H11,read;executed,H11-02,the plist's --host defaults to 127.0.0.1; poll_host; nothing widens the bind without OPENFERMENT_HOST
+file,scripts/host/lib.sh,M,H11,H11,executed,H11-01;H11-03;H11-04;H11-08;H11-09;H11-10;H11-11,"backup_database rotation (7, 8, month and year boundaries, failures, full disk, SIGTERM, clock back), real pg_dump and pg_restore round trip, env_setting fuzzed against python-dotenv (645 forms), has_"
+file,scripts/host/nightly.sh,M,H11,H11,executed,H11-04;H11-07,"run as launchd runs it (env -i, /bin/bash, HOME with a space) on stand-ins; step order, exports, statuses; mutation of the dump call"
 file,scripts/lib/guild-ladder.ts,M,H13,,,,
 file,scripts/lib/guild-test-skills.ts,M,H13,,,,
-file,scripts/prototype-up.sh,M,H13,,,,
-file,scripts/prove.py,M,H13,,,,
-file,scripts/session-start.sh,M,H13,,,,
-file,scripts/smoke.ts,M,H13,,,,
-file,scripts/walk.ts,M,H13,,,,
-file,src/App.tsx,M,H7,,,,
-file,src/api/types.gen.ts,M,H7,,,,
-file,src/components/AnswerPlanView.tsx,M,H7,,,,
-file,src/components/Chip.tsx,M,H7,,,,
-file,src/components/CollectCard.tsx,M,H7,,,,
-file,src/components/CommandPalette.tsx,M,H7,,,,
-file,src/components/ComponentTag.tsx,M,H7,,,,
-file,src/components/DataTable.tsx,M,H7,,,,
-file,src/components/DepositionPanel.tsx,M,H7,,,,
-file,src/components/Dossier.tsx,M,H7,,,,
-file,src/components/EngineRunLink.tsx,A,H7,,,,
-file,src/components/EvidenceCard.tsx,M,H7,,,,
-file,src/components/GuildBits.tsx,M,H7,,,,
-file,src/components/GuildGate.tsx,M,H7,,,,
-file,src/components/HomeStart.tsx,M,H7,,,,
-file,src/components/JobsTray.tsx,M,H7,,,,
-file,src/components/LessonEmbeds.tsx,M,H7,,,,
-file,src/components/NewScenarioDialog.tsx,M,H7,,,,
-file,src/components/ParameterPanel.tsx,M,H7,,,,
-file,src/components/ParameterRow.tsx,M,H7,,,,
-file,src/components/PassageQuote.tsx,M,H7,,,,
-file,src/components/PlanTrace.tsx,M,H7,,,,
-file,src/components/ProcessTrain.tsx,M,H7,,,,
-file,src/components/ProjectSwitch.tsx,M,H7,,,,
-file,src/components/PropertiesPanel.tsx,M,H7,,,,
-file,src/components/ProposalsCard.tsx,M,H7,,,,
-file,src/components/ProposedTrain.tsx,M,H7,,,,
-file,src/components/Provenance.tsx,M,H7,,,,
-file,src/components/QuantityField.tsx,M,H7,,,,
-file,src/components/ReadingOrigin.tsx,A,H7,,,,
-file,src/components/ReferenceView.tsx,M,H7,,,,
-file,src/components/RunbookBits.tsx,M,H7,,,,
-file,src/components/SffGraph.tsx,M,H7,,,,
-file,src/components/TimeSeriesPanel.tsx,M,H7,,,,
-file,src/components/TraceCards.tsx,M,H7,,,,
-file,src/components/Unbuilt.tsx,M,H7,,,,
-file,src/components/figures/CeilingGap.tsx,M,H7,,,,
-file,src/components/figures/CostWaterfall.tsx,M,H7,,,,
-file,src/components/figures/Distribution.tsx,M,H7,,,,
-file,src/components/figures/EvidenceStrip.tsx,M,H7,,,,
-file,src/components/figures/FigureFrame.tsx,M,H7,,,,
-file,src/components/figures/Frontier.tsx,M,H7,,,,
-file,src/components/figures/IntervalLedger.tsx,M,H7,,,,
-file,src/components/figures/MixLine.tsx,M,H7,,,,
-file,src/components/figures/OxygenBalance.tsx,M,H7,,,,
-file,src/components/figures/PurityByStream.tsx,M,H7,,,,
-file,src/components/figures/RecoveryByUnit.tsx,M,H7,,,,
-file,src/components/figures/TimeCourse.tsx,M,H7,,,,
-file,src/components/figures/Tornado.tsx,M,H7,,,,
-file,src/components/figures/TrajectoryBand.tsx,M,H7,,,,
-file,src/components/figures/encoding.ts,M,H7,,,,
-file,src/components/figures/index.ts,M,H7,,,,
-file,src/components/ui.tsx,M,H7,,,,
-file,src/data/components.ts,M,H7,,,,
-file,src/data/labels.ts,M,H7,,,,
-file,src/data/nav.ts,M,H7,,,,
-file,src/data/ontology.ts,M,H7,,,,
-file,src/data/shortcuts.ts,M,H7,,,,
-file,src/data/skillFamilies.ts,M,H7,,,,
-file,src/data/subsystems.ts,M,H7,,,,
-file,src/data/tabs.ts,M,H7,,,,
-file,src/data/types.ts,D,H7,,,,
-file,src/data/vocabulary.ts,M,H7,,,,
-file,src/engine/capture.ts,M,H7,,,,
-file,src/engine/checks.ts,M,H7,,,,
-file,src/engine/competence.ts,M,H7,,,,
-file,src/engine/diff.ts,M,H7,,,,
-file,src/engine/geneos/enumeration.ts,D,H7,,,,
-file,src/engine/interp.ts,M,H7,,,,
-file,src/engine/ledger.ts,M,H7,,,,
-file,src/engine/lock.ts,M,H7,,,,
-file,src/engine/metrics.ts,M,H7,,,,
-file,src/engine/path.ts,M,H7,,,,
-file,src/engine/readings.ts,A,H7,,,,
-file,src/engine/reconcile.ts,M,H7,,,,
-file,src/engine/scale.ts,M,H7,,,,
-file,src/engine/series.ts,M,H7,,,,
-file,src/engine/units.ts,M,H7,,,,
-file,src/lib/artifacts.ts,M,H7,,,,
-file,src/lib/catalogues.ts,A,H7,,,,
-file,src/lib/checks.ts,M,H7,,,,
-file,src/lib/cite.ts,A,H7,,,,
-file,src/lib/csv.ts,M,H7,,,,
-file,src/lib/durable.ts,M,H7,,,,
-file,src/lib/events.ts,M,H7,,,,
-file,src/lib/fermos.ts,M,H7,,,,
-file,src/lib/geneos.ts,M,H7,,,,
-file,src/lib/guild.ts,M,H7,,,,
-file,src/lib/http.ts,M,H7,,,,
-file,src/lib/intake.ts,M,H7,,,,
-file,src/lib/literature.ts,M,H7,,,,
-file,src/lib/params.ts,M,H7,,,,
-file,src/lib/postdoc.ts,M,H7,,,,
-file,src/lib/practice.ts,M,H7,,,,
-file,src/lib/proforma.ts,M,H7,,,,
-file,src/lib/project.ts,M,H7,,,,
-file,src/lib/projectState.ts,M,H7,,,,
-file,src/lib/proposals.ts,M,H7,,,,
-file,src/lib/protocols.ts,A,H7,,,,
-file,src/lib/pureos.ts,M,H7,,,,
-file,src/lib/review.ts,M,H7,,,,
-file,src/lib/studies.ts,M,H7,,,,
-file,src/lib/thermo.ts,M,H7,,,,
-file,src/lib/viz.ts,M,H7,,,,
-file,src/router.tsx,M,H7,,,,
-file,src/screens/BenchCheck.tsx,M,H7,,,,
-file,src/screens/BioRepo.tsx,M,H7,,,,
-file,src/screens/BioRepoArtifacts.tsx,M,H7,,,,
-file,src/screens/BioRepoSearch.tsx,M,H7,,,,
-file,src/screens/Catalogues.tsx,A,H7,,,,
-file,src/screens/Compare.tsx,M,H7,,,,
-file,src/screens/Deposition.tsx,M,H7,,,,
-file,src/screens/DepositionDetail.tsx,M,H7,,,,
-file,src/screens/Depositions.tsx,M,H7,,,,
-file,src/screens/FermOS.tsx,M,H7,,,,
-file,src/screens/FermOSForecast.tsx,M,H7,,,,
-file,src/screens/FermOSSimulate.tsx,M,H7,,,,
-file,src/screens/FermOSVessel.tsx,M,H7,,,,
-file,src/screens/FlowsheetPage.tsx,M,H7,,,,
-file,src/screens/Flowsheets.tsx,M,H7,,,,
-file,src/screens/GeneOS.tsx,M,H7,,,,
-file,src/screens/GeneOSModel.tsx,M,H7,,,,
-file,src/screens/Guild.tsx,M,H7,,,,
-file,src/screens/GuildChecks.tsx,M,H7,,,,
-file,src/screens/GuildMatrix.tsx,M,H7,,,,
-file,src/screens/GuildPeople.tsx,M,H7,,,,
-file,src/screens/GuildSkills.tsx,M,H7,,,,
-file,src/screens/Home.tsx,M,H7,,,,
-file,src/screens/Intake.tsx,M,H7,,,,
-file,src/screens/IntakeIngest.tsx,M,H7,,,,
-file,src/screens/Organisms.tsx,M,H7,,,,
-file,src/screens/PaperReader.tsx,M,H7,,,,
-file,src/screens/Postdoc.tsx,M,H7,,,,
-file,src/screens/Primer.tsx,M,H7,,,,
-file,src/screens/PrimerLesson.tsx,M,H7,,,,
-file,src/screens/PrimerPath.tsx,M,H7,,,,
-file,src/screens/PrimerPractice.tsx,M,H7,,,,
-file,src/screens/Proforma.tsx,M,H7,,,,
-file,src/screens/ProformaBiosteam.tsx,M,H7,,,,
-file,src/screens/ProformaComparison.tsx,M,H7,,,,
-file,src/screens/ProformaReference.tsx,M,H7,,,,
-file,src/screens/ProformaRun.tsx,M,H7,,,,
-file,src/screens/ProformaScenario.tsx,M,H7,,,,
-file,src/screens/ProformaStudies.tsx,M,H7,,,,
-file,src/screens/ProjectHome.tsx,M,H7,,,,
-file,src/screens/ProtocolDetail.tsx,M,H7,,,,
-file,src/screens/ProtocolEditor.tsx,M,H7,,,,
-file,src/screens/Protocols.tsx,M,H7,,,,
-file,src/screens/PureOS.tsx,M,H7,,,,
-file,src/screens/PureOSBuilder.tsx,M,H7,,,,
-file,src/screens/PureOSPropose.tsx,M,H7,,,,
-file,src/screens/PureOSTrain.tsx,M,H7,,,,
-file,src/screens/RunbookDetail.tsx,M,H7,,,,
-file,src/screens/RunbookLedger.tsx,M,H7,,,,
-file,src/screens/Runbooks.tsx,M,H7,,,,
-file,src/screens/Settings.tsx,M,H7,,,,
-file,src/screens/SettingsFigures.tsx,M,H7,,,,
-file,src/screens/StrainPage.tsx,M,H7,,,,
-file,src/screens/Witness.tsx,M,H7,,,,
-file,src/store.ts,M,H7,,,,
-file,src/styles.css,M,H7,,,,
-operation,POST /api/ask,project,H9 H5,,,,
-operation,POST /api/ask/stream,project,H9 H5,,,,
-operation,GET /api/audit,project,H5 H10,,,,
-operation,GET /api/biorepo/artifacts,project,H2 H5,,,,
-operation,GET /api/biorepo/artifacts/{artifact_id},project,H2 H5,,,,
-operation,GET /api/biorepo/artifacts/{artifact_id}/checks,project,H2 H5,,,,
-operation,POST /api/biorepo/artifacts/{artifact_id}/replay,project,H2 H5,,,,
-operation,GET /api/biorepo/artifacts/{artifact_id}/tables,project,H2 H5,,,,
-operation,POST /api/biorepo/check,project,H5 H10,,,,
-operation,POST /api/biorepo/decisions,project,H5 H10,,,,
-operation,GET /api/biorepo/overlay,project,H5 H10,,,,
-operation,GET /api/catalogues/{kind},project,H5 H10,,,,
-operation,POST /api/catalogues/{kind},project,H5 H10,,,,
-operation,GET /api/catalogues/{kind}/{entry_id},project,H5 H10,,,,
-operation,GET /api/conversations,project,H9 H5,,,,
-operation,GET /api/conversations/{conversation_id},project,H9 H5,,,,
-operation,GET /api/conversations/{conversation_id}/turns/{turn_id}/calls,project,H9 H5,,,,
-operation,GET /api/depositions/readings,project,H3 H7 H5,,,,
-operation,GET /api/engines,project,H1 H2 H5,,,,
-operation,GET /api/engines/{name}/parameters,project,H1 H2 H5,,,,
-operation,POST /api/engines/{name}/run,project,H1 H2 H5,,,,
-operation,GET /api/events,project,H5 H10,,,,
-operation,GET /api/fermos/bind,project,H4 H5,,,,
-operation,GET /api/fermos/families,project,H4 H5,,,,
-operation,GET /api/fermos/families/{family_id},project,H4 H5,,,,
-operation,POST /api/fermos/fit,project,H4 H5,,,,
-operation,GET /api/fermos/fits,project,H4 H5,,,,
-operation,POST /api/fermos/forecast,project,H4 H5,,,,
-operation,GET /api/fermos/harvest,project,H4 H5,,,,
-operation,POST /api/fermos/simulate,project,H4 H5,,,,
-operation,GET /api/fermos/simulations,project,H4 H5,,,,
-operation,POST /api/fermos/vessel,project,H4 H5,,,,
-operation,GET /api/fermos/vessel/specs,project,H4 H5,,,,
-operation,GET /api/fermos/vessels,project,H4 H5,,,,
-operation,GET /api/flowsheets,project,H8 H5,,,,
-operation,POST /api/flowsheets/export,project,H8 H5,,,,
-operation,POST /api/flowsheets/import,project,H8 H5,,,,
-operation,POST /api/flowsheets/import-url,project,H8 H5,,,,
-operation,GET /api/flowsheets/library,project,H2 H5,,,,
-operation,POST /api/flowsheets/library/{file_id},project,H2 H5,,,,
-operation,GET /api/flowsheets/{record_id},project,H8 H5,,,,
-operation,GET /api/flowsheets/{record_id}/file,project,H8 H5,,,,
-operation,POST /api/geneos/ceiling,project,H5 H10,,,,
-operation,POST /api/geneos/frontier,project,H5 H10,,,,
-operation,POST /api/geneos/mix,project,H5 H10,,,,
-operation,GET /api/geneos/models,project,H5 H10,,,,
-operation,GET /api/guild,project,H5 H10,,,,
-operation,POST /api/guild/check,project,H5 H10,,,,
-operation,GET /api/guild/checks,project,H5 H10,,,,
-operation,POST /api/guild/checks/propose,project,H5 H10,,,,
-operation,POST /api/guild/checks/request,project,H5 H10,,,,
-operation,POST /api/guild/checks/{check_id}/brief,project,H5 H10,,,,
-operation,POST /api/guild/checks/{check_id}/dismiss,project,H5 H10,,,,
-operation,POST /api/guild/checks/{check_id}/record,project,H5 H10,,,,
-operation,POST /api/guild/checks/{check_id}/schedule,project,H5 H10,,,,
-operation,POST /api/guild/evidence,project,H5 H10,,,,
-operation,POST /api/guild/people,project,H5 H10,,,,
-operation,POST /api/guild/policy,project,H5 H10,,,,
-operation,POST /api/guild/withdraw,project,H5 H10,,,,
-operation,GET /api/health,none,H5 H10,,,,
-operation,POST /api/intake/catalogue,project,H8 H5,,,,
-operation,POST /api/intake/collect,project,H8 H5,,,,
-operation,POST /api/intake/paste,project,H8 H5,,,,
-operation,POST /api/intake/upload,project,H8 H5,,,,
-operation,POST /api/intake/{paper_id}/extract,project,H8 H5,,,,
-operation,GET /api/library,project,H2 H5,,,,
-operation,GET /api/library/{plant}/parameters,project,H2 H5,,,,
-operation,GET /api/library/{plant}/regression,project,H2 H5,,,,
-operation,POST /api/library/{plant}/run,project,H2 H5,,,,
-operation,POST /api/literature/answer,project,H8 H5,,,,
-operation,GET /api/literature/documents,project,H8 H5,,,,
-operation,GET /api/literature/search,project,H8 H5,,,,
-operation,GET /api/literature/stats,project,H8 H5,,,,
-operation,GET /api/params/{scope},project,H5 H10,,,,
-operation,POST /api/params/{scope}/resolve,project,H5 H10,,,,
-operation,GET /api/practice,project,H5 H10,,,,
-operation,POST /api/practice/draft,project,H5 H10,,,,
-operation,POST /api/practice/record,project,H5 H10,,,,
-operation,POST /api/practice/turn,project,H5 H10,,,,
-operation,GET /api/proforma/bind,project,H2 H5,,,,
-operation,GET /api/proforma/ceiling-check,project,H2 H5,,,,
-operation,POST /api/proforma/run,project,H2 H5,,,,
-operation,GET /api/proforma/runs,project,H1 H2 H5,,,,
-operation,GET /api/proforma/scenarios,project,H2 H5,,,,
-operation,GET /api/proforma/shelf,project,H2 H5,,,,
-operation,GET /api/proforma/status,project,H2 H5,,,,
-operation,GET /api/projects,none,H5 H10,,,,
-operation,POST /api/projects,none,H5 H10,,,,
-operation,GET /api/projects/{project_id},none,H5 H10,,,,
-operation,GET /api/proposals,project,H5 H10,,,,
-operation,POST /api/proposals/{proposal_id}/carry-out,project,H5 H10,,,,
-operation,POST /api/proposals/{proposal_id}/dismiss,project,H5 H10,,,,
-operation,GET /api/protocols,project,H3 H7 H5,,,,
-operation,POST /api/protocols,project,H3 H7 H5,,,,
-operation,GET /api/protocols/{protocol_id},project,H3 H7 H5,,,,
-operation,POST /api/protocols/{protocol_id}/versions,project,H3 H7 H5,,,,
-operation,GET /api/protparam,project,H5 H10,,,,
-operation,POST /api/protparam,project,H5 H10,,,,
-operation,GET /api/pureos/catalogue,project,H4 H5,,,,
-operation,GET /api/pureos/catalogue/{type_id}/specs,project,H4 H5,,,,
-operation,POST /api/pureos/propose,project,H4 H5,,,,
-operation,GET /api/pureos/train-runs,project,H4 H5,,,,
-operation,POST /api/pureos/train/check,project,H4 H5,,,,
-operation,POST /api/pureos/train/from-run,project,H4 H5,,,,
-operation,POST /api/pureos/train/run,project,H4 H5,,,,
-operation,POST /api/pureos/train/validate,project,H4 H5,,,,
-operation,GET /api/pureos/train/{key},project,H4 H5,,,,
-operation,GET /api/pureos/trains,project,H4 H5,,,,
-operation,GET /api/pureos/trains-kept,project,H4 H5,,,,
-operation,GET /api/runs,project,H1 H2 H5,,,,
-operation,GET /api/runs/{run_id},project,H1 H2 H5,,,,
-operation,GET /api/state,project,H5 H10,,,,
-operation,DELETE /api/state/{kind}/{item_id},project,H5 H10,,,,
-operation,PUT /api/state/{kind}/{item_id},project,H5 H10,,,,
-operation,GET /api/studies/comparisons,project,H2 H5,,,,
-operation,POST /api/studies/comparisons,project,H2 H5,,,,
-operation,GET /api/studies/comparisons/{comparison_id},project,H2 H5,,,,
-operation,GET /api/studies/export,project,H2 H5,,,,
-operation,GET /api/studies/runbooks,project,H2 H5,,,,
-operation,POST /api/studies/runbooks,project,H2 H5,,,,
-operation,GET /api/studies/runbooks/{runbook_id},project,H2 H5,,,,
-operation,POST /api/studies/runbooks/{runbook_id}/lock,project,H2 H5,,,,
-operation,GET /api/studies/scenarios,project,H2 H5,,,,
-operation,POST /api/studies/scenarios,project,H2 H5,,,,
-operation,GET /api/studies/scenarios/{scenario_id},project,H2 H5,,,,
-operation,POST /api/studies/scenarios/{scenario_id}/run,project,H2 H5,,,,
-operation,GET /api/thermo/props,project,H4 H5,,,,
-operation,POST /api/thermo/props,project,H4 H5,,,,
-operation,GET /api/thermo/volatility,project,H4 H5,,,,
-operation,POST /api/thermo/volatility,project,H4 H5,,,,
-operation,GET /api/tools,project,H5 H10,,,,
-operation,POST /api/tools/{name},project,H5 H10,,,,
-operation,GET /api/witness/runs,project,H1 H2 H5,,,,
-tool,search_records,openferment,H9 H5,,,,
-tool,catalogue_read,openferment,H9 H5,,,,
-tool,catalogue_write,openferment,H9 H5,,,,
-tool,search_passages,openferment,H9 H5,,,,
-tool,literature_sources,openferment,H9 H5,,,,
-tool,literature_document,openferment,H9 H5,,,,
-tool,convert_units,openferment,H9 H5,,,,
-tool,engine_plants,openferment,H9 H5,,,,
-tool,engine_parameters,openferment,H9 H5,,,,
-tool,engine_run,openferment,H9 H5,,,,
-tool,engine_report,openferment,H9 H5,,,,
-tool,flowsheet_library,openferment,H9 H5,,,,
-tool,flowsheet_import,openferment,H9 H5,,,,
-tool,flowsheet_read,openferment,H9 H5,,,,
-tool,study_scenario,openferment,H9 H5,,,,
-tool,study_compare,openferment,H9 H5,,,,
-tool,study_read,openferment,H9 H5,,,,
-tool,selling_price,openferment,H9 H5,,,,
-tool,run_flowsheet,openferment,H9 H5,,,,
-tool,stream_table,openferment,H9 H5,,,,
-tool,growth_forecast,openferment,H9 H5,,,,
-tool,fermos_simulate,openferment,H9 H5,,,,
-tool,fermos_vessel,openferment,H9 H5,,,,
-tool,pureos_build,openferment,H9 H5,,,,
-tool,pureos_propose,openferment,H9 H5,,,,
-tool,yield_ceiling,openferment,H9 H5,,,,
-tool,thermo_props,openferment,H9 H5,,,,
-tool,draft_runbook,openferment,H9 H5,,,,
-tool,runbooks_read,openferment,H9 H5,,,,
-tool,geneos_read,openferment,H9 H5,,,,
-tool,fermos_read,openferment,H9 H5,,,,
-tool,pureos_read,openferment,H9 H5,,,,
-tool,proforma_read,openferment,H9 H5,,,,
-tool,biorepo_read,openferment,H9 H5,,,,
-tool,guild_read,openferment,H9 H5,,,,
-tool,primer_read,openferment,H9 H5,,,,
-tool,intake_read,openferment,H9 H5,,,,
-tool,home_read,openferment,H9 H5,,,,
-tool,runbooks_write,openferment,H9 H5,,,,
-tool,geneos_write,openferment,H9 H5,,,,
-tool,fermos_write,openferment,H9 H5,,,,
-tool,pureos_write,openferment,H9 H5,,,,
-tool,proforma_write,openferment,H9 H5,,,,
-tool,biorepo_write,openferment,H9 H5,,,,
-tool,guild_write,openferment,H9 H5,,,,
-tool,primer_write,openferment,H9 H5,,,,
-tool,intake_write,openferment,H9 H5,,,,
-tool,home_write,openferment,H9 H5,,,,
-tool,ask_postdoc,openferment,H9 H5,,,,
-tool,get_artifact,openferment,H9 H5,,,,
-tool,answer_question,sci-rag,H9 H5,,,,
-tool,corpus_stats,sci-rag,H9 H5,,,,
-tool,get_citations,sci-rag,H9 H5,,,,
-tool,get_document,sci-rag,H9 H5,,,,
-tool,get_entity_relationships,sci-rag,H9 H5,,,,
-tool,list_sources,sci-rag,H9 H5,,,,
-tool,search_corpus,sci-rag,H9 H5,,,,
-tool,search_entities,sci-rag,H9 H5,,,,
-rail,Home,/,H7 H14,,,,
-rail,Intake,/intake,H7 H14,,,,
-rail,BioRepo,/biorepo,H7 H14,,,,
-rail,Postdoc,/postdoc,H7 H14,,,,
-rail,geneOS,/geneos,H7 H14,,,,
-rail,fermOS,/fermos,H7 H14,,,,
-rail,pureOS,/pureos,H7 H14,,,,
-rail,Proforma,/proforma,H7 H14,,,,
-rail,Runbooks,/runbooks,H7 H14,,,,
-rail,Primer,/primer,H7 H14,,,,
-rail,Guild,/guild,H7 H14,,,,
-rail,Catalogues,/catalogues,H7 H14,,,,
-screen,src/screens/Architecture.tsx,,H7 H14,,,,
-screen,src/screens/BenchCheck.tsx,,H7 H14,,,,
-screen,src/screens/BioRepo.tsx,,H7 H14,,,,
-screen,src/screens/BioRepoArtifacts.tsx,,H7 H14,,,,
-screen,src/screens/BioRepoSearch.tsx,,H7 H14,,,,
-screen,src/screens/Catalogues.tsx,,H7 H14,,,,
-screen,src/screens/Compare.tsx,,H7 H14,,,,
-screen,src/screens/Deposition.tsx,,H7 H14,,,,
-screen,src/screens/DepositionDetail.tsx,,H7 H14,,,,
-screen,src/screens/Depositions.tsx,,H7 H14,,,,
-screen,src/screens/FermOS.tsx,,H7 H14,,,,
-screen,src/screens/FermOSForecast.tsx,,H7 H14,,,,
-screen,src/screens/FermOSSimulate.tsx,,H7 H14,,,,
-screen,src/screens/FermOSVessel.tsx,,H7 H14,,,,
-screen,src/screens/FlowsheetPage.tsx,,H7 H14,,,,
-screen,src/screens/Flowsheets.tsx,,H7 H14,,,,
-screen,src/screens/GeneOS.tsx,,H7 H14,,,,
-screen,src/screens/GeneOSModel.tsx,,H7 H14,,,,
-screen,src/screens/Guild.tsx,,H7 H14,,,,
-screen,src/screens/GuildChecks.tsx,,H7 H14,,,,
-screen,src/screens/GuildMatrix.tsx,,H7 H14,,,,
-screen,src/screens/GuildPeople.tsx,,H7 H14,,,,
-screen,src/screens/GuildSkills.tsx,,H7 H14,,,,
-screen,src/screens/Home.tsx,,H7 H14,,,,
-screen,src/screens/Intake.tsx,,H7 H14,,,,
-screen,src/screens/IntakeIngest.tsx,,H7 H14,,,,
-screen,src/screens/Organisms.tsx,,H7 H14,,,,
-screen,src/screens/PaperReader.tsx,,H7 H14,,,,
-screen,src/screens/Postdoc.tsx,,H7 H14,,,,
-screen,src/screens/Primer.tsx,,H7 H14,,,,
-screen,src/screens/PrimerLesson.tsx,,H7 H14,,,,
-screen,src/screens/PrimerPath.tsx,,H7 H14,,,,
-screen,src/screens/PrimerPractice.tsx,,H7 H14,,,,
-screen,src/screens/Proforma.tsx,,H7 H14,,,,
-screen,src/screens/ProformaBiosteam.tsx,,H7 H14,,,,
-screen,src/screens/ProformaComparison.tsx,,H7 H14,,,,
-screen,src/screens/ProformaReference.tsx,,H7 H14,,,,
-screen,src/screens/ProformaRun.tsx,,H7 H14,,,,
-screen,src/screens/ProformaScenario.tsx,,H7 H14,,,,
-screen,src/screens/ProformaStudies.tsx,,H7 H14,,,,
-screen,src/screens/ProjectHome.tsx,,H7 H14,,,,
-screen,src/screens/ProtocolDetail.tsx,,H7 H14,,,,
-screen,src/screens/ProtocolEditor.tsx,,H7 H14,,,,
-screen,src/screens/Protocols.tsx,,H7 H14,,,,
-screen,src/screens/PureOS.tsx,,H7 H14,,,,
-screen,src/screens/PureOSBuilder.tsx,,H7 H14,,,,
-screen,src/screens/PureOSPropose.tsx,,H7 H14,,,,
-screen,src/screens/PureOSTrain.tsx,,H7 H14,,,,
-screen,src/screens/RunbookDetail.tsx,,H7 H14,,,,
-screen,src/screens/RunbookLedger.tsx,,H7 H14,,,,
-screen,src/screens/Runbooks.tsx,,H7 H14,,,,
-screen,src/screens/Settings.tsx,,H7 H14,,,,
-screen,src/screens/SettingsFigures.tsx,,H7 H14,,,,
-screen,src/screens/StrainPage.tsx,,H7 H14,,,,
-screen,src/screens/Witness.tsx,,H7 H14,,,,
-engine,biosteam,openferment_core.engine.biosteam:ENGINE,H1 H2 H4,,,,
-engine,kinetics,openferment_core.fermos_engine:ENGINE,H1 H2 H4,,,,
-engine,train,openferment_core.pureos.engine:ENGINE,H1 H2 H4,,,,
-engine,mirror,openferment_engine_mirror.engine:ENGINE (examples),H1 H13,,,,
+file,scripts/prototype-up.sh,M,H13,H10,executed,,both servers bind 127.0.0.1; its static and decode logic run as serve_dist_probe.mjs (no file outside dist/); the whole script left: it writes core/.env
+file,scripts/prove.py,M,H13,H10,read,,HOST 127.0.0.1 for the service and its port probe
+file,scripts/session-start.sh,M,H13,H11,executed,H11-05;H11-06,run in a worktree on stand-ins over core/.env with no final newline and with export and spaced database lines
+file,scripts/smoke.ts,M,H13,P,read,,"row 33: not run, it picks its own port and database name"
+file,scripts/walk.ts,M,H13,P,read,,row 33
+file,src/App.tsx,M,H7,H7,browser,H7-05;H7-08,read whole; route dispatch walked in three states; logo link and unknown-project address driven
+file,src/api/types.gen.ts,M,H7,H7;P,executed,,"GET answers of the full project held to docs/api/openapi.json, its source (scripts/answers_vs_types.py); AS_KEPT and exclude_unset schemas compared"
+file,src/components/AnswerPlanView.tsx,M,H7,H7,browser,,"rendered on the walked screens in the empty, full and stopped states with no console error, page error or screen boundary; not read line by line"
+file,src/components/Chip.tsx,M,H7,H7,browser,,"rendered on the walked screens in the empty, full and stopped states with no console error, page error or screen boundary; not read line by line"
+file,src/components/CollectCard.tsx,M,H7,H7,browser,,"rendered on the walked screens in the empty, full and stopped states with no console error, page error or screen boundary; not read line by line"
+file,src/components/CommandPalette.tsx,M,H7,H7,browser,,"rendered on the walked screens in the empty, full and stopped states with no console error, page error or screen boundary; not read line by line"
+file,src/components/ComponentTag.tsx,M,H7,H7,browser,,"rendered on the walked screens in the empty, full and stopped states with no console error, page error or screen boundary; not read line by line"
+file,src/components/DataTable.tsx,M,H7,H7,browser,,"rendered on the walked screens in the empty, full and stopped states with no console error, page error or screen boundary; not read line by line"
+file,src/components/DepositionPanel.tsx,M,H7,H7,browser,H7-03,"rendered on the walked screens in the empty, full and stopped states with no console error, page error or screen boundary; not read line by line"
+file,src/components/Dossier.tsx,M,H7,H4;H7,read;browser,,same waterfallTotal and priceNote use
+file,src/components/EngineRunLink.tsx,A,H7,H7,browser,,"rendered on the walked screens in the empty, full and stopped states with no console error, page error or screen boundary; not read line by line"
+file,src/components/EvidenceCard.tsx,M,H7,H7,browser,,"rendered on the walked screens in the empty, full and stopped states with no console error, page error or screen boundary; not read line by line"
+file,src/components/GuildBits.tsx,M,H7,H7,browser,,"rendered on the walked screens in the empty, full and stopped states with no console error, page error or screen boundary; not read line by line"
+file,src/components/GuildGate.tsx,M,H7,H7,browser,,"rendered on the walked screens in the empty, full and stopped states with no console error, page error or screen boundary; not read line by line"
+file,src/components/HomeStart.tsx,M,H7,H7,browser,,"rendered on the walked screens in the empty, full and stopped states with no console error, page error or screen boundary; not read line by line"
+file,src/components/JobsTray.tsx,M,H7,H7,browser,,"rendered on the walked screens in the empty, full and stopped states with no console error, page error or screen boundary; not read line by line"
+file,src/components/LessonEmbeds.tsx,M,H7,H7,browser,,"rendered on the walked screens in the empty, full and stopped states with no console error, page error or screen boundary; not read line by line"
+file,src/components/NewScenarioDialog.tsx,M,H7,H7,browser,,"rendered on the walked screens in the empty, full and stopped states with no console error, page error or screen boundary; not read line by line"
+file,src/components/ParameterPanel.tsx,M,H7,H7,browser,,"rendered on the walked screens in the empty, full and stopped states with no console error, page error or screen boundary; not read line by line"
+file,src/components/ParameterRow.tsx,M,H7,H7,browser,H7-04,"rendered on the walked screens in the empty, full and stopped states with no console error, page error or screen boundary; not read line by line"
+file,src/components/PassageQuote.tsx,M,H7,H7,browser,,"rendered on the walked screens in the empty, full and stopped states with no console error, page error or screen boundary; not read line by line"
+file,src/components/PlanTrace.tsx,M,H7,H7,browser,,"rendered on the walked screens in the empty, full and stopped states with no console error, page error or screen boundary; not read line by line"
+file,src/components/ProcessTrain.tsx,M,H7,H7,browser,,"rendered on the walked screens in the empty, full and stopped states with no console error, page error or screen boundary; not read line by line"
+file,src/components/ProjectSwitch.tsx,M,H7,H7,browser,,"rendered on the walked screens in the empty, full and stopped states with no console error, page error or screen boundary; not read line by line"
+file,src/components/PropertiesPanel.tsx,M,H7,H7,browser,,"rendered on the walked screens in the empty, full and stopped states with no console error, page error or screen boundary; not read line by line"
+file,src/components/ProposalsCard.tsx,M,H7,H7,browser,,"rendered on the walked screens in the empty, full and stopped states with no console error, page error or screen boundary; not read line by line"
+file,src/components/ProposedTrain.tsx,M,H7,H7,browser,,"rendered on the walked screens in the empty, full and stopped states with no console error, page error or screen boundary; not read line by line"
+file,src/components/Provenance.tsx,M,H7,H7,browser,,"rendered on the walked screens in the empty, full and stopped states with no console error, page error or screen boundary; not read line by line"
+file,src/components/QuantityField.tsx,M,H7,H7,browser,,"rendered on the walked screens in the empty, full and stopped states with no console error, page error or screen boundary; not read line by line"
+file,src/components/ReadingOrigin.tsx,A,H7,H7,browser,,"rendered on the walked screens in the empty, full and stopped states with no console error, page error or screen boundary; not read line by line"
+file,src/components/ReferenceView.tsx,M,H7,H7,browser,,"rendered on the walked screens in the empty, full and stopped states with no console error, page error or screen boundary; not read line by line"
+file,src/components/RunbookBits.tsx,M,H7,H7,browser,,"rendered on the walked screens in the empty, full and stopped states with no console error, page error or screen boundary; not read line by line"
+file,src/components/SffGraph.tsx,M,H7,H7,browser,,"rendered on the walked screens in the empty, full and stopped states with no console error, page error or screen boundary; not read line by line"
+file,src/components/TimeSeriesPanel.tsx,M,H7,H7,browser,,"rendered on the walked screens in the empty, full and stopped states with no console error, page error or screen boundary; not read line by line"
+file,src/components/TraceCards.tsx,M,H7,H7,browser,,"rendered on the walked screens in the empty, full and stopped states with no console error, page error or screen boundary; not read line by line"
+file,src/components/Unbuilt.tsx,M,H7,H7,browser,,"rendered on the walked screens in the empty, full and stopped states with no console error, page error or screen boundary; not read line by line"
+file,src/components/figures/CeilingGap.tsx,M,H7,H7,browser,,"rendered on the walked screens in the empty, full and stopped states with no console error, page error or screen boundary; not read line by line"
+file,src/components/figures/CostWaterfall.tsx,M,H7,H4;H7,browser,H4-01;H4-02,"bars, waterfallTotal, priceNote rendered in Chromium"
+file,src/components/figures/Distribution.tsx,M,H7,H7,browser,,"rendered on the walked screens in the empty, full and stopped states with no console error, page error or screen boundary; not read line by line"
+file,src/components/figures/EvidenceStrip.tsx,M,H7,H7,browser,,"rendered on the walked screens in the empty, full and stopped states with no console error, page error or screen boundary; not read line by line"
+file,src/components/figures/FigureFrame.tsx,M,H7,H7,browser,,"rendered on the walked screens in the empty, full and stopped states with no console error, page error or screen boundary; not read line by line"
+file,src/components/figures/Frontier.tsx,M,H7,H7,browser,,"rendered on the walked screens in the empty, full and stopped states with no console error, page error or screen boundary; not read line by line"
+file,src/components/figures/IntervalLedger.tsx,M,H7,H7,browser,,"rendered on the walked screens in the empty, full and stopped states with no console error, page error or screen boundary; not read line by line"
+file,src/components/figures/MixLine.tsx,M,H7,H7,browser,,"rendered on the walked screens in the empty, full and stopped states with no console error, page error or screen boundary; not read line by line"
+file,src/components/figures/OxygenBalance.tsx,M,H7,H7,browser,,"rendered on the walked screens in the empty, full and stopped states with no console error, page error or screen boundary; not read line by line"
+file,src/components/figures/PurityByStream.tsx,M,H7,H7,browser,,"rendered on the walked screens in the empty, full and stopped states with no console error, page error or screen boundary; not read line by line"
+file,src/components/figures/RecoveryByUnit.tsx,M,H7,H7,browser,,"rendered on the walked screens in the empty, full and stopped states with no console error, page error or screen boundary; not read line by line"
+file,src/components/figures/TimeCourse.tsx,M,H7,H7,browser,,"rendered on the walked screens in the empty, full and stopped states with no console error, page error or screen boundary; not read line by line"
+file,src/components/figures/Tornado.tsx,M,H7,H7,browser,,"rendered on the walked screens in the empty, full and stopped states with no console error, page error or screen boundary; not read line by line"
+file,src/components/figures/TrajectoryBand.tsx,M,H7,H7,browser,,"rendered on the walked screens in the empty, full and stopped states with no console error, page error or screen boundary; not read line by line"
+file,src/components/figures/encoding.ts,M,H7,H7,browser,,"rendered on the walked screens in the empty, full and stopped states with no console error, page error or screen boundary; not read line by line"
+file,src/components/figures/index.ts,M,H7,H7,browser,,"rendered on the walked screens in the empty, full and stopped states with no console error, page error or screen boundary; not read line by line"
+file,src/components/ui.tsx,M,H7,H7,browser,,"rendered on the walked screens in the empty, full and stopped states with no console error, page error or screen boundary; not read line by line"
+file,src/data/components.ts,M,H7,H7,browser,,"rendered on the walked screens in the empty, full and stopped states with no console error, page error or screen boundary; not read line by line"
+file,src/data/labels.ts,M,H7,H7,browser,,"rendered on the walked screens in the empty, full and stopped states with no console error, page error or screen boundary; not read line by line"
+file,src/data/nav.ts,M,H7,H7;P,browser;read,,read whole; every RAIL and SUB_VIEWS address walked; redirects read
+file,src/data/ontology.ts,M,H7,H7,browser,,"rendered on the walked screens in the empty, full and stopped states with no console error, page error or screen boundary; not read line by line"
+file,src/data/shortcuts.ts,M,H7,H7,browser,,"rendered on the walked screens in the empty, full and stopped states with no console error, page error or screen boundary; not read line by line"
+file,src/data/skillFamilies.ts,M,H7,H7,browser,,"rendered on the walked screens in the empty, full and stopped states with no console error, page error or screen boundary; not read line by line"
+file,src/data/subsystems.ts,M,H7,H7,browser,,"rendered on the walked screens in the empty, full and stopped states with no console error, page error or screen boundary; not read line by line"
+file,src/data/tabs.ts,M,H7,H7,browser,,"rendered on the walked screens in the empty, full and stopped states with no console error, page error or screen boundary; not read line by line"
+file,src/data/types.ts,D,H7,H7,read,,deleted in alpha 2.2; absent from the tree and imported by nothing under src/ or scripts/
+file,src/data/vocabulary.ts,M,H7,H7,browser,,"rendered on the walked screens in the empty, full and stopped states with no console error, page error or screen boundary; not read line by line"
+file,src/engine/capture.ts,M,H7,H14;H7,executed;browser,H14-07,"rendered on the walked screens in the empty, full and stopped states with no console error, page error or screen boundary; not read line by line"
+file,src/engine/checks.ts,M,H7,H7,browser,,"rendered on the walked screens in the empty, full and stopped states with no console error, page error or screen boundary; not read line by line"
+file,src/engine/competence.ts,M,H7,H7;P,browser;read,,"rendered on the walked screens in the empty, full and stopped states with no console error, page error or screen boundary; not read line by line"
+file,src/engine/diff.ts,M,H7,H7,browser,,"rendered on the walked screens in the empty, full and stopped states with no console error, page error or screen boundary; not read line by line"
+file,src/engine/geneos/enumeration.ts,D,H7,H7,read,,deleted in alpha 2.2; absent from the tree and imported by nothing under src/ or scripts/
+file,src/engine/interp.ts,M,H7,H7,browser,,"rendered on the walked screens in the empty, full and stopped states with no console error, page error or screen boundary; not read line by line"
+file,src/engine/ledger.ts,M,H7,H7,browser,,"rendered on the walked screens in the empty, full and stopped states with no console error, page error or screen boundary; not read line by line"
+file,src/engine/lock.ts,M,H7,H2;H7,read;browser,H2-03,lockIntact reads the row's own lockHash
+file,src/engine/metrics.ts,M,H7,H7,browser,,"rendered on the walked screens in the empty, full and stopped states with no console error, page error or screen boundary; not read line by line"
+file,src/engine/path.ts,M,H7,H7,browser,,"rendered on the walked screens in the empty, full and stopped states with no console error, page error or screen boundary; not read line by line"
+file,src/engine/readings.ts,A,H7,H7,browser,,"rendered on the walked screens in the empty, full and stopped states with no console error, page error or screen boundary; not read line by line"
+file,src/engine/reconcile.ts,M,H7,H7,browser,,"rendered on the walked screens in the empty, full and stopped states with no console error, page error or screen boundary; not read line by line"
+file,src/engine/scale.ts,M,H7,H7,browser,,"rendered on the walked screens in the empty, full and stopped states with no console error, page error or screen boundary; not read line by line"
+file,src/engine/series.ts,M,H7,H7,browser,,"rendered on the walked screens in the empty, full and stopped states with no console error, page error or screen boundary; not read line by line"
+file,src/engine/units.ts,M,H7,H3;H7,read;browser,H3-07;H3-08,LABELLED_MASS_RATIO is the same two patterns as units.py
+file,src/lib/artifacts.ts,M,H7,H7,browser,,"rendered on the walked screens in the empty, full and stopped states with no console error, page error or screen boundary; not read line by line"
+file,src/lib/catalogues.ts,A,H7,H7,browser,,"rendered on the walked screens in the empty, full and stopped states with no console error, page error or screen boundary; not read line by line"
+file,src/lib/checks.ts,M,H7,H7,browser,,"rendered on the walked screens in the empty, full and stopped states with no console error, page error or screen boundary; not read line by line"
+file,src/lib/cite.ts,A,H7,H7,browser,,"rendered on the walked screens in the empty, full and stopped states with no console error, page error or screen boundary; not read line by line"
+file,src/lib/csv.ts,M,H7,H7,browser,,"rendered on the walked screens in the empty, full and stopped states with no console error, page error or screen boundary; not read line by line"
+file,src/lib/durable.ts,M,H7,H7,executed,H7-01;H7-09,read whole; the snapshot read from IndexedDB in the browser during the outbox scenarios
+file,src/lib/events.ts,M,H7,H7,browser,,"rendered on the walked screens in the empty, full and stopped states with no console error, page error or screen boundary; not read line by line"
+file,src/lib/fermos.ts,M,H7,H7,browser,,"rendered on the walked screens in the empty, full and stopped states with no console error, page error or screen boundary; not read line by line"
+file,src/lib/geneos.ts,M,H7,H7,browser,,"rendered on the walked screens in the empty, full and stopped states with no console error, page error or screen boundary; not read line by line"
+file,src/lib/guild.ts,M,H7,H7,browser,,"rendered on the walked screens in the empty, full and stopped states with no console error, page error or screen boundary; not read line by line"
+file,src/lib/http.ts,M,H7,H7,executed,,read whole; ServiceDown and ServiceRefused paths seen with the service stopped and with a 422
+file,src/lib/intake.ts,M,H7,H7;P,browser;read,,"rendered on the walked screens in the empty, full and stopped states with no console error, page error or screen boundary; not read line by line"
+file,src/lib/literature.ts,M,H7,H7,browser,,"rendered on the walked screens in the empty, full and stopped states with no console error, page error or screen boundary; not read line by line"
+file,src/lib/params.ts,M,H7,H7,browser,,"rendered on the walked screens in the empty, full and stopped states with no console error, page error or screen boundary; not read line by line"
+file,src/lib/postdoc.ts,M,H7,H7,browser,,"rendered on the walked screens in the empty, full and stopped states with no console error, page error or screen boundary; not read line by line"
+file,src/lib/practice.ts,M,H7,H7,browser,,"rendered on the walked screens in the empty, full and stopped states with no console error, page error or screen boundary; not read line by line"
+file,src/lib/proforma.ts,M,H7,H4;H7,browser,H4-01;H4-02,"runViewOfRun basePrice, the cost grid"
+file,src/lib/project.ts,M,H7,H7,executed,,read whole; per-tab open project held in memory (held)
+file,src/lib/projectState.ts,M,H7,H7,executed,H7-02;H7-03;H7-04,read whole; changes/enqueue/flush driven by the bench and the parameter panel
+file,src/lib/proposals.ts,M,H7,H7,browser,,"rendered on the walked screens in the empty, full and stopped states with no console error, page error or screen boundary; not read line by line"
+file,src/lib/protocols.ts,A,H7,H7,browser,,"rendered on the walked screens in the empty, full and stopped states with no console error, page error or screen boundary; not read line by line"
+file,src/lib/pureos.ts,M,H7,H7,browser,,"rendered on the walked screens in the empty, full and stopped states with no console error, page error or screen boundary; not read line by line"
+file,src/lib/review.ts,M,H7,H7;P,browser;read,P-03,"rendered on the walked screens in the empty, full and stopped states with no console error, page error or screen boundary; not read line by line"
+file,src/lib/studies.ts,M,H7,H7,browser,,"rendered on the walked screens in the empty, full and stopped states with no console error, page error or screen boundary; not read line by line"
+file,src/lib/thermo.ts,M,H7,H7,browser,,"rendered on the walked screens in the empty, full and stopped states with no console error, page error or screen boundary; not read line by line"
+file,src/lib/viz.ts,M,H7,H7,browser,,"rendered on the walked screens in the empty, full and stopped states with no console error, page error or screen boundary; not read line by line"
+file,src/router.tsx,M,H7,H7,browser,H7-08,read whole; inProject held for every anchor on 74 addresses in three states
+file,src/screens/BenchCheck.tsx,M,H7,H7,browser,,"rendered on the walked screens in the empty, full and stopped states with no console error, page error or screen boundary; not read line by line"
+file,src/screens/BioRepo.tsx,M,H7,H7,browser,,"rendered on the walked screens in the empty, full and stopped states with no console error, page error or screen boundary; not read line by line"
+file,src/screens/BioRepoArtifacts.tsx,M,H7,H7,browser,,"rendered on the walked screens in the empty, full and stopped states with no console error, page error or screen boundary; not read line by line"
+file,src/screens/BioRepoSearch.tsx,M,H7,H7,browser,,"rendered on the walked screens in the empty, full and stopped states with no console error, page error or screen boundary; not read line by line"
+file,src/screens/Catalogues.tsx,A,H7,H7,browser,,"rendered on the walked screens in the empty, full and stopped states with no console error, page error or screen boundary; not read line by line"
+file,src/screens/Compare.tsx,M,H7,H7,browser,,"rendered on the walked screens in the empty, full and stopped states with no console error, page error or screen boundary; not read line by line"
+file,src/screens/Deposition.tsx,M,H7,H7,browser,H7-02;H7-07;H7-09,"read in part (run, staged, bench); measured at 810x1080 (scripts/deposition_a11y.mjs)"
+file,src/screens/DepositionDetail.tsx,M,H7,H3;H7,browser,H3-14;H7-06,"Chromium on dist, deposition dep1 with released evidence"
+file,src/screens/Depositions.tsx,M,H7,H7,browser,,"rendered on the walked screens in the empty, full and stopped states with no console error, page error or screen boundary; not read line by line"
+file,src/screens/FermOS.tsx,M,H7,H7,browser,,"rendered on the walked screens in the empty, full and stopped states with no console error, page error or screen boundary; not read line by line"
+file,src/screens/FermOSForecast.tsx,M,H7,H7,browser,,"rendered on the walked screens in the empty, full and stopped states with no console error, page error or screen boundary; not read line by line"
+file,src/screens/FermOSSimulate.tsx,M,H7,H7,browser,,"rendered on the walked screens in the empty, full and stopped states with no console error, page error or screen boundary; not read line by line"
+file,src/screens/FermOSVessel.tsx,M,H7,H7,browser,,"rendered on the walked screens in the empty, full and stopped states with no console error, page error or screen boundary; not read line by line"
+file,src/screens/FlowsheetPage.tsx,M,H7,H7,browser,,"rendered on the walked screens in the empty, full and stopped states with no console error, page error or screen boundary; not read line by line"
+file,src/screens/Flowsheets.tsx,M,H7,H7,browser,,"rendered on the walked screens in the empty, full and stopped states with no console error, page error or screen boundary; not read line by line"
+file,src/screens/GeneOS.tsx,M,H7,H7,browser,,"rendered on the walked screens in the empty, full and stopped states with no console error, page error or screen boundary; not read line by line"
+file,src/screens/GeneOSModel.tsx,M,H7,H7,browser,,"rendered on the walked screens in the empty, full and stopped states with no console error, page error or screen boundary; not read line by line"
+file,src/screens/Guild.tsx,M,H7,H7,browser,,"rendered on the walked screens in the empty, full and stopped states with no console error, page error or screen boundary; not read line by line"
+file,src/screens/GuildChecks.tsx,M,H7,H7,browser,,"rendered on the walked screens in the empty, full and stopped states with no console error, page error or screen boundary; not read line by line"
+file,src/screens/GuildMatrix.tsx,M,H7,H7,browser,,"rendered on the walked screens in the empty, full and stopped states with no console error, page error or screen boundary; not read line by line"
+file,src/screens/GuildPeople.tsx,M,H7,H7,browser,,"rendered on the walked screens in the empty, full and stopped states with no console error, page error or screen boundary; not read line by line"
+file,src/screens/GuildSkills.tsx,M,H7,H7,browser,H7-06,"rendered on the walked screens in the empty, full and stopped states with no console error, page error or screen boundary; not read line by line"
+file,src/screens/Home.tsx,M,H7,H7,browser,H7-08,"rendered on the walked screens in the empty, full and stopped states with no console error, page error or screen boundary; not read line by line"
+file,src/screens/Intake.tsx,M,H7,H7,browser,,"rendered on the walked screens in the empty, full and stopped states with no console error, page error or screen boundary; not read line by line"
+file,src/screens/IntakeIngest.tsx,M,H7,H7,browser,,"rendered on the walked screens in the empty, full and stopped states with no console error, page error or screen boundary; not read line by line"
+file,src/screens/Organisms.tsx,M,H7,H7,browser,,"rendered on the walked screens in the empty, full and stopped states with no console error, page error or screen boundary; not read line by line"
+file,src/screens/PaperReader.tsx,M,H7,H7,browser,H7-06,"rendered on the walked screens in the empty, full and stopped states with no console error, page error or screen boundary; not read line by line"
+file,src/screens/Postdoc.tsx,M,H7,H7,browser,H7-06,"rendered on the walked screens in the empty, full and stopped states with no console error, page error or screen boundary; not read line by line"
+file,src/screens/Primer.tsx,M,H7,H7,browser,,"rendered on the walked screens in the empty, full and stopped states with no console error, page error or screen boundary; not read line by line"
+file,src/screens/PrimerLesson.tsx,M,H7,H7,browser,,"rendered on the walked screens in the empty, full and stopped states with no console error, page error or screen boundary; not read line by line"
+file,src/screens/PrimerPath.tsx,M,H7,H7,browser,,"rendered on the walked screens in the empty, full and stopped states with no console error, page error or screen boundary; not read line by line"
+file,src/screens/PrimerPractice.tsx,M,H7,H7,browser,,"rendered on the walked screens in the empty, full and stopped states with no console error, page error or screen boundary; not read line by line"
+file,src/screens/Proforma.tsx,M,H7,H7,browser,,"rendered on the walked screens in the empty, full and stopped states with no console error, page error or screen boundary; not read line by line"
+file,src/screens/ProformaBiosteam.tsx,M,H7,H4;H7,browser,H4-01;H4-02,CostBreakdown and the sliders' lines
+file,src/screens/ProformaComparison.tsx,M,H7,H4;H7,read;browser,H4-06,OUTPUT_WORDS labels
+file,src/screens/ProformaReference.tsx,M,H7,H7,browser,,"rendered on the walked screens in the empty, full and stopped states with no console error, page error or screen boundary; not read line by line"
+file,src/screens/ProformaRun.tsx,M,H7,H7,browser,,"rendered on the walked screens in the empty, full and stopped states with no console error, page error or screen boundary; not read line by line"
+file,src/screens/ProformaScenario.tsx,M,H7,H7,browser,,"rendered on the walked screens in the empty, full and stopped states with no console error, page error or screen boundary; not read line by line"
+file,src/screens/ProformaStudies.tsx,M,H7,H7,browser,,"rendered on the walked screens in the empty, full and stopped states with no console error, page error or screen boundary; not read line by line"
+file,src/screens/ProjectHome.tsx,M,H7,H7,browser,,"rendered on the walked screens in the empty, full and stopped states with no console error, page error or screen boundary; not read line by line"
+file,src/screens/ProtocolDetail.tsx,M,H7,H7,browser,H7-09,"rendered on the walked screens in the empty, full and stopped states with no console error, page error or screen boundary; not read line by line"
+file,src/screens/ProtocolEditor.tsx,M,H7,H7,browser,,"rendered on the walked screens in the empty, full and stopped states with no console error, page error or screen boundary; not read line by line"
+file,src/screens/Protocols.tsx,M,H7,H7,browser,,"rendered on the walked screens in the empty, full and stopped states with no console error, page error or screen boundary; not read line by line"
+file,src/screens/PureOS.tsx,M,H7,H7,browser,,"rendered on the walked screens in the empty, full and stopped states with no console error, page error or screen boundary; not read line by line"
+file,src/screens/PureOSBuilder.tsx,M,H7,H7,browser,,"rendered on the walked screens in the empty, full and stopped states with no console error, page error or screen boundary; not read line by line"
+file,src/screens/PureOSPropose.tsx,M,H7,H7,browser,,"rendered on the walked screens in the empty, full and stopped states with no console error, page error or screen boundary; not read line by line"
+file,src/screens/PureOSTrain.tsx,M,H7,H7,browser,,"rendered on the walked screens in the empty, full and stopped states with no console error, page error or screen boundary; not read line by line"
+file,src/screens/RunbookDetail.tsx,M,H7,H7,browser,H7-06,"rendered on the walked screens in the empty, full and stopped states with no console error, page error or screen boundary; not read line by line"
+file,src/screens/RunbookLedger.tsx,M,H7,H7,browser,,"rendered on the walked screens in the empty, full and stopped states with no console error, page error or screen boundary; not read line by line"
+file,src/screens/Runbooks.tsx,M,H7,H7,browser,,"rendered on the walked screens in the empty, full and stopped states with no console error, page error or screen boundary; not read line by line"
+file,src/screens/Settings.tsx,M,H7,H7,browser,H7-09,"rendered on the walked screens in the empty, full and stopped states with no console error, page error or screen boundary; not read line by line"
+file,src/screens/SettingsFigures.tsx,M,H7,H7,browser,,"rendered on the walked screens in the empty, full and stopped states with no console error, page error or screen boundary; not read line by line"
+file,src/screens/StrainPage.tsx,M,H7,H7,browser,,"rendered on the walked screens in the empty, full and stopped states with no console error, page error or screen boundary; not read line by line"
+file,src/screens/Witness.tsx,M,H7,H7,browser,,"rendered on the walked screens in the empty, full and stopped states with no console error, page error or screen boundary; not read line by line"
+file,src/store.ts,M,H7,H3;H7;P,read;executed,H7-01;H7-02;H7-03;H7-04;H7-05;P-02,PROVENANCE_RANK equals PROVENANCE_ORDER member for member; provenanceOf and aggregateExclusion read; setSampleTime and amendEntry read (H3-05's path)
+file,src/styles.css,M,H7,H7,browser,,"rendered on the walked screens in the empty, full and stopped states with no console error, page error or screen boundary; not read line by line"
+operation,POST /api/ask,project,H9 H5,H10;H5;H9;P,fuzzed;executed,H9-05;H9-06;H9-08;H9-11,"body_sweep.py: broken JSON, a list, a string, wrong types (a valid body left: the route reaches a model or the network)"
+operation,POST /api/ask/stream,project,H9 H5,H10;H5;H9;P,fuzzed;executed,H9-06,"body_sweep.py: broken JSON, a list, a string, wrong types (a valid body left: the route reaches a model or the network)"
+operation,GET /api/audit,project,H5 H10,H1;H10;H3;H5;H6;H9;P,executed;fuzzed,H10-02;H3-03,engine_run audit rows read
+operation,GET /api/biorepo/artifacts,project,H2 H5,H10;H2;H5;H6,executed;fuzzed,H10-02,get_sweep.py with ?project= (row counts of every table unchanged); nul_probe.py
+operation,GET /api/biorepo/artifacts/{artifact_id},project,H2 H5,H10;H2;H5;H6,fuzzed;executed,,"path_sweep.py: 17 values in each path parameter (traversal, %2e%2e, double encoding, backslash, absolute, NUL, 20000 characters, SQL, format strings); no traversal answer, no leak"
+operation,GET /api/biorepo/artifacts/{artifact_id}/checks,project,H2 H5,H10;H2;H5;H6,fuzzed;executed,,"path_sweep.py: 17 values in each path parameter (traversal, %2e%2e, double encoding, backslash, absolute, NUL, 20000 characters, SQL, format strings); no traversal answer, no leak"
+operation,POST /api/biorepo/artifacts/{artifact_id}/replay,project,H2 H5,H1;H10;H2;H5;H6,executed;fuzzed,H1-04;H2-02,"contract, kinetics and scenario runs; version moved; tool uninstalled 409"
+operation,GET /api/biorepo/artifacts/{artifact_id}/tables,project,H2 H5,H10;H2;H4;H5;H6,fuzzed;executed,,"path_sweep.py: 17 values in each path parameter (traversal, %2e%2e, double encoding, backslash, absolute, NUL, 20000 characters, SQL, format strings); no traversal answer, no leak"
+operation,POST /api/biorepo/check,project,H5 H10,H10;H5;P,fuzzed;executed,P-02,"the guard matrix (30 header shapes, 7 methods), the cross-site page, 64 MB, deep and million-key bodies, the key-override sentinel; body_sweep.py"
+operation,POST /api/biorepo/decisions,project,H5 H10,H10;H14;H5;P,fuzzed;executed,P-02,"body_sweep.py: broken JSON, a list, a string, wrong types, an empty object and every string a NUL"
+operation,GET /api/biorepo/overlay,project,H5 H10,H10;H5;H6;P,executed;fuzzed,H5-02;P-02,get_sweep.py with ?project= (row counts of every table unchanged)
+operation,GET /api/catalogues/{kind},project,H5 H10,H10;H5;H6;P,fuzzed;executed,H6-01,"path_sweep.py: 17 values in each path parameter (traversal, %2e%2e, double encoding, backslash, absolute, NUL, 20000 characters, SQL, format strings); no traversal answer, no leak"
+operation,POST /api/catalogues/{kind},project,H5 H10,H10;H14;H3;H5;P,fuzzed;executed,H14-02;H3-07;H3-17,path sweep; a NUL name kept (json body column takes it); body_sweep.py
+operation,GET /api/catalogues/{kind}/{entry_id},project,H5 H10,H10;H3;H5;H6;P,fuzzed;executed,H6-01,"path_sweep.py: 17 values in each path parameter (traversal, %2e%2e, double encoding, backslash, absolute, NUL, 20000 characters, SQL, format strings); no traversal answer, no leak"
+operation,GET /api/conversations,project,H9 H5,H10;H5;H6;H9,executed;fuzzed,,get_sweep.py with ?project= (row counts of every table unchanged)
+operation,GET /api/conversations/{conversation_id},project,H9 H5,H10;H5;H6;H9,fuzzed;executed,H10-02,"path_sweep.py: 17 values in each path parameter (traversal, %2e%2e, double encoding, backslash, absolute, NUL, 20000 characters, SQL, format strings); no traversal answer, no leak; NUL answers 500"
+operation,GET /api/conversations/{conversation_id}/turns/{turn_id}/calls,project,H9 H5,H10;H5;H6;H9,fuzzed;executed,H10-02,"path_sweep.py: 17 values in each path parameter (traversal, %2e%2e, double encoding, backslash, absolute, NUL, 20000 characters, SQL, format strings); no traversal answer, no leak; NUL answers 500"
+operation,GET /api/depositions/readings,project,H3 H7 H5,H10;H2;H3;H5;H6;H7;P,executed;fuzzed,H3-05,get_sweep.py with ?project= (row counts of every table unchanged)
+operation,GET /api/engines,project,H1 H2 H5,H1;H10;H2;H3;H5;H6;P,fuzzed;executed,H1-02;H1-06;H1-07;H1-10;H5-06,"with broken, duplicate and set-aside engines installed"
+operation,GET /api/engines/{name}/parameters,project,H1 H2 H5,H1;H10;H2;H3;H5;P,fuzzed;executed,H1-05;H1-08,"path_sweep.py: 17 values in each path parameter (traversal, %2e%2e, double encoding, backslash, absolute, NUL, 20000 characters, SQL, format strings); no traversal answer, no leak"
+operation,POST /api/engines/{name}/run,project,H1 H2 H5,H1;H10;H2;H3;H4;H5;P,fuzzed;executed,H1-01;H1-05;H1-06;H1-07;H1-08;H1-09;H3-06;H4-04,"about sixty malformed and boundary bodies, concurrency, worker kills"
+operation,GET /api/events,project,H5 H10,H10;H5;H9;P,executed;fuzzed,,after=NUL answers 422 in words; the stream opens like any GET
+operation,GET /api/fermos/bind,project,H4 H5,H10;H14;H4;H5,executed;fuzzed,H14-02,get_sweep.py with ?project= (row counts of every table unchanged)
+operation,GET /api/fermos/families,project,H4 H5,H10;H4;H5;H6,executed;fuzzed,,get_sweep.py with ?project= (row counts of every table unchanged)
+operation,GET /api/fermos/families/{family_id},project,H4 H5,H10;H4;H5,fuzzed;executed,,"path_sweep.py: 17 values in each path parameter (traversal, %2e%2e, double encoding, backslash, absolute, NUL, 20000 characters, SQL, format strings); no traversal answer, no leak"
+operation,POST /api/fermos/fit,project,H4 H5,H10;H2;H4;H5,fuzzed;executed,H2-01,"body_sweep.py: broken JSON, a list, a string, wrong types, an empty object and every string a NUL"
+operation,GET /api/fermos/fits,project,H4 H5,H10;H4;H5;H6,executed;fuzzed,,get_sweep.py with ?project= (row counts of every table unchanged)
+operation,POST /api/fermos/forecast,project,H4 H5,H10;H2;H4;H5,fuzzed;executed,H2-01;H5-05,"body_sweep.py: broken JSON, a list, a string, wrong types, an empty object and every string a NUL"
+operation,GET /api/fermos/harvest,project,H4 H5,H10;H4;H5,executed;fuzzed,,get_sweep.py with ?project= (row counts of every table unchanged)
+operation,POST /api/fermos/simulate,project,H4 H5,H10;H2;H4;H5;H6,fuzzed;executed,H4-04;H4-05,"body_sweep.py: broken JSON, a list, a string, wrong types, an empty object and every string a NUL"
+operation,GET /api/fermos/simulations,project,H4 H5,H10;H4;H5;H6,executed;fuzzed,,get_sweep.py with ?project= (row counts of every table unchanged)
+operation,POST /api/fermos/vessel,project,H4 H5,H10;H2;H4;H5,fuzzed;executed,,"body_sweep.py: broken JSON, a list, a string, wrong types, an empty object and every string a NUL"
+operation,GET /api/fermos/vessel/specs,project,H4 H5,H10;H4;H5,executed;fuzzed,,get_sweep.py with ?project= (row counts of every table unchanged)
+operation,GET /api/fermos/vessels,project,H4 H5,H10;H4;H5;H6,executed;fuzzed,,get_sweep.py with ?project= (row counts of every table unchanged)
+operation,GET /api/flowsheets,project,H8 H5,H10;H5;H6;H8,executed;fuzzed,,get_sweep.py with ?project= (row counts of every table unchanged)
+operation,POST /api/flowsheets/export,project,H8 H5,H10;H5;H8,fuzzed;executed,,"body_sweep.py: broken JSON, a list, a string, wrong types, an empty object and every string a NUL"
+operation,POST /api/flowsheets/import,project,H8 H5,H10;H5;H8,fuzzed,H8-12,"malformed SFF files, a traversal filename, a file naming another project in its metadata; body_sweep.py"
+operation,POST /api/flowsheets/import-url,project,H8 H5,H10;H5;H8,fuzzed,H8-05,"body_sweep.py: broken JSON, a list, a string, wrong types (a valid body left: the route reaches a model or the network)"
+operation,GET /api/flowsheets/library,project,H2 H5,H10;H2;H5,executed;fuzzed,,get_sweep.py with ?project= (row counts of every table unchanged)
+operation,POST /api/flowsheets/library/{file_id},project,H2 H5,H10;H2;H5;H8,fuzzed;executed,,"body_sweep.py: broken JSON, a list, a string, wrong types (a valid body left: the route reaches a model or the network); path_sweep.py on its path parameters"
+operation,GET /api/flowsheets/{record_id},project,H8 H5,H10;H5;H6;H8,fuzzed;executed,H10-02,"path_sweep.py: 17 values in each path parameter (traversal, %2e%2e, double encoding, backslash, absolute, NUL, 20000 characters, SQL, format strings); no traversal answer, no leak; NUL answers 500"
+operation,GET /api/flowsheets/{record_id}/file,project,H8 H5,H10;H5;H6;H8,fuzzed;executed,H10-02,"path_sweep.py: 17 values in each path parameter (traversal, %2e%2e, double encoding, backslash, absolute, NUL, 20000 characters, SQL, format strings); no traversal answer, no leak; NUL answers 500"
+operation,POST /api/geneos/ceiling,project,H5 H10,H10;H5,fuzzed,,"body_sweep.py: broken JSON, a list, a string, wrong types, an empty object and every string a NUL"
+operation,POST /api/geneos/frontier,project,H5 H10,H10;H5,fuzzed,,"body_sweep.py: broken JSON, a list, a string, wrong types, an empty object and every string a NUL"
+operation,POST /api/geneos/mix,project,H5 H10,H10;H5,fuzzed,,"body_sweep.py: broken JSON, a list, a string, wrong types, an empty object and every string a NUL"
+operation,GET /api/geneos/models,project,H5 H10,H10;H5;H6,executed;fuzzed,,get_sweep.py with ?project= (row counts of every table unchanged)
+operation,GET /api/guild,project,H5 H10,H10;H5;H6,executed;fuzzed,,get_sweep.py with ?project= (row counts of every table unchanged)
+operation,POST /api/guild/check,project,H5 H10,H10;H5,fuzzed,H5-06;H5-07,"body_sweep.py: broken JSON, a list, a string, wrong types, an empty object and every string a NUL"
+operation,GET /api/guild/checks,project,H5 H10,H10;H5;H6,executed;fuzzed,,get_sweep.py with ?project= (row counts of every table unchanged)
+operation,POST /api/guild/checks/propose,project,H5 H10,H10;H5,fuzzed,,"body_sweep.py: broken JSON, a list, a string, wrong types (a valid body left: the route reaches a model or the network)"
+operation,POST /api/guild/checks/request,project,H5 H10,H10;H5,fuzzed,,"body_sweep.py: broken JSON, a list, a string, wrong types, an empty object and every string a NUL"
+operation,POST /api/guild/checks/{check_id}/brief,project,H5 H10,H10;H5,fuzzed,,"body_sweep.py: broken JSON, a list, a string, wrong types (a valid body left: the route reaches a model or the network)"
+operation,POST /api/guild/checks/{check_id}/dismiss,project,H5 H10,H10;H5,fuzzed,,"body_sweep.py: broken JSON, a list, a string, wrong types, an empty object and every string a NUL; path_sweep.py on its path parameters"
+operation,POST /api/guild/checks/{check_id}/record,project,H5 H10,H10;H5,fuzzed,,"body_sweep.py: broken JSON, a list, a string, wrong types, an empty object and every string a NUL; path_sweep.py on its path parameters"
+operation,POST /api/guild/checks/{check_id}/schedule,project,H5 H10,H10;H5,fuzzed,,"body_sweep.py: broken JSON, a list, a string, wrong types, an empty object and every string a NUL; path_sweep.py on its path parameters"
+operation,POST /api/guild/evidence,project,H5 H10,H10;H5,fuzzed,H5-06;H5-07,"body_sweep.py: broken JSON, a list, a string, wrong types, an empty object and every string a NUL"
+operation,POST /api/guild/people,project,H5 H10,H10;H5,fuzzed,,a person kept and read back; a NUL name; body_sweep.py
+operation,POST /api/guild/policy,project,H5 H10,H10;H5,fuzzed,,"body_sweep.py: broken JSON, a list, a string, wrong types, an empty object and every string a NUL"
+operation,POST /api/guild/withdraw,project,H5 H10,H10;H5,fuzzed,,"body_sweep.py: broken JSON, a list, a string, wrong types, an empty object and every string a NUL"
+operation,GET /api/health,none,H5 H10,H10;H11;H5;H6;H9,executed;fuzzed,H11-01;H11-03;H9-10,get_sweep.py with ?project= (row counts of every table unchanged)
+operation,POST /api/intake/catalogue,project,H8 H5,H10;H5;H8;P,fuzzed;executed,H8-10;H8-11,"body_sweep.py: broken JSON, a list, a string, wrong types, an empty object and every string a NUL"
+operation,POST /api/intake/collect,project,H8 H5,H10;H14;H5;H8,fuzzed;executed,,"body_sweep.py: broken JSON, a list, a string, wrong types (a valid body left: the route reaches a model or the network)"
+operation,POST /api/intake/paste,project,H8 H5,H10;H14;H5;H8;H9,fuzzed;executed,H5-02;H8-01;H8-02,a NUL title and text; a pasted document for the /rag manifest; body_sweep.py
+operation,POST /api/intake/upload,project,H8 H5,H10;H5;H8;P,fuzzed;executed,H8-01;H8-02;H8-03;H8-04,"body_sweep.py: broken JSON, a list, a string, wrong types, an empty object and every string a NUL"
+operation,POST /api/intake/{paper_id}/extract,project,H8 H5,H10;H5;H8;H9;P,fuzzed;executed,H9-06,"body_sweep.py: broken JSON, a list, a string, wrong types (a valid body left: the route reaches a model or the network)"
+operation,GET /api/library,project,H2 H5,H10;H2;H5;H6,executed;fuzzed,,get_sweep.py with ?project= (row counts of every table unchanged)
+operation,GET /api/library/{plant}/parameters,project,H2 H5,H10;H2;H4;H5,fuzzed;executed,H2-06,"path_sweep.py: 17 values in each path parameter (traversal, %2e%2e, double encoding, backslash, absolute, NUL, 20000 characters, SQL, format strings); no traversal answer, no leak"
+operation,GET /api/library/{plant}/regression,project,H2 H5,H10;H2;H5,fuzzed;executed,H2-06,"path_sweep.py: 17 values in each path parameter (traversal, %2e%2e, double encoding, backslash, absolute, NUL, 20000 characters, SQL, format strings); no traversal answer, no leak"
+operation,POST /api/library/{plant}/run,project,H2 H5,H10;H14;H2;H4;H5,fuzzed;executed,H14-09;H4-01;H4-03;H4-06,"body_sweep.py: broken JSON, a list, a string, wrong types, an empty object and every string a NUL; path_sweep.py on its path parameters"
+operation,POST /api/literature/answer,project,H8 H5,H10;H14;H5;H8;H9,fuzzed;executed,H14-03;H5-01;H8-08;H9-01,"body_sweep.py: broken JSON, a list, a string, wrong types (a valid body left: the route reaches a model or the network)"
+operation,GET /api/literature/documents,project,H8 H5,H10;H5;H6;H8,executed;fuzzed,H5-02;H8-02,get_sweep.py with ?project= (row counts of every table unchanged)
+operation,GET /api/literature/search,project,H8 H5,H10;H5;H8;H9,executed;fuzzed,H5-01;H5-02;H8-06,get_sweep.py with ?project= (row counts of every table unchanged)
+operation,GET /api/literature/stats,project,H8 H5,H10;H5;H6;H8,executed;fuzzed,H5-02,get_sweep.py with ?project= (row counts of every table unchanged)
+operation,GET /api/params/{scope},project,H5 H10,H10;H5,fuzzed,,"path_sweep.py: 17 values in each path parameter (traversal, %2e%2e, double encoding, backslash, absolute, NUL, 20000 characters, SQL, format strings); no traversal answer, no leak"
+operation,POST /api/params/{scope}/resolve,project,H5 H10,H10;H3;H5,fuzzed;executed,H3-05,"body_sweep.py: broken JSON, a list, a string, wrong types, an empty object and every string a NUL; path_sweep.py on its path parameters"
+operation,GET /api/practice,project,H5 H10,H10;H5;H6,executed;fuzzed,,get_sweep.py with ?project= (row counts of every table unchanged)
+operation,POST /api/practice/draft,project,H5 H10,H10;H5,fuzzed,,"body_sweep.py: broken JSON, a list, a string, wrong types (a valid body left: the route reaches a model or the network)"
+operation,POST /api/practice/record,project,H5 H10,H10;H5,fuzzed,H10-02,"body_sweep.py: broken JSON, a list, a string, wrong types, an empty object and every string a NUL; the NUL body answers 500"
+operation,POST /api/practice/turn,project,H5 H10,H10;H5,fuzzed,,"body_sweep.py: broken JSON, a list, a string, wrong types (a valid body left: the route reaches a model or the network)"
+operation,GET /api/proforma/bind,project,H2 H5,H10;H2;H4;H5;P,executed;fuzzed,,get_sweep.py with ?project= (row counts of every table unchanged)
+operation,GET /api/proforma/ceiling-check,project,H2 H5,H10;H2;H5;P,executed;fuzzed,,get_sweep.py with ?project= (row counts of every table unchanged)
+operation,POST /api/proforma/run,project,H2 H5,H10;H2;H3;H4;H5;H6,fuzzed;executed;left,H2-02;H4-02,"body_sweep.py: broken JSON, a list, a string, wrong types, an empty object and every string a NUL"
+operation,GET /api/proforma/runs,project,H1 H2 H5,H1;H10;H2;H5;H6,executed;fuzzed,,no scenarioId 422 in words; an unknown scenario answers artifact null
+operation,GET /api/proforma/scenarios,project,H2 H5,H10;H2;H5;H6;P,executed;fuzzed,,get_sweep.py with ?project= (row counts of every table unchanged)
+operation,GET /api/proforma/shelf,project,H2 H5,H10;H2;H5;H6;P,executed;fuzzed,,get_sweep.py with ?project= (row counts of every table unchanged)
+operation,GET /api/proforma/status,project,H2 H5,H10;H2;H5;H6,executed;fuzzed,,get_sweep.py with ?project= (row counts of every table unchanged)
+operation,GET /api/projects,none,H5 H10,H10;H5;H6,executed;fuzzed,,get_sweep.py with ?project= (row counts of every table unchanged)
+operation,POST /api/projects,none,H5 H10,H10;H5;P,fuzzed;executed,H10-02,"the cross-site page's fetch, form and beacon (each 403), NUL in name, by and description; body_sweep.py"
+operation,GET /api/projects/{project_id},none,H5 H10,H10;H5;H6,fuzzed;executed,H10-02,"path_sweep.py: 17 values in each path parameter (traversal, %2e%2e, double encoding, backslash, absolute, NUL, 20000 characters, SQL, format strings); no traversal answer, no leak; NUL answers 500"
+operation,GET /api/proposals,project,H5 H10,H10;H5;H6;H9,executed;fuzzed,H10-02;H9-02,get_sweep.py with ?project= (row counts of every table unchanged); nul_probe.py
+operation,POST /api/proposals/{proposal_id}/carry-out,project,H5 H10,H10;H5,fuzzed,,"body_sweep.py: broken JSON, a list, a string, wrong types, an empty object and every string a NUL; path_sweep.py on its path parameters"
+operation,POST /api/proposals/{proposal_id}/dismiss,project,H5 H10,H10;H5,fuzzed,,"body_sweep.py: broken JSON, a list, a string, wrong types, an empty object and every string a NUL; path_sweep.py on its path parameters"
+operation,GET /api/protocols,project,H3 H7 H5,H10;H5;H6;H7;P,executed;fuzzed,,get_sweep.py with ?project= (row counts of every table unchanged)
+operation,POST /api/protocols,project,H3 H7 H5,H10;H5;H7;P,fuzzed;executed,,"body_sweep.py: broken JSON, a list, a string, wrong types, an empty object and every string a NUL"
+operation,GET /api/protocols/{protocol_id},project,H3 H7 H5,H10;H5;H7;P,fuzzed;executed,H10-02,"path_sweep.py: 17 values in each path parameter (traversal, %2e%2e, double encoding, backslash, absolute, NUL, 20000 characters, SQL, format strings); no traversal answer, no leak; NUL answers 500"
+operation,POST /api/protocols/{protocol_id}/versions,project,H3 H7 H5,H10;H5;H7;P,fuzzed;executed;browser,,"body_sweep.py: broken JSON, a list, a string, wrong types, an empty object and every string a NUL; path_sweep.py on its path parameters"
+operation,GET /api/protparam,project,H5 H10,H10;H5,executed;fuzzed,H5-06,get_sweep.py with ?project= (row counts of every table unchanged)
+operation,POST /api/protparam,project,H5 H10,H10;H5,fuzzed,H5-06,"body_sweep.py: broken JSON, a list, a string, wrong types, an empty object and every string a NUL"
+operation,GET /api/pureos/catalogue,project,H4 H5,H10;H4;H5,executed;fuzzed,,get_sweep.py with ?project= (row counts of every table unchanged)
+operation,GET /api/pureos/catalogue/{type_id}/specs,project,H4 H5,H10;H4;H5,fuzzed;executed,,"path_sweep.py: 17 values in each path parameter (traversal, %2e%2e, double encoding, backslash, absolute, NUL, 20000 characters, SQL, format strings); no traversal answer, no leak"
+operation,POST /api/pureos/propose,project,H4 H5,H10;H4;H5,fuzzed;executed,H5-06,"body_sweep.py: broken JSON, a list, a string, wrong types (a valid body left: the route reaches a model or the network)"
+operation,GET /api/pureos/train-runs,project,H4 H5,H10;H2;H4;H5;H6,executed;left;fuzzed,,get_sweep.py with ?project= (row counts of every table unchanged)
+operation,POST /api/pureos/train/check,project,H4 H5,H10;H4;H5,fuzzed;executed,,"body_sweep.py: broken JSON, a list, a string, wrong types, an empty object and every string a NUL"
+operation,POST /api/pureos/train/from-run,project,H4 H5,H10;H2;H4;H5,fuzzed;executed,,"body_sweep.py: broken JSON, a list, a string, wrong types, an empty object and every string a NUL"
+operation,POST /api/pureos/train/run,project,H4 H5,H10;H2;H4;H5,fuzzed;executed,,"body_sweep.py: broken JSON, a list, a string, wrong types, an empty object and every string a NUL"
+operation,POST /api/pureos/train/validate,project,H4 H5,H10;H4;H5,fuzzed;executed,,"body_sweep.py: broken JSON, a list, a string, wrong types, an empty object and every string a NUL"
+operation,GET /api/pureos/train/{key},project,H4 H5,H10;H4;H5;P,fuzzed;executed,,"path_sweep.py: 17 values in each path parameter (traversal, %2e%2e, double encoding, backslash, absolute, NUL, 20000 characters, SQL, format strings); no traversal answer, no leak"
+operation,GET /api/pureos/trains,project,H4 H5,H10;H4;H5;H6,executed;fuzzed,,get_sweep.py with ?project= (row counts of every table unchanged)
+operation,GET /api/pureos/trains-kept,project,H4 H5,H10;H4;H5;H6,executed;fuzzed,,get_sweep.py with ?project= (row counts of every table unchanged)
+operation,GET /api/runs,project,H1 H2 H5,H1;H10;H2;H3;H4;H5;H6,executed;fuzzed,H1-01;H10-02;H3-06,"?engine= with spaces, unknown, empty; no project header 422; another project's list empty"
+operation,GET /api/runs/{run_id},project,H1 H2 H5,H1;H10;H2;H3;H4;H5;H6;P,executed;fuzzed,H10-02;H3-06,unknown id 404; another project's run 404; an uninstalled engine's run read
+operation,GET /api/state,project,H5 H10,H10;H3;H5;H6;P,executed;fuzzed,H3-03,get_sweep.py with ?project= (row counts of every table unchanged)
+operation,DELETE /api/state/{kind}/{item_id},project,H5 H10,H10;H2;H3;H5;P,fuzzed;executed,H2-04;H5-04;H5-03,"body_sweep.py: broken JSON, a list, a string, wrong types, an empty object and every string a NUL; path_sweep.py on its path parameters"
+operation,PUT /api/state/{kind}/{item_id},project,H5 H10,H10;H2;H3;H5;H6;P,fuzzed;executed,H2-03;H3-03;H3-04;H3-05;H3-15;H5-03,"body_sweep.py: broken JSON, a list, a string, wrong types, an empty object and every string a NUL; path_sweep.py on its path parameters"
+operation,GET /api/studies/comparisons,project,H2 H5,H10;H14;H2;H5;H6,executed;fuzzed,H14-01,get_sweep.py with ?project= (row counts of every table unchanged)
+operation,POST /api/studies/comparisons,project,H2 H5,H10;H14;H2;H5,fuzzed;executed,H14-01;H2-01;H2-08,"body_sweep.py: broken JSON, a list, a string, wrong types, an empty object and every string a NUL"
+operation,GET /api/studies/comparisons/{comparison_id},project,H2 H5,H10;H2;H5;H6,fuzzed;executed,H10-02,"path_sweep.py: 17 values in each path parameter (traversal, %2e%2e, double encoding, backslash, absolute, NUL, 20000 characters, SQL, format strings); no traversal answer, no leak; NUL answers 500"
+operation,GET /api/studies/export,project,H2 H5,H10;H2;H5,executed;fuzzed,H2-05,get_sweep.py with ?project= (row counts of every table unchanged)
+operation,GET /api/studies/runbooks,project,H2 H5,H10;H2;H5;H6,executed;fuzzed,H2-04,get_sweep.py with ?project= (row counts of every table unchanged)
+operation,POST /api/studies/runbooks,project,H2 H5,H10;H2;H5,fuzzed;executed,H2-04,"body_sweep.py: broken JSON, a list, a string, wrong types, an empty object and every string a NUL"
+operation,GET /api/studies/runbooks/{runbook_id},project,H2 H5,H10;H2;H5;H6,fuzzed;executed,H2-03;H2-04,"path_sweep.py: 17 values in each path parameter (traversal, %2e%2e, double encoding, backslash, absolute, NUL, 20000 characters, SQL, format strings); no traversal answer, no leak"
+operation,POST /api/studies/runbooks/{runbook_id}/lock,project,H2 H5,H10;H2;H5,fuzzed;executed,,"body_sweep.py: broken JSON, a list, a string, wrong types, an empty object and every string a NUL; path_sweep.py on its path parameters"
+operation,GET /api/studies/scenarios,project,H2 H5,H10;H2;H5;H6,executed;fuzzed,,get_sweep.py with ?project= (row counts of every table unchanged)
+operation,POST /api/studies/scenarios,project,H2 H5,H10;H2;H3;H5,fuzzed;executed;left,H2-07,"body_sweep.py: broken JSON, a list, a string, wrong types, an empty object and every string a NUL"
+operation,GET /api/studies/scenarios/{scenario_id},project,H2 H5,H10;H2;H5;H6,fuzzed;executed,H10-02;H2-07,"path_sweep.py: 17 values in each path parameter (traversal, %2e%2e, double encoding, backslash, absolute, NUL, 20000 characters, SQL, format strings); no traversal answer, no leak; NUL answers 500"
+operation,POST /api/studies/scenarios/{scenario_id}/run,project,H2 H5,H10;H2;H3;H5,fuzzed;executed;left,H10-02;H2-07,"body_sweep.py: broken JSON, a list, a string, wrong types, an empty object and every string a NUL; path_sweep.py on its path parameters; the NUL body answers 500"
+operation,GET /api/thermo/props,project,H4 H5,H10;H4;H5,executed;fuzzed,,get_sweep.py with ?project= (row counts of every table unchanged)
+operation,POST /api/thermo/props,project,H4 H5,H10;H4;H5,fuzzed;executed,,"body_sweep.py: broken JSON, a list, a string, wrong types, an empty object and every string a NUL"
+operation,GET /api/thermo/volatility,project,H4 H5,H10;H4;H5,executed;fuzzed,H5-06,get_sweep.py with ?project= (row counts of every table unchanged)
+operation,POST /api/thermo/volatility,project,H4 H5,H10;H4;H5,fuzzed;executed,H5-06,"body_sweep.py: broken JSON, a list, a string, wrong types, an empty object and every string a NUL"
+operation,GET /api/tools,project,H5 H10,H10;H5;H6;H9;P,executed;fuzzed,,get_sweep.py with ?project= (row counts of every table unchanged)
+operation,POST /api/tools/{name},project,H5 H10,H1;H10;H14;H3;H5;H6;H9;P,executed;fuzzed,H1-08;H14-02;H3-04;H3-13;H5-06;H5-01;H5-02;H6-01;H9-02;H9-12;H9-13;H9-14;H9-16,"engine_run, engine_parameters, engine_plants, engine_report with ?by= and the assistant header"
+operation,GET /api/witness/runs,project,H1 H2 H5,H1;H10;H14;H2;H5;H6,executed;fuzzed,H14-04,answers [] on a project with no extraction; not an engine route
+tool,search_records,openferment,H9 H5,H5;H9;P,fuzzed;executed,H9-13,"probe_tools.py: POST /api/tools, the openferment MCP server in its own process and through --service, from bh-b with A's ids; unknown, malformed, upper-case projects; no answer carried A's words or id"
+tool,catalogue_read,openferment,H9 H5,H5;H9;P,fuzzed;executed,H5-06,"no project: 200 'catalogue_read failed: ProjectRequired'; probe_tools.py: POST /api/tools, the openferment MCP server in its own process and through --service, from bh-b with A's ids; unknown, malform"
+tool,catalogue_write,openferment,H9 H5,H3;H5;H9;P,executed;fuzzed,H3-13,"numbers in name, summary and note kept"
+tool,search_passages,openferment,H9 H5,H5;H9,fuzzed,H5-01;H5-02;H9-13,"A's race notes in B's results during A's pastes; paperTitle is A's on a shared document; probe_tools.py: POST /api/tools, the openferment MCP server in its own process and through --service, from bh-b"
+tool,literature_sources,openferment,H9 H5,H5;H9,fuzzed,H5-02,"A's title and class on a shared document; probe_tools.py: POST /api/tools, the openferment MCP server in its own process and through --service, from bh-b with A's ids; unknown, malformed, upper-case p"
+tool,literature_document,openferment,H9 H5,H5;H9,fuzzed,H5-02;H5-06,"A's title; with no project, 'the project holds no readable document'; probe_tools.py: POST /api/tools, the openferment MCP server in its own process and through --service, from bh-b with A's ids; unkn"
+tool,convert_units,openferment,H9 H5,H5;H9,fuzzed,,"probe_tools.py: POST /api/tools, the openferment MCP server in its own process and through --service, from bh-b with A's ids; unknown, malformed, upper-case projects; no answer carried A's words or id"
+tool,engine_plants,openferment,H9 H5,H1;H2;H5;H9,executed;fuzzed,,lists an uninstalled engine's runs with its words
+tool,engine_parameters,openferment,H9 H5,H1;H2;H5;H9,executed;fuzzed,,"probe_tools.py: POST /api/tools, the openferment MCP server in its own process and through --service, from bh-b with A's ids; unknown, malformed, upper-case projects; no answer carried A's words or id"
+tool,engine_run,openferment,H9 H5,H1;H2;H5;H9,executed;fuzzed,H1-08;H9-14,"probe_tools.py: POST /api/tools, the openferment MCP server in its own process and through --service, from bh-b with A's ids; unknown, malformed, upper-case projects; no answer carried A's words or id"
+tool,engine_report,openferment,H9 H5,H1;H2;H5;H9,executed;fuzzed,H9-14,names diagnostics; refuses a run of another engine named
+tool,flowsheet_library,openferment,H9 H5,H5;H9,fuzzed,,"probe_tools.py: POST /api/tools, the openferment MCP server in its own process and through --service, from bh-b with A's ids; unknown, malformed, upper-case projects; no answer carried A's words or id"
+tool,flowsheet_import,openferment,H9 H5,H5;H9,fuzzed,,"probe_tools.py: POST /api/tools, the openferment MCP server in its own process and through --service, from bh-b with A's ids; unknown, malformed, upper-case projects; no answer carried A's words or id"
+tool,flowsheet_read,openferment,H9 H5,H5;H9,fuzzed,H9-14,"probe_tools.py: POST /api/tools, the openferment MCP server in its own process and through --service, from bh-b with A's ids; unknown, malformed, upper-case projects; no answer carried A's words or id"
+tool,study_scenario,openferment,H9 H5,H2;H3;H5;H9,executed;read;fuzzed,H3-11;H9-12,numbers_in and stamped run directly on its input shape; the tool itself starts the worker
+tool,study_compare,openferment,H9 H5,H2;H5;H9,executed;fuzzed,H2-01,"probe_tools.py: POST /api/tools, the openferment MCP server in its own process and through --service, from bh-b with A's ids; unknown, malformed, upper-case projects; no answer carried A's words or id"
+tool,study_read,openferment,H9 H5,H2;H5;H9,executed;fuzzed,,"probe_tools.py: POST /api/tools, the openferment MCP server in its own process and through --service, from bh-b with A's ids; unknown, malformed, upper-case projects; no answer carried A's words or id"
+tool,selling_price,openferment,H9 H5,H2;H5;H9;P,executed;fuzzed,H9-13,"probe_tools.py: POST /api/tools, the openferment MCP server in its own process and through --service, from bh-b with A's ids; unknown, malformed, upper-case projects; no answer carried A's words or id"
+tool,run_flowsheet,openferment,H9 H5,H2;H5;H9,executed;fuzzed,H9-13,"probe_tools.py: POST /api/tools, the openferment MCP server in its own process and through --service, from bh-b with A's ids; unknown, malformed, upper-case projects; no answer carried A's words or id"
+tool,stream_table,openferment,H9 H5,H5;H9;P,fuzzed;executed,,"probe_tools.py: POST /api/tools, the openferment MCP server in its own process and through --service, from bh-b with A's ids; unknown, malformed, upper-case projects; no answer carried A's words or id"
+tool,growth_forecast,openferment,H9 H5,H2;H5;H9,executed;fuzzed,H5-05,"refused in words that are only the artifact id; the HTTP route answers 500; probe_tools.py: POST /api/tools, the openferment MCP server in its own process and through --service, from bh-b with A's ids"
+tool,fermos_simulate,openferment,H9 H5,H5;H9,fuzzed,,"probe_tools.py: POST /api/tools, the openferment MCP server in its own process and through --service, from bh-b with A's ids; unknown, malformed, upper-case projects; no answer carried A's words or id"
+tool,fermos_vessel,openferment,H9 H5,H5;H9,fuzzed,,"probe_tools.py: POST /api/tools, the openferment MCP server in its own process and through --service, from bh-b with A's ids; unknown, malformed, upper-case projects; no answer carried A's words or id"
+tool,pureos_build,openferment,H9 H5,H5;H9,fuzzed,,"probe_tools.py: POST /api/tools, the openferment MCP server in its own process and through --service, from bh-b with A's ids; unknown, malformed, upper-case projects; no answer carried A's words or id"
+tool,pureos_propose,openferment,H9 H5,H5;H9,fuzzed,,"probe_tools.py: POST /api/tools, the openferment MCP server in its own process and through --service, from bh-b with A's ids; unknown, malformed, upper-case projects; no answer carried A's words or id"
+tool,yield_ceiling,openferment,H9 H5,H5;H9,fuzzed,H9-13,"probe_tools.py: POST /api/tools, the openferment MCP server in its own process and through --service, from bh-b with A's ids; unknown, malformed, upper-case projects; no answer carried A's words or id"
+tool,thermo_props,openferment,H9 H5,H5;H9,fuzzed,,"probe_tools.py: POST /api/tools, the openferment MCP server in its own process and through --service, from bh-b with A's ids; unknown, malformed, upper-case projects; no answer carried A's words or id"
+tool,draft_runbook,openferment,H9 H5,H5;H9,fuzzed,,"probe_tools.py: POST /api/tools, the openferment MCP server in its own process and through --service, from bh-b with A's ids; unknown, malformed, upper-case projects; no answer carried A's words or id"
+tool,runbooks_read,openferment,H9 H5,H3;H5;H9;P,executed;fuzzed,H3-04;H3-14,"measured-evidence rows: overwritten and orphan rows marked measured, an unconfirmed one unverified"
+tool,geneos_read,openferment,H9 H5,H14;H5;H9,executed;fuzzed,,host kind read back for a kept strain
+tool,fermos_read,openferment,H9 H5,H5;H9,fuzzed,,"probe_tools.py: POST /api/tools, the openferment MCP server in its own process and through --service, from bh-b with A's ids; unknown, malformed, upper-case projects; no answer carried A's words or id"
+tool,pureos_read,openferment,H9 H5,H5;H9,fuzzed,,"probe_tools.py: POST /api/tools, the openferment MCP server in its own process and through --service, from bh-b with A's ids; unknown, malformed, upper-case projects; no answer carried A's words or id"
+tool,proforma_read,openferment,H9 H5,H5;H9,fuzzed,,"probe_tools.py: POST /api/tools, the openferment MCP server in its own process and through --service, from bh-b with A's ids; unknown, malformed, upper-case projects; no answer carried A's words or id"
+tool,biorepo_read,openferment,H9 H5,H5;H9;P,fuzzed;executed,P-02,"probe_tools.py: POST /api/tools, the openferment MCP server in its own process and through --service, from bh-b with A's ids; unknown, malformed, upper-case projects; no answer carried A's words or id"
+tool,guild_read,openferment,H9 H5,H5;H9,fuzzed,,"probe_tools.py: POST /api/tools, the openferment MCP server in its own process and through --service, from bh-b with A's ids; unknown, malformed, upper-case projects; no answer carried A's words or id"
+tool,primer_read,openferment,H9 H5,H5;H9,fuzzed,,"probe_tools.py: POST /api/tools, the openferment MCP server in its own process and through --service, from bh-b with A's ids; unknown, malformed, upper-case projects; no answer carried A's words or id"
+tool,intake_read,openferment,H9 H5,H5;H9,fuzzed,,"probe_tools.py: POST /api/tools, the openferment MCP server in its own process and through --service, from bh-b with A's ids; unknown, malformed, upper-case projects; no answer carried A's words or id"
+tool,home_read,openferment,H9 H5,H5;H9,fuzzed,,"probe_tools.py: POST /api/tools, the openferment MCP server in its own process and through --service, from bh-b with A's ids; unknown, malformed, upper-case projects; no answer carried A's words or id"
+tool,runbooks_write,openferment,H9 H5,H5;H9,fuzzed,H9-16,"probe_tools.py: POST /api/tools, the openferment MCP server in its own process and through --service, from bh-b with A's ids; unknown, malformed, upper-case projects; no answer carried A's words or id"
+tool,geneos_write,openferment,H9 H5,H5;H9,fuzzed,,"probe_tools.py: POST /api/tools, the openferment MCP server in its own process and through --service, from bh-b with A's ids; unknown, malformed, upper-case projects; no answer carried A's words or id"
+tool,fermos_write,openferment,H9 H5,H5;H9,fuzzed,H5-05,"action forecast: refused in words that are only the artifact id; probe_tools.py: POST /api/tools, the openferment MCP server in its own process and through --service, from bh-b with A's ids; unknown, "
+tool,pureos_write,openferment,H9 H5,H5;H9,fuzzed,,"probe_tools.py: POST /api/tools, the openferment MCP server in its own process and through --service, from bh-b with A's ids; unknown, malformed, upper-case projects; no answer carried A's words or id"
+tool,proforma_write,openferment,H9 H5,H5;H9,fuzzed,,"probe_tools.py: POST /api/tools, the openferment MCP server in its own process and through --service, from bh-b with A's ids; unknown, malformed, upper-case projects; no answer carried A's words or id"
+tool,biorepo_write,openferment,H9 H5,H14;H5;H9,executed;fuzzed,H14-02,"the candidate action through the tool door, ?by= a person"
+tool,guild_write,openferment,H9 H5,H5;H9,fuzzed,,"probe_tools.py: POST /api/tools, the openferment MCP server in its own process and through --service, from bh-b with A's ids; unknown, malformed, upper-case projects; no answer carried A's words or id"
+tool,primer_write,openferment,H9 H5,H5;H9,fuzzed,,"probe_tools.py: POST /api/tools, the openferment MCP server in its own process and through --service, from bh-b with A's ids; unknown, malformed, upper-case projects; no answer carried A's words or id"
+tool,intake_write,openferment,H9 H5,H5;H9,fuzzed,H9-02,"probe_tools.py: POST /api/tools, the openferment MCP server in its own process and through --service, from bh-b with A's ids; unknown, malformed, upper-case projects; no answer carried A's words or id"
+tool,home_write,openferment,H9 H5,H5;H9,fuzzed,,"probe_tools.py: POST /api/tools, the openferment MCP server in its own process and through --service, from bh-b with A's ids; unknown, malformed, upper-case projects; no answer carried A's words or id"
+tool,ask_postdoc,openferment,H9 H5,H5;H9,fuzzed,H9-11;H9-15,"probe_tools.py: POST /api/tools, the openferment MCP server in its own process and through --service, from bh-b with A's ids; unknown, malformed, upper-case projects; no answer carried A's words or id"
+tool,get_artifact,openferment,H9 H5,H5;H9,fuzzed,H9-15,"probe_tools.py: POST /api/tools, the openferment MCP server in its own process and through --service, from bh-b with A's ids; unknown, malformed, upper-case projects; no answer carried A's words or id"
+tool,answer_question,sci-rag,H9 H5,H5;H8;H9,fuzzed;left,H5-01;H5-08,"keyless; same narrowing; unknown --project answers as an empty corpus; probe_tools.py: sci-rag MCP server from bh-b, bh-zzz, ../bh-a, BH-A; no answer carried A's words or ids"
+tool,corpus_stats,sci-rag,H9 H5,H5;H8;H9,fuzzed;executed,H5-02;H5-08,"B's sources and licence classes carry A's; probe_tools.py: sci-rag MCP server from bh-b, bh-zzz, ../bh-a, BH-A; no answer carried A's words or ids"
+tool,get_citations,sci-rag,H9 H5,H5;H8;H9,fuzzed;executed,H5-08;H9-14,"unknown --project: 'No such document'; probe_tools.py: sci-rag MCP server from bh-b, bh-zzz, ../bh-a, BH-A; no answer carried A's words or ids"
+tool,get_document,sci-rag,H9 H5,H5;H8;H9,fuzzed;executed,H5-02;H5-08;H8-02;H9-14,"B reads A's title, source and source_ref on a shared document; probe_tools.py: sci-rag MCP server from bh-b, bh-zzz, ../bh-a, BH-A; no answer carried A's words or ids"
+tool,get_entity_relationships,sci-rag,H9 H5,H5;H8;H9;P,fuzzed;executed,H5-08,"B lists no A-only edge; an A-only quote withheld; unknown --project: 'holds no passage yet'; probe_tools.py: sci-rag MCP server from bh-b, bh-zzz, ../bh-a, BH-A; no answer carried A's words or ids"
+tool,list_sources,sci-rag,H9 H5,H5;H8;H9,fuzzed;executed,H5-02;H5-08;H8-02,"B's sources name project:bh-a:paste; probe_tools.py: sci-rag MCP server from bh-b, bh-zzz, ../bh-a, BH-A; no answer carried A's words or ids"
+tool,search_corpus,sci-rag,H9 H5,H5;H8;H9,fuzzed;executed,H5-01;H5-02;H5-08,"same narrowing as /api/literature/search; unknown --project answers as an empty corpus; probe_tools.py: sci-rag MCP server from bh-b, bh-zzz, ../bh-a, BH-A; no answer carried A's words or ids"
+tool,search_entities,sci-rag,H9 H5,H5;H8;H9;P,fuzzed;executed,H5-08,"graph rows by hand (graph_rows.sql): B lists no A-only entity, descriptions held to the rule; unknown --project: 'holds no passage yet'; probe_tools.py: sci-rag MCP server from bh-b, bh-zzz, ../bh-a, "
+rail,Home,/,H7 H14,H14;H6;H7,browser,H14-05;H14-06;H14-08,"fresh service and full copy: new project from Home, vitals and destination tiles"
+rail,Intake,/intake,H7 H14,H14;H6;H7;P,browser,P-02,"collect OSTI, Europe PMC, SGD, a bare number, a DOI with no open text, a paste; Extract with no key; review session started"
+rail,BioRepo,/biorepo,H7 H14,H14;H6;H7,browser,H14-03;H14-04,"Papers, Search, reader at a passage, Answer with no key, Artifacts, Witness, Compare"
+rail,Postdoc,/postdoc,H7 H14,H14;H6;H7;P,browser,,no-key card and a question asked with no key: the answer says so in words
+rail,geneOS,/geneos,H7 H14,H14;H6;H7,browser,H14-02,"Hosts after keeping a strain, the strain page, Model tab"
+rail,fermOS,/fermos,H7 H14,H14;H6;H7,browser,,"Fits, Simulate, Vessel, Forecast read; titre records offered for properties"
+rail,pureOS,/pureos,H7 H14,H14;H6;H7,browser,H14-08,"Trains read from runs, Builder, a train from a run, the proposer card"
+rail,Proforma,/proforma,H7 H14,H14;H6;H7,browser,H14-01;H14-09,"Studies: run corn and cornstover, compare two runs, scenarios, export; reference page; New scenario and reload"
+rail,Runbooks,/runbooks,H7 H14,H14;H6;H7,browser,H14-07,"runbook from a run, lock, deposition with the readings alone, read-back, reload, ledger"
+rail,Primer,/primer,H7 H14,H14;H6;H7,browser,,"Lessons, My path, Practice with an empty ledger and no lessons; a missing lesson id"
+rail,Guild,/guild,H7 H14,H14;H6;H7,browser,,"review queue: accept, reject with a reason, skip, gold; Matrix, People, Skills, Checks"
+rail,Catalogues,/catalogues,H7 H14,H14;H6;H7;P,browser,H14-02;H6-01,"kept a strain with aliases, a product, a skill with a policy; read back elsewhere"
+screen,src/screens/Architecture.tsx,,H7 H14,H14;H7,browser,,"walked in empty, full and stopped states (scripts/walk_all.mjs)"
+screen,src/screens/BenchCheck.tsx,,H7 H14,H14;H7,left;browser,,needs a ledger and a scheduled check; the address of a missing check drew nothing in the main region
+screen,src/screens/BioRepo.tsx,,H7 H14,H14;H6;H7,browser,,"over the upgraded db, alpha 2.1's rows on it (screens.cjs)"
+screen,src/screens/BioRepoArtifacts.tsx,,H7 H14,H14;H6;H7,browser,,"over the upgraded db, alpha 2.1's rows on it (screens.cjs)"
+screen,src/screens/BioRepoSearch.tsx,,H7 H14,H14;H7,browser,H14-03,Search and Answer with no key
+screen,src/screens/Catalogues.tsx,,H7 H14,H14;H6;H7;P,browser,H14-02;H6-01,"over the upgraded db, alpha 2.1's rows on it (screens.cjs)"
+screen,src/screens/Compare.tsx,,H7 H14,H14;H6;H7,browser,,"over the upgraded db, alpha 2.1's rows on it (screens.cjs)"
+screen,src/screens/Deposition.tsx,,H7 H14,H14;H7,browser,H14-07;H7-02;H7-07;H7-09,"DepositionBench: staged, begin, record, read back, reload"
+screen,src/screens/DepositionDetail.tsx,,H7 H14,H14;H3;H6;H7,browser,H3-14;H3-03;H7-06,the not-found state alone
+screen,src/screens/Depositions.tsx,,H7 H14,H14;H6;H7,browser,,"over the upgraded db, alpha 2.1's rows on it (screens.cjs)"
+screen,src/screens/FermOS.tsx,,H7 H14,H14;H6;H7,browser,,"over the upgraded db, alpha 2.1's rows on it (screens.cjs)"
+screen,src/screens/FermOSForecast.tsx,,H7 H14,H14;H6;H7,browser,,"over the upgraded db, alpha 2.1's rows on it (screens.cjs)"
+screen,src/screens/FermOSSimulate.tsx,,H7 H14,H14;H6;H7,browser,,"over the upgraded db, alpha 2.1's rows on it (screens.cjs)"
+screen,src/screens/FermOSVessel.tsx,,H7 H14,H14;H6;H7,browser,,"over the upgraded db, alpha 2.1's rows on it (screens.cjs)"
+screen,src/screens/FlowsheetPage.tsx,,H7 H14,H14;H6;H7,browser,,"over the upgraded db, alpha 2.1's rows on it (screens.cjs)"
+screen,src/screens/Flowsheets.tsx,,H7 H14,H14;H6;H7,browser,,"over the upgraded db, alpha 2.1's rows on it (screens.cjs)"
+screen,src/screens/GeneOS.tsx,,H7 H14,H14;H6;H7;P,browser,H14-02,"over the upgraded db, alpha 2.1's rows on it (screens.cjs)"
+screen,src/screens/GeneOSModel.tsx,,H7 H14,H14;H6;H7,browser,,opened; its worker calls were cut off by the tour's navigation
+screen,src/screens/Guild.tsx,,H7 H14,H14;H6;H7;P,browser;read,P-03,"accept, reject, skip, gold by keyboard; decisions kept across reload"
+screen,src/screens/GuildChecks.tsx,,H7 H14,H14;H6;H7,browser,,empty ledger
+screen,src/screens/GuildMatrix.tsx,,H7 H14,H14;H6;H7,browser,,empty ledger
+screen,src/screens/GuildPeople.tsx,,H7 H14,H14;H6;H7,browser,,empty ledger
+screen,src/screens/GuildSkills.tsx,,H7 H14,H14;H6;H7;P,browser,H7-06,a skill kept on Catalogues shows here
+screen,src/screens/Home.tsx,,H7 H14,H14;H6;H7,browser,H14-05;H14-06;H14-08;H7-08,"over the upgraded db, alpha 2.1's rows on it (screens.cjs)"
+screen,src/screens/Intake.tsx,,H7 H14,H14;H6;H7;P,browser,P-02,"facets, Start review session"
+screen,src/screens/IntakeIngest.tsx,,H7 H14,H14;H6;H7,browser,,"collect, paste, Extract with no key (toast names the missing key)"
+screen,src/screens/Organisms.tsx,,H7 H14,H14;H7,browser,H14-02,geneOS Hosts view: coverage 0 for a kept strain whose alias the records name
+screen,src/screens/PaperReader.tsx,,H7 H14,H14;H6;H7,browser,H7-06,opened at a found passage
+screen,src/screens/Postdoc.tsx,,H7 H14,H14;H6;H7;P,browser,H7-06,no key said in words; ?q= cleared from the address after an ask (read)
+screen,src/screens/Primer.tsx,,H7 H14,H14;H6;H7,browser,,"over the upgraded db, alpha 2.1's rows on it (screens.cjs)"
+screen,src/screens/PrimerLesson.tsx,,H7 H14,H14;H6;H7,browser,,the not-found state alone; no lesson kept
+screen,src/screens/PrimerPath.tsx,,H7 H14,H14;H6;H7,browser,,"over the upgraded db, alpha 2.1's rows on it (screens.cjs)"
+screen,src/screens/PrimerPractice.tsx,,H7 H14,H14;H6;H7,browser,,"over the upgraded db, alpha 2.1's rows on it (screens.cjs)"
+screen,src/screens/Proforma.tsx,,H7 H14,H14;H6;H7,browser,,"over the upgraded db, alpha 2.1's rows on it (screens.cjs)"
+screen,src/screens/ProformaBiosteam.tsx,,H7 H14,H14;H7,read;browser,,"its cells render inside the run, scenario and reference pages"
+screen,src/screens/ProformaComparison.tsx,,H7 H14,H14;H6;H7,browser,H14-01,numbers agree with the two runs' pages
+screen,src/screens/ProformaReference.tsx,,H7 H14,H14;H6;H7,browser,,"over the upgraded db, alpha 2.1's rows on it (screens.cjs)"
+screen,src/screens/ProformaRun.tsx,,H7 H14,H14;H6;H7;P,browser,,runbook made here; scenario on a reading made here
+screen,src/screens/ProformaScenario.tsx,,H7 H14,H14;H6;H7,browser,,"made from New scenario, kept across reload"
+screen,src/screens/ProformaStudies.tsx,,H7 H14,H14;H6;H7;P,browser,H14-01;H14-09,"over the upgraded db, alpha 2.1's rows on it (screens.cjs)"
+screen,src/screens/ProjectHome.tsx,,H7 H14,H14;H7,browser,,"walked in empty, full and stopped states (scripts/walk_all.mjs)"
+screen,src/screens/ProtocolDetail.tsx,,H7 H14,H14;H7,left;browser,H7-09,no protocol in the project; none made
+screen,src/screens/ProtocolEditor.tsx,,H7 H14,H14;H7;P,browser,,the not-found state for a missing id alone
+screen,src/screens/Protocols.tsx,,H7 H14,H14;H6;H7;P,browser,,empty state
+screen,src/screens/PureOS.tsx,,H7 H14,H14;H6;H7,browser,H14-08,recovery of 100.0% checked against the train: 0.99983
+screen,src/screens/PureOSBuilder.tsx,,H7 H14,H14;H6;H7,browser,,opened empty; no train run made
+screen,src/screens/PureOSPropose.tsx,,H7 H14,H14;H7,read;browser,,the proposer card on pureOS's page; not run
+screen,src/screens/PureOSTrain.tsx,,H7 H14,H14;H6;H7;P,browser,,"over the upgraded db, alpha 2.1's rows on it (screens.cjs)"
+screen,src/screens/RunbookDetail.tsx,,H7 H14,H14;H6;H7;P,browser,H7-06,"made, locked, lock kept across reload"
+screen,src/screens/RunbookLedger.tsx,,H7 H14,H14;H6;H7,browser,,"over the upgraded db, alpha 2.1's rows on it (screens.cjs)"
+screen,src/screens/Runbooks.tsx,,H7 H14,H14;H6;H7,browser,,"over the upgraded db, alpha 2.1's rows on it (screens.cjs)"
+screen,src/screens/Settings.tsx,,H7 H14,H14;H6;H7;P,browser,H7-09,reviewer name set; About read
+screen,src/screens/SettingsFigures.tsx,,H7 H14,H14;H7,browser,,"walked in empty, full and stopped states (scripts/walk_all.mjs)"
+screen,src/screens/StrainPage.tsx,,H7 H14,H14;H6;H7,browser,H14-02,"over the upgraded db, alpha 2.1's rows on it (screens.cjs)"
+screen,src/screens/Witness.tsx,,H7 H14,H14;H6;H7,browser,H14-04,"over the upgraded db, alpha 2.1's rows on it (screens.cjs)"
+engine,biosteam,openferment_core.engine.biosteam:ENGINE,H1 H2 H4,H1;H2;H4;H6;P,executed,H1-03;H1-04;H1-05;H1-10;H2-02;H2-06;H4-01;H4-02;H4-03;H4-06;H4-07,conform with no --thing held; with --thing ethanol_glucose_v0 fails
+engine,kinetics,openferment_core.fermos_engine:ENGINE,H1 H2 H4,H1;H2;H3;H4;H6;P,executed,H1-01;H2-01;H3-06;H4-04;H4-05,conform --inputs held
+engine,train,openferment_core.pureos.engine:ENGINE,H1 H2 H4,H1;H2;H4;H6;P,executed,H1-10,conform --project held
+engine,mirror,openferment_engine_mirror.engine:ENGINE (examples),H1 H13,H1,fuzzed,H1-01,conform held; the door battery

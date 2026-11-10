@@ -1,0 +1,11 @@
+--- a/core/openferment_core/basis.py
++++ b/core/openferment_core/basis.py
+@@ -267,7 +267,7 @@
+     or a model's estimate, or rests on one; else `measured` when any input is
+     a measurement; else the weakest of its sources' classes, `computed` at
+     best."""
+-    if any(i.source.kind in ASSUMED_KINDS for i in basis.inputs):
++    if any(i.source.kind == "assumption" for i in basis.inputs):
+         return "assumed"
+     classes = ["computed"]
+     for i in basis.inputs:

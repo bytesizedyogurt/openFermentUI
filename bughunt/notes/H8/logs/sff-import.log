@@ -1,0 +1,44 @@
+422 | empty file | "empty.json is not JSON: its text stops reading as JSON at line 1, column 1"
+422 | whitespace | "ws.json is not JSON: its text stops reading as JSON at line 2, column 2"
+413 | 17 MB file (past 16 MB) | "big.json is larger than 16 MB"
+422 | UTF-16 JSON | "u16.json is not UTF-8 text; an SFF file is JSON"
+422 | UTF-8 with BOM | "bom.json is not JSON: its text stops reading as JSON at line 1, column 1"
+422 | Latin-1 title | "l1.json is not UTF-8 text; an SFF file is JSON"
+422 | invalid UTF-8 | "bad.json is not UTF-8 text; an SFF file is JSON"
+422 | not JSON | "x.json is not JSON: its text stops reading as JSON at line 1, column 1"
+422 | JSON list | "l.json is not an SFF flowsheet: an SFF file is a JSON object with a list of units and a list of streams"
+422 | units not a list | "u.json is not an SFF flowsheet: an SFF file is a JSON object with a list of units and a list of streams"
+422 | nested 100k deep | "deep.json nests its JSON deeper than a flowsheet's reader follows"
+200 | NaN in a flow | {"id": "sff-5f1c20897c0ddc02", "title": "H8 tiny", "origin": "imported", "source": "the file nan.json, imported", "libraryId": null, "valid": false}
+200 | tiny valid shape | {"id": "sff-bd2b7533a5f3f742", "title": "H8 tiny", "origin": "imported", "source": "the file tiny.json, imported", "libraryId": null, "valid": false}
+200 | tiny again, same bytes, other name | {"id": "sff-bd2b7533a5f3f742", "title": "H8 tiny", "origin": "imported", "source": "the file tiny.json, imported", "libraryId": null, "valid": false}
+200 | same name, other bytes | {"id": "sff-d35ae14a9c5b97ca", "title": "H8 tiny two", "origin": "imported", "source": "the file tiny.json, imported", "libraryId": null, "valid": false}
+200 | dot-dot name | {"id": "sff-ce5bbb5db89871e3", "title": "x", "origin": "imported", "source": "the file ../../etc/x.json, imported", "libraryId": null, "valid": false}
+200 | NUL in the name | {"id": "sff-81b721017f4c831f", "title": "nul%00", "origin": "imported", "source": "the file nul%00.json, imported", "libraryId": null, "valid": false}
+200 | HTML in the name | {"id": "sff-f2c64c9849ca9b49", "title": "<img src=x onerror=alert(1)>", "origin": "imported", "source": "the file <img src=x onerror=alert(1)>.json, imported", "libraryId": null, "valid": false}
+200 | very long name | {"id": "sff-8ab58915894eb4e9", "title": "nnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnn
+200 | unicode name | {"id": "sff-47b4a5387bb6e3cd", "title": "流程✓", "origin": "imported", "source": "the file 流程✓.json, imported", "libraryId": null, "valid": false}
+422 | empty name | [{"type": "value_error", "loc": ["body", "file"], "msg": "Value error, Expected UploadFile, received: <class 'str'>", "input": "{\"units\": [{\"id\": \"U1\", \"unit_type\": \"Mixer\"}], \"streams\": [{\"id\": \"s1\", \"source_unit_id\": \"None\", \"sink_unit_id\": \"U1\"}, {\"id\": \"s2\", \"source_
+422 | by empty | [{"type": "missing", "loc": ["body", "by"], "msg": "Field required", "input": null}]
+422 | by 201 chars | [{"type": "string_too_long", "loc": ["body", "by"], "msg": "String should have at most 200 characters", "input": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb
+200 | a reference flowsheet under a hostile name | {"id": "sff-f9d0ac8162d24c6f", "title": "Corn → Ethanol + Crude oil + DDGS", "origin": "library", "source": "the PISCES SFF reference flowsheet SF_BST_01 (https://github.com/sustainability-software-lab/pisces-standard-flowsheet-format at e236e3250414, MIT)", "libraryId": "SF_BST_01", "valid": true}
+
+KEPT: 9
+   sff-f9d0ac8162d24c6f | Corn → Ethanol + Crude oil + DDGS | library | the PISCES SFF reference flowsheet SF_BST_01 (https://github.com/sustainability-software-lab/pisces-standard-flowsheet-f
+     file: 200 attachment; filename="sff-f9d0ac8162d24c6f.sff.json" 400985 bytes
+   sff-47b4a5387bb6e3cd | 流程✓ | imported | the file 流程✓.json, imported
+     file: 200 attachment; filename="sff-47b4a5387bb6e3cd.sff.json" 210 bytes
+   sff-8ab58915894eb4e9 | nnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnn | imported | the file nnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnn
+     file: 200 attachment; filename="sff-8ab58915894eb4e9.sff.json" 210 bytes
+   sff-f2c64c9849ca9b49 | <img src=x onerror=alert(1)> | imported | the file <img src=x onerror=alert(1)>.json, imported
+     file: 200 attachment; filename="sff-f2c64c9849ca9b49.sff.json" 210 bytes
+   sff-81b721017f4c831f | nul%00 | imported | the file nul%00.json, imported
+     file: 200 attachment; filename="sff-81b721017f4c831f.sff.json" 210 bytes
+   sff-ce5bbb5db89871e3 | x | imported | the file ../../etc/x.json, imported
+     file: 200 attachment; filename="sff-ce5bbb5db89871e3.sff.json" 210 bytes
+   sff-d35ae14a9c5b97ca | H8 tiny two | imported | the file tiny.json, imported
+     file: 200 attachment; filename="sff-d35ae14a9c5b97ca.sff.json" 230 bytes
+   sff-bd2b7533a5f3f742 | H8 tiny | imported | the file tiny.json, imported
+     file: 200 attachment; filename="sff-bd2b7533a5f3f742.sff.json" 226 bytes
+   sff-5f1c20897c0ddc02 | H8 tiny | imported | the file nan.json, imported
+     file: 200 attachment; filename="sff-5f1c20897c0ddc02.sff.json" 240 bytes

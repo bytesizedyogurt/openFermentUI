@@ -1,0 +1,236 @@
+{
+ "candidates": [
+  {
+   "id": "H11-01",
+   "title": "The example's placeholder key counts as a key at /api/health and the nightly brief step, and as none at install.sh and pnpm ready",
+   "severity": "S3",
+   "kind": "Inconsistency",
+   "area": "host scripts: the key check across install.sh, pnpm ready, /api/health and the nightly",
+   "statement": "Over the core/.env that runbook step 1 makes (the example with its `ANTHROPIC_API_KEY=sk-ant-...` line), has_key and pnpm ready say no key, while GET /api/health answers hasKey true, so the Postdoc screen hides its no-key callout, and the nightly's `checks brief --missing` drafts briefs on the placeholder.",
+   "contract": "scripts/host/install.sh:54 \"core/.env holds no key yet. The app runs; Postdoc and extraction wait for one.\"; scripts/host/nightly.sh:50-51 \"Each new check gets the model's brief while the key is there; without one the checks wait in the queue\"; core/openferment_core/api.py:470-472 \"`hasKey` lets the UI tell \\\"the service is down\\\" from \\\"the service is up but has no key\\\"\"",
+   "reproCommand": "bash bughunt/notes/H11/scripts/with-worktree.sh placeholder-key-doors.sh lib",
+   "expected": "Every door reads the placeholder line as no key: has_key false, ready's key row fail, hasKey false (the Postdoc screen shows \"Postdoc is running without an API key\"), and the brief step prints that the checks wait.",
+   "observed": "runbook step 1's core/.env: has_key=no key, ready=no-key(fail), checks-brief=drafts-briefs; /api/health hasKey=True from a service started with the file's key value.",
+   "cause": "core/openferment_core/api.py:488 hasKey=bool(os.environ.get(\"ANTHROPIC_API_KEY\")) and core/openferment_core/checks.py:664 `if not os.environ.get(\"ANTHROPIC_API_KEY\")` test presence alone; ready.py:81 (PLACEHOLDER_KEY) and scripts/host/lib.sh:92 refuse the placeholder.",
+   "confidence": "high",
+   "fixSize": "small",
+   "evidence": "placeholder-key-doors.sh writes step 1's file (sed '/^OPENFERMENT_DATABASE_URL=/d' core/.env.example), asks has_key through bash, ready.check_key and the brief test through the repo's Python after load_dotenv, then starts the head's service on 127.0.0.1:8912 over bh_h11_health with ANTHROPIC_API_KEY set to the file's value (ANTHROPIC_BASE_URL on a closed loopback port) and reads /api/health: hasKey true. src/screens/Postdoc.tsx:144 shows the no-key callout only when hasKey is false. Run twice, same answers."
+  },
+  {
+   "id": "H11-02",
+   "title": "OPENFERMENT_HOST in the installing shell installs a server on every interface, and guard.py admits writes from any machine on the network",
+   "severity": "S3",
+   "kind": "Contract break",
+   "area": "scripts/host/install.sh, lib.sh, launchd.py",
+   "statement": "install.sh takes OPENFERMENT_HOST from the environment and writes it into the server's LaunchDaemon, so OPENFERMENT_HOST=0.0.0.0 installs a service listening on every interface with one line of notice, and guard.refusal allows a POST that names the Mini's LAN address in Host.",
+   "contract": "CLAUDE.md:52 \"R: The service binds `127.0.0.1`; the loopback bind and `core/openferment_core/guard.py` are the access control until accounts exist\"; CLAUDE.md:137 stop condition \"Widening network exposure ... the service keeps its loopback bind\"; docs/runbooks/live-host-install.md:146 \"The service binds `127.0.0.1` and nothing else\"",
+   "reproCommand": "bash bughunt/notes/H11/scripts/with-worktree.sh wide-bind.sh",
+   "expected": "The installed server job listens on 127.0.0.1, or install.sh stops and asks before it writes a wider address.",
+   "observed": "install.sh exit 0; its one line on the address: \"The server listens on 0.0.0.0:8000 (OPENFERMENT_HOST), so Tailscale is left alone.\"; the plist's ProgramArguments hold --host 0.0.0.0; guard.refusal('POST', {host: '192.168.1.20:8000'}) and {host: 'mini.local:8000'} both answer allowed. Reads stay open by guard.py's own rule, so Guild's personnel ledger is readable from the LAN too.",
+   "cause": "scripts/host/lib.sh:41 HOST=\"${OPENFERMENT_HOST:-127.0.0.1}\" reaches launchd.py --host (install.sh:81); launchd.py:57-62 checks the paths, user and port and takes any host; guard.py answers_to admits every IP address and .local name and checks no peer address. The runbook names no OPENFERMENT_HOST.",
+   "confidence": "medium",
+   "fixSize": "small",
+   "evidence": "wide-bind.sh runs install.sh once on stand-ins (standins.sh: uname, id, brew, sudo, launchctl, pmset, plutil, tailscale, curl, pnpm, uv and the keg's PostgreSQL tools, each logging its call) with OPENFERMENT_HOST=0.0.0.0, reads the written plist with plistlib and calls guard.refusal in the repo's Python. The knob is deliberate in lib.sh's comments; the finding is that it widens the bind against the R line with no ask."
+  },
+  {
+   "id": "H11-03",
+   "title": "install.sh takes a shell's OPENFERMENT_DATABASE_URL as core/.env's, so the installed service runs with no database while every check passes",
+   "severity": "S3",
+   "kind": "Broken use",
+   "area": "scripts/host/lib.sh ensure_database, install.sh",
+   "statement": "ensure_database asks env_setting, which answers from the environment first, so an install run from a shell that exports OPENFERMENT_DATABASE_URL writes no database line into core/.env; the LaunchDaemon starts the service with PATH, HOME and PYTHONUNBUFFERED alone, so the live service has no database, while /api/health and pnpm ready (run from the same shell) both pass.",
+   "contract": "scripts/host/lib.sh:122-124 \"a database named `openferment`, and its address in core/.env. Makes what is missing and says what it made.\"; docs/runbooks/live-host-install.md:137-139 \"when no database is named in `core/.env`, checks for pgvector, makes the database `openferment` and names it there\"; core/openferment_core/db/engine.py:56 \"on the live host scripts/host/install.sh writes it\"",
+   "reproCommand": "bash bughunt/notes/H11/scripts/with-worktree.sh env-url-install.sh && bash bughunt/notes/H11/scripts/no-database-service.sh",
+   "expected": "With no database line in core/.env, install.sh writes one (or names the environment's value and writes it), so the service the LaunchDaemon starts reads its database from core/.env.",
+   "observed": "install.sh exit 0, saying \"OPENFERMENT_DATABASE_URL names the database.\"; core/.env's database as python-dotenv reads it: None; the job's EnvironmentVariables: HOME, PATH, PYTHONUNBUFFERED. A service started that way answers GET /api/health 200 {\"ok\":true,...} and GET /api/projects 503 \"OPENFERMENT_DATABASE_URL is not set ... on the live host scripts/host/install.sh writes it\". With the example's development address exported, the refusal tells the person to \"Delete that line from core/.env\", a line the file lacks.",
+   "cause": "scripts/host/lib.sh:147-153 named=\"$(env_setting OPENFERMENT_DATABASE_URL)\" then `?*) echo ...; return`; env_setting (lib.sh:108) reads ${!name} before the file. scripts/host/launchd.py:71 passes no database setting to the jobs.",
+   "confidence": "high",
+   "fixSize": "small",
+   "evidence": "env-url-install.sh runs install.sh on stand-ins from a shell exporting the live address and then the example's development address, over step 1's core/.env; no-database-service.sh starts the head's service on 127.0.0.1:8913 with OPENFERMENT_DATABASE_URL empty (load_dotenv never overrides a set name, so no database is reached) and asks /api/health and /api/projects."
+  },
+  {
+   "id": "H11-04",
+   "title": "The night's dump always dumps a database named openferment, while the service and the night's work use the one OPENFERMENT_DATABASE_URL names",
+   "severity": "S3",
+   "kind": "Inconsistency",
+   "area": "scripts/host/lib.sh backup_database, nightly.sh",
+   "statement": "nightly.sh exports OPENFERMENT_DATABASE_URL from core/.env for the extraction, the checks and the briefs, and backup_database runs `pg_dump -h 127.0.0.1 ... openferment` whatever that address names, so a Mini whose core/.env names another database (which ensure_database accepts) keeps nightly dumps of a different or absent database.",
+   "contract": "scripts/host/nightly.sh:30 \"The database as the night finds it, before the night's work writes to it\"; scripts/host/lib.sh:151-153 ensure_database accepts any address besides the example's (\"OPENFERMENT_DATABASE_URL names the database.\"); docs/runbooks/live-host-install.md:260 \"dumps the database `openferment`\"",
+   "reproCommand": "bash bughunt/notes/H11/scripts/with-worktree.sh nightly-cases.sh",
+   "expected": "The dump reads the database the night's work and the service read, the one core/.env's OPENFERMENT_DATABASE_URL names.",
+   "observed": "core/.env naming postgresql://sean@127.0.0.1:5432/ethanol_live: the four python steps run with DB=.../ethanol_live, and pg_dump is asked for `-h 127.0.0.1 --format=custom --file=.../openferment-<date>.dump.part openferment`. Where openferment is absent every night fails its dump; where it is a leftover the folder fills with dumps of it and exit 0.",
+   "cause": "scripts/host/lib.sh:188 the database name `openferment` and host 127.0.0.1 are fixed in the pg_dump call, and OPENFERMENT_DATABASE_URL is never read there.",
+   "confidence": "high",
+   "fixSize": "small",
+   "evidence": "nightly-cases.sh runs nightly.sh as launchd does (env -i PATH HOME, /bin/bash nightly.sh, a HOME with a space) on stand-ins whose python records each module call with the two settings nightly.sh exports, and whose pg_dump records its arguments. The prompt's §3 names `pg_dump openferment`, so the code meets that sentence and departs from the address the rest of the host reads."
+  },
+  {
+   "id": "H11-05",
+   "title": "session-start.sh appends its settings onto a last line with no newline, gluing them onto the key line",
+   "severity": "S3",
+   "kind": "Broken use",
+   "area": "scripts/session-start.sh",
+   "statement": "When core/.env ends without a newline, session-start's `printf 'OPENFERMENT_DATABASE_URL=...\\n' >> core/.env` (and its OPENFERMENT_WORKSPACE_ID line) joins the file's last line, so a key line saved without a final newline reads as the key with the setting stuck to its end, and the setting is lost.",
+   "contract": "scripts/session-start.sh:6 \"Idempotent: run it at the start of every session, on a fresh clone or a warm one\" and :18-20 \"when PostgreSQL answers on 127.0.0.1 and core/.env names none, the development address (compose.yaml's) joins core/.env\"; scripts/host/lib.sh:162-163 writes the same line \"On a line of its own, whether or not the file's last line ends in one\"",
+   "reproCommand": "bash bughunt/notes/H11/scripts/with-worktree.sh session-start-newline.sh",
+   "expected": "The development address lands on a line of its own and the key line reads as it was written.",
+   "observed": "core/.env after: `ANTHROPIC_API_KEY=sk-ant-...OPENFERMENT_DATABASE_URL=postgresql://openferment:openferment@127.0.0.1:5432/openferment_dev`; python-dotenv reads the key as 'sk-ant-...OPENFERMENT_DATABASE_URL=postgresql://...' and the database as None. With OPENFERMENT_WORKSPACE_ID set the workspace line glues to the key in the same way.",
+   "cause": "scripts/session-start.sh:48 and :63 append with printf '...\\n' and no leading newline.",
+   "confidence": "high",
+   "fixSize": "small",
+   "evidence": "session-start-newline.sh runs session-start.sh in a fresh worktree on stand-ins for pnpm, uv and pg_isready over `# hand-written\\nANTHROPIC_API_KEY=sk-ant-...` with no final newline (the example's placeholder text, no key), then prints the file and dotenv_values. A key saved this way would answer 401 on every call."
+  },
+  {
+   "id": "H11-06",
+   "title": "session-start.sh misses an export or spaced database line and appends the development address, which then wins",
+   "severity": "S3",
+   "kind": "Inconsistency",
+   "area": "scripts/session-start.sh",
+   "statement": "session-start checks `grep -q '^OPENFERMENT_DATABASE_URL='`, so a core/.env naming its database as `export OPENFERMENT_DATABASE_URL=...` or `OPENFERMENT_DATABASE_URL = ...` (forms python-dotenv and lib.sh's env_setting both read) gains the development address on a later line, and the service then reads openferment_dev.",
+   "contract": "scripts/session-start.sh:18-20 \"when PostgreSQL answers on 127.0.0.1 and core/.env names none, the development address ... joins core/.env\"; scripts/host/lib.sh:97-100 env_setting reads \"an `export` before the name, blanks around `=`\" as python-dotenv does (core/tests/test_host.py:195-196 hold those forms)",
+   "reproCommand": "bash bughunt/notes/H11/scripts/with-worktree.sh session-start-export.sh",
+   "expected": "A core/.env that names a database in any form python-dotenv reads is left with that database.",
+   "observed": "Both forms: read before postgresql://sean@127.0.0.1:5432/openferment; session-start prints \"OPENFERMENT_DATABASE_URL added to core/.env (the development address)\"; read after postgresql://openferment:openferment@127.0.0.1:5432/openferment_dev.",
+   "cause": "scripts/session-start.sh:62 `! grep -q '^OPENFERMENT_DATABASE_URL=' core/.env`.",
+   "confidence": "high",
+   "fixSize": "small",
+   "evidence": "session-start-export.sh runs session-start.sh in a fresh worktree on stand-ins over each form and reads core/.env with python-dotenv before and after."
+  },
+  {
+   "id": "H11-07",
+   "title": "The nightly's dump test passes with nightly.sh's backup call commented out",
+   "severity": "S4",
+   "kind": "Hollow test",
+   "area": "core/tests/test_host.py",
+   "statement": "test_the_nightly_dumps_before_the_nights_work_and_counts_a_failed_dump looks for the substring `backup_database || status=$?` in nightly.sh's text, so `# backup_database || status=$?` keeps it green, and the other two dump tests call lib.sh's backup_database directly, so no test fails when the night stops dumping.",
+   "contract": "core/tests/test_host.py:347 test named \"the nightly dumps before the night's work and counts a failed dump\"; core/tests/test_host.py:5-7 \"lib.sh's reading of core/.env, its database step and the night's dump run against stand-ins\"",
+   "reproCommand": "bash bughunt/notes/H11/scripts/with-worktree.sh hollow-nightly-test.sh",
+   "expected": "Commenting out the dump call in nightly.sh fails a test.",
+   "observed": "With line 33 reading `# backup_database || status=$?  (mutation: the night skips its dump)`: `-k \"nightly_dumps_before or night_dumps or failed_dump\"` gives 3 passed; the mutated nightly.sh run on stand-ins makes no pg_dump call and exits 0.",
+   "cause": "core/tests/test_host.py:348-350 assert on substrings of the script text.",
+   "confidence": "high",
+   "fixSize": "small",
+   "evidence": "hollow-nightly-test.sh edits nightly.sh in a fresh worktree of its own, runs the worktree's test_host.py with the repo's Python, runs the mutated night on stand-ins, then restores the file with git checkout in that worktree."
+  },
+  {
+   "id": "H11-08",
+   "title": "has_key answers for any key line in core/.env, and the service reads the last one",
+   "severity": "S4",
+   "kind": "Inconsistency",
+   "area": "scripts/host/lib.sh has_key (owner question 13)",
+   "statement": "has_key is true when some line starts `ANTHROPIC_API_KEY=sk-ant-` and no line is the placeholder, while python-dotenv (the service, pnpm ready) takes the file's last key line, so install.sh and pnpm ready disagree on a core/.env with two key lines.",
+   "contract": "scripts/host/lib.sh:88 \"True when core/.env holds something shaped like a real key.\"; the service reads core/.env with load_dotenv (last line wins), as pnpm ready's key row does (core/openferment_core/ready.py:79-88)",
+   "reproCommand": "bash bughunt/notes/H11/scripts/with-worktree.sh placeholder-key-doors.sh lib",
+   "expected": "has_key and pnpm ready's key row give one answer for one file.",
+   "observed": "placeholder line, then a key line: has_key=no key, ready=key(ok). A key line, then an empty one: has_key=key, ready=no-key(fail).",
+   "cause": "scripts/host/lib.sh:90-92 two greps over every line of the file.",
+   "confidence": "medium",
+   "fixSize": "small",
+   "evidence": "The same script's rows 2 and 3 (strings shaped like keys with H11 in them, never a key). Owner question 13 is open on how has_key reads the key line, and a change there is a stop condition; this facet (which line counts) is one the question's wording leaves out."
+  },
+  {
+   "id": "H11-09",
+   "title": "An exported CDPATH makes install.sh, deploy.sh and nightly.sh stop at their first cd when run as the runbook writes them",
+   "severity": "S4",
+   "kind": "Broken use",
+   "area": "scripts/host/lib.sh REPO",
+   "statement": "lib.sh computes REPO with `cd \"$(dirname \"${BASH_SOURCE[0]}\")/../..\" && pwd`; run as `scripts/host/install.sh` from the checkout with CDPATH exported as `.:$HOME`, cd prints the directory, REPO holds it twice on two lines, and install.sh stops at `cd \"$REPO\"`.",
+   "contract": "docs/runbooks/live-host-install.md:133 \"scripts/host/install.sh\" and :253 \"scripts/host/deploy.sh\", run from ~/openferment",
+   "reproCommand": "bash bughunt/notes/H11/scripts/with-worktree.sh cdpath.sh",
+   "expected": "install.sh runs the same with or without CDPATH in the environment.",
+   "observed": "CDPATH='': exit 0. CDPATH='.:$HOME': exit 1, \"scripts/host/install.sh: line 23: cd: $'<checkout>\\n<checkout>': No such file or directory\".",
+   "cause": "scripts/host/lib.sh:6 `cd` with a relative path and stdout captured.",
+   "confidence": "high",
+   "fixSize": "small",
+   "evidence": "cdpath.sh on stand-ins in a fresh worktree; bash prints the new directory when a CDPATH entry resolves a relative cd (zsh users who export CDPATH hand it to bash). launchd's jobs use absolute paths and are unaffected."
+  },
+  {
+   "id": "H11-10",
+   "title": "A night's dump stopped half way leaves its .part file in the backups folder, and no later night removes it",
+   "severity": "S4",
+   "kind": "Broken use",
+   "area": "scripts/host/lib.sh backup_database",
+   "statement": "When launchd or a restart stops the nightly with SIGTERM during pg_dump, bash ends before `rm -f \"$file.part\"`, and the rotation counts only names ending in a date and .dump, so each stopped night leaves a partial dump in ~/openferment-backups for good.",
+   "contract": "scripts/host/lib.sh:172-173 \"The dump is written beside its name and moved into place once whole, so a failed night keeps the seven as they were.\"; docs/runbooks/live-host-install.md:260 \"the newest seven are kept\"",
+   "reproCommand": "bash bughunt/notes/H11/scripts/with-worktree.sh killed-dump.sh lib",
+   "expected": "The folder holds the newest seven dumps and nothing a stopped night left.",
+   "observed": "night 2026-11-10 stopped: exit 143, folder openferment-2026-11-10.dump.part; after three more nights: openferment-2026-11-10.dump.part openferment-2026-11-11.dump openferment-2026-11-12.dump openferment-2026-11-13.dump.",
+   "cause": "scripts/host/lib.sh:188-191 cleanup on pg_dump's failure alone, with no trap; lib.sh:197 rotation glob excludes .part.",
+   "confidence": "high",
+   "fixSize": "small",
+   "evidence": "killed-dump.sh runs backup_database in its own process group with a pg_dump stand-in that writes half and sleeps, sends SIGTERM to the group, then runs three ordinary nights (date stand-in). macOS restarts for updates overnight, near the 03:00 job."
+  },
+  {
+   "id": "H11-11",
+   "title": "A clock set back makes the rotation remove the dump it just made, and the night exits 0",
+   "severity": "S4",
+   "kind": "Broken use",
+   "area": "scripts/host/lib.sh backup_database",
+   "statement": "The rotation keeps the seven names that sort last, so a dump made while the Mac's date reads earlier than the kept files sorts first and is removed at once, with \"openferment dumped into ...\" and \"... removed: the newest 7 are kept\" both in the log and exit 0.",
+   "contract": "scripts/host/lib.sh:168-170 \"one file a day named by its date, the newest seven kept\"",
+   "reproCommand": "bash bughunt/notes/H11/scripts/with-worktree.sh backup-rotation.sh lib",
+   "expected": "Tonight's dump stays in the folder, or the night fails in words.",
+   "observed": "date 2026-01-13 after nights up to 2027-01-12: \"openferment dumped into .../openferment-2026-01-13.dump\", then \"openferment-2026-01-13.dump removed: the newest 7 are kept\", status 0; the folder holds 2027-01-04 to 2027-01-12.",
+   "cause": "scripts/host/lib.sh:197-203 the newest by name, with tonight's file among the candidates for removal.",
+   "confidence": "low",
+   "fixSize": "small",
+   "evidence": "backup-rotation.sh case 9 (date stand-in). The same script holds the rotation at seven and eight files, across 31 October into November and 31 December into 2027, the same night twice, a dump failing half way and a full disk (/dev/full): every one of those holds. A Mac keeps its time by network, so the case needs a wrong clock."
+  }
+ ],
+ "suspected": [
+  {
+   "title": "BSD grep's reading of `\\s` in has_key's placeholder pattern",
+   "tried": "Read scripts/host/lib.sh:92. GNU grep reads \\s as whitespace; if macOS's grep reads it as a literal s, the placeholder with trailing blanks or a carriage return counts as a key in install.sh's message. No BSD grep in the container to run it."
+  },
+  {
+   "title": "`${changed//$'\\n'/ }` inside double quotes on /bin/bash 3.2 (deploy.sh:33)",
+   "tried": "Runs on bash 5.2 here (two dirty files named on one line). Building bash 3.2.57 from source to run it was refused by the sandbox; the line only shapes a refusal message."
+  },
+  {
+   "title": "install.sh's `tailscale serve status | grep -q \":$PORT\"` under pipefail can read as not serving",
+   "tried": "pipefail-grep-q.sh shows the mechanism: a writer that prints more after the matching line dies of SIGPIPE (status 141) and the `if` takes the not-serving branch. Whether tailscale writes after its matching line, and late enough, needs the real CLI."
+  },
+  {
+   "title": "The checkout-location check misses a Documents path typed in lower case or reached through a symlink",
+   "tried": "Read install.sh:44-47: the case compares the logical path, so ~/documents/openferment on a case-insensitive volume, or ~/openferment as a symlink into ~/Documents, passes the check and the jobs then meet macOS privacy protection. Needs macOS to run."
+  },
+  {
+   "title": "A deploy that stops at verify or the build leaves the pulled code and the synced venv under the running service",
+   "tried": "Read deploy.sh:41-92 and ran it on stand-ins: the pull, pnpm install, uv sync and the engines run before verify, so after a failed verify a KeepAlive restart (a crash, a power cut) starts the new code on the schema the migration never reached. The comment's claim about the schema holds, and the pulled code and the synced venv change under the running service before verify runs."
+  },
+  {
+   "title": "launchctl bootstrap straight after bootout can fail with error 5 on macOS",
+   "tried": "Read install.sh:83-87 (one second's sleep after a bootout that succeeded). Under set -e a failed bootstrap stops install.sh with the server booted out. Needs macOS."
+  },
+  {
+   "title": "wait_for_health can answer from another process already on the port",
+   "tried": "Read install.sh:91 and lib.sh:52-62: any process answering /api/health on 127.0.0.1:PORT (a service started by hand) satisfies the wait while the job's server fails to bind and KeepAlive restarts it. Not run."
+  }
+ ],
+ "needsLiveModel": [
+  "What the Postdoc screen and the nightly's extraction and brief steps say when the example's placeholder key (H11-01) meets Anthropic's answer to it: the calls themselves are the model door, so they were never made here."
+ ],
+ "held": [
+  "install.sh run twice on stand-ins, from a checkout path and a HOME each holding a space: the daemons folder, the jobs launchd holds, core/.env (one database line, mode 600) and HOME are the same after both runs; the second run makes no database and writes no line (install-twice.sh).",
+  "backup_database's rotation at seven and eight files, night by night across 31 October into November and 31 December into 2027, the same night twice, a dump failing half way, a dump onto a full disk (/dev/full), other files in the folder, folder 700 and dumps 600, all under a HOME with a space (backup-rotation.sh, also with BASH_COMPAT=32).",
+  "The night's dump with the real pg_dump (16.15) and the runbook's step 7 restore with the real createdb and pg_restore, on test databases: 44 tables, every row count equal; the one pg_restore error is COMMENT ON EXTENSION vector for a non-superuser role, which the Mini's Homebrew superuser does not meet (dump-restore.sh).",
+  "env_setting against python-dotenv over 645 forms of the line: every difference is an unclosed quote (the comment's third named form), a `\\n` escape inside double quotes, or a later bare name (env_setting_fuzz.py).",
+  "ShellCheck 0.11.0 at style severity with every optional check on install.sh, deploy.sh, nightly.sh, lib.sh, session-start.sh and engines-local.sh: nothing at the default checks; with -o all, only brace, [[ ]], masked-status and default-case notes.",
+  "deploy.sh's refusals and paths on stand-ins: an unknown option, two dirty files named on one line, a modified biorepo.json with and without a database named, a rebase left half-done, --no-pull --no-restart, no job installed; --verify names the tests' server from core/.env, from the live address (openferment_test on its server, a query dropped), or as the user on 127.0.0.1, with UV_FROZEN=1 (deploy-cases.sh).",
+  "nightly.sh as launchd runs it (env -i, /bin/bash, HOME with a space): the dump first, the extraction only with a project named, a failed step makes exit 1 and the others still run, an `export NAME=\"x\" # c` line read as python-dotenv reads it (nightly-cases.sh).",
+  "lib.sh's poll_host and launchd.poll_host agree on loopback, everywhere, IPv4, IPv6 and bracketed inputs; launchd.py --read reads back host and port, and refuses a missing or broken plist with exit 1.",
+  "Every command, flag and path the runbook names exists in the tree: the pnpm scripts (ready, db:migrate, db:import-alpha1 with --name, --by and --data, geneos:fetch, build, prove, verify's sixteen stages), conform with --inputs and --project, write_placeholder_inputs(path, by=), the ready rows by name, LIVE_START, the extras sim, lit, agent and dev, packageManager pnpm@10.33.0, the clone address, the alpha-1.0 and alpha-2.1 commits, alpha 1.0's install.sh --uninstall with the same two labels, biorepo.json unchanged between alpha 1.0 and 2047f5a, hash routing for #/p/<id>.",
+  "No host script prints, logs or passes on the key: has_key greps quietly, session-start writes it with printf under umask 177 and checks git ignores the file, and the plists carry PATH, HOME and PYTHONUNBUFFERED alone.",
+  "core/tests/test_host.py: 52 passed at the head."
+ ],
+ "unexamined": [
+  {
+   "item": "Running any host script on macOS's /bin/bash 3.2 and BSD userland",
+   "reason": "The container is Linux with bash 5.2 and GNU tools; building bash 3.2.57 here was refused by the sandbox. Every bash 3.2 and BSD point was reasoned against the man pages and marked read: process substitution, here-strings, ${!name:-}, [[:space:]] classes in patterns, tail -1 and -n +8, paste -sd: -, mktemp -d, date +%F, cut, tr, sort -r with LC_ALL=C all hold; no associative arrays, mapfile, ${var,,}, &>>, local -n, printf -v, negative offsets, sed -i, readlink -f or stat in the host scripts."
+  },
+  {
+   "item": "launchd's own behaviour (log files' owner, ExitTimeOut, StartCalendarInterval after sleep), Homebrew's brew services --sudo-service-user, fdesetup, pmset, plutil and Tailscale's CLI",
+   "reason": "macOS and its tools are absent here; each was stood in for and its use read."
+  }
+ ]
+}

@@ -1,0 +1,11 @@
+--- a/core/openferment_core/engine/runs.py
++++ b/core/openferment_core/engine/runs.py
+@@ -449,7 +449,7 @@
+                          "refused it in: one of the two")
+     basis = list(basis)
+     run_id = artifacts.artifact_id(tool, version, basis, seed)
+-    if art is not None and (art.id, art.tool, art.toolVersion) != (run_id, tool, version):
++    if False:
+         raise ValueError(f"artifact {art.id} ({art.tool}, {art.toolVersion}) is no computation of run {run_id}'s "
+                          f"basis ({tool}, {version})")
+     if art is not None and (flowsheet is None) == (sff_refused is None):

@@ -1,0 +1,166 @@
+{
+  "candidates": [
+    {
+      "id": "H2-01",
+      "title": "A comparison puts two runs' values of one name in different units on one row and reckons the change across the units",
+      "severity": "S1",
+      "kind": "Wrong number",
+      "area": "studies/comparisons (POST /api/studies/comparisons, study_compare, study.md)",
+      "statement": "A comparison row takes the first run's unit for every run's value of that name, whatever unit each run's outputs.values states, and computes each run's relative change across the two units, so the same titre written in g L-1 and in mg L-1 reads as a change of +99,900 %.",
+      "contract": "docs/api/studies.md:140: \"`rows` | `[{key, unit, values, change}]`: every output any run answers, each run's value (null for a run with no output of that key), and its relative change from the first run's ... a run of any other engine's are its outputs.values (`values.<name>`, each in its unit; `docs/api/runs.md`, Outputs)\"",
+      "reproCommand": "bash bughunt/notes/H2/scripts/repro_fresh.sh  (section H2-01; make_fit.py writes the two fits)",
+      "expected": "Values of one name in two units kept apart (a row per unit) or held to one unit before the change is reckoned: the same product titre forecast from the same readings in g L-1 and in mg L-1 shows a change of 0.",
+      "observed": "Row values.finals.product, unit 'g L-1', values [19.5338, 19533.85], change [0.0, 998.9998]; GET /api/runs/{second} states finals.product 19533.85 mg L-1. study_compare cites the change as evidence <comparison>:values.finals.product:2 = 998.9998 with unit 'fraction', and the export's study.md prints it as +99899.98 %.",
+      "cause": "core/openferment_core/studies/comparisons.py:125-137 (`_rows`: `unit = next((u for u in units if u is not None), None)`; `_change` over the raw values with no unit check)",
+      "confidence": "high",
+      "fixSize": "small",
+      "evidence": "Two POST /api/fermos/fit of one logistic run, the product series in g L-1 and in mg L-1 (x1000), each forecast through POST /api/fermos/forecast; POST /api/studies/comparisons over the two forecast runs answered the row above; the same through the study_compare tool; reproduced on a fresh database (bh_h2_fresh, port 8823). Any two runs whose engine states a shared output name in two units meet the same row (a contract engine's outputs, a forecast's series units)."
+    },
+    {
+      "id": "H2-02",
+      "title": "A Proforma scenario run replays outside the exact precision the biosteam engine states for it once the worker restarts",
+      "severity": "S2",
+      "kind": "Contract break",
+      "area": "runs/replay (proforma.run; POST /api/biorepo/artifacts/{id}/replay; nightly checks)",
+      "statement": "A kept proforma.run artifact of ethanol_glucose_v0 replays identically in the worker that computed it and, after the service restarts, with one-ulp differences in nine TEA and utility numbers, so the replay answers identical false and withinTolerance false against the rtol 0, atol 0 the engine states for the flowsheet.",
+      "contract": "docs/api/engines.md:616-618: \"A scenario flowsheet's is `rtol` 0, `atol` 0: `proforma.run` registers no tolerance, so its replay holds every output identically.\" and docs/api/runs.md:229-231: \"A Proforma run registers no tolerance either: its replay is `identical` or names its differences, and the biosteam engine's scenario flowsheets state rtol 0, atol 0.\"",
+      "reproCommand": "bash bughunt/notes/H2/scripts/repro_proforma_replay.sh",
+      "expected": "The run replays identically in any worker at the precision the thing states, as a library run's replay holds at the ten digits it keeps; or the thing states the precision its numbers keep.",
+      "observed": "Replay in the worker that ran it: identical True. After bh_svc_stop and bh_svc_start over the same database: identical False, withinTolerance False, tolerance None, 9 differences (tea.FCI 21777995.078954738 -> 21777995.078954734, tea.TCI, tea.installedEquipmentCost, tea.lines[2].perUnit, tea.lines[2].usdPerYear, tea.purchaseCost, tea.utilityCost, utilities.electricityConsumption, utilities.heating). GET /api/engines states precision {rtol 0.0, atol 0.0} for ethanol_glucose_v0. nightly_checks.replay_newest counts such a replay a problem ('replays differently').",
+      "cause": "core/openferment_core/proforma.py:803-810 registers proforma.run with no tolerance_of and its output keeps every digit BioSTEAM gives (library.py:68-74 rounds a library run to DIGITS = 10 for this last-digit drift); proforma.py:1514-1523 states EnginePrecision(rtol=0.0, atol=0.0)",
+      "confidence": "high",
+      "fixSize": "medium",
+      "evidence": "On bh_h2_main after a restart, be9d3a3b825fb83d (500 samples), 1a5a3b27a6d2e210 and de79b2992a6400e9 (20 samples) each replayed with the same nine differences, twice; the library runs, the vessel design, the train run, the composite custom_train_v1 run and the kinetics runs replayed identically in the same worker. Reproduced from a fresh database (bh_h2_rep, port 8822): identical before the restart, nine differences after."
+    },
+    {
+      "id": "H2-03",
+      "title": "A locked runbook's row keeps a lockedAt and lockHash other than its lock's, and the runbook then reads as a broken lock",
+      "severity": "S3",
+      "kind": "Contract break",
+      "area": "studies/runbooks (PUT /api/state/runbooks/{id}, GET /api/studies/runbooks/{id})",
+      "statement": "After a lock, PUT /api/state/runbooks/{id} with the frozen predictions and a rewritten lockedAt and lockHash is kept, and GET /api/studies/runbooks/{id} then answers that moment and digest in place of the ones runbook_locks keeps.",
+      "contract": "docs/api/studies.md:170-174: \"Locking freezes the predictions and measures under the digest the browser's own code writes ... with the moment: the lock is kept in `runbook_locks` and audited, then carried by the row.\" and docs/api/studies.md:184: \"`GET /api/studies/runbooks/{id}` | Any runbook of the project, a lock the row does not carry laid on\"",
+      "reproCommand": "bash bughunt/notes/H2/scripts/repro_fresh.sh  (section H2-03; lock_probe.py)",
+      "expected": "The write refused in words, or the lock's own lockedAt and lockHash laid over the row's, once runbook_locks holds the lock.",
+      "observed": "PUT with lockedAt 2020-01-01T00:00:00Z and lockHash 0000000000000000: 200. GET answers lockedAt 2020-01-01T00:00:00Z, lockHash 0000000000000000; the lock froze 2026-11-10T21:56:35Z under defaed1f2d69e44b. src/engine/lock.ts lockIntact compares the predictions' digest with the row's lockHash, so RunbookDetail shows 'lock broken' over predictions that are the frozen ones.",
+      "cause": "core/openferment_core/project_state.py:579-584 (the store checks frozen_as over predictions and measures alone); core/openferment_core/studies/runbooks.py:67-71 (`_laid` lays the lock on only when the row carries no lockedAt)",
+      "confidence": "high",
+      "fixSize": "small",
+      "evidence": "lock_probe.py on bh_h2_main and on a fresh database: a moved prediction is refused 422 (held), the rewritten lock fields are kept 200 and served back; a row with the lock fields set null gets the lock laid back on."
+    },
+    {
+      "id": "H2-04",
+      "title": "A locked runbook is taken back whole through the state door, and made again it answers as an unlocked draft",
+      "severity": "S3",
+      "kind": "Contract break",
+      "area": "studies/runbooks (DELETE /api/state/runbooks/{id}, POST /api/studies/runbooks)",
+      "statement": "DELETE /api/state/runbooks/{id} removes a locked study runbook, its frozen predictions leaving GET, the listing and the export while its lock stays, and POST /api/studies/runbooks for the same run and outputs then answers lockedAt null and lockHash null although GET /api/studies/runbooks lists the same id locked.",
+      "contract": "core/openferment_core/project_state.py:30-31: \"What a person made, locked, measured or asked stays: a deposition, a measurement, a lock and a conversation are never taken back through here.\"; docs/api/studies.md:173-175: \"From then on the store (`project_state.py`) refuses a runbook row whose predictions or measures are not the ones frozen, from the page or the service alike; its status and stages still move.\"",
+      "reproCommand": "bash bughunt/notes/H2/scripts/repro_fresh.sh  (section H2-04; lock_probe.py)",
+      "expected": "A locked runbook refused at DELETE in words, as a deposition and a lock are; a make that finds the lock answering the runbook with it laid on.",
+      "observed": "DELETE 200 {removed: true}; GET /api/studies/runbooks/rb-study-990b5b646ae3 404 'the project holds no runbook'; audit keep_runbooks, lock, remove_runbooks, keep_runbooks; POST /api/studies/runbooks again 200 with lockedAt None, lockHash None; GET /api/studies/runbooks lists rb-study-990b5b646ae3 with lockedAt 2026-11-10T21:56:35Z.",
+      "cause": "core/openferment_core/project_state.py:144 (Kind('runbooks') stays removable whatever its lock); core/openferment_core/studies/runbooks.py:133-140 (make answers the Runbook it built, the lock not laid on)",
+      "confidence": "medium",
+      "fixSize": "small",
+      "evidence": "lock_probe.py on bh_h2_main and on a fresh database. Whether a person may take back a locked runbook is the owner's rule to state; the answer of the make door disagreeing with the read door is shown either way."
+    },
+    {
+      "id": "H2-05",
+      "title": "The export package leaves out the kinetic fits its forecast runs rest on",
+      "severity": "S3",
+      "kind": "Contract break",
+      "area": "studies/exports (GET /api/studies/export, python -m openferment_core.studies.exports)",
+      "statement": "study.json carries each run's artifact and each comparison's and no artifact a kept basis names beyond those, so a forecast run's kinetic fit (its parameters and the readings it was fitted on) is absent from a package that is to open without the service.",
+      "contract": "CLAUDE.md:8 (R): \"every claim, number and result stays inspectable back to its source, its calculation and its assumptions\"; docs/api/studies.md:234-236: \"The project's studies as one zip that opens with nothing of openFerment's\"",
+      "reproCommand": "bash bughunt/notes/H2/scripts/repro_fresh.sh  (section H2-05; open_export.py runs under python3 -I -S)",
+      "expected": "Every artifact a kept run's basis names (a forecast's fit, a Proforma run's chosen fit) inside study.json's artifacts, so each number traces to its source in the package alone.",
+      "observed": "open_export.py: 'each artifact a kept artifact rests on held: MISSING' naming the two kinetic fits each growth_forecast run's basis names (input 'kinetic fit'). Every other check of the package held: manifest sizes and sha256, SFF files byte for byte, determinism between exports, the command line's package equal to the route's.",
+      "cause": "core/openferment_core/studies/exports.py:97-102 (study(): the artifacts of the runs and of the comparisons alone)",
+      "confidence": "medium",
+      "fixSize": "small",
+      "evidence": "Exports of h2a on bh_h2_main and of a fresh project; docs/api/studies.md:240 names 'the artifacts that computed the runs and the comparisons', which a fit is not, so the break is against the R line and the package's purpose."
+    },
+    {
+      "id": "H2-06",
+      "title": "A plant's package-test read with no configuration answers null where its run with none is held to its default's test",
+      "severity": "S4",
+      "kind": "Inconsistency",
+      "area": "library routes (GET /api/library/{plant}/regression)",
+      "statement": "GET /api/library/oilcane/regression answers null, while GET /api/library/oilcane/parameters reads S1 and POST /api/library/oilcane/run {} runs in S1 held to test_oilcane_S1, 11 of 11.",
+      "contract": "docs/api/engines.md:629-633: \"A plant that takes a configuration, asked with none, runs in its default (`default_configuration` ...), and every door that reads its parameters reads them there\"; core/openferment_core/api.py:1312-1313: \"The values the package's own test for this plant asserts, read from the installed file; null when it has none.\"",
+      "reproCommand": "bash bughunt/notes/H2/scripts/repro_fresh.sh  (section H2-06)",
+      "expected": "The default configuration's test (test_oilcane_S1) for a read naming no configuration, as the parameters read and the run take the default.",
+      "observed": "/regression -> null; /regression?configuration=S1 -> test_oilcane_S1 with 11 values; POST /api/library/oilcane/run {} -> configuration S1, outputs.regression {within 11, of 11}. ProformaReference.tsx asks the route with no configuration (src/lib/proforma.ts:113-114), so the page at /proforma/reference/oilcane says the service read no package test.",
+      "cause": "core/openferment_core/api.py:1311-1315 passes the configuration as asked to library.regression, without engine/biosteam.default_configuration",
+      "confidence": "high",
+      "fixSize": "small",
+      "evidence": "On bh_h2_main and on a fresh database. The reference cards Proforma lists (cornstover, corn) take no configuration, so the main screen is untouched; a plant with configurations reached by its address meets it."
+    },
+    {
+      "id": "H2-07",
+      "title": "One run of a plant's default configuration is kept as two study scenarios",
+      "severity": "S4",
+      "kind": "Inconsistency",
+      "area": "studies/scenarios (POST /api/studies/scenarios)",
+      "statement": "A scenario made with no configuration and one naming the plant's default (cane, S1) with the same values get two ids and run as one row, whose scenarioId names the first alone.",
+      "contract": "docs/api/studies.md:14: \"`id` | `ssc-` and the first twelve hex of the sha256 of the plant, the configuration and the values: the same values on the same plant are one scenario\"",
+      "reproCommand": "bash bughunt/notes/H2/scripts/repro_fresh.sh  (section H2-07)",
+      "expected": "One scenario for the same values on the same plant in the same configuration, the configuration a run resolves to.",
+      "observed": "ssc-dfb16a00b81f (no configuration) and ssc-a453c2dfc65c (S1) both run as 92285f57a6cc6c00, configuration S1, scenarioId ssc-dfb16a00b81f; the second scenario's runIds lists the run.",
+      "cause": "core/openferment_core/studies/scenarios.py:148 hashes asked.configuration as made, while _checked (scenarios.py:105) and the run (engine/biosteam.py:188) resolve it to the default",
+      "confidence": "high",
+      "fixSize": "small",
+      "evidence": "On bh_h2_main and on a fresh database. studies.md:30-32 keeps the configuration as made, so a fix keys the id on the resolved one and keeps the field as made."
+    },
+    {
+      "id": "H2-08",
+      "title": "A comparison asked again with a title of spaces loses the title it was kept with",
+      "severity": "S4",
+      "kind": "Broken use",
+      "area": "studies/comparisons (POST /api/studies/comparisons)",
+      "statement": "A title of spaces passes ComparisonCreate's min_length of 1, is stripped to an empty string and replaces the kept comparison's title, its by staying the first asker's.",
+      "contract": "core/openferment_core/models.py:4809: \"title: str = Field(min_length=1, max_length=200)\"; docs/api/studies.md:149: \"`POST /api/studies/comparisons` | `{title, runIds, by}`: two to twelve runs compared, kept\"",
+      "reproCommand": "bash bughunt/notes/H2/scripts/repro_fresh.sh  (section H2-08)",
+      "expected": "A blank title refused in words, or the kept title left as it was.",
+      "observed": "POST with title '   ' by 'Someone Else' over two runs compared before -> comparison title '' by 'Hunter H2'; GET /api/studies/comparisons lists it with title ''.",
+      "cause": "core/openferment_core/studies/comparisons.py:270 (title=asked.title.strip(), no blank check; rows.put writes the body over the kept one)",
+      "confidence": "high",
+      "fixSize": "small",
+      "evidence": "On bh_h2_main (comparison bb36e01a33094022 lost 'default beside measured') and on a fresh database."
+    }
+  ],
+  "suspected": [
+    {
+      "title": "A run's provenance on GET stays as kept after a record its basis rests on is reviewed or demoted, until the run is asked for again",
+      "tried": "Read compute_kept and artifacts.compute: the row and the artifact follow a demoted record only when the same request is asked again (runs.md:22 and :173-176 say so). Proving a stale label on GET /api/runs/{id} needs a record in the evidence pool bound to a Proforma input, which needs an extracted candidate (a live model or a long intake chain); not built."
+    },
+    {
+      "title": "A fermOS fit takes a depositionId the project does not hold, and its forecast reads as computed from bench readings",
+      "tried": "POST /api/fermos/fit with depositionId dep-h2-g, which no deposition row holds, was kept; runs.md:81-82 names the series arriving as the browser sends them a known debt, so not filed."
+    },
+    {
+      "title": "batch_v1 simulates to done with a product yield on substrate far above what mass allows",
+      "tried": "POST /api/fermos/simulate with yps 5.0 g g-1 kept a done run with no flag; the kinetics science is H4's to judge, so not filed."
+    }
+  ],
+  "needsLiveModel": [
+    "Postdoc citing a comparison's change evidence (H2-01) in a claim: the evidence ids and their values were read through study_compare at the HTTP tool door; what a live plan turn writes from them needs a model."
+  ],
+  "held": [
+    "Every run of every engine kept as one runs row of one shape: library, Proforma (ethanol_glucose_v0 and custom_train_v1), kinetics simulation, forecast and vessel, train, and the sample contract engine; id equal to the artifact id of its basis recomputed outside the service; inputs typed with origins (measurement with ref, by, at); provenance equal to the artifact's; outputs.values each with origin the run's artifact; versions as runs.md names them; SFF record run-<id> or sffRefused words (check_run.py).",
+    "The same request at two or more doors is one row with the first asker's by: library route, biosteam engine route, engine_run, a study scenario's run; Proforma route, engine route and run_flowsheet over a kept scenario; fermOS simulate and vessel routes and the kinetics engine route; forecast route, engine route and growth_forecast; train route, engine route and engine_run.",
+    "A receipt is kept for a refusal inside the computation (library, Proforma, kinetics, sample engine) and answered from without computing; every refusal before anything runs keeps nothing.",
+    "Three concurrent identical new library runs keep one row and one SFF record.",
+    "A project reads none of another's runs, artifacts, comparisons, flowsheets, kinetics configurations or train inlets: each refused 404 or 422 in words.",
+    "The alpha 2.1 development database, copied by pg_dump and migrated with the head's migrations (0009 to 0010): 16 library runs, 23 artifacts, 4 scenarios, 5 comparisons and 1 runbook read through the head's routes; every run and comparison replayed identically; two kept scenarios answered from their rows; its export opened and held every check.",
+    "Library, kinetics, vessel, train and composite runs replay identically after a service restart; a measured scenario's run is measured, and a corrected reading refuses every door.",
+    "The lock digest's number writer matches node's JSON.stringify on 80008 numbers; a moved prediction of a locked runbook is refused.",
+    "The export package opens under python -I -S, its manifest and SFF hashes hold, two exports match byte for byte in every member beside the manifest, and the command line's package equals the route's."
+  ],
+  "unexamined": [
+    {"item": "engine/conform.py and the worker modules' internals", "reason": "H1's (shared assignment); H2 tested the runs they serve and the sample engine's rows"},
+    {"item": "a mirror engine installed beside the core", "reason": "would need a worktree venv install; the sample contract engine exercised run_engine's row shape, and H1 owns the install path"},
+    {"item": "provenance following a reviewed or demoted record", "reason": "needs records in the evidence pool through extraction; see suspected"},
+    {"item": "the run, comparison and runbook screens", "reason": "H7's; H2 read ProformaReference.tsx and lock.ts only where a candidate reaches them"}
+  ]
+}

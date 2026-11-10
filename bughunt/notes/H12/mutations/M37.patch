@@ -1,0 +1,11 @@
+--- a/core/openferment_core/measurements.py
++++ b/core/openferment_core/measurements.py
+@@ -101,7 +101,7 @@
+     when = times.get(entry.get("id"))
+     later = [e for e in entries[at + 1:] if e.get("measureId") == entry.get("measureId")
+              and times.get(e.get("id")) == when]
+-    return str(later[-1].get("id")) if later else None
++    return str(later[0].get("id")) if later else None
+ 
+ 
+ def unnamed(maker: str) -> str | None:

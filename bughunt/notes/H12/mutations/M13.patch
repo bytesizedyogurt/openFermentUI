@@ -1,0 +1,11 @@
+--- a/core/openferment_core/biorepo.py
++++ b/core/openferment_core/biorepo.py
+@@ -302,7 +302,7 @@
+         )
+ 
+     try:
+-        refuse_estimates(decision, "BioRepo")
++        pass
+     except EstimateRefused as e:
+         raise WriteRefused("estimate", f"{decision.recordId}: {e}") from None
+ 

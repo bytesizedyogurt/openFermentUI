@@ -1,0 +1,90 @@
+=== check:secrets
+  browser surface   166 tracked files under src/ scanned, none name a key
+  tracked files     no key-shaped string in any file git tracks
+  database          no database password in a tracked file for a server off loopback
+  core/.env         absent — the service will refuse to start rather than guess
+
+✓ No secret can reach the browser or a commit.
+=== exit 0
+=== gen:api --check
+
+> openferment@0.1.0 gen:api /tmp/claude-0/-home-user-openFermentUI/cfbc5c9f-640a-5002-a705-5ceaf850fdc6/scratchpad/bh/work/H13/wt
+> cd core && uv run --all-extras python ../scripts/gen-api.py --check
+
+✓ docs/api/openapi.json and src/api/types.gen.ts are what the service writes.
+=== exit 0
+=== gen:components --check
+
+> openferment@0.1.0 gen:components /tmp/claude-0/-home-user-openFermentUI/cfbc5c9f-640a-5002-a705-5ceaf850fdc6/scratchpad/bh/work/H13/wt
+> cd core && uv run --all-extras python ../scripts/gen-components.py --check
+
+✓ COMPONENTS.md is what the package map writes.
+=== exit 0
+=== gen:tools --check
+
+> openferment@0.1.0 gen:tools /tmp/claude-0/-home-user-openFermentUI/cfbc5c9f-640a-5002-a705-5ceaf850fdc6/scratchpad/bh/work/H13/wt
+> cd core && uv run --all-extras python ../scripts/gen-tools.py --check
+
+✓ docs/TOOLS.md is what the registry writes.
+=== exit 0
+=== check:plan
+
+openFerment provenance ranking check
+────────────────────────────────────
+  provenance    9 classes in models.py, ranked 9 deep in one order on both sides
+
+✓ PROVENANCE_RANK holds PROVENANCE_ORDER, member for member.
+=== exit 0
+=== check:tools
+
+> openferment@0.1.0 check:tools /tmp/claude-0/-home-user-openFermentUI/cfbc5c9f-640a-5002-a705-5ceaf850fdc6/scratchpad/bh/work/H13/wt
+> cd core && uv run --all-extras python ../scripts/check-tools.py
+
+✓ check:tools  10 modules with a read and a write tool; writes.py calls only 20 module write functions, and no other tool file reaches any of the 118 functions that keep a run (Proforma's, a simulation, a forecast, a vessel, a train, an engine run or a comparison), a train or a scenario a model made, or write an audit line; 11 gated actions need a person; 7 gates in gates.py and docs/TOOLS.md alike; 48 tools, each registered, each acting in one project, and docs/TOOLS.md as the registry writes it; a number stands only in a quantity or a count, and no fermOS or pureOS tool takes one
+=== exit 0
+=== check:licences
+  vendored     pisces_sff (MIT) at e236e3250414 in core/vendor/pisces_sff
+  vendored     sci_rag_migrations (BSD-3-Clause) at 26b3990c6264 in core/openferment_core/literature/kit_alembic/versions
+  vendored     sci_rag_prompts (BSD-3-Clause) at 26b3990c6264 in core/openferment_core/literature/domain/prompts
+  listing      THIRD_PARTY.md is current
+
+✓ Every dependency's licence is allowed or accepted by a named person.
+=== exit 0
+=== check:guild
+✓ and the change is named as the skills  [["skills"]]
+✓ a step’s note, references and timer label are compared too  ["timer label","note","references"]
+✓ a material’s rounding, stock and record are compared
+✓ a version compared with itself differs in nothing
+
+✓ Guild levels are computed the way the ladder says.
+=== exit 0
+=== check:state
+✓ every destination on the rail is a named component, read at its rail address
+✓ a link back to a rail destination names it as the rail does
+✓ a destination's tab carries no link back to another destination in its header
+✓ no subsystem the shelf calls unbuilt has a route the service serves
+
+✓ The project rows are sent as the page changes them, and kept until the service answers; a refusal is never an outage.
+=== exit 0
+=== check:figures
+✓ the dossier draws ceiling, forecast, price in that order, names an artifact that is missing, and says when the service is down
+✓ tables: recovery by unit 3, one row per unit; a unit with no product in says why and draws no bar; a run with no unit table says so before naming no product
+✓ tables: cost breakdown 5, one row per line and the run's price; CostWaterfall and Tornado stand on toTable, ENCODING and FigureFrame
+✓ tables: time course 16, one row per mark; curves keep the simulation's provenance, a ceiling's rule its own, and only the service's flag rings a yield
+✓ tables: oxygen balance 5, one row per hour of uptake, the transfer the design's value, the short hours the service's; OxygenBalance stands on toTable, ENCODING and FigureFrame
+✓ tables: purity by stream 5, one row per stream; 4 bars for the streams with a share, the product stream the service's alone; PurityByStream stands on toTable, ENCODING and FigureFrame
+=== exit 0
+=== typecheck
+
+> openferment@0.1.0 typecheck /tmp/claude-0/-home-user-openFermentUI/cfbc5c9f-640a-5002-a705-5ceaf850fdc6/scratchpad/bh/work/H13/wt
+> tsc --noEmit
+
+=== exit 0
+=== test:reconcile
+✓ a bound missed above it  held false, delta 10.00, refuted
+✓ a negative reading against a zero prediction has a negative delta  delta -100
+✓ the ledger counts locked, tested, held, missed and inconclusive runs  {"locked":3,"tested":1,"held":1,"missed":0,"inconclusiveRuns":1,"hitRate":null}
+✓ a hit rate appears at 5 tested  {"locked":5,"tested":5,"held":1,"missed":4,"inconclusiveRuns":0,"hitRate":0.2}
+
+THE THREE KINDS RECONCILE
+=== exit 0

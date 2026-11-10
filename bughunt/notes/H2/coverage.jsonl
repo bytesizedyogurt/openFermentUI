@@ -1,0 +1,103 @@
+{"kind": "file", "item": "core/openferment_core/engine/runs.py", "method": "executed", "findings": ["H2-01"], "note": "keep_run, compute_kept, run, run_engine, values_of, parameters_of read whole; rows of every engine kept and checked field by field (check_run.py)"}
+{"kind": "file", "item": "core/openferment_core/engine/biosteam.py", "method": "executed", "findings": ["H2-06", "H2-07"], "note": "run_plant at the library, engine, scenario and tool doors: one row"}
+{"kind": "file", "item": "core/openferment_core/engine/library.py", "method": "executed", "findings": ["H2-06"], "note": "run_inputs, tolerance, regression read; 16 alpha 2.1 runs replayed identically"}
+{"kind": "file", "item": "core/openferment_core/engine/contract.py", "method": "executed", "findings": [], "note": "WorkerEngine compute/sff_document via the sample engine through run_engine (contract_run.py)"}
+{"kind": "file", "item": "core/openferment_core/engine/__init__.py", "method": "read", "findings": []}
+{"kind": "file", "item": "core/openferment_core/engine/sample.py", "method": "executed", "findings": [], "note": "the sample engine kept rows through run_engine"}
+{"kind": "file", "item": "core/openferment_core/engine/simulator.py", "method": "read", "findings": [], "note": "function map only; exercised by every BioSTEAM run"}
+{"kind": "file", "item": "core/openferment_core/engine/sff.py", "method": "executed", "findings": [], "note": "export and keep_run_file read; run files checked by sha in the export package"}
+{"kind": "file", "item": "core/openferment_core/engine/registry.py", "method": "read", "findings": [], "note": "found() registers contract tools at discovery (replay route relies on it); H1 covers it in depth"}
+{"kind": "file", "item": "core/openferment_core/engine/conform.py", "method": "left", "findings": [], "note": "H1's area (conformance checks); H2 read only its map"}
+{"kind": "file", "item": "core/openferment_core/fermos_engine.py", "method": "executed", "findings": ["H2-01"], "note": "simulate, forecast, vessel at fermOS routes, the engine route and growth_forecast: one row each"}
+{"kind": "file", "item": "core/openferment_core/pureos/engine.py", "method": "executed", "findings": [], "note": "train run at the pureOS route, the engine route and engine_run: one row"}
+{"kind": "file", "item": "core/openferment_core/proforma.py", "method": "executed", "findings": ["H2-02"], "note": "keep_run, computed, run, run_thing, thing_list, basis_inputs read; route, engine and run_flowsheet doors one row; replay drift after a restart"}
+{"kind": "file", "item": "core/openferment_core/studies/__init__.py", "method": "read", "findings": []}
+{"kind": "file", "item": "core/openferment_core/studies/scenarios.py", "method": "executed", "findings": ["H2-07"], "note": "made and run with assumptions and measurements; a corrected reading refused"}
+{"kind": "file", "item": "core/openferment_core/studies/comparisons.py", "method": "executed", "findings": ["H2-01", "H2-08"], "note": "library beside Proforma, two forecasts, measured beside default, a receipt, another project's runs"}
+{"kind": "file", "item": "core/openferment_core/studies/runbooks.py", "method": "executed", "findings": ["H2-03", "H2-04"], "note": "made, locked, then every state-door write probed (lock_probe.py)"}
+{"kind": "file", "item": "core/openferment_core/studies/exports.py", "method": "executed", "findings": ["H2-05"], "note": "route and command line packages opened in python -I -S; byte-identical between exports"}
+{"kind": "file", "item": "core/openferment_core/workers/library_plants.py", "method": "executed", "findings": [], "note": "exercised through every BioSTEAM run, replay and SFF export; H1 reads the worker code"}
+{"kind": "file", "item": "core/openferment_core/workers/proforma_worker.py", "method": "executed", "findings": [], "note": "exercised through every BioSTEAM run, replay and SFF export; H1 reads the worker code"}
+{"kind": "file", "item": "core/openferment_core/workers/sff_toolkit.py", "method": "executed", "findings": [], "note": "exercised through every BioSTEAM run, replay and SFF export; H1 reads the worker code"}
+{"kind": "file", "item": "core/openferment_core/workers/__init__.py", "method": "left", "findings": [], "note": "worker internals are H1's (shared assignment); H2 tested the runs they serve"}
+{"kind": "file", "item": "core/openferment_core/workers/dot_names.py", "method": "left", "findings": [], "note": "worker internals are H1's (shared assignment); H2 tested the runs they serve"}
+{"kind": "file", "item": "core/openferment_core/workers/echo_worker.py", "method": "left", "findings": [], "note": "worker internals are H1's (shared assignment); H2 tested the runs they serve"}
+{"kind": "file", "item": "core/openferment_core/workers/geneos_worker.py", "method": "left", "findings": [], "note": "worker internals are H1's (shared assignment); H2 tested the runs they serve"}
+{"kind": "file", "item": "core/openferment_core/workers/kept_references.py", "method": "left", "findings": [], "note": "worker internals are H1's (shared assignment); H2 tested the runs they serve"}
+{"kind": "file", "item": "core/openferment_core/workers/sample_worker.py", "method": "executed", "findings": [], "note": "the worker code is H1's to read; sample_worker ran through contract_run.py"}
+{"kind": "file", "item": "core/openferment_core/artifacts.py", "method": "executed", "findings": ["H2-02"], "note": "compute, replay, _within read whole; replay of each tool"}
+{"kind": "file", "item": "core/openferment_core/project_state.py", "method": "executed", "findings": ["H2-03", "H2-04"], "note": "_put lock check, remove, run_request read"}
+{"kind": "file", "item": "core/openferment_core/runbook_lock.py", "method": "fuzzed", "findings": [], "note": "js_number held to node's JSON.stringify on 80008 numbers, no difference (fuzz_js_number.py)"}
+{"kind": "file", "item": "core/openferment_core/biorepo.py", "method": "read", "findings": [], "note": "map only; decision paths are H5/H10's"}
+{"kind": "file", "item": "core/openferment_core/basis.py", "method": "read", "findings": [], "note": "origin_of, is_measurement, basis_provenance read against runs.md"}
+{"kind": "file", "item": "core/openferment_core/api.py", "method": "executed", "findings": ["H2-06"], "note": "the runs, studies, Proforma, library, engines, flowsheet library and BioRepo artifact routes"}
+{"kind": "file", "item": "core/openferment_core/tools/engine.py", "method": "executed", "findings": [], "note": "engine_plants, engine_parameters, engine_run, engine_report across engines"}
+{"kind": "file", "item": "core/openferment_core/tools/studies.py", "method": "executed", "findings": ["H2-01"], "note": "study_scenario, study_compare, study_read"}
+{"kind": "file", "item": "core/openferment_core/tools/proforma.py", "method": "executed", "findings": [], "note": "run_flowsheet, selling_price"}
+{"kind": "file", "item": "core/openferment_core/tools/writes.py", "method": "read", "findings": [], "note": "run_engine, make_scenario, make_comparison, run_scenario"}
+{"kind": "file", "item": "core/openferment_core/nightly_checks.py", "method": "read", "findings": ["H2-02"], "note": "replay_newest counts an outside-precision replay as a problem"}
+{"kind": "file", "item": "docs/api/runs.md", "method": "read", "findings": ["H2-02"]}
+{"kind": "file", "item": "docs/api/studies.md", "method": "read", "findings": ["H2-01", "H2-03", "H2-04", "H2-05", "H2-07"]}
+{"kind": "file", "item": "docs/api/engines.md", "method": "read", "findings": ["H2-02", "H2-06"], "note": "the service, the core's three engines"}
+{"kind": "file", "item": "docs/api/sff.md", "method": "read", "findings": [], "note": "a run file's openferment metadata block checked in exported files"}
+{"kind": "file", "item": "docs/decisions/ADR-015-engine-contract.md", "method": "read", "findings": []}
+{"kind": "file", "item": "src/engine/lock.ts", "method": "read", "findings": ["H2-03"], "note": "lockIntact reads the row's own lockHash"}
+{"kind": "operation", "item": "GET /api/biorepo/artifacts", "method": "executed", "findings": []}
+{"kind": "operation", "item": "GET /api/biorepo/artifacts/{artifact_id}", "method": "executed", "findings": []}
+{"kind": "operation", "item": "GET /api/biorepo/artifacts/{artifact_id}/checks", "method": "executed", "findings": []}
+{"kind": "operation", "item": "POST /api/biorepo/artifacts/{artifact_id}/replay", "method": "executed", "findings": ["H2-02"]}
+{"kind": "operation", "item": "GET /api/biorepo/artifacts/{artifact_id}/tables", "method": "executed", "findings": []}
+{"kind": "operation", "item": "GET /api/engines", "method": "executed", "findings": []}
+{"kind": "operation", "item": "GET /api/engines/{name}/parameters", "method": "executed", "findings": []}
+{"kind": "operation", "item": "POST /api/engines/{name}/run", "method": "executed", "findings": []}
+{"kind": "operation", "item": "GET /api/flowsheets/library", "method": "executed", "findings": []}
+{"kind": "operation", "item": "POST /api/flowsheets/library/{file_id}", "method": "executed", "findings": []}
+{"kind": "operation", "item": "GET /api/library", "method": "executed", "findings": []}
+{"kind": "operation", "item": "GET /api/library/{plant}/parameters", "method": "executed", "findings": ["H2-06"]}
+{"kind": "operation", "item": "GET /api/library/{plant}/regression", "method": "executed", "findings": ["H2-06"]}
+{"kind": "operation", "item": "POST /api/library/{plant}/run", "method": "fuzzed", "findings": [], "note": "every refusal before anything runs probed (unknown key, range, nameless origin, record origin, configuration, unit); a receipt kept and answered from"}
+{"kind": "operation", "item": "GET /api/proforma/bind", "method": "executed", "findings": []}
+{"kind": "operation", "item": "GET /api/proforma/ceiling-check", "method": "executed", "findings": []}
+{"kind": "operation", "item": "POST /api/proforma/run", "method": "executed", "findings": ["H2-02"]}
+{"kind": "operation", "item": "GET /api/proforma/runs", "method": "executed", "findings": []}
+{"kind": "operation", "item": "GET /api/proforma/scenarios", "method": "executed", "findings": []}
+{"kind": "operation", "item": "GET /api/proforma/shelf", "method": "executed", "findings": []}
+{"kind": "operation", "item": "GET /api/proforma/status", "method": "executed", "findings": []}
+{"kind": "operation", "item": "GET /api/runs", "method": "executed", "findings": []}
+{"kind": "operation", "item": "GET /api/runs/{run_id}", "method": "executed", "findings": []}
+{"kind": "operation", "item": "GET /api/studies/comparisons", "method": "executed", "findings": []}
+{"kind": "operation", "item": "POST /api/studies/comparisons", "method": "executed", "findings": ["H2-01", "H2-08"]}
+{"kind": "operation", "item": "GET /api/studies/comparisons/{comparison_id}", "method": "executed", "findings": []}
+{"kind": "operation", "item": "GET /api/studies/export", "method": "executed", "findings": ["H2-05"]}
+{"kind": "operation", "item": "GET /api/studies/runbooks", "method": "executed", "findings": ["H2-04"]}
+{"kind": "operation", "item": "POST /api/studies/runbooks", "method": "executed", "findings": ["H2-04"]}
+{"kind": "operation", "item": "GET /api/studies/runbooks/{runbook_id}", "method": "executed", "findings": ["H2-03", "H2-04"]}
+{"kind": "operation", "item": "POST /api/studies/runbooks/{runbook_id}/lock", "method": "executed", "findings": []}
+{"kind": "operation", "item": "GET /api/studies/scenarios", "method": "executed", "findings": []}
+{"kind": "operation", "item": "POST /api/studies/scenarios", "method": "executed", "findings": ["H2-07"]}
+{"kind": "operation", "item": "GET /api/studies/scenarios/{scenario_id}", "method": "executed", "findings": ["H2-07"]}
+{"kind": "operation", "item": "POST /api/studies/scenarios/{scenario_id}/run", "method": "executed", "findings": ["H2-07"]}
+{"kind": "operation", "item": "GET /api/witness/runs", "method": "executed", "findings": [], "note": "an empty list on a project with no extraction; its rows are H8's"}
+{"kind": "operation", "item": "POST /api/pureos/train/run", "method": "executed", "findings": []}
+{"kind": "operation", "item": "GET /api/pureos/train-runs", "method": "left", "findings": [], "note": "H4's read; H2 kept train runs through the run routes"}
+{"kind": "operation", "item": "POST /api/pureos/train/from-run", "method": "executed", "findings": []}
+{"kind": "operation", "item": "PUT /api/state/{kind}/{item_id}", "method": "executed", "findings": ["H2-03"]}
+{"kind": "operation", "item": "DELETE /api/state/{kind}/{item_id}", "method": "executed", "findings": ["H2-04"]}
+{"kind": "operation", "item": "POST /api/fermos/simulate", "method": "executed", "findings": []}
+{"kind": "operation", "item": "POST /api/fermos/forecast", "method": "executed", "findings": ["H2-01"]}
+{"kind": "operation", "item": "POST /api/fermos/vessel", "method": "executed", "findings": []}
+{"kind": "operation", "item": "POST /api/fermos/fit", "method": "executed", "findings": ["H2-01"]}
+{"kind": "operation", "item": "GET /api/depositions/readings", "method": "executed", "findings": []}
+{"kind": "tool", "item": "engine_plants", "method": "executed", "findings": []}
+{"kind": "tool", "item": "engine_parameters", "method": "executed", "findings": []}
+{"kind": "tool", "item": "engine_run", "method": "executed", "findings": []}
+{"kind": "tool", "item": "engine_report", "method": "executed", "findings": []}
+{"kind": "tool", "item": "study_scenario", "method": "executed", "findings": []}
+{"kind": "tool", "item": "study_compare", "method": "executed", "findings": ["H2-01"]}
+{"kind": "tool", "item": "study_read", "method": "executed", "findings": []}
+{"kind": "tool", "item": "selling_price", "method": "executed", "findings": []}
+{"kind": "tool", "item": "run_flowsheet", "method": "executed", "findings": []}
+{"kind": "tool", "item": "growth_forecast", "method": "executed", "findings": []}
+{"kind": "engine", "item": "biosteam", "method": "executed", "findings": ["H2-02", "H2-06"], "note": "library plants and scenario flowsheets run, replayed, compared"}
+{"kind": "engine", "item": "kinetics", "method": "executed", "findings": ["H2-01"], "note": "simulation, forecast, vessel; receipts; replays identical"}
+{"kind": "engine", "item": "train", "method": "executed", "findings": [], "note": "a train made through the Builder's routes, run at three doors, replayed identically after a restart"}

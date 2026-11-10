@@ -1,0 +1,16 @@
+NOTICE:  database "bh_h6_r1" does not exist, skipping
+postgresql+asyncpg://openferment:***@127.0.0.1:5432/bh_h6_r1: openferment at 0007, sci_rag at 0006
+alpha 2.1 kept ethanol category biofuel
+alpha 2.1 kept cellulase category industrial_enzyme
+alpha 2.1 catalogue_write: {'state': 'open', 'kind': 'product', 'id': 'xylitol', 'name': 'Xylitol', 'by': 'claude-opus-5-5', 'note': "kept in the project's catalogue, marked as yours; a person may replace it."}
+alpha 2.1 lists: ['cellulase', 'ethanol', 'xylitol']
+postgresql+asyncpg://openferment:***@127.0.0.1:5432/bh_h6_r1: openferment at 0010, sci_rag at 0006
+head lists: ['cellulase']
+head GET /api/catalogues/product/ethanol -> 404 {"detail":"the project's product catalogue holds no ethanol"}
+head GET /api/catalogues/product/xylitol -> 404 {"detail":"the project's product catalogue holds no xylitol"}
+head GET /api/catalogues/product/cellulase -> 200 {"kind":"product","id":"cellulase","name":"Cellulase","species":null,"program":null,"aliases":[],"category":"industrial_
+head catalogue_read: 1 ['cellulase']
+rows in the database: product/cellulase (industrial_enzyme), product/ethanol (biofuel), product/xylitol (sugar alcohol)
+the head's log:
+WARNING openferment_core.catalogues: the product catalogue's row ethanol does not read as an entry and is left out: category: a product's category is one of the classes pureOS's proposer reads (molecu
+WARNING openferment_core.catalogues: the product catalogue's row xylitol does not read as an entry and is left out: category: a product's category is one of the classes pureOS's proposer reads (molecu

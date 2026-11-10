@@ -1,0 +1,11 @@
+--- a/core/openferment_core/validate.py
++++ b/core/openferment_core/validate.py
+@@ -206,8 +206,6 @@
+     masked = _IDENTIFIER.sub(lambda m: " " * len(m.group(0)), masked)
+     masked = _blank_prose_counts(masked)
+     if m := _DIGIT.search(masked):
+-        return m.group(0)
+-    if m := _WORD_NUMBER.search(masked):
+         return m.group(0)
+     if m := _MAGNITUDE.search(masked):
+         return m.group(0)

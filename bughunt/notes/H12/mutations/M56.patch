@@ -1,0 +1,11 @@
+--- a/core/openferment_core/literature/collectors.py
++++ b/core/openferment_core/literature/collectors.py
+@@ -314,7 +314,7 @@
+             raise HostFailed(f"the host name {host} resolved to an address this fetch cannot read") from None
+         if not found:
+             raise HostFailed(f"the host name {host} resolves to no address")
+-    for address in found:
++    for address in found[:1]:
+         why = refused_class(address)
+         if why is None:
+             continue

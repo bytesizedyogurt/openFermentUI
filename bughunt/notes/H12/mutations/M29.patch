@@ -1,0 +1,11 @@
+--- a/core/openferment_core/guard.py
++++ b/core/openferment_core/guard.py
+@@ -88,7 +88,7 @@
+     if not (o[0] == h[0] or (o[0] in LOOPBACK and h[0] in LOOPBACK)):
+         return False
+     origin_port = o[1] or DEFAULT_PORTS[o[2]]
+-    return origin_port == h[1] if h[1] is not None else origin_port in DEFAULT_PORTS.values()
++    return True
+ 
+ 
+ def key_refusal(headers: Mapping[str, str]) -> str | None:

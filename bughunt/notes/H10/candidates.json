@@ -1,0 +1,111 @@
+{
+  "candidates": [
+    {
+      "id": "H10-02",
+      "title": "A NUL character in an id, a query filter or a text field answers a bare 500 at 20 doors and a 404 in words at others",
+      "severity": "S3",
+      "kind": "Contract break",
+      "area": "api.py routes over text columns; the /rag mount",
+      "statement": "A request whose path id, query filter or body text holds U+0000 reaches PostgreSQL, which refuses the byte, and the service answers 500 'Internal Server Error' at 20 /api doors and 2 /rag doors, where GET /api/studies/runbooks/{id}, /api/biorepo/artifacts/{id} and /api/catalogues/{kind}/{id} answer the same id with a 404 in words.",
+      "contract": "core/openferment_core/api.py:207 (docs/api/openapi.json info.description) 'A refusal is a status with its reason in `detail`, in words.'; CLAUDE.md:87 'a refusal is a 422 in words'; openapi.json GET /api/runs/{run_id} 404 'The project holds no run of that id'",
+      "reproCommand": "bash bughunt/notes/H10/scripts/repro_all.sh 02 (fresh database bh_h10_repro; runs bughunt/notes/H10/scripts/nul_probe.py)",
+      "expected": "A 404 in words for an id the project does not hold, and a 422 in words for a filter or a name the service will not take, as the runbook, artifact and catalogue doors already answer.",
+      "observed": "500 'Internal Server Error' for GET /api/projects/{id}, /api/runs/{id}, /api/flowsheets/{id}, /api/flowsheets/{id}/file, /api/protocols/{id}, /api/conversations/{id}, /api/conversations/{id}/turns/{t}/calls, /api/studies/scenarios/{id}, /api/studies/comparisons/{id}; GET /api/audit?who=, ?action=, ?target=, /api/runs?engine=, /api/biorepo/artifacts?tool=, /api/proposals?state=; POST /api/projects with a NUL in name, by or description; POST /api/studies/scenarios/{id}/run; POST /api/practice/record with a NUL sessionId; and the kit's problem+json 500 'DBAPIError' for GET /rag/v1/documents/{id} and ?search=. The log holds asyncpg.exceptions.CharacterNotInRepertoireError: invalid byte sequence for encoding \"UTF8\": 0x00 for each. A NUL in a catalogue entry's name is kept (200) and served back, since body columns are json.",
+      "cause": "core/openferment_core/api.py:424-426: the handlers map OperationalError, InterfaceError and ConnectionRefusedError alone; the DataError PostgreSQL raises for 0x00 in a text column (lookup keys, filters, projects.name) reaches Starlette's generic 500. No model or validator refuses U+0000 in an id or text field.",
+      "confidence": "high",
+      "fixSize": "small",
+      "evidence": "nul_probe.py against a fresh service: 20 /api answers a 5xx; with a /rag key, 2 more. The four doors answering 404 in words take the same 'a\\x00b' id. body_sweep.py over every POST, PUT and DELETE with every string a NUL found POST /api/projects and POST /api/practice/record as the two body doors that answer 500. No answer body carried a stack trace, path or SQL."
+    },
+    {
+      "id": "H10-03",
+      "title": "/rag answers with no key: its corpus manifest gives the project's counts and names endpoints, an embedder and a feature this mount does not have",
+      "severity": "S4",
+      "kind": "Contract break",
+      "area": "literature/kit.py rest_app (the /rag mount)",
+      "statement": "With OPENFERMENT_RAG_KEY unset, /rag/health, /rag/v1/corpus-manifest, /rag/docs and /rag/openapi.json answer 200 with no key, the manifest naming the project's document and chunk counts that /rag/v1/status refuses with 401, and the manifest names a REST address at /v1, an MCP endpoint at /mcp, an openapi at /openapi.json, embedder provider 'local-hash' and byo_llm_key true, none of which this mount serves.",
+      "contract": "docs/decisions/ADR-002-sci-rag-kit.md:106-108 'with none set a key made in memory and never shown stands in, so `/rag` refuses every request'; core/openferment_core/ready.py:248 '/rag refuses every request: no OPENFERMENT_RAG_KEY in core/.env'; CLAUDE.md:67 'its REST serves under `/rag` behind `OPENFERMENT_RAG_KEY`'; ADR-002:109 'the kit's `/mcp` endpoint is left out of the mount'",
+      "reproCommand": "bash bughunt/notes/H10/scripts/repro_all.sh 03 (runs bughunt/notes/H10/scripts/rag_probe.sh on a service started with OPENFERMENT_RAG_KEY empty)",
+      "expected": "Every /rag route refuses a request with no key when none is set (ADR-002), and a manifest it serves names this mount's own addresses (/rag/v1), its embedder (FastEmbed) and no MCP endpoint or own-key feature.",
+      "observed": "No key: /rag/v1/status 401, /rag/v1/documents 401; /rag/health 200, /rag/v1/corpus-manifest 200 with stats documents 1, chunks 1 for project r1, /rag/docs 200, /rag/openapi.json 200; /rag/ redirects 307 to /docs (openFerment's own docs). Manifest: endpoints rest http://127.0.0.1:8905/v1 (404), mcp http://127.0.0.1:8905/mcp (404), openapi http://127.0.0.1:8905/openapi.json (openFerment's document); embedding provider 'local-hash' while sci_rag.chunks holds embedding_version fastembed:BAAI/bge-small-en-v1.5@384; features byo_llm_key true while RAG_SCOPES leaves byo_llm out.",
+      "cause": "core/openferment_core/literature/kit.py:841-850 mounts the kit's create_app whole beside the /mcp removal: sci_rag/server/routers/meta.py serves /health and /v1/corpus-manifest with no require_scopes, builds endpoints from request.base_url (which leaves out the /rag mount) and reads settings.embedding_provider, which kit.py:213 sets to 'local-hash'.",
+      "confidence": "high",
+      "fixSize": "small",
+      "evidence": "rag_probe.sh on a service with OPENFERMENT_RAG_KEY empty, after one pasted document; ready --offline prints the rag row '/rag refuses every request'. With a key set (8902): right key in Bearer or X-API-Key 200, wrong, empty or a prefix of the key 401, a wrong X-API-Key beside a right Bearer 401, the key absent from the log."
+    },
+    {
+      "id": "H10-04",
+      "title": "Every body column is json while CLAUDE.md and ADR-001 say JSONB",
+      "severity": "S4",
+      "kind": "Drift",
+      "area": "db/models.py, alembic 0001, CLAUDE.md, ADR-001",
+      "statement": "All 29 `body` columns of the openferment schema are PostgreSQL json, which the records call JSONB.",
+      "contract": "CLAUDE.md:66 'a row keeps its lookup keys as columns and the Pydantic model as JSONB `body` (ADR-001)'; docs/decisions/ADR-001-postgresql.md:62 'the Pydantic model of `models.py` dumped as JSONB'",
+      "reproCommand": "bash bughunt/notes/H10/scripts/repro_all.sh 04",
+      "expected": "body columns of type jsonb, or records that say json.",
+      "observed": "information_schema.columns: data_type json for all 29 body columns; core/openferment_core/db/models.py:68-69 Column(\"body\", JSON); alembic 0001 postgresql.JSON(astext_type=sa.Text()). The json type keeps a \\u0000 escape (a catalogue entry named with a NUL is kept and served back), which jsonb would refuse.",
+      "cause": "core/openferment_core/db/models.py:69 uses sqlalchemy JSON, which PostgreSQL renders as json.",
+      "confidence": "high",
+      "fixSize": "small",
+      "evidence": "psql on a freshly migrated bh_ database; grep of CLAUDE.md and ADR-001."
+    },
+    {
+      "id": "H10-05",
+      "title": "guard.py's list of names it answers to leaves out .localhost, which its code and the OpenAPI description admit",
+      "severity": "S4",
+      "kind": "Drift",
+      "area": "guard.py docstring",
+      "statement": "guard.py's docstring names an IP address, a dotless name, .local, .ts.net and OPENFERMENT_ALLOWED_HOSTS as the hosts a change may come under; OWN_SUFFIXES also holds .localhost, a POST under evil.localhost reaches its endpoint, and the generated OpenAPI description lists .localhost.",
+      "contract": "core/openferment_core/guard.py:22-24 'A host this service answers to: an IP address, a name with no dot, a `.local` name (Bonjour), a `.ts.net` name (Tailscale's names for the owner's devices), or one listed in OPENFERMENT_ALLOWED_HOSTS.'",
+      "reproCommand": "bash bughunt/notes/H10/scripts/repro_all.sh 05",
+      "expected": "The docstring names every suffix OWN_SUFFIXES holds, as api.py's DESCRIPTION does.",
+      "observed": "POST /api/biorepo/check under Host evil.localhost with the same Origin: 422 from the endpoint (passed the guard); guard.py:37 OWN_SUFFIXES = (\".local\", \".localhost\", \".ts.net\"); openapi.json's description: 'a name ending `.local`, `.localhost` or `.ts.net`'.",
+      "cause": "core/openferment_core/guard.py:22-24 was written before .localhost joined OWN_SUFFIXES at guard.py:37.",
+      "confidence": "high",
+      "fixSize": "small",
+      "evidence": "guard_matrix.py row 'x.localhost' 422; repro_all.sh 05."
+    }
+  ],
+  "suspected": [
+    {
+      "title": "No limit on a request's size, and a refused body comes back once per field error",
+      "tried": "A 64 MB JSON body to POST /api/biorepo/check was read whole (RSS 465 MB to 813 MB) and its 422 answer was 201 MB, the input echoed in each of three missing-field errors; a million-key body took 8 s and answered 67 MB; a 16 MB header and 20000 headers were accepted; a 70 KB URL answered 400; 100000-deep JSON answered 400 in words. The guard refuses a cross-site write before the body is read, so only a local caller reaches this; no contract names a limit."
+    },
+    {
+      "title": "A websocket upgrade to any path outside /rag answers 500 with a traceback in the log",
+      "tried": "Upgrade requests to /api/health and / answered 500 (StaticFiles asserts scope type http); /rag paths answered 403. The http middlewares (guard, project) do not see websocket scopes, and no websocket route exists, so nothing is reachable through it."
+    },
+    {
+      "title": "The /rag key is looked up in a dict, with no rate limit on wrong keys",
+      "tried": "sci_rag StaticKeyBackend.authenticate does keys.get(token); its timing depends on a salted hash the caller cannot steer, so no timing probe was meaningful. check_rate runs after a key is found, so wrong keys are unlimited; a short OPENFERMENT_RAG_KEY would be guessable without limit, and ready.py checks presence alone."
+    },
+    {
+      "title": "LIKE wildcards in /rag/v1/documents?search= are unescaped",
+      "tried": "kit.py:467 ilike(f\"%{search}%\") binds the value; '%' and '_' act as wildcards inside the project's own documents. Within one project, so no cross-project read."
+    }
+  ],
+  "needsLiveModel": [
+    "X-OpenFerment-Key on a route that calls a model (/api/ask, /rag/v1/answer, /api/literature/answer): that the key reaches the provider alone and stays out of logs, errors and audit rows on a real call. Keyless runs here covered only routes with no model call.",
+    "The error stream of POST /api/literature/answer and /api/ask/stream when the model call fails mid-answer: whether the event's message carries an exception text with a path."
+  ],
+  "held": [
+    "Cross-site writes from a page on 127.0.0.1:8901 driven in Chromium: a no-cors fetch, a text/plain form POST and sendBeacon to /api/projects, no-cors POSTs to /api/tools/{name} and /rag/v1/query each answered 403 naming the page's origin; JSON fetch and PUT stopped at the preflight (OPTIONS 405); a no-cors DELETE refused by the browser; no project was made.",
+    "guard_matrix.py over raw HTTP: forged Origin, Origin null, ws:, file:, empty, two Origins with the hostile first, a hostile Host with or without Origin, a forged X-Forwarded-Host beside a cross-site Origin, X-Forwarded-For, the Funnel header and a missing Host were all refused; PATCH, PUT and DELETE refused like POST.",
+    "CORS: no Access-Control-Allow-Origin on any /api, /rag or / answer for any Origin; /api preflights 405, /rag preflights 400.",
+    "The key override: a sentinel in X-OpenFerment-Key never appeared in an answer body or header, the service log or a pg_dump of the database; it was refused under a hostile Host and through Funnel; the audit row says override true and names nothing of the key.",
+    "Static dist/: 17 traversal shapes (.., %2e%2e, %2f, double encoding, backslash, absolute, NUL, 5000 characters) answered 404; scripts/lib/serve-dist.mjs with prototype-up.sh's decode never served a file outside dist/.",
+    "Path parameters: 17 values in every path parameter of every operation (path_sweep.py) gave no traversal answer and no stack trace, file path, SQL or environment value in any body; only the NUL 500s of H10-02.",
+    "SQL: every text() in the service holds constants and bound parameters; injection through the audit, runs, artifacts, proposals, search and readings filters returned [] in milliseconds and pg_sleep never ran.",
+    "Bind: prove.py, smoke.ts, prototype-up.sh (both its servers), launchd.py's default and lib.sh's default all listen on 127.0.0.1; lsof showed the service on localhost alone.",
+    "Every GET in openapi.json sent with ?project= kept no row: row counts of every table equal before and after.",
+    "Upload names: intake keeps Path(name).name; an SFF import keeps the name as words and writes no file; an SFF file naming another project in its metadata stays in the importing project and is a 404 from the other.",
+    "Error bodies: 4xx answers in words; the service's 5xx is a bare 'Internal Server Error'; the kit's 500 names the exception class alone; library and engine refusals for odd plants, configurations and things are 422 in words."
+  ],
+  "unexamined": [
+    {"item": "Slow bodies (a slowloris client)", "reason": "Not run: the body is read in the event loop before a handler's thread, so it holds sockets alone; low value on a loopback service."},
+    {"item": "tailscale serve and Funnel with a real Tailscale", "reason": "No Tailscale here; the Funnel header was sent by hand."},
+    {"item": "pnpm dev (Vite 5.4.21 allowedHosts)", "reason": "Not started in the main tree, since it writes node_modules/.vite; Vite's own Host check is upstream."},
+    {"item": "scripts/prototype-up.sh end to end", "reason": "It runs session-start.sh, which writes core/.env; its static server and decode logic were run alone."},
+    {"item": "scripts/host/launchd.py and install.sh on macOS", "reason": "Not runnable here; read for the bind address only."},
+    {"item": "The module logic of the 23 files shared with H5", "reason": "H5's half of this assignment; H10 reached them through their routes' fuzzing alone."}
+  ]
+}

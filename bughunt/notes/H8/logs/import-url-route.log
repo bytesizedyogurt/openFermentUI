@@ -1,0 +1,10 @@
+INFO openferment.api: serving the built app from /home/user/openFermentUI/dist at /
+INFO httpx: HTTP Request: GET https://public.test/bad-location "HTTP/1.1 302 Found"
+INFO httpx2: HTTP Request: POST http://127.0.0.1/api/flowsheets/import-url "HTTP/1.1 500 Internal Server Error"
+INFO httpx: HTTP Request: GET https://public.test/js-location "HTTP/1.1 302 Found"
+INFO httpx2: HTTP Request: POST http://127.0.0.1/api/flowsheets/import-url "HTTP/1.1 500 Internal Server Error"
+INFO httpx: HTTP Request: GET https://public.test/nul.json "HTTP/1.1 200 OK"
+INFO httpx2: HTTP Request: POST http://127.0.0.1/api/flowsheets/import-url "HTTP/1.1 200 OK"
+/bad-location -> 500 Internal Server Error
+/js-location -> 500 Internal Server Error
+/nul.json -> 200 {"id":"sff-8157bd6e6fa33ddf","title":"nul \u0000 title","origin":"imported","source":"the file at https://public.test/nul.json, imported","sffVersion":null,"sha256":"8157bd6e6fa33ddf170cdfe422127d788c7ee9e106459d6bdd467c1393454bc3","bytes":79,"simulator":null,"runArtifactId":null,"libraryId":null,"u
