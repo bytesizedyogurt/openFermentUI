@@ -103,6 +103,14 @@ session continues from this file and `git log` alone.
    prompt's §9 completion report, and the tag `alpha-2.2` attempted once on the branch's head. Files in
    flight: none; stage H's commits hold the records, the runs of its step 1 and the close review's
    fixes (the Log, stage H).
+8. **The bug hunt and its fixes.** The hunt of `2047f5a` (10 and 11 November) is reported in
+   `docs/reports/bug-hunt-2026-11.md` on `claude/alpha-2-2-bughunt`, its reproductions in
+   `bughunt/repro/<id>/run.sh`. The fixes take the report's fix order group by group on
+   `claude/alpha-2-2-fixes`, cut from the hunt's head (`fa8db4a`); each group's fix reruns its
+   reproductions twice beside the hunt's logs (`after-fix-run1.log`, `after-fix-run2.log`). Group 1
+   (H5-01) is done; group 2 (H7-01, the browser's shared pending-writes snapshot) is next. Groups 16
+   and 19 change how a key is read, a stop condition, and wait on the owner (the Log, Fixes after the
+   bug hunt).
 
 ## Current stage
 
@@ -3616,3 +3624,33 @@ F.2f on, on `llm.ROUTES`' defaults (ADR-008, Implementation 17);
   database address empty, on Python 3.12 and on 3.13, `CLAUDE.md` at 149 lines; ShellCheck 0.11.0 and `bash -n` on
   the host scripts; `pnpm test:core` 3060 passed, 1 skipped, 175 deselected (5 min 12 s). `test:sim` and `test:lit`
   are not owed: neither the engines nor the literature layer moved. No model was called and nothing was spent.
+
+### Fixes after the bug hunt — 2026-11-11
+
+On `claude/alpha-2-2-fixes`, cut from `claude/alpha-2-2-bughunt` at `fa8db4a`, in the fix order of
+`docs/reports/bug-hunt-2026-11.md`.
+
+- Group 1, H5-01 (S1): a literature search in one project returned another project's private passage
+  when the other project committed it, under a source the two share, while the search ran. `_narrowed`
+  read the scope (`visible`) before the kit's retrieval statements ran, so the new document passed the
+  `sources` allowlist and an `exclude_document_ids` list read before it existed.
+  - The fix: `kit.ProjectRetriever`, the retriever `kit.service()` builds, reads the documents a
+    retrieval's items name against the project's holdings once the retrieval is done (`kit.holding`).
+    An item naming a document the project does not hold sends the retrieval once more with that
+    document excluded, so the scope still precedes the ranking. Any such item the second run returns
+    is dropped. The search, the answer engine and the retrieval report reach the one retriever, and a
+    retrieval with no project named is refused in words (422, `project_required`). The kit's
+    `RetrievalScope` carries no document allowlist, so the check stands on openFerment's side; the fix
+    order's own example, a condition inside the retrieval statement, waits on a document allowlist in
+    the kit's scope.
+  - Tests: three in `core/tests/test_literature_kit.py`. Two replay the race every time: the scope
+    read before the other project's commit, then the search and an answer in the project. A check in
+    the first shows the kit alone ranks the other project's note first under that scope. The third
+    asks the retriever with no project named. All three fail on `fa8db4a`'s `kit.py` and pass on the
+    fix; the file's 23 tests pass.
+  - The reproduction: `bash bughunt/repro/H5-01/run.sh`, twice, reads `RESULT: NO-DEFECT` in
+    `after-fix-run1.log` and `after-fix-run2.log`: A pasted all 60 notes while B searched 102 and 109
+    times, and 0 of A's notes reached B's hits (the hunt's runs read DEFECT after 18 and 17 searches).
+  - Records: `kit.py`'s docstring and ADR-002's line on the project as the scope name the check.
+  - Checks: `pnpm test:core` 3063 passed, 1 skipped, 175 deselected (5 min 36 s); `pnpm test:lit` 10 passed.
+    No model was called and nothing was spent.

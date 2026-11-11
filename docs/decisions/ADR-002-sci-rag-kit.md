@@ -82,7 +82,10 @@ Two adaptations, both meant to be offered upstream:
   calls, `/rag` and the MCP server alike: the sources of the project's documents go to the kit
   as its `sources` allowlist and the other documents of those sources as
   `exclude_document_ids`, so a shared document is visible to each project that linked it and to
-  no other. Which documents a project holds is read through openFerment's own session, the one
+  no other. Once a retrieval is done, the documents its items name are read against the
+  project's holdings again (`kit.ProjectRetriever`), so a document another project commits under
+  a shared source while a search runs stays out of it (the bug hunt's H5-01, 11 November 2026).
+  Which documents a project holds is read through openFerment's own session, the one
   a test's transaction binds. The kit keeps one concept graph for the instance, one entity row a
   name; a project builds it over its own passages and reads it through `literature/graph.py`
   (Implementation F), and the community layer is off for every scoped request, as the kit makes

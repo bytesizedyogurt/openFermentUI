@@ -1,0 +1,10 @@
+NOTICE:  database "bh_r_h5_01_race" does not exist, skipping
+service: http://127.0.0.1:10200 over a fresh bh_r_h5_01_race (keyless)
+step: bh-a pastes the seed -> ingested 80268156d16f45369a726c12525ce333
+step: bh-b pastes the seed -> linked 80268156d16f45369a726c12525ce333
+step: B holds 1 document(s), kit source(s): ['project:bh-a:paste']
+step: A pasted 60 private notes while B searched 109 times (3.5 s)
+step: one search from B after A stopped returns 0 of A's notes (1 hits)
+EXPECTED: every hit B's /api/literature/search returns is a passage of a document B holds; none of A's private notes, during A's ingestion or after it
+OBSERVED: 0 distinct A-only document(s) came back in B's hits while A ingested (0 held by A, 0 held by B), each with a passage id: ; after A stopped, B's search returns 0
+RESULT: NO-DEFECT

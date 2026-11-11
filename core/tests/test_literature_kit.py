@@ -104,6 +104,71 @@ def test_a_project_that_holds_nothing_sees_nothing(tmp_path, two_projects):
     assert kit.stats(THERE)["documents"] == 0
 
 
+def _raced(tmp_path, monkeypatch, topic: str) -> tuple[kit.Stored, kit.Stored]:
+    """H5-01's race, made to happen every time: THERE collects a document and
+    HERE links it, so HERE's scope names THERE's paste source; HERE's scope is
+    read; then THERE commits a private note under that source. `visible`
+    answers HERE with the scope read before the note existed, as a search
+    that began before THERE's commit reads it. The shared document and the
+    note are returned."""
+    text = _text(topic)
+    shared = _store(tmp_path, THERE, topic, text)
+    assert _store(tmp_path, HERE, topic, text).status == "linked"
+    before = db.run(kit.visible(HERE))
+    private = _store(tmp_path, THERE, f"{topic} private note")
+    assert kit.source(THERE, "paste") in before.sources and private.document_id not in before.excluded
+    real = kit.visible
+
+    async def read_before_the_commit(project_id: str) -> kit.Visible:
+        return before if project_id == HERE else await real(project_id)
+
+    monkeypatch.setattr(kit, "visible", read_before_the_commit)
+    return shared, private
+
+
+def test_a_document_committed_under_a_shared_source_during_a_search_stays_out_of_it(tmp_path, two_projects,
+                                                                                    monkeypatch):
+    shared, private = _raced(tmp_path, monkeypatch, "racing feed study")
+    query = "racing feed study private note placeholder vessel"
+
+    async def as_the_kit_alone_ranks_it():
+        with projects.using(HERE):
+            scope = await kit._narrowed(None)
+            return await kit.Retriever.retrieve(kit.service().retriever, query, limit=1, scope=scope,
+                                                profile="interactive")
+
+    assert [i.document_id for i in db.run(as_the_kit_alone_ranks_it()).items] == [private.document_id], \
+        "the scope read before the commit lets the note through, and the kit ranks it first"
+    hits, _ = kit.search(query, project_id=HERE, top_k=20)
+    assert {h.document_id for h in hits} == {shared.document_id}
+    top, _ = kit.search(query, project_id=HERE, top_k=1)
+    assert [h.document_id for h in top] == [shared.document_id], "the search runs again without the note"
+    assert {i.document_id for i in kit.retrieve(query, project_id=THERE, top_k=20).items} == {
+        shared.document_id, private.document_id}
+
+
+def test_an_answer_during_a_commit_under_a_shared_source_cites_only_the_projects_documents(tmp_path, two_projects,
+                                                                                          monkeypatch):
+    shared, _ = _raced(tmp_path, monkeypatch, "racing xylose study")
+    mock = MockLLM(responses=["Xylose was studied [1]."])
+    monkeypatch.setattr(kit, "_MODEL", lambda role: mock)
+    events = _answer("racing xylose study private note placeholder vessel", HERE, profile="interactive")
+    cited = next(e.data["citations"] for e in events if e.type == "citations")
+    assert {c["document_id"] for c in cited} == {shared.document_id}
+
+
+def test_the_retriever_asks_for_the_project_before_it_reads_anything(monkeypatch):
+    monkeypatch.delenv(projects.ENV, raising=False)
+
+    async def go():
+        with projects.using(None):
+            return await kit.service().retriever.retrieve("anything", limit=1)
+
+    with pytest.raises(ApiError) as refused:
+        db.run(go())
+    assert refused.value.status == 422 and refused.value.code == "project_required"
+
+
 def test_a_document_the_project_does_not_hold_is_not_found(tmp_path, two_projects):
     theirs = _store(tmp_path, THERE, "a report held elsewhere")
     with pytest.raises(ApiError) as missing:

@@ -16,7 +16,10 @@ stored again, so `documents_link` is the authority on who holds what. Every
 read a project makes is narrowed to its linked documents: their sources go to
 the kit as its `sources` allowlist, and every other document from those
 sources as `exclude_document_ids` (`visible`). A project that holds nothing
-sees nothing; the kit denies an empty allowlist outright.
+sees nothing; the kit denies an empty allowlist outright. The retriever reads
+the project's holdings again once a retrieval is done, so a document another
+project commits under a shared source during the search stays out of it
+(`ProjectRetriever`).
 
 `ProjectService` is the kit's own `RagService` with that narrowing applied to
 every read, the concept graph's among them (`graph.py`), so the calls below,
@@ -41,7 +44,7 @@ import os
 import queue
 import secrets
 import threading
-from collections.abc import AsyncIterator, Callable, Coroutine, Iterator
+from collections.abc import AsyncIterator, Callable, Coroutine, Iterable, Iterator
 from dataclasses import dataclass
 from typing import Any, TypeVar
 
@@ -302,7 +305,7 @@ def service(kind: str = "loop") -> ProjectService:
         if held is None:
             _answer_for_the_kit()
             s = settings()
-            retriever = Retriever(
+            retriever = ProjectRetriever(
                 settings=s,
                 domain=load_domain(DOMAIN_DIR),
                 embedder=embedder(),
@@ -370,6 +373,19 @@ async def visible(project_id: str) -> Visible:
     return Visible(tuple(held), tuple(sources), tuple(others))
 
 
+async def holding(project_id: str, document_ids: Iterable[str]) -> set[str]:
+    """Which of `document_ids` the project holds when this is read."""
+    ids = sorted(set(document_ids))
+    if not ids:
+        return set()
+    link = t.documents_link
+    async with db.session() as s:
+        rows = (await s.execute(
+            select(link.c.document_id).where(link.c.project_id == project_id, link.c.document_id.in_(ids))
+        )).all()
+    return {r[0] for r in rows}
+
+
 async def linked(project_id: str, document_id: str) -> dict[str, Any] | None:
     """The link row of a document the project holds, or None."""
     link = t.documents_link
@@ -414,6 +430,44 @@ async def _narrowed(base: RetrievalScope | None) -> RetrievalScope:
 async def _held(document_id: str) -> None:
     if await _on_db(linked(_project(), document_id)) is None:
         raise ApiError(404, "document_not_found", "No such document", document_id)
+
+
+class ProjectRetriever(Retriever):
+    """The kit's retriever, with every result held to the current project.
+
+    `_narrowed` reads the project's scope in a statement of its own, before
+    the retrieval runs. A document another project commits in between, under
+    a source the two projects share, passes both the scope's `sources`
+    allowlist and its `exclude_document_ids`, which were read before it
+    existed. So once the retrieval is done, the documents its items name are
+    read against the project's holdings again (`holding`). When an item names
+    a document the project does not hold, the retrieval runs once more with
+    that document excluded, so the scope still precedes the ranking. Any item
+    the second run returns from a document the project does not hold is
+    dropped. Every caller of the service's retriever reaches it: the search,
+    the answer engine and the retrieval report."""
+
+    async def retrieve(self, query: str, **kw: Any) -> RetrievalResult:
+        project = _project()
+        result = await super().retrieve(query, **kw)
+        strays = await self._strays(project, result)
+        if strays - {None}:
+            scope = kw.get("scope") or RetrievalScope()
+            kw["scope"] = dataclasses.replace(scope, exclude_document_ids=tuple(sorted(
+                {*scope.exclude_document_ids, *(d for d in strays if d is not None)})))
+            result = await super().retrieve(query, **kw)
+            strays = await self._strays(project, result)
+        if strays:
+            result = dataclasses.replace(result, items=[i for i in result.items if i.document_id not in strays])
+        return result
+
+    @staticmethod
+    async def _strays(project: str, result: RetrievalResult) -> set[str | None]:
+        """The documents the result's items name that the project does not
+        hold, None standing for an item that names no document."""
+        named = {i.document_id for i in result.items}
+        held = await _on_db(holding(project, (d for d in named if d is not None)))
+        return {d for d in named if d not in held}
 
 
 class ProjectService(RagService):
