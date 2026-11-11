@@ -157,8 +157,52 @@ def test_an_answer_during_a_commit_under_a_shared_source_cites_only_the_projects
     assert {c["document_id"] for c in cited} == {shared.document_id}
 
 
+def test_a_stray_every_run_returns_is_dropped_and_each_run_excludes_the_strays_before_it(monkeypatch):
+    """The kit's retrieval stood in for: each run returns a new document the
+    project does not hold, as when the other project keeps committing. The
+    reruns exclude the strays seen so far, and the last run's stray is
+    dropped while the project's own item stays."""
+    from sci_rag.retrieve.types import RetrievalResult, RetrievalScope, RetrievedItem
+
+    def item(document: str) -> RetrievedItem:
+        return RetrievedItem(kind="chunk", id=f"c-{document}", score=1.0, layers=["vector"], title=document,
+                             content=document, document_id=document)
+
+    excluded: list[tuple[str, ...]] = []
+
+    async def kit_retrieve(self, query, **kw):
+        excluded.append(kw["scope"].exclude_document_ids)
+        n = len(excluded)
+        return RetrievalResult(items=[item(f"theirs-{n}")] + ([item("mine")] if n > 1 else []), traces=[],
+                               profile="interactive")
+
+    async def holding(project_id, ids):
+        return {"mine"} & set(ids)
+
+    async def visible(project_id):
+        return kit.Visible(("mine",), ("a-source",), ("theirs-0",))
+
+    monkeypatch.setattr(kit.Retriever, "retrieve", kit_retrieve)
+    monkeypatch.setattr(kit, "holding", holding)
+    monkeypatch.setattr(kit, "visible", visible)
+
+    async def go():
+        with projects.using(HERE):
+            return await kit.service().retriever.retrieve("q", limit=2, scope=RetrievalScope(sources=("a-source",)))
+
+    result = db.run(go())
+    assert [i.document_id for i in result.items] == ["mine"]
+    assert excluded == [(), ("theirs-0", "theirs-1"), ("theirs-0", "theirs-1", "theirs-2")]
+    assert len(excluded) == 1 + kit.ProjectRetriever.RERUNS
+
+
 def test_the_retriever_asks_for_the_project_before_it_reads_anything(monkeypatch):
     monkeypatch.delenv(projects.ENV, raising=False)
+
+    async def read(*_a, **_k):
+        raise AssertionError("the kit's retrieval ran before the project was asked for")
+
+    monkeypatch.setattr(kit.Retriever, "retrieve", read)
 
     async def go():
         with projects.using(None):

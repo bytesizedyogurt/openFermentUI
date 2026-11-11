@@ -619,6 +619,7 @@ the line that records the decision and the decision record it stands under.
 | `pnpm db:up` (compose.yaml, `pgvector/pgvector:pg17`) has never run here: this container has no Docker daemon; CI runs the same image as a service | its first run on a machine with Docker, the owner's |
 | Component tests on fixtures recorded from the real service (`pnpm record:fixtures`, alpha 2.0 prompt §9.3) are unbuilt; the walk and the smoke run against the real service | a stage after alpha 2.2 that builds `pnpm record:fixtures` |
 | No offline test computes on a published genome-scale model (Yeast9 and iMM904 need their fetched files, caches kept outside git; Departures, §5.5 stage 2); a model add-on applied in the worker, and a metabolite-defined product's demand through the worker, are untested | a test under the marker `slow` or `live`, on a host that holds the fetched files |
+| Two concept-graph builds at once (`pnpm lit:graph` for two projects) can lose one project's document from an entity's `document_ids`: each build batch reads `kg_entities`, merges in Python and writes the arrays back, with no lock, under READ COMMITTED (`sci_rag/graph/extractor.py:356-452`). The entity keeps the description the lost document's passage produced, and `graph.entities` shows it to the other project (`literature/graph.py:296-309`). Found by the review of the bug hunt's group 1 fix, 11 November 2026 | its own fix: each batch's read and write of `kg_entities` under one advisory lock taken in `graph.build`, with a test of two builds at once |
 | `units.json` maps `wt%` and `% (w/w)` to `% CDW`, aliases written for the PHA program; changing them changes how a stored record converts | the vocabulary review, after alpha 2.2, with a migration for the records it converts |
 | RunbookDetail's held-for-review panel keeps words of Dominion's era: candidates near a claimed identity band, a ruling with legal consequences, and two rulings (a boundary accepted as mapped; candidates excluded pending counsel) that `store.resolveRunbookReview` writes into the held stage, with a boundary map among the runbook's outputs. No code in this build sets a runbook held for review, so the panel answers only a row kept in that state | the stage that lets a runbook be held for review, with that state's own words and rulings |
 | `fermos.forecast_run` keeps `duration_h`, a length the calling code sets as its own convention, which the tests and their stand-ins pass (`standins.py`, `test_fermos.py`, `test_fermos_3r.py`, `test_proforma_fermos.py`, `test_proforma_ceiling.py`); the routes, the tools and the engine set a forecast's length as a typed `t_end` | the change that has those tests set a typed `t_end`, or reach `fermos.forecast()` through a helper of their own |
@@ -3636,21 +3637,38 @@ On `claude/alpha-2-2-fixes`, cut from `claude/alpha-2-2-bughunt` at `fa8db4a`, i
   `sources` allowlist and an `exclude_document_ids` list read before it existed.
   - The fix: `kit.ProjectRetriever`, the retriever `kit.service()` builds, reads the documents a
     retrieval's items name against the project's holdings once the retrieval is done (`kit.holding`).
-    An item naming a document the project does not hold sends the retrieval once more with that
-    document excluded, so the scope still precedes the ranking. Any such item the second run returns
-    is dropped. The search, the answer engine and the retrieval report reach the one retriever, and a
+    An item naming a document the project does not hold sends the retrieval again, up to
+    `ProjectRetriever.RERUNS` (2) times, each time excluding the strays seen so far and every other
+    document of the project's sources as `visible` reads them then, so the scope still precedes the
+    ranking and a second document committed in the same window goes out with the first. Any such item
+    the last run returns is dropped. The search, the answer engine and the retrieval report reach the one retriever, and a
     retrieval with no project named is refused in words (422, `project_required`). The kit's
     `RetrievalScope` carries no document allowlist, so the check stands on openFerment's side; the fix
     order's own example, a condition inside the retrieval statement, waits on a document allowlist in
     the kit's scope.
-  - Tests: three in `core/tests/test_literature_kit.py`. Two replay the race every time: the scope
+  - Tests: four in `core/tests/test_literature_kit.py`. Two replay the race every time: the scope
     read before the other project's commit, then the search and an answer in the project. A check in
     the first shows the kit alone ranks the other project's note first under that scope. The third
-    asks the retriever with no project named. All three fail on `fa8db4a`'s `kit.py` and pass on the
-    fix; the file's 23 tests pass.
+    stands in for the kit's retrieval with runs that each return a new stray, and holds the
+    exclusions each rerun carries and the drop after the last. The fourth asks the retriever with no
+    project named, the kit's retrieval set to fail if it is reached. Each fails on `fa8db4a`'s
+    `kit.py` and passes on the fix; the file's 24 tests pass.
   - The reproduction: `bash bughunt/repro/H5-01/run.sh`, twice, reads `RESULT: NO-DEFECT` in
-    `after-fix-run1.log` and `after-fix-run2.log`: A pasted all 60 notes while B searched 102 and 109
+    `after-fix-run1.log` and `after-fix-run2.log`: A pasted all 60 notes while B searched 115 and 104
     times, and 0 of A's notes reached B's hits (the hunt's runs read DEFECT after 18 and 17 searches).
   - Records: `kit.py`'s docstring and ADR-002's line on the project as the scope name the check.
-  - Checks: `pnpm test:core` 3063 passed, 1 skipped, 175 deselected (5 min 36 s); `pnpm test:lit` 10 passed.
+  - Review: three readers (every read path, the retriever's own correctness, regressions and cost),
+    each claim then checked against the code. Confirmed and fixed: the first commit's one rerun
+    excluded only the strays that ranked (now the bounded rerun above), no test reached the drop after
+    the rerun, and the no-project test could not show the refusal comes before any read. Checked and
+    set aside: the reruns replace the first run's traces (the hits B gets come from the last run, and
+    a trace naming the rerun would tell B of another project's work), a deep-profile rerun asks the
+    graph and HyDE layers' model again (a rerun happens only in a race), and the LLM reranker reads a
+    racing passage before the check (its text reaches no reply to B). Every read path was found
+    covered: the search, the answer engine, `/rag`, both MCP servers, the document, citation, graph
+    and stats reads, and the retrieval report.
+  - Found by the review, apart from H5-01: two concept-graph builds at once can lose one project's
+    document from an entity's `document_ids` and keep the description its passage produced (an Open
+    debt, below).
+  - Checks: `pnpm test:core` 3064 passed, 1 skipped, 175 deselected (5 min 31 s); `pnpm test:lit` 10 passed.
     No model was called and nothing was spent.

@@ -441,20 +441,30 @@ class ProjectRetriever(Retriever):
     allowlist and its `exclude_document_ids`, which were read before it
     existed. So once the retrieval is done, the documents its items name are
     read against the project's holdings again (`holding`). When an item names
-    a document the project does not hold, the retrieval runs once more with
-    that document excluded, so the scope still precedes the ranking. Any item
-    the second run returns from a document the project does not hold is
-    dropped. Every caller of the service's retriever reaches it: the search,
-    the answer engine and the retrieval report."""
+    a document the project does not hold, the retrieval runs again, up to
+    `RERUNS` times, each time excluding the strays seen so far and every other
+    document of the project's sources as `visible` reads them then, so the
+    scope still precedes the ranking and a second document committed in the
+    same window is excluded with the first. Any item the last run returns
+    from a document the project does not hold is dropped. Every caller of the
+    service's retriever reaches it: the search, the answer engine and the
+    retrieval report."""
+
+    #: How many times a retrieval runs again when its items name a document
+    #: the project does not hold.
+    RERUNS = 2
 
     async def retrieve(self, query: str, **kw: Any) -> RetrievalResult:
         project = _project()
         result = await super().retrieve(query, **kw)
         strays = await self._strays(project, result)
-        if strays - {None}:
+        for _ in range(self.RERUNS):
+            if not strays - {None}:
+                break
             scope = kw.get("scope") or RetrievalScope()
+            now = await _on_db(visible(project))
             kw["scope"] = dataclasses.replace(scope, exclude_document_ids=tuple(sorted(
-                {*scope.exclude_document_ids, *(d for d in strays if d is not None)})))
+                {*scope.exclude_document_ids, *now.excluded, *(d for d in strays if d is not None)})))
             result = await super().retrieve(query, **kw)
             strays = await self._strays(project, result)
         if strays:
