@@ -1,0 +1,67 @@
+== worktree /tmp/claude-0/-home-user-openFermentUI/cfbc5c9f-640a-5002-a705-5ceaf850fdc6/scratchpad/bh/work/H12-13/wt-20140 at 2047f5a, diff:  1 file changed, 1 insertion(+), 1 deletion(-)
+== 1. the contract
+   basis.py: def is_measurement(source: BasisSource) -> bool:
+   basis.py:     """Whether a basis source is a deposition's reading a run set
+   basis.py:     (`measurement_source`): a deposition naming one reading,
+   basis.py:     `<deposition id>/<entry id>`, its note saying when the reading was
+   basis.py:     taken. A deposition naming a whole series (the readings a kinetic fit is
+   basis.py:     made on, fermos.py) is the bench's record the fit rests on."""
+   basis.py:     return (source.kind == "deposition" and bool(READING_REF.fullmatch(source.id or ""))
+   basis.py:             and bool(_MEASURED.match(source.note or "")))
+   ADR-006: - A reading's basis source is a `deposition` naming it (`basis.measurement_source`): its id the
+   ADR-006:   ref, its `by` the depositor and its note `measured on <at>` with any conversion.
+   ADR-006:   `basis.origin_of` reads it back as a `measurement`. A deposition source naming a whole series
+   ADR-006:   (the readings a kinetic fit is made on) reads back as the bench's record, as it did, and the
+   ADR-006:   fit's provenance stays what it was.
+== 2. every deposition basis source the tests build (syntax trees of core/tests/test_*.py)
+   test_basis.py:204  measurement_source  id='dep-b1/de-1'  reading-shaped=True  note='measured on ... (measurement_source stamps it, basis.py:103)'
+   test_basis.py:211  BasisSource  id='d-1'  reading-shaped=False  note='the readings as the browser sent them'
+   test_basis.py:262  measurement_source  id='dep-b1/de-1'  reading-shaped=True  note='measured on ... (measurement_source stamps it, basis.py:103)'
+   test_basis.py:197  measurement_source  id="<over.get('ref', READING)>"  reading-shaped=False  note='measured on ... (measurement_source stamps it, basis.py:103)'
+   test_engine_pins.py:272  fermos.fit  id='dep-f'  reading-shaped=False  note='the readings as the browser sent them; ... (fermos.py:368)'
+   test_engines.py:1564  fermos.fit  id='dep-f'  reading-shaped=False  note='the readings as the browser sent them; ... (fermos.py:368)'
+   test_engines.py:1608  fermos.fit  id='dep-f'  reading-shaped=False  note='the readings as the browser sent them; ... (fermos.py:368)'
+   test_engines.py:1978  BasisSource  id='dep-1/de-1'  reading-shaped=True  note='measured on {...}T00:00:00Z'
+   test_fermos.py:133  fermos.fit  id='dep-1'  reading-shaped=False  note='the readings as the browser sent them; ... (fermos.py:368)'
+   test_fermos.py:141  fermos.fit  id='sample'  reading-shaped=False  note='the readings as the browser sent them; ... (fermos.py:368)'
+   test_fermos.py:210  fermos.fit  id='dep-f'  reading-shaped=False  note='the readings as the browser sent them; ... (fermos.py:368)'
+   test_fermos.py:248  fermos.fit  id='dep-r'  reading-shaped=False  note='the readings as the browser sent them; ... (fermos.py:368)'
+   test_fermos.py:267  fermos.fit  id='dep-g'  reading-shaped=False  note='the readings as the browser sent them; ... (fermos.py:368)'
+   test_fermos.py:325  fermos.fit  id='dep-k'  reading-shaped=False  note='the readings as the browser sent them; ... (fermos.py:368)'
+   test_fermos.py:346  fermos.fit  id='dep-ps'  reading-shaped=False  note='the readings as the browser sent them; ... (fermos.py:368)'
+   test_fermos.py:358  fermos.fit  id='dep-l'  reading-shaped=False  note='the readings as the browser sent them; ... (fermos.py:368)'
+   test_fermos.py:534  fermos.fit  id='dep-gauge'  reading-shaped=False  note='the readings as the browser sent them; ... (fermos.py:368)'
+   test_fermos.py:365  fermos.fit  id='dep-l'  reading-shaped=False  note='the readings as the browser sent them; ... (fermos.py:368)'
+   test_fermos.py:367  fermos.fit  id='dep-l'  reading-shaped=False  note='the readings as the browser sent them; ... (fermos.py:368)'
+   test_fermos_3r.py:116  fermos.fit  id='dep-synthetic'  reading-shaped=False  note='the readings as the browser sent them; ... (fermos.py:368)'
+   test_fermos_bind.py:288  fermos.fit  id='dep-bind'  reading-shaped=False  note='the readings as the browser sent them; ... (fermos.py:368)'
+   test_fermos_bind.py:340  fermos.fit  id='dep-log'  reading-shaped=False  note='the readings as the browser sent them; ... (fermos.py:368)'
+   test_fermos_screen.py:172  fermos.fit  id='dep-synthetic'  reading-shaped=False  note='the readings as the browser sent them; ... (fermos.py:368)'
+   test_fermos_screen.py:197  fermos.fit  id='dep-od'  reading-shaped=False  note='the readings as the browser sent them; ... (fermos.py:368)'
+   test_measurements.py:725  measurement_source  id='dep-1/de-3'  reading-shaped=True  note='measured on ... (measurement_source stamps it, basis.py:103)'
+   test_measurements.py:471  measurement_source  id='dep-1/de-1'  reading-shaped=True  note='measured on ... (measurement_source stamps it, basis.py:103)'
+   test_measurements.py:569  measurement_source  id='dep-1/de-2'  reading-shaped=True  note='measured on ... (measurement_source stamps it, basis.py:103)'
+   test_phase7_review.py:46  fermos.fit  id='dep-r5'  reading-shaped=False  note='the readings as the browser sent them; ... (fermos.py:368)'
+   test_phase7_review.py:56  fermos.fit  id='dep-r5b'  reading-shaped=False  note='the readings as the browser sent them; ... (fermos.py:368)'
+   test_proforma_ceiling.py:246  fermos.fit  id='dep-ethanol'  reading-shaped=False  note='the readings as the browser sent them; ... (fermos.py:368)'
+   test_proforma_fermos.py:92  fermos.fit  id='<dep>'  reading-shaped=False  note='the readings as the browser sent them; ... (fermos.py:368)'
+   test_proforma_fermos.py:295  fermos.fit  id='dep-spelled'  reading-shaped=False  note='the readings as the browser sent them; ... (fermos.py:368)'
+   test_proforma_fermos.py:358  fermos.fit  id='dep-g'  reading-shaped=False  note='the readings as the browser sent them; ... (fermos.py:368)'
+   test_proforma_fermos.py:312  fermos.fit  id='dep-mg'  reading-shaped=False  note='the readings as the browser sent them; ... (fermos.py:368)'
+   test_review_8r.py:188  fermos.fit  id='dep-8r'  reading-shaped=False  note='the readings as the browser sent them; ... (fermos.py:368)'
+   test_tools.py:763  fermos.fit  id='dep-t'  reading-shaped=False  note='the readings as the browser sent them; ... (fermos.py:368)'
+   sources and fits: 36; with a reading-shaped id and a note other than 'measured on': 0
+== 3. a deposition source dep-b1/de-1 with fermOS's series note, on bh_r_h12_13_probe
+   module: core/openferment_core/basis.py
+   as it stands: is_measurement=False origin_of=record is_set=False basis_provenance=computed
+                 fermos.fit('dep-b1/de-1') kept as computed; fermos.fit('dep-b1') kept as computed
+   M05 applied:  - return (source.kind == "deposition" and bool(READING_REF.fullmatch(source.id or "")) - and bool(_MEASURED.match(source.note or ""))) + return (source.kind == "deposition" and bool(READING_REF.fullmatch(source.id or "")))
+   with M05:     is_measurement=True origin_of=raises ValidationError is_set=True basis_provenance=measured
+                 fermos.fit('dep-b1/de-1') kept as measured; fermos.fit('dep-b1') kept as computed
+                 calls the counter saw the note clause decide in the probe: 6
+== 4. pytest, M05 with the counter: the hunt's eight files for M05 and the two test_engines tests that build a reading
+   225 passed in 51.39s (exit 0)
+   calls the counter saw the note clause decide in the test run: 0
+EXPECTED: a test builds a deposition source with a reading-shaped id and a note other than 'measured on <at>' (basis.py:195-200: a reading's note says when it was taken; ADR-006:188-192) and holds it to the bench's record, so the fit resting on it stays computed; dropping the note clause (M05) fails that test
+OBSERVED: tree: is_measurement=False, origin record, fit computed; M05: is_measurement=True, origin_of raises ValidationError, fit measured; tests building a source the clause decides: 0 of 36; calls it decided in the test run: 0 (the probe's: 6); the selection with M05: 225 passed in 51.39s (exit 0)
+RESULT: DEFECT

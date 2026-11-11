@@ -19,3 +19,28 @@ bh_r_r2_02_cfg made fresh and migrated (the server answers); databases named bh_
 refused: the server at 127.0.0.1:5432 holds no database bh_r_r2_02_missing (database "bh_r_r2_02_missing" does not exist): pnpm db:reset <name> makes a database of that name there and migrates it
 exit 2
 == 2b. conform biosteam, OPENFERMENT_DATABASE_URL naming bh_r_r2_02_missing (the checks build a plant: minutes)
+! the verdict could not be kept for GET /api/engines: DBAPIError: (sqlalchemy.dialects.postgresql.asyncpg.Error) database "bh_r_r2_02_missing" does not exist
+(Background on this error at: https://sqlalche.me/e/21/dbapi)
+biosteam (engine run 1 · biosteam · biorefineries 2.35.1 · biosteam 2.54.0 · thermosteam 0.54.2): every check holds
+✓ 1  a JSON number outside a quantity is refused in words before the worker is reached
+✓ 2  every default carries an origin naming what it rests on (a library-default, a record or an artifact its ref, a convention its note, a person's assumption its by), and a parameter with none takes a run's value
+✓ 3  a run writes one runs row keyed by its basis, and the same request twice is that one row, with its diagnostics in their shape when it reports some
+✓ 4  a replay holds every output within the precision the thing states
+✓ 5  the run's SFF file validates and scores, or sffRefused holds words
+✓ 6  importing the module the entry point names imports neither the worker module nor what the engine computes with
+✓ 7  a request the engine refuses is kept as a receipt in its words, with no traceback
+✓ 8  created_by on every run is the person or the model that asked for it
+exit 0 (30 s)
+checks' databases (bh_r_r2_02_cf*) left on the server after it: 0
+== 2c. conform train --project p, OPENFERMENT_DATABASE_URL naming bh_r_r2_02_missing
+✗ the PostgreSQL server OPENFERMENT_DATABASE_URL names (postgresql+asyncpg://openferment:***@127.0.0.1:5432/bh_r_r2_02_missing) could not read project 'p' from its database: DBAPIError: (sqlalchemy.dialects.postgresql.asyncpg.Error) database "bh_r_r2_02_missing" does not exist
+(Background on this error at: https://sqlalche.me/e/21/dbapi). Start it (pnpm db:up), on the live host with sudo brew services start --sudo-service-user="$(id -un)" postgresql@17, or set OPENFERMENT_DATABASE_URL in the environment or in core/.env to a server with pgvector that answers
+exit 2
+== 2d. the control: conform train --project p, OPENFERMENT_DATABASE_URL naming bh_r_r2_02_cfg (migrated, no project p)
+✗ database 'bh_r_r2_02_cfg' holds no project 'p': name a project it holds
+exit 2
+== the reading
+migrations refuse in words with db:reset, exit 2: 1; conform made its eight checks: 1; printed why the verdict was not kept (the missing database named): 1; its exit follows its checks: 1; --project refused in words naming the setting and the missing database, exit 2: 1 (control: 1); --project's words end with 'Start it (pnpm db:up)' for a server that answers: 1
+EXPECTED: engines.md:805-808 and 113-115 hold conform to a server alone: the checks run on the server the address names, the verdict is kept once the named database is migrated, a verdict it cannot keep is printed with the words why, exit 1 on a failed check and 2 only for no address or a server that does not answer (PROGRESS.md D0.7); migrations alone refuse a database the server does not hold, exit 2 with pnpm db:reset (PROGRESS.md R4)
+OBSERVED: migrations exit 2; conform biosteam exit 0, 8 check rows printed, the verdict's failure printed naming database bh_r_r2_02_missing, 'every check holds'; conform train --project p exit 2 naming OPENFERMENT_DATABASE_URL and the missing database: each command does what its page says
+RESULT: NO-DEFECT

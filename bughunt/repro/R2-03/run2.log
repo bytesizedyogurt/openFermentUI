@@ -1,0 +1,25 @@
+== 0. the contract
+6:- MCP: `--service <origin>` (a loopback address alone, no proxy, no redirect) relays each call to
+232:    one project (--service). Through no proxy: the call is a loopback one,
+233:    and a cloud container's HTTPS_PROXY names a proxy elsewhere. A redirect
+239:        self.http = httpx.Client(base_url=origin, trust_env=False, follow_redirects=False, transport=transport,
+== 1. what the relay tests hand the client, and what httpx reads then
+63:    return mcp_server.build(project, origin, transport=httpx.MockTransport(handle)), seen
+httpx/_client.py:685:        allow_env_proxies = trust_env and transport is None
+lines of core/tests/test_mcp_service.py naming a proxy: 0
+== the worktree
+2047f5a alpha2.2: H review — the backup in the nightly, stage H's step 3 named next, the records' facts and words
+the worktree's served test binds 127.0.0.1:10920 (its _free_port alone changed)
+openferment_core imported from: /tmp/claude-0/-home-user-openFermentUI/cfbc5c9f-640a-5002-a705-5ceaf850fdc6/scratchpad/bh/work/R2-03/wt-1794355696-23726/core/openferment_core/mcp_server.py
+== 2a. M16 applied; the whole of tests/test_mcp_service.py in this container's environment
+HTTPS_PROXY=http://127.0.0.1:39409
+NO_PROXY=localhost,127.0.0.1,::1,127.0.0.0/8,0.0....
+https_proxy=http://127.0.0.1:39409
+no_proxy=localhost,127.0.0.1,::1,127.0.0.0/8,0.0....
+239:        self.http = httpx.Client(base_url=origin, trust_env=True, follow_redirects=False, transport=transport,
+51 passed in 10.17s
+exit 0
+== 2b. M16; the served test in a CI-like environment (no proxy variable)
+1 passed in 12.91s
+exit 0
+== 3. the control: M17 (follow_redirects=True); the redirect test

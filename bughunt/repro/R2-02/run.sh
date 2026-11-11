@@ -89,7 +89,7 @@ grep -v '^$' "$OUT/cc.out" | cut -c1-220; echo "exit $xc"
 # ── the verdict, held to the pages ──
 mig_ok=0; grep -q "holds no database $MISSING" "$OUT/mig.out" && grep -q 'pnpm db:reset' "$OUT/mig.out" && [ "$xm" = 2 ] && mig_ok=1
 said=0; grep -q '^! the verdict could not be kept for GET /api/engines: .*database "'"$MISSING"'" does not exist' "$OUT/cb.out" && said=1
-ran=0; [ "$(grep -c '^[✓✗] [1-8] ' "$OUT/cb.out")" -ge 8 ] && ran=1
+rows=$(grep -cE '^(✓|✗) [1-8] ' "$OUT/cb.out"); ran=0; [ "$rows" -ge 8 ] && ran=1
 code_ok=0
 { grep -q ': every check holds$' "$OUT/cb.out" && [ "$xb" = 0 ]; } && code_ok=1
 { grep -q ': a check fails$' "$OUT/cb.out" && [ "$xb" = 1 ]; } && code_ok=1
@@ -102,7 +102,7 @@ echo "migrations refuse in words with db:reset, exit 2: $mig_ok; conform made it
      "--project refused in words naming the setting and the missing database, exit 2: $tr_ok (control: $ctl_ok);" \
      "--project's words end with 'Start it (pnpm db:up)' for a server that answers: $advice"
 EXP="engines.md:805-808 and 113-115 hold conform to a server alone: the checks run on the server the address names, the verdict is kept once the named database is migrated, a verdict it cannot keep is printed with the words why, exit 1 on a failed check and 2 only for no address or a server that does not answer (PROGRESS.md D0.7); migrations alone refuse a database the server does not hold, exit 2 with pnpm db:reset (PROGRESS.md R4)"
-OBS="migrations exit $xm; conform biosteam exit $xb, its checks made, the verdict's failure printed naming database $MISSING, '$(grep -o 'every check holds\|a check fails' "$OUT/cb.out" | head -1)'; conform train --project p exit $xt naming OPENFERMENT_DATABASE_URL and the missing database"
+OBS="migrations exit $xm; conform biosteam exit $xb, $rows check rows printed, the verdict's failure printed naming database $MISSING, '$(grep -o 'every check holds\|a check fails' "$OUT/cb.out" | head -1)'; conform train --project p exit $xt naming OPENFERMENT_DATABASE_URL and the missing database"
 if [ "$mig_ok$ran$said$code_ok$tr_ok$ctl_ok" = 111111 ]; then
   verdict "$EXP" "$OBS: each command does what its page says" NO-DEFECT
 fi

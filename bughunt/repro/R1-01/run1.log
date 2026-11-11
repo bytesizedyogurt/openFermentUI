@@ -1,0 +1,29 @@
+EXPECTED: the D8 departure row in docs/PROGRESS.md names the route the reference screen reads kept
+EXPECTED: reference runs from, a route the service serves: GET /api/biorepo/artifacts?tool= (src/lib/proforma.ts:169-171).
+--- the row (docs/PROGRESS.md:483), the routes it names for the reference screen:
+    `GET /api/runs?engine=biosteam`
+    `GET /api/artifacts`
+--- docs/api/openapi.json, every path holding 'artifacts':
+    /api/biorepo/artifacts ['get']
+    /api/biorepo/artifacts/{artifact_id} ['get']
+    /api/biorepo/artifacts/{artifact_id}/checks ['get']
+    /api/biorepo/artifacts/{artifact_id}/replay ['post']
+    /api/biorepo/artifacts/{artifact_id}/tables ['get']
+--- the app's route table (openferment_core.api:app.routes, outside the schema too):
+    129 routes; ['/api/biorepo/artifacts', '/api/biorepo/artifacts/{artifact_id}', '/api/biorepo/artifacts/{artifact_id}/checks', '/api/biorepo/artifacts/{artifact_id}/replay', '/api/biorepo/artifacts/{artifact_id}/tables']
+--- api.py decorators naming an artifacts path:
+    2448:@app.get("/api/biorepo/artifacts"
+    2458:@app.get("/api/biorepo/artifacts/{artifact_id}"
+    2498:@app.get("/api/biorepo/artifacts/{artifact_id}/tables"
+    2511:@app.get("/api/biorepo/artifacts/{artifact_id}/checks"
+    2525:@app.post("/api/biorepo/artifacts/{artifact_id}/replay"
+--- what the reference screen calls (ProformaReference.tsx keptReferenceRuns -> lib/proforma.ts):
+    ProformaReference.tsx:283:    keptReferenceRuns(ctrl.signal).then(
+    proforma.ts:171:  call<Artifact[]>(`/api/biorepo/artifacts?${KEPT_REFERENCE_TOOLS.map((t) => `tool=${encodeURIComponent(t)}`).join('&')}`, { signal });
+    client files naming /api/artifacts: 0
+--- live: the service on a fresh database, both paths asked in one project
+NOTICE:  database "bh_r_r1_01_svc" does not exist, skipping
+    GET /api/artifacts -> 404; GET /api/biorepo/artifacts?tool=proforma.reference&tool=proforma_benchmark -> 200
+OBSERVED: the row names (`GET /api/artifacts`) [1]; in openapi.json: False; in the app's routes: False;
+OBSERVED: api.py decorators for it: 0; client calls of it: 0; live GET /api/artifacts -> 404, the screen's route -> 200
+RESULT: DEFECT

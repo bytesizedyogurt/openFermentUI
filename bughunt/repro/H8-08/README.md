@@ -43,11 +43,11 @@ a rejected key, an unreachable API. The stream also carries four event kinds the
 client passes over them.
 
 **Likely cause.** The kit's generator,
-`core/.venv/lib/python3.13/site-packages/sci_rag/answer/generator.py:298-311`, catches any exception from
+`core/.venv/lib/python3.13/site-packages/sci_rag/answer/generator.py:296-311`, catches any exception from
 `llm.stream`, writes its words to the log (line 304) and sends the client
 `f"{type(exc).__name__}: generation failed (see server logs)"` (line 309). openFerment's adapter
 `core/openferment_core/literature/kit.py:833-838` passes the kit's `error` event on as it came (it drops the
-`_` keys alone), and the route `api.py:2151-2155` sends it. llm.py's own words (`llm.py:717-719`) reach the
+`_` keys alone), and the route `api.py:2152-2157` sends it. llm.py's own words (`llm.py:717-719`) reach the
 log alone. Confidence high. A small fix in openFerment: `kit.answer` (or `llm.kit_client`'s `stream`) keeps the
 `ModelUnavailable` words of the call that failed and puts them in the `error` event's message, or refuses with
 those words before the kit's stream starts when no key is held.

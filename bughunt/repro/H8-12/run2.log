@@ -1,0 +1,21 @@
+INPUT: marked.json starts with bytes ef bb bf, then {"units": [], "streams": [], "metadata":...
+EXPECTED: docs/api/sff.md:43-45 "A file is refused only when no graph can be read from it: not UTF-8, not JSON,
+EXPECTED: or not an object with a list of units and a list of streams (422)"; the candidate reads a BOM file as
+EXPECTED: UTF-8 JSON (RFC 8259 lets a parser ignore the mark), so: kept, or refused in words naming the mark.
+EXPECTED: The refusal stands inside the contract when the file is outside JSON's grammar (RFC 8259 §8.1: a
+EXPECTED: writer MUST NOT add the mark, a parser MAY ignore it or treat it as an error) and no reader in the
+EXPECTED: tree reads a graph from those bytes; it breaks the contract when the toolkit, which checks every kept
+EXPECTED: file byte for byte, reads a graph from them.
+NOTICE:  database "bh_r_h8_12_svc" does not exist, skipping
+OBSERVED: POST /api/flowsheets/import (marked.json) -> HTTP 422 {"detail":"marked.json is not JSON: its text stops reading as JSON at line 1, column 1"}
+OBSERVED: POST /api/intake/catalogue (marked.csv, kind strain) -> HTTP 200 {"kind":"strain","kept":["S1"],"refused":[]}
+OBSERVED: TOOLKIT plain.json: read; valid False, 29 findings, completeness 0.000
+OBSERVED: TOOLKIT marked.json: raised JSONDecodeError: Unexpected UTF-8 BOM (decode using utf-8-sig): line 1 column 1 (char 0)
+OBSERVED: PYJSON marked.json decoded as utf-8: Unexpected UTF-8 BOM (decode using utf-8-sig) (line 1, column 1)
+OBSERVED: import door refuses as not JSON: 1; its words name the mark: 0; catalogue door keeps S1: 1
+OBSERVED: the worker's toolkit check reads plain.json: 1; reads marked.json: 0; raises on the mark: 1
+OBSERVED: the refusal is the contract's own ground 'not JSON': the mark sits outside JSON's grammar (RFC 8259 §8.1),
+OBSERVED: and the toolkit that checks every kept file byte for byte reads no graph from these bytes either; the
+OBSERVED: catalogue door's utf-8-sig reading is a separate door's choice that no contract ties to this one.
+OBSERVED: what remains is wording (S4 at most): the refusal gives the place, line 1, column 1, and leaves out the reason Python's json gives, 'Unexpected UTF-8 BOM'
+RESULT: NO-DEFECT

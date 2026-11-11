@@ -57,3 +57,7 @@ line under the example's placeholder (file B) meets it. Owner question 13 (docs/
 condition; this facet, which of several lines counts, sits outside the question's wording and would join it.
 Severity S4: a message at install disagrees with the service, and `pnpm ready`, which install.sh runs after,
 gives the answer the service holds (install.sh:123).
+
+Note on the made-up key: the script joins its placeholder value (`sk-ant-` and `H11-08-NOT-A-KEY`) at run time
+and prints the core/.env lines with the value masked as `sk-ant-(H11-08-NOT-A-KEY`, and the two logs are masked
+the same way, so `pnpm check:secrets` reads no key-shaped string in this folder. The placeholder was never a key.

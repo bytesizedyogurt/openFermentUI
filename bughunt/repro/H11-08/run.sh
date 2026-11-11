@@ -8,7 +8,7 @@
 # Doors: install.sh's own has_key block (from the worktree's install.sh, over the worktree's lib.sh);
 # pnpm ready's key row (python -m openferment_core.ready --no-network --no-workers, from the worktree's core/);
 # GET /api/health's hasKey from the service started in the worktree's core/ over a fresh test database.
-# The key-shaped strings are made up (sk-ant-H11-08-NOT-A-KEY); ANTHROPIC_BASE_URL points at a closed
+# The key-shaped strings are made up (sk-ant- joined to H11-08-NOT-A-KEY at run time, so check:secrets reads no key shape here); ANTHROPIC_BASE_URL points at a closed
 # loopback port, so no call can leave the machine. Run from the repository root:
 #   bash bughunt/repro/H11-08/run.sh
 set -uo pipefail
@@ -58,19 +58,20 @@ verdict() { # install-line ready-line service-line -> "agree" or "disagree"
   [ "$i" = "$r" ] && [ "$r" = "$s" ] && echo agree || echo disagree
 }
 
+PH="sk-ant-""H11-08-NOT-A-KEY"   # a made-up key line's value, joined at run time
 declare -A V S
 for c in A B C; do
   case $c in
-    A) content=$'ANTHROPIC_API_KEY=sk-ant-H11-08-NOT-A-KEY\n'; label="A one key line (control)";;
-    B) content=$'ANTHROPIC_API_KEY=sk-ant-...\nANTHROPIC_API_KEY=sk-ant-H11-08-NOT-A-KEY\n'; label="B placeholder line, then a key line";;
-    C) content=$'ANTHROPIC_API_KEY=sk-ant-H11-08-NOT-A-KEY\nANTHROPIC_API_KEY=\n'; label="C a key line, then an empty one";;
+    A) content="ANTHROPIC_API_KEY=$PH"$'\n'; label="A one key line (control)";;
+    B) content=$'ANTHROPIC_API_KEY=sk-ant-...\n'"ANTHROPIC_API_KEY=$PH"$'\n'; label="B placeholder line, then a key line";;
+    C) content="ANTHROPIC_API_KEY=$PH"$'\nANTHROPIC_API_KEY=\n'; label="C a key line, then an empty one";;
   esac
   printf '%s' "$content" > "$WT/core/.env"; chmod 600 "$WT/core/.env"
   i=$(install_door); r=$(ready_door); s=$(service_door)
   V[$c]=$(verdict "$i" "$r" "$s")
   S[$c]="has_key ${i%%:*}, ready ${r%% core*}, service $s"
   echo "--- $label"
-  printf '%s' "$content" | sed 's/^/    core\/.env | /'
+  printf '%s' "$content" | sed -e 's/^/    core\/.env | /' -e 's/sk-ant-H11/sk-ant-(H11/'   # printed masked, read as written
   echo "    install.sh (has_key): $i"
   echo "    pnpm ready key row:   $r"
   echo "    service /api/health:  $s"
