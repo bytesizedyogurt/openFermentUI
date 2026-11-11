@@ -66,17 +66,32 @@ second tab's save and never reached the service (the bug hunt's H7-01). A save n
 `mergeSnapshot`): it keeps what this tab owes now and, from the snapshot already stored, every owed write this tab
 has never held, which is another tab's. A write this tab held and no longer holds was answered by the service or
 replaced by this tab's own later write of the same row, so the merge leaves it out. Two writes of one row from tabs
-that never saw each other's both stay, oldest first, so the service rules on them in order as it would on two tabs
-online: a deposition's later write that leaves out the other tab's reading is refused in words, and the page says
-so. Guild's owed writes are kept by project (`guildOwed`), since each project's ledger is its own: a page takes the
-block of the project it has open, and every other project's block stays as stored; a block written before this note
-is read once as the open project's. A person's owed write is named by its id and the time of the change, so a later
-change of one person is another write. A review decision the service is found to hold, or a later one, leaves the
-snapshot (`holdDecision`). The read and the write run in one IndexedDB transaction, so two tabs' saves take turns;
-a stored value this browser cannot read back is written over by the saving tab's snapshot.
+that never saw each other's both stay, oldest first, so a page that sends from the merged snapshot puts them to the
+service in order: a deposition's later write that leaves out the other tab's reading is refused in words, and the
+page says so. Tabs still open send their own queues, each on its own retry, in the order they come. A page that
+writes a row again replaces the row's last queued write, the one its view stands on, and another tab's earlier write
+of the row stays (`enqueue`).
 
-A page that loads takes every owed write in the snapshot at once, beside the tab that queued it, and both may send
-it. The service keeps a write it is sent twice as it kept the first, apart from one case the Open table holds: a
-copy the loading page took can reach the service after the queuing tab's later write of the same row, and a row the
-service replaces whole then takes the older copy. `check:state` holds two tabs saving in turn during an outage to
-both tabs' writes reaching the service, and `bughunt/repro/H7-01/run.sh` holds it in Chromium.
+Guild's owed writes are kept by project (`guildOwed`), since each project's ledger is its own, and the person a page
+acts as is kept in the same block, so each project keeps its own. A page takes the block of the project it has open,
+and every other project's block stays as stored; a block written before this note is read once as the open
+project's. The page reads the snapshot once the project list has settled, keeps its project until it reloads, and
+reloads when its open project goes away, so every save names the project its writes were made in. A Guild write with
+no project open is refused in words. A person's owed write is named by its id and the time of the change, so a later
+change of one person is another write; of two tabs' owed changes of one person the later stands, and `syncGuild`
+sends an owed change only when the service holds an older copy (its copy differs and was written before the change),
+as `syncDecisions` reads a decision. A withdrawal the service already shows is not sent again. A review decision
+carries the project it was made in: a page re-applies and sends its own project's decisions alone, and one the
+service is found to hold, or a later one, leaves the snapshot (`holdDecision`).
+
+The read and the write run in one IndexedDB transaction, so two tabs' saves take turns; a stored value this browser
+cannot read back is written over by the saving tab's snapshot. A save made as a tab goes away (`pagehide`) is placed
+at once, merged over the snapshot the tab last read or wrote, since a closing page may run no later event; a tab
+still open lays its own writes in again on its next save.
+
+A page that loads takes the whole outbox and the open project's Guild block at once, beside the tab that queued
+them, and both may send a write. A row the service keeps whole takes it twice to the same end, and a second lock, a
+second withdrawal or a second Guild entry is refused, which the page that sent it second shows. The Open table holds
+what remains: a copy the loading page took can reach the service after the queuing tab's later write of the row, and
+review decisions are keyed by record id alone in the snapshot. `check:state` and `check:guild` hold the merge and the
+sends, and `bughunt/repro/H7-01/run.sh` holds the queue in Chromium.

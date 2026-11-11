@@ -330,6 +330,26 @@ const three = [e('sc-1', { id: 'sc-1' }), e('sc-2', null, 'q'), e('sc-3', { id: 
   check('another project’s owed Guild writes stay in its own block, and this project’s stay in theirs',
     JSON.stringify(otherProject.guildOwed?.q?.pending) === '["p-cy"]' && JSON.stringify(otherProject.guildOwed?.p?.pending) === '["ev-b","p-ada"]',
     JSON.stringify(otherProject.guildOwed));
+  check('a page reads the Guild block of the project it has open, and another project’s stays out of it',
+    JSON.stringify(owedGuild(otherProject, 'q')?.pending) === '["p-cy"]' && JSON.stringify(owedGuild(otherProject, 'p')?.pending) === '["ev-b","p-ada"]');
+  {
+    // Two tabs both owe one person: the later change stands, whichever tab saves.
+    const mineA = emptyHeld();
+    const theirsB = snap([], { guildOwed: { p: { ...owing([['p-ada', at(1)]], []),
+      ledger: ({ version: 1, people: [{ id: 'p-ada', addedAt: at(1), updatedAt: at(4), title: 'later' }], evidence: [], policy: {} }) as unknown as Guild } } });
+    const ownA: GuildOwed = { ...owing([['p-ada', at(1)]], []),
+      ledger: ({ version: 1, people: [{ id: 'p-ada', addedAt: at(1), updatedAt: at(2), title: 'earlier' }], evidence: [], policy: {} }) as unknown as Guild };
+    const settled = save(mineA, snap([], { guildOwed: { p: ownA } }), theirsB);
+    check('of two tabs’ owed changes of one person, the later stands whichever tab saves',
+      (settled.guildOwed?.p?.ledger.people[0] as unknown as { title: string })?.title === 'later', JSON.stringify(settled.guildOwed?.p?.ledger.people));
+  }
+  {
+    // A page that took two tabs' writes of one row and writes the row again replaces the one its view stood on.
+    const row = (n: number): OutboxEntry => ({ project: 'p', kind: 'scenarios', id: 'sc-1', value: n, by: 'Ada', at: at(n) });
+    const queuedTwice = enqueue([row(1), row(3)], [row(5)]);
+    check('a new write of a row replaces the row’s last queued write, and another tab’s earlier write of it stays',
+      JSON.stringify(queuedTwice.map((x) => x.value)) === '[1,5]', JSON.stringify(queuedTwice.map((x) => x.value)));
+  }
   {
     const legacySnap = snap([], { guild: owing([['p-old', at(1)]], []) });
     check('a page takes a snapshot’s legacy Guild block as the open project’s, and none when no project is open',

@@ -144,7 +144,14 @@ export function conversationsHeld(saved: LiveConversation[], current: LiveConver
 export function enqueue(outbox: OutboxEntry[], entries: OutboxEntry[]): OutboxEntry[] {
   const key = (e: OutboxEntry) => `${e.project}\u0000${e.kind}\u0000${e.id}`;
   const later = new Set(entries.map(key));
-  return [...outbox.filter((e) => !later.has(key(e))), ...entries];
+  // The page's row stands on the last queued write of it, which the new write replaces; an earlier write of the
+  // row, another tab's that the page took at load, stays for the service to rule on in order (durable.ts).
+  const last = new Map<string, number>();
+  outbox.forEach((e, i) => {
+    if (later.has(key(e))) last.set(key(e), i);
+  });
+  const replaced = new Set(last.values());
+  return [...outbox.filter((_, i) => !replaced.has(i)), ...entries];
 }
 
 interface Flushed {

@@ -1018,14 +1018,19 @@ export const useStore = create<OFState>()((set, get) => ({
     const open = get().projectId;
     const keep = open && listed.some((p) => p.id === open) ? open : listed.length === 1 ? listed[0].id : null;
     if (keep !== open) setOpenProjectId(keep);
+    // A page whose open project went away holds that project's owed writes; it loads again into the one kept.
+    if (open && keep !== open && typeof window !== 'undefined') {
+      window.location.reload();
+      return;
+    }
     set({ projects: listed, projectsProblem: null, projectId: keep });
     projectSettled();
   },
 
   openProject: (id) => {
     if (id === get().projectId) return;
+    // The page keeps the project it has open until it reloads, so every save before then names it (durable.ts).
     setOpenProjectId(id);
-    set({ projectId: id });
     window.location.reload();
   },
 
@@ -2528,7 +2533,8 @@ export const useStore = create<OFState>()((set, get) => ({
       const decisionAt = { ...s.decisionAt };
       const records = s.records.map((r) => {
         const d = snap.reviewDecisions[r.id];
-        if (!d) return r;
+        // Another project's decision on a record of the same id is that project's.
+        if (!d || (d.project && d.project !== s.projectId)) return r;
         // §7.3 — the service may already have applied its decision for this
         // record; the later of the two wins. The decision's own `at` when the
         // snapshot carries one, the snapshot's savedAt for older snapshots.
@@ -2739,6 +2745,8 @@ export const useStore = create<OFState>()((set, get) => ({
     const pending: ReviewDecision[] = [];
     let kept = 0;
     for (const [id, mine] of Object.entries(local.decisions)) {
+      // Another project's decision is sent by a page open on that project.
+      if (mine.project && mine.project !== s.projectId) continue;
       const madeAt = s.decisionAt[id] ?? mine.at ?? local.savedAt;
       const server = s.overlay.records[id];
       if (server && server.at >= madeAt) {
@@ -2862,6 +2870,10 @@ export const useStore = create<OFState>()((set, get) => ({
 
   guildWithdraw: async (evidenceId, reason) => {
     const s = get();
+    if (!s.projectId) {
+      get().toast({ text: 'Open a project first: each project keeps its own Guild ledger.', kind: 'error' });
+      return false;
+    }
     const by = actingIdOf(s);
     if (!by) {
       get().toast({ text: 'Choose who you are with Acting as before withdrawing an entry.', kind: 'error' });
@@ -3235,12 +3247,19 @@ export const useStore = create<OFState>()((set, get) => ({
         };
         await attempt(`deviation on ${e.skillId}`, () => postEvidence(deviation));
       };
-      // A change to a person the service already holds is sent unless the service's copy carries it already.
+      // A change to a person the service already holds is sent unless the service carries it already: its copy
+      // says the same, or it was written at or after the change (it holds this change or a later one, as
+      // syncDecisions reads a decision). An add the service holds is the service's.
       const onService = new Map(server.people.map((p) => [p.id, p]));
       const carried = (p: GuildPerson) => {
         const q = onService.get(p.id);
-        return !!q && q.name === p.name && q.title === p.title && q.role === p.role && q.active === p.active;
+        if (!q) return false;
+        if (!p.updatedBy) return true;
+        if (q.name === p.name && q.title === p.title && q.role === p.role && q.active === p.active) return true;
+        return Date.parse(q.updatedAt ?? q.addedAt) >= Date.parse(p.updatedAt ?? p.addedAt);
       };
+      // A withdrawal of an entry the service shows withdrawn is the service's already.
+      const withdrawnThere = new Set(server.evidence.filter((e) => e.withdrawnAt).map((e) => e.id));
       // People first, then entries, then withdrawals: each may name the one before.
       for (const p of s.guild.people)
         if (pending.has(p.id) && !carried(p) && !(await attempt(p.name, () => postPerson(p)))) return;
@@ -3248,7 +3267,7 @@ export const useStore = create<OFState>()((set, get) => ({
         if (pending.has(e.id) && !stored.has(e.id) && !(await attempt(`${e.kind} on ${e.skillId}`, () => postEvidence(e), asDeviation(e))))
           return;
       for (const w of s.guildPendingWithdrawals)
-        if (!(await attempt(`withdrawal of ${w.evidenceId}`, () => postWithdrawal(w)))) return;
+        if (!withdrawnThere.has(w.evidenceId) && !(await attempt(`withdrawal of ${w.evidenceId}`, () => postWithdrawal(w)))) return;
       // Read again only when this sync sent something: with nothing posted the first read is the ledger.
       const fresh = posted > 0 ? ((await loadGuild()) ?? server) : server;
       // The service's ledger is the truth for everything this sync sent.
@@ -3390,6 +3409,11 @@ async function guildPost<T>(
   local: T,
 ): Promise<T | null> {
   const pend = () => set((x) => ({ guildPending: x.guildPending.includes(id) ? x.guildPending : [...x.guildPending, id] }));
+  if (!get().projectId) {
+    set(onRefused());
+    get().toast({ text: 'Open a project first: each project keeps its own Guild ledger.', kind: 'error' });
+    return null;
+  }
   if (!get().serviceUp) {
     pend();
     return local;
@@ -3531,6 +3555,8 @@ function snapshotOf(s: OFState): DurableSnapshot {
       rejectReason: r.rejectReason,
       reviewer: r.reviewer,
       at: s.decisionAt[r.id],
+      // The project it was made in, so a page re-applies and sends only its own project's decisions.
+      ...(s.projectId ? { project: s.projectId } : {}),
       // The sentence a promotion re-anchored to, when it did (§7.3).
       ...(reanchoredSpan(r) ?? {}),
     };

@@ -36,7 +36,7 @@
 // persistence is bad; refusing to open the screen because persistence is
 // unavailable would be worse.
 import type { components } from '@/api/types.gen';
-import type { Guild, GuildWithdrawal } from '@/lib/guild';
+import type { Guild, GuildPerson, GuildWithdrawal } from '@/lib/guild';
 import type { Deposition, MeasuredEvidence, Provenance, Runbook } from './studies';
 import type { RecordStatus, ReviewDecision } from './review';
 import type { Override } from './params';
@@ -81,6 +81,12 @@ export interface DurableReviewDecision {
    */
   quote?: ReviewDecision['quote'];
   sectionId?: ReviewDecision['sectionId'];
+  /**
+   * The project the decision was made in, so a page re-applies and sends only
+   * its own project's decisions. Absent from a decision saved before this was
+   * kept, which a page reads as its own, as it did then.
+   */
+  project?: string;
 }
 
 /**
@@ -89,7 +95,7 @@ export interface DurableReviewDecision {
  * build), and a ReviewDecision is assignable to this shape (the types agree).
  */
 type KeysSubset<A, B> = [keyof A] extends [keyof B] ? true : never;
-export const DecisionMirror: [KeysSubset<DurableReviewDecision, ReviewDecision>, (d: ReviewDecision) => DurableReviewDecision] = [
+export const DecisionMirror: [KeysSubset<Omit<DurableReviewDecision, 'project'>, ReviewDecision>, (d: ReviewDecision) => DurableReviewDecision] = [
   true,
   (d) => d,
 ];
@@ -242,7 +248,10 @@ function openDb(): Promise<IDBDatabase | null> {
         const db = req.result;
         if (!db.objectStoreNames.contains(STORE)) db.createObjectStore(STORE);
       };
-      req.onsuccess = () => done(req.result);
+      req.onsuccess = () => {
+        opened = req.result;
+        done(req.result);
+      };
       req.onerror = () => done(null);
       // A blocked upgrade never fires either handler. Time out rather than
       // leaving every caller awaiting a promise that will not settle.
@@ -265,12 +274,15 @@ function openDb(): Promise<IDBDatabase | null> {
 // place. A write this tab held and no longer holds was answered by the service
 // or replaced by this tab's later write of the same row, so the merge leaves it
 // out. Two writes of one row from tabs that never saw each other's both stay,
-// oldest first, so the service rules on them in order as it would on two tabs
-// online. A page that loads takes every owed write the snapshot holds at once
-// (the store's `applyDurable`), beside the tab that queued it, and both may send
-// it; the service keeps a write it is sent twice as it kept the first. The read
-// and the write run in one IndexedDB transaction, and the browser runs two
-// tabs' transactions on one store one after the other.
+// oldest first, so a page that sends from the merged snapshot puts them to the
+// service in order; tabs still open send their own queues each on its own
+// retry, in the order they come. A page that loads takes the whole outbox and
+// the open project's Guild block at once (the store's `applyDurable`), beside
+// the tab that queued them, and both may send a write: a row the service keeps
+// whole takes it twice to the same end, and a second lock, a second withdrawal
+// or a second Guild entry is refused, which the page that sent it second shows.
+// The read and the write run in one IndexedDB transaction, and the browser runs
+// two tabs' transactions on one store one after the other.
 
 /** The owed writes a tab has held, each by what names it. */
 export interface Held {
@@ -365,11 +377,22 @@ function mergeGuild(project: string, own: GuildOwed, stored: GuildOwed | undefin
   const people = new Set(own.ledger.people.map((p) => p.id));
   const evidence = new Set(own.ledger.evidence.map((x) => x.id));
   const withdrawn = new Set(own.withdrawals.map((w) => withdrawalOf(project, w)));
+  // A person both blocks owe: another tab's change this tab never held stands when it is the later.
+  const when = (p: GuildPerson) => p.updatedAt ?? p.addedAt;
+  const laterThere = new Map(
+    stored.ledger.people
+      .filter((p) => owedHere.has(p.id) && stored.pending.includes(p.id) && !held.guild.has(owedOf(project, p.id, stored.ledger)))
+      .map((p) => [p.id, p]),
+  );
+  const settled = (p: GuildPerson) => {
+    const q = laterThere.get(p.id);
+    return q && when(q) > when(p) ? q : p;
+  };
   return {
     ...own,
     ledger: {
       ...own.ledger,
-      people: [...own.ledger.people, ...stored.ledger.people.filter((p) => there.has(p.id) && !people.has(p.id))],
+      people: [...own.ledger.people.map(settled), ...stored.ledger.people.filter((p) => there.has(p.id) && !people.has(p.id))],
       evidence: [...own.ledger.evidence, ...stored.ledger.evidence.filter((x) => there.has(x.id) && !evidence.has(x.id))],
     },
     pending: [...own.pending, ...owedThere],
@@ -417,6 +440,10 @@ export function mergeSnapshot(mine: DurableSnapshot, stored: DurableSnapshot | n
 
 /** What this tab has held, for every save it makes. */
 let held = emptyHeld();
+/** The snapshot this tab last read or wrote, which a save made as the tab goes away merges over. */
+let lastStored: DurableSnapshot | null = null;
+/** The database once open, so a save made as the tab goes away needs no wait. */
+let opened: IDBDatabase | null = null;
 
 /**
  * Count a loaded review decision as held once the service is found to hold
@@ -452,6 +479,7 @@ export async function loadDurable(project: string | null): Promise<DurableSnapsh
         // as a shape they were never written in is worse.
         const snapshot = asSnapshot(req.result);
         if (snapshot) holdLoaded(held, snapshot, project);
+        lastStored = snapshot;
         resolve(snapshot);
       };
       req.onerror = () => resolve(null);
@@ -477,7 +505,9 @@ async function flush(): Promise<void> {
     const req = store.get(KEY);
     req.onsuccess = () => {
       try {
-        store.put(mergeSnapshot(snapshot, asSnapshot(req.result), held), KEY);
+        const merged = mergeSnapshot(snapshot, asSnapshot(req.result), held);
+        store.put(merged, KEY);
+        lastStored = merged;
       } catch {
         // As below: the app keeps running on memory.
       }
@@ -513,11 +543,28 @@ export function saveDurable(snapshot: DurableSnapshot): void {
   timer = setTimeout(() => void flush(), 400);
 }
 
-/** Write immediately — used when the tab is going away. */
+/**
+ * Write immediately — used when the tab is going away. A closing page may run
+ * no event after its own, so the write is placed now, merged over the snapshot
+ * this tab last read or wrote; a tab still open lays its own owed writes in
+ * again on its next save.
+ */
 export function flushDurable(): void {
   if (timer) {
     clearTimeout(timer);
     timer = null;
+  }
+  const snapshot = pending;
+  if (snapshot && opened) {
+    pending = null;
+    try {
+      const merged = mergeSnapshot(snapshot, lastStored, held);
+      opened.transaction(STORE, 'readwrite').objectStore(STORE).put(merged, KEY);
+      lastStored = merged;
+    } catch {
+      // As in flush: the app keeps running on memory.
+    }
+    return;
   }
   void flush();
 }
@@ -526,6 +573,7 @@ export function flushDurable(): void {
 export async function clearDurable(): Promise<void> {
   pending = null;
   held = emptyHeld();
+  lastStored = null;
   if (timer) {
     clearTimeout(timer);
     timer = null;

@@ -220,7 +220,8 @@ const s = () => useStore.getState();
 async function main() {
   // The store holds the test skills and the protocols they tag: the authored
   // catalogue left with the seed (ADR-010).
-  useStore.setState({ serviceUp: false, skills: SKILLS, protocols: TEST_PROTOCOLS });
+  // A project is open: each project keeps its own ledger, and the store refuses a Guild write with none.
+  useStore.setState({ serviceUp: false, skills: SKILLS, protocols: TEST_PROTOCOLS, projectId: 'check-guild' });
   const lead = await s().guildAddPerson({ name: 'Ada Lead', title: 'Lead', role: 'lead', joinedAt: '2026-01-01' });
   check('the first person is added by nobody and becomes who is signing', lead?.addedBy === null && s().guildActingId === lead?.id);
   const tom = await s().guildAddPerson({ name: 'Tom Trainee', title: 'Trainee', role: 'member', joinedAt: '2026-06-01' });
@@ -539,6 +540,27 @@ async function main() {
     s().guild.evidence.some((e) => e.id === meanwhile.id) && s().guildPending.includes(meanwhile.id),
     s().guildPending,
   );
+  {
+    // An owed change to a person the service holds is sent unless the service carries it: its copy says the same,
+    // or was written at or after the change; an add the service holds is the service's (durable.ts, H7-01).
+    const annThere = server7.people.find((x) => x.id === 'p-ann')!;
+    const peopleThere = server7.people;
+    const syncAnn = async (ann: GuildPerson) => {
+      reset7({ serviceUp: true, guildPending: ['p-ann'] });
+      useStore.setState((x) => ({ guild: { ...x.guild, people: x.guild.people.map((q) => (q.id === 'p-ann' ? ann : q)) } }));
+      posts7.length = 0;
+      await s().syncGuild();
+      return posts7.includes('people::p-ann');
+    };
+    const changed = (title: string, at: string | null, by: string | null = 'p-lead') =>
+      ({ ...annThere, title, updatedBy: by, updatedAt: at }) as GuildPerson;
+    check('an owed person whose change the service already holds is not sent again', !(await syncAnn(changed(annThere.title ?? '', '2026-10-10T00:00:00Z'))), posts7);
+    check('an owed change to a person the service holds an older copy of is sent', await syncAnn(changed('Senior', '2026-10-10T00:00:00Z')), posts7);
+    server7.people = peopleThere.map((x) => (x.id === 'p-ann' ? { ...x, title: 'Principal', updatedBy: 'p-lead', updatedAt: '2026-10-11T00:00:00Z' } : x));
+    check('an owed change older than the change the service holds is not sent over it', !(await syncAnn(changed('Senior', '2026-10-10T00:00:00Z'))), posts7);
+    check('an owed add of a person the service already holds is not sent again', !(await syncAnn(changed('Other', null, null))), posts7);
+    server7.people = peopleThere;
+  }
 
 
   // ── 8. practice (OF-BLD-013 §4.3) ───────────────────────────────────

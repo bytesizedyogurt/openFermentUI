@@ -623,7 +623,7 @@ the line that records the decision and the decision record it stands under.
 | Component tests on fixtures recorded from the real service (`pnpm record:fixtures`, alpha 2.0 prompt §9.3) are unbuilt; the walk and the smoke run against the real service | a stage after alpha 2.2 that builds `pnpm record:fixtures` |
 | No offline test computes on a published genome-scale model (Yeast9 and iMM904 need their fetched files, caches kept outside git; Departures, §5.5 stage 2); a model add-on applied in the worker, and a metabolite-defined product's demand through the worker, are untested | a test under the marker `slow` or `live`, on a host that holds the fetched files |
 | Two concept-graph builds at once (`pnpm lit:graph` for two projects that share a document) can each send a batch of a shared passage to the model before either stamps it, and pay for that batch twice; `GRAPH_LOCK` keeps the graph whole, and the spend is the same as two builds run one after the other with no stamp between them (found by the review of the graph lock, 11 November 2026) | a build that reads the stamps again inside the lock before it asks the model, or one build at a time for the instance |
-| A page that loads during an outage takes every owed write in the browser's snapshot at once, beside the tab that queued it, and both send it: a copy the loading page took can reach the service after the queuing tab's later write of the same row, and a row the service replaces whole (an override scope, a scenario) then takes the older copy (found by the review of the H7-01 fix, 11 November 2026; ADR-014's note) | a write that names the version of the row it read, refused in words when the row changed since: group 3 of the bug hunt's fix order (H7-04) builds it for overrides, and it serves every kind |
+| Two pages owing one row send it each on its own: a copy a loading page took at load, or a tab's own queue, can reach the service after the other's later write of the row, and a row the service replaces whole (an override scope, a scenario) then takes the older copy; and review decisions are keyed by record id alone in the snapshot, so two projects' offline decisions on one record id keep the later (found by the reviews of the H7-01 fix, 11 November 2026; ADR-014's note) | a write that names the version of the row it read, refused in words when the row changed since: group 3 of the bug hunt's fix order (H7-04) builds it for overrides, and it serves every kind; decisions keyed by project and record |
 | `units.json` maps `wt%` and `% (w/w)` to `% CDW`, aliases written for the PHA program; changing them changes how a stored record converts | the vocabulary review, after alpha 2.2, with a migration for the records it converts |
 | RunbookDetail's held-for-review panel keeps words of Dominion's era: candidates near a claimed identity band, a ruling with legal consequences, and two rulings (a boundary accepted as mapped; candidates excluded pending counsel) that `store.resolveRunbookReview` writes into the held stage, with a boundary map among the runbook's outputs. No code in this build sets a runbook held for review, so the panel answers only a row kept in that state | the stage that lets a runbook be held for review, with that state's own words and rulings |
 | `fermos.forecast_run` keeps `duration_h`, a length the calling code sets as its own convention, which the tests and their stand-ins pass (`standins.py`, `test_fermos.py`, `test_fermos_3r.py`, `test_proforma_fermos.py`, `test_proforma_ceiling.py`); the routes, the tools and the engine set a forecast's length as a typed `t_end` | the change that has those tests set a typed `t_end`, or reach `fermos.forecast()` through a helper of their own |
@@ -3756,9 +3756,32 @@ On `claude/alpha-2-2-fixes`, cut from `claude/alpha-2-2-bughunt` at `fa8db4a`, i
     nine more: a stored write later than the tab's own, a write taken at load and written again, a loaded decision
     on a record not loaded, a decision with no time of its own, a later change of a person, two withdrawals of one
     entry, another project's Guild block, and the legacy block taken and left.
-  - Set aside, each with its reason: the put waits on the read's success event on a closing tab (the read and the
-    write are one transaction the browser commits once the page goes; the old put depended on the same `openDb`
-    wait), and the reproduction's verdict wording (it reads DEFECT on the loss it was built for).
+  - Set aside, with its reason: the reproduction's verdict wording (it reads DEFECT on the loss it was built for).
+    The put waiting on the read's success event on a closing tab was set aside here, and the second review showed
+    it holds (the entry below).
   - Checks: `pnpm typecheck`, `pnpm build`, the reproduction twice (`RESULT: NO-DEFECT`), `check:state`,
     `check:plan`, `check:figures`, `check:guild`, `test:reconcile`, `gen:components --check` and `pnpm smoke` (20
     screens) pass; `pnpm test:core` 3065 passed, 1 skipped, 175 deselected (6 min 4 s).
+- The second review of the H7-01 fix (fffa62d): two readers (correctness, regressions and records), each claim
+  checked against the code; 16 claims, 16 confirmed.
+  - New with fffa62d, and fixed: `syncGuild` posted an older owed change of a person over a later one the service held
+    (it now sends a change only when the service's copy differs and was written before it, and an add the service
+    holds is the service's); the page read the snapshot before its project settled, and a page kept running after
+    `openProject` set the new project (the snapshot is read once the project list settles, `openProject` reloads with
+    the page's project unchanged, and a page whose project went away reloads); a Guild write with no project open was
+    kept nowhere (it is refused in words); `holdDecision` could let go of another project's decision on a record of
+    the same id (a decision carries its project, and a page re-applies, sends and lets go of its own project's
+    alone); the pagehide save waited on the read's success event, which a closing page may never run (it is placed
+    at once, merged over the snapshot the tab last read or wrote); and the records claimed a write sent twice is kept
+    as the first (a second lock, withdrawal or Guild entry is refused; a withdrawal the service shows is no longer
+    sent again).
+  - Older than the fix, and fixed: of two tabs' owed changes of one person the saving tab's own stood (the later
+    stands now); a page that took two tabs' writes of one row and wrote it again replaced both (`enqueue` replaces the
+    row's last queued write alone).
+  - Records: ADR-014's note is rewritten to the code, the acting person kept per project among it; the Open row
+    names both remaining gaps. `check:state` holds three more (the open project's Guild block read, the later of two
+    tabs' changes of one person, a write replacing the row's last queued write) and `check:guild` four (a person the
+    service carries, an older copy on the service, a later change on the service, an add the service holds).
+  - Checks: `pnpm typecheck`, `pnpm build`, the reproduction twice (`RESULT: NO-DEFECT`), `check:state`, `check:guild`,
+    `check:plan`, `check:figures`, `test:reconcile`, `gen:components --check` and `pnpm smoke` (20 screens) pass;
+    `pnpm test:core` 3065 passed, 1 skipped, 175 deselected (5 min 36 s).

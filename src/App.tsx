@@ -375,7 +375,9 @@ export default function App() {
     void projects.then(() => hydrateOverlay());
     void projects.then(() => hydrateCatalogues());
     void projects.then(() => hydrateProtocols());
-    void Promise.all([hydrateDurable(), projects]).then(() => hydrateProjectState());
+    // The snapshot is read once the project list has settled, so the page takes the owed writes of the project it
+    // has open (durable.ts, owedGuild).
+    void projects.then(() => hydrateDurable()).then(() => hydrateProjectState());
   }, [hydrateDurable, hydrateOverlay, loadProjects, hydrateProjectState, hydrateCatalogues, hydrateProtocols]);
 
   // Theme / density / motion applied at the document root.
