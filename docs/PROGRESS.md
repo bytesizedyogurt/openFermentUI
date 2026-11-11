@@ -108,7 +108,8 @@ session continues from this file and `git log` alone.
    `bughunt/repro/<id>/run.sh`. The fixes take the report's fix order group by group on
    `claude/alpha-2-2-fixes`, cut from the hunt's head (`fa8db4a`); each group's fix reruns its
    reproductions twice beside the hunt's logs (`after-fix-run1.log`, `after-fix-run2.log`). Group 1
-   (H5-01) is done; group 2 (H7-01, the browser's shared pending-writes snapshot) is next. Groups 16
+   (H5-01) is done, and so is the concept-graph build race its review found; group 2 (H7-01, the
+   browser's shared pending-writes snapshot) is next. Groups 16
    and 19 change how a key is read, a stop condition, and wait on the owner (the Log, Fixes after the
    bug hunt).
 
@@ -576,6 +577,7 @@ the line that records the decision and the decision record it stands under.
 
 | Debt | Paid at | Commit |
 |---|---|---|
+| Two concept-graph builds at once (`pnpm lit:graph` for two projects) could lose one project's document from an entity's `document_ids`: each build batch read `kg_entities`, merged in Python and wrote the arrays back with no lock, so the entity kept the description the lost document's passage produced and `graph.entities` showed it to the other project. Every build batch's transaction now holds one advisory lock (`graph.GRAPH_LOCK`), and a test makes two builds overlap every time | the bug hunt's fix run, 11 November 2026 (found by group 1's review) | on `claude/alpha-2-2-fixes`, after `e173803` (the Log, Fixes after the bug hunt) |
 | The agent builder's interface points (`docs/reports/handoff-2026-11.md`, round 1), each in the code `docs/TOOLS.md` and `docs/api/openapi.json` are written from (ADR-008's Implementation 13): a BioRepo record is one rule, `module_stores.RECORD`, that `biorepo_read` lists its kinds `record` and `candidate` by and `search_records` names each hit's kind by, so a candidate a reviewer verified is a record; a write's answer names the audit rows it left (`ToolResult.auditIds`), a gated write's proposal among them; `GET /api/audit` takes `action`, `target` and `who` beside `limit`, so a write of any age is found by what it was, and serves each row as an `AuditRow` under its `id`, its null fields left out as an answer over MCP leaves them out; `AuditEntry`'s `detail` says what a row holds, and `catalogue_write` and `study_scenario` keep their call's note there as the other writes do; a module read's summary is a `ModuleRead`, its `partial` a sentence, and `module_stores.DETAIL` names each kind's `detail` field by field; the client recipe hands the server no `VIRTUAL_ENV`, and the page's top points at it. `core/tests/test_agent_interface.py` holds each, a row of every kind among them | alpha 2.2, E.16 | `dc02f20` |
 | The per-request key override and the local-model route (owner question 10 and §3 of the alpha 2.1 prompt): `X-OpenFerment-Key` serves a request's calls and is kept nowhere; `OPENFERMENT_LOCAL_BASE_URL` serves a local model in single calls | alpha 2.1, D.4 | `fa9782e`, `53c123c` |
 | A retrieval report over a project's own corpus, as far as it asks no model: the commands (`pnpm lit:graph`, `pnpm lit:report --project`; ADR-002, Implementation F), then the Ethanol project's 130 questions, built by code from its 457 kept candidates and asked in `interactive`, `vector_only` and `keyword_only` under both relevance rules with 0 model calls (`docs/reports/literature-retrieval.md`), and the graph build's dry run, 92 batches over its 814 passages. The lanes that ask a model are open (below) | alpha 2.2, F.5.4 and F.5's offline part | `adb9c8d`, `0dd8415` |
@@ -619,7 +621,6 @@ the line that records the decision and the decision record it stands under.
 | `pnpm db:up` (compose.yaml, `pgvector/pgvector:pg17`) has never run here: this container has no Docker daemon; CI runs the same image as a service | its first run on a machine with Docker, the owner's |
 | Component tests on fixtures recorded from the real service (`pnpm record:fixtures`, alpha 2.0 prompt §9.3) are unbuilt; the walk and the smoke run against the real service | a stage after alpha 2.2 that builds `pnpm record:fixtures` |
 | No offline test computes on a published genome-scale model (Yeast9 and iMM904 need their fetched files, caches kept outside git; Departures, §5.5 stage 2); a model add-on applied in the worker, and a metabolite-defined product's demand through the worker, are untested | a test under the marker `slow` or `live`, on a host that holds the fetched files |
-| Two concept-graph builds at once (`pnpm lit:graph` for two projects) can lose one project's document from an entity's `document_ids`: each build batch reads `kg_entities`, merges in Python and writes the arrays back, with no lock, under READ COMMITTED (`sci_rag/graph/extractor.py:356-452`). The entity keeps the description the lost document's passage produced, and `graph.entities` shows it to the other project (`literature/graph.py:296-309`). Found by the review of the bug hunt's group 1 fix, 11 November 2026 | its own fix: each batch's read and write of `kg_entities` under one advisory lock taken in `graph.build`, with a test of two builds at once |
 | `units.json` maps `wt%` and `% (w/w)` to `% CDW`, aliases written for the PHA program; changing them changes how a stored record converts | the vocabulary review, after alpha 2.2, with a migration for the records it converts |
 | RunbookDetail's held-for-review panel keeps words of Dominion's era: candidates near a claimed identity band, a ruling with legal consequences, and two rulings (a boundary accepted as mapped; candidates excluded pending counsel) that `store.resolveRunbookReview` writes into the held stage, with a boundary map among the runbook's outputs. No code in this build sets a runbook held for review, so the panel answers only a row kept in that state | the stage that lets a runbook be held for review, with that state's own words and rulings |
 | `fermos.forecast_run` keeps `duration_h`, a length the calling code sets as its own convention, which the tests and their stand-ins pass (`standins.py`, `test_fermos.py`, `test_fermos_3r.py`, `test_proforma_fermos.py`, `test_proforma_ceiling.py`); the routes, the tools and the engine set a forecast's length as a typed `t_end` | the change that has those tests set a typed `t_end`, or reach `fermos.forecast()` through a helper of their own |
@@ -3672,3 +3673,27 @@ On `claude/alpha-2-2-fixes`, cut from `claude/alpha-2-2-bughunt` at `fa8db4a`, i
     debt, below).
   - Checks: `pnpm test:core` 3064 passed, 1 skipped, 175 deselected (5 min 31 s); `pnpm test:lit` 10 passed.
     No model was called and nothing was spent.
+- The concept-graph build race group 1's review found (not a hunt finding): two builds at once could
+  lose one project's document from an entity's `document_ids`. The kit's batch step
+  (`sci_rag/graph/extractor.py`, `_extract_batch`) asks the model, then in one transaction reads the
+  entities the batch names, merges their chunk and document lists in Python and writes them back,
+  with no lock and under READ COMMITTED. A batch that read an entity before another build's commit
+  wrote its stale lists over that commit, and the entity kept the description the lost document's
+  passage produced. `graph.entities` shows a description only while every document naming the
+  entity is the project's, so the other project then read it.
+  - The fix: `graph.build` hands the kit's batch step a session factory on the kit's engine
+    (`_writer`) whose every transaction first takes one PostgreSQL advisory lock
+    (`pg_advisory_xact_lock(GRAPH_LOCK)`, an `after_begin` hook on `_GraphWrite`) and holds it to
+    the commit. The batches of every build then write one after another, each reading what the last
+    committed. The model call comes before the batch's transaction, so it stays outside the lock.
+    `graph.build` is the one writer of the concept graph (`pnpm lit:graph` calls it).
+  - Tests: `test_two_builds_at_once_keep_every_document_an_entity_is_named_in` in
+    `core/tests/test_literature_graph.py` makes the two builds overlap every time: this project's
+    batch reads the entity, then waits inside its transaction (1.5 s at most) for the other
+    project's build to commit. Without the lock the other build commits in that wait and its
+    document is lost from the entity; with the lock it waits, and the entity names all three
+    documents, its description withheld from this project. `test_the_kits_batch_step_is_the_one_this_build_calls`
+    now holds that the factory the build hands the kit is on the kit's engine and takes the lock.
+    The two literature test files' 46 tests pass; `pnpm test:core` 3065 passed, 1 skipped, 175
+    deselected (5 min 56 s); `pnpm test:lit` 10 passed. No model was called.
+  - Records: `graph.py`'s docstring (the build), ADR-002's Implementation F and the Paid row.

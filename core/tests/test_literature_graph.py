@@ -247,6 +247,56 @@ def test_a_shared_document_is_built_once_and_serves_both_projects(tmp_path, two_
         assert edge["document_id"] == shared.document_id
 
 
+def test_two_builds_at_once_keep_every_document_an_entity_is_named_in(tmp_path, two_projects, monkeypatch):
+    """Two builds that name one entity at once, made to overlap every time:
+    this project's batch reads the entity, then waits inside its transaction
+    for the other project's build to commit (1.5 s at most). The lock keeps
+    the other build waiting instead, so the entity's document list ends
+    whole, and the description the other project's private passage produced
+    stays out of this project's reads."""
+    tag = _tag()
+    name = f"organism-{tag}"
+    first = _store(tmp_path, HERE, tag, f"The {name} grew in a placeholder vessel.")
+    assert _build(HERE, Reader({name: Named("Organism")})).entities_created == 1
+    second = _store(tmp_path, HERE, tag + "b", f"The {name} was fed in a placeholder vessel.")
+    theirs = _store(tmp_path, THERE, tag + "t", f"The {name} was harvested from a private vessel.")
+    here = {row[0] for row in _pending(HERE)}
+    assert here and here.isdisjoint(row[0] for row in _pending(THERE))
+    read, committed = asyncio.Event(), asyncio.Event()
+    insert_relationships = extractor._insert_relationships
+
+    async def after_the_read(session, relationships, entity_ids, chunk_id_by_passage, *rest):
+        if set(chunk_id_by_passage.values()) <= here:
+            read.set()
+            try:
+                await asyncio.wait_for(committed.wait(), 1.5)
+            except TimeoutError:
+                pass
+        return await insert_relationships(session, relationships, entity_ids, chunk_id_by_passage, *rest)
+
+    monkeypatch.setattr(extractor, "_insert_relationships", after_the_read)
+
+    async def both() -> None:
+        async def the_other_build() -> None:
+            await asyncio.wait_for(read.wait(), 30)
+            private = Reader({name: Named("Organism", description=f"Private words of {tag}.")})
+            await graph.build(THERE, llm=private, rate_limit_s=0)
+            committed.set()
+
+        await asyncio.gather(graph.build(HERE, llm=Reader({name: Named("Organism")}), rate_limit_s=0),
+                             the_other_build())
+
+    db.run(both())
+
+    async def named_in() -> list[str]:
+        async with kit.service().session_factory() as session:
+            return await session.scalar(select(KgEntity.document_ids).where(KgEntity.name == name))
+
+    assert set(db.run(named_in())) == {first.document_id, second.document_id, theirs.document_id}
+    [listed] = _entities(HERE, name)["entities"]
+    assert (listed["description"], listed["description_note"]) == (None, graph.DESCRIPTION_NOTE)
+
+
 def test_a_build_stops_in_words_when_no_model_answers(tmp_path):
     tag = _tag()
     _store(tmp_path, HERE, tag, f"The organism-{tag} grew.", f"The organism-{tag} was fed.",
@@ -395,8 +445,9 @@ def test_the_kits_batch_step_is_the_one_this_build_calls(tmp_path, monkeypatch):
     [(batch, session_factory, llm, domain, stats, rate_limit_s)] = seen
     service = kit.service()
     assert [r[0] for r in batch] == [c.id for c in kit.document(batch[0][1], project_id=HERE)[1]]
-    assert (session_factory, llm, domain, stats, rate_limit_s) == (service.session_factory, model, service.domain,
-                                                                   built, 0)
+    assert (llm, domain, stats, rate_limit_s) == (model, service.domain, built, 0)
+    assert session_factory.kw["bind"] is service.session_factory.kw["bind"], "the kit's own engine"
+    assert session_factory.kw["sync_session_class"] is graph._GraphWrite, "its transactions hold GRAPH_LOCK"
 
 
 # ── the reads, under the rule ──────────────────────────────────────────────

@@ -20,6 +20,15 @@ and edge against the passage numbers the model names, so a batch of one
 document keeps every word of its answer inside a document that each project
 holding any of its passages holds whole. A chunk of a document two projects
 hold is read once and serves both.
+Each batch reads the entities it names, merges their chunk and document lists
+in Python and writes them back, with no lock of the kit's own, so two builds at
+once could each write a list read before the other committed and lose a
+document; the entity would then keep the description that document's passage
+produced, which the scoped reads below show only while the entity's document
+list is whole. So every transaction a build's batches open first takes one
+advisory lock (`GRAPH_LOCK`, `_GraphWrite`): the batches of every build write
+one after another, each reading what the last committed. The model call comes
+before the batch's transaction, so it stays outside the lock.
 `literature/` imports no `llm`, so the command hands in the client and `stop`,
 a predicate read after each batch: its words (no key, the account's usage
 limit, the day's cap) end the build, and the chunks it had yet to read wait for
@@ -64,9 +73,10 @@ from typing import Any
 from sci_rag.db.models import Chunk, Document
 from sci_rag.graph.extractor import _MAX_PASSAGE_CHARS, ExtractionStats, _extract_with_recovery
 from sci_rag.llm.client import LLMClient
-from sqlalchemy import Row, String, bindparam, select, text
+from sqlalchemy import Connection, Row, String, bindparam, event, select, text
 from sqlalchemy.dialects.postgresql import ARRAY
 from sqlalchemy.ext.asyncio import AsyncSession, async_sessionmaker
+from sqlalchemy.orm import Session, SessionTransaction
 
 from .. import db
 from . import kit
@@ -87,6 +97,24 @@ EVIDENCE_WITHHELD = "Withheld: the quote's words do not stand in the passage thi
 MOST = 100
 #: The ceiling the kit's batch step asks for a batch's answer (`_extract_batch`).
 ANSWER_TOKENS = 8192
+#: The PostgreSQL advisory lock every build batch's transaction holds: one key
+#: for the instance's one concept graph, the bytes of "of:graph".
+GRAPH_LOCK = int.from_bytes(b"of:graph", "big")
+
+
+class _GraphWrite(Session):
+    """A session whose every transaction first waits for `GRAPH_LOCK` and
+    holds it until the transaction ends."""
+
+
+@event.listens_for(_GraphWrite, "after_begin")
+def _take_the_graph_lock(session: Session, transaction: SessionTransaction, connection: Connection) -> None:
+    connection.execute(text("SELECT pg_advisory_xact_lock(:key)"), {"key": GRAPH_LOCK})
+
+
+def _writer(factory: async_sessionmaker[AsyncSession]) -> async_sessionmaker[AsyncSession]:
+    """Sessions on `factory`'s engine whose transactions hold `GRAPH_LOCK`."""
+    return async_sessionmaker(factory.kw["bind"], expire_on_commit=False, sync_session_class=_GraphWrite)
 
 
 def no_graph(project_id: str) -> str:
@@ -160,7 +188,8 @@ async def build(project_id: str, *, llm: LLMClient, batch_size: int = 10, limit:
                 stop: Callable[[], str | None] | None = None) -> Built:
     """Read the project's pending chunks into the concept graph, `batch_size`
     to a batch within one document (`batches`), each through the kit's own
-    batch step on `llm` (the kit's `extraction` role). `stop` is read after
+    batch step on `llm` (the kit's `extraction` role), its writes under
+    `GRAPH_LOCK`. `stop` is read after
     each batch, and words from it end the build there (`Built.stopped`)."""
     if batch_size < 1:
         raise ValueError("a batch holds one chunk at least")
@@ -168,9 +197,9 @@ async def build(project_id: str, *, llm: LLMClient, batch_size: int = 10, limit:
     cut = list(batches(rows, batch_size=batch_size))
     built = Built(chunks_pending=len(rows))
     service = kit.service()
+    writer = _writer(service.session_factory)
     for n, batch in enumerate(cut, start=1):
-        await _extract_with_recovery(batch, service.session_factory, llm, service.domain, built,
-                                     rate_limit_s=rate_limit_s)
+        await _extract_with_recovery(batch, writer, llm, service.domain, built, rate_limit_s=rate_limit_s)
         built.batches_run += 1
         words = stop() if stop is not None else None
         if words:

@@ -175,7 +175,10 @@ refusal with no project and, with one, the connection's failure, each in words
   again, on Haiku, by every later build, counted in `chunks_left` each time; `OPENFERMENT_ROUTES`
   naming a second index model reads it (Sonnet answered each of F.1's declines). `stop`, read
   after each batch, ends the build in its words (no key, the account's usage limit, the day's cap).
-  `literature/` imports no `llm`: the command hands in the client and the stop.
+  `literature/` imports no `llm`: the command hands in the client and the stop. Each batch's
+  transaction holds one PostgreSQL advisory lock (`graph.GRAPH_LOCK`), so two builds at once write
+  one after another, each batch reading what the last committed, and neither loses a document from
+  an entity the other names (the bug hunt's fix run, 11 November 2026).
 - **A scoped read shows what the project's own passages prove**, by the rule the kit's retrieval
   seeds its graph walk by under a scope (`retrieve/stages/graph.py`: a name and a passage compared
   in lower case, each run of other characters one space). An entity is the project's when one of
