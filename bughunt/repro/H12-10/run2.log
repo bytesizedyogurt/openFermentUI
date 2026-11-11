@@ -24,3 +24,18 @@ tests in core/tests that write a runs row through runs._put: 0
   head probe: exit 0; 2 passed in 2.23s
 2. M21
 M21 applied, line 467 now: first, when, asked = (who, _now(), scenario_id)
+  M21 five files: exit 0; 208 passed, 1 deselected in 47.68s
+  M21 probe: by-at-scenario by='Second Person' at='2026-11-10T23:56:28.405565Z' scenarioId='second-scenario' sffRefused='the placeholder engine has no plant'
+  M21 probe: diagnostics [('time taken', 1.0, 'placeholder-ms')] sffRefused='the placeholder engine has no plant'
+  M21 probe FAILED tests/test_h12_10_probe.py::test_a_held_row_with_neither_is_written_again_under_its_first_askers_by_at_and_scenario
+  M21 probe: exit 1; 1 failed, 1 passed in 2.54s
+3. M24
+M24 applied, line 477 now: reported = (None if False else
+  M24 five files: exit 0; 208 passed, 1 deselected in 57.83s
+  M24 probe: by-at-scenario by='First Person' at='2026-11-01T00:00:00Z' scenarioId='first-scenario' sffRefused='the placeholder engine has no plant'
+  M24 probe: diagnostics [('time taken', 9.0, 'placeholder-ms')] sffRefused='the placeholder engine has no plant'
+  M24 probe FAILED tests/test_h12_10_probe.py::test_a_held_row_with_neither_keeps_its_own_diagnostics
+  M24 probe: exit 1; 1 failed, 1 passed in 2.73s
+EXPECTED: a test plants a done runs row with neither sff nor sffRefused and keeps the run again, so M21 (the second asker's by, at and scenario written over the first's) and M24 (the second computation's diagnostics over the row's own) each fail a test among test_runs, test_engines, test_engine_diagnostics, test_proforma_runs and test_events, as each fails the probe
+OBSERVED: the probe on the head: exit 0 (2 passed in 2.23s); M21: the five files exit 0 (208 passed, 1 deselected in 47.68s), the probe exit 1 (1 failed, 1 passed in 2.54s; by='Second Person' at='2026-11-10T23:56:28.405565Z' scenarioId='second-scenario' sffRefused='the placeholder engine has no plant'); M24: the five files exit 0 (208 passed, 1 deselected in 57.83s), the probe exit 1 (1 failed, 1 passed in 2.73s; [('time taken', 9.0, 'placeholder-ms')] sffRefused='the placeholder engine has no plant')
+RESULT: DEFECT

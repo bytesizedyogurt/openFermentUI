@@ -1,0 +1,13 @@
+EXPECTED: with no key, POST /api/literature/answer ends in an `error` event that says there is no key
+EXPECTED: (core/openferment_core/api.py:2149, docs/api/openapi.json:23239: "with no key the stream says so in an
+EXPECTED: `error`"), in the service's own words as the extract route gives them: "ANTHROPIC_API_KEY is not set ...";
+EXPECTED: BioRepo Search shows those words (src/lib/literature.ts:116: "the service's words, a missing key among them")
+NOTICE:  database "bh_r_h8_08_svc" does not exist, skipping
+OBSERVED: GET /api/health hasKey False
+OBSERVED: pasted document b0f1199791e946d598c3ee90364ac8d0; search (no model) finds 1 passage(s)
+OBSERVED: the stream's events, in order: retrieval_started retrieval_done compression_done generation_started error 
+OBSERVED: the stream's error: {"code": "generation_failed", "message": "ModelUnavailable: generation failed (see server logs)"}
+OBSERVED: the service log: 2026-11-11 00:00:15 [warning  ] answer_generation_failed       detail='ANTHROPIC_API_KEY is not set. Put it in core/.env (gitignored) and restart the service.' error=ModelUnavailable
+OBSERVED: POST /api/intake/{id}/extract answers HTTP 503: {"detail":"ANTHROPIC_API_KEY is not set. Put it in core/.env (gitignored) and restart the service."}
+OBSERVED: BioRepo Search shows: ModelUnavailable: generation failed (see server logs) The service log says why.
+RESULT: DEFECT

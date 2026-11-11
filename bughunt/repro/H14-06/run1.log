@@ -1,0 +1,12 @@
+service http://127.0.0.1:10081 over fresh database bh_r_h14_06_home, no key
+step 1: project made: h14-06
+step 2: GET /api/health -> {"ok":true,"service":"openferment-core","model":"claude-opus-5-5","fallbackModel":"claude-sonnet-5-5","hasKey":false}
+step 3: Home and Postdoc of the built app in Chromium (project h14-06): {"homePostdocCard":["Postdoc","ask, plan, answer from records","live through openferment-core, on the model it is configured with"],"postdocNoKey":"Postdoc is running without an API key","postdocAnswersOn":""}
+step 4: the source at 2047f5a
+  src/screens/Home.tsx:285:    Postdoc: { now: 'live through openferment-core, on the model it is configured with', built: true },
+  src/screens/Home.tsx lines naming health or hasKey: 0
+  src/screens/Postdoc.tsx:144:      {health && health.ok && !health.hasKey && (
+  src/screens/Postdoc.tsx:146:        <Callout kind="warn" title="Postdoc is running without an API key">
+EXPECTED: with /api/health hasKey false, Home's Postdoc destination line says Postdoc waits for a key, as Postdoc's own screen does (Home.tsx:235 "What each destination actually has, right now"; Home.tsx:781 "an honest current state per entry"; Postdoc.tsx:146 "Postdoc is running without an API key")
+OBSERVED: hasKey false; Home's Postdoc card "Postdoc | ask, plan, answer from records | live through openferment-core, on the model it is configured with"; Postdoc's callout "Postdoc is running without an API key"; Postdoc's answers-on line "-"
+RESULT: DEFECT

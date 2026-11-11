@@ -1,0 +1,15 @@
+EXPECTED: ComparisonCreate holds a title to min_length 1 (core/openferment_core/models.py:4809), so a title of
+EXPECTED: three spaces asked again over two runs already compared is refused in words (a 422), or the
+EXPECTED: comparison keeps the title it was kept with ('default beside measured').
+NOTICE:  database "bh_r_h2_08_svc" does not exist, skipping
+SETUP: two kinetics runs 7e9f8632911b0c7a and b9f2b95dd20c0485
+CASE first ask: 200 id cb73163a285612ff title 'default beside measured' by 'Hunter H2-08'
+CASE asked again, title of three spaces: 200 id cb73163a285612ff title '' by 'Hunter H2-08'
+CASE read back: GET /api/studies/comparisons/cb73163a285612ff title ''; the list's title ''
+CASE first ask with a title of three spaces (runs reversed): 200 title ''
+COMPARISON_ID cb73163a285612ff
+VERDICT DEFECT lost=True blank_first_ask_kept=True
+OBSERVED: the comparisons row cb73163a285612ff holds created_by 'Hunter H2-08', body title '', body by 'Hunter H2-08'
+OBSERVED: asked again, title of three spaces: 200 id cb73163a285612ff title '' by 'Hunter H2-08'
+OBSERVED: read back: GET /api/studies/comparisons/cb73163a285612ff title ''; the list's title ''
+RESULT: DEFECT

@@ -1,0 +1,24 @@
+EXPECTED: scripts/host/lib.sh:172-173 'The dump is written beside its name and moved into place once whole, so
+EXPECTED: a failed night keeps the seven as they were', lib.sh:189 removes the .part on a failed night, and
+EXPECTED: core/tests/test_host.py:344 holds a failed night to 'no half file'; the runbook
+EXPECTED: (docs/runbooks/live-host-install.md:260) says 'the newest seven are kept'. So a night stopped half
+EXPECTED: way leaves no .part behind, or the next nights clear it: after the stopped night and three ordinary
+EXPECTED: nights the folder holds the newest seven openferment-<date>.dump files and nothing else.
+setup: worktree 2047f5a; test database bh_r_h11_10_dump, 44 tables
+setup: lib.sh:188-189 reads: if ! (umask 077 && "$tool" -h 127.0.0.1 --format=custom --file="$file.part" openferment); then / rm -f "$file.part"
+setup: lib.sh:197 reads: past="$(printf '%s\n' "$dir"/openferment-[0-9][0-9][0-9][0-9]-[0-9][0-9]-[0-9][0-9].dump |
+setup: folder before: openferment-2026-11-03.dump openferment-2026-11-04.dump openferment-2026-11-05.dump openferment-2026-11-06.dump openferment-2026-11-07.dump openferment-2026-11-08.dump openferment-2026-11-09.dump 
+night 2026-11-10: the real pg_dump has opened openferment-2026-11-10.dump.part (0 bytes) and waits on the lock on openferment.alembic_version (sessions waiting: 1); SIGTERM to the night's process group
+night 2026-11-10: exit 143; the night's log: pg_dump: terminated by user 
+night 2026-11-10: folder: openferment-2026-11-03.dump openferment-2026-11-04.dump openferment-2026-11-05.dump openferment-2026-11-06.dump openferment-2026-11-07.dump openferment-2026-11-08.dump openferment-2026-11-09.dump openferment-2026-11-10.dump.part 
+night 2026-11-11: exit 0; 2 log lines: openferment dumped into ~/openferment-backups/openferment-2026-11-11.dump openferment-2026-11-03.dump removed: the newest 7 are kept 
+night 2026-11-11: folder: openferment-2026-11-04.dump openferment-2026-11-05.dump openferment-2026-11-06.dump openferment-2026-11-07.dump openferment-2026-11-08.dump openferment-2026-11-09.dump openferment-2026-11-10.dump.part openferment-2026-11-11.dump 
+night 2026-11-12: exit 0; 2 log lines: openferment dumped into ~/openferment-backups/openferment-2026-11-12.dump openferment-2026-11-04.dump removed: the newest 7 are kept 
+night 2026-11-12: folder: openferment-2026-11-05.dump openferment-2026-11-06.dump openferment-2026-11-07.dump openferment-2026-11-08.dump openferment-2026-11-09.dump openferment-2026-11-10.dump.part openferment-2026-11-11.dump openferment-2026-11-12.dump 
+night 2026-11-13: exit 0; 2 log lines: openferment dumped into ~/openferment-backups/openferment-2026-11-13.dump openferment-2026-11-05.dump removed: the newest 7 are kept 
+night 2026-11-13: folder: openferment-2026-11-06.dump openferment-2026-11-07.dump openferment-2026-11-08.dump openferment-2026-11-09.dump openferment-2026-11-10.dump.part openferment-2026-11-11.dump openferment-2026-11-12.dump openferment-2026-11-13.dump 
+pg_dump calls: 4, each: pg_dump -h 127.0.0.1 --format=custom --file=~/openferment-backups/openferment-<date>.dump.part openferment
+OBSERVED: the stopped night exited 143 and left openferment-2026-11-10.dump.part in the folder (1 .part after it; 0 bytes now, and pg_restore --list refuses it).
+OBSERVED: after three ordinary nights (each a whole dump pg_restore reads: 3 of 3) the folder holds 7 dated dumps and 1 .part file(s): openferment-2026-11-06.dump openferment-2026-11-07.dump openferment-2026-11-08.dump openferment-2026-11-09.dump openferment-2026-11-10.dump.part openferment-2026-11-11.dump openferment-2026-11-12.dump openferment-2026-11-13.dump 
+OBSERVED: no later night removed the stopped night's half file; the rotation's glob never names it.
+RESULT: DEFECT

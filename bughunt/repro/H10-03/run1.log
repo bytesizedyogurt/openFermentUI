@@ -1,0 +1,56 @@
+tree: 3f2840c; core/ src/ scripts/ examples/ docs/ as at 2047f5a: yes
+A: service on http://127.0.0.1:9170 over fresh bh_r_h10_03_nokey, OPENFERMENT_RAG_KEY empty; paste into r1: 200
+   pnpm ready's rag row for this setting (core/openferment_core/ready.py:248):
+     return Check("rag", "warn", f"/rag refuses every request: no {kit.RAG_KEY} in core/.env. Set one to search "
+-- A: every door asked with no key (X-OpenFerment-Project: r1, no Authorization, no X-API-Key)
+   GET /rag/v1/status           401
+   GET /rag/v1/documents        401
+   GET /rag/health              200
+   GET /rag/v1/corpus-manifest  200
+   GET /rag/docs                200
+   GET /rag/openapi.json        200
+   GET /rag/                    307 -> http://127.0.0.1:9170/docs
+   /rag/health body: {"status":"ok","service":"sci-rag","version":"0.5.0","database":true}
+-- A: the manifest, given with no key
+   stats      {"documents": 1, "chunks": 1, "entities": 0, "communities": 0}
+   embedding  {"model": "BAAI/bge-small-en-v1.5", "provider": "local-hash", "dimension": 384}
+   endpoints  {"rest": "http://127.0.0.1:9170/v1", "mcp": "http://127.0.0.1:9170/mcp", "openapi": "http://127.0.0.1:9170/openapi.json"}
+   features   {"byo_llm_key": true, "streaming": true, "license_scoping": true}
+-- A: what the manifest's own endpoints answer
+   rest    http://127.0.0.1:9170/v1/status              404
+   mcp     http://127.0.0.1:9170/mcp/                   405
+   mcp     http://127.0.0.1:9170/rag/mcp/               404
+   openapi http://127.0.0.1:9170/openapi.json           info.title openferment-core (the kit's /rag/openapi.json: openFerment bioprocess literature)
+   sci_rag.chunks embedding_version: fastembed:BAAI/bge-small-en-v1.5@384
+   the key's scopes (core/openferment_core/literature/kit.py:88): RAG_SCOPES = ("retrieval:query", "retrieval:answer", "corpus:read")
+
+B: service on http://127.0.0.1:9171 over fresh bh_r_h10_03_key, a throwaway OPENFERMENT_RAG_KEY set; paste into r1: 200
+   GET /rag/v1/status           no key 401, a wrong key 401, the key 200
+   GET /rag/v1/corpus-manifest  no key 200, a wrong key 200, the key 200
+   GET /rag/health              no key 200, a wrong key 200, the key 200
+   GET /rag/openapi.json        no key 200, a wrong key 200, the key 200
+   manifest stats.documents with no key: 1
+   lines of service B's log holding the key: 0
+
+-- the contract
+   ADR-002:108:  stands in, so `/rag` refuses every request; the kit, given no keys, would run open. Its CORS origins are empty, a `/rag` request names its proje
+   ADR-002:109:  and the kit's `/mcp` endpoint is left out of the mount. The MCP server runs over stdio
+   CLAUDE.md:67:- C: Sci RAG Kit is an in-process library with a local FastEmbed embedder; its REST serves under `/rag` behind `OPENFERMENT_RAG_KEY`, and its MCP s
+   the kit's meta router (/home/user/openFermentUI/core/.venv/lib/python3.13/site-packages/sci_rag/server/routers/meta.py):
+     ``/v1/corpus-manifest`` is deliberately unauthenticated: it is the
+     descriptor a multi-RAG router (a "switchboard" across several sci-rag-kit
+     @router.get("/v1/corpus-manifest", response_model=CorpusManifest)
+     async def corpus_manifest(request: Request) -> CorpusManifest:
+         service: RagService = request.app.state.service
+         base_url = str(request.base_url).rstrip("/")
+         return CorpusManifest(**await service.corpus_manifest(base_url=base_url))
+   the mount (core/openferment_core/literature/kit.py:848-849):
+         app = create_app(settings=settings(), service=service("free"))
+         app.router.routes = [r for r in app.router.routes if not (isinstance(r, Mount) and r.path == "/mcp")]
+   the provider the kit is told (core/openferment_core/literature/kit.py:213): embedding_provider="local-hash",
+
+EXPECTED: with no OPENFERMENT_RAG_KEY set every /rag request is refused (ADR-002:107-108; ready.py:248), with one set every /rag request without it is refused (CLAUDE.md:67), and a manifest /rag serves names this mount's own address (/rag/v1), no MCP endpoint (ADR-002:109) and the FastEmbed embedder its chunks carry
+OBSERVED: A (no key set): /rag/v1/status 401, /rag/v1/documents 401, and with no key /rag/health 200, /rag/v1/corpus-manifest 200, /rag/docs 200, /rag/openapi.json 200; the manifest gives r1's counts {"documents": 1, "chunks": 1, "entities": 0, "communities": 0}
+OBSERVED: B (a key set): with no key /rag/v1/corpus-manifest 200, /rag/health 200, /rag/openapi.json 200 (manifest stats.documents 1); /rag/v1/status no key 401, with the key 200
+OBSERVED: the manifest names rest http://127.0.0.1:9170/v1; mcp http://127.0.0.1:9170/mcp; openapi http://127.0.0.1:9170/openapi.json is 'openferment-core'; embedding.provider 'local-hash' beside chunks embedded by fastembed:BAAI/bge-small-en-v1.5@384; features.byo_llm_key true with no byo_llm scope on the key
+RESULT: DEFECT

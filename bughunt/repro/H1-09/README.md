@@ -49,7 +49,7 @@ as its name, value and unit alone, with no stray number in the artifact, its has
 **Likely cause.** `core/openferment_core/engine/contract.py:172-197`: `_typed` checks only that `name`, `value` and
 `unit` are present and well typed, and then returns `items` whole (`return items`, line 197) with every other key
 still in it. `core/openferment_core/engine/runs.py:647` keeps that list as the artifact's `values`, and
-`core/openferment_core/artifacts.py:151-152` (`output_hash`) and `artifacts.py:367-401` (`_diff`, `_within`) hash
+`core/openferment_core/artifacts.py:151-152` (`output_hash`) and `artifacts.py:367-402` (`_diff`, `_within`) hash
 and compare it whole. One fix is for `_typed` to refuse a key beyond the three. Another is for it to return
 `{"name", "value", "unit"}` alone. The same `_typed` reads diagnostics, so a stray key on a diagnostic is kept on the
 run's row too (this reproduction does not exercise that path).

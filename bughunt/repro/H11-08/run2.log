@@ -1,0 +1,24 @@
+worktree /tmp/claude-0/-home-user-openFermentUI/cfbc5c9f-640a-5002-a705-5ceaf850fdc6/scratchpad/bh/work/H11-08/wt at 2047f5a; the Python doors import /tmp/claude-0/-home-user-openFermentUI/cfbc5c9f-640a-5002-a705-5ceaf850fdc6/scratchpad/bh/work/H11-08/wt/core/openferment_core/ready.py
+--- A one key line (control)
+    core/.env | ANTHROPIC_API_KEY=sk-ant-H11-08-NOT-A-KEY
+    install.sh (has_key): key: core/.env holds a key.
+    pnpm ready key row:   ✓ key core/.env holds a key
+    service /api/health:  hasKey True
+    doors: agree
+--- B placeholder line, then a key line
+    core/.env | ANTHROPIC_API_KEY=sk-ant-...
+    core/.env | ANTHROPIC_API_KEY=sk-ant-H11-08-NOT-A-KEY
+    install.sh (has_key): no key: core/.env holds no key yet. The app runs; Postdoc and extraction wait for one. Write the key on
+    pnpm ready key row:   ✓ key core/.env holds a key
+    service /api/health:  hasKey True
+    doors: disagree
+--- C a key line, then an empty one
+    core/.env | ANTHROPIC_API_KEY=sk-ant-H11-08-NOT-A-KEY
+    core/.env | ANTHROPIC_API_KEY=
+    install.sh (has_key): key: core/.env holds a key.
+    pnpm ready key row:   ✗ key core/.env holds no key. Postdoc and extraction need one: set a spend cap in the Anthropic console, write the key on core/.env's ANTHROPIC_API_KEY= line (core/.env.example holds it; when core/.env is absent, copy the example, leaving out its OPENFERMENT_DATABASE_URL line on the live host, docs/runbooks/live-host-install.md step 1), and restart the service
+    service /api/health:  hasKey False
+    doors: disagree
+EXPECTED: for each file the three doors give one answer: has_key (install.sh's message) says a key is held exactly when pnpm ready's key row and the service's hasKey do, since the service and ready read core/.env's last ANTHROPIC_API_KEY line.
+OBSERVED: A (control) agree (has_key key, ready ✓ key, service hasKey True); B (placeholder, then a key line) disagree (has_key no key, ready ✓ key, service hasKey True); C (a key line, then an empty one) disagree (has_key key, ready ✗ key, service hasKey False).
+RESULT: DEFECT

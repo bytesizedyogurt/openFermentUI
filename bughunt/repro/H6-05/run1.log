@@ -1,0 +1,33 @@
+tree: 3f2840c; core/ src/ scripts/ examples/ as at 2047f5a: yes
+database bh_r_h6_05_types made from empty and migrated to head: 0010
+
+-- schema openferment: the type of every content column (body, record, selection, settings, input, result)
+  json: 34 columns (body,input,record,result,selection,settings)
+  body columns: 29, of type json: 29; columns of type jsonb anywhere in schema openferment: 0
+
+-- what the two types keep (a cast, no table written): models.py names key order as its reason for json
+  '{"b":1,"a":-0}'::json  -> {"b":1,"a":-0}
+  '{"b":1,"a":-0}'::jsonb -> {"a": 0, "b": 1}
+
+-- the documents
+  docs/decisions/ADR-001-postgresql.md:62: `created_at`; the rest of the row is `body`, the Pydantic model of `models.py` dumped as JSONB.
+  CLAUDE.md:66: - C: PostgreSQL with pgvector is the one database; a row keeps its lookup keys as columns and the Pydantic model as JSONB `body` (ADR-001).
+  docs/PROGRESS.md:541:| §7.4 | Tables `overrides`, `fits`, `trains` and `practice_scenarios`, and `projects.settings`, beyond the list; each table keeps its lookup keys as columns and the
+  docs/PROGRESS.md:763:  four more, Departures) as SQLAlchemy Core with a JSONB `body` (ADR-001, Implementation), alembic `0001_initial`, and
+  docs/PROGRESS.md:796: connections. `db/rows.py` holds the row reads and writes the stores share. Content columns
+  docs/PROGRESS.md:797: are `json` (key order is kept: a simulation's curves are drawn in it). `ready.py`'s data row
+-- the tree
+  core/openferment_core/db/models.py:5: the rest of the row is `body`, the Pydantic model of `models.py` dumped as
+  core/openferment_core/db/models.py:6: JSON, so the Pydantic models stay the one description of a record's content
+  core/openferment_core/db/models.py:7: and these tables hold and index it. The content columns are `json`, which
+  core/openferment_core/db/models.py:8: keeps the text as written: an object's keys keep their order (a simulation's
+  core/openferment_core/db/models.py:9: series are drawn in it) and a negative zero stays one. Nothing here queries
+  core/openferment_core/db/models.py:36:from sqlalchemy.dialects.postgresql import JSON, TIMESTAMP
+  core/openferment_core/db/models.py:69:    return Column("body", JSON, nullable=False)
+  core/openferment_core/db/models.py:374:    Column("body", JSON, nullable=False),
+  postgresql.JSON columns in the migrations: 0001_initial.py:29 0006_eval.py:1 0007_catalogue.py:1 0009_engine_checks.py:1 0010_protocols.py:1 
+  postgresql.JSONB columns in the migrations: 0 files
+
+EXPECTED: the content columns a migrated database holds are of the type ADR-001:62 and CLAUDE.md:66 name (JSONB), or the two documents say json as models.py:6-9 does
+OBSERVED: 34 content columns of type json (29 of 29 body columns), 0 of type jsonb; 2 of the 2 documents say JSONB
+RESULT: DEFECT

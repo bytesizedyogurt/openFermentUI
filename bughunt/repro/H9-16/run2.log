@@ -1,0 +1,11 @@
+1. Alice Person (?by=):            pr-6fa5ee9802be
+2. Bob Other (?by=):               runbooks_write refused lock: runbooks lock on rb-same is already proposed in this ask (pr-6fa5ee9802be) and waits for a person. Nothing was proposed. Say so in gaps.
+3. assistant other/1 (header):     runbooks_write refused lock: runbooks lock on rb-same is already proposed in this ask (pr-6fa5ee9802be) and waits for a person. Nothing was proposed. Say so in gaps.
+open proposals: [{"id": "pr-6fa5ee9802be", "by": "Alice Person", "target": "rb-same", "askId": null}]
+audit rows for lock: [{"who": "Alice Person", "state": "proposed", "target": "rb-same", "askId": null}]
+the twin rule, as the tree holds it:
+  134:        twin = next((p for p in await _all(s, pid, "proposed") if p.askId == made.askId
+  138:            raise ProposalRefused(f"{made.module} {made.action}{on} is already proposed in this ask ({twin.id}) and "
+EXPECTED: each call, outside any ask, judged on its own (Bob's and the assistant's kept as their own proposals), or a refusal whose words name the open proposal without calling it 'this ask'
+OBSERVED: Alice -> pr-6fa5ee9802be; Bob -> runbooks_write refused lock: runbooks lock on rb-same is already proposed in this ask (pr-6fa5ee9802be) and waits for a person. Nothing was proposed. Say so in gaps.; assistant -> runbooks_write refused lock: runbooks lock on rb-same is already proposed in this ask (pr-6fa5ee9802be) and waits for a person. Nothing was proposed. Say so in gaps.; open proposals 1, each askId null: True
+RESULT: DEFECT

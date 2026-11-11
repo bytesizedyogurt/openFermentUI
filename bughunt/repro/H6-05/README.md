@@ -60,7 +60,7 @@ Commit `fa16892` (stage 2.3, "every store on its table") changed
 `core/openferment_core/db/models.py:36` from `postgresql import JSONB` to `postgresql import JSON`
 and added the docstring's reason at models.py:7-9; migration
 `core/openferment_core/db/alembic/versions/0001_initial.py` (29 columns, for example line 42) and
-`0006_eval.py:31`, `0007_catalogue.py:31`, `0009_engine_checks.py:32`, `0010_protocols.py:31` make
+`0006_eval.py:31` (one line for its two tables, `eval_questions` and `eval_runs`), `0007_catalogue.py:31`, `0009_engine_checks.py:32`, `0010_protocols.py:31` make
 `postgresql.JSON` columns to match. ADR-001:62 and CLAUDE.md:66, written at stage 2.1 (`96fd138`)
 while the column was still JSONB, kept the word. The fix is two words, in ADR-001:62 and CLAUDE.md:66,
 and the two PROGRESS.md lines with them; `core/tests/test_guidance.py` holds CLAUDE.md's lines, so the
