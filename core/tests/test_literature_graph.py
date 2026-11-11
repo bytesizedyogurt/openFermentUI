@@ -25,7 +25,7 @@ from sci_rag.db.models import Chunk, KgEntity, KgRelationship
 from sci_rag.graph import extractor
 from sci_rag.ingest.manifest import CorpusEntry
 from sci_rag.llm.client import LLMClient
-from sqlalchemy import insert, select
+from sqlalchemy import insert, select, text
 
 from openferment_core import db, literature_mcp, projects
 from openferment_core.db import models as t
@@ -250,10 +250,11 @@ def test_a_shared_document_is_built_once_and_serves_both_projects(tmp_path, two_
 def test_two_builds_at_once_keep_every_document_an_entity_is_named_in(tmp_path, two_projects, monkeypatch):
     """Two builds that name one entity at once, made to overlap every time:
     this project's batch reads the entity, then waits inside its transaction
-    for the other project's build to commit (1.5 s at most). The lock keeps
-    the other build waiting instead, so the entity's document list ends
-    whole, and the description the other project's private passage produced
-    stays out of this project's reads."""
+    until the other project's build has committed or is seen waiting on
+    `GRAPH_LOCK` in `pg_locks`. Without the lock the other build commits in
+    that wait and its document is lost; with it the other build waits, so the
+    entity's document list ends whole, and the description the other
+    project's private passage produced stays out of this project's reads."""
     tag = _tag()
     name = f"organism-{tag}"
     first = _store(tmp_path, HERE, tag, f"The {name} grew in a placeholder vessel.")
@@ -262,16 +263,33 @@ def test_two_builds_at_once_keep_every_document_an_entity_is_named_in(tmp_path, 
     theirs = _store(tmp_path, THERE, tag + "t", f"The {name} was harvested from a private vessel.")
     here = {row[0] for row in _pending(HERE)}
     assert here and here.isdisjoint(row[0] for row in _pending(THERE))
-    read, committed = asyncio.Event(), asyncio.Event()
+    read, committed, seen = asyncio.Event(), asyncio.Event(), asyncio.Event()
     insert_relationships = extractor._insert_relationships
+    waiting = text("SELECT EXISTS (SELECT 1 FROM pg_locks WHERE locktype = 'advisory' AND NOT granted"
+                   " AND database = (SELECT oid FROM pg_database WHERE datname = current_database())"
+                   " AND classid = :hi AND objid = :lo AND objsubid = 1)")
+
+    async def watch_for_a_waiter(done: asyncio.Event) -> None:
+        """Set `seen` once a session waits on GRAPH_LOCK; stop when `done` is set."""
+        key = {"hi": graph.GRAPH_LOCK >> 32, "lo": graph.GRAPH_LOCK & 0xFFFFFFFF}
+        async with kit.service().session_factory() as session:
+            while not done.is_set():
+                if await session.scalar(waiting, key):
+                    seen.set()
+                    return
+                await asyncio.sleep(0.02)
 
     async def after_the_read(session, relationships, entity_ids, chunk_id_by_passage, *rest):
         if set(chunk_id_by_passage.values()) <= here:
             read.set()
-            try:
-                await asyncio.wait_for(committed.wait(), 1.5)
-            except TimeoutError:
-                pass
+            done = asyncio.Event()
+            watch = asyncio.ensure_future(watch_for_a_waiter(done))
+            either = [asyncio.ensure_future(committed.wait()), asyncio.ensure_future(seen.wait())]
+            await asyncio.wait(either, timeout=30, return_when=asyncio.FIRST_COMPLETED)
+            done.set()
+            await watch
+            for task in either:
+                task.cancel()
         return await insert_relationships(session, relationships, entity_ids, chunk_id_by_passage, *rest)
 
     monkeypatch.setattr(extractor, "_insert_relationships", after_the_read)

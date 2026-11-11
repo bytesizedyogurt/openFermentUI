@@ -170,8 +170,10 @@ refusal with no project and, with one, the connection's failure, each in words
   keeps its answer inside a document that each project holding any of its passages holds whole. A
   document shorter than ten passages takes a call of its own, so a build makes more calls than its
   passages divided by ten, and the dry run counts them. A chunk of a document two projects hold is
-  read once and serves both. A batch the index route's model declines is a batch that fails: on
-  the default route, Haiku alone (ADR-008, Implementation 17), it stays unstamped and is read
+  read by the first build that reaches it and serves both; two builds that run at once can each
+  send a batch of it to the model before either stamps it, and pay for it twice. A batch the
+  index route's model declines is a batch that fails: on the default route, Haiku alone (ADR-008,
+  Implementation 17), it stays unstamped and is read
   again, on Haiku, by every later build, counted in `chunks_left` each time; `OPENFERMENT_ROUTES`
   naming a second index model reads it (Sonnet answered each of F.1's declines). `stop`, read
   after each batch, ends the build in its words (no key, the account's usage limit, the day's cap).

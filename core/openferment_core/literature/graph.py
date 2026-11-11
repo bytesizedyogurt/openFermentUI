@@ -19,7 +19,9 @@ kit writes one description a name from the whole batch and files each entity
 and edge against the passage numbers the model names, so a batch of one
 document keeps every word of its answer inside a document that each project
 holding any of its passages holds whole. A chunk of a document two projects
-hold is read once and serves both.
+hold is read by the first build that reaches it and serves both; two builds that
+run at once can each send a batch of it to the model before either stamps it,
+and pay for it twice (the lock below keeps the graph whole, not the spend).
 Each batch reads the entities it names, merges their chunk and document lists
 in Python and writes them back, with no lock of the kit's own, so two builds at
 once could each write a list read before the other committed and lose a

@@ -622,6 +622,7 @@ the line that records the decision and the decision record it stands under.
 | `pnpm db:up` (compose.yaml, `pgvector/pgvector:pg17`) has never run here: this container has no Docker daemon; CI runs the same image as a service | its first run on a machine with Docker, the owner's |
 | Component tests on fixtures recorded from the real service (`pnpm record:fixtures`, alpha 2.0 prompt §9.3) are unbuilt; the walk and the smoke run against the real service | a stage after alpha 2.2 that builds `pnpm record:fixtures` |
 | No offline test computes on a published genome-scale model (Yeast9 and iMM904 need their fetched files, caches kept outside git; Departures, §5.5 stage 2); a model add-on applied in the worker, and a metabolite-defined product's demand through the worker, are untested | a test under the marker `slow` or `live`, on a host that holds the fetched files |
+| Two concept-graph builds at once (`pnpm lit:graph` for two projects that share a document) can each send a batch of a shared passage to the model before either stamps it, and pay for that batch twice; `GRAPH_LOCK` keeps the graph whole, and the spend is the same as two builds run one after the other with no stamp between them (found by the review of the graph lock, 11 November 2026) | a build that reads the stamps again inside the lock before it asks the model, or one build at a time for the instance |
 | `units.json` maps `wt%` and `% (w/w)` to `% CDW`, aliases written for the PHA program; changing them changes how a stored record converts | the vocabulary review, after alpha 2.2, with a migration for the records it converts |
 | RunbookDetail's held-for-review panel keeps words of Dominion's era: candidates near a claimed identity band, a ruling with legal consequences, and two rulings (a boundary accepted as mapped; candidates excluded pending counsel) that `store.resolveRunbookReview` writes into the held stage, with a boundary map among the runbook's outputs. No code in this build sets a runbook held for review, so the panel answers only a row kept in that state | the stage that lets a runbook be held for review, with that state's own words and rulings |
 | `fermos.forecast_run` keeps `duration_h`, a length the calling code sets as its own convention, which the tests and their stand-ins pass (`standins.py`, `test_fermos.py`, `test_fermos_3r.py`, `test_proforma_fermos.py`, `test_proforma_ceiling.py`); the routes, the tools and the engine set a forecast's length as a typed `t_end` | the change that has those tests set a typed `t_end`, or reach `fermos.forecast()` through a helper of their own |
@@ -3722,3 +3723,16 @@ On `claude/alpha-2-2-fixes`, cut from `claude/alpha-2-2-bughunt` at `fa8db4a`, i
   - Checks: `pnpm typecheck`, `check:state` (the ten above among its checks), `check:plan`, `check:figures`,
     `check:guild`, `test:reconcile`, `gen:components --check`, `pnpm build` and `pnpm smoke` (20 screens) pass;
     `pnpm test:core` 3065 passed, 1 skipped, 175 deselected (6 min 11 s). No model was called.
+- The review of the graph lock (70abace): two readers, the lock's correctness and its regressions,
+  each claim checked against the code. Held: `after_begin` runs `pg_advisory_xact_lock` as the
+  statement that opens each batch's transaction, on the connection every later statement of the
+  batch uses; each retry and half of a batch opens a session of its own and takes the lock again; no
+  model call or sleep falls inside it; no other writer of the graph runs in openFerment's paths; the
+  key meets no other advisory lock of the database (`db.lock`'s keys are hashed), and the one lock
+  taken before any row lock leaves no deadlock. Confirmed and fixed: the test's fixed 1.5 s wait could
+  let a regression that loses the lock itself pass on a slow machine; it now waits until the other
+  build has committed or is seen waiting on `GRAPH_LOCK` in `pg_locks`, 30 s at most, and it fails
+  every time with the lock's `after_begin` hook removed. Confirmed and recorded: the records said a
+  shared passage is read once, and two builds at once can each pay for it (`graph.py`'s docstring,
+  ADR-002's Implementation F and `docs/api/intake.md` now say so, and the Open table holds the spend).
+  `pnpm test:core` 3065 passed, 1 skipped, 175 deselected (6 min); `pnpm test:lit` 10 passed.
