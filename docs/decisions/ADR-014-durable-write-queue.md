@@ -57,3 +57,16 @@ sentence under `src/` (a string, a template, a JSX attribute's words, or one ele
 expressions) and holds it to this record: a sentence that keeps something in this browser names a write that waits
 for the service or a preference, a browser owns no row, and a session holds what it loaded and what lives on the
 page alone. `pnpm smoke` reads Postdoc's empty list on the screen.
+
+## Implementation note (the bug hunt's fix run, 2026-11-11)
+
+Every tab of a browser saves under the one key, and each tab held its own copy of the queue, so the tab that saved
+last set the queue for the whole browser: a reading queued at the bench in one tab during an outage was erased by a
+second tab's save and never reached the service (the bug hunt's H7-01). A save now merges (`durable.ts`,
+`mergeSnapshot`): it keeps what this tab owes now and, from the snapshot already stored, every owed write this tab
+has never held, which is another tab's. A write this tab held and no longer holds was answered by the service or
+replaced by a later write of the same row, so the merge leaves it out; of two writes of one row, the later stands.
+Project rows, review decisions and Guild's owed writes are merged alike. The read and the write run in one IndexedDB
+transaction, so two tabs' saves take turns. A write another tab queued is sent by that tab, and once it has closed,
+by the next page to load the snapshot. `check:state` holds two tabs saving in turn during an outage to both tabs'
+writes reaching the service, and `bughunt/repro/H7-01/run.sh` holds it in Chromium.

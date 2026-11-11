@@ -240,7 +240,111 @@ function openDb(): Promise<IDBDatabase | null> {
   return dbPromise;
 }
 
-/** The stored snapshot, or null when there is none or it cannot be read. */
+// ── Every tab of this browser writes the one snapshot ─────────────────
+//
+// Each tab keeps its own copy of the writes it owes the service, and every tab
+// of this browser saves under the one key. So a save merges (H7-01, the bug
+// hunt of November 2026): it keeps what this tab owes now, and from the
+// snapshot already stored it keeps every owed write this tab has never held,
+// which is another tab's. A tab that saves last leaves the others' writes in
+// place, and the next page to load sends them. A write this tab held and no
+// longer holds was answered by the service or replaced by a later write of the
+// same row, so the merge leaves it out. The read and the write run in one
+// IndexedDB transaction, and the browser runs two tabs' transactions on one
+// store one after the other.
+
+/** The owed writes a tab has held, each by what names it. */
+export interface Held {
+  outbox: Set<string>;
+  decisions: Set<string>;
+  guild: Set<string>;
+  withdrawals: Set<string>;
+}
+
+export function emptyHeld(): Held {
+  return { outbox: new Set(), decisions: new Set(), guild: new Set(), withdrawals: new Set() };
+}
+
+const rowOf = (e: OutboxEntry) => `${e.project}\u0000${e.kind}\u0000${e.id}`;
+const entryOf = (e: OutboxEntry) => `${rowOf(e)}\u0000${e.at}`;
+const decisionOf = (recordId: string, d: DurableReviewDecision) => `${recordId}\u0000${d.at ?? ''}`;
+const withdrawalOf = (w: GuildWithdrawal) => `${w.evidenceId}\u0000${w.at}`;
+
+/**
+ * Add the owed writes `snapshot` holds to `held`. `decisions: false` leaves its
+ * review decisions out: a loaded snapshot's decisions count as this tab's only
+ * once a snapshot it saves carries them, since a tab re-applies a decision only
+ * to the records it has loaded.
+ */
+export function hold(held: Held, snapshot: DurableSnapshot, { decisions = true } = {}): void {
+  for (const e of snapshot.outbox ?? []) held.outbox.add(entryOf(e));
+  if (decisions) for (const [id, d] of Object.entries(snapshot.reviewDecisions)) held.decisions.add(decisionOf(id, d));
+  for (const id of snapshot.guild?.pending ?? []) held.guild.add(id);
+  for (const w of snapshot.guild?.withdrawals ?? []) held.withdrawals.add(withdrawalOf(w));
+}
+
+/**
+ * The snapshot a tab writes: `mine`, what it owes now, with every owed write of
+ * `stored` that it has never `held` laid beside it. Of two writes of one row the
+ * later stands, and the outbox runs oldest first.
+ */
+export function mergeSnapshot(mine: DurableSnapshot, stored: DurableSnapshot | null, held: Held): DurableSnapshot {
+  if (!stored) return mine;
+  const rows = new Map<string, OutboxEntry>();
+  const theirs = (stored.outbox ?? []).filter((e) => !held.outbox.has(entryOf(e)));
+  for (const e of [...(mine.outbox ?? []), ...theirs]) {
+    const was = rows.get(rowOf(e));
+    if (!was || was.at < e.at) rows.set(rowOf(e), e);
+  }
+  const outbox = [...rows.values()].sort((a, b) => (a.at < b.at ? -1 : a.at > b.at ? 1 : 0));
+
+  const reviewDecisions = { ...mine.reviewDecisions };
+  for (const [id, d] of Object.entries(stored.reviewDecisions ?? {})) {
+    if (held.decisions.has(decisionOf(id, d))) continue;
+    const own = reviewDecisions[id];
+    if (!own || (own.at ?? '') < (d.at ?? '')) reviewDecisions[id] = d;
+  }
+
+  const own = mine.guild ?? stored.guild;
+  let guild = own;
+  if (own && stored.guild) {
+    const owedHere = new Set(own.pending);
+    const owedThere = stored.guild.pending.filter((id) => !held.guild.has(id) && !owedHere.has(id));
+    const there = new Set(owedThere);
+    const people = new Set(own.ledger.people.map((p) => p.id));
+    const evidence = new Set(own.ledger.evidence.map((x) => x.id));
+    const withdrawn = new Set(own.withdrawals.map(withdrawalOf));
+    guild = {
+      ...own,
+      ledger: {
+        ...own.ledger,
+        people: [...own.ledger.people, ...stored.guild.ledger.people.filter((p) => there.has(p.id) && !people.has(p.id))],
+        evidence: [...own.ledger.evidence, ...stored.guild.ledger.evidence.filter((x) => there.has(x.id) && !evidence.has(x.id))],
+      },
+      pending: [...own.pending, ...owedThere],
+      withdrawals: [
+        ...own.withdrawals,
+        ...stored.guild.withdrawals.filter((w) => !held.withdrawals.has(withdrawalOf(w)) && !withdrawn.has(withdrawalOf(w))),
+      ],
+    };
+  }
+  return { ...mine, reviewDecisions, outbox, ...(guild ? { guild } : {}) };
+}
+
+/** What this tab has held, for every save it makes. */
+let held = emptyHeld();
+
+/** A stored value as a snapshot: one of an older shape is discarded rather than migrated on a guess. */
+function asSnapshot(v: unknown): DurableSnapshot | null {
+  const snapshot = v as DurableSnapshot | undefined;
+  return snapshot && snapshot.version === 1 ? snapshot : null;
+}
+
+/**
+ * The stored snapshot, or null when there is none or it cannot be read. The
+ * page takes its outbox and Guild's owed writes as its own (the store's
+ * `applyDurable`), so they count as held from here.
+ */
 export async function loadDurable(): Promise<DurableSnapshot | null> {
   const db = await openDb();
   if (!db) return null;
@@ -249,11 +353,11 @@ export async function loadDurable(): Promise<DurableSnapshot | null> {
       const tx = db.transaction(STORE, 'readonly');
       const req = tx.objectStore(STORE).get(KEY);
       req.onsuccess = () => {
-        const v = req.result as DurableSnapshot | undefined;
-        // A snapshot from an older shape is discarded rather than migrated on
-        // a guess. Losing a session's depositions is bad; silently
-        // reinterpreting them as a shape they were never written in is worse.
-        resolve(v && v.version === 1 ? v : null);
+        // Losing a session's depositions is bad; silently reinterpreting them
+        // as a shape they were never written in is worse.
+        const snapshot = asSnapshot(req.result);
+        if (snapshot) hold(held, snapshot, { decisions: false });
+        resolve(snapshot);
       };
       req.onerror = () => resolve(null);
     } catch {
@@ -274,7 +378,15 @@ async function flush(): Promise<void> {
   if (!db) return;
   try {
     const tx = db.transaction(STORE, 'readwrite');
-    tx.objectStore(STORE).put(snapshot, KEY);
+    const store = tx.objectStore(STORE);
+    const req = store.get(KEY);
+    req.onsuccess = () => {
+      try {
+        store.put(mergeSnapshot(snapshot, asSnapshot(req.result), held), KEY);
+      } catch {
+        // As below: the app keeps running on memory.
+      }
+    };
   } catch {
     // Quota exceeded, or the store went away mid-session. The app keeps
     // running on memory; the next successful write catches up.
@@ -284,10 +396,12 @@ async function flush(): Promise<void> {
 /**
  * Queue a write. Coalesced on a short timer because a running deposition
  * mutates on every keystroke and every timer tick, and writing each one
- * through would put IndexedDB traffic in the way of the bench.
+ * through would put IndexedDB traffic in the way of the bench. Every owed write
+ * the snapshot carries counts as held by this tab from here.
  */
 export function saveDurable(snapshot: DurableSnapshot): void {
   if (!durableAvailable()) return;
+  hold(held, snapshot);
   pending = snapshot;
   if (timer) return;
   timer = setTimeout(() => void flush(), 400);
@@ -305,6 +419,7 @@ export function flushDurable(): void {
 /** Drop everything persisted. Used by "Clear this browser’s data", which must truly clear. */
 export async function clearDurable(): Promise<void> {
   pending = null;
+  held = emptyHeld();
   if (timer) {
     clearTimeout(timer);
     timer = null;

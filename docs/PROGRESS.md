@@ -109,7 +109,8 @@ session continues from this file and `git log` alone.
    `claude/alpha-2-2-fixes`, cut from the hunt's head (`fa8db4a`); each group's fix reruns its
    reproductions twice beside the hunt's logs (`after-fix-run1.log`, `after-fix-run2.log`). Group 1
    (H5-01) is done, and so is the concept-graph build race its review found; group 2 (H7-01, the
-   browser's shared pending-writes snapshot) is next. Groups 16
+   browser's shared pending-writes snapshot) is done; group 3 (H7-04, a scope's overrides written
+   whole) is next. Groups 16
    and 19 change how a key is read, a stop condition, and wait on the owner (the Log, Fixes after the
    bug hunt).
 
@@ -3697,3 +3698,27 @@ On `claude/alpha-2-2-fixes`, cut from `claude/alpha-2-2-bughunt` at `fa8db4a`, i
     The two literature test files' 46 tests pass; `pnpm test:core` 3065 passed, 1 skipped, 175
     deselected (5 min 56 s); `pnpm test:lit` 10 passed. No model was called.
   - Records: `graph.py`'s docstring (the build), ADR-002's Implementation F and the Paid row.
+- Group 2, H7-01 (S1): two tabs on one project during an outage each saved their own queue whole under
+  the browser's one Durable key (`durable.ts`'s `KEY`), so the tab that saved last set the queue for the
+  whole browser, and a reading queued at the bench in the other tab was erased and never sent.
+  - The fix: a save merges (`durable.ts`, `mergeSnapshot`, `hold`, `emptyHeld`). Each tab keeps the owed
+    writes it has held, by what names each (an outbox entry by project, kind, row and time; a review
+    decision by record and time; Guild's owed ids; a withdrawal by entry and time). A save keeps what
+    the tab owes now and, from the stored snapshot, every owed write the tab has never held; of two
+    writes of one row the later stands, and the outbox runs oldest first. A write the tab held and no
+    longer holds was answered or replaced, so it leaves. The stored outbox and Guild's owed writes a
+    page loads count as held at once (the page takes them as its own); a loaded review decision counts
+    once a snapshot the page saves carries it, so a decision for a record the page has not loaded stays
+    in the store. The read and the write run in one IndexedDB transaction.
+  - Checks: ten in `scripts/check-state.ts` (the browser's one snapshot, two tabs): two tabs saving in
+    turn keep both depositions, oldest first, and the page that opens next sends both to a stand-in
+    service; an answered write leaves while the other tab's stays; the later of two writes of one row
+    stands; review decisions and Guild's owed writes alike. `pnpm check:state` passes.
+  - The reproduction: `bash bughunt/repro/H7-01/run.sh`, twice in Chromium over the built app, reads
+    `RESULT: NO-DEFECT` (`after-fix-run1.log`, `after-fix-run2.log`): the queue held A's and B's
+    depositions through B's save and both tabs closing, and once the service answered it held A's with
+    5.5 USD/kg and B's with 6.6 USD/kg.
+  - Records: `durable.ts`'s section on the one snapshot, ADR-014's implementation note.
+  - Checks: `pnpm typecheck`, `check:state` (the ten above among its checks), `check:plan`, `check:figures`,
+    `check:guild`, `test:reconcile`, `gen:components --check`, `pnpm build` and `pnpm smoke` (20 screens) pass;
+    `pnpm test:core` 3065 passed, 1 skipped, 175 deselected (6 min 11 s). No model was called.

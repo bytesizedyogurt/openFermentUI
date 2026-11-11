@@ -92,6 +92,8 @@ import { interpolate } from '../src/engine/interp';
 import { awaitingReadBack, correctedBy, correctionOf } from '../src/engine/readings';
 import { lockIntact, runbookLockHash } from '../src/engine/lock';
 import { assumptionOfOverride, projectStateOf, useStore } from '../src/store';
+import { EMPTY_SNAPSHOT, emptyHeld, hold, mergeSnapshot, type DurableReviewDecision, type DurableSnapshot } from '../src/lib/durable';
+import type { Guild } from '../src/lib/guild';
 
 let fails = 0;
 const check = (label: string, ok: boolean, extra = '') => {
@@ -212,6 +214,74 @@ const three = [e('sc-1', { id: 'sc-1' }), e('sc-2', null, 'q'), e('sc-3', { id: 
   const { result } = await flushAgainst([{ status: 200 }, 'down'], three);
   check('a service that does not answer stops the flush, and everything from there stays', result.sent === 1 &&
     result.left.length === 2 && result.left[0] === three[1], `${result.left.length} left`);
+}
+
+// ── the browser's one snapshot, two tabs (H7-01) ──────────────────────
+//
+// Two tabs on one project while the service is away, each saving under the one key every tab shares
+// (src/lib/durable.ts). A save merges: what the tab owes now, beside every owed write in the stored snapshot it has
+// never held.
+{
+  const at = (n: number) => `2026-11-11T10:00:0${n}.000Z`;
+  const deposition = (id: string, reading: string, n: number): OutboxEntry =>
+    ({ project: 'p', kind: 'depositions', id, value: { id, entries: [reading] }, by: 'Ada', at: at(n) });
+  const snap = (outbox: OutboxEntry[], extra: Partial<DurableSnapshot> = {}): DurableSnapshot =>
+    ({ ...EMPTY_SNAPSHOT, savedAt: at(9), outbox, ...extra });
+  const save = (held: ReturnType<typeof emptyHeld>, mine: DurableSnapshot, stored: DurableSnapshot | null) => {
+    hold(held, mine);
+    return mergeSnapshot(mine, stored, held);
+  };
+  const ids = (x: DurableSnapshot) => JSON.stringify((x.outbox ?? []).map((e) => e.id));
+  const tabA = emptyHeld();
+  const tabB = emptyHeld();
+  const fromA = deposition('dep-a', '5.5 USD/kg', 1);
+  const fromB = deposition('dep-b', '6.6 USD/kg', 2);
+  let stored = save(tabA, snap([fromA]), null);
+  stored = save(tabB, snap([fromB]), stored);
+  check('a tab that saves last keeps the other tab’s queued write beside its own, oldest first', ids(stored) === '["dep-a","dep-b"]', ids(stored));
+  {
+    const { result, asked } = await flushAgainst([{ status: 200 }, { status: 200 }], stored.outbox ?? []);
+    check('once both tabs have closed, the page that opens next sends both tabs’ writes', result.sent === 2 &&
+      asked[0] === 'PUT /api/state/depositions/dep-a p' && asked[1] === 'PUT /api/state/depositions/dep-b p', asked.join('; '));
+  }
+  const afterAnswer = save(tabA, snap([]), stored);
+  check('a write the tab held and the service answered leaves the store, and the other tab’s stays', ids(afterAnswer) === '["dep-b"]', ids(afterAnswer));
+  const againB = save(tabB, snap([fromB]), afterAnswer);
+  check('the tab that held a write leaves it out once answered; the tab that owes one keeps it, once', ids(againB) === '["dep-b"]', ids(againB));
+  const later = deposition('dep-a', '7.7 USD/kg', 3);
+  const rewritten = save(tabB, snap([fromB, later]), stored);
+  check('of two writes of one row from two tabs, the later stands, once',
+    ids(rewritten) === '["dep-b","dep-a"]' && (rewritten.outbox ?? [])[1] === later, ids(rewritten));
+
+  const decision = (status: DurableReviewDecision['status'], n: number): DurableReviewDecision =>
+    ({ status, provenance: 'unverified', reviewer: 'Ada', at: at(n) });
+  const decA = emptyHeld();
+  const decB = emptyHeld();
+  let decided = save(decA, snap([], { reviewDecisions: { 'rec-1': decision('verified', 1) } }), null);
+  decided = save(decB, snap([], { reviewDecisions: { 'rec-2': decision('rejected', 2) } }), decided);
+  check('each tab’s review decision stays in the one snapshot', JSON.stringify(Object.keys(decided.reviewDecisions).sort()) === '["rec-1","rec-2"]');
+  decided = save(decB, snap([], { reviewDecisions: { 'rec-1': decision('rejected', 3), 'rec-2': decision('rejected', 2) } }), decided);
+  check('of two decisions on one record from two tabs, the later stands', decided.reviewDecisions['rec-1']?.status === 'rejected' &&
+    decided.reviewDecisions['rec-1']?.at === at(3) && 'rec-2' in decided.reviewDecisions, JSON.stringify(decided.reviewDecisions));
+  const answeredDecision = save(decA, snap([], { reviewDecisions: {} }), snap([], { reviewDecisions: { 'rec-1': decision('verified', 1), 'rec-3': decision('verified', 4) } }));
+  check('a decision the tab held and the service answered leaves the store, and another tab’s stays',
+    JSON.stringify(Object.keys(answeredDecision.reviewDecisions)) === '["rec-3"]', JSON.stringify(answeredDecision.reviewDecisions));
+
+  const ledger = (people: string[], evidence: string[]) =>
+    ({ version: 1, people: people.map((id) => ({ id })), evidence: evidence.map((id) => ({ id })), policy: {} }) as unknown as Guild;
+  const owing = (people: string[], evidence: string[]): DurableSnapshot['guild'] =>
+    ({ ledger: ledger(people, evidence), pending: [...people, ...evidence], withdrawals: [], actingId: null });
+  const guildA = emptyHeld();
+  const guildB = emptyHeld();
+  let guilded = save(guildA, snap([], { guild: owing(['per-a'], []) }), null);
+  guilded = save(guildB, snap([], { guild: owing([], ['ev-b']) }), guilded);
+  check('each tab’s owed Guild writes stay in the one snapshot, each with its ledger row',
+    JSON.stringify(guilded.guild?.pending) === '["ev-b","per-a"]' &&
+    JSON.stringify(guilded.guild?.ledger.people.map((x) => x.id)) === '["per-a"]' &&
+    JSON.stringify(guilded.guild?.ledger.evidence.map((x) => x.id)) === '["ev-b"]', JSON.stringify(guilded.guild));
+  const guildAnswered = save(guildA, snap([], { guild: owing([], []) }), guilded);
+  check('a Guild write the tab held and the service answered leaves the store, and the other tab’s stays',
+    JSON.stringify(guildAnswered.guild?.pending) === '["ev-b"]', JSON.stringify(guildAnswered.guild?.pending));
 }
 
 // ── the overlay a project's pages load ───────────────────────────────
