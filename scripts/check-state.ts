@@ -92,8 +92,18 @@ import { interpolate } from '../src/engine/interp';
 import { awaitingReadBack, correctedBy, correctionOf } from '../src/engine/readings';
 import { lockIntact, runbookLockHash } from '../src/engine/lock';
 import { assumptionOfOverride, projectStateOf, useStore } from '../src/store';
-import { EMPTY_SNAPSHOT, emptyHeld, hold, mergeSnapshot, type DurableReviewDecision, type DurableSnapshot } from '../src/lib/durable';
-import type { Guild } from '../src/lib/guild';
+import {
+  EMPTY_SNAPSHOT,
+  emptyHeld,
+  hold,
+  holdLoaded,
+  mergeSnapshot,
+  owedGuild,
+  type DurableReviewDecision,
+  type DurableSnapshot,
+  type GuildOwed,
+} from '../src/lib/durable';
+import type { Guild, GuildWithdrawal } from '../src/lib/guild';
 
 let fails = 0;
 const check = (label: string, ok: boolean, extra = '') => {
@@ -231,27 +241,39 @@ const three = [e('sc-1', { id: 'sc-1' }), e('sc-2', null, 'q'), e('sc-3', { id: 
     hold(held, mine);
     return mergeSnapshot(mine, stored, held);
   };
-  const ids = (x: DurableSnapshot) => JSON.stringify((x.outbox ?? []).map((e) => e.id));
+  const ids = (x: DurableSnapshot) => JSON.stringify((x.outbox ?? []).map((e) => `${e.id}@${e.at.slice(18, 19)}`));
   const tabA = emptyHeld();
   const tabB = emptyHeld();
   const fromA = deposition('dep-a', '5.5 USD/kg', 1);
   const fromB = deposition('dep-b', '6.6 USD/kg', 2);
   let stored = save(tabA, snap([fromA]), null);
   stored = save(tabB, snap([fromB]), stored);
-  check('a tab that saves last keeps the other tab’s queued write beside its own, oldest first', ids(stored) === '["dep-a","dep-b"]', ids(stored));
+  check('a tab that saves last keeps the other tab’s queued write beside its own, oldest first', ids(stored) === '["dep-a@1","dep-b@2"]', ids(stored));
   {
     const { result, asked } = await flushAgainst([{ status: 200 }, { status: 200 }], stored.outbox ?? []);
     check('once both tabs have closed, the page that opens next sends both tabs’ writes', result.sent === 2 &&
       asked[0] === 'PUT /api/state/depositions/dep-a p' && asked[1] === 'PUT /api/state/depositions/dep-b p', asked.join('; '));
   }
   const afterAnswer = save(tabA, snap([]), stored);
-  check('a write the tab held and the service answered leaves the store, and the other tab’s stays', ids(afterAnswer) === '["dep-b"]', ids(afterAnswer));
+  check('a write the tab held and the service answered leaves the store, and the other tab’s stays', ids(afterAnswer) === '["dep-b@2"]', ids(afterAnswer));
   const againB = save(tabB, snap([fromB]), afterAnswer);
-  check('the tab that held a write leaves it out once answered; the tab that owes one keeps it, once', ids(againB) === '["dep-b"]', ids(againB));
+  check('a tab that saves again over its own earlier save keeps the write it still owes, once', ids(againB) === '["dep-b@2"]', ids(againB));
   const later = deposition('dep-a', '7.7 USD/kg', 3);
   const rewritten = save(tabB, snap([fromB, later]), stored);
-  check('of two writes of one row from two tabs, the later stands, once',
-    ids(rewritten) === '["dep-b","dep-a"]' && (rewritten.outbox ?? [])[1] === later, ids(rewritten));
+  check('two writes of one row from tabs that never saw each other’s both stay, oldest first, for the service to rule on in order',
+    ids(rewritten) === '["dep-a@1","dep-b@2","dep-a@3"]', ids(rewritten));
+  const olderMine = save(tabA, snap([fromA]), rewritten);
+  check('a stored write later than the tab’s own write of the row stays beside it, oldest first',
+    ids(olderMine) === '["dep-a@1","dep-b@2","dep-a@3"]' && (olderMine.outbox ?? [])[2] === later, ids(olderMine));
+  {
+    // A page that loads the snapshot takes its writes as its own, then writes the row again: its later write
+    // replaces the one it took, so the one it took leaves with it.
+    const tabC = emptyHeld();
+    holdLoaded(tabC, stored, 'p');
+    const replaced = save(tabC, snap([fromB, deposition('dep-a', '8.8 USD/kg', 4)]), stored);
+    check('a page that took a write at load and wrote the row again keeps its own write alone',
+      ids(replaced) === '["dep-b@2","dep-a@4"]', ids(replaced));
+  }
 
   const decision = (status: DurableReviewDecision['status'], n: number): DurableReviewDecision =>
     ({ status, provenance: 'unverified', reviewer: 'Ada', at: at(n) });
@@ -266,22 +288,60 @@ const three = [e('sc-1', { id: 'sc-1' }), e('sc-2', null, 'q'), e('sc-3', { id: 
   const answeredDecision = save(decA, snap([], { reviewDecisions: {} }), snap([], { reviewDecisions: { 'rec-1': decision('verified', 1), 'rec-3': decision('verified', 4) } }));
   check('a decision the tab held and the service answered leaves the store, and another tab’s stays',
     JSON.stringify(Object.keys(answeredDecision.reviewDecisions)) === '["rec-3"]', JSON.stringify(answeredDecision.reviewDecisions));
+  {
+    // A page that loads a decision on a record it has not loaded (another project's) leaves it in the store.
+    const tabQ = emptyHeld();
+    const loaded = snap([], { reviewDecisions: { 'rec-9': decision('verified', 5) } });
+    holdLoaded(tabQ, loaded, 'p');
+    const kept = save(tabQ, snap([], { reviewDecisions: {} }), loaded);
+    check('a loaded decision on a record the page has not loaded stays in the store', 'rec-9' in kept.reviewDecisions, JSON.stringify(kept.reviewDecisions));
+    const old = { ...loaded, savedAt: at(6), reviewDecisions: { 'rec-8': { status: 'verified', provenance: 'unverified', reviewer: 'Ada' } as DurableReviewDecision } };
+    const carried = save(emptyHeld(), snap([], { reviewDecisions: {} }), old);
+    check('a decision from before decisions carried their own time keeps its snapshot’s time when carried',
+      carried.reviewDecisions['rec-8']?.at === at(6), JSON.stringify(carried.reviewDecisions));
+  }
 
-  const ledger = (people: string[], evidence: string[]) =>
-    ({ version: 1, people: people.map((id) => ({ id })), evidence: evidence.map((id) => ({ id })), policy: {} }) as unknown as Guild;
-  const owing = (people: string[], evidence: string[]): DurableSnapshot['guild'] =>
-    ({ ledger: ledger(people, evidence), pending: [...people, ...evidence], withdrawals: [], actingId: null });
+  const ledger = (people: [string, string][], evidence: string[]) =>
+    ({ version: 1, people: people.map(([id, when]) => ({ id, addedAt: when })), evidence: evidence.map((id) => ({ id })), policy: {} }) as unknown as Guild;
+  const owing = (people: [string, string][], evidence: string[], withdrawals: GuildWithdrawal[] = []): GuildOwed =>
+    ({ ledger: ledger(people, evidence), pending: [...people.map(([id]) => id), ...evidence], withdrawals, actingId: null });
   const guildA = emptyHeld();
   const guildB = emptyHeld();
-  let guilded = save(guildA, snap([], { guild: owing(['per-a'], []) }), null);
-  guilded = save(guildB, snap([], { guild: owing([], ['ev-b']) }), guilded);
-  check('each tab’s owed Guild writes stay in the one snapshot, each with its ledger row',
-    JSON.stringify(guilded.guild?.pending) === '["ev-b","per-a"]' &&
-    JSON.stringify(guilded.guild?.ledger.people.map((x) => x.id)) === '["per-a"]' &&
-    JSON.stringify(guilded.guild?.ledger.evidence.map((x) => x.id)) === '["ev-b"]', JSON.stringify(guilded.guild));
-  const guildAnswered = save(guildA, snap([], { guild: owing([], []) }), guilded);
+  let guilded = save(guildA, snap([], { guildOwed: { p: owing([['p-ada', at(1)]], []) } }), null);
+  guilded = save(guildB, snap([], { guildOwed: { p: owing([], ['ev-b']) } }), guilded);
+  check('each tab’s owed Guild writes stay in the project’s block, each with its ledger row',
+    JSON.stringify(guilded.guildOwed?.p?.pending) === '["ev-b","p-ada"]' &&
+    JSON.stringify(guilded.guildOwed?.p?.ledger.people.map((x) => x.id)) === '["p-ada"]' &&
+    JSON.stringify(guilded.guildOwed?.p?.ledger.evidence.map((x) => x.id)) === '["ev-b"]', JSON.stringify(guilded.guildOwed));
+  const guildAnswered = save(guildA, snap([], { guildOwed: { p: owing([], []) } }), guilded);
   check('a Guild write the tab held and the service answered leaves the store, and the other tab’s stays',
-    JSON.stringify(guildAnswered.guild?.pending) === '["ev-b"]', JSON.stringify(guildAnswered.guild?.pending));
+    JSON.stringify(guildAnswered.guildOwed?.p?.pending) === '["ev-b"]' && guildAnswered.guildOwed?.p?.ledger.people.length === 0,
+    JSON.stringify(guildAnswered.guildOwed?.p));
+  const changedLater = save(guildB, snap([], { guildOwed: { p: owing([['p-ada', at(5)]], ['ev-b']) } }), guildAnswered);
+  const answeredAgain = save(guildA, snap([], { guildOwed: { p: owing([], []) } }), changedLater);
+  check('a later change of a person another tab once owed is another write, and stays',
+    JSON.stringify([...(answeredAgain.guildOwed?.p?.pending ?? [])].sort()) === '["ev-b","p-ada"]', JSON.stringify(answeredAgain.guildOwed?.p?.pending));
+  const withdrawal = (by: string): GuildWithdrawal => ({ evidenceId: 'ev-x', by, at: '2026-11-11', reason: `a placeholder reason of ${by}` });
+  let withdrawn = save(emptyHeld(), snap([], { guildOwed: { p: owing([], [], [withdrawal('p-ada')]) } }), null);
+  withdrawn = save(emptyHeld(), snap([], { guildOwed: { p: owing([], [], [withdrawal('p-bo')]) } }), withdrawn);
+  check('two withdrawals of one entry on one day by two people are two writes, and both stay',
+    withdrawn.guildOwed?.p?.withdrawals.length === 2, JSON.stringify(withdrawn.guildOwed?.p?.withdrawals));
+  const otherProject = save(emptyHeld(), snap([], { guildOwed: { q: owing([['p-cy', at(1)]], []) } }), guilded);
+  check('another project’s owed Guild writes stay in its own block, and this project’s stay in theirs',
+    JSON.stringify(otherProject.guildOwed?.q?.pending) === '["p-cy"]' && JSON.stringify(otherProject.guildOwed?.p?.pending) === '["ev-b","p-ada"]',
+    JSON.stringify(otherProject.guildOwed));
+  {
+    const legacySnap = snap([], { guild: owing([['p-old', at(1)]], []) });
+    check('a page takes a snapshot’s legacy Guild block as the open project’s, and none when no project is open',
+      JSON.stringify(owedGuild(legacySnap, 'p')?.pending) === '["p-old"]' && owedGuild(legacySnap, null) === undefined);
+    const took = emptyHeld();
+    holdLoaded(took, legacySnap, 'p');
+    const afterTaking = save(took, snap([], { guildOwed: { p: owing([['p-old', at(1)]], []) } }), legacySnap);
+    const untouched = save(emptyHeld(), snap([], { guildOwed: { q: owing([], []) } }), legacySnap);
+    check('the legacy block leaves once the page that took it saves, and stays for a page that did not',
+      afterTaking.guild === undefined && JSON.stringify(afterTaking.guildOwed?.p?.pending) === '["p-old"]' &&
+      JSON.stringify(untouched.guild?.pending) === '["p-old"]');
+  }
 }
 
 // ── the overlay a project's pages load ───────────────────────────────

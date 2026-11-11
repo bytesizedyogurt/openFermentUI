@@ -128,17 +128,18 @@ export interface DurableSnapshot {
   reviewerName: string;
   /**
    * What Guild's ledger still owes the service, and who was signing
-   * (OF-BLD-013 §1.3): `ledger` holds the people and entries made while the
-   * service was away (since alpha 2.0, those alone; the ledger itself loads
-   * from the service), `pending` their ids. Optional, so older snapshots
-   * still load.
+   * (OF-BLD-013 §1.3), by project: each project's ledger is its own, so a page
+   * takes the block of the project it has open, and every other project's
+   * block stays where it lies. Optional, so older snapshots still load.
    */
-  guild?: {
-    ledger: Guild;
-    pending: string[];
-    withdrawals: GuildWithdrawal[];
-    actingId: string | null;
-  };
+  guildOwed?: Record<string, GuildOwed>;
+  /**
+   * LEGACY, read once: the one block a snapshot kept before Guild's owed
+   * writes were kept by project, read as the open project's by the page that
+   * loads it (the reading it had when it was written), and left out of that
+   * page's next save.
+   */
+  guild?: GuildOwed;
   /**
    * LEGACY, left where it lies. The lessons finished in this browser, by id,
    * as a snapshot before alpha 2.2 E.12 kept them; a lesson shows finished
@@ -164,6 +165,20 @@ export interface DurableSnapshot {
   createdScenarios?: Record<string, Scenario>;
   /** LEGACY, read once: pureOS's trains built here (OF-BLD-020 §5.3), by train id. */
   trainsMade?: Record<string, TrainMade>;
+}
+
+/**
+ * What Guild's ledger owes the service in one project: `ledger` holds the
+ * people and entries made while the service was away (since alpha 2.0, those
+ * alone; the ledger itself loads from the service), `pending` their ids,
+ * `withdrawals` the withdrawals not yet sent, and `actingId` the person the
+ * page acts as there.
+ */
+export interface GuildOwed {
+  ledger: Guild;
+  pending: string[];
+  withdrawals: GuildWithdrawal[];
+  actingId: string | null;
 }
 
 /**
@@ -247,11 +262,15 @@ function openDb(): Promise<IDBDatabase | null> {
 // hunt of November 2026): it keeps what this tab owes now, and from the
 // snapshot already stored it keeps every owed write this tab has never held,
 // which is another tab's. A tab that saves last leaves the others' writes in
-// place, and the next page to load sends them. A write this tab held and no
-// longer holds was answered by the service or replaced by a later write of the
-// same row, so the merge leaves it out. The read and the write run in one
-// IndexedDB transaction, and the browser runs two tabs' transactions on one
-// store one after the other.
+// place. A write this tab held and no longer holds was answered by the service
+// or replaced by this tab's later write of the same row, so the merge leaves it
+// out. Two writes of one row from tabs that never saw each other's both stay,
+// oldest first, so the service rules on them in order as it would on two tabs
+// online. A page that loads takes every owed write the snapshot holds at once
+// (the store's `applyDurable`), beside the tab that queued it, and both may send
+// it; the service keeps a write it is sent twice as it kept the first. The read
+// and the write run in one IndexedDB transaction, and the browser runs two
+// tabs' transactions on one store one after the other.
 
 /** The owed writes a tab has held, each by what names it. */
 export interface Held {
@@ -259,80 +278,156 @@ export interface Held {
   decisions: Set<string>;
   guild: Set<string>;
   withdrawals: Set<string>;
+  /** Whether this page took the snapshot's legacy Guild block as its own. */
+  legacyGuild: boolean;
 }
 
 export function emptyHeld(): Held {
-  return { outbox: new Set(), decisions: new Set(), guild: new Set(), withdrawals: new Set() };
+  return { outbox: new Set(), decisions: new Set(), guild: new Set(), withdrawals: new Set(), legacyGuild: false };
 }
 
-const rowOf = (e: OutboxEntry) => `${e.project}\u0000${e.kind}\u0000${e.id}`;
-const entryOf = (e: OutboxEntry) => `${rowOf(e)}\u0000${e.at}`;
-const decisionOf = (recordId: string, d: DurableReviewDecision) => `${recordId}\u0000${d.at ?? ''}`;
-const withdrawalOf = (w: GuildWithdrawal) => `${w.evidenceId}\u0000${w.at}`;
+const entryOf = (e: OutboxEntry) => `${e.project}\u0000${e.kind}\u0000${e.id}\u0000${e.at}`;
+const decisionOf = (recordId: string, at: string | undefined) => `${recordId}\u0000${at ?? ''}`;
+/** A withdrawal by every field it carries: two of one entry on one day by two people are two writes. */
+const withdrawalOf = (project: string, w: GuildWithdrawal) =>
+  `${project}\u0000${w.evidenceId}\u0000${w.at}\u0000${w.by}\u0000${w.reason}`;
+/**
+ * An owed Guild write by its project, its id and, for a person, the time of the
+ * write itself: a person's id comes from the name, so two changes of one person
+ * are two writes. An entry's id is new with each entry.
+ */
+function owedOf(project: string, id: string, ledger: Guild): string {
+  const person = ledger.people.find((p) => p.id === id);
+  return `${project}\u0000${id}\u0000${person ? (person.updatedAt ?? person.addedAt) : ''}`;
+}
+
+function holdGuild(held: Held, project: string, owed: GuildOwed): void {
+  for (const id of owed.pending) held.guild.add(owedOf(project, id, owed.ledger));
+  for (const w of owed.withdrawals) held.withdrawals.add(withdrawalOf(project, w));
+}
 
 /**
- * Add the owed writes `snapshot` holds to `held`. `decisions: false` leaves its
- * review decisions out: a loaded snapshot's decisions count as this tab's only
- * once a snapshot it saves carries them, since a tab re-applies a decision only
- * to the records it has loaded.
+ * The Guild writes a snapshot owes in `project`: its block for the project,
+ * with a legacy block (written before the blocks were kept by project) laid
+ * beside it, as the open project's.
  */
-export function hold(held: Held, snapshot: DurableSnapshot, { decisions = true } = {}): void {
+export function owedGuild(snapshot: DurableSnapshot, project: string | null): GuildOwed | undefined {
+  if (!project) return undefined;
+  const block = snapshot.guildOwed?.[project];
+  const legacy = snapshot.guild;
+  if (!legacy) return block;
+  if (!block) return legacy;
+  const people = new Set(block.ledger.people.map((p) => p.id));
+  const evidence = new Set(block.ledger.evidence.map((x) => x.id));
+  const withdrawn = new Set(block.withdrawals.map((w) => withdrawalOf(project, w)));
+  return {
+    ...block,
+    ledger: {
+      ...block.ledger,
+      people: [...block.ledger.people, ...legacy.ledger.people.filter((p) => !people.has(p.id))],
+      evidence: [...block.ledger.evidence, ...legacy.ledger.evidence.filter((x) => !evidence.has(x.id))],
+    },
+    pending: [...block.pending, ...legacy.pending.filter((id) => !block.pending.includes(id))],
+    withdrawals: [...block.withdrawals, ...legacy.withdrawals.filter((w) => !withdrawn.has(withdrawalOf(project, w)))],
+  };
+}
+
+/** Add every owed write of a snapshot this tab saves to `held`. */
+export function hold(held: Held, snapshot: DurableSnapshot): void {
   for (const e of snapshot.outbox ?? []) held.outbox.add(entryOf(e));
-  if (decisions) for (const [id, d] of Object.entries(snapshot.reviewDecisions)) held.decisions.add(decisionOf(id, d));
-  for (const id of snapshot.guild?.pending ?? []) held.guild.add(id);
-  for (const w of snapshot.guild?.withdrawals ?? []) held.withdrawals.add(withdrawalOf(w));
+  for (const [id, d] of Object.entries(snapshot.reviewDecisions)) held.decisions.add(decisionOf(id, d.at));
+  for (const [project, owed] of Object.entries(snapshot.guildOwed ?? {})) holdGuild(held, project, owed);
+}
+
+/**
+ * Add what a page takes as its own from a loaded snapshot to `held`: the whole
+ * outbox, and Guild's owed writes in the project it has open (`owedGuild`). Its
+ * review decisions count as held once a snapshot the page saves carries them
+ * (a page re-applies a decision only to the records it has loaded), or once
+ * the service is found to hold them (`holdDecision`).
+ */
+export function holdLoaded(held: Held, snapshot: DurableSnapshot, project: string | null): void {
+  for (const e of snapshot.outbox ?? []) held.outbox.add(entryOf(e));
+  const owed = owedGuild(snapshot, project);
+  if (owed && project) holdGuild(held, project, owed);
+  if (snapshot.guild && project) held.legacyGuild = true;
+}
+
+/**
+ * Merge one project's Guild block: this tab's, with every owed write of the
+ * stored block it has never held.
+ */
+function mergeGuild(project: string, own: GuildOwed, stored: GuildOwed | undefined, held: Held): GuildOwed {
+  if (!stored) return own;
+  const owedHere = new Set(own.pending);
+  const owedThere = stored.pending.filter((id) => !held.guild.has(owedOf(project, id, stored.ledger)) && !owedHere.has(id));
+  const there = new Set(owedThere);
+  const people = new Set(own.ledger.people.map((p) => p.id));
+  const evidence = new Set(own.ledger.evidence.map((x) => x.id));
+  const withdrawn = new Set(own.withdrawals.map((w) => withdrawalOf(project, w)));
+  return {
+    ...own,
+    ledger: {
+      ...own.ledger,
+      people: [...own.ledger.people, ...stored.ledger.people.filter((p) => there.has(p.id) && !people.has(p.id))],
+      evidence: [...own.ledger.evidence, ...stored.ledger.evidence.filter((x) => there.has(x.id) && !evidence.has(x.id))],
+    },
+    pending: [...own.pending, ...owedThere],
+    withdrawals: [
+      ...own.withdrawals,
+      ...stored.withdrawals.filter((w) => !held.withdrawals.has(withdrawalOf(project, w)) && !withdrawn.has(withdrawalOf(project, w))),
+    ],
+  };
 }
 
 /**
  * The snapshot a tab writes: `mine`, what it owes now, with every owed write of
- * `stored` that it has never `held` laid beside it. Of two writes of one row the
- * later stands, and the outbox runs oldest first.
+ * `stored` that it has never `held` laid beside it. The outbox runs oldest
+ * first. Of two decisions on one record the later stands. A project's Guild
+ * block that `mine` does not carry, another project's, stays as stored.
  */
 export function mergeSnapshot(mine: DurableSnapshot, stored: DurableSnapshot | null, held: Held): DurableSnapshot {
   if (!stored) return mine;
-  const rows = new Map<string, OutboxEntry>();
   const theirs = (stored.outbox ?? []).filter((e) => !held.outbox.has(entryOf(e)));
-  for (const e of [...(mine.outbox ?? []), ...theirs]) {
-    const was = rows.get(rowOf(e));
-    if (!was || was.at < e.at) rows.set(rowOf(e), e);
-  }
-  const outbox = [...rows.values()].sort((a, b) => (a.at < b.at ? -1 : a.at > b.at ? 1 : 0));
+  const outbox = [...(mine.outbox ?? []), ...theirs].sort((a, b) => (a.at < b.at ? -1 : a.at > b.at ? 1 : 0));
 
   const reviewDecisions = { ...mine.reviewDecisions };
-  for (const [id, d] of Object.entries(stored.reviewDecisions ?? {})) {
-    if (held.decisions.has(decisionOf(id, d))) continue;
+  for (const [id, was] of Object.entries(stored.reviewDecisions ?? {})) {
+    if (held.decisions.has(decisionOf(id, was.at))) continue;
+    // A decision from before decisions carried their own time keeps its snapshot's.
+    const d = was.at ? was : { ...was, at: stored.savedAt };
+    if (held.decisions.has(decisionOf(id, d.at))) continue;
     const own = reviewDecisions[id];
     if (!own || (own.at ?? '') < (d.at ?? '')) reviewDecisions[id] = d;
   }
 
-  const own = mine.guild ?? stored.guild;
-  let guild = own;
-  if (own && stored.guild) {
-    const owedHere = new Set(own.pending);
-    const owedThere = stored.guild.pending.filter((id) => !held.guild.has(id) && !owedHere.has(id));
-    const there = new Set(owedThere);
-    const people = new Set(own.ledger.people.map((p) => p.id));
-    const evidence = new Set(own.ledger.evidence.map((x) => x.id));
-    const withdrawn = new Set(own.withdrawals.map(withdrawalOf));
-    guild = {
-      ...own,
-      ledger: {
-        ...own.ledger,
-        people: [...own.ledger.people, ...stored.guild.ledger.people.filter((p) => there.has(p.id) && !people.has(p.id))],
-        evidence: [...own.ledger.evidence, ...stored.guild.ledger.evidence.filter((x) => there.has(x.id) && !evidence.has(x.id))],
-      },
-      pending: [...own.pending, ...owedThere],
-      withdrawals: [
-        ...own.withdrawals,
-        ...stored.guild.withdrawals.filter((w) => !held.withdrawals.has(withdrawalOf(w)) && !withdrawn.has(withdrawalOf(w))),
-      ],
-    };
-  }
-  return { ...mine, reviewDecisions, outbox, ...(guild ? { guild } : {}) };
+  const guildOwed: Record<string, GuildOwed> = { ...(stored.guildOwed ?? {}) };
+  for (const [project, own] of Object.entries(mine.guildOwed ?? {}))
+    guildOwed[project] = mergeGuild(project, own, stored.guildOwed?.[project], held);
+  const { guild: _legacy, ...rest } = mine;
+  return {
+    ...rest,
+    reviewDecisions,
+    outbox,
+    guildOwed,
+    // The legacy block stays until the page that took it as its own saves.
+    ...(stored.guild && !held.legacyGuild ? { guild: stored.guild } : {}),
+  };
 }
 
 /** What this tab has held, for every save it makes. */
 let held = emptyHeld();
+
+/**
+ * Count a loaded review decision as held once the service is found to hold
+ * it, or a later one, so the next save leaves it out. `savedAt` is the loaded
+ * snapshot's time, which a decision from before decisions carried their own
+ * time stands on.
+ */
+export function holdDecision(recordId: string, d: DurableReviewDecision, savedAt: string): void {
+  held.decisions.add(decisionOf(recordId, d.at));
+  held.decisions.add(decisionOf(recordId, d.at ?? savedAt));
+}
 
 /** A stored value as a snapshot: one of an older shape is discarded rather than migrated on a guess. */
 function asSnapshot(v: unknown): DurableSnapshot | null {
@@ -342,10 +437,10 @@ function asSnapshot(v: unknown): DurableSnapshot | null {
 
 /**
  * The stored snapshot, or null when there is none or it cannot be read. The
- * page takes its outbox and Guild's owed writes as its own (the store's
- * `applyDurable`), so they count as held from here.
+ * page takes its outbox and Guild's owed writes in `project` as its own (the
+ * store's `applyDurable`), so they count as held from here (`holdLoaded`).
  */
-export async function loadDurable(): Promise<DurableSnapshot | null> {
+export async function loadDurable(project: string | null): Promise<DurableSnapshot | null> {
   const db = await openDb();
   if (!db) return null;
   return new Promise((resolve) => {
@@ -356,7 +451,7 @@ export async function loadDurable(): Promise<DurableSnapshot | null> {
         // Losing a session's depositions is bad; silently reinterpreting them
         // as a shape they were never written in is worse.
         const snapshot = asSnapshot(req.result);
-        if (snapshot) hold(held, snapshot, { decisions: false });
+        if (snapshot) holdLoaded(held, snapshot, project);
         resolve(snapshot);
       };
       req.onerror = () => resolve(null);
@@ -383,6 +478,17 @@ async function flush(): Promise<void> {
     req.onsuccess = () => {
       try {
         store.put(mergeSnapshot(snapshot, asSnapshot(req.result), held), KEY);
+      } catch {
+        // As below: the app keeps running on memory.
+      }
+    };
+    // A stored value this browser cannot read back: keep the read's error from
+    // ending the transaction, and write this tab's snapshot over it, as a save
+    // did before saves merged.
+    req.onerror = (ev) => {
+      ev.preventDefault();
+      try {
+        store.put(snapshot, KEY);
       } catch {
         // As below: the app keeps running on memory.
       }

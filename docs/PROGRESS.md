@@ -623,6 +623,7 @@ the line that records the decision and the decision record it stands under.
 | Component tests on fixtures recorded from the real service (`pnpm record:fixtures`, alpha 2.0 prompt §9.3) are unbuilt; the walk and the smoke run against the real service | a stage after alpha 2.2 that builds `pnpm record:fixtures` |
 | No offline test computes on a published genome-scale model (Yeast9 and iMM904 need their fetched files, caches kept outside git; Departures, §5.5 stage 2); a model add-on applied in the worker, and a metabolite-defined product's demand through the worker, are untested | a test under the marker `slow` or `live`, on a host that holds the fetched files |
 | Two concept-graph builds at once (`pnpm lit:graph` for two projects that share a document) can each send a batch of a shared passage to the model before either stamps it, and pay for that batch twice; `GRAPH_LOCK` keeps the graph whole, and the spend is the same as two builds run one after the other with no stamp between them (found by the review of the graph lock, 11 November 2026) | a build that reads the stamps again inside the lock before it asks the model, or one build at a time for the instance |
+| A page that loads during an outage takes every owed write in the browser's snapshot at once, beside the tab that queued it, and both send it: a copy the loading page took can reach the service after the queuing tab's later write of the same row, and a row the service replaces whole (an override scope, a scenario) then takes the older copy (found by the review of the H7-01 fix, 11 November 2026; ADR-014's note) | a write that names the version of the row it read, refused in words when the row changed since: group 3 of the bug hunt's fix order (H7-04) builds it for overrides, and it serves every kind |
 | `units.json` maps `wt%` and `% (w/w)` to `% CDW`, aliases written for the PHA program; changing them changes how a stored record converts | the vocabulary review, after alpha 2.2, with a migration for the records it converts |
 | RunbookDetail's held-for-review panel keeps words of Dominion's era: candidates near a claimed identity band, a ruling with legal consequences, and two rulings (a boundary accepted as mapped; candidates excluded pending counsel) that `store.resolveRunbookReview` writes into the held stage, with a boundary map among the runbook's outputs. No code in this build sets a runbook held for review, so the panel answers only a row kept in that state | the stage that lets a runbook be held for review, with that state's own words and rulings |
 | `fermos.forecast_run` keeps `duration_h`, a length the calling code sets as its own convention, which the tests and their stand-ins pass (`standins.py`, `test_fermos.py`, `test_fermos_3r.py`, `test_proforma_fermos.py`, `test_proforma_ceiling.py`); the routes, the tools and the engine set a forecast's length as a typed `t_end` | the change that has those tests set a typed `t_end`, or reach `fermos.forecast()` through a helper of their own |
@@ -3736,3 +3737,28 @@ On `claude/alpha-2-2-fixes`, cut from `claude/alpha-2-2-bughunt` at `fa8db4a`, i
   shared passage is read once, and two builds at once can each pay for it (`graph.py`'s docstring,
   ADR-002's Implementation F and `docs/api/intake.md` now say so, and the Open table holds the spend).
   `pnpm test:core` 3065 passed, 1 skipped, 175 deselected (6 min); `pnpm test:lit` 10 passed.
+- The review of the H7-01 fix (165f90e): three readers (loss and resurrection, the store and the browser, the checks
+  and records), each claim checked against the code; 21 claims, 11 confirmed.
+  - Fixed in the merge: two writes of one row from tabs that never saw each other's both stay, oldest first, for
+    the service to rule on in order (the first commit kept the later alone, so the earlier tab's reading was erased
+    with no word); a stored value the read cannot read back is written over by the tab's snapshot, so it blocks no
+    save; a review decision the service holds, or a later one, leaves the snapshot (`holdDecision`, called by
+    `syncDecisions`); a decision from before decisions carried their own time keeps its snapshot's time when carried;
+    a person's owed write is named by its id and the time of the change, and a withdrawal by every field.
+  - Fixed beside it, both older than the fix: Guild's owed writes carried no project, so a page open on another
+    project took them as its own and posted them there; they are kept by project now (`guildOwed`, `owedGuild`), a
+    legacy block read once as the open project's. `syncGuild` dropped an owed change to a person the service already
+    held without posting it; it posts the change unless the service's copy carries it (`write_person` takes a person
+    it holds as a change).
+  - Records and checks: ADR-014's note said a write another tab queued is sent once that tab has closed; a page that
+    loads takes it at once, beside the queuing tab, and the note says so, the stale copy that can follow in the Open
+    table. Check 4's words named a case its input cannot reach and now name the one it tests. `check:state` holds
+    nine more: a stored write later than the tab's own, a write taken at load and written again, a loaded decision
+    on a record not loaded, a decision with no time of its own, a later change of a person, two withdrawals of one
+    entry, another project's Guild block, and the legacy block taken and left.
+  - Set aside, each with its reason: the put waits on the read's success event on a closing tab (the read and the
+    write are one transaction the browser commits once the page goes; the old put depended on the same `openDb`
+    wait), and the reproduction's verdict wording (it reads DEFECT on the loss it was built for).
+  - Checks: `pnpm typecheck`, `pnpm build`, the reproduction twice (`RESULT: NO-DEFECT`), `check:state`,
+    `check:plan`, `check:figures`, `check:guild`, `test:reconcile`, `gen:components --check` and `pnpm smoke` (20
+    screens) pass; `pnpm test:core` 3065 passed, 1 skipped, 175 deselected (6 min 4 s).

@@ -49,7 +49,9 @@ import {
   clearDurable,
   durableAvailable,
   flushDurable,
+  holdDecision,
   loadDurable,
+  owedGuild,
   saveDurable,
   type DurableSnapshot,
   type ScenarioAssumption,
@@ -2508,7 +2510,7 @@ export const useStore = create<OFState>()((set, get) => ({
   },
 
   hydrateDurable: async () => {
-    const snap = await loadDurable();
+    const snap = await loadDurable(get().projectId);
     if (!snap) {
       set({ durableReady: durableAvailable(), guildHydrated: true });
       if (get().serviceUp) void get().syncGuild();
@@ -2553,10 +2555,11 @@ export const useStore = create<OFState>()((set, get) => ({
         // position (off unless changed since load) stands.
         // OF-BLD-013 §1.3 — what Guild's ledger still owes the service, laid
         // beside the ledger the page holds. Older snapshots predate the field.
-        guild: owedLedger(s.guild, snap.guild?.ledger),
-        guildPending: snap.guild?.pending ?? [],
-        guildPendingWithdrawals: snap.guild?.withdrawals ?? [],
-        guildActingId: snap.guild?.actingId ?? s.guildActingId,
+        // Each project's ledger is its own: the page takes the block of the project it has open (owedGuild).
+        guild: owedLedger(s.guild, owedGuild(snap, s.projectId)?.ledger),
+        guildPending: owedGuild(snap, s.projectId)?.pending ?? [],
+        guildPendingWithdrawals: owedGuild(snap, s.projectId)?.withdrawals ?? [],
+        guildActingId: owedGuild(snap, s.projectId)?.actingId ?? s.guildActingId,
         guildHydrated: true,
         // A lesson shows finished from the ledger's entries (alpha 2.2 E.12): an
         // older snapshot's lessons finished here are left where they lie, and the
@@ -2738,7 +2741,11 @@ export const useStore = create<OFState>()((set, get) => ({
     for (const [id, mine] of Object.entries(local.decisions)) {
       const madeAt = s.decisionAt[id] ?? mine.at ?? local.savedAt;
       const server = s.overlay.records[id];
-      if (server && server.at >= madeAt) continue; // the service has this one, or a newer one
+      if (server && server.at >= madeAt) {
+        // The service has this one, or a newer one: the next save leaves it out of the snapshot.
+        holdDecision(id, mine, local.savedAt);
+        continue;
+      }
       if (s.refusedDecisions[id]) continue; // refused this session; the record has not changed since
       const record = s.records.find((r) => r.id === id);
       if (!record) continue; // a candidate not in this overlay; nothing to post it about
@@ -3228,9 +3235,15 @@ export const useStore = create<OFState>()((set, get) => ({
         };
         await attempt(`deviation on ${e.skillId}`, () => postEvidence(deviation));
       };
+      // A change to a person the service already holds is sent unless the service's copy carries it already.
+      const onService = new Map(server.people.map((p) => [p.id, p]));
+      const carried = (p: GuildPerson) => {
+        const q = onService.get(p.id);
+        return !!q && q.name === p.name && q.title === p.title && q.role === p.role && q.active === p.active;
+      };
       // People first, then entries, then withdrawals: each may name the one before.
       for (const p of s.guild.people)
-        if (pending.has(p.id) && !stored.has(p.id) && !(await attempt(p.name, () => postPerson(p)))) return;
+        if (pending.has(p.id) && !carried(p) && !(await attempt(p.name, () => postPerson(p)))) return;
       for (const e of s.guild.evidence)
         if (pending.has(e.id) && !stored.has(e.id) && !(await attempt(`${e.kind} on ${e.skillId}`, () => postEvidence(e), asDeviation(e))))
           return;
@@ -3529,13 +3542,18 @@ function snapshotOf(s: OFState): DurableSnapshot {
     savedAt: new Date().toISOString(),
     reviewDecisions,
     reviewerName: s.reviewer,
-    guild: {
-      // Only what the service has not acknowledged; the ledger loads from it.
-      ledger: { ...s.guild, people: s.guild.people.filter((x) => owed.has(x.id)), evidence: s.guild.evidence.filter((x) => owed.has(x.id)) },
-      pending: s.guildPending,
-      withdrawals: s.guildPendingWithdrawals,
-      actingId: s.guildActingId,
-    },
+    // Guild's owed writes in the open project, by its id: another project's block stays as stored (mergeSnapshot).
+    guildOwed: s.projectId
+      ? {
+          [s.projectId]: {
+            // Only what the service has not acknowledged; the ledger loads from it.
+            ledger: { ...s.guild, people: s.guild.people.filter((x) => owed.has(x.id)), evidence: s.guild.evidence.filter((x) => owed.has(x.id)) },
+            pending: s.guildPending,
+            withdrawals: s.guildPendingWithdrawals,
+            actingId: s.guildActingId,
+          },
+        }
+      : {},
     outbox: s.stateOutbox,
     // Rows kept here before alpha 2.0 stay until a project is open to take them.
     ...(legacy
