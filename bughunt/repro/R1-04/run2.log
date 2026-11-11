@@ -1,0 +1,28 @@
+== 0. the checkout against 2047f5a (these four files): identical
+== 1. docs/PROGRESS.md at 2047f5a
+   line 543, under "## Departures from the execution prompt", row "§5.5, stage 2":
+     The browser keeps an outbox: review decisions, Guild changes and project rows the service has not yet acknowledged, saved in IndexedDB until sent; and three preferences, who is deciding, who is acting in Guild, and the lessons finished here 
+     later steps this row names (E.12, ADR-018, since/until alpha 2.2): none
+   line 502, under "## Departures from the execution prompt", row "alpha 2.2 §6.5, E.12":
+     The Durable snapshot keeps no lesson, and Primer lists the project's lessons in the catalogue's order, a lesson addressed by its id alone (`/primer/<lesson>`): the modules slice, `learnProgress` and `completeLesson` leave the store ...
+     a snapshot's older `learnProgress` loads, and the next save leaves it out (ADR-014's note of E.12) 
+== 2. docs/decisions/ADR-014-durable-write-queue.md at 2047f5a
+   line 14: besides the preferences (the reviewer's name, the Guild person the browser acts as, and until alpha 2.2 E.12 the lessons finished here)
+   line 39: The snapshot keeps no lesson. ...
+   lines 43-44: The preferences the snapshot keeps are the reviewer's name and the Guild person the browser acts as.
+== 3. the tree at 2047f5a
+   src/store.ts snapshotOf writes: version savedAt reviewDecisions reviewerName guild guild.pending guild.withdrawals guild.actingId outbox 
+     and, while a pre-2.0 snapshot's rows wait for a project: depositions measuredEvidence runbookLocks adoptedRunbooks parameterOverrides proformaFits createdScenarios trainsMade liveConversations 
+     keys naming a lesson or learning: 0
+   src/lib/durable.ts:148 DurableSnapshot.learnProgress, marked LEGACY: "LEGACY, left where it lies. The lessons finished in this browser, by id, as a snapshot before alpha 2.2 E.12 kept them; a lesson shows finished from the ledger's entries for whoever is learning, so nothing reads this, and the next save leaves it out."
+   lines of src/ and scripts/ at 2047f5a naming learnProgress or completeLesson: 2
+     the legacy member's type: 1; check:guild's check that the store keeps no lesson: 1; any other reader: 0
+     2047f5a:scripts/check-guild.ts:404:    !('learnProgress' in s()) && !('completeLesson' in s()) && !('modules' in s()),
+     2047f5a:src/lib/durable.ts:148:  learnProgress?: Record<string, true>;
+EXPECTED: one account in the Departures table of what the browser's Durable snapshot keeps, true of the tree at 2047f5a:
+EXPECTED: two preferences (who is deciding, reviewerName; who is acting in Guild, guild.actingId) and the unacknowledged writes,
+EXPECTED: with no lesson, as row "alpha 2.2 §6.5, E.12" (line 502) and ADR-014:14 ("until alpha 2.2 E.12 the lessons finished here") say
+OBSERVED: line 543 ("§5.5, stage 2") says the browser keeps "three preferences, who is deciding, who is acting in Guild, and the lessons finished here" and names no later step (none);
+OBSERVED: line 502 of the same table says "The Durable snapshot keeps no lesson"; snapshotOf writes 0 key(s) naming a lesson;
+OBSERVED: learnProgress is a LEGACY member of DurableSnapshot ("nothing reads this, and the next save leaves it out"); of the 2 line(s) of src/ and scripts/ naming it, 1 is its type, 1 is check:guild's check that the store keeps no lesson, 0 read it
+RESULT: DEFECT

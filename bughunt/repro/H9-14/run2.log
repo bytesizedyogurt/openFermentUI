@@ -1,0 +1,18 @@
+NOTICE:  database "bh_r_h9_14_svc" does not exist, skipping
+service: http://127.0.0.1:9221 over bh_r_h9_14_svc
+project: {"id":"h914","name":"h914","description":"","createdBy":"bughunt","createdAt":"2026-11-11T00:09:38.016268+00:00"}
+## engine_report, an id of no run
+[200] engine_report refused: the project holds no run no-such-run 
+## engine_report, a NUL in the run id
+[200] engine_report failed: DBAPIError: (sqlalchemy.dialects.postgresql.asyncpg.Error) invalid byte sequence for encoding "UTF8": 0x00 [SQL: SELECT openferment.runs.body  FROM openferment.runs  WHERE openferment.runs.project_id = $1::VARCHAR AND openferment.runs.id = $2::VARCHAR] [parameters: ('h914', 'a\x00b')] (Background on this error at: https://sqlalche.me/e/21/dbapi) 
+## flowsheet_read, an id of no record
+[200] flowsheet_read refused: the project holds no flowsheet no-such-record (flowsheet_read with no record lists them) 
+## flowsheet_read, a NUL in the record id
+[200] flowsheet_read failed: DBAPIError: (sqlalchemy.dialects.postgresql.asyncpg.Error) invalid byte sequence for encoding "UTF8": 0x00 [SQL: SELECT openferment.flowsheets.body  FROM openferment.flowsheets  WHERE openferment.flowsheets.project_id = $1::VARCHAR AND openferment.flowsheets.id = $2::VARCHAR] [parameters: ('h914', 'a\x00b')] (Background on this error at: https://sqlalche.me/e/21/dbapi) 
+## sci-rag get_document, an id of no document and a NUL in the id
+CASE unknown isError=True Error executing tool get_document: No such document: no-such-document
+CASE nul isError=True Error executing tool get_document: The kit's service failed: DBAPIError: (sqlalchemy.dialects.postgresql.asyncpg.Error) invalid byte sequence for encoding "UTF8": 0x00\n[SQL: SELECT openferment.documents_link.project_id, openferment.documents_link.document_id, openferment.documents_link.selection, openferment.documents_link.created_by, openferment.documents_link.created_at \nFROM openferment.documents_link \nWHERE openferment.documents_link.project_id = $1::VARCHAR AND openferment.documents_link.document_id = $2::VARCHAR]\n[parameters: ('h914', 'a\x00b')]\n(Background on this error at: https://sqlalche.me/e/21/dbapi)
+
+EXPECTED: an id holding a NUL is refused in words as an id of nothing is (engine_report refused: ..., flowsheet_read refused: ..., the kit's words for a document the project does not hold), with no driver error, SQL text or bound parameters
+OBSERVED: at 3 of 3 doors (engine_report flowsheet_read sci-rag get_document) the id of nothing is refused in words and the NUL id answers the driver's DBAPIError with its [SQL: SELECT ...] statement and [parameters: (project, id)]; engine_report's: [200] engine_report failed: DBAPIError: (sqlalchemy.dialects.postgresql.asyncpg.Error) invalid byte sequence for encoding "UTF8": 0x00 [SQL: SELECT openferment.runs.body  FROM openferment.runs  WHERE openferment.runs.project_id = $1::VARCHAR AND openferment.runs.id = $2::VARCHAR] [parameters: ('h914', 'a\x00b')] (Background on t
+RESULT: DEFECT

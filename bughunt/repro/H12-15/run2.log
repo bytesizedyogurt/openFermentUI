@@ -1,0 +1,27 @@
+worktree /tmp/claude-0/-home-user-openFermentUI/cfbc5c9f-640a-5002-a705-5ceaf850fdc6/scratchpad/bh/work/H12-15/wt-5221 at 2047f5a; test database prefix bh_r_h12_15_gate
+== the kept tree (2047f5a): the two IPv4-mapped rows of REFUSED, both tests
+  kept-3.12: 4 passed, 83 deselected in 3.65s
+  kept-3.13: 4 passed, 83 deselected in 3.23s
+  kept-3.12: python 3.12.3; module /tmp/claude-0/-home-user-openFermentUI/cfbc5c9f-640a-5002-a705-5ceaf850fdc6/scratchpad/bh/work/H12-15/wt-5221/core/openferment_core/literature/collectors.py; 231072 mapped addresses; IPv6Address property defers to ipv4_mapped: is_unspecified=no, is_loopback=no, is_link_local=no, is_multicast=no, is_reserved=no, is_private=yes, is_site_local=no, is_global=yes
+  kept-3.13: python 3.13.17; module /tmp/claude-0/-home-user-openFermentUI/cfbc5c9f-640a-5002-a705-5ceaf850fdc6/scratchpad/bh/work/H12-15/wt-5221/core/openferment_core/literature/collectors.py; 231072 mapped addresses; IPv6Address property defers to ipv4_mapped: is_unspecified=yes, is_loopback=yes, is_link_local=yes, is_multicast=yes, is_reserved=yes, is_private=yes, is_site_local=no, is_global=yes
+== M57 applied: seen = address (collectors.py:287)
+  m57-3.12: 4 failed, 126 passed in 11.77s
+    FAILED tests/test_sff_url.py::test_an_address_outside_the_public_internet_is_refused_before_connecting[::ffff:127.0.0.1-a loopback address]
+    FAILED tests/test_sff_url.py::test_an_address_outside_the_public_internet_is_refused_before_connecting[::ffff:10.0.0.5-a private address]
+    FAILED tests/test_sff_url.py::test_a_name_that_resolves_outside_the_public_internet_is_refused_before_connecting[::ffff:127.0.0.1-a loopback address]
+    FAILED tests/test_sff_url.py::test_a_name_that_resolves_outside_the_public_internet_is_refused_before_connecting[::ffff:10.0.0.5-a private address]
+  m57-3.13: 130 passed in 12.32s
+  m57-3.12: python 3.12.3; module /tmp/claude-0/-home-user-openFermentUI/cfbc5c9f-640a-5002-a705-5ceaf850fdc6/scratchpad/bh/work/H12-15/wt-5221/core/openferment_core/literature/collectors.py; 231072 mapped addresses; IPv6Address property defers to ipv4_mapped: is_unspecified=no, is_loopback=no, is_link_local=no, is_multicast=no, is_reserved=no, is_private=yes, is_site_local=no, is_global=yes
+  m57-3.13: python 3.13.17; module /tmp/claude-0/-home-user-openFermentUI/cfbc5c9f-640a-5002-a705-5ceaf850fdc6/scratchpad/bh/work/H12-15/wt-5221/core/openferment_core/literature/collectors.py; 231072 mapped addresses; IPv6Address property defers to ipv4_mapped: is_unspecified=yes, is_loopback=yes, is_link_local=yes, is_multicast=yes, is_reserved=yes, is_private=yes, is_site_local=no, is_global=yes
+== what dropping the line changes in refused_class's answers
+  3.12.3: 216708 of 231072 mapped addresses answered in other words (0 of them let through); for example:
+    < ::ffff:10.0.0.0	a private address
+    < ::ffff:127.0.0.0	a loopback address
+    < ::ffff:169.254.0.0	a link-local address
+    > ::ffff:10.0.0.0	a reserved address
+    > ::ffff:127.0.0.0	a reserved address
+    > ::ffff:169.254.0.0	a reserved address
+  3.13.17: 0 of 231072 mapped addresses answered in other words
+EXPECTED: the candidate's claim, a break of the IPv4-mapped rule that the container's gate (3.13.17) lets pass: with M57 applied, test_sff_url.py and test_collectors.py fail on 3.12.3 and pass on 3.13.17 while refused_class answers some mapped address in other words on 3.13.17
+OBSERVED: with M57 applied, 4 tests fail on 3.12.3 and 0 on 3.13.17; refused_class answers 216708 mapped addresses in other words on 3.12.3 and 0 on 3.13.17, where every IPv6Address property it reads defers to ipv4_mapped beside is_site_local, which no mapped address holds in either form (probe line above), so on 3.13.17 the dropped line changes no answer for a test to see, and CI's 3.12.3 run catches the drop
+RESULT: NO-DEFECT

@@ -33,8 +33,8 @@ S_SET=$(grep -n 'hour 14 with timers running cannot be lost to a page reload' "$
 S_DUR=$(grep -n '14 with timers running and deviations logged cannot be lost to a page' "$BH_ROOT/src/lib/durable.ts" | cut -d: -f1)
 S_DEP=$(grep -n "A run at the bench lives in this page's memory, so a reload ends it" "$BH_ROOT/src/screens/Deposition.tsx" | cut -d: -f1)
 S_PRO=$(grep -n 'Deposition records step completions, deviations and timers for this session only' "$BH_ROOT/src/screens/ProtocolDetail.tsx" | cut -d: -f1)
-echo "OBSERVED: src/screens/Settings.tsx:${S_SET:-none}: \"$(sed -n "${S_SET:-1}p" "$BH_ROOT/src/screens/Settings.tsx" | tr -s ' ' | sed 's/^ //')\""
-echo "OBSERVED: src/lib/durable.ts:${S_DUR:-none}: \"$(sed -n "${S_DUR:-1}p" "$BH_ROOT/src/lib/durable.ts" | tr -s ' ' | sed 's/^ //')\""
+echo "OBSERVED: src/screens/Settings.tsx:$(( ${S_SET:-3} - 2 ))-${S_SET:-0}: \"$(sed -n "$(( ${S_SET:-3} - 2 )),${S_SET:-0}p" "$BH_ROOT/src/screens/Settings.tsx" | tr -s ' ' | sed 's/^ //' | paste -sd' ')\""
+echo "OBSERVED: src/lib/durable.ts:$(( ${S_DUR:-2} - 1 ))-$(( ${S_DUR:-0} + 1 )): \"$(sed -n "$(( ${S_DUR:-2} - 1 )),$(( ${S_DUR:-0} + 1 ))p" "$BH_ROOT/src/lib/durable.ts" | sed 's#^// ##' | paste -sd' ')\""
 echo "OBSERVED: src/screens/Deposition.tsx:${S_DEP:-none} and src/screens/ProtocolDetail.tsx:${S_PRO:-none} say a run lives in page memory, for this session only"
 SNAP_FROM=$(grep -n '^function snapshotOf' "$BH_ROOT/src/store.ts" | cut -d: -f1)
 SNAP_RUNS=$(awk -v from="${SNAP_FROM:-0}" 'NR>=from && from>0 { print; if (NR>from && /^}/) exit }' "$BH_ROOT/src/store.ts" | grep -c '\bruns\b\|activeRunId')
@@ -79,12 +79,13 @@ if f.get("stopped"):
 note, b, a = f["note"], f["before"], f["after"]
 row = f["storageRow"] or ""
 runs_key = '"runs"' in (b["snapshot"] or "")
+snap_keys = sorted(json.loads(b["snapshot"]).keys()) if b["snapshot"] else None
 claim = "hour 14 with timers running cannot be lost to a page reload" in row
 print(f"OBSERVED: Settings > About, the Storage row on the built app: \"{row}\"")
-print(f"OBSERVED: before the reload: address {b['address']}; {b['step']}; the deviation note on screen {b['noteShown']}; "
+print(f"OBSERVED: before the reload: address {b['address']}; the bench header \"{b['header']}\"; the deviation note on screen {b['noteShown']}; "
       f"the timer 'placeholder wait' on screen {b['timerShown']} with {b['pauseShown']} Pause button(s); "
       f"the IndexedDB snapshot holds the note {note in (b['snapshot'] or '')}, the timer {'placeholder wait' in (b['snapshot'] or '')}, "
-      f"a key named runs {runs_key}")
+      f"a key named runs {runs_key}; its keys {snap_keys}")
 print(f"OBSERVED: leave-page prompts accepted: {f['dialogs']}")
 print(f"OBSERVED: after one reload: address {a['address']}; \"This run is no longer active\" shown {a['noLongerActive']}; "
       f"the deviation note on screen {a['noteShown']}; the timer on screen {a['timerShown']} with {a['pauseShown']} Pause button(s); "

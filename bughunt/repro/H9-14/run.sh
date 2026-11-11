@@ -14,7 +14,7 @@ DATA="$W/data"
 cleanup() {
   bh_svc_stop "$PORT"
   bh_db_drop "$DB"
-  rm -rf "$DATA" "$W/svc.log"
+  rm -rf "$W"
 }
 trap cleanup EXIT
 

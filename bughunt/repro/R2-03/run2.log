@@ -23,3 +23,22 @@ exit 0
 1 passed in 12.91s
 exit 0
 == 3. the control: M17 (follow_redirects=True); the redirect test
+FAILED tests/test_mcp_service.py::test_a_redirect_the_service_answers_is_followed_nowhere
+1 failed in 3.08s
+exit 1
+== 4. what M16 changes: HTTP_PROXY and HTTPS_PROXY name a recorder on 127.0.0.1:10921, NO_PROXY unset
+-- 4a. the code as it stands (trust_env=False)
+1 passed in 6.96s
+exit 0; requests the recorder received: 0
+-- 4b. M16 (trust_env=True)
+FAILED tests/test_mcp_service.py::test_the_server_started_with_service_writes_through_it_and_the_audit_names_the_client
+1 failed in 8.32s
+exit 1; requests the recorder received: 2
+{"line": "POST http://127.0.0.1:10920/api/tools/catalogue_write HTTP/1.1", "project": "test-project", "assistant": "example-test/0.1", "body": "{\"kind\": \"skill\", \"id\": \"example-test.skill\", \"name\": \"A placeholder skill\", \"note\": \"a placeholder entry\"}"}
+{"line": "POST http://127.0.0.1:10920/api/tools/biorepo_read HTTP/1.1", "project": "test-project", "assistant": "example-test/0.1", "body": "{\"ids\": [], \"words\": \"\", \"kind\": \"record\", \"state\": \"\", \"limit\": 5}"}
+AssertionError: {'error': 'the service at http://127.0.0.1:10920 answered 502 Bad Gateway: a proxy stand-in'}
+== the reading
+M16, whole file in this container: green=1 (served test run: 1); M16, served test with no proxy variable: green=1; control M17 caught by the redirect test: 1; under HTTP_PROXY with NO_PROXY unset, the code as it stands passes with nothing sent to the proxy: 1; M16 sends the relayed call, its project and the client's name to the proxy and the served test fails: 1
+EXPECTED: a test of tests/test_mcp_service.py fails when the --service relay reads the environment's proxy settings (commit 6f85338: 'a loopback address alone, no proxy, no redirect'; mcp_server.py:232 'Through no proxy: the call is a loopback one'), as the redirect test fails for follow_redirects=True
+OBSERVED: M16 (trust_env=True at mcp_server.py:239): test_mcp_service.py 51 passed in 10.17s in this container, the served test 1 passed in 12.91s with no proxy set; M17: 1 failed in 3.08s; under HTTP_PROXY=127.0.0.1:10921 with NO_PROXY unset the mutant sent 2 relayed requests (project test-project, assistant example-test/0.1) to the proxy, where the code as it stands sent 0: the suite stays green for a relay that goes through the environment's proxy
+RESULT: DEFECT

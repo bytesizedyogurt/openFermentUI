@@ -1,6 +1,6 @@
 #!/usr/bin/env bash
 # P-03: Guild's review strip says the records it hides sit "on papers with no PMCID, DOI or PMID, which
-# biorepo.write refuses", while the filter hides records on documents the project does not hold (paperHeld) and
+# biorepo.write refuses"; the filter hides records on documents the project does not hold (paperHeld) and
 # biorepo.write keeps a decision on a held document with no identifier.
 # The static part greps the tree; the live part is the head's own service on 127.0.0.1:10120 over a fresh
 # database, fixture mode (no model, no network), keyless. Nothing under core/, src/, scripts/ or examples/ changes.

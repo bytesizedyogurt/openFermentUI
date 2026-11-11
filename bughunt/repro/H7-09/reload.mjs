@@ -77,7 +77,7 @@ try {
     noteShown,
     timerShown: body.includes('placeholder wait'),
     pauseShown: await page.getByRole('button', { name: /^Pause/ }).count(),
-    step: (body.match(/Step \d+ of \d+/) || [null])[0],
+    header: flat(await page.locator('header').first().innerText()).slice(0, 160),
     snapshot: await snapshot(page),
   };
 

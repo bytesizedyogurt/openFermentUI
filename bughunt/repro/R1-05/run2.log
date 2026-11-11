@@ -1,0 +1,17 @@
+== 1. the report at 2047f5a
+11:- **The core's commit.** `CORE=6f85338` (the D.0 commit, green on CI run 41865693107), recorded in
+82:**What it read.** `.mcp.json`, `docs/TOOLS.md` whole (838 lines) and `docs/api/openapi.json`
+127:   sits at the end of an 84 KB `docs/TOOLS.md` with no pointer from its top.
+the report's count: 838
+the commit that wrote line 82: 37e6bd0 alpha2.2: D.2–D.4 — the handoff by strangers: the mirror engine and the record-reader, each built from the pages alone, no core file changed
+== 2. docs/TOOLS.md at CORE=6f85338 and at 37e6bd0
+6f85338: wc -l 837; awk NR 837; splitlines() 837; bytes 84382; last byte '\n'
+37e6bd0: wc -l 837; awk NR 837; splitlines() 837; bytes 84382; last byte '\n'
+core/tests/test_guidance.py:25:    return (ROOT / "CLAUDE.md").read_text(encoding="utf-8").splitlines()
+== 3. where 838 could come from
+6f85338: split('\n') pieces 838 (a file ending in a newline gives one empty piece after its last line)
+the first commit after CORE whose TOOLS.md holds 838 lines: 50a4f96 alpha2.2: E.8 — the catalogues screen: a project's strains, products, skills and
+it comes after 37e6bd0, the commit that wrote the report's line
+EXPECTED: docs/TOOLS.md at CORE=6f85338 holds the 838 lines docs/reports/handoff-2026-11.md:82 gives it ('`docs/TOOLS.md` whole (838 lines)')
+OBSERVED: at 6f85338 it holds 837 lines (wc -l 837, awk NR 837, splitlines() 837; 84382 bytes, the last byte a newline), and 837 at 37e6bd0, the commit that wrote line 82; 838 is its split('\n') piece count (838)
+RESULT: DEFECT

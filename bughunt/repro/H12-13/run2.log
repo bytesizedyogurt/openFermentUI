@@ -60,3 +60,8 @@
                  fermos.fit('dep-b1/de-1') kept as measured; fermos.fit('dep-b1') kept as computed
                  calls the counter saw the note clause decide in the probe: 6
 == 4. pytest, M05 with the counter: the hunt's eight files for M05 and the two test_engines tests that build a reading
+   225 passed in 55.71s (exit 0)
+   calls the counter saw the note clause decide in the test run: 0
+EXPECTED: a test builds a deposition source with a reading-shaped id and a note other than 'measured on <at>' (basis.py:195-200: a reading's note says when it was taken; ADR-006:188-192) and holds it to the bench's record, so the fit resting on it stays computed; dropping the note clause (M05) fails that test
+OBSERVED: tree: is_measurement=False, origin record, fit computed; M05: is_measurement=True, origin_of raises ValidationError, fit measured; tests building a source the clause decides: 0 of 36; calls it decided in the test run: 0 (the probe's: 6); the selection with M05: 225 passed in 55.71s (exit 0)
+RESULT: DEFECT
