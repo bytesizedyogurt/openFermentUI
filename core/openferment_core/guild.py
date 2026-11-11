@@ -232,6 +232,26 @@ def _now() -> str:
     return datetime.now(timezone.utc).isoformat(timespec="seconds").replace("+00:00", "Z")
 
 
+#: How far ahead of the service's clock a page's own time for a change may run.
+CLOCK_ALLOWANCE = timedelta(minutes=5)
+
+
+def _change_time(asked: str | None) -> str:
+    """The time a change to a person was made, as the page that made it stamped
+    it, so two changes made while the service was away keep their order whichever
+    arrives first (the browser's `syncGuild` compares them); the service's own
+    time when the page names none, names one that is not a time, or names one
+    further ahead of the service's clock than `CLOCK_ALLOWANCE`."""
+    if asked:
+        try:
+            at = datetime.fromisoformat(asked.replace("Z", "+00:00"))
+        except ValueError:
+            at = None
+        if at is not None and at.tzinfo is not None and at <= datetime.now(timezone.utc) + CLOCK_ALLOWANCE:
+            return asked
+    return _now()
+
+
 def _day(value: str) -> date | None:
     """The calendar day an `at` names, or None when it names none."""
     try:
@@ -304,7 +324,8 @@ def write_person(person: GuildPerson, *, dry_run: bool = False) -> GuildPerson:
     after is added by an active lead. A change names who made it in
     `updatedBy`, also an active lead, and may change the title, role and
     active flag; the name is held to the same rule as on the way in, and the
-    dates and the person who added them are kept as first written.
+    dates and the person who added them are kept as first written. A change
+    keeps the time it was made (`_change_time`).
     """
     _check_name(person.name)
     if not PERSON_ID.match(person.id):
@@ -354,7 +375,7 @@ async def _write_person(project_id: str, person: GuildPerson, dry_run: bool) -> 
                     "role": person.role,
                     "active": person.active,
                     "updatedBy": person.updatedBy,
-                    "updatedAt": _now(),
+                    "updatedAt": _change_time(person.updatedAt),
                 }
             )
         if not dry_run:

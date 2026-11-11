@@ -3785,3 +3785,30 @@ On `claude/alpha-2-2-fixes`, cut from `claude/alpha-2-2-bughunt` at `fa8db4a`, i
   - Checks: `pnpm typecheck`, `pnpm build`, the reproduction twice (`RESULT: NO-DEFECT`), `check:state`, `check:guild`,
     `check:plan`, `check:figures`, `test:reconcile`, `gen:components --check` and `pnpm smoke` (20 screens) pass;
     `pnpm test:core` 3065 passed, 1 skipped, 175 deselected (5 min 36 s).
+- The third review of the H7-01 fix (d5bb479): three readers (Guild, the open project, the queue), a verifier per
+  claim; 12 claims, 12 confirmed.
+  - New with d5bb479, and fixed: `syncGuild` read the service's copy of a person by when the service wrote it, cut to
+    the second, against when the page made its own change, so the first of two pages to sync stood whichever change
+    was later (the service keeps a change's own time, `guild.py` `_change_time`, when it runs no more than five
+    minutes ahead of the service's clock, and the page compares change against change); the review screen showed
+    another project's offline decision on a record of the same id (`durableReview` holds this project's alone); a
+    reload the person cancelled after `openProject` left the store on one project and its requests naming another
+    (`openProject` remembers the choice and the page keeps its project until it reloads); `loadProjects` reloaded a
+    page whose project went away and went on to read in it (its reload is gone: the list settles before the snapshot
+    is read, so the page holds no other project's writes then); the pagehide save wrote over a remembered copy of the
+    snapshot, so it could erase another tab's writes stored since, put back a write another tab had sent, and write
+    whole over a snapshot it never read (every save reads and then writes in one transaction, a pagehide save
+    starting it in the same task on the open database); and a change made while an unanswered flush ran left two
+    writes of its row (`enqueue` replaces the row's left-over write).
+  - Older than the fix, and fixed: an address naming a project the service does not hold, deleted or mistyped,
+    reloaded the page without end (it opens nothing, and the page says the service holds no such project, with a
+    link to the projects it holds); checked in Chromium over the built app: two loads and the words, and none from a
+    page already open.
+  - Records: ADR-014's note says the service keeps a change's own time, the page keeps its project until it reloads,
+    the review screen holds this project's decisions, and a closing page may leave its last 400 ms of changes
+    unstored. `test_guild.py` holds a change's own time and the service's time for one ahead of its clock or
+    unreadable, `check:guild` an owed change made after the one the service holds, and `check:state` one write of
+    a row after an unanswered flush.
+  - Checks: `pnpm typecheck`, `pnpm build`, the reproduction twice (`RESULT: NO-DEFECT`), `check:state`, `check:guild`,
+    `check:plan`, `check:figures`, `test:reconcile`, `gen:components --check` and `pnpm smoke` (20 screens) pass;
+    `pnpm test:core` 3070 passed, 1 skipped, 175 deselected (5 min 27 s).

@@ -14,7 +14,7 @@ from __future__ import annotations
 import asyncio
 import json
 import threading
-from datetime import date, timedelta
+from datetime import date, datetime, timedelta, timezone
 from pathlib import Path
 
 import pytest
@@ -109,6 +109,26 @@ def test_a_change_is_made_by_a_lead_and_keeps_what_was_first_written():
     stored = guild.write_person(change.model_copy(update={"updatedBy": "p-sean", "addedBy": "p-eric", "joinedAt": "2020-01-01"}))
     assert stored.title == "Operator" and stored.addedBy == "p-sean" and stored.joinedAt == "2026-06-01"
     assert stored.updatedBy == "p-sean" and stored.updatedAt
+
+
+def test_a_change_keeps_the_time_it_was_made():
+    """A page that held a change offline sends it later; the service keeps the
+    change's own time, so a page comparing its owed copy against the service's
+    reads the two changes in the order they were made (H7-01)."""
+    team()
+    made = "2026-06-02T10:00:00.123Z"
+    change = person("p-patrick", "Patrick Mugisha", title="Operator", updatedBy="p-sean", updatedAt=made)
+    assert guild.write_person(change).updatedAt == made
+
+
+@pytest.mark.parametrize("asked", ["2999-01-01T00:00:00Z", "yesterday", "2026-06-02T10:00:00", ""])
+def test_a_change_time_ahead_of_the_clock_or_unreadable_is_the_services_own(asked):
+    team()
+    before = datetime.now(timezone.utc).replace(microsecond=0)
+    change = person("p-patrick", "Patrick Mugisha", title="Operator", updatedBy="p-sean", updatedAt=asked or None)
+    stored = guild.write_person(change)
+    kept = datetime.fromisoformat(stored.updatedAt.replace("Z", "+00:00"))
+    assert stored.updatedAt != asked and before <= kept <= datetime.now(timezone.utc)
 
 
 def test_the_ledger_never_loses_its_last_lead():

@@ -349,6 +349,13 @@ const three = [e('sc-1', { id: 'sc-1' }), e('sc-2', null, 'q'), e('sc-3', { id: 
     const queuedTwice = enqueue([row(1), row(3)], [row(5)]);
     check('a new write of a row replaces the row’s last queued write, and another tab’s earlier write of it stays',
       JSON.stringify(queuedTwice.map((x) => x.value)) === '[1,5]', JSON.stringify(queuedTwice.map((x) => x.value)));
+    // A flush the service did not answer leaves the row's write owed; a change made while it ran replaces that write
+    // (store.ts `flushProjectState`), so the page owes the row once, at its latest.
+    const leftOver = [row(1)];
+    const madeMeanwhile = [row(7)];
+    const owedAfter = enqueue(leftOver, madeMeanwhile);
+    check('a change made while an unanswered flush ran leaves one write of the row, the later',
+      JSON.stringify(owedAfter.map((x) => x.value)) === '[7]', JSON.stringify(owedAfter.map((x) => x.value)));
   }
   {
     const legacySnap = snap([], { guild: owing([['p-old', at(1)]], []) });

@@ -52,6 +52,7 @@ import {
   holdDecision,
   loadDurable,
   owedGuild,
+  rememberProject,
   saveDurable,
   type DurableSnapshot,
   type ScenarioAssumption,
@@ -1017,20 +1018,18 @@ export const useStore = create<OFState>()((set, get) => ({
     }
     const open = get().projectId;
     const keep = open && listed.some((p) => p.id === open) ? open : listed.length === 1 ? listed[0].id : null;
+    // The project settles here, before the page reads what this browser owes the service (App.tsx), so the owed
+    // writes it takes are the kept project's.
     if (keep !== open) setOpenProjectId(keep);
-    // A page whose open project went away holds that project's owed writes; it loads again into the one kept.
-    if (open && keep !== open && typeof window !== 'undefined') {
-      window.location.reload();
-      return;
-    }
     set({ projects: listed, projectsProblem: null, projectId: keep });
     projectSettled();
   },
 
   openProject: (id) => {
+    // The page keeps the project it has open, and every request names it, until it reloads: the next load reads
+    // the project remembered here, so a reload the person cancels leaves this page whole (durable.ts).
+    rememberProject(id);
     if (id === get().projectId) return;
-    // The page keeps the project it has open until it reloads, so every save before then names it (durable.ts).
-    setOpenProjectId(id);
     window.location.reload();
   },
 
@@ -1175,7 +1174,8 @@ export const useStore = create<OFState>()((set, get) => ({
         const pending = get().stateOutbox;
         if (!pending.length) return;
         const { left, sent, refused } = await flush(pending);
-        set((s) => ({ stateOutbox: [...left, ...s.stateOutbox.filter((e) => !pending.includes(e))] }));
+        // A change made while the flush ran replaces its row's last unsent write, the one the page's view stood on.
+        set((s) => ({ stateOutbox: enqueue(left, s.stateOutbox.filter((e) => !pending.includes(e))) }));
         for (const { entry, why } of refused)
           get().logActivity({
             at: stamp(),
@@ -2552,7 +2552,13 @@ export const useStore = create<OFState>()((set, get) => ({
         stateOutbox: enqueue(snap.outbox ?? [], s.stateOutbox),
         stateLegacy: legacyStateOf(snap),
         durableReady: durableAvailable(),
-        durableReview: { savedAt: snap.savedAt, decisions: snap.reviewDecisions },
+        // This project's decisions alone (a decision saved before decisions named their project is this page's).
+        durableReview: {
+          savedAt: snap.savedAt,
+          decisions: Object.fromEntries(
+            Object.entries(snap.reviewDecisions).filter(([, d]) => !d.project || d.project === s.projectId),
+          ),
+        },
         decisionAt,
         // Older snapshots predate the field; an unnamed reviewer is the
         // same as one who has not said yet (OF-BLD-012.1 F2).
@@ -3248,8 +3254,8 @@ export const useStore = create<OFState>()((set, get) => ({
         await attempt(`deviation on ${e.skillId}`, () => postEvidence(deviation));
       };
       // A change to a person the service already holds is sent unless the service carries it already: its copy
-      // says the same, or it was written at or after the change (it holds this change or a later one, as
-      // syncDecisions reads a decision). An add the service holds is the service's.
+      // says the same, or it holds a change made at or after this one (the service keeps a change's own time,
+      // guild.py `_change_time`, as BioRepo keeps a decision's). An add the service holds is the service's.
       const onService = new Map(server.people.map((p) => [p.id, p]));
       const carried = (p: GuildPerson) => {
         const q = onService.get(p.id);

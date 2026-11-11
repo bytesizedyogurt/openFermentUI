@@ -74,20 +74,24 @@ of the row stays (`enqueue`).
 
 Guild's owed writes are kept by project (`guildOwed`), since each project's ledger is its own, and the person a page
 acts as is kept in the same block, so each project keeps its own. A page takes the block of the project it has open,
-and every other project's block stays as stored; a block written before this note is read once as the open
-project's. The page reads the snapshot once the project list has settled, keeps its project until it reloads, and
-reloads when its open project goes away, so every save names the project its writes were made in. A Guild write with
-no project open is refused in words. A person's owed write is named by its id and the time of the change, so a later
-change of one person is another write; of two tabs' owed changes of one person the later stands, and `syncGuild`
-sends an owed change only when the service holds an older copy (its copy differs and was written before the change),
-as `syncDecisions` reads a decision. A withdrawal the service already shows is not sent again. A review decision
-carries the project it was made in: a page re-applies and sends its own project's decisions alone, and one the
-service is found to hold, or a later one, leaves the snapshot (`holdDecision`).
+and every other project's block stays as stored; a block written before this note is read once as the open project's.
+The page settles its project from the project list before it reads the snapshot, and keeps that project until it
+reloads: choosing another project remembers the choice and reloads the page, so every save names the project its
+writes were made in. A Guild write with no project open is refused in words. A person's owed write is named by its id
+and the time of the change, so a later change of one person is another write; of two tabs' owed changes of one person
+the later stands. The service keeps a change's own time, as the page stamped it, when that time runs no more than five
+minutes ahead of the service's clock (`guild.py`, `_change_time`), and `syncGuild` sends an owed change only when the
+service holds an older copy: its copy differs, and the change it holds was made before this one, as `syncDecisions`
+reads a decision. A withdrawal the service already shows is not sent again. A review decision carries the project it
+was made in: a page re-applies, shows and sends its own project's decisions alone, and one the service is found to
+hold, or a later one, leaves the snapshot (`holdDecision`).
 
 The read and the write run in one IndexedDB transaction, so two tabs' saves take turns; a stored value this browser
-cannot read back is written over by the saving tab's snapshot. A save made as a tab goes away (`pagehide`) is placed
-at once, merged over the snapshot the tab last read or wrote, since a closing page may run no later event; a tab
-still open lays its own writes in again on its next save.
+cannot read back is written over by the saving tab's snapshot. A save made as a tab goes away (`pagehide`) reads and
+writes as every save does, and starts its transaction in the same task on the database the page already opened, so the
+browser runs it as the page goes. A closing page may stop before the transaction ends; its changes from the last 400 ms,
+the window a save waits to gather keystrokes, then stay unstored. A page that writes a row while a flush to the service
+is out replaces the row's unsent write, so the page owes the row once.
 
 A page that loads takes the whole outbox and the open project's Guild block at once, beside the tab that queued
 them, and both may send a write. A row the service keeps whole takes it twice to the same end, and a second lock, a

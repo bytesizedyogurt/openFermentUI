@@ -135,11 +135,15 @@ function Screen() {
   const [a, b, c, d, e] = route.segments;
   const projectId = useStore((s) => s.projectId);
   const openProject = useStore((s) => s.openProject);
+  const projects = useStore((s) => s.projects);
+  // The address names a project the service's list leaves out (gone, or mistyped): the page stays on its own.
+  const unheld = route.project !== null && projects !== null && !projects.some((p) => p.id === route.project);
 
-  // A project's address opens the project (§8.5): the page reloads in it.
+  // A project's address opens the project (§8.5): the page reloads in it, once, and an address naming a project the
+  // service does not hold opens nothing, so the page settles on the project it keeps.
   useEffect(() => {
-    if (route.project && route.project !== projectId) openProject(route.project);
-  }, [route.project, projectId, openProject]);
+    if (route.project && route.project !== projectId && !unheld) openProject(route.project);
+  }, [route.project, projectId, openProject, unheld]);
 
   // §8 — an old path lands on the new screen rather than the not-found page.
   // Replace rather than push, so Back does not bounce the reader between the
@@ -163,6 +167,16 @@ function Screen() {
   // Sub-views are paths UNDER their owner, so a URL says where a thing lives:
   // /geneos/hosts/cw15 rather than /organisms/cw15. Nothing was deleted —
   // every screen below is the same file it was, mounted somewhere else.
+  if (unheld && route.project !== projectId) {
+    return (
+      <div className="p-8 text-ink-soft text-body" data-testid="project-unheld">
+        The service holds no project <span className="font-num text-ink">{route.project}</span>.{' '}
+        <a className="text-accent underline underline-offset-2" href="#/">
+          The projects it holds
+        </a>
+      </div>
+    );
+  }
   if (route.project && route.project !== projectId) {
     return (
       <div className="p-8 text-ink-soft text-body" data-testid="opening-project">

@@ -558,6 +558,9 @@ async function main() {
     check('an owed change to a person the service holds an older copy of is sent', await syncAnn(changed('Senior', '2026-10-10T00:00:00Z')), posts7);
     server7.people = peopleThere.map((x) => (x.id === 'p-ann' ? { ...x, title: 'Principal', updatedBy: 'p-lead', updatedAt: '2026-10-11T00:00:00Z' } : x));
     check('an owed change older than the change the service holds is not sent over it', !(await syncAnn(changed('Senior', '2026-10-10T00:00:00Z'))), posts7);
+    // The service keeps a change's own time (guild.py `_change_time`): an earlier change sent first still reads as earlier.
+    server7.people = peopleThere.map((x) => (x.id === 'p-ann' ? { ...x, title: 'Senior', updatedBy: 'p-lead', updatedAt: '2026-10-10T10:00:00Z' } : x));
+    check('an owed change made after the change the service holds is sent', await syncAnn(changed('Principal', '2026-10-10T10:05:00Z')), posts7);
     check('an owed add of a person the service already holds is not sent again', !(await syncAnn(changed('Other', null, null))), posts7);
     server7.people = peopleThere;
   }

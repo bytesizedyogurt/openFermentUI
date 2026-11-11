@@ -440,9 +440,7 @@ export function mergeSnapshot(mine: DurableSnapshot, stored: DurableSnapshot | n
 
 /** What this tab has held, for every save it makes. */
 let held = emptyHeld();
-/** The snapshot this tab last read or wrote, which a save made as the tab goes away merges over. */
-let lastStored: DurableSnapshot | null = null;
-/** The database once open, so a save made as the tab goes away needs no wait. */
+/** The database once open, so a save made as the tab goes away starts its transaction with no wait. */
 let opened: IDBDatabase | null = null;
 
 /**
@@ -479,7 +477,6 @@ export async function loadDurable(project: string | null): Promise<DurableSnapsh
         // as a shape they were never written in is worse.
         const snapshot = asSnapshot(req.result);
         if (snapshot) holdLoaded(held, snapshot, project);
-        lastStored = snapshot;
         resolve(snapshot);
       };
       req.onerror = () => resolve(null);
@@ -497,7 +494,8 @@ async function flush(): Promise<void> {
   pending = null;
   timer = null;
   if (!snapshot) return;
-  const db = await openDb();
+  // With the database open, the transaction starts in this task, so a page going away places it.
+  const db = opened ?? (await openDb());
   if (!db) return;
   try {
     const tx = db.transaction(STORE, 'readwrite');
@@ -505,9 +503,7 @@ async function flush(): Promise<void> {
     const req = store.get(KEY);
     req.onsuccess = () => {
       try {
-        const merged = mergeSnapshot(snapshot, asSnapshot(req.result), held);
-        store.put(merged, KEY);
-        lastStored = merged;
+        store.put(mergeSnapshot(snapshot, asSnapshot(req.result), held), KEY);
       } catch {
         // As below: the app keeps running on memory.
       }
@@ -544,27 +540,16 @@ export function saveDurable(snapshot: DurableSnapshot): void {
 }
 
 /**
- * Write immediately — used when the tab is going away. A closing page may run
- * no event after its own, so the write is placed now, merged over the snapshot
- * this tab last read or wrote; a tab still open lays its own owed writes in
- * again on its next save.
+ * Write immediately — used when the tab is going away. With the database open
+ * the read and the write start in this task, and the browser runs the
+ * transaction as the page goes; a closing page that runs no event after its
+ * own may leave its last changes, the ones made within the coalescing window,
+ * unstored.
  */
 export function flushDurable(): void {
   if (timer) {
     clearTimeout(timer);
     timer = null;
-  }
-  const snapshot = pending;
-  if (snapshot && opened) {
-    pending = null;
-    try {
-      const merged = mergeSnapshot(snapshot, lastStored, held);
-      opened.transaction(STORE, 'readwrite').objectStore(STORE).put(merged, KEY);
-      lastStored = merged;
-    } catch {
-      // As in flush: the app keeps running on memory.
-    }
-    return;
   }
   void flush();
 }
@@ -573,7 +558,6 @@ export function flushDurable(): void {
 export async function clearDurable(): Promise<void> {
   pending = null;
   held = emptyHeld();
-  lastStored = null;
   if (timer) {
     clearTimeout(timer);
     timer = null;
