@@ -444,8 +444,9 @@ function mergeGuild(project: string, own: GuildOwed, stored: GuildOwed | undefin
 /**
  * The snapshot a tab writes: `mine`, what it owes now, with every owed write of
  * `stored` that it has never `held` laid beside it. The outbox runs oldest
- * first. Of two decisions on one record the later stands. A project's Guild
- * block that `mine` does not carry, another project's, stays as stored.
+ * first. Of two decisions under one key (`decisionKey`: a project and a
+ * record) the later stands. A project's Guild block that `mine` does not carry,
+ * another project's, stays as stored.
  */
 export function mergeSnapshot(mine: DurableSnapshot, stored: DurableSnapshot | null, held: Held): DurableSnapshot {
   if (!stored) return mine;
@@ -487,10 +488,12 @@ let opened: IDBDatabase | null = null;
 // A page that is closing or reloading runs no event after its own, so a save
 // made then cannot read the snapshot before it writes. It writes what the tab
 // owes, and what it has held, under a key of its own (`parting:` and the tab's
-// id), which no other tab writes, so the write erases nothing of theirs. The
-// next page to load folds every such record into the snapshot, as the tab's own
-// save would have merged it, and deletes it (`foldParting`); a tab that lives
-// on (the back-forward cache) deletes its own on its next save.
+// id), which no other tab writes, so the write erases nothing of theirs; a tab
+// whose last save has landed writes nothing. The next page to load folds every
+// such record into the snapshot and deletes it (`foldParting`): the owed writes
+// as the tab's own save would have merged them, the rest from whichever was
+// saved later. A tab that lives on (the back-forward cache) deletes its own on
+// its next save.
 
 const PARTING = 'parting:';
 
@@ -533,9 +536,12 @@ function asParting(v: unknown): Parting | null {
 }
 
 /**
- * The snapshot with each parting tab's last save laid in, oldest first, as each
- * tab's own save would have merged it: what the tab owed, with every owed write
- * of the snapshot it had never held.
+ * The snapshot with each parting tab's last save laid in, oldest first: the
+ * writes the tab owed, with every owed write of the snapshot it had never held,
+ * as the tab's own save would have merged them. What a save takes whole (who
+ * is reviewing, the person acted as in each project, the rows kept before
+ * alpha 2.0) comes from whichever of the two was saved later, so a closed
+ * tab's older choice never stands over a later one saved since.
  */
 export function foldParting(main: DurableSnapshot | null, parting: Parting[]): DurableSnapshot | null {
   let folded = main;
@@ -548,9 +554,27 @@ export function foldParting(main: DurableSnapshot | null, parting: Parting[]): D
       withdrawals: new Set(p.held.withdrawals),
       legacyGuild: p.held.legacyGuild,
     };
-    folded = mergeSnapshot(p.snapshot, folded, h);
+    const merged = mergeSnapshot(p.snapshot, folded, h);
+    folded = folded && folded.savedAt > p.snapshot.savedAt ? owedOver(folded, merged) : merged;
   }
   return folded;
+}
+
+/** `later` whole, with the owed writes of `merged` laid in, each Guild block keeping `later`'s acting person. */
+function owedOver(later: DurableSnapshot, merged: DurableSnapshot): DurableSnapshot {
+  const guildOwed: Record<string, GuildOwed> = {};
+  for (const [project, block] of Object.entries(merged.guildOwed ?? {})) {
+    const there = later.guildOwed?.[project];
+    guildOwed[project] = there ? { ...block, actingId: there.actingId } : block;
+  }
+  const { guild: _legacy, ...rest } = later;
+  return {
+    ...rest,
+    reviewDecisions: merged.reviewDecisions,
+    outbox: merged.outbox,
+    guildOwed,
+    ...(merged.guild ? { guild: merged.guild } : {}),
+  };
 }
 
 /**
@@ -581,40 +605,49 @@ export async function loadDurable(project: string | null): Promise<DurableSnapsh
   const db = await openDb();
   if (!db) return null;
   return new Promise((resolve) => {
+    let done = false;
+    // The page takes a snapshot as its own once the transaction that read it has ended: the fold only when its
+    // write-back and its deletes committed, else the snapshot as stored, and the parting records stay.
+    const take = (snapshot: DurableSnapshot | null) => {
+      if (done) return;
+      done = true;
+      if (snapshot) holdLoaded(held, snapshot, project);
+      resolve(snapshot);
+    };
     try {
       // One transaction: the snapshot and what parting tabs left are read, folded, written back and let go together.
       const tx = db.transaction(STORE, 'readwrite');
       const store = tx.objectStore(STORE);
-      const range = IDBKeyRange.bound(PARTING, `${PARTING}￿`);
+      const range = IDBKeyRange.bound(PARTING, `${PARTING}\uffff`);
       const main = store.get(KEY);
       const left = store.getAll(range);
       const keys = store.getAllKeys(range);
       let read = 0;
       let partingRead = true;
-      let failed = false;
+      let stored: DurableSnapshot | null = null;
+      let folded: DurableSnapshot | null = null;
       const settle = () => {
-        if (++read < 3 || failed) return;
+        if (++read < 3 || done) return;
         // Losing a session's depositions is bad; silently reinterpreting them
         // as a shape they were never written in is worse.
+        stored = asSnapshot(main.result);
         const parting = partingRead ? ((left.result as unknown[]) ?? []).map(asParting).filter((p): p is Parting => p !== null) : [];
-        const snapshot = foldParting(asSnapshot(main.result), parting);
+        if (!partingRead || !(keys.result ?? []).length) return;
         try {
-          // What parting tabs left is let go only once it is laid into the snapshot written here.
-          if (partingRead && parting.length && snapshot) store.put(snapshot, KEY);
-          if (partingRead) for (const k of keys.result ?? []) store.delete(k);
+          // What parting tabs left is let go in the transaction that writes it into the snapshot.
+          const next = foldParting(stored, parting);
+          if (parting.length && next) store.put(next, KEY);
+          for (const k of keys.result ?? []) store.delete(k);
+          folded = next;
         } catch {
-          // As in a save: the page runs on what it read, and the parting records stay for the next load.
+          // As in a save: the page runs on the snapshot as stored, and the parting records stay for the next load.
+          folded = null;
         }
-        if (snapshot) holdLoaded(held, snapshot, project);
-        resolve(snapshot);
       };
       main.onsuccess = settle;
       left.onsuccess = settle;
       keys.onsuccess = settle;
-      main.onerror = () => {
-        failed = true;
-        resolve(null);
-      };
+      main.onerror = () => take(null);
       // What parting tabs left cannot be read: the snapshot alone is read, and their records stay.
       const unread = (ev: Event) => {
         ev.preventDefault();
@@ -623,8 +656,11 @@ export async function loadDurable(project: string | null): Promise<DurableSnapsh
       };
       left.onerror = unread;
       keys.onerror = unread;
+      tx.oncomplete = () => take(folded ?? stored);
+      // The write-back failed (a full store, say) and the transaction rolled back: the snapshot as stored.
+      tx.onabort = () => take(stored);
     } catch {
-      resolve(null);
+      take(null);
     }
   });
 }
@@ -633,6 +669,8 @@ let pending: DurableSnapshot | null = null;
 let timer: ReturnType<typeof setTimeout> | null = null;
 /** The last snapshot this tab saved, which it leaves as it goes. */
 let latest: DurableSnapshot | null = null;
+/** The last snapshot this tab's save wrote and saw committed: a tab going away with nothing newer leaves nothing. */
+let landed: DurableSnapshot | null = null;
 
 async function flush(): Promise<void> {
   const snapshot = pending;
@@ -643,6 +681,9 @@ async function flush(): Promise<void> {
   if (!db) return;
   try {
     const tx = db.transaction(STORE, 'readwrite');
+    tx.oncomplete = () => {
+      landed = snapshot;
+    };
     const store = tx.objectStore(STORE);
     const req = store.get(KEY);
     req.onsuccess = () => {
@@ -702,7 +743,7 @@ export function flushDurable(): void {
     timer = null;
   }
   pending = null;
-  if (!latest || !opened) return;
+  if (!latest || !opened || latest === landed) return;
   try {
     const tx = opened.transaction(STORE, 'readwrite');
     tx.objectStore(STORE).put(partingOf(latest, held), TAB);
@@ -717,6 +758,7 @@ export function flushDurable(): void {
 export async function clearDurable(): Promise<void> {
   pending = null;
   latest = null;
+  landed = null;
   held = emptyHeld();
   if (timer) {
     clearTimeout(timer);

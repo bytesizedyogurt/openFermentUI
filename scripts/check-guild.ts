@@ -469,9 +469,14 @@ async function main() {
   const server7: Guild = ledger([...R_PEOPLE]);
   const posts7: string[] = [];
   let duringSync: (() => void) | null = null;
+  // Reads of the ledger the service answers before it stops answering them; null: every read is answered.
+  let readsLeft: number | null = null;
   (globalThis as any).fetch = async (url: string, init?: { body: string }) => {
     const reply = (status: number, body: unknown) => ({ ok: status === 200, status, json: async () => body }) as Response;
-    if (!init?.body) return reply(200, server7);
+    if (!init?.body) {
+      if (readsLeft !== null && readsLeft-- <= 0) throw new TypeError('fetch failed');
+      return reply(200, server7);
+    }
     const body = JSON.parse(init.body);
     posts7.push(`${url.replace('/api/guild/', '')}:${body.kind ?? ''}:${body.id ?? body.evidenceId}`);
     if (duringSync) {
@@ -566,7 +571,14 @@ async function main() {
     // The service holds the person as an add alone, which arrived after the change was made: the change follows the add.
     server7.people = peopleThere.map((x) => (x.id === 'p-ann' ? { ...x, title: 'First', updatedBy: null, updatedAt: null, addedAt: '2026-10-12T00:00:00Z' } : x));
     check('an owed change to a person the service holds as an add alone is sent', await syncAnn(changed('Senior', '2026-10-10T00:00:00Z')), posts7);
+    // The service takes the change, then stops answering before the page reads the ledger again: the page shows the
+    // person as the service answered the post.
     server7.people = peopleThere;
+    readsLeft = 1;
+    await syncAnn(changed('Chief', '2026-10-12T00:00:00Z'));
+    readsLeft = null;
+    check('a ledger read again that fails shows each person as the service answered the post',
+      s().guild.people.find((x) => x.id === 'p-ann')?.title === 'Chief', s().guild.people.find((x) => x.id === 'p-ann')?.title);
   }
 
 

@@ -165,12 +165,15 @@ interface Flushed {
 /**
  * Send the outbox in order, each row naming its own project. A refusal is the
  * service's answer and the row is dropped with its reason; a service that does
- * not answer stops the flush, and everything from there on is kept.
+ * not answer stops the flush, and everything from there on is kept. `still`,
+ * asked before each row, stops the flush the same way when it answers false
+ * (the browser's data was cleared while the flush ran).
  */
-export async function flush(outbox: OutboxEntry[]): Promise<Flushed> {
+export async function flush(outbox: OutboxEntry[], still: () => boolean = () => true): Promise<Flushed> {
   const refused: Flushed['refused'] = [];
   let sent = 0;
   for (let i = 0; i < outbox.length; i++) {
+    if (!still()) return { left: outbox.slice(i), sent, refused };
     const e = outbox[i];
     const path = `/api/state/${encodeURIComponent(e.kind)}/${encodeURIComponent(e.id)}`;
     const headers = { 'X-OpenFerment-Project': e.project };

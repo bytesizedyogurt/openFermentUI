@@ -370,7 +370,17 @@ async def _write_person(project_id: str, person: GuildPerson, dry_run: bool) -> 
                     raise GuildRefused("added", "the first person on the ledger is added by nobody")
             elif not _active_lead(ledger, person.addedBy):
                 raise GuildRefused("added", f"{person.addedBy!r} is not an active lead; only a lead adds people")
-            stored = person.model_copy(update={"addedAt": _now(), "updatedBy": None, "updatedAt": None})
+            # A person added and changed while the service was away arrives as one add that carries the change: the
+            # change keeps who made it and when, so a later change sent by another page is read against it, and an
+            # earlier one is kept back (below).
+            changed_by = person.updatedBy if person.updatedBy and (
+                _active_lead(ledger, person.updatedBy) or (not ledger.people and person.updatedBy == person.id)
+            ) else None
+            stored = person.model_copy(update={
+                "addedAt": _now(),
+                "updatedBy": changed_by,
+                "updatedAt": _change_time(person.updatedAt) if changed_by else None,
+            })
         else:
             if not _active_lead(ledger, person.updatedBy):
                 raise GuildRefused("added", f"{person.updatedBy!r} is not an active lead; only a lead changes a person")

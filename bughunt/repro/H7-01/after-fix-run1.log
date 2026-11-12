@@ -2,15 +2,15 @@ EXPECTED: tab A's reading (5.5 USD/kg) stays in the browser's queue through tab 
 - both depositions begun with the service up; the service holds A: {"entries":[],"state":"running"}
 - and B: {"entries":[],"state":"running"}
 - service stopped; health answers: "no answer"
-- the snapshot queue after tab A recorded 5.5 USD/kg: [{"kind":"depositions","id":"dep-mwcs947y-1","entries":["5.5 USD/kg"]}]
-- the snapshot queue after tab B recorded 6.6 USD/kg: [{"kind":"depositions","id":"dep-mwcs947y-1","entries":["5.5 USD/kg"]},{"kind":"depositions","id":"dep-mwcs94ol-1","entries":["6.6 USD/kg"]}]
-- tab A still shows, in its own memory: "H7-01 placeholder runbook Deposition dep-mwcs947y-1 · the readings alone · 1 measured · 0 observed Exit"
-- the snapshot queue with both tabs closed, the service still stopped: [{"kind":"depositions","id":"dep-mwcs947y-1","entries":["5.5 USD/kg"]},{"kind":"depositions","id":"dep-mwcs94ol-1","entries":["6.6 USD/kg"]}]
+- the snapshot queue after tab A recorded 5.5 USD/kg: [{"kind":"depositions","id":"dep-mwctuoiz-1","entries":["5.5 USD/kg"]}]
+- the snapshot queue after tab B recorded 6.6 USD/kg: [{"kind":"depositions","id":"dep-mwctuoiz-1","entries":["5.5 USD/kg"]},{"kind":"depositions","id":"dep-mwctup0m-1","entries":["6.6 USD/kg"]}]
+- tab A still shows, in its own memory: "H7-01 placeholder runbook Deposition dep-mwctuoiz-1 · the readings alone · 1 measured · 0 observed Exit"
+- the snapshot queue with both tabs closed, the service still stopped: [{"kind":"depositions","id":"dep-mwctuoiz-1","entries":["5.5 USD/kg"]},{"kind":"depositions","id":"dep-mwctup0m-1","entries":["6.6 USD/kg"]}]
 - service started again; health answers: 200
 - a new tab open 8 s after the queue sent B: the service holds A: {"entries":["5.5 USD/kg"],"state":"running"}
 - and B: {"entries":["6.6 USD/kg"],"state":"running"}
 - the snapshot queue after: []
 - words on the new tab about a dropped or lost reading: []
-OBSERVED: queue after tab A wrote: ['dep-mwcs947y-1']; after tab B wrote: ['dep-mwcs947y-1', 'dep-mwcs94ol-1']; with both tabs closed: ['dep-mwcs947y-1', 'dep-mwcs94ol-1'] (A dep-mwcs947y-1, B dep-mwcs94ol-1).
-OBSERVED: once the service answered and a tab opened, the service held A's deposition with ['5.5 USD/kg'] and B's with ['6.6 USD/kg']; tab A had shown, before it closed: "H7-01 placeholder runbook Deposition dep-mwcs947y-1 · the readings alone · 1 measured · 0 observed Exit"; words on the new tab about a dropped reading: none.
+OBSERVED: queue after tab A wrote: ['dep-mwctuoiz-1']; after tab B wrote: ['dep-mwctuoiz-1', 'dep-mwctup0m-1']; with both tabs closed: ['dep-mwctuoiz-1', 'dep-mwctup0m-1'] (A dep-mwctuoiz-1, B dep-mwctup0m-1).
+OBSERVED: once the service answered and a tab opened, the service held A's deposition with ['5.5 USD/kg'] and B's with ['6.6 USD/kg']; tab A had shown, before it closed: "H7-01 placeholder runbook Deposition dep-mwctuoiz-1 · the readings alone · 1 measured · 0 observed Exit"; words on the new tab about a dropped reading: none.
 RESULT: NO-DEFECT

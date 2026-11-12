@@ -78,40 +78,51 @@ and every other project's block stays as stored; a block written before this not
 A Guild write with no project open is refused in words. A person's owed write is named by its id and the time of the
 change, so a later change of one person is another write; of two tabs' owed changes of one person the later stands.
 The service keeps a change's own time, as the page stamped it, when that time runs no more than five minutes ahead of
-its clock (`guild.py`, `_change_time`), and of two changes of one person it keeps the later, whichever arrives last: a
-change made before the one it holds leaves the ledger as it is. `syncGuild` sends an owed change unless the service's
-copy says the same or holds a change made at or after it; a copy held as an add alone carries no change, so the change
-is sent. A withdrawal the service already shows is not sent again.
+its clock (`guild.py`, `_change_time`), and a person added and changed while the service was away, who arrives as one
+add carrying the change, keeps the change's maker and time. Of two changes of one person the service keeps the later,
+whichever arrives last: a change made before the one it holds leaves the ledger as it is. `syncGuild` sends an owed
+change unless the service's copy says the same or holds a change made at or after it; a copy held as an add alone
+carries no change, so the change is sent. A withdrawal the service already shows is not sent again. When the ledger
+cannot be read again after a sync, the page shows each person and entry as the service answered its post.
 
 A review decision carries the project it was made in, and the snapshot keys it by its project and its record
 (`decisionKey`), since a record id is made from a paper and its words and one paper may be held by two projects: each
 project's offline decision on a record of one id stays, and a page re-applies, shows and sends its own project's
 decisions alone (`decisionsIn`). A decision kept by its record alone, as a snapshot before this kept it, is read as
-the loading page's, and leaves once the page saves it under its project. One the service is found to hold, or a later
-one, leaves the snapshot (`holdDecision`).
+the loading page's when it names no project or names the page's, and leaves once the page saves it under its project;
+one naming another project waits for a page open on that project. An undo that takes a record back to undecided after
+a decision the service holds is owed like any decision, and is kept until it is sent. One the service is found to
+hold, or a later one, leaves the snapshot (`holdDecision`).
 
 The address names the project a page loads in (`#/p/<id>/...`; `lib/project.ts`), and an address that names none opens
-the one this browser last opened. The page settles its project from the project list before it reads the snapshot: the
-address's project when the service holds it, else the one remembered, else the only one held, and the browser
-remembers it. It keeps that project until it reloads, so every save names the project its writes were made in.
-Choosing another project writes its address and reloads, so the choice lands whether or not this browser can remember
-it (site data blocked); a reload the person stays from (a run is going) leaves the page in its project, its address
-with it. A project an address names that the page's list leaves out is looked for once more on the service (one made
-since in another tab opens), and a project the service does not hold opens nothing: the page says so and stays in its
-own.
+the one this browser last opened. The page's first read of the project list settles its project before it reads the
+snapshot, and a call made while that read is out waits for it: the address's project when the service holds it, else
+the one remembered, else the only one held, and the browser remembers it. The page keeps that project until it
+reloads, so every save names the project its writes were made in. Choosing another project writes its address and
+reloads, so the choice lands whether or not this browser can remember it (site data blocked); a reload the person
+stays from (a run is going) leaves the page in its project, its address with it, and a project made there joins the
+page's list once the address is the page's own again. A project an address names that the page's list leaves out is
+looked for once more on the service (one made since in another tab opens); a project the service does not hold opens
+nothing, and the page says so and stays in its own; a list the service does not answer leaves the address to say, and
+the page opens the project it names, as a load of the address does.
 
 The read and the write of a save run in one IndexedDB transaction, so two tabs' saves take turns; a stored value this
 browser cannot read back is written over by the saving tab's snapshot. A page that is closing or reloading runs no
 event after its own, so its save (`pagehide`) cannot read first: it writes the tab's last snapshot and the owed writes
 it has held under a key of its own (`parting:` and the tab's id), which no other tab writes, and commits the
-transaction at once (`flushDurable`). The next page to load folds every such record into the snapshot, oldest first,
-as each tab's own save would have merged it, and deletes it (`foldParting`, in `loadDurable`'s one transaction); a tab
-that lives on deletes its own on its next save. Clearing this browser's data clears them too. In Chromium a write
-placed at `pagehide` and left to commit on its own did not land before the page went; committed at once, it does.
+transaction at once (`flushDurable`); a tab whose last save has landed leaves nothing. The next page to load folds
+every such record into the snapshot, oldest first, and deletes it (`foldParting`, in `loadDurable`'s one transaction):
+the owed writes as the tab's own save would have merged them, and what a save takes whole (who is reviewing, the
+person acted as in each project, the rows kept before alpha 2.0) from whichever of the snapshot and the record was
+saved later. The page takes the fold as its own once that transaction has committed; one that rolled back leaves the
+page the snapshot as stored, and the records for the next load. A tab that lives on deletes its own record on its next
+save. Clearing this browser's data clears them too. In Chromium a write placed at `pagehide` and left to commit on its
+own did not land before the page went; committed at once, it does.
 
 A page that writes a row while a flush to the service is out replaces the row's unsent write, so the page owes the row
-once. A flush whose every write the service refused goes round again for what was made while it ran, and a flush still
-out when this browser's data is cleared puts back nothing it took.
+once. A flush whose every write the service refused goes round again for what was made while it ran. Clearing this
+browser's data ends a flush, a Guild sync or a decision sync still running: what it had not sent by then is not sent,
+and nothing it took is put back.
 
 A page that loads takes the whole outbox and the open project's Guild block at once, beside the tab that queued them,
 and both may send a write. A row the service keeps whole takes it twice to the same end, and a second lock, a second

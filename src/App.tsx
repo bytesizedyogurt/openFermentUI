@@ -146,17 +146,22 @@ function Screen() {
 
   // A project's address opens the project (§8.5): the page reloads in it once the service's list holds it. A
   // project the page's list leaves out may have been made since in another tab, so the list is read again, once;
-  // a project the service does not hold (gone, or mistyped) opens nothing, and the page stays in its own.
+  // a project the service does not hold (gone, or mistyped) opens nothing, and the page stays in its own. A list
+  // the service still does not answer leaves the address to say, as a load of the address does: the page opens it.
   useEffect(() => {
-    if (!elsewhere || projects === null || !route.project) return;
+    if (!elsewhere || !route.project) return;
     if (listed) {
       openProject(route.project);
       return;
     }
-    if (readFor === route.project) return;
-    const asked = route.project;
-    void loadProjects().finally(() => setReadFor(asked));
-  }, [elsewhere, listed, projects, route.project, readFor, openProject, loadProjects]);
+    if (projects === null && !projectsProblem) return;
+    if (readFor !== route.project) {
+      const asked = route.project;
+      void loadProjects().finally(() => setReadFor(asked));
+      return;
+    }
+    if (projects === null) openProject(route.project);
+  }, [elsewhere, listed, projects, projectsProblem, route.project, readFor, openProject, loadProjects]);
 
   // §8 — an old path lands on the new screen rather than the not-found page.
   // Replace rather than push, so Back does not bounce the reader between the

@@ -121,6 +121,25 @@ def test_a_change_keeps_the_time_it_was_made():
     assert guild.write_person(change).updatedAt == made
 
 
+def test_an_add_that_carries_a_change_keeps_the_change_and_its_time():
+    """A person added and then changed while the service was away arrives as one
+    add: the change keeps its maker and time, so an earlier change another page
+    sends later is kept back, and a change made after it is written (H7-01)."""
+    team()
+    added_and_changed = person("p-ann", "Ann Uwase", title="Principal", updatedBy="p-sean", updatedAt="2026-06-02T09:10:00.000Z")
+    stored = guild.write_person(added_and_changed)
+    assert stored.updatedBy == "p-sean" and stored.updatedAt == "2026-06-02T09:10:00.000Z" and stored.title == "Principal"
+    earlier = added_and_changed.model_copy(update={"title": "Senior", "updatedAt": "2026-06-02T09:05:00.000Z"})
+    assert guild.write_person(earlier).title == "Principal"
+    later = added_and_changed.model_copy(update={"title": "Head", "updatedAt": "2026-06-02T09:20:00.000Z"})
+    assert guild.write_person(later).title == "Head"
+    # An add that names no change, or a change by someone who is not a lead, keeps no change.
+    plain = guild.write_person(person("p-bea", "Bea Mukamana"))
+    assert plain.updatedBy is None and plain.updatedAt is None
+    by_member = guild.write_person(person("p-cal", "Cal Nkusi", updatedBy="p-patrick", updatedAt="2026-06-02T09:00:00.000Z"))
+    assert by_member.updatedBy is None and by_member.updatedAt is None
+
+
 def test_a_change_made_before_the_one_the_ledger_holds_leaves_it_as_it_is():
     """Two pages sync at once, each owing a change of one person: the change
     made later stands whichever arrives last (H7-01)."""

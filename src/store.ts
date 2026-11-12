@@ -1011,32 +1011,39 @@ export const useStore = create<OFState>()((set, get) => ({
   protocolsProblem: null,
 
   loadProjects: async () => {
-    const first = !projectsSettled;
-    projectsSettled = true;
-    let listed: Project[];
-    try {
-      listed = await call<Project[]>('/api/projects');
-    } catch (e) {
-      set({ projectsProblem: e instanceof Error ? e.message : String(e) });
-      projectSettled();
-      return;
+    const read = async (): Promise<Project[] | null> => {
+      try {
+        return await call<Project[]>('/api/projects');
+      } catch (e) {
+        set({ projectsProblem: e instanceof Error ? e.message : String(e) });
+        return null;
+      }
+    };
+    // The first read settles the project the page acts in, and a call made while it is out waits for it, so no
+    // caller goes on (to read what this browser owes, App.tsx) before the project has settled.
+    if (!firstProjects) {
+      firstProjects = (async () => {
+        const listed = await read();
+        if (listed) {
+          const open = get().projectId;
+          const remembered = lastProject();
+          const held = (id: string | null): id is string => !!id && listed.some((p) => p.id === id);
+          // The address's project when the service holds it, else the one this browser remembers, else the only one.
+          const keep = held(open) ? open : held(remembered) ? remembered : listed.length === 1 ? listed[0].id : null;
+          // The project settles here, before the page reads what this browser owes the service, so the owed writes
+          // it takes are the kept project's; the browser remembers it.
+          if (keep !== open || keep !== remembered) setOpenProjectId(keep);
+          set({ projects: listed, projectsProblem: null, projectId: keep });
+        }
+        projectSettled();
+      })();
+      return firstProjects;
     }
+    await firstProjects;
     // Read again later (a project made in another tab since), the list alone changes: the page keeps its project
     // until it reloads, since what it owes the service is that project's.
-    if (!first) {
-      set({ projects: listed, projectsProblem: null });
-      return;
-    }
-    const open = get().projectId;
-    const remembered = lastProject();
-    const held = (id: string | null): id is string => !!id && listed.some((p) => p.id === id);
-    // The address's project when the service holds it, else the one this browser remembers, else the only one.
-    const keep = held(open) ? open : held(remembered) ? remembered : listed.length === 1 ? listed[0].id : null;
-    // The project settles here, before the page reads what this browser owes the service (App.tsx), so the owed
-    // writes it takes are the kept project's; the browser remembers it.
-    if (keep !== open || keep !== remembered) setOpenProjectId(keep);
-    set({ projects: listed, projectsProblem: null, projectId: keep });
-    projectSettled();
+    const listed = await read();
+    if (listed) set({ projects: listed, projectsProblem: null });
   },
 
   openProject: (id) => {
@@ -1065,8 +1072,10 @@ export const useStore = create<OFState>()((set, get) => ({
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ name: asked.name, description: asked.description ?? '', by }),
     });
-    set((s) => ({ projects: [...(s.projects ?? []), made] }));
     get().openProject(made.id);
+    // A page that stays (a run is going, and the person stayed at the prompt) lists the project made, once its
+    // address is its own again (openProject), so nothing drawn in between names the new project.
+    setTimeout(() => set((s) => ({ projects: [...(s.projects ?? []), made] })), 0);
     return made;
   },
 
@@ -1198,9 +1207,9 @@ export const useStore = create<OFState>()((set, get) => ({
         const pending = get().stateOutbox;
         if (!pending.length) return;
         const epoch = stateEpoch;
-        const { left, sent, refused } = await flush(pending);
-        // The browser's data was cleared while the flush ran: what it owed went with it, and what was made since
-        // is sent from the top.
+        const { left, sent, refused } = await flush(pending, () => epoch === stateEpoch);
+        // The browser's data was cleared while the flush ran: the flush sent nothing after the clear, what it had not
+        // sent went with the browser's data, and what was made since is sent from the top.
         if (epoch !== stateEpoch) continue;
         // A change made while the flush ran replaces its row's last unsent write, the one the page's view stood on.
         set((s) => ({ stateOutbox: enqueue(left, s.stateOutbox.filter((e) => !pending.includes(e))) }));
@@ -2774,6 +2783,7 @@ export const useStore = create<OFState>()((set, get) => ({
     const s = get();
     const local = s.durableReview;
     if (!local || !s.overlay || !s.serviceUp) return;
+    const epoch = stateEpoch;
     const pending: ReviewDecision[] = [];
     let kept = 0;
     for (const [id, mine] of Object.entries(local.decisions)) {
@@ -2798,7 +2808,11 @@ export const useStore = create<OFState>()((set, get) => ({
       }
       pending.push(decisionOf(record, reanchoredSpan(record), madeAt));
     }
-    for (const d of pending) await get().postReviewDecision(d);
+    for (const d of pending) {
+      // A clear of this browser's data while the sync runs ends it: nothing more is sent.
+      if (epoch !== stateEpoch) return;
+      await get().postReviewDecision(d);
+    }
     if (pending.length || kept) {
       get().logActivity({
         at: stamp(),
@@ -3237,18 +3251,27 @@ export const useStore = create<OFState>()((set, get) => ({
       const server = await loadGuild();
       if (!server) return;
       const s = get();
+      // A clear of this browser's data while the sync runs ends it: nothing more is sent, and nothing laid in.
+      const epoch = stateEpoch;
       const pending = new Set(s.guildPending);
       // Already on the service: stored, with the answer lost on the way back.
       const stored = new Set([...server.people.map((p) => p.id), ...server.evidence.map((e) => e.id)]);
       const refused: string[] = [];
       let posted = 0;
+      // What the service answered to each post: the person or entry as it keeps them.
+      const answeredPeople = new Map<string, GuildPerson>();
+      const answeredEvidence = new Map<string, GuildEvidence>();
       const attempt = async (
         label: string,
-        post: () => Promise<unknown>,
+        post: () => Promise<GuildPerson | GuildEvidence>,
         onRefused?: (e: GuildRefused) => Promise<void>,
+        kind: 'person' | 'evidence' = 'evidence',
       ): Promise<boolean> => {
+        if (epoch !== stateEpoch) return false;
         try {
-          await post();
+          const answer = await post();
+          if (kind === 'person') answeredPeople.set(answer.id, answer as GuildPerson);
+          else answeredEvidence.set(answer.id, answer as GuildEvidence);
           posted += 1;
           return true;
         } catch (e) {
@@ -3297,14 +3320,21 @@ export const useStore = create<OFState>()((set, get) => ({
       const withdrawnThere = new Set(server.evidence.filter((e) => e.withdrawnAt).map((e) => e.id));
       // People first, then entries, then withdrawals: each may name the one before.
       for (const p of s.guild.people)
-        if (pending.has(p.id) && !carried(p) && !(await attempt(p.name, () => postPerson(p)))) return;
+        if (pending.has(p.id) && !carried(p) && !(await attempt(p.name, () => postPerson(p), undefined, 'person'))) return;
       for (const e of s.guild.evidence)
         if (pending.has(e.id) && !stored.has(e.id) && !(await attempt(`${e.kind} on ${e.skillId}`, () => postEvidence(e), asDeviation(e))))
           return;
       for (const w of s.guildPendingWithdrawals)
         if (!withdrawnThere.has(w.evidenceId) && !(await attempt(`withdrawal of ${w.evidenceId}`, () => postWithdrawal(w)))) return;
-      // Read again only when this sync sent something: with nothing posted the first read is the ledger.
-      const fresh = posted > 0 ? ((await loadGuild()) ?? server) : server;
+      // Read again only when this sync sent something: with nothing posted the first read is the ledger. A read
+      // again that fails takes the first read with each post's answer laid in, the ledger as the service keeps it.
+      const reread = posted > 0 ? await loadGuild() : null;
+      if (epoch !== stateEpoch) return;
+      const laid = <T extends { id: string }>(rows: T[], answered: Map<string, T>) => [
+        ...rows.map((r) => answered.get(r.id) ?? r),
+        ...[...answered.values()].filter((a) => !rows.some((r) => r.id === a.id)),
+      ];
+      const fresh = reread ?? { ...server, people: laid(server.people, answeredPeople), evidence: laid(server.evidence, answeredEvidence) };
       // The service's ledger is the truth for everything this sync sent.
       // Anything made while it ran, and anything it did not send, stays.
       const sent = new Set(s.guildPending);
@@ -3575,15 +3605,19 @@ function overridesOfSnapshot(snap: Pick<DurableSnapshot, 'parameterOverrides' | 
   return out;
 }
 
-function snapshotOf(s: OFState): DurableSnapshot {
+/** What this page saves to Durable, as the store holds it now (exported for `check:state`). */
+export function snapshotOf(s: OFState): DurableSnapshot {
   const reviewDecisions: DurableSnapshot['reviewDecisions'] = {};
   for (const r of s.records) {
-    // Only records a reviewer has actually touched.
-    if (r.status === 'unverified' && !r.gold && !r.corrected && !r.reviewer) continue;
+    const server = s.overlay?.records[r.id];
+    const madeAt = s.decisionAt[r.id];
+    // Only records a reviewer has actually touched, and a record taken back to undecided (an undo) after a decision
+    // the service holds: that undo is owed to the service like any decision.
+    const undone = !!server && !!madeAt && server.at < madeAt;
+    if (r.status === 'unverified' && !r.gold && !r.corrected && !r.reviewer && !undone) continue;
     // And only decisions the service does not hold yet: one it holds at this
     // time or later is its own, and loads with the overlay.
-    const server = s.overlay?.records[r.id];
-    if (server && s.decisionAt[r.id] && server.at >= s.decisionAt[r.id]) continue;
+    if (server && madeAt && server.at >= madeAt) continue;
     // Keyed by the project and the record, so another project's decision on a record of the same id stays its own.
     reviewDecisions[decisionKey(s.projectId, r.id)] = {
       recordId: r.id,
@@ -3696,8 +3730,8 @@ function owedLedger(ledger: Guild, owed: Guild | undefined): Guild {
 let stateFlushing = false;
 /** Bumped when the browser's data is cleared, so a flush out at the time puts back nothing it took. */
 let stateEpoch = 0;
-/** Whether the page has read the project list once: the project it acts in settles then (`loadProjects`). */
-let projectsSettled = false;
+/** The page's first read of the project list, which settles the project it acts in (`loadProjects`). */
+let firstProjects: Promise<void> | null = null;
 let stateRetry: ReturnType<typeof setTimeout> | null = null;
 /** How many reads of the project's catalogues this page has asked for; only the newest one's answer is kept. */
 let catalogueReads = 0;

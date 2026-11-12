@@ -3846,3 +3846,29 @@ On `claude/alpha-2-2-fixes`, cut from `claude/alpha-2-2-bughunt` at `fa8db4a`, i
   - Checks: `pnpm typecheck`, `pnpm build`, the reproduction twice (`RESULT: NO-DEFECT`), `check:state`, `check:guild`,
     `check:plan`, `check:figures`, `test:reconcile`, `gen:components --check`, `pnpm smoke` (20 screens) and
     `pnpm prove --steps 9` (55 checks) pass; `pnpm test:core` 3071 passed, 1 skipped, 175 deselected (5 min 38 s).
+- The fifth review of the H7-01 fix (826926c): four readers (the parting record, the open project, decisions,
+  Guild), a verifier per claim; 11 claims, 11 confirmed, seven new with 826926c and four older.
+  - New with 826926c, and fixed: the fold laid a closed tab's reviewer and acting person over a later save (what a
+    save takes whole now comes from whichever was saved later, and a tab whose last save landed leaves nothing); the
+    load took the fold before its transaction committed, so a failed write-back left records to be laid in twice (it
+    takes the fold once committed, else the snapshot as stored); after a failed first project list, an address to
+    another project showed `Opening project…` for good (the list is read again, and a list still unanswered leaves
+    the page to open the address); a project made during a run, the person staying at the prompt, left links naming
+    it (it joins the list once the address is the page's again); under the development build's double start the
+    second list read could let the snapshot be read before the project settled (a call waits for the first read); a
+    person added and changed offline reached the service as an add with its change time dropped, so an earlier
+    change from another page was written over it (the add keeps the change's maker and time); and two records
+    overstated (`mergeSnapshot`'s docblock, ADR-014's sentence on decisions kept by record alone).
+  - Older than 826926c, and fixed: clearing this browser's data left a flush, a Guild sync and a decision sync
+    sending what they had not sent yet (each stops); an undo back to undecided, made with the service away after a
+    decision it held, was kept nowhere though the page said it waited (it is kept and sent like any decision); and a
+    Guild sync whose read again failed showed the ledger as it was before its posts (it shows each post's answer).
+  - Records: ADR-014's note is rewritten to the code; `durable.ts`'s comments follow. `test_guild.py` holds an add
+    that carries a change; `check:guild` a failed read again; `check:state` the fold by time, a write unsent at a
+    clear, and an undo kept (each of these three fails on 826926c's lines).
+  - Checked in Chromium over the built app: the walk of the fourth review's six cases holds again, and a page whose
+    first project list failed opens another project's address, reading the list again when it answers and opening
+    the address when it does not.
+  - Checks: `pnpm typecheck`, `pnpm build`, the reproduction twice (`RESULT: NO-DEFECT`), `check:state`, `check:guild`,
+    `check:plan`, `check:figures`, `test:reconcile`, `gen:components --check`, `pnpm smoke` (20 screens) and
+    `pnpm prove --steps 9` (55 checks) pass; `pnpm test:core` 3072 passed, 1 skipped, 175 deselected (6 min 5 s).

@@ -91,7 +91,7 @@ import { fmt } from '../src/engine/units';
 import { interpolate } from '../src/engine/interp';
 import { awaitingReadBack, correctedBy, correctionOf } from '../src/engine/readings';
 import { lockIntact, runbookLockHash } from '../src/engine/lock';
-import { assumptionOfOverride, projectStateOf, useStore } from '../src/store';
+import { assumptionOfOverride, projectStateOf, snapshotOf, useStore } from '../src/store';
 import {
   EMPTY_SNAPSHOT,
   decisionKey,
@@ -340,6 +340,18 @@ const three = [e('sc-1', { id: 'sc-1' }), e('sc-2', null, 'q'), e('sc-3', { id: 
       ids(folded!) === '["dep-t@1","dep-u@3","dep-t2@4"]', ids(folded!));
     check('a page with nothing stored lays in what a parting tab left', ids(foldParting(null, [partingOf(lastOfT, tabT)])!) === '["dep-t@1","dep-t2@4"]');
     check('a snapshot no tab left anything beside stays as it is', foldParting(main, []) === main);
+    // A closed tab's choice of reviewer and of the person acted as stands only when its record is the later.
+    const owingOf = (_: string[]): GuildOwed =>
+      ({ ledger: { version: 1, people: [], evidence: [], policy: {} } as unknown as Guild, pending: [], withdrawals: [], actingId: null });
+    const closedEarly = { ...snap([fromT]), savedAt: at(1), reviewerName: 'Ada',
+      guildOwed: { p: { ...owingOf([]), actingId: 'p-ada' } } } as DurableSnapshot;
+    const savedSince = { ...main, savedAt: at(5), reviewerName: 'Bea', guildOwed: { p: { ...owingOf([]), actingId: 'p-bea' } } } as DurableSnapshot;
+    const byTime = foldParting(savedSince, [partingOf(closedEarly, emptyHeld())])!;
+    check('a closed tab’s older reviewer and acting person do not stand over a later save, and its owed writes are laid in',
+      byTime.reviewerName === 'Bea' && byTime.guildOwed?.p?.actingId === 'p-bea' && byTime.savedAt === at(5) && ids(byTime).includes('dep-t@1'),
+      JSON.stringify([byTime.reviewerName, byTime.guildOwed?.p?.actingId, byTime.savedAt]));
+    const closedLate = { ...closedEarly, savedAt: at(9), reviewerName: 'Cy' } as DurableSnapshot;
+    check('a closed tab’s later reviewer stands', foldParting(savedSince, [partingOf(closedLate, emptyHeld())])!.reviewerName === 'Cy');
   }
 
   const ledger = (people: [string, string][], evidence: string[]) =>
@@ -433,9 +445,37 @@ const three = [e('sc-1', { id: 'sc-1' }), e('sc-2', null, 'q'), e('sc-3', { id: 
       await useStore.getState().flushProjectState();
       check('a flush out when the browser’s data is cleared puts back nothing it took',
         cleared && useStore.getState().stateOutbox.length === 0, JSON.stringify(useStore.getState().stateOutbox.map((x) => x.id)));
+      // Cleared while the first of two writes is out, and answered: the second, unsent at the clear, is not sent.
+      asked.length = 0;
+      let clearedTwo = false;
+      globalThis.fetch = (async (url: string, init?: RequestInit) => {
+        asked.push(`${init?.method} ${url}`);
+        if (!clearedTwo && url.includes('/sc-first')) {
+          clearedTwo = true;
+          useStore.getState().clearBrowserData();
+        }
+        return new Response('{}', { status: 200 });
+      }) as typeof fetch;
+      useStore.setState({ stateOutbox: [row('sc-first', 4), row('sc-second', 5)] });
+      await useStore.getState().flushProjectState();
+      check('a write still unsent when the browser’s data is cleared is not sent after it',
+        clearedTwo && !asked.some((x) => x.includes('/sc-second')), asked.join('; '));
     } finally {
       globalThis.fetch = real;
     }
+  }
+  {
+    // An undo back to undecided, made after a decision the service holds, is owed to the service (snapshotOf).
+    const base = useStore.getState();
+    const record = { id: 'rec-undone', status: 'unverified', provenance: 'unverified', paperId: 'P-1' } as unknown as (typeof base.records)[number];
+    const overlay = { ...(base.overlay ?? {}), records: { 'rec-undone': { recordId: 'rec-undone', at: at(1) } } } as unknown as NonNullable<typeof base.overlay>;
+    const undoneLater = snapshotOf({ ...base, projectId: 'p', records: [record], overlay, decisionAt: { 'rec-undone': at(2) } });
+    const notUndone = snapshotOf({ ...base, projectId: 'p', records: [record], overlay, decisionAt: { 'rec-undone': at(1) } });
+    const neverDecided = snapshotOf({ ...base, projectId: 'p', records: [record], overlay: { ...overlay, records: {} }, decisionAt: {} });
+    const key = decisionKey('p', 'rec-undone');
+    check('an undo to undecided after a decision the service holds is kept until it is sent, and an untouched record is not',
+      undoneLater.reviewDecisions[key]?.status === 'unverified' && !(key in notUndone.reviewDecisions) && !(key in neverDecided.reviewDecisions),
+      JSON.stringify(Object.keys(undoneLater.reviewDecisions)));
   }
   {
     const legacySnap = snap([], { guild: owing([['p-old', at(1)]], []) });
