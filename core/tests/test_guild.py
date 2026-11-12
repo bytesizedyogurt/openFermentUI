@@ -121,6 +121,22 @@ def test_a_change_keeps_the_time_it_was_made():
     assert guild.write_person(change).updatedAt == made
 
 
+def test_a_change_made_before_the_one_the_ledger_holds_leaves_it_as_it_is():
+    """Two pages sync at once, each owing a change of one person: the change
+    made later stands whichever arrives last (H7-01)."""
+    team()
+    later = person("p-patrick", "Patrick Mugisha", title="Principal", updatedBy="p-sean", updatedAt="2026-06-02T10:05:00.000Z")
+    earlier = later.model_copy(update={"title": "Senior", "updatedAt": "2026-06-02T10:00:00.000Z"})
+    guild.write_person(later)
+    answered = guild.write_person(earlier)
+    assert answered.title == "Principal" and answered.updatedAt == later.updatedAt
+    held = next(p for p in guild.read().people if p.id == "p-patrick")
+    assert held.title == "Principal" and held.updatedAt == later.updatedAt
+    # A change made after the one held is written as ever.
+    guild.write_person(later.model_copy(update={"title": "Head", "updatedAt": "2026-06-02T10:06:00.000Z"}))
+    assert next(p for p in guild.read().people if p.id == "p-patrick").title == "Head"
+
+
 @pytest.mark.parametrize("asked", ["2999-01-01T00:00:00Z", "yesterday", "2026-06-02T10:00:00", ""])
 def test_a_change_time_ahead_of_the_clock_or_unreadable_is_the_services_own(asked):
     team()

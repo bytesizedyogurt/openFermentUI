@@ -578,6 +578,7 @@ the line that records the decision and the decision record it stands under.
 
 | Debt | Paid at | Commit |
 |---|---|---|
+| Review decisions were keyed by record id alone in the browser's snapshot, so of two projects' offline decisions on one record id (a record id is made from a paper and its words, and one paper may be held by two projects) the later stood and the other was never sent; each is keyed by its project and record now (`decisionKey`, `decisionsIn`), and a decision kept by its record alone leaves once the page saves it under its project | the bug hunt's fix run, the fourth round of the H7-01 fix (11 November 2026) | the commit after `c12687b` |
 | Two concept-graph builds at once (`pnpm lit:graph` for two projects) could lose one project's document from an entity's `document_ids`: each build batch read `kg_entities`, merged in Python and wrote the arrays back with no lock, so the entity kept the description the lost document's passage produced and `graph.entities` showed it to the other project. Every build batch's transaction now holds one advisory lock (`graph.GRAPH_LOCK`), and a test makes two builds overlap every time | the bug hunt's fix run, 11 November 2026 (found by group 1's review) | on `claude/alpha-2-2-fixes`, after `e173803` (the Log, Fixes after the bug hunt) |
 | The agent builder's interface points (`docs/reports/handoff-2026-11.md`, round 1), each in the code `docs/TOOLS.md` and `docs/api/openapi.json` are written from (ADR-008's Implementation 13): a BioRepo record is one rule, `module_stores.RECORD`, that `biorepo_read` lists its kinds `record` and `candidate` by and `search_records` names each hit's kind by, so a candidate a reviewer verified is a record; a write's answer names the audit rows it left (`ToolResult.auditIds`), a gated write's proposal among them; `GET /api/audit` takes `action`, `target` and `who` beside `limit`, so a write of any age is found by what it was, and serves each row as an `AuditRow` under its `id`, its null fields left out as an answer over MCP leaves them out; `AuditEntry`'s `detail` says what a row holds, and `catalogue_write` and `study_scenario` keep their call's note there as the other writes do; a module read's summary is a `ModuleRead`, its `partial` a sentence, and `module_stores.DETAIL` names each kind's `detail` field by field; the client recipe hands the server no `VIRTUAL_ENV`, and the page's top points at it. `core/tests/test_agent_interface.py` holds each, a row of every kind among them | alpha 2.2, E.16 | `dc02f20` |
 | The per-request key override and the local-model route (owner question 10 and §3 of the alpha 2.1 prompt): `X-OpenFerment-Key` serves a request's calls and is kept nowhere; `OPENFERMENT_LOCAL_BASE_URL` serves a local model in single calls | alpha 2.1, D.4 | `fa9782e`, `53c123c` |
@@ -623,7 +624,7 @@ the line that records the decision and the decision record it stands under.
 | Component tests on fixtures recorded from the real service (`pnpm record:fixtures`, alpha 2.0 prompt §9.3) are unbuilt; the walk and the smoke run against the real service | a stage after alpha 2.2 that builds `pnpm record:fixtures` |
 | No offline test computes on a published genome-scale model (Yeast9 and iMM904 need their fetched files, caches kept outside git; Departures, §5.5 stage 2); a model add-on applied in the worker, and a metabolite-defined product's demand through the worker, are untested | a test under the marker `slow` or `live`, on a host that holds the fetched files |
 | Two concept-graph builds at once (`pnpm lit:graph` for two projects that share a document) can each send a batch of a shared passage to the model before either stamps it, and pay for that batch twice; `GRAPH_LOCK` keeps the graph whole, and the spend is the same as two builds run one after the other with no stamp between them (found by the review of the graph lock, 11 November 2026) | a build that reads the stamps again inside the lock before it asks the model, or one build at a time for the instance |
-| Two pages owing one row send it each on its own: a copy a loading page took at load, or a tab's own queue, can reach the service after the other's later write of the row, and a row the service replaces whole (an override scope, a scenario) then takes the older copy; and review decisions are keyed by record id alone in the snapshot, so two projects' offline decisions on one record id keep the later (found by the reviews of the H7-01 fix, 11 November 2026; ADR-014's note) | a write that names the version of the row it read, refused in words when the row changed since: group 3 of the bug hunt's fix order (H7-04) builds it for overrides, and it serves every kind; decisions keyed by project and record |
+| Two pages owing one row send it each on its own: a copy a loading page took at load, a tab's own queue, or what a closing tab left (`foldParting`) can reach the service after another page's later write of the row, and a row the service replaces whole (an override scope, a scenario) then takes the older copy (found by the reviews of the H7-01 fix, 11 November 2026; ADR-014's note) | a write that names the version of the row it read, refused in words when the row changed since: group 3 of the bug hunt's fix order (H7-04) builds it for overrides, and it serves every kind |
 | `units.json` maps `wt%` and `% (w/w)` to `% CDW`, aliases written for the PHA program; changing them changes how a stored record converts | the vocabulary review, after alpha 2.2, with a migration for the records it converts |
 | RunbookDetail's held-for-review panel keeps words of Dominion's era: candidates near a claimed identity band, a ruling with legal consequences, and two rulings (a boundary accepted as mapped; candidates excluded pending counsel) that `store.resolveRunbookReview` writes into the held stage, with a boundary map among the runbook's outputs. No code in this build sets a runbook held for review, so the panel answers only a row kept in that state | the stage that lets a runbook be held for review, with that state's own words and rulings |
 | `fermos.forecast_run` keeps `duration_h`, a length the calling code sets as its own convention, which the tests and their stand-ins pass (`standins.py`, `test_fermos.py`, `test_fermos_3r.py`, `test_proforma_fermos.py`, `test_proforma_ceiling.py`); the routes, the tools and the engine set a forecast's length as a typed `t_end` | the change that has those tests set a typed `t_end`, or reach `fermos.forecast()` through a helper of their own |
@@ -3812,3 +3813,36 @@ On `claude/alpha-2-2-fixes`, cut from `claude/alpha-2-2-bughunt` at `fa8db4a`, i
   - Checks: `pnpm typecheck`, `pnpm build`, the reproduction twice (`RESULT: NO-DEFECT`), `check:state`, `check:guild`,
     `check:plan`, `check:figures`, `test:reconcile`, `gen:components --check` and `pnpm smoke` (20 screens) pass;
     `pnpm test:core` 3070 passed, 1 skipped, 175 deselected (5 min 27 s).
+- The fourth review of the H7-01 fix (c12687b): three readers (Guild's times, the open project, the queue), a
+  verifier per claim; 12 claims, 12 confirmed, five new with c12687b and seven older.
+  - New with c12687b, and fixed: the pagehide save placed its read in the closing task and its write in the read's
+    success event, which a closing page never runs, so a page closed or reloaded stored nothing of its last 400 ms
+    (a closing tab now writes its last snapshot and what it held under its own key, committed at once, and the next
+    page to load folds it in, `foldParting`; a write left to commit on its own did not land in Chromium either); the
+    comments said the write started in that task; a project made in another tab after the page loaded was called
+    one the service did not hold, and left unopenable (the list is read again, once, before the page says so); a
+    fresh load of a dead project's address opened it for a whole load and forgot the project the browser had (the
+    page waits for the list, and keeps the project it remembers); and check-guild's comment still spoke of the
+    service's write time.
+  - Older than c12687b, and fixed: a person the service held as an add alone counted as carrying a later owed change,
+    by the add's arrival time (such a change is sent); two pages syncing at once could write the earlier of two
+    changes over the later (the service keeps the later, whichever arrives last); the snapshot kept one decision a
+    record id, so of two projects' offline decisions on one record the earlier was never sent (keyed by project and
+    record, `decisionKey`; the Paid table); with site data blocked every `/p/` address reloaded without end, and the
+    switch at a `/p/` address was undone by the next load, `Make it and open it` too (the address names the project a
+    page opens, and choosing one writes it); a flush whose every write was refused left a change made while it ran
+    unsent (it goes round again); and a flush out when this browser's data was cleared put back what it took (it
+    puts back nothing).
+  - Checked in Chromium over the built app: a dead address opens nothing after one load and keeps the remembered
+    project; a project made later opens; the switch at a `/p/` address lands; with `localStorage` throwing, an
+    address opens in one load and the switch lands; a name typed just before a reload is there after it; a project
+    chosen during a run, the person staying at the prompt, leaves the page in its project and its address, and going
+    ahead lands in the new one.
+  - Records: ADR-014's note is rewritten to the code (Guild's later change, decisions by project, the address, the
+    parting record, the flush); the Open row names what a closing tab left among the late copies; `project.ts`'s
+    header names the address. `test_guild.py` holds the later change kept; `check:guild` an owed change over an add
+    alone; `check:state` two projects' decisions on one record, a decision rekeyed, the fold of a parting tab's last
+    save, and the store's flush over a refused round and over a clear (each of the last two fails on c12687b's lines).
+  - Checks: `pnpm typecheck`, `pnpm build`, the reproduction twice (`RESULT: NO-DEFECT`), `check:state`, `check:guild`,
+    `check:plan`, `check:figures`, `test:reconcile`, `gen:components --check`, `pnpm smoke` (20 screens) and
+    `pnpm prove --steps 9` (55 checks) pass; `pnpm test:core` 3071 passed, 1 skipped, 175 deselected (5 min 38 s).

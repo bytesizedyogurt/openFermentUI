@@ -135,15 +135,28 @@ function Screen() {
   const [a, b, c, d, e] = route.segments;
   const projectId = useStore((s) => s.projectId);
   const openProject = useStore((s) => s.openProject);
+  const loadProjects = useStore((s) => s.loadProjects);
   const projects = useStore((s) => s.projects);
-  // The address names a project the service's list leaves out (gone, or mistyped): the page stays on its own.
-  const unheld = route.project !== null && projects !== null && !projects.some((p) => p.id === route.project);
+  const projectsProblem = useStore((s) => s.projectsProblem);
+  // The project an address names that the page's list left out, once the list has been read again for it.
+  const [readFor, setReadFor] = useState<string | null>(null);
+  const elsewhere = route.project !== null && route.project !== projectId;
+  const listed = elsewhere && !!projects?.some((p) => p.id === route.project);
+  const unheld = elsewhere && projects !== null && !listed && readFor === route.project;
 
-  // A project's address opens the project (§8.5): the page reloads in it, once, and an address naming a project the
-  // service does not hold opens nothing, so the page settles on the project it keeps.
+  // A project's address opens the project (§8.5): the page reloads in it once the service's list holds it. A
+  // project the page's list leaves out may have been made since in another tab, so the list is read again, once;
+  // a project the service does not hold (gone, or mistyped) opens nothing, and the page stays in its own.
   useEffect(() => {
-    if (route.project && route.project !== projectId && !unheld) openProject(route.project);
-  }, [route.project, projectId, openProject, unheld]);
+    if (!elsewhere || projects === null || !route.project) return;
+    if (listed) {
+      openProject(route.project);
+      return;
+    }
+    if (readFor === route.project) return;
+    const asked = route.project;
+    void loadProjects().finally(() => setReadFor(asked));
+  }, [elsewhere, listed, projects, route.project, readFor, openProject, loadProjects]);
 
   // §8 — an old path lands on the new screen rather than the not-found page.
   // Replace rather than push, so Back does not bounce the reader between the
@@ -167,20 +180,45 @@ function Screen() {
   // Sub-views are paths UNDER their owner, so a URL says where a thing lives:
   // /geneos/hosts/cw15 rather than /organisms/cw15. Nothing was deleted —
   // every screen below is the same file it was, mounted somewhere else.
-  if (unheld && route.project !== projectId) {
+  if (unheld) {
     return (
       <div className="p-8 text-ink-soft text-body" data-testid="project-unheld">
-        The service holds no project <span className="font-num text-ink">{route.project}</span>.{' '}
+        {projectsProblem ? (
+          <>
+            Project <span className="font-num text-ink">{route.project}</span> is not opened: the service&rsquo;s list of
+            projects could not be read ({projectsProblem}).{' '}
+          </>
+        ) : (
+          <>
+            The service holds no project <span className="font-num text-ink">{route.project}</span>.{' '}
+          </>
+        )}
         <a className="text-accent underline underline-offset-2" href="#/">
           The projects it holds
         </a>
+        {projectId && (
+          <>
+            {' · '}
+            <a className="text-accent underline underline-offset-2" href={`#/p/${encodeURIComponent(projectId)}`}>
+              Back to the open project
+            </a>
+          </>
+        )}
       </div>
     );
   }
-  if (route.project && route.project !== projectId) {
+  if (elsewhere) {
     return (
       <div className="p-8 text-ink-soft text-body" data-testid="opening-project">
         Opening project <span className="font-num text-ink">{route.project}</span>…
+        {projectId && (
+          <>
+            {' '}
+            <a className="text-accent underline underline-offset-2" href={`#/p/${encodeURIComponent(projectId)}`}>
+              Stay in the open project
+            </a>
+          </>
+        )}
       </div>
     );
   }

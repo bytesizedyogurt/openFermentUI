@@ -236,19 +236,27 @@ def _now() -> str:
 CLOCK_ALLOWANCE = timedelta(minutes=5)
 
 
+def _instant(value: str | None) -> datetime | None:
+    """The instant an ISO time with a zone names, or None."""
+    if not value:
+        return None
+    try:
+        at = datetime.fromisoformat(value.replace("Z", "+00:00"))
+    except ValueError:
+        return None
+    return at if at.tzinfo is not None else None
+
+
 def _change_time(asked: str | None) -> str:
     """The time a change to a person was made, as the page that made it stamped
-    it, so two changes made while the service was away keep their order whichever
-    arrives first (the browser's `syncGuild` compares them); the service's own
-    time when the page names none, names one that is not a time, or names one
-    further ahead of the service's clock than `CLOCK_ALLOWANCE`."""
-    if asked:
-        try:
-            at = datetime.fromisoformat(asked.replace("Z", "+00:00"))
-        except ValueError:
-            at = None
-        if at is not None and at.tzinfo is not None and at <= datetime.now(timezone.utc) + CLOCK_ALLOWANCE:
-            return asked
+    it, so the ledger can tell which of two changes made while the service was
+    away is the later (`_write_person` keeps that one, and the browser's
+    `syncGuild` compares against it); the service's own time when the page names
+    none, names one that is not a time with a zone, or names one further ahead
+    of the service's clock than `CLOCK_ALLOWANCE`."""
+    at = _instant(asked)
+    if asked and at is not None and at <= datetime.now(timezone.utc) + CLOCK_ALLOWANCE:
+        return asked
     return _now()
 
 
@@ -325,7 +333,9 @@ def write_person(person: GuildPerson, *, dry_run: bool = False) -> GuildPerson:
     `updatedBy`, also an active lead, and may change the title, role and
     active flag; the name is held to the same rule as on the way in, and the
     dates and the person who added them are kept as first written. A change
-    keeps the time it was made (`_change_time`).
+    keeps the time it was made (`_change_time`), and a change made before the
+    one the ledger holds leaves the ledger as it is: the later change stands,
+    and the person comes back as the ledger holds them.
     """
     _check_name(person.name)
     if not PERSON_ID.match(person.id):
@@ -334,7 +344,9 @@ def write_person(person: GuildPerson, *, dry_run: bool = False) -> GuildPerson:
         raise GuildRefused("date", f"joinedAt {person.joinedAt!r} is not a date")
     stored, existing = db.run(_write_person(projects.current(), person, dry_run))
     if not dry_run:
-        log.info("guild: person %s (%s) %s", stored.id, stored.role, "changed" if existing else "added")
+        kept = existing is not None and stored is existing
+        log.info("guild: person %s (%s) %s", stored.id, stored.role,
+                 "kept: a later change stands" if kept else "changed" if existing else "added")
     return stored
 
 
@@ -368,6 +380,12 @@ async def _write_person(project_id: str, person: GuildPerson, dry_run: bool) -> 
             ] + ([person] if person.active and person.role == "lead" else [])
             if not leads_after:
                 raise GuildRefused("role", "this change would leave the ledger with no active lead")
+            made = _change_time(person.updatedAt)
+            held_at, made_at = _instant(existing.updatedAt), _instant(made)
+            if held_at is not None and made_at is not None and made_at < held_at:
+                # A change made before the one the ledger holds, sent late (two pages syncing at once): the later
+                # change stands, and the page takes it with the ledger.
+                return existing, existing
             stored = existing.model_copy(
                 update={
                     "name": person.name.strip(),
@@ -375,7 +393,7 @@ async def _write_person(project_id: str, person: GuildPerson, dry_run: bool) -> 
                     "role": person.role,
                     "active": person.active,
                     "updatedBy": person.updatedBy,
-                    "updatedAt": _change_time(person.updatedAt),
+                    "updatedAt": made,
                 }
             )
         if not dry_run:

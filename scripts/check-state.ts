@@ -94,11 +94,15 @@ import { lockIntact, runbookLockHash } from '../src/engine/lock';
 import { assumptionOfOverride, projectStateOf, useStore } from '../src/store';
 import {
   EMPTY_SNAPSHOT,
+  decisionKey,
+  decisionsIn,
   emptyHeld,
+  foldParting,
   hold,
   holdLoaded,
   mergeSnapshot,
   owedGuild,
+  partingOf,
   type DurableReviewDecision,
   type DurableSnapshot,
   type GuildOwed,
@@ -300,6 +304,43 @@ const three = [e('sc-1', { id: 'sc-1' }), e('sc-2', null, 'q'), e('sc-3', { id: 
     check('a decision from before decisions carried their own time keeps its snapshot’s time when carried',
       carried.reviewDecisions['rec-8']?.at === at(6), JSON.stringify(carried.reviewDecisions));
   }
+  {
+    // Two projects hold one paper, so a record id may be both projects': each project's offline decision on it stays.
+    const inA = (n: number): DurableReviewDecision => ({ ...decision('verified', n), project: 'a', recordId: 'rec-x' });
+    const inB = (n: number): DurableReviewDecision => ({ ...decision('rejected', n), project: 'b', recordId: 'rec-x' });
+    let both = save(emptyHeld(), snap([], { reviewDecisions: { [decisionKey('b', 'rec-x')]: inB(1) } }), null);
+    both = save(emptyHeld(), snap([], { reviewDecisions: { [decisionKey('a', 'rec-x')]: inA(2) } }), both);
+    check('two projects’ offline decisions on a record of one id both stay, whichever is later',
+      Object.keys(both.reviewDecisions).length === 2 && decisionsIn(both, 'b')['rec-x']?.status === 'rejected' &&
+      decisionsIn(both, 'a')['rec-x']?.status === 'verified', JSON.stringify(both.reviewDecisions));
+    const legacy = snap([], { reviewDecisions: { 'rec-y': decision('verified', 3), 'rec-z': { ...decision('verified', 4), project: 'b' } } });
+    check('a page reads a decision saved before decisions named their project as its own, and another project’s as that project’s',
+      'rec-y' in decisionsIn(legacy, 'a') && !('rec-z' in decisionsIn(legacy, 'a')) && 'rec-z' in decisionsIn(legacy, 'b'));
+    const rekeyed = save(emptyHeld(), snap([], { reviewDecisions: { [decisionKey('a', 'rec-y')]: { ...decision('verified', 3), project: 'a', recordId: 'rec-y' } } }), legacy);
+    check('a decision kept by its record alone leaves once the page saves it under its project',
+      !('rec-y' in rekeyed.reviewDecisions) && decisionKey('a', 'rec-y') in rekeyed.reviewDecisions && 'rec-z' in rekeyed.reviewDecisions,
+      JSON.stringify(Object.keys(rekeyed.reviewDecisions)));
+  }
+  {
+    // A tab going away cannot read before it writes: it leaves its last snapshot and what it held under its own key,
+    // and the next page to load lays them in as the tab's own save would have.
+    const tabT = emptyHeld();
+    const tabU = emptyHeld();
+    const fromT = deposition('dep-t', '1.1 USD/kg', 1);
+    const answered = deposition('dep-done', '2.2 USD/kg', 2);
+    const fromU = deposition('dep-u', '3.3 USD/kg', 3);
+    let main = save(tabT, snap([fromT, answered]), null);
+    main = save(tabU, snap([fromU]), main);
+    // T's last change: the service answered dep-done, and T owes a new reading, then T closes before its save lands.
+    const fromT2 = deposition('dep-t2', '4.4 USD/kg', 4);
+    const lastOfT = snap([fromT, fromT2]);
+    hold(tabT, lastOfT);
+    const folded = foldParting(main, [partingOf(lastOfT, tabT)]);
+    check('a parting tab’s last writes are laid in, the other tab’s stay, and the write the service answered leaves',
+      ids(folded!) === '["dep-t@1","dep-u@3","dep-t2@4"]', ids(folded!));
+    check('a page with nothing stored lays in what a parting tab left', ids(foldParting(null, [partingOf(lastOfT, tabT)])!) === '["dep-t@1","dep-t2@4"]');
+    check('a snapshot no tab left anything beside stays as it is', foldParting(main, []) === main);
+  }
 
   const ledger = (people: [string, string][], evidence: string[]) =>
     ({ version: 1, people: people.map(([id, when]) => ({ id, addedAt: when })), evidence: evidence.map((id) => ({ id })), policy: {} }) as unknown as Guild;
@@ -356,6 +397,45 @@ const three = [e('sc-1', { id: 'sc-1' }), e('sc-2', null, 'q'), e('sc-3', { id: 
     const owedAfter = enqueue(leftOver, madeMeanwhile);
     check('a change made while an unanswered flush ran leaves one write of the row, the later',
       JSON.stringify(owedAfter.map((x) => x.value)) === '[7]', JSON.stringify(owedAfter.map((x) => x.value)));
+  }
+  {
+    // The store's own flush (store.ts `flushProjectState`) against a stand-in service.
+    const real = globalThis.fetch;
+    const asked: string[] = [];
+    const row = (id: string, n: number): OutboxEntry => ({ project: 'p', kind: 'scenarios', id, value: { id }, by: 'Ada', at: at(n) });
+    try {
+      // Every write of the round is refused, and a change is made while it runs: the change is sent.
+      let calls = 0;
+      globalThis.fetch = (async (url: string, init?: RequestInit) => {
+        asked.push(`${init?.method} ${url}`);
+        if (calls++ === 0) {
+          useStore.setState((x) => ({ stateOutbox: enqueue(x.stateOutbox, [row('sc-made', 2)]) }));
+          return new Response(JSON.stringify({ detail: 'refused in words' }), { status: 422 });
+        }
+        return new Response('{}', { status: 200 });
+      }) as typeof fetch;
+      useStore.setState({ stateOutbox: [row('sc-refused', 1)] });
+      await useStore.getState().flushProjectState();
+      check('a flush whose every write is refused sends a change made while it ran',
+        asked.some((x) => x.includes('/sc-made')) && useStore.getState().stateOutbox.length === 0, asked.join('; '));
+      // The browser's data is cleared while a flush is out, and the service never answers: nothing is put back.
+      asked.length = 0;
+      let cleared = false;
+      globalThis.fetch = (async (url: string, init?: RequestInit) => {
+        asked.push(`${init?.method} ${url}`);
+        if (!cleared) {
+          cleared = true;
+          useStore.getState().clearBrowserData();
+        }
+        throw new TypeError('fetch failed');
+      }) as typeof fetch;
+      useStore.setState({ stateOutbox: [row('sc-cleared', 3)] });
+      await useStore.getState().flushProjectState();
+      check('a flush out when the browser’s data is cleared puts back nothing it took',
+        cleared && useStore.getState().stateOutbox.length === 0, JSON.stringify(useStore.getState().stateOutbox.map((x) => x.id)));
+    } finally {
+      globalThis.fetch = real;
+    }
   }
   {
     const legacySnap = snap([], { guild: owing([['p-old', at(1)]], []) });

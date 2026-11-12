@@ -87,6 +87,12 @@ export interface DurableReviewDecision {
    * kept, which a page reads as its own, as it did then.
    */
   project?: string;
+  /**
+   * The record decided. The snapshot keys a decision by its project and its
+   * record (`decisionKey`), so two projects' decisions on one record id are
+   * two; a decision saved before then is keyed by its record alone.
+   */
+  recordId?: ReviewDecision['recordId'];
 }
 
 /**
@@ -105,9 +111,10 @@ export interface DurableSnapshot {
   version: 1;
   savedAt: string;
   /**
-   * Review decisions the service has not yet acknowledged, keyed by record
-   * id: re-applied over the service's records at hydrate and posted when it
-   * answers (`syncDecisions`).
+   * Review decisions the service has not yet acknowledged, keyed by their
+   * project and record (`decisionKey`): re-applied over the service's records
+   * at hydrate and posted when it answers (`syncDecisions`), each by a page
+   * open on its project (`decisionsIn`).
    */
   reviewDecisions: Record<string, DurableReviewDecision>;
   /**
@@ -299,7 +306,34 @@ export function emptyHeld(): Held {
 }
 
 const entryOf = (e: OutboxEntry) => `${e.project}\u0000${e.kind}\u0000${e.id}\u0000${e.at}`;
-const decisionOf = (recordId: string, at: string | undefined) => `${recordId}\u0000${at ?? ''}`;
+const decisionOf = (key: string, at: string | undefined) => `${key}\u0000${at ?? ''}`;
+
+/**
+ * A review decision's key in the snapshot: its project and its record, so one
+ * project's decision on a record never stands in for another project's on a
+ * record of the same id (record ids are made from a paper and its words, and
+ * one paper may be held by two projects). Without a project, the record alone.
+ */
+export function decisionKey(project: string | null | undefined, recordId: string): string {
+  return project ? `${project}\u0000${recordId}` : recordId;
+}
+
+/**
+ * The decisions a snapshot holds for `project`, by record id: the project's own,
+ * and those saved before decisions named their project, which a page reads as
+ * its own; of two on one record, the later.
+ */
+export function decisionsIn(snapshot: DurableSnapshot, project: string | null): Record<string, DurableReviewDecision> {
+  const out: Record<string, DurableReviewDecision> = {};
+  const when = (d: DurableReviewDecision) => d.at ?? snapshot.savedAt;
+  for (const [key, d] of Object.entries(snapshot.reviewDecisions ?? {})) {
+    if (d.project && d.project !== project) continue;
+    const id = d.recordId ?? key;
+    const was = out[id];
+    if (!was || when(was) < when(d)) out[id] = d;
+  }
+  return out;
+}
 /** A withdrawal by every field it carries: two of one entry on one day by two people are two writes. */
 const withdrawalOf = (project: string, w: GuildWithdrawal) =>
   `${project}\u0000${w.evidenceId}\u0000${w.at}\u0000${w.by}\u0000${w.reason}`;
@@ -347,7 +381,11 @@ export function owedGuild(snapshot: DurableSnapshot, project: string | null): Gu
 /** Add every owed write of a snapshot this tab saves to `held`. */
 export function hold(held: Held, snapshot: DurableSnapshot): void {
   for (const e of snapshot.outbox ?? []) held.outbox.add(entryOf(e));
-  for (const [id, d] of Object.entries(snapshot.reviewDecisions)) held.decisions.add(decisionOf(id, d.at));
+  for (const [key, d] of Object.entries(snapshot.reviewDecisions)) {
+    held.decisions.add(decisionOf(key, d.at));
+    // The same decision as a snapshot from before decisions were keyed by project kept it, by its record alone.
+    if (d.recordId) held.decisions.add(decisionOf(d.recordId, d.at));
+  }
   for (const [project, owed] of Object.entries(snapshot.guildOwed ?? {})) holdGuild(held, project, owed);
 }
 
@@ -414,14 +452,15 @@ export function mergeSnapshot(mine: DurableSnapshot, stored: DurableSnapshot | n
   const theirs = (stored.outbox ?? []).filter((e) => !held.outbox.has(entryOf(e)));
   const outbox = [...(mine.outbox ?? []), ...theirs].sort((a, b) => (a.at < b.at ? -1 : a.at > b.at ? 1 : 0));
 
+  // By project and record: of two decisions under one key, the later stands.
   const reviewDecisions = { ...mine.reviewDecisions };
-  for (const [id, was] of Object.entries(stored.reviewDecisions ?? {})) {
-    if (held.decisions.has(decisionOf(id, was.at))) continue;
+  for (const [key, was] of Object.entries(stored.reviewDecisions ?? {})) {
+    if (held.decisions.has(decisionOf(key, was.at))) continue;
     // A decision from before decisions carried their own time keeps its snapshot's.
     const d = was.at ? was : { ...was, at: stored.savedAt };
-    if (held.decisions.has(decisionOf(id, d.at))) continue;
-    const own = reviewDecisions[id];
-    if (!own || (own.at ?? '') < (d.at ?? '')) reviewDecisions[id] = d;
+    if (held.decisions.has(decisionOf(key, d.at))) continue;
+    const own = reviewDecisions[key];
+    if (!own || (own.at ?? '') < (d.at ?? '')) reviewDecisions[key] = d;
   }
 
   const guildOwed: Record<string, GuildOwed> = { ...(stored.guildOwed ?? {}) };
@@ -440,8 +479,79 @@ export function mergeSnapshot(mine: DurableSnapshot, stored: DurableSnapshot | n
 
 /** What this tab has held, for every save it makes. */
 let held = emptyHeld();
-/** The database once open, so a save made as the tab goes away starts its transaction with no wait. */
+/** The database once open, so a save made as the tab goes away places its write with no wait. */
 let opened: IDBDatabase | null = null;
+
+// ── A tab going away ──────────────────────────────────────────────────
+//
+// A page that is closing or reloading runs no event after its own, so a save
+// made then cannot read the snapshot before it writes. It writes what the tab
+// owes, and what it has held, under a key of its own (`parting:` and the tab's
+// id), which no other tab writes, so the write erases nothing of theirs. The
+// next page to load folds every such record into the snapshot, as the tab's own
+// save would have merged it, and deletes it (`foldParting`); a tab that lives
+// on (the back-forward cache) deletes its own on its next save.
+
+const PARTING = 'parting:';
+
+function tabId(): string {
+  try {
+    if (typeof crypto !== 'undefined' && typeof crypto.randomUUID === 'function') return crypto.randomUUID();
+  } catch {
+    /* below */
+  }
+  return `${Date.now().toString(36)}-${Math.random().toString(36).slice(2)}`;
+}
+
+/** This tab's key for what it leaves as it goes. */
+const TAB = `${PARTING}${tabId()}`;
+
+/** What a tab leaves as it goes: its last snapshot and the owed writes it had held. */
+export interface Parting {
+  version: 1;
+  snapshot: DurableSnapshot;
+  held: { outbox: string[]; decisions: string[]; guild: string[]; withdrawals: string[]; legacyGuild: boolean };
+}
+
+export function partingOf(snapshot: DurableSnapshot, h: Held): Parting {
+  return {
+    version: 1,
+    snapshot,
+    held: { outbox: [...h.outbox], decisions: [...h.decisions], guild: [...h.guild], withdrawals: [...h.withdrawals], legacyGuild: h.legacyGuild },
+  };
+}
+
+function asParting(v: unknown): Parting | null {
+  const p = v as Parting | undefined;
+  if (!p || p.version !== 1 || !asSnapshot(p.snapshot) || !p.held) return null;
+  const list = (x: unknown) => (Array.isArray(x) ? x.filter((y): y is string => typeof y === 'string') : []);
+  return {
+    version: 1,
+    snapshot: p.snapshot,
+    held: { outbox: list(p.held.outbox), decisions: list(p.held.decisions), guild: list(p.held.guild), withdrawals: list(p.held.withdrawals), legacyGuild: p.held.legacyGuild === true },
+  };
+}
+
+/**
+ * The snapshot with each parting tab's last save laid in, oldest first, as each
+ * tab's own save would have merged it: what the tab owed, with every owed write
+ * of the snapshot it had never held.
+ */
+export function foldParting(main: DurableSnapshot | null, parting: Parting[]): DurableSnapshot | null {
+  let folded = main;
+  const inOrder = [...parting].sort((a, b) => (a.snapshot.savedAt < b.snapshot.savedAt ? -1 : a.snapshot.savedAt > b.snapshot.savedAt ? 1 : 0));
+  for (const p of inOrder) {
+    const h: Held = {
+      outbox: new Set(p.held.outbox),
+      decisions: new Set(p.held.decisions),
+      guild: new Set(p.held.guild),
+      withdrawals: new Set(p.held.withdrawals),
+      legacyGuild: p.held.legacyGuild,
+    };
+    folded = mergeSnapshot(p.snapshot, folded, h);
+  }
+  return folded;
+}
 
 /**
  * Count a loaded review decision as held once the service is found to hold
@@ -450,8 +560,10 @@ let opened: IDBDatabase | null = null;
  * time stands on.
  */
 export function holdDecision(recordId: string, d: DurableReviewDecision, savedAt: string): void {
-  held.decisions.add(decisionOf(recordId, d.at));
-  held.decisions.add(decisionOf(recordId, d.at ?? savedAt));
+  for (const key of [decisionKey(d.project, recordId), recordId]) {
+    held.decisions.add(decisionOf(key, d.at));
+    held.decisions.add(decisionOf(key, d.at ?? savedAt));
+  }
 }
 
 /** A stored value as a snapshot: one of an older shape is discarded rather than migrated on a guess. */
@@ -470,16 +582,47 @@ export async function loadDurable(project: string | null): Promise<DurableSnapsh
   if (!db) return null;
   return new Promise((resolve) => {
     try {
-      const tx = db.transaction(STORE, 'readonly');
-      const req = tx.objectStore(STORE).get(KEY);
-      req.onsuccess = () => {
+      // One transaction: the snapshot and what parting tabs left are read, folded, written back and let go together.
+      const tx = db.transaction(STORE, 'readwrite');
+      const store = tx.objectStore(STORE);
+      const range = IDBKeyRange.bound(PARTING, `${PARTING}￿`);
+      const main = store.get(KEY);
+      const left = store.getAll(range);
+      const keys = store.getAllKeys(range);
+      let read = 0;
+      let partingRead = true;
+      let failed = false;
+      const settle = () => {
+        if (++read < 3 || failed) return;
         // Losing a session's depositions is bad; silently reinterpreting them
         // as a shape they were never written in is worse.
-        const snapshot = asSnapshot(req.result);
+        const parting = partingRead ? ((left.result as unknown[]) ?? []).map(asParting).filter((p): p is Parting => p !== null) : [];
+        const snapshot = foldParting(asSnapshot(main.result), parting);
+        try {
+          // What parting tabs left is let go only once it is laid into the snapshot written here.
+          if (partingRead && parting.length && snapshot) store.put(snapshot, KEY);
+          if (partingRead) for (const k of keys.result ?? []) store.delete(k);
+        } catch {
+          // As in a save: the page runs on what it read, and the parting records stay for the next load.
+        }
         if (snapshot) holdLoaded(held, snapshot, project);
         resolve(snapshot);
       };
-      req.onerror = () => resolve(null);
+      main.onsuccess = settle;
+      left.onsuccess = settle;
+      keys.onsuccess = settle;
+      main.onerror = () => {
+        failed = true;
+        resolve(null);
+      };
+      // What parting tabs left cannot be read: the snapshot alone is read, and their records stay.
+      const unread = (ev: Event) => {
+        ev.preventDefault();
+        partingRead = false;
+        settle();
+      };
+      left.onerror = unread;
+      keys.onerror = unread;
     } catch {
       resolve(null);
     }
@@ -488,13 +631,14 @@ export async function loadDurable(project: string | null): Promise<DurableSnapsh
 
 let pending: DurableSnapshot | null = null;
 let timer: ReturnType<typeof setTimeout> | null = null;
+/** The last snapshot this tab saved, which it leaves as it goes. */
+let latest: DurableSnapshot | null = null;
 
 async function flush(): Promise<void> {
   const snapshot = pending;
   pending = null;
   timer = null;
   if (!snapshot) return;
-  // With the database open, the transaction starts in this task, so a page going away places it.
   const db = opened ?? (await openDb());
   if (!db) return;
   try {
@@ -504,6 +648,8 @@ async function flush(): Promise<void> {
     req.onsuccess = () => {
       try {
         store.put(mergeSnapshot(snapshot, asSnapshot(req.result), held), KEY);
+        // What this tab left as it went once (the back-forward cache) is in the snapshot written now.
+        store.delete(TAB);
       } catch {
         // As below: the app keeps running on memory.
       }
@@ -515,6 +661,7 @@ async function flush(): Promise<void> {
       ev.preventDefault();
       try {
         store.put(snapshot, KEY);
+        store.delete(TAB);
       } catch {
         // As below: the app keeps running on memory.
       }
@@ -535,28 +682,41 @@ export function saveDurable(snapshot: DurableSnapshot): void {
   if (!durableAvailable()) return;
   hold(held, snapshot);
   pending = snapshot;
+  latest = snapshot;
   if (timer) return;
   timer = setTimeout(() => void flush(), 400);
 }
 
 /**
- * Write immediately — used when the tab is going away. With the database open
- * the read and the write start in this task, and the browser runs the
- * transaction as the page goes; a closing page that runs no event after its
- * own may leave its last changes, the ones made within the coalescing window,
- * unstored.
+ * Write now — used when the tab is going away (`pagehide`). A closing page runs
+ * no event after its own, so this write cannot wait on a read: it puts the
+ * tab's last snapshot and what it has held under the tab's own key, in this
+ * task, with the database the page already opened, and the browser commits it
+ * as the page goes. The next page to load folds it into the snapshot
+ * (`loadDurable`, `foldParting`). A page that goes before its database has
+ * opened leaves nothing.
  */
 export function flushDurable(): void {
   if (timer) {
     clearTimeout(timer);
     timer = null;
   }
-  void flush();
+  pending = null;
+  if (!latest || !opened) return;
+  try {
+    const tx = opened.transaction(STORE, 'readwrite');
+    tx.objectStore(STORE).put(partingOf(latest, held), TAB);
+    // Commit now, so the write does not wait on an event the closing page will not run.
+    tx.commit?.();
+  } catch {
+    // Quota exceeded, or the store went away: the page goes with what was stored last.
+  }
 }
 
 /** Drop everything persisted. Used by "Clear this browser’s data", which must truly clear. */
 export async function clearDurable(): Promise<void> {
   pending = null;
+  latest = null;
   held = emptyHeld();
   if (timer) {
     clearTimeout(timer);
@@ -565,8 +725,9 @@ export async function clearDurable(): Promise<void> {
   const db = await openDb();
   if (!db) return;
   try {
+    // The snapshot and whatever parting tabs left, every record this browser keeps here.
     const tx = db.transaction(STORE, 'readwrite');
-    tx.objectStore(STORE).delete(KEY);
+    tx.objectStore(STORE).clear();
   } catch {
     /* nothing to do — the caller cannot act on this either */
   }

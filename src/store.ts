@@ -49,7 +49,10 @@ import {
   clearDurable,
   durableAvailable,
   flushDurable,
+  decisionKey,
+  decisionsIn,
   holdDecision,
+  lastProject,
   loadDurable,
   owedGuild,
   rememberProject,
@@ -62,7 +65,7 @@ import { DecisionRefused, IntakeDown, extractPaper, loadOverlay, postDecision } 
 import { blocks, recordOf, writeRefusal, type ReviewAction } from '@/lib/review';
 import { isFieldId } from '@/data/ontology';
 import { call } from '@/lib/http';
-import { openProjectId, projectSettled, setOpenProjectId, type Project } from '@/lib/project';
+import { addressedProject, openProjectId, projectAddress, projectSettled, setOpenProjectId, type Project } from '@/lib/project';
 import {
   EMPTY_STATE,
   applyEntries,
@@ -1008,6 +1011,8 @@ export const useStore = create<OFState>()((set, get) => ({
   protocolsProblem: null,
 
   loadProjects: async () => {
+    const first = !projectsSettled;
+    projectsSettled = true;
     let listed: Project[];
     try {
       listed = await call<Project[]>('/api/projects');
@@ -1016,21 +1021,40 @@ export const useStore = create<OFState>()((set, get) => ({
       projectSettled();
       return;
     }
+    // Read again later (a project made in another tab since), the list alone changes: the page keeps its project
+    // until it reloads, since what it owes the service is that project's.
+    if (!first) {
+      set({ projects: listed, projectsProblem: null });
+      return;
+    }
     const open = get().projectId;
-    const keep = open && listed.some((p) => p.id === open) ? open : listed.length === 1 ? listed[0].id : null;
+    const remembered = lastProject();
+    const held = (id: string | null): id is string => !!id && listed.some((p) => p.id === id);
+    // The address's project when the service holds it, else the one this browser remembers, else the only one.
+    const keep = held(open) ? open : held(remembered) ? remembered : listed.length === 1 ? listed[0].id : null;
     // The project settles here, before the page reads what this browser owes the service (App.tsx), so the owed
-    // writes it takes are the kept project's.
-    if (keep !== open) setOpenProjectId(keep);
+    // writes it takes are the kept project's; the browser remembers it.
+    if (keep !== open || keep !== remembered) setOpenProjectId(keep);
     set({ projects: listed, projectsProblem: null, projectId: keep });
     projectSettled();
   },
 
   openProject: (id) => {
-    // The page keeps the project it has open, and every request names it, until it reloads: the next load reads
-    // the project remembered here, so a reload the person cancels leaves this page whole (durable.ts).
+    // The page keeps the project it has open, and every request names it, until it reloads. The address names the
+    // project a page loads in (lib/project.ts), so the choice is written there, and remembered for an address that
+    // names none.
     rememberProject(id);
-    if (id === get().projectId) return;
+    const there = addressedProject() === id ? null : projectAddress(id);
+    if (id === get().projectId) {
+      if (there) window.location.replace(there);
+      return;
+    }
+    const was = window.location.href;
+    if (there) window.history.replaceState(window.history.state, '', there);
     window.location.reload();
+    // A reload the person stays from (a run is going) leaves the page in its project, its address with it; a reload
+    // that goes ahead has its address already.
+    if (there) setTimeout(() => window.history.replaceState(window.history.state, '', was), 0);
   },
 
   createProject: async (asked) => {
@@ -1173,7 +1197,11 @@ export const useStore = create<OFState>()((set, get) => ({
       for (;;) {
         const pending = get().stateOutbox;
         if (!pending.length) return;
+        const epoch = stateEpoch;
         const { left, sent, refused } = await flush(pending);
+        // The browser's data was cleared while the flush ran: what it owed went with it, and what was made since
+        // is sent from the top.
+        if (epoch !== stateEpoch) continue;
         // A change made while the flush ran replaces its row's last unsent write, the one the page's view stood on.
         set((s) => ({ stateOutbox: enqueue(left, s.stateOutbox.filter((e) => !pending.includes(e))) }));
         for (const { entry, why } of refused)
@@ -1194,7 +1222,9 @@ export const useStore = create<OFState>()((set, get) => ({
           }, STATE_RETRY_MS);
           return;
         }
-        if (!sent) return;
+        // The service answered every write: anything made while it did is sent now. A round that sent and refused
+        // nothing (none was owed by then) ends the loop.
+        if (!sent && !refused.length) return;
       }
     } finally {
       stateFlushing = false;
@@ -2531,10 +2561,11 @@ export const useStore = create<OFState>()((set, get) => ({
       // replacing them, so a new extraction brings new records without
       // discarding what a reviewer already decided.
       const decisionAt = { ...s.decisionAt };
+      // This project's decisions alone, by record: another project's on a record of the same id is that project's.
+      const ours = decisionsIn(snap, s.projectId);
       const records = s.records.map((r) => {
-        const d = snap.reviewDecisions[r.id];
-        // Another project's decision on a record of the same id is that project's.
-        if (!d || (d.project && d.project !== s.projectId)) return r;
+        const d = ours[r.id];
+        if (!d) return r;
         // §7.3 — the service may already have applied its decision for this
         // record; the later of the two wins. The decision's own `at` when the
         // snapshot carries one, the snapshot's savedAt for older snapshots.
@@ -2553,12 +2584,7 @@ export const useStore = create<OFState>()((set, get) => ({
         stateLegacy: legacyStateOf(snap),
         durableReady: durableAvailable(),
         // This project's decisions alone (a decision saved before decisions named their project is this page's).
-        durableReview: {
-          savedAt: snap.savedAt,
-          decisions: Object.fromEntries(
-            Object.entries(snap.reviewDecisions).filter(([, d]) => !d.project || d.project === s.projectId),
-          ),
-        },
+        durableReview: { savedAt: snap.savedAt, decisions: ours },
         decisionAt,
         // Older snapshots predate the field; an unnamed reviewer is the
         // same as one who has not said yet (OF-BLD-012.1 F2).
@@ -3255,14 +3281,17 @@ export const useStore = create<OFState>()((set, get) => ({
       };
       // A change to a person the service already holds is sent unless the service carries it already: its copy
       // says the same, or it holds a change made at or after this one (the service keeps a change's own time,
-      // guild.py `_change_time`, as BioRepo keeps a decision's). An add the service holds is the service's.
+      // guild.py `_change_time`, as BioRepo keeps a decision's, and keeps the later of two). A copy the service
+      // holds as an add alone carries no change, and a change follows its person's add, so the change is sent.
+      // An add the service holds is the service's.
       const onService = new Map(server.people.map((p) => [p.id, p]));
       const carried = (p: GuildPerson) => {
         const q = onService.get(p.id);
         if (!q) return false;
         if (!p.updatedBy) return true;
         if (q.name === p.name && q.title === p.title && q.role === p.role && q.active === p.active) return true;
-        return Date.parse(q.updatedAt ?? q.addedAt) >= Date.parse(p.updatedAt ?? p.addedAt);
+        if (!q.updatedAt) return false;
+        return Date.parse(q.updatedAt) >= Date.parse(p.updatedAt ?? p.addedAt);
       };
       // A withdrawal of an entry the service shows withdrawn is the service's already.
       const withdrawnThere = new Set(server.evidence.filter((e) => e.withdrawnAt).map((e) => e.id));
@@ -3318,6 +3347,8 @@ export const useStore = create<OFState>()((set, get) => ({
     // snapshot behind would restore itself on the next reload, which is the
     // opposite of what the button says.
     void clearDurable();
+    // A flush to the service still out when the data goes puts back nothing it took (flushProjectState).
+    stateEpoch += 1;
     // The overlay is the service's state, not the session's: it survives a
     // reset the way it survives a reload.
     const overlay = get().overlay;
@@ -3553,7 +3584,9 @@ function snapshotOf(s: OFState): DurableSnapshot {
     // time or later is its own, and loads with the overlay.
     const server = s.overlay?.records[r.id];
     if (server && s.decisionAt[r.id] && server.at >= s.decisionAt[r.id]) continue;
-    reviewDecisions[r.id] = {
+    // Keyed by the project and the record, so another project's decision on a record of the same id stays its own.
+    reviewDecisions[decisionKey(s.projectId, r.id)] = {
+      recordId: r.id,
       status: r.status,
       provenance: r.provenance,
       gold: r.gold,
@@ -3661,6 +3694,10 @@ function owedLedger(ledger: Guild, owed: Guild | undefined): Guild {
 }
 
 let stateFlushing = false;
+/** Bumped when the browser's data is cleared, so a flush out at the time puts back nothing it took. */
+let stateEpoch = 0;
+/** Whether the page has read the project list once: the project it acts in settles then (`loadProjects`). */
+let projectsSettled = false;
 let stateRetry: ReturnType<typeof setTimeout> | null = null;
 /** How many reads of the project's catalogues this page has asked for; only the newest one's answer is kept. */
 let catalogueReads = 0;
@@ -3718,7 +3755,8 @@ if (durableAvailable()) {
       return;
     saveDurable(snapshotOf(s));
   });
-  // A tab closing mid-run must not lose the last few hundred milliseconds.
+  // A tab closing mid-run must not lose the last few hundred milliseconds: it leaves them under its own key
+  // (durable.ts `flushDurable`), and the next page to load lays them in.
   window.addEventListener('pagehide', flushDurable);
 }
 

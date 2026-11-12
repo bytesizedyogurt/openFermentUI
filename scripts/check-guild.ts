@@ -542,7 +542,8 @@ async function main() {
   );
   {
     // An owed change to a person the service holds is sent unless the service carries it: its copy says the same,
-    // or was written at or after the change; an add the service holds is the service's (durable.ts, H7-01).
+    // or holds a change made at or after this one (the service keeps a change's own time, guild.py `_change_time`);
+    // a copy held as an add alone carries no change; an add the service holds is the service's (H7-01).
     const annThere = server7.people.find((x) => x.id === 'p-ann')!;
     const peopleThere = server7.people;
     const syncAnn = async (ann: GuildPerson) => {
@@ -562,6 +563,9 @@ async function main() {
     server7.people = peopleThere.map((x) => (x.id === 'p-ann' ? { ...x, title: 'Senior', updatedBy: 'p-lead', updatedAt: '2026-10-10T10:00:00Z' } : x));
     check('an owed change made after the change the service holds is sent', await syncAnn(changed('Principal', '2026-10-10T10:05:00Z')), posts7);
     check('an owed add of a person the service already holds is not sent again', !(await syncAnn(changed('Other', null, null))), posts7);
+    // The service holds the person as an add alone, which arrived after the change was made: the change follows the add.
+    server7.people = peopleThere.map((x) => (x.id === 'p-ann' ? { ...x, title: 'First', updatedBy: null, updatedAt: null, addedAt: '2026-10-12T00:00:00Z' } : x));
+    check('an owed change to a person the service holds as an add alone is sent', await syncAnn(changed('Senior', '2026-10-10T00:00:00Z')), posts7);
     server7.people = peopleThere;
   }
 
