@@ -91,7 +91,7 @@ import { fmt } from '../src/engine/units';
 import { interpolate } from '../src/engine/interp';
 import { awaitingReadBack, correctedBy, correctionOf } from '../src/engine/readings';
 import { lockIntact, runbookLockHash } from '../src/engine/lock';
-import { assumptionOfOverride, projectStateOf, snapshotOf, useStore } from '../src/store';
+import { assumptionOfOverride, byMakers, projectStateOf, snapshotOf, useStore } from '../src/store';
 import {
   EMPTY_SNAPSHOT,
   decisionKey,
@@ -107,7 +107,7 @@ import {
   type DurableSnapshot,
   type GuildOwed,
 } from '../src/lib/durable';
-import type { Guild, GuildWithdrawal } from '../src/lib/guild';
+import type { Guild, GuildPerson, GuildWithdrawal } from '../src/lib/guild';
 
 let fails = 0;
 const check = (label: string, ok: boolean, extra = '') => {
@@ -352,6 +352,22 @@ const three = [e('sc-1', { id: 'sc-1' }), e('sc-2', null, 'q'), e('sc-3', { id: 
       JSON.stringify([byTime.reviewerName, byTime.guildOwed?.p?.actingId, byTime.savedAt]));
     const closedLate = { ...closedEarly, savedAt: at(9), reviewerName: 'Cy' } as DurableSnapshot;
     check('a closed tab’s later reviewer stands', foldParting(savedSince, [partingOf(closedLate, emptyHeld())])!.reviewerName === 'Cy');
+    // A later save by a tab in another project carries this project's block as it was; the closed tab's newer choice
+    // in its own project stands.
+    const inY = (actingId: string, when: string): GuildOwed => ({ ...owingOf([]), actingId, at: when });
+    const closedInY = { ...snap([]), savedAt: at(2), guildOwed: { y: inY('p-two', at(2)) } } as DurableSnapshot;
+    const laterInX = { ...snap([]), savedAt: at(3), guildOwed: { y: inY('p-one', at(1)), x: inY('p-x', at(3)) } } as DurableSnapshot;
+    const perProject = foldParting(laterInX, [partingOf(closedInY, emptyHeld())])!;
+    check('a closed tab’s newer choice of who it acts as in its project stands over that project’s older block',
+      perProject.guildOwed?.y?.actingId === 'p-two' && perProject.guildOwed?.x?.actingId === 'p-x',
+      JSON.stringify([perProject.guildOwed?.y?.actingId, perProject.guildOwed?.x?.actingId]));
+  }
+  {
+    // A person goes after the people who added and changed them, so a lead added offline is on the ledger first.
+    const person = (id: string, addedBy: string | null, updatedBy: string | null = null) => ({ id, addedBy, updatedBy }) as unknown as GuildPerson;
+    const order = byMakers([person('p-ann', 'p-lead', 'p-lead2'), person('p-lead2', 'p-lead'), person('p-lead', null), person('p-bo', 'p-lead')]);
+    check('people are sent after the people who added and changed them',
+      JSON.stringify(order.map((p) => p.id)) === '["p-lead","p-lead2","p-ann","p-bo"]', JSON.stringify(order.map((p) => p.id)));
   }
 
   const ledger = (people: [string, string][], evidence: string[]) =>

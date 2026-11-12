@@ -79,11 +79,15 @@ A Guild write with no project open is refused in words. A person's owed write is
 change, so a later change of one person is another write; of two tabs' owed changes of one person the later stands.
 The service keeps a change's own time, as the page stamped it, when that time runs no more than five minutes ahead of
 its clock (`guild.py`, `_change_time`), and a person added and changed while the service was away, who arrives as one
-add carrying the change, keeps the change's maker and time. Of two changes of one person the service keeps the later,
-whichever arrives last: a change made before the one it holds leaves the ledger as it is. `syncGuild` sends an owed
-change unless the service's copy says the same or holds a change made at or after it; a copy held as an add alone
-carries no change, so the change is sent. A withdrawal the service already shows is not sent again. When the ledger
-cannot be read again after a sync, the page shows each person and entry as the service answered its post.
+add carrying the change, keeps the change's maker and time when its maker is a lead the ledger holds by then;
+`syncGuild` sends each person after the people who added and changed them (`byMakers`), so a lead added offline is
+held first. The ledger's first person stays active: an offline change that leaves them inactive would leave no lead to
+add anyone, and is not taken. Of two changes of one person the service keeps the later, whichever arrives last: a
+change made before the one it holds leaves the ledger as it is. `syncGuild` sends an owed change unless the service's
+copy says the same or holds a change made at or after it; a copy held as an add alone carries no change, so the change
+is sent. A withdrawal the service already shows is not sent again. When the ledger cannot be read again after a sync,
+the page shows each person and entry as the service answered its post. A run the service refuses goes as a deviation,
+and a deviation the service went away before taking is owed in the run's place.
 
 A review decision carries the project it was made in, and the snapshot keys it by its project and its record
 (`decisionKey`), since a record id is made from a paper and its words and one paper may be held by two projects: each
@@ -103,8 +107,9 @@ reloads, so the choice lands whether or not this browser can remember it (site d
 stays from (a run is going) leaves the page in its project, its address with it, and a project made there joins the
 page's list once the address is the page's own again. A project an address names that the page's list leaves out is
 looked for once more on the service (one made since in another tab opens); a project the service does not hold opens
-nothing, and the page says so and stays in its own; a list the service does not answer leaves the address to say, and
-the page opens the project it names, as a load of the address does.
+nothing, and the page says so and stays in its own, as it does when that second read goes unanswered. A page whose
+list the service has never answered since it loaded leaves the address to say: it opens the project the address names,
+as a load of the address does, and remembers nothing a list has not confirmed.
 
 The read and the write of a save run in one IndexedDB transaction, so two tabs' saves take turns; a stored value this
 browser cannot read back is written over by the saving tab's snapshot. A page that is closing or reloading runs no
@@ -112,17 +117,19 @@ event after its own, so its save (`pagehide`) cannot read first: it writes the t
 it has held under a key of its own (`parting:` and the tab's id), which no other tab writes, and commits the
 transaction at once (`flushDurable`); a tab whose last save has landed leaves nothing. The next page to load folds
 every such record into the snapshot, oldest first, and deletes it (`foldParting`, in `loadDurable`'s one transaction):
-the owed writes as the tab's own save would have merged them, and what a save takes whole (who is reviewing, the
-person acted as in each project, the rows kept before alpha 2.0) from whichever of the snapshot and the record was
-saved later. The page takes the fold as its own once that transaction has committed; one that rolled back leaves the
-page the snapshot as stored, and the records for the next load. A tab that lives on deletes its own record on its next
-save. Clearing this browser's data clears them too. In Chromium a write placed at `pagehide` and left to commit on its
-own did not land before the page went; committed at once, it does.
+the owed writes as the tab's own save would have merged them, and what a save takes whole from whichever of the
+snapshot and the record was saved later: who is reviewing and the rows kept before alpha 2.0 by the save's time, the
+person acted as in a project by the time that project's block was written (each block carries its own). The page takes
+the fold as its own once that transaction has committed; one that rolled back leaves the page the snapshot as stored,
+and the records for the next load. A tab that lives on deletes its own record on its next save. Clearing this
+browser's data clears them too. In Chromium a write placed at `pagehide` and left to commit on its own did not land
+before the page went; committed at once, it does.
 
 A page that writes a row while a flush to the service is out replaces the row's unsent write, so the page owes the row
 once. A flush whose every write the service refused goes round again for what was made while it ran. Clearing this
 browser's data ends a flush, a Guild sync or a decision sync still running: what it had not sent by then is not sent,
-and nothing it took is put back.
+and nothing it took is put back. A Guild row still owed leaves the page's ledger at the clear, and a sync the clear
+stopped reads the ledger again.
 
 A page that loads takes the whole outbox and the open project's Guild block at once, beside the tab that queued them,
 and both may send a write. A row the service keeps whole takes it twice to the same end, and a second lock, a second

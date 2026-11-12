@@ -3872,3 +3872,25 @@ On `claude/alpha-2-2-fixes`, cut from `claude/alpha-2-2-bughunt` at `fa8db4a`, i
   - Checks: `pnpm typecheck`, `pnpm build`, the reproduction twice (`RESULT: NO-DEFECT`), `check:state`, `check:guild`,
     `check:plan`, `check:figures`, `test:reconcile`, `gen:components --check`, `pnpm smoke` (20 screens) and
     `pnpm prove --steps 9` (55 checks) pass; `pnpm test:core` 3072 passed, 1 skipped, 175 deselected (6 min 5 s).
+- The sixth review of the H7-01 fix (e313119): three readers (Durable, the open project, Guild and decisions), a
+  verifier per claim; 7 claims, 7 confirmed, four new with e313119 and three older.
+  - New with e313119, and fixed: the fold took a later save's acting person for every project, so a closed tab's
+    newer choice in its own project gave way to an older block another project's tab only carried (each project's
+    block carries its own time, and the later block's person stands); a page whose list went unanswered remembered
+    the address's project although no list confirmed it (it opens the address and remembers nothing); a clear while
+    a Guild sync's posts were out left the never-sent rows shown, open to being sent by a later edit (they leave the
+    page's ledger, and the stopped sync reads the ledger again); and ADR-014 said a page holding a list opens an
+    address whose second read goes unanswered (it says so and stays, as the note now reads).
+  - Older than e313119, and fixed: a first lead who left themself inactive offline left a ledger no one could add to
+    (the first person stays active); a deviation the service went away before taking was lost with the refused run
+    (it is owed in the run's place); and an add whose change was made by a lead added in the same sync lost the
+    change's time (each person is sent after the people who added and changed them, `byMakers`).
+  - Records: ADR-014's note follows. `test_guild.py` holds the first lead kept active; `check:state` the fold by
+    project and `byMakers`; `check:guild` a deviation owed and a clear during a sync (three of these fail on
+    e313119's lines). `check:guild`'s stand-ins answer the project rows with a 503: a reset reads them, and the
+    stand-in had answered with the Guild ledger, an unhandled rejection a later wait brought out.
+  - Checked in Chromium over the built app: the walk holds again, and a page whose list stays unanswered opens the
+    address and remembers nothing.
+  - Checks: `pnpm typecheck`, `pnpm build`, the reproduction twice (`RESULT: NO-DEFECT`), `check:state`, `check:guild`,
+    `check:plan`, `check:figures`, `test:reconcile`, `gen:components --check`, `pnpm smoke` (20 screens) and
+    `pnpm prove --steps 9` (55 checks) pass; `pnpm test:core` 3073 passed, 1 skipped, 175 deselected (5 min 52 s).

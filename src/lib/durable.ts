@@ -192,6 +192,8 @@ export interface GuildOwed {
   pending: string[];
   withdrawals: GuildWithdrawal[];
   actingId: string | null;
+  /** When the block was written, ISO; absent from a block saved before this was kept. */
+  at?: string;
 }
 
 /**
@@ -555,17 +557,22 @@ export function foldParting(main: DurableSnapshot | null, parting: Parting[]): D
       legacyGuild: p.held.legacyGuild,
     };
     const merged = mergeSnapshot(p.snapshot, folded, h);
-    folded = folded && folded.savedAt > p.snapshot.savedAt ? owedOver(folded, merged) : merged;
+    folded = folded && folded.savedAt > p.snapshot.savedAt ? owedOver(folded, merged, p.snapshot) : merged;
   }
   return folded;
 }
 
-/** `later` whole, with the owed writes of `merged` laid in, each Guild block keeping `later`'s acting person. */
-function owedOver(later: DurableSnapshot, merged: DurableSnapshot): DurableSnapshot {
+/**
+ * `later` whole, with the owed writes of `merged` laid in; each project's acting person is that of whichever of
+ * `later` and `earlier` wrote the project's block later (a save writes the open project's block alone).
+ */
+function owedOver(later: DurableSnapshot, merged: DurableSnapshot, earlier: DurableSnapshot): DurableSnapshot {
   const guildOwed: Record<string, GuildOwed> = {};
   for (const [project, block] of Object.entries(merged.guildOwed ?? {})) {
     const there = later.guildOwed?.[project];
-    guildOwed[project] = there ? { ...block, actingId: there.actingId } : block;
+    const mine = earlier.guildOwed?.[project];
+    const laterThere = there && (!mine || (there.at ?? later.savedAt) > (mine.at ?? earlier.savedAt));
+    guildOwed[project] = laterThere ? { ...block, actingId: there.actingId, at: there.at } : block;
   }
   const { guild: _legacy, ...rest } = later;
   return {

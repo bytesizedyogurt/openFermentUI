@@ -686,7 +686,7 @@ interface OFState {
    */
   loadProjects: () => Promise<void>;
   /** Open another project. The page reloads, so nothing of the last one is left showing. */
-  openProject: (id: string) => void;
+  openProject: (id: string, opts?: { remember?: boolean }) => void;
   /** Make a project, signed with the reviewer name, and open it. */
   createProject: (asked: { name: string; description?: string }) => Promise<Project>;
   /**
@@ -1046,11 +1046,11 @@ export const useStore = create<OFState>()((set, get) => ({
     if (listed) set({ projects: listed, projectsProblem: null });
   },
 
-  openProject: (id) => {
+  openProject: (id, opts) => {
     // The page keeps the project it has open, and every request names it, until it reloads. The address names the
     // project a page loads in (lib/project.ts), so the choice is written there, and remembered for an address that
-    // names none.
-    rememberProject(id);
+    // names none; a project no list has confirmed (the service not answering) is opened by its address alone.
+    if (opts?.remember !== false) rememberProject(id);
     const there = addressedProject() === id ? null : projectAddress(id);
     if (id === get().projectId) {
       if (there) window.location.replace(there);
@@ -3246,12 +3246,14 @@ export const useStore = create<OFState>()((set, get) => ({
   syncGuild: async () => {
     if (guildSyncing) return;
     guildSyncing = true;
+    let stoppedByClear = false;
     try {
       if (!get().serviceUp) return;
       const server = await loadGuild();
       if (!server) return;
       const s = get();
-      // A clear of this browser's data while the sync runs ends it: nothing more is sent, and nothing laid in.
+      // A clear of this browser's data while the sync runs ends it: nothing more is sent, and nothing laid in; the
+      // ledger is read again once this sync has let go (below).
       const epoch = stateEpoch;
       const pending = new Set(s.guildPending);
       // Already on the service: stored, with the answer lost on the way back.
@@ -3267,7 +3269,10 @@ export const useStore = create<OFState>()((set, get) => ({
         onRefused?: (e: GuildRefused) => Promise<void>,
         kind: 'person' | 'evidence' = 'evidence',
       ): Promise<boolean> => {
-        if (epoch !== stateEpoch) return false;
+        if (epoch !== stateEpoch) {
+          stoppedByClear = true;
+          return false;
+        }
         try {
           const answer = await post();
           if (kind === 'person') answeredPeople.set(answer.id, answer as GuildPerson);
@@ -3300,7 +3305,12 @@ export const useStore = create<OFState>()((set, get) => ({
           raw: `${e.raw}; refused as ${e.kind === 'independent' ? 'a run alone' : 'a cosigned run'} (${r.why}), so it stands as a deviation`,
           recordedAt: null,
         };
-        await attempt(`deviation on ${e.skillId}`, () => postEvidence(deviation));
+        if (await attempt(`deviation on ${e.skillId}`, () => postEvidence(deviation))) return;
+        // The service went away before it took the deviation: the deviation is owed in the run's place.
+        set((x) => ({
+          guild: { ...x.guild, evidence: [...x.guild.evidence.filter((y) => y.id !== e.id), deviation] },
+          guildPending: [...x.guildPending.filter((id) => id !== e.id), deviation.id],
+        }));
       };
       // A change to a person the service already holds is sent unless the service carries it already: its copy
       // says the same, or it holds a change made at or after this one (the service keeps a change's own time,
@@ -3318,8 +3328,9 @@ export const useStore = create<OFState>()((set, get) => ({
       };
       // A withdrawal of an entry the service shows withdrawn is the service's already.
       const withdrawnThere = new Set(server.evidence.filter((e) => e.withdrawnAt).map((e) => e.id));
-      // People first, then entries, then withdrawals: each may name the one before.
-      for (const p of s.guild.people)
+      // People first, then entries, then withdrawals: each may name the one before. A person goes after the people
+      // who added and changed them, so a lead added offline is on the ledger before the change they made.
+      for (const p of byMakers(s.guild.people))
         if (pending.has(p.id) && !carried(p) && !(await attempt(p.name, () => postPerson(p), undefined, 'person'))) return;
       for (const e of s.guild.evidence)
         if (pending.has(e.id) && !stored.has(e.id) && !(await attempt(`${e.kind} on ${e.skillId}`, () => postEvidence(e), asDeviation(e))))
@@ -3329,7 +3340,10 @@ export const useStore = create<OFState>()((set, get) => ({
       // Read again only when this sync sent something: with nothing posted the first read is the ledger. A read
       // again that fails takes the first read with each post's answer laid in, the ledger as the service keeps it.
       const reread = posted > 0 ? await loadGuild() : null;
-      if (epoch !== stateEpoch) return;
+      if (epoch !== stateEpoch) {
+        stoppedByClear = true;
+        return;
+      }
       const laid = <T extends { id: string }>(rows: T[], answered: Map<string, T>) => [
         ...rows.map((r) => answered.get(r.id) ?? r),
         ...[...answered.values()].filter((a) => !rows.some((r) => r.id === a.id)),
@@ -3369,6 +3383,8 @@ export const useStore = create<OFState>()((set, get) => ({
         get().toast({ text: `The service refused ${refused.length} Guild change${refused.length === 1 ? '' : 's'} made offline: ${refused[0]}`, kind: 'error' });
     } finally {
       guildSyncing = false;
+      // Stopped by a clear: the ledger is read again, so the page shows the service's ledger alone.
+      if (stoppedByClear) void get().syncGuild();
     }
   },
 
@@ -3410,9 +3426,14 @@ export const useStore = create<OFState>()((set, get) => ({
     unreadCandidates.clear();
     if (overlay) get().applyOverlay(overlay);
     // Guild's ledger is the service's when there is one, and survives a reset
-    // the way the overlay does; what was only ever in this browser goes.
+    // the way the overlay does; what was only ever in this browser goes: a row
+    // still owed leaves the page's ledger until the sync below reads it again.
+    const owed = new Set(get().guildPending);
+    const known = get().guild;
     set({
-      guild: serviceUp ? get().guild : EMPTY_GUILD,
+      guild: serviceUp
+        ? { ...known, people: known.people.filter((x) => !owed.has(x.id)), evidence: known.evidence.filter((x) => !owed.has(x.id)) }
+        : EMPTY_GUILD,
       guildPending: [],
       guildPendingWithdrawals: [],
       guildActingId: serviceUp ? get().guildActingId : null,
@@ -3605,6 +3626,28 @@ function overridesOfSnapshot(snap: Pick<DurableSnapshot, 'parameterOverrides' | 
   return out;
 }
 
+/**
+ * People in an order that puts each after the people who added and changed them (a lead added offline goes before
+ * the change they made, so the service holds them as a lead by then); the rest keep their order.
+ */
+export function byMakers(people: GuildPerson[]): GuildPerson[] {
+  const byId = new Map(people.map((p) => [p.id, p]));
+  const placed = new Set<string>();
+  const out: GuildPerson[] = [];
+  const visit = (p: GuildPerson, seen: Set<string>) => {
+    if (placed.has(p.id) || seen.has(p.id)) return;
+    seen.add(p.id);
+    for (const maker of [p.addedBy, p.updatedBy]) {
+      const q = maker ? byId.get(maker) : undefined;
+      if (q && q.id !== p.id) visit(q, seen);
+    }
+    placed.add(p.id);
+    out.push(p);
+  };
+  for (const p of people) visit(p, new Set());
+  return out;
+}
+
 /** What this page saves to Durable, as the store holds it now (exported for `check:state`). */
 export function snapshotOf(s: OFState): DurableSnapshot {
   const reviewDecisions: DurableSnapshot['reviewDecisions'] = {};
@@ -3636,9 +3679,10 @@ export function snapshotOf(s: OFState): DurableSnapshot {
   }
   const owed = new Set(s.guildPending);
   const legacy = s.stateLegacy;
+  const savedAt = new Date().toISOString();
   return {
     ...EMPTY_SNAPSHOT,
-    savedAt: new Date().toISOString(),
+    savedAt,
     reviewDecisions,
     reviewerName: s.reviewer,
     // Guild's owed writes in the open project, by its id: another project's block stays as stored (mergeSnapshot).
@@ -3650,6 +3694,8 @@ export function snapshotOf(s: OFState): DurableSnapshot {
             pending: s.guildPending,
             withdrawals: s.guildPendingWithdrawals,
             actingId: s.guildActingId,
+            // When this project's block was written: what a save takes whole of it is the later block's (foldParting).
+            at: savedAt,
           },
         }
       : {},

@@ -251,6 +251,8 @@ async function main() {
   (globalThis as any).fetch = async (url: string, init?: { body: string }) => {
     const reply = (status: number, body: unknown) =>
       ({ ok: status === 200, status, json: async () => body }) as Response;
+    // The project's rows are no part of these checks (the reset below reads them again).
+    if (!init?.body && url.startsWith('/api/state')) return reply(503, { detail: 'the project rows are not served in this check' });
     if (!init?.body) return reply(200, server);
     const body = JSON.parse(init.body);
     posted.push(url.replace('/api/guild/', '') + ':' + (body.id ?? body.evidenceId));
@@ -471,9 +473,13 @@ async function main() {
   let duringSync: (() => void) | null = null;
   // Reads of the ledger the service answers before it stops answering them; null: every read is answered.
   let readsLeft: number | null = null;
+  // The service goes away as a deviation is posted.
+  let dropOnDeviation = false;
   (globalThis as any).fetch = async (url: string, init?: { body: string }) => {
     const reply = (status: number, body: unknown) => ({ ok: status === 200, status, json: async () => body }) as Response;
     if (!init?.body) {
+      // The project's rows are no part of these checks (a clear reads them again).
+      if (url.startsWith('/api/state')) return reply(503, { detail: 'the project rows are not served in this check' });
       if (readsLeft !== null && readsLeft-- <= 0) throw new TypeError('fetch failed');
       return reply(200, server7);
     }
@@ -484,6 +490,7 @@ async function main() {
       duringSync = null;
     }
     if (url.endsWith('/evidence')) {
+      if (dropOnDeviation && body.kind === 'deviation') throw new TypeError('fetch failed');
       if (body.kind === 'independent' || (body.kind === 'supervised' && body.source?.kind === 'deposition'))
         return reply(422, { detail: 'authority: the service knows of a failed check this browser has not seen' });
       const kept = { ...body, recordedAt: '2026-10-09T12:00:00Z' };
@@ -579,6 +586,43 @@ async function main() {
     readsLeft = null;
     check('a ledger read again that fails shows each person as the service answered the post',
       s().guild.people.find((x) => x.id === 'p-ann')?.title === 'Chief', s().guild.people.find((x) => x.id === 'p-ann')?.title);
+  }
+  {
+    // A run alone the service refuses goes as a deviation; the service goes away as the deviation is posted: the
+    // deviation is owed in the run's place, and sent once the service answers.
+    reset7({ guildActingId: 'p-ann' });
+    const run = s().startRun('PR-OD-01', '1.0', 1);
+    await s().recordStepForGuild(run, 'o4');
+    const alone = lastEntry()!;
+    useStore.setState({ serviceUp: true });
+    dropOnDeviation = true;
+    posts7.length = 0;
+    await s().syncGuild();
+    dropOnDeviation = false;
+    const owedNow = s().guild.evidence.filter((e) => s().guildPending.includes(e.id));
+    check('a deviation the service went away before taking is owed in the refused run’s place',
+      owedNow.some((e) => e.kind === 'deviation' && e.source.stepId === 'o4') && !s().guildPending.includes(alone.id),
+      owedNow.map((e) => [e.kind, e.id]));
+    useStore.setState({ serviceUp: true });
+    posts7.length = 0;
+    await s().syncGuild();
+    check('and it is sent once the service answers, the refused run once',
+      posts7.some((x) => x.startsWith('evidence:deviation:')) && !posts7.some((x) => x.endsWith(`:${alone.id}`)), posts7);
+  }
+  {
+    // Cleared while a sync's posts are out: what was never sent is neither shown nor sent.
+    reset7({ serviceUp: true, guildPending: [] });
+    const neverSent = (id: string, name: string) => ({ ...R_PEOPLE[1], id, name, addedBy: 'p-lead', updatedBy: null, updatedAt: null }) as GuildPerson;
+    useStore.setState((x) => ({ guild: { ...x.guild, people: [...x.guild.people, neverSent('p-new-a', 'New A'), neverSent('p-new-b', 'New B')] },
+      guildPending: ['p-new-a', 'p-new-b'] }));
+    duringSync = () => s().clearBrowserData();
+    posts7.length = 0;
+    await s().syncGuild();
+    // What the clear set going (its read of the project rows, the sync read again) settles against this stand-in.
+    await new Promise((r) => setTimeout(r, 100));
+    check('a clear while a sync runs sends nothing more and shows none of the rows it never sent',
+      !posts7.some((x) => x.endsWith(':p-new-b')) && !s().guild.people.some((x) => x.id === 'p-new-b') && s().guildPending.length === 0,
+      JSON.stringify([posts7, s().guild.people.map((x) => x.id)]));
   }
 
 

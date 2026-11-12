@@ -160,7 +160,7 @@ function Screen() {
       void loadProjects().finally(() => setReadFor(asked));
       return;
     }
-    if (projects === null) openProject(route.project);
+    if (projects === null) openProject(route.project, { remember: false });
   }, [elsewhere, listed, projects, projectsProblem, route.project, readFor, openProject, loadProjects]);
 
   // §8 — an old path lands on the new screen rather than the not-found page.

@@ -381,6 +381,10 @@ async def _write_person(project_id: str, person: GuildPerson, dry_run: bool) -> 
                 "updatedBy": changed_by,
                 "updatedAt": _change_time(person.updatedAt) if changed_by else None,
             })
+            if not ledger.people and not person.active:
+                # The ledger's first person is its lead, and a change made offline that leaves them inactive would
+                # leave the ledger with no active lead and no way to add one: as online, that change is not taken.
+                stored = stored.model_copy(update={"active": True, "updatedBy": None, "updatedAt": None})
         else:
             if not _active_lead(ledger, person.updatedBy):
                 raise GuildRefused("added", f"{person.updatedBy!r} is not an active lead; only a lead changes a person")

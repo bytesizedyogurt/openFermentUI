@@ -140,6 +140,15 @@ def test_an_add_that_carries_a_change_keeps_the_change_and_its_time():
     assert by_member.updatedBy is None and by_member.updatedAt is None
 
 
+def test_the_first_lead_added_with_an_offline_change_to_inactive_stays_active():
+    """A first lead who left themself inactive while the service was away would
+    leave the ledger with no lead who can add anyone: the add stands, active."""
+    stored = guild.write_person(person("p-sean", "Sean Creighton", role="lead", added_by=None, active=False,
+                                       updatedBy="p-sean", updatedAt="2026-06-02T09:00:00.000Z"))
+    assert stored.active is True and stored.updatedBy is None
+    guild.write_person(person("p-eric", "Eric Habimana"))
+
+
 def test_a_change_made_before_the_one_the_ledger_holds_leaves_it_as_it_is():
     """Two pages sync at once, each owing a change of one person: the change
     made later stands whichever arrives last (H7-01)."""
