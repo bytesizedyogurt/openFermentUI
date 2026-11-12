@@ -74,6 +74,7 @@ import {
   enqueue,
   flush,
   loadProjectState,
+  rowKey,
   type OutboxEntry,
   type ProjectRows,
   type ProjectState,
@@ -1207,12 +1208,49 @@ export const useStore = create<OFState>()((set, get) => ({
         const pending = get().stateOutbox;
         if (!pending.length) return;
         const epoch = stateEpoch;
-        const { left, sent, refused } = await flush(pending, () => epoch === stateEpoch);
+        const { left, sent, refused, kept } = await flush(pending, () => epoch === stateEpoch);
         // The browser's data was cleared while the flush ran: the flush sent nothing after the clear, what it had not
         // sent went with the browser's data, and what was made since is sent from the top.
         if (epoch !== stateEpoch) continue;
-        // A change made while the flush ran replaces its row's last unsent write, the one the page's view stood on.
-        set((s) => ({ stateOutbox: enqueue(left, s.stateOutbox.filter((e) => !pending.includes(e))) }));
+        set((s) => {
+          // A change made while the flush ran replaces its row's last unsent write, the one the page's view stood on.
+          // A scope's overrides changed while their write was out stood on that write, which the service kept: the
+          // change stands on the rows the write sent (bug hunt H7-04).
+          const answered = new Map(kept.map((k) => [rowKey(k.entry), k]));
+          const made = s.stateOutbox
+            .filter((e) => !pending.includes(e))
+            .map((e) => {
+              const was = answered.get(rowKey(e));
+              return was && e.kind === 'overrides' && e.value !== null ? { ...e, base: was.entry.value ?? [] } : e;
+            });
+          // The scope as the service answered it, another page's keys among them, where the page's view still stands
+          // on the write it sent: the page shows it, and its next change stands on it.
+          const madeRows = new Set(made.map(rowKey));
+          let parameterOverrides = s.parameterOverrides;
+          let seen = s.stateSeen?.overrides ?? {};
+          for (const { entry, value } of answered.values()) {
+            if (entry.kind !== 'overrides' || entry.value === null || entry.project !== s.projectId || !Array.isArray(value)) continue;
+            if (madeRows.has(rowKey(entry)) || parameterOverrides[entry.id] !== entry.value || seen[entry.id] !== entry.value) continue;
+            parameterOverrides = { ...parameterOverrides, [entry.id]: value as Override[] };
+            seen = { ...seen, [entry.id]: value as Override[] };
+          }
+          const laid = parameterOverrides !== s.parameterOverrides && s.stateSeen !== null;
+          return {
+            stateOutbox: enqueue(left, made),
+            ...(laid && s.stateSeen
+              ? {
+                  parameterOverrides,
+                  proformaAssumptions: assumptionsFromOverrides(parameterOverrides),
+                  stateSeen: { ...s.stateSeen, overrides: seen },
+                }
+              : {}),
+          };
+        });
+        // A scope's overrides refused (another page changed a key this page changed too): the page reads the
+        // project's overrides again, so it shows each scope as the service keeps it.
+        const project = get().projectId;
+        if (project && refused.some(({ entry }) => entry.kind === 'overrides' && entry.project === project))
+          void rereadOverrides(project);
         for (const { entry, why } of refused)
           get().logActivity({
             at: stamp(),
@@ -3774,6 +3812,32 @@ function owedLedger(ledger: Guild, owed: Guild | undefined): Guild {
 }
 
 let stateFlushing = false;
+
+/**
+ * Read the open project's overrides again once the service refused a write of a scope's overrides (bug hunt H7-04):
+ * the page shows each scope as the service keeps it, what this browser still owes laid over it, and the next change
+ * stands on that. What was read is laid while the same project stays open; a read that fails is said in words.
+ */
+async function rereadOverrides(project: string): Promise<void> {
+  let held: ProjectState;
+  try {
+    held = await loadProjectState();
+  } catch (e) {
+    useStore.getState().logActivity({
+      at: stamp(),
+      icon: 'alert',
+      text: `This page could not read the project's overrides again after the service refused a change, so it shows the change until the project loads again: ${e instanceof Error ? e.message : String(e)}`,
+      href: '#/',
+      provenance: 'user',
+    });
+    return;
+  }
+  useStore.setState((s) => {
+    if (s.projectId !== project || !s.stateSeen) return {};
+    const overrides = applyEntries(held, s.stateOutbox.filter((e) => e.project === project)).overrides;
+    return { parameterOverrides: overrides, proformaAssumptions: assumptionsFromOverrides(overrides), stateSeen: { ...s.stateSeen, overrides } };
+  });
+}
 /** Bumped when the browser's data is cleared, so a flush out at the time puts back nothing it took. */
 let stateEpoch = 0;
 /** The page's first read of the project list, which settles the project it acts in (`loadProjects`). */

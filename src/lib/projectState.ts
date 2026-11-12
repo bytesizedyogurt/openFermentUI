@@ -24,6 +24,12 @@ type StateKind = Exclude<keyof ProjectState, 'depositedBy' | 'refused'>;
 /** A row the service keeps that does not read as its kind, and why; the store says each in words. */
 export type RefusedRow = components['schemas']['RefusedRow'];
 
+/** What a page sends to keep one row (`PUT /api/state/{kind}/{id}`): the row, who, and for a scope's overrides the rows it read. */
+type StateWrite = components['schemas']['StateWrite'];
+
+/** What the service answers a kept row with: the row as the project keeps it now. */
+type StateKept = components['schemas']['StateKept'];
+
 /**
  * Everything a project keeps of its pages (`GET /api/state`), keyed as the page keeps it, each row read as its kind's
  * model and served as kept: the depositions and measured evidence, the runbooks a page adopted or made and those
@@ -60,7 +66,17 @@ export interface OutboxEntry {
   value: unknown;
   by: string;
   at: string;
+  /**
+   * For a scope's overrides, the rows of the scope the page's view stood on when it made this write: the service lays
+   * the write on what it keeps key by key against them, so another page's key stays, and refuses it in words when
+   * another page changed a key this write changes too (bug hunt H7-04). Left out, the write replaces the scope
+   * whole, as a write an older page queued does.
+   */
+  base?: unknown;
 }
+
+/** A row as the outbox names it: one project's one row of one kind. */
+export const rowKey = (e: Pick<OutboxEntry, 'project' | 'kind' | 'id'>) => `${e.project}\u0000${e.kind}\u0000${e.id}`;
 
 export function loadProjectState(signal?: AbortSignal): Promise<ProjectState> {
   return call<ProjectState>('/api/state', { signal });
@@ -91,7 +107,8 @@ const KEPT_WHEN_GONE: ReadonlySet<StateKind> = new Set(['conversations', 'deposi
 /**
  * The writes that take `before` to `after`: every row whose object changed,
  * and every row a person took back. The store replaces what it changes, so a
- * row whose object is the same is the same row.
+ * row whose object is the same is the same row. A scope's overrides carry the
+ * rows the scope held in `before` (`base`), none where it held none.
  */
 export function changes(before: ProjectRows, after: ProjectRows, project: string, by: string): OutboxEntry[] {
   const at = new Date().toISOString();
@@ -99,7 +116,9 @@ export function changes(before: ProjectRows, after: ProjectRows, project: string
   const now = rowsOf(after);
   const out: OutboxEntry[] = [];
   for (const kind of Object.keys(now) as StateKind[]) {
-    for (const [id, value] of now[kind]) if (was[kind].get(id) !== value) out.push({ project, kind, id, value, by, at });
+    for (const [id, value] of now[kind])
+      if (was[kind].get(id) !== value)
+        out.push(kind === 'overrides' ? { project, kind, id, value, by, at, base: was[kind].get(id) ?? [] } : { project, kind, id, value, by, at });
     if (KEPT_WHEN_GONE.has(kind)) continue;
     for (const id of was[kind].keys()) if (!now[kind].has(id)) out.push({ project, kind, id, value: null, by, at });
   }
@@ -140,18 +159,26 @@ export function conversationsHeld(saved: LiveConversation[], current: LiveConver
   return [...current, ...saved.filter((c) => !ids.has(c.id)).reverse()];
 }
 
-/** Add `entries` to `outbox`, a later write of a row replacing an earlier one still unsent. */
+/**
+ * Add `entries` to `outbox`, a later write of a row replacing an earlier one still unsent. The later write of a
+ * scope's overrides stands on what the one it replaces stood on, which the service has not seen changed (`base`).
+ */
 export function enqueue(outbox: OutboxEntry[], entries: OutboxEntry[]): OutboxEntry[] {
-  const key = (e: OutboxEntry) => `${e.project}\u0000${e.kind}\u0000${e.id}`;
-  const later = new Set(entries.map(key));
+  const later = new Set(entries.map(rowKey));
   // The page's row stands on the last queued write of it, which the new write replaces; an earlier write of the
   // row, another tab's that the page took at load, stays for the service to rule on in order (durable.ts).
   const last = new Map<string, number>();
   outbox.forEach((e, i) => {
-    if (later.has(key(e))) last.set(key(e), i);
+    if (later.has(rowKey(e))) last.set(rowKey(e), i);
   });
   const replaced = new Set(last.values());
-  return [...outbox.filter((_, i) => !replaced.has(i)), ...entries];
+  const added = entries.map((e) => {
+    const i = last.get(rowKey(e));
+    if (i === undefined || e.kind !== 'overrides' || e.value === null) return e;
+    const { base: _stood, ...rest } = e;
+    return 'base' in outbox[i] ? { ...rest, base: outbox[i].base } : rest;
+  });
+  return [...outbox.filter((_, i) => !replaced.has(i)), ...added];
 }
 
 interface Flushed {
@@ -160,6 +187,11 @@ interface Flushed {
   sent: number;
   /** Writes the service answered with a refusal, in its words; they are dropped. */
   refused: { entry: OutboxEntry; why: string }[];
+  /**
+   * The writes the service kept, in order, each with the row as it answered it: a scope's overrides as the scope
+   * holds once the write was laid on, another page's keys among them; a take-back answers null.
+   */
+  kept: { entry: OutboxEntry; value: unknown }[];
 }
 
 /**
@@ -171,29 +203,35 @@ interface Flushed {
  */
 export async function flush(outbox: OutboxEntry[], still: () => boolean = () => true): Promise<Flushed> {
   const refused: Flushed['refused'] = [];
+  const kept: Flushed['kept'] = [];
   let sent = 0;
   for (let i = 0; i < outbox.length; i++) {
-    if (!still()) return { left: outbox.slice(i), sent, refused };
+    if (!still()) return { left: outbox.slice(i), sent, refused, kept };
     const e = outbox[i];
     const path = `/api/state/${encodeURIComponent(e.kind)}/${encodeURIComponent(e.id)}`;
     const headers = { 'X-OpenFerment-Project': e.project };
     try {
-      if (e.value === null) await call(`${path}?by=${encodeURIComponent(e.by)}`, { method: 'DELETE', headers });
-      else
-        await call(path, {
+      if (e.value === null) {
+        await call(`${path}?by=${encodeURIComponent(e.by)}`, { method: 'DELETE', headers });
+        kept.push({ entry: e, value: null });
+      } else {
+        const write: StateWrite = { by: e.by, value: e.value, ...(e.base !== undefined ? { base: e.base } : {}) };
+        const answer = await call<StateKept>(path, {
           method: 'PUT',
           headers: { ...headers, 'Content-Type': 'application/json' },
-          body: JSON.stringify({ by: e.by, value: e.value }),
+          body: JSON.stringify(write),
         });
+        kept.push({ entry: e, value: answer?.value ?? e.value });
+      }
       sent += 1;
     } catch (err) {
       if (err instanceof ServiceRefused && err.status !== 503) {
         refused.push({ entry: e, why: err.message });
         continue;
       }
-      if (err instanceof ServiceDown || err instanceof ServiceRefused) return { left: outbox.slice(i), sent, refused };
+      if (err instanceof ServiceDown || err instanceof ServiceRefused) return { left: outbox.slice(i), sent, refused, kept };
       throw err;
     }
   }
-  return { left: [], sent, refused };
+  return { left: [], sent, refused, kept };
 }

@@ -44,6 +44,16 @@ times. Every other change is refused in words.
 
 A Live conversation is Postdoc's own record (postdoc/conversations.py),
 which a page's write is laid onto.
+
+A scope's overrides are one row a key, and two pages may hold one scope (a
+Proforma scenario's panel open in two tabs). A page's write names the rows it
+read beside the rows it sends (`base`), and the service lays the write on what
+it keeps key by key (`_merged`): a key the page set or took back is changed,
+a key the page left as it read it stays as the service keeps it, another
+page's among them, and a key another page changed since this page read it,
+which this page changed too, refuses the write in words, nothing kept (bug
+hunt H7-04). A write that names no rows replaces the scope whole, as every
+write did before.
 """
 from __future__ import annotations
 
@@ -233,6 +243,10 @@ def _checked(kind: str, item_id: str, value: Any) -> Any:
         if not isinstance(value, list) or not all(isinstance(o, dict) and o.get("scope") == item_id and
                                                   isinstance(o.get("key"), str) and o["key"] for o in value):
             raise StateRefused(f"the overrides of {item_id} are a list, each naming this scope and its key")
+        twice = _named_twice(value)
+        if twice:
+            raise StateRefused(f"the overrides of {item_id} name {', '.join(twice)} more than once; a scope keeps one "
+                               "override a key, so nothing was kept")
         for o in value:
             _reads_as(kind, o, f"the override of {o['key']} in {item_id}")
             if o.get("unit") is not None and not item_id.startswith(OWN_UNIT_SCOPE):
@@ -519,6 +533,82 @@ def run_request(scenario: dict[str, Any], by: str = "") -> Any:
 # ── writes ─────────────────────────────────────────────────────────────
 
 
+def _named_twice(listed: list[dict[str, Any]]) -> list[str]:
+    """The keys a scope's list names more than once, in the order first named."""
+    seen: set[str] = set()
+    twice: list[str] = []
+    for o in listed:
+        if o["key"] in seen and o["key"] not in twice:
+            twice.append(o["key"])
+        seen.add(o["key"])
+    return twice
+
+
+def _read_base(item_id: str, base: Any) -> list[dict[str, Any]]:
+    """The rows of a scope a page's write says it read, each naming the scope
+    and its key once; refused in words when they do not. They are compared
+    with what the service keeps, and never kept themselves."""
+    if not isinstance(base, list) or not all(isinstance(o, dict) and o.get("scope") == item_id and
+                                             isinstance(o.get("key"), str) and o["key"] for o in base):
+        raise StateRefused(f"the overrides this page read of {item_id} are a list, each naming this scope and its "
+                           "key; nothing was kept")
+    if len(json.dumps(base)) > MAX_BYTES:
+        raise StateRefused(f"the overrides this page read of {item_id} are over {MAX_BYTES // 1_000_000} MB; a page "
+                           "sends less")
+    twice = _named_twice(base)
+    if twice:
+        raise StateRefused(f"the overrides this page read of {item_id} name {', '.join(twice)} more than once; "
+                           "nothing was kept")
+    return base
+
+
+def _as_read(o: dict[str, Any] | None) -> dict[str, Any] | None:
+    """An override as a page reads it, to compare two: read as its model, a
+    default filled and a null left out, so `3` and `3.0` are one number, as
+    they are to the page. A row that does not read is one no page was served
+    (`state`), and compares as no row."""
+    if o is None:
+        return None
+    try:
+        return READERS[OVERRIDES][0].validate_python(o).model_dump(mode="json", exclude_none=True)
+    except ValidationError:
+        return None
+
+
+def _merged(item_id: str, kept: list[dict[str, Any]], base: list[dict[str, Any]],
+            value: list[dict[str, Any]]) -> list[dict[str, Any]]:
+    """A scope's overrides once a page's write is laid on what the service
+    keeps (`kept`), key by key against the rows the page read (`base`): a key
+    the page set or took back is changed where the service keeps it as the
+    page read it, or already as the page sends it; a key the page left as it
+    read it stays as kept. A key another page changed since, which this page
+    changed too, refuses the write in words, nothing kept (bug hunt H7-04)."""
+    held = {o["key"]: o for o in kept if isinstance(o, dict) and isinstance(o.get("key"), str)}
+    read = {o["key"]: o for o in base}
+    sent = {o["key"]: o for o in value}
+    out = dict(held)
+    clashes: list[str] = []
+    for key in [*read, *(k for k in sent if k not in read)]:
+        was, now = _as_read(read.get(key)), _as_read(sent.get(key))
+        if was == now:
+            continue
+        there = _as_read(held.get(key))
+        if there == was:
+            if key in sent:
+                out[key] = sent[key]
+            else:
+                out.pop(key, None)
+        elif there != now:
+            o = held.get(key)
+            clashes.append(f"{key} was taken back" if there is None else
+                           f"{key} was kept by {o.get('by') or 'another page'} at {o.get('at') or 'a later time'}")
+    if clashes:
+        raise StateRefused(f"the overrides of {item_id} changed since this page read them: {'; '.join(clashes)}; this "
+                           "page changed the same, so nothing in this write was kept, and the scope as the service "
+                           "keeps it is read again")
+    return list(out.values())
+
+
 async def _held(s: AsyncSession, kind: str, project_id: str, item_id: str) -> bool:
     if kind == LOCKS:
         q = select(t.runbook_locks.c.runbook_id).where(t.runbook_locks.c.project_id == project_id,
@@ -570,7 +660,10 @@ def _readings_chosen(before: list[dict[str, Any]], after: list[dict[str, Any]]) 
     return [o for o in after if o.get("origin") == "measurement" and not same(o)]
 
 
-async def _put(project_id: str, kind: str, item_id: str, value: Any, by: str) -> None:
+async def _put(project_id: str, kind: str, item_id: str, value: Any, by: str,
+               base: list[dict[str, Any]] | None = None) -> Any:
+    """Keep one row; what was kept: a scope's overrides as the scope holds
+    them once the write is laid on (`_merged`), any other row as it was sent."""
     async with db.session() as s:
         # A runbook and its lock are written one at a time, so a row cannot
         # slip in between a lock and the content it froze; a deposition's
@@ -600,9 +693,21 @@ async def _put(project_id: str, kind: str, item_id: str, value: Any, by: str) ->
             ))
         elif kind == OVERRIDES:
             before = (await _overrides(s, project_id, item_id)).get(item_id, []) if existed else []
+            # A write that names the rows it read is laid on what the scope keeps key by key; one that names none
+            # replaces the scope whole.
+            value = value if base is None else _merged(item_id, before, base, value)
             chosen = _readings_chosen(before, value)
-            await s.execute(delete(t.overrides).where(t.overrides.c.project_id == project_id, t.overrides.c.scope == item_id))
+            # Each key is written on its own: a row the write leaves as kept stays, with its maker and its time.
+            held = {o.get("key"): o for o in before}
+            keys = {o["key"] for o in value}
+            for key in [k for k in held if k not in keys]:
+                await s.execute(delete(t.overrides).where(t.overrides.c.project_id == project_id,
+                                                          t.overrides.c.scope == item_id, t.overrides.c.key == key))
             for o in value:
+                if held.get(o["key"]) == o:
+                    continue
+                await s.execute(delete(t.overrides).where(t.overrides.c.project_id == project_id,
+                                                          t.overrides.c.scope == item_id, t.overrides.c.key == o["key"]))
                 await s.execute(insert(t.overrides).values(project_id=project_id, scope=item_id, key=o["key"], body=o,
                                                            created_by=_override_maker(o, by)))
         else:
@@ -628,19 +733,29 @@ async def _put(project_id: str, kind: str, item_id: str, value: Any, by: str) ->
             # is audited.
             await audit.add(project_id, agent="person", who=by, module="runbooks", action="amend_depositions",
                             state="kept", target=item_id)
+    return value
 
 
-def put(kind: str, item_id: str, value: Any, by: str) -> Any:
-    """Keep one row whole, or refuse it in words; what was kept."""
+def put(kind: str, item_id: str, value: Any, by: str, base: Any = None) -> Any:
+    """Keep one row, or refuse it in words; what was kept. A scope's
+    overrides sent with the rows the page read of the scope (`base`) are laid
+    on what the service keeps key by key, and what was kept is the scope as it
+    then holds; every other row is kept whole."""
     checked = _checked(kind, item_id, value)
+    if base is not None and kind != OVERRIDES:
+        raise StateRefused(f"a write names the rows it read for a scope's overrides alone; a {kind} row is kept "
+                           "whole, so nothing was kept")
+    read = _read_base(item_id, base) if base is not None else None
     if kind == CONVERSATIONS:
         try:
             _conversations.merge(checked, by=by)
         except _conversations.ConversationRefused as e:
             raise StateRefused(str(e)) from None
         return checked
-    db.run(_put(projects.current(), kind, item_id, checked, (by or "").strip() or UNNAMED))
-    return checked
+    kept = db.run(_put(projects.current(), kind, item_id, checked, (by or "").strip() or UNNAMED, read))
+    # The scope answered as a load serves it: a row kept before its kind had a model, that does not read, stays kept
+    # and unserved (`state`).
+    return [o for o in kept if _as_read(o) is not None] if kind == OVERRIDES else kept
 
 
 async def _remove(project_id: str, kind: str, item_id: str, by: str) -> None:

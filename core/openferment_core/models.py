@@ -5077,8 +5077,10 @@ class ProjectState(BaseModel):
 
 
 class StateKept(BaseModel):
-    """PUT /api/state/{kind}/{id}: the row the project keeps now, as the page
-    sent it, under its kind and id."""
+    """PUT /api/state/{kind}/{id}: the row the project keeps now, under its
+    kind and id: as the page sent it, or, for a scope's overrides sent with
+    the rows the page read, the scope as it holds once the write was laid on
+    key by key, another page's keys among them (project_state.py)."""
 
     kind: str
     id: str

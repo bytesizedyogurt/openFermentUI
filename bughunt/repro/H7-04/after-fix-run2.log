@@ -1,0 +1,10 @@
+EXPECTED: after tab A types feed_glucose_conc=1.234 and tab B, open on the same scenario, types titre=5.678, the service keeps both overrides of proforma:sc-h7-04-twotabs (store.ts:2391, an override kept by scope and key, one a parameter), or a page says in words that the other tab's override was replaced.
+- the service before either tab types: []
+- the service after tab A typed feed_glucose_conc=1.234: ["feed_glucose_conc=1.234"]
+- the service after tab B typed titre=5.678: ["feed_glucose_conc=1.234","titre=5.678"]
+- tab A after a reload shows feed_glucose_conc: {"value":"1.234 g L-1","overridden":"true"}
+- what each tab sent for the scope: {"A":[["feed_glucose_conc=1.234"]],"B":[["titre=5.678"]]}
+- toasts shown: {"A":[],"B":[]}
+OBSERVED: the service held ['feed_glucose_conc=1.234'] for proforma:sc-h7-04-twotabs after tab A typed feed_glucose_conc=1.234, and ['feed_glucose_conc=1.234', 'titre=5.678'] after tab B typed titre=5.678; tab A sent [['feed_glucose_conc=1.234']], tab B sent [['titre=5.678']].
+OBSERVED: tab B showed feed_glucose_conc as "1.234 g L-1" when it wrote; tab A after a reload shows feed_glucose_conc as "1.234 g L-1" (overridden: true); toasts on tab A: none; toasts on tab B: none.
+RESULT: NO-DEFECT

@@ -137,3 +137,11 @@ withdrawal or a second Guild entry is refused, which the page that sent it secon
 remains: a copy a loading page took, or what a closing tab left, can reach the service after another page's later
 write of the row. `check:state` and `check:guild` hold the merge and the sends, and `bughunt/repro/H7-01/run.sh` holds
 the queue in Chromium.
+
+A write of a scope's overrides names the rows the page's view stood on (`base`), and the service lays it on what it
+keeps key by key (bug hunt H7-04; `docs/api/studies.md`). An owed write the outbox carries keeps the rows its view
+stood on: a later write of the scope that replaces it stands on them too, a write made while the scope's write was out
+stands on what that write sent, and a write an older page queued with none replaces the scope whole, as it was made
+to. So an older copy of a scope's write changes the keys it changed alone, and one that meets a key another page
+changed since is refused in words, after which the page reads the project's overrides again. A row the service keeps
+whole (a scenario, a train) still takes whichever copy reaches it last (the Open table).

@@ -89,6 +89,99 @@ def test_the_overrides_of_a_scope_are_replaced_whole():
     assert project_state.load()["overrides"] == {scope: [{"scope": scope, "key": "Ks", "value": 0.2, **named}]}
 
 
+SCOPE = "proforma:sc-1"
+
+
+def _o(key: str, value: float | str, by: str = "Ada Moreno", at: str = AT) -> dict[str, Any]:
+    return {"scope": SCOPE, "key": key, "value": value, "by": by, "at": at}
+
+
+def _kept_overrides() -> dict[str, Any]:
+    return {o["key"]: o for o in project_state.load()["overrides"].get(SCOPE, [])}
+
+
+def test_two_pages_writing_one_scope_from_two_lists_each_holding_one_key_keep_both_keys():
+    """Bug hunt H7-04: two tabs open on one scenario's panel, each from the
+    scope as it loaded (nothing kept), each sending its own key. The second
+    write names the rows it read, so the first key stays kept, and the
+    answer is the scope as it holds, both keys in it."""
+    c = client()
+    a, b = _o("titre", 5.678, "Ada Moreno"), _o("price", 1.25, "Ben Okafor")
+    r = c.put(f"/api/state/overrides/{SCOPE}", json={"by": "Ada Moreno", "value": [a], "base": []})
+    assert r.status_code == 200 and r.json()["value"] == [a]
+    r = c.put(f"/api/state/overrides/{SCOPE}", json={"by": "Ben Okafor", "value": [b], "base": []})
+    assert r.status_code == 200, r.text
+    assert {o["key"] for o in r.json()["value"]} == {"titre", "price"}
+    assert _kept_overrides() == {"titre": a, "price": b}
+    assert c.get("/api/state").json()["overrides"][SCOPE] == r.json()["value"]
+    # The second page takes its key back from what it now holds: the first page's key stays.
+    r = c.put(f"/api/state/overrides/{SCOPE}", json={"by": "Ben Okafor", "value": [a], "base": [a, b]})
+    assert r.status_code == 200 and r.json()["value"] == [a]
+    assert _kept_overrides() == {"titre": a}
+    # The first page takes its key back from the list it read before the second page wrote: nothing is left.
+    project_state.put("overrides", SCOPE, [], "Ada Moreno", base=[a])
+    assert project_state.load()["overrides"] == {}
+
+
+def test_a_key_another_page_changed_since_this_page_read_it_refuses_the_write_in_words_and_keeps_nothing():
+    first = _o("titre", 5.678, "Ada Moreno", "2026-10-30T07:05:00Z")
+    project_state.put("overrides", SCOPE, [first], "Ada Moreno", base=[])
+    # A second page read the scope empty, and sets the same key to another value, beside a key of its own.
+    with pytest.raises(project_state.StateRefused,
+                       match=r"titre was kept by Ada Moreno at 2026-10-30T07:05:00Z; .*nothing in this write was kept"):
+        project_state.put("overrides", SCOPE, [_o("titre", 6.0, "Ben Okafor"), _o("price", 1.25, "Ben Okafor")],
+                          "Ben Okafor", base=[])
+    assert _kept_overrides() == {"titre": first}
+    # Through the route: a 422 in words.
+    r = client().put(f"/api/state/overrides/{SCOPE}",
+                     json={"by": "Ben Okafor", "value": [_o("titre", 6.0, "Ben Okafor")], "base": []})
+    assert r.status_code == 422 and "changed since this page read them" in r.json()["detail"]
+    # A key another page took back, which this page changes, is refused the same way.
+    project_state.put("overrides", SCOPE, [], "Ada Moreno", base=[first])
+    with pytest.raises(project_state.StateRefused, match="titre was taken back"):
+        project_state.put("overrides", SCOPE, [_o("titre", 7.0, "Ben Okafor")], "Ben Okafor", base=[first])
+    assert project_state.load()["overrides"] == {}
+
+
+def test_two_pages_that_set_a_key_alike_are_one_change_and_a_number_reads_as_the_page_reads_it():
+    project_state.put("overrides", SCOPE, [_o("titre", 3.0)], "Ada Moreno", base=[])
+    # The other page read nothing and sends the same row: the scope already holds what it sends.
+    assert project_state.put("overrides", SCOPE, [_o("titre", 3.0)], "Ada Moreno", base=[]) == [_o("titre", 3.0)]
+    # A page that read `3` where the service keeps `3.0` read the same row, and its change is kept.
+    kept = project_state.put("overrides", SCOPE, [_o("titre", 4.5)], "Ada Moreno", base=[_o("titre", 3)])
+    assert kept == [_o("titre", 4.5)] == list(_kept_overrides().values())
+
+
+def test_a_row_the_write_leaves_as_kept_keeps_its_maker_and_its_time():
+    project_state.put("overrides", SCOPE, [_o("titre", 5.678, "Ada Moreno")], "Ada Moreno", base=[])
+
+    async def made() -> dict[str, tuple[str, Any]]:
+        async with db.session() as s:
+            q = t.overrides.select().where(t.overrides.c.project_id == projects.current())
+            return {r.key: (r.created_by, r.created_at) for r in (await s.execute(q)).all()}
+
+    before = db.run(made())
+    project_state.put("overrides", SCOPE, [_o("price", 1.25, "Ben Okafor")], "Ben Okafor", base=[])
+    after = db.run(made())
+    assert after["titre"] == before["titre"] and after["price"][0] == "Ben Okafor"
+
+
+@pytest.mark.parametrize(
+    ("kind", "item_id", "value", "base", "words"),
+    [
+        ("trains", "tr-1", TRAIN, [], "for a scope's overrides alone"),
+        ("overrides", SCOPE, [], {"titre": 1}, "are a list, each naming this scope and its key"),
+        ("overrides", SCOPE, [], [{"scope": "proforma:sc-2", "key": "titre"}], "each naming this scope"),
+        ("overrides", SCOPE, [], [_o("titre", 1.0), _o("titre", 2.0)], "name titre more than once"),
+        ("overrides", SCOPE, [_o("titre", 1.0), _o("titre", 2.0)], None, "name titre more than once"),
+    ],
+)
+def test_rows_a_write_says_it_read_that_are_not_a_scopes_rows_are_refused_in_words(kind, item_id, value, base, words):
+    with pytest.raises(project_state.StateRefused, match=words):
+        project_state.put(kind, item_id, value, "Ada Moreno", base=base)
+    assert all(not v for v in project_state.load().values())
+
+
 def test_a_projects_rows_are_its_own():
     project_state.put("depositions", "dep-1", DEPOSITION, "Ada Moreno")
     other = projects.create(ProjectCreate(name="Other", by="Ada Moreno"))

@@ -13859,7 +13859,7 @@
         "type": "object"
       },
       "StateKept": {
-        "description": "PUT /api/state/{kind}/{id}: the row the project keeps now, as the page\nsent it, under its kind and id.",
+        "description": "PUT /api/state/{kind}/{id}: the row the project keeps now, under its\nkind and id: as the page sent it, or, for a scope's overrides sent with\nthe rows the page read, the scope as it holds once the write was laid on\nkey by key, another page's keys among them (project_state.py).",
         "properties": {
           "id": {
             "title": "Id",
@@ -13906,8 +13906,11 @@
         "type": "object"
       },
       "StateWrite": {
-        "description": "PUT /api/state/{kind}/{id}: the row as the page keeps it, and who.",
+        "description": "PUT /api/state/{kind}/{id}: the row as the page keeps it, and who. A\nscope's overrides may name the rows the page read of the scope (`base`):\nthe service then lays the write on what it keeps key by key, and refuses\nit in words when another page changed a key this page changed too (bug\nhunt H7-04).",
         "properties": {
+          "base": {
+            "title": "Base"
+          },
           "by": {
             "default": "",
             "title": "By",
@@ -26510,7 +26513,7 @@
         "x-openferment-scope": "project"
       },
       "put": {
-        "description": "One row kept whole, read as its kind's model first (project_state.py).",
+        "description": "One row kept, read as its kind's model first (project_state.py): a\nscope's overrides sent with the rows the page read are laid on what the\nservice keeps key by key, and the answer is the scope as it then holds;\nevery other row is kept whole.",
         "operationId": "state_put_api_state__kind___item_id__put",
         "parameters": [
           {
@@ -26596,7 +26599,7 @@
                 }
               }
             },
-            "description": "A kind the project does not keep, an id of another shape, a row naming another id, a row that does not read as its kind's model or holds a number JSON cannot carry, a second lock, a locked runbook's predictions or measures changed, or a kept deposition rewritten: nothing kept, in words (a list of field errors when the request's own fields are refused)."
+            "description": "A kind the project does not keep, an id of another shape, a row naming another id, a row that does not read as its kind's model or holds a number JSON cannot carry, a second lock, a locked runbook's predictions or measures changed, a kept deposition rewritten, or a scope's override changed by another page since this page read it and changed by this page too: nothing kept, in words (a list of field errors when the request's own fields are refused)."
           }
         },
         "summary": "State Put",

@@ -110,7 +110,8 @@ session continues from this file and `git log` alone.
    reproductions twice beside the hunt's logs (`after-fix-run1.log`, `after-fix-run2.log`). Group 1
    (H5-01) is done, and so is the concept-graph build race its review found; group 2 (H7-01, the
    browser's shared pending-writes snapshot) is done; group 3 (H7-04, a scope's overrides written
-   whole) is next. Groups 16
+   whole) is done, each write of a scope laid on key by key against the rows it read; group 4 (H5-03,
+   a write under one kind replacing another kind's row, in the same `_put`) is next. Groups 16
    and 19 change how a key is read, a stop condition, and wait on the owner (the Log, Fixes after the
    bug hunt).
 
@@ -578,6 +579,7 @@ the line that records the decision and the decision record it stands under.
 
 | Debt | Paid at | Commit |
 |---|---|---|
+| A scope's overrides went to the service as one list and the service replaced the scope whole, so of two tabs on one Proforma scenario's panel the second's write deleted the first's kept override with no word on either page (H7-04, S1); a write of a scope now names the rows its view stood on and the service lays it on key by key, keeping another page's keys and refusing in words a key both pages changed, nothing kept, after which the page reads the project's overrides again | the bug hunt's fix run, group 3 (12 November 2026) | the commit after `6b93984` |
 | Review decisions were keyed by record id alone in the browser's snapshot, so of two projects' offline decisions on one record id (a record id is made from a paper and its words, and one paper may be held by two projects) the later stood and the other was never sent; each is keyed by its project and record now (`decisionKey`, `decisionsIn`), and a decision kept by its record alone leaves once the page saves it under its project | the bug hunt's fix run, the fourth round of the H7-01 fix (11 November 2026) | the commit after `c12687b` |
 | Two concept-graph builds at once (`pnpm lit:graph` for two projects) could lose one project's document from an entity's `document_ids`: each build batch read `kg_entities`, merged in Python and wrote the arrays back with no lock, so the entity kept the description the lost document's passage produced and `graph.entities` showed it to the other project. Every build batch's transaction now holds one advisory lock (`graph.GRAPH_LOCK`), and a test makes two builds overlap every time | the bug hunt's fix run, 11 November 2026 (found by group 1's review) | on `claude/alpha-2-2-fixes`, after `e173803` (the Log, Fixes after the bug hunt) |
 | The agent builder's interface points (`docs/reports/handoff-2026-11.md`, round 1), each in the code `docs/TOOLS.md` and `docs/api/openapi.json` are written from (ADR-008's Implementation 13): a BioRepo record is one rule, `module_stores.RECORD`, that `biorepo_read` lists its kinds `record` and `candidate` by and `search_records` names each hit's kind by, so a candidate a reviewer verified is a record; a write's answer names the audit rows it left (`ToolResult.auditIds`), a gated write's proposal among them; `GET /api/audit` takes `action`, `target` and `who` beside `limit`, so a write of any age is found by what it was, and serves each row as an `AuditRow` under its `id`, its null fields left out as an answer over MCP leaves them out; `AuditEntry`'s `detail` says what a row holds, and `catalogue_write` and `study_scenario` keep their call's note there as the other writes do; a module read's summary is a `ModuleRead`, its `partial` a sentence, and `module_stores.DETAIL` names each kind's `detail` field by field; the client recipe hands the server no `VIRTUAL_ENV`, and the page's top points at it. `core/tests/test_agent_interface.py` holds each, a row of every kind among them | alpha 2.2, E.16 | `dc02f20` |
@@ -624,7 +626,7 @@ the line that records the decision and the decision record it stands under.
 | Component tests on fixtures recorded from the real service (`pnpm record:fixtures`, alpha 2.0 prompt §9.3) are unbuilt; the walk and the smoke run against the real service | a stage after alpha 2.2 that builds `pnpm record:fixtures` |
 | No offline test computes on a published genome-scale model (Yeast9 and iMM904 need their fetched files, caches kept outside git; Departures, §5.5 stage 2); a model add-on applied in the worker, and a metabolite-defined product's demand through the worker, are untested | a test under the marker `slow` or `live`, on a host that holds the fetched files |
 | Two concept-graph builds at once (`pnpm lit:graph` for two projects that share a document) can each send a batch of a shared passage to the model before either stamps it, and pay for that batch twice; `GRAPH_LOCK` keeps the graph whole, and the spend is the same as two builds run one after the other with no stamp between them (found by the review of the graph lock, 11 November 2026) | a build that reads the stamps again inside the lock before it asks the model, or one build at a time for the instance |
-| Two pages owing one row send it each on its own: a copy a loading page took at load, a tab's own queue, or what a closing tab left (`foldParting`) can reach the service after another page's later write of the row, and a row the service replaces whole (an override scope, a scenario) then takes the older copy (found by the reviews of the H7-01 fix, 11 November 2026; ADR-014's note) | a write that names the version of the row it read, refused in words when the row changed since: group 3 of the bug hunt's fix order (H7-04) builds it for overrides, and it serves every kind |
+| Two pages owing one row send it each on its own: a copy a loading page took at load, a tab's own queue, or what a closing tab left (`foldParting`) can reach the service after another page's later write of the row, and a row the service keeps whole (a scenario, a train, a runbook, a scenario's fits) then takes the older copy (found by the reviews of the H7-01 fix, 11 November 2026; ADR-014's note). A scope's overrides are laid on key by key since group 3 (H7-04), so an older copy of one changes its own keys alone and a key changed since is refused in words | a write that names the version of the row it read, refused in words when the row changed since, for each kind the service keeps whole |
 | `units.json` maps `wt%` and `% (w/w)` to `% CDW`, aliases written for the PHA program; changing them changes how a stored record converts | the vocabulary review, after alpha 2.2, with a migration for the records it converts |
 | RunbookDetail's held-for-review panel keeps words of Dominion's era: candidates near a claimed identity band, a ruling with legal consequences, and two rulings (a boundary accepted as mapped; candidates excluded pending counsel) that `store.resolveRunbookReview` writes into the held stage, with a boundary map among the runbook's outputs. No code in this build sets a runbook held for review, so the panel answers only a row kept in that state | the stage that lets a runbook be held for review, with that state's own words and rulings |
 | `fermos.forecast_run` keeps `duration_h`, a length the calling code sets as its own convention, which the tests and their stand-ins pass (`standins.py`, `test_fermos.py`, `test_fermos_3r.py`, `test_proforma_fermos.py`, `test_proforma_ceiling.py`); the routes, the tools and the engine set a forecast's length as a typed `t_end` | the change that has those tests set a typed `t_end`, or reach `fermos.forecast()` through a helper of their own |
@@ -3894,3 +3896,37 @@ On `claude/alpha-2-2-fixes`, cut from `claude/alpha-2-2-bughunt` at `fa8db4a`, i
   - Checks: `pnpm typecheck`, `pnpm build`, the reproduction twice (`RESULT: NO-DEFECT`), `check:state`, `check:guild`,
     `check:plan`, `check:figures`, `test:reconcile`, `gen:components --check`, `pnpm smoke` (20 screens) and
     `pnpm prove --steps 9` (55 checks) pass; `pnpm test:core` 3073 passed, 1 skipped, 175 deselected (5 min 52 s).
+- Group 3, H7-04 (S1): a scope's overrides went to the service as one list (`rowsOf`), and the service replaced the
+  scope whole (the overrides branch of `project_state._put`), so of two tabs on one Proforma scenario's panel the
+  second tab's write deleted the first tab's kept override, with no word on either page.
+  - The fix, on the service: `PUT /api/state/overrides/{scope}` takes the rows the page's view stood on beside the
+    rows it sends (`StateWrite.base`), and `_put` lays the write on what the scope keeps key by key
+    (`project_state._merged`). A key the page set or took back is changed where the service keeps it as the page read
+    it, or already as the page sends it; a key the page left as it read it stays as kept, another page's among them;
+    a key another page changed since, which this page changed too, refuses the whole write in words naming the key and
+    who kept it, a 422, nothing kept. Two rows compare as the `Override` model reads them (`_as_read`), so `3` and
+    `3.0` are one value, and a kept row that does not read compares as no row. Each key is written on its own, so a
+    row the write leaves as kept keeps its maker and its time. The answer is the scope as it then holds. A list or a
+    base naming one key twice, a base of another shape, and a base sent with another kind are refused in words. A
+    write without a base replaces the scope whole, as before.
+  - The fix, on the page: an overrides write in the outbox carries `base`, the scope's list in the state the change
+    was made from (`changes`); a later write that replaces an unsent one stands on what that one stood on, and a write
+    an older page queued with none stays whole (`enqueue`); a write made while its scope's write was out stands on what
+    that write sent (`flushProjectState`). The page lays the service's answer into its view and its `stateSeen` alike,
+    so it shows the other page's key and sends nothing more; a refused write is said in the service's words, and the
+    page reads the project's overrides again (`rereadOverrides`).
+  - Tests: five in `core/tests/test_project_state.py`, two writes to one scope from two lists each holding one key
+    among them (the route keeps both and answers both), a key both pages changed refused in words with the first
+    kept, a key taken back since refused, number forms, a kept row's maker and time, and the refusals of a base. Eleven
+    in `scripts/check-state.ts` (a scope's overrides from two pages): the rows a write carries, what a replacing write
+    stands on, the body sent and the answer taken back, the store laying the answer in, a change made while its
+    scope's write was out, and a refusal said and read again; the in-flight check fails with the rebase line removed.
+  - The reproduction: `bash bughunt/repro/H7-04/run.sh`, twice in Chromium over the built app, reads
+    `RESULT: NO-DEFECT` (`after-fix-run1.log`, `after-fix-run2.log`): after tab B typed `titre=5.678` the service held
+    `feed_glucose_conc=1.234` and `titre=5.678`, and tab A after a reload showed its value overridden.
+  - Records: `project_state.py`'s docstring, `docs/api/studies.md`, ADR-014's note, the Paid row, and the Open row
+    narrowed to the kinds the service keeps whole.
+  - Checks: `pnpm typecheck`, `check:state` (the eleven above among its checks), `check:plan`, `check:figures`,
+    `check:guild`, `test:reconcile`, `gen:components --check`, `pnpm build`, `pnpm smoke` (20 screens) and
+    `pnpm prove --steps 9` (55 checks) pass; `test_project_state.py` 72 passed; `pnpm test:core` 3082 passed, 1
+    skipped, 175 deselected (5 min 59 s). No model was called.

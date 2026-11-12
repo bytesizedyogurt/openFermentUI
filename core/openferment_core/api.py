@@ -2811,10 +2811,17 @@ def projects_get(project_id: str) -> Project:
 
 
 class StateWrite(BaseModel):
-    """PUT /api/state/{kind}/{id}: the row as the page keeps it, and who."""
+    """PUT /api/state/{kind}/{id}: the row as the page keeps it, and who. A
+    scope's overrides may name the rows the page read of the scope (`base`):
+    the service then lays the write on what it keeps key by key, and refuses
+    it in words when another page changed a key this page changed too (bug
+    hunt H7-04)."""
 
     by: str = ""
     value: Any
+    # The overrides the page read of the scope before this write, each naming the scope and its key; null or left
+    # out, the write replaces the scope whole. Another kind's write names none.
+    base: Any = None
 
 
 @app.get("/api/state", response_model=ProjectState, response_model_exclude_unset=True)
@@ -2840,13 +2847,18 @@ def _state_refused(said: str) -> dict[str, Any]:
 @app.put("/api/state/{kind}/{item_id}", response_model=StateKept, responses=_state_refused(
     "A kind the project does not keep, an id of another shape, a row naming another id, a row that does not read "
     "as its kind's model or holds a number JSON cannot carry, a second lock, a locked runbook's predictions or "
-    "measures changed, or a kept deposition rewritten: nothing kept"))
+    "measures changed, a kept deposition rewritten, or a scope's override changed by another page since this page "
+    "read it and changed by this page too: nothing kept"))
 def state_put(kind: str, item_id: str, write: StateWrite) -> StateKept:
-    """One row kept whole, read as its kind's model first (project_state.py)."""
+    """One row kept, read as its kind's model first (project_state.py): a
+    scope's overrides sent with the rows the page read are laid on what the
+    service keeps key by key, and the answer is the scope as it then holds;
+    every other row is kept whole."""
     from . import project_state
 
     try:
-        return StateKept(kind=kind, id=item_id, value=project_state.put(kind, item_id, write.value, write.by))
+        return StateKept(kind=kind, id=item_id,
+                         value=project_state.put(kind, item_id, write.value, write.by, write.base))
     except project_state.StateRefused as e:
         raise HTTPException(status_code=422, detail=str(e)) from e
 
