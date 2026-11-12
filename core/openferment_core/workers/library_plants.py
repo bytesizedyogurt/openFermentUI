@@ -810,10 +810,16 @@ def run(plant: str, configuration: str | None, overrides: dict[str, Any], *,
             out["readBack"] = p.flowsheet.read_back(p)
             out["outputs"] = p.flowsheet.outputs(p)
             out["outputUnits"] = dict(p.flowsheet.OUTPUT_UNITS)
+        # The tables are read at the price the run solved, so the breakdown's
+        # lines sum to the price the run reports: read at the package's list
+        # price, capital recovery (sales less operating cost) carried the list
+        # price's margin and the lines summed to a price the run did not solve.
+        solved = out["price"].get("solvedPrice") if isinstance(out["price"], dict) else None
+        solved = solved if isinstance(solved, (int, float)) and not isinstance(solved, bool) else None
         try:
-            out.update(read_tables(_Module(), p, draw))
+            out.update(read_tables(_Module(price=solved), p, draw))
         except Exception as e:  # noqa: BLE001 — the tables are read without the TEA's breakdown, and say why
-            out.update(read_tables(_Module(tea=False), p, draw))
+            out.update(read_tables(_Module(tea=False, price=solved), p, draw))
             out["teaNote"] = f"the TEA's breakdown could not be read from BioSTEAM: {type(e).__name__}: {e}"
     return out
 
@@ -823,12 +829,13 @@ class _Module:
     TEA when BioSTEAM cannot break it down (an agile system's market values,
     measured on oilcane's `*` configurations)."""
 
-    def __init__(self, tea: bool = True) -> None:
+    def __init__(self, tea: bool = True, price: float | None = None) -> None:
         self.tea = tea
+        self.price = price
 
     def parts(self, p: Plant) -> dict[str, Any]:
         return {"system": p.system, "tea": p.tea if self.tea else None, "product": p.product,
-                "feedstock": p.feedstock, "price": None}
+                "feedstock": p.feedstock, "price": self.price}
 
 
 def export(plant: str, configuration: str | None, overrides: dict[str, Any], path: str, *,

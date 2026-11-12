@@ -130,6 +130,13 @@
           },
           "usage": {
             "$ref": "#/components/schemas/Usage"
+          },
+          "web": {
+            "items": {
+              "$ref": "#/components/schemas/WebSource"
+            },
+            "title": "Web",
+            "type": "array"
           }
         },
         "required": [
@@ -1441,6 +1448,13 @@
               "$ref": "#/components/schemas/ClaimValue"
             },
             "title": "Values",
+            "type": "array"
+          },
+          "webIds": {
+            "items": {
+              "type": "string"
+            },
+            "title": "Webids",
             "type": "array"
           }
         },
@@ -8948,6 +8962,13 @@
           },
           "usage": {
             "$ref": "#/components/schemas/Usage"
+          },
+          "web": {
+            "items": {
+              "$ref": "#/components/schemas/WebSource"
+            },
+            "title": "Web",
+            "type": "array"
           }
         },
         "title": "ToolResult",
@@ -10048,6 +10069,46 @@
           }
         },
         "title": "VesselRequest",
+        "type": "object"
+      },
+      "WebSource": {
+        "description": "A web page a search returned (ADR-015): what a claim cites when it\nrests on the open web. It is a pointer, never a record: the page is held\nby nobody here, so a claim resting on it alone is `unverified`, and a\nnumber read off it is the model's estimate.",
+        "properties": {
+          "id": {
+            "title": "Id",
+            "type": "string"
+          },
+          "pageAge": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Pageage"
+          },
+          "query": {
+            "default": "",
+            "title": "Query",
+            "type": "string"
+          },
+          "title": {
+            "title": "Title",
+            "type": "string"
+          },
+          "url": {
+            "title": "Url",
+            "type": "string"
+          }
+        },
+        "required": [
+          "id",
+          "url",
+          "title"
+        ],
+        "title": "WebSource",
         "type": "object"
       }
     }

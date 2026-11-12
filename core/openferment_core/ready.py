@@ -290,6 +290,23 @@ def check_graphviz() -> Check:
                  "run order instead of drawing it. Install: brew install graphviz")
 
 
+def check_web() -> Check:
+    """Whether Postdoc may look at the open web (ADR-015), and how many
+    searches a look may make. Optional, so a warning at most; whether the
+    Anthropic organisation allows the tool is known only when a search runs."""
+    from . import llm
+
+    raw = os.environ.get(llm.WEB_SETTING, "").strip()
+    n = llm.web_searches()
+    if n > 0:
+        return Check("web", "ok", f"Postdoc may search the open web, up to {n} searches a look, on the index route "
+                                  f"({llm.WEB_SETTING}; 0 turns it off)")
+    if raw.lower() in ("0", "off", "false", "no"):
+        return Check("web", "ok", f"the open web is off ({llm.WEB_SETTING}={raw}); Postdoc answers from the project alone")
+    return Check("web", "warn", f"{llm.WEB_SETTING}={raw!r} is not a count, so the open web is off; set a count up to "
+                                f"{llm.MAX_WEB_SEARCHES}, or 0 to turn it off")
+
+
 def check_artifacts() -> Check:
     try:
         n = _count(t.artifacts)
@@ -513,7 +530,8 @@ def run(no_network: bool = False, port: int | None = None, workers: bool = True,
     # checked says why and the rest still run.
     for name, row in (("literature", check_literature), ("embedder", check_embedder), ("rag", check_rag),
                       ("models", check_models), ("artifacts", check_artifacts),
-                      ("spend", check_spend), ("workers", lambda: check_workers(workers)), ("graphviz", check_graphviz)):
+                      ("spend", check_spend), ("workers", lambda: check_workers(workers)), ("graphviz", check_graphviz),
+                      ("web", check_web)):
         try:
             checks.append(row())
         except Exception as e:  # any failure is the row's answer, in words

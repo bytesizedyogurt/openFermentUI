@@ -124,7 +124,7 @@ def test_a_turn_nobody_is_answering_reads_interrupted_and_its_page_record_stands
 
 def test_a_turn_names_the_artifacts_its_calls_produced():
     cid, tid, _ = conversations.begin("What does the run cost?", conversation_id="lc-1", turn_id="t-1", by="Ada Moreno")
-    basis = ComputedBasis(tool="library.run", toolVersion="library run 2", inputs=[], artifactId="0123456789abcdef",
+    basis = ComputedBasis(tool="library.run", toolVersion="library run 3", inputs=[], artifactId="0123456789abcdef",
                           at="2026-10-30T07:00:00Z")
     result = ToolResult(summary={"price": "the solved price"}, evidence=[Evidence(
         id="ev-1", label="Minimum selling price", value=0.66, unit="USD/kg", provenance="computed", basis=basis)])

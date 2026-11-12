@@ -56,6 +56,20 @@ def test_the_packages_own_composition_is_the_packages_plant(warm):
     assert ours["readBack"]["organisms"] == [{"name": "Zymomonas mobilis", "label": "ethanologen"}]
 
 
+def test_the_price_breakdowns_lines_sum_to_the_price_the_run_solved(warm):
+    """The breakdown is read with the product at the solved price (library run
+    3): read at the package's list price, which differs from the solved price
+    on this plant, capital recovery carried the list price's margin and the
+    lines summed to a price the run did not report."""
+    out = library.run(FLOWSHEET).output
+    price, tea = out["price"], out["tea"]
+    assert price["packagePrice"] != pytest.approx(price["solvedPrice"], rel=1e-3)
+    assert tea["productPrice"] == pytest.approx(price["solvedPrice"], rel=1e-9)
+    assert sum(line["perUnit"] for line in tea["lines"]) == pytest.approx(price["solvedPrice"], rel=1e-6)
+    ethanol = next(s for s in out["streams"] if s["id"] == tea["product"])
+    assert ethanol["price"] == pytest.approx(price["solvedPrice"], rel=1e-9)
+
+
 def test_every_configuration_builds_or_is_refused_as_the_shelf_says(warm):
     entry = library.plant(FLOWSHEET)
     assert entry.kind == "flowsheet" and entry.composedFrom == "biorefineries.cellulosic"

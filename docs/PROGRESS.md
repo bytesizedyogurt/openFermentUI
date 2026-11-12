@@ -7,8 +7,9 @@ session continues from this file and `git log` alone.
 
 ## Resume
 
-1. Branch: `claude/alpha-2-1-functional`, cut from `main` at `7f990f8` (the merge of #15).
-   `git fetch origin claude/alpha-2-1-functional && git checkout claude/alpha-2-1-functional`.
+1. Branch: `claude/advisor-demo`, cut from `main` at `112eb8b` (the merge of #16), with the work
+   of 12 November 2026 (Current stage). `git fetch origin claude/advisor-demo && git checkout
+   claude/advisor-demo`. Before it: `claude/alpha-2-1-functional`, merged as #16.
 2. Environment:
    - `pnpm install --frozen-lockfile`
    - `cd core && uv sync --all-extras`
@@ -42,6 +43,33 @@ session continues from this file and `git log` alone.
 5. Files in flight: none.
 
 ## Current stage
+
+Advisor demo (2026-11-12), on `claude/advisor-demo`, at the owner's request ("present this to my
+advisor; make it work with Opus; let it be connected to the internet and do things; make sure
+flowcharts and feedstocks and basic TEA work; do checks"). The session had no Anthropic key and
+could not reach Europe PMC or Hugging Face, so nothing here was asked of a live model.
+
+- **Checked, as found**: `pnpm test:core` 2302 passed and `pnpm test:sim` 132 passed on `112eb8b`
+  before any change. Through the running service: `cornstover`, `corn`, `sugarcane` and
+  `cellulosic_ethanol_v0` build, run and price; a person's dry composition on
+  `cellulosic_ethanol_v0` changes the price and marks the run assumed; shares that do not sum to
+  one are refused in words. `lactic` does not build on these pins (the package's own IndexError)
+  and says so.
+- **Fixed, the TEA**: a library run's price breakdown was read with the product at the package's
+  list price while the page's headline was the price the run solved. On `cellulosic_ethanol_v0`
+  the two differ, so capital recovery carried the list price's margin and the waterfall's lines
+  summed to a price the run did not report. The tables are now read at the solved price
+  (`workers/library_plants.py`, `LIBRARY_RUN_VERSION` 3; `test_cellulosic_sim.py`). A run kept
+  under version 2 keeps its old breakdown; run the plant again for the new one.
+- **Fixed, the flowsheet drawing**: a plant of sixty-eight units drew as one line of thirty-three
+  columns inside a scrolling box. `SffGraph` now opens on the whole plant, its columns folded into
+  lines as text folds, with the full-size drawing one button away.
+- **Added, the open web** (ADR-015): `web_search`, the forty-ninth tool; a claim cites a page in
+  `webIds`, and the answer shows the pages under the claim, marked unverified. Held by stand-ins
+  (`test_web_search.py`); the first live search is owed (Live owed).
+- **Opus**: nothing to change. The answer chain is Claude Opus 5.5 then Claude Sonnet 5.5 by
+  default (`llm.DEFAULT_PRIMARY`), and `pnpm ready` says which models a key reaches. What holds a
+  live answer is the account's usage limit (Blockers), which only the owner can raise.
 
 Alpha 2.1, stage F (2026-11-02): the work is on `claude/alpha-2-1-functional` with its pull request
 to `main` and the §9 completion report. Stage C is held by the Anthropic account's own usage limit
@@ -160,6 +188,7 @@ DOI or PMID. Each now reads the project's rows.
 | 2026-11-02 21:35 | `pnpm test:core` | 2302 passed, 1 skipped, 168 deselected | 3 min 59 s | F.2 |
 | 2026-11-02 22:07 | Alpha 2.1 F.3, every conversation held: `typecheck`, `check:state`, `gen:components --check`, `check:plan`, `build`, `pnpm test:core`, `pnpm smoke` | all passed; 2302 passed, 1 skipped, 168 deselected; 12 of 12 screens open | 4 min 13 s (`test:core`) | F.3 |
 | 2026-10-30 06:47 | `test:core` with 2.2; `check:tools`; `pnpm smoke` (own database, project made through the API) | 1920 passed, 2 skipped, 128 deselected; passed; 11 of 11 rail entries open in the project | 4 min 26 s | 2.2 |
+| 2026-11-12 22:45 | Advisor demo, on `claude/advisor-demo`, in a session with no key and no route to Hugging Face: `test:core`; `test:sim`; secrets, typecheck, `gen:api --check`, `gen:components --check`, plan, licences, tools, guild, state, figures, build, `pnpm smoke`, reconcile; `pnpm prove` | 2324 passed, 1 skipped; 133 passed; all passed, 11 of 11 rail entries and Studies open; the proof holds 53 of 61: its 8 failures are step 3 and the walk's Ingest and Search, each waiting on FastEmbed's model file, which this session could not fetch (403 from the session's proxy). `test:lit` not run for the same reason | 3 min 37 s; 4 min 2 s | this commit |
 
 ## Spend (alpha 2.1)
 
@@ -191,6 +220,7 @@ cap for this work is 150 USD and an ask's 6 USD (`core/.env`).
 | [012](decisions/ADR-012-licence-undecided.md) | Licence undecided | open (owner) |
 | [013](decisions/ADR-013-cornstover-package-test.md) | The corn stover plant's two values its package's own test fails, held to the package's measurement | accepted, stage 5 |
 | [014](decisions/ADR-014-durable-write-queue.md) | The Durable snapshot keeps the writes the service has not acknowledged | accepted, stage 7 (a departure) |
+| [015](decisions/ADR-015-open-web.md) | Postdoc reads the open web through a tool of its own; a page is unverified | accepted, 12 November 2026 (the owner's request; live search owed) |
 
 ## Departures from the execution prompt
 
@@ -293,6 +323,7 @@ The two LIVE steps alpha 1.0 still owed, each judged against this build:
 |---|---|
 | §4.5, the paid lanes of the retrieval evaluation (`pnpm rag:eval && pnpm data:push`), waiting on a helper model the safety classifier lets through | Retired with their code: the bespoke retrieval stack and the data branch are deleted (§5.4, §5.5; ADR-010). Its successor is the kit's retrieval report, `pnpm lit:report`, which asks no model. A report with the lanes that call one (the graph, HyDE, a judge grading the answers), over a project's own corpus, is a debt below |
 | §10.3, the saved answer (`pnpm demo:fixtures --real && pnpm data:push`): a real Postdoc answer, its artifacts and the retrieval report saved | Retired with the demo infrastructure (§5.3; ADR-010). A real answer is now a turn of a conversation the service keeps, with its tool calls and the artifacts they made (stage 6); `pnpm prove --live` step 6 keeps two, asked of the routed models |
+| 2026-11-12, the open web (ADR-015): one live `web_search` | Built with no key in the session. With the key answering: `curl -sS -X POST 'http://127.0.0.1:8000/api/tools/web_search' -H 'Content-Type: application/json' -H 'X-OpenFerment-Project: <project id>' -d '{"query": "corn stover delivered feedstock cost"}'` returns a report and pages, or the API's refusal in words; then one Postdoc question that needs the web. If the shape differs from the stand-ins, `llm._web_pages` is where it is read |
 
 ## Owner questions (execution prompt §13) and the defaults taken
 

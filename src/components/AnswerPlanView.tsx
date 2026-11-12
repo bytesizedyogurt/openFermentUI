@@ -15,6 +15,7 @@
 // a fourth one — a claim is evidence, and evidence in this system is ticked.
 import { AlertTriangle, ExternalLink, HelpCircle, Quote, SearchX } from 'lucide-react';
 import type {
+  WebSource,
   AnswerPlan,
   Claim,
   ClaimValue,
@@ -148,13 +149,52 @@ function ModuleRowChips({ refs, rows }: { refs: string[]; rows: Map<string, Modu
   );
 }
 
+/** The web pages a claim rests on (ADR-015): each opens the page itself, in a new tab. */
+function WebSourceChips({ ids, web }: { ids: string[]; web: Map<string, WebSource> }) {
+  const cited = ids.map((id) => web.get(id)).filter((w): w is WebSource => Boolean(w));
+  if (cited.length === 0) return null;
+  return (
+    <div className="mt-2" data-testid="claim-web-sources">
+      <p className="text-caption text-ink-soft">
+        From the open web. Nobody here holds these pages, so the claim is unverified until a source enters Intake.
+      </p>
+      <div className="mt-1 flex flex-wrap gap-x-3 gap-y-1">
+        {cited.map((w) => (
+          <a
+            key={w.id}
+            href={w.url}
+            target="_blank"
+            rel="noopener noreferrer"
+            className="text-caption text-accent hover:underline inline-flex items-baseline gap-1"
+            title={w.url}
+          >
+            <ExternalLink size={11} aria-hidden className="self-center" />
+            <span className="truncate max-w-[44ch]">{w.title}</span>
+            <span className="text-ink-soft font-num">{hostOf(w.url)}</span>
+          </a>
+        ))}
+      </div>
+    </div>
+  );
+}
+
+function hostOf(url: string): string {
+  try {
+    return new URL(url).hostname.replace(/^www\./, '');
+  } catch {
+    return '';
+  }
+}
+
 function ClaimRow({
   claim,
   index,
   passages,
   evidence,
   rows,
+  web,
 }: {
+  web: Map<string, WebSource>;
   claim: Claim;
   index: number;
   passages: Map<string, Passage>;
@@ -213,6 +253,7 @@ function ClaimRow({
           )}
 
           <ModuleRowChips refs={claim.moduleRefs ?? []} rows={rows} />
+          <WebSourceChips ids={claim.webIds ?? []} web={web} />
 
           {note && <p className="text-caption text-ink-soft mt-1.5">{note}</p>}
 
@@ -288,6 +329,7 @@ export function AnswerPlanView({ plan }: { plan: AnswerPlan }) {
   const passages = new Map((plan.passages ?? []).map((p) => [p.id, p]));
   const evidence = new Map((plan.evidence ?? []).map((e) => [e.id, e]));
   const rows = new Map((plan.rows ?? []).map((r) => [r.ref, r]));
+  const web = new Map((plan.web ?? []).map((w) => [w.id, w]));
   const toolCalls = (plan.trace ?? []).filter((t) => t.kind === 'tool').length;
   // The loop answered only when its last step is a kept plan; a question no
   // model answered, or an answer that was not a plan, says so (§5.R).
@@ -318,7 +360,7 @@ export function AnswerPlanView({ plan }: { plan: AnswerPlan }) {
         <Card className="px-4 py-1">
           <ul>
             {plan.claims.map((claim, i) => (
-              <ClaimRow key={claim.id} claim={claim} index={i} passages={passages} evidence={evidence} rows={rows} />
+              <ClaimRow key={claim.id} claim={claim} index={i} passages={passages} evidence={evidence} rows={rows} web={web} />
             ))}
           </ul>
         </Card>

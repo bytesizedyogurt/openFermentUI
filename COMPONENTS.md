@@ -161,6 +161,7 @@ One tool registry, three callers (OF-BLD-014 §3.4, E.6).
 | `studies.py` | The project's studies, for Postdoc (alpha 2.0 stage 6; execution prompt §4.6, §9.1 step 6; ADR-006). |
 | `thermo.py` | `thermo_props`: what thermosteam says of a mixture on file (OF-BLD-019 §4.2, D9). |
 | `units.py` | `convert_units`: a record's own value in another unit (OF-BLD-014 §3.4). |
+| `web.py` | The open web, for Postdoc (ADR-015): `web_search`. |
 | `writes.py` | One write tool per module, the pair of its read tool (OF-BLD-015 §7.3). |
 
 ### `workers/`

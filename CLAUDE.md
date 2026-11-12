@@ -74,6 +74,7 @@
 - C: The licence stays undecided, and no LICENSE file is added until the owner chooses (ADR-012).
 - C: The corn stover plant's two values its package's own test fails on these pins are held to the package's own measurement (ADR-013).
 - C: The browser's Durable snapshot keeps preferences and the writes the service has not acknowledged (ADR-014).
+- C: Postdoc reads the open web through `web_search`, a tool whose every call is a request of its own with Anthropic's web search tool; a page is cited by id, leaves its claim `unverified`, and gives no store a value (ADR-015; `OPENFERMENT_WEB_SEARCH`, 0 for off).
 
 ## Communication contracts
 
@@ -118,6 +119,7 @@
 - C: ADR-006: a task needs a formal decision rule or uncertainty method, justified and evaluated for that task. ADR-008: the evaluation that lets the simple system compete.
 - C: ADR-010: a deleted piece proves needed, restored from `alpha-1.0` with a decision record. ADR-011: a guard proves necessary again and returns with a negative test.
 - C: ADR-013: biosteam, thermosteam or biorefineries changes version, or the package's test values change upstream. ADR-014: the owner asks for the queue to go, or accounts give pending writes a home on the service.
+- C: ADR-015: a live search shows a shape the stand-ins did not, the owner wants pages held through Intake, or another provider serves the index route.
 
 ## Stop conditions (ask the owner first; execution prompt §11.1)
 
@@ -134,4 +136,4 @@
 - R: Tag `alpha-1.0` marks `d19224f`, the tree before this build, and a deleted piece returns from it (ADR-010); the tag's push waits on the owner (`docs/PROGRESS.md`, Blockers).
 - C: `docs/handoff/2026-10/` holds the owner's handoff documents (white paper, development plan, reference atlas), with extracted text in `txt/`.
 - C: A citation such as OF-BLD-012 §2.3, OF-DES or OF-COR-001 in code or tests names an alpha 1.0 document; those kept are in `docs/history/`, and none carries authority.
-- C: `docs/decisions/` holds ADR-000 to ADR-014; `docs/PROGRESS.md` holds the log of every stage, the departures, the debts and the blockers; `docs/reports/` holds measured reports.
+- C: `docs/decisions/` holds ADR-000 to ADR-015; `docs/PROGRESS.md` holds the log of every stage, the departures, the debts and the blockers; `docs/reports/` holds measured reports.

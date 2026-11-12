@@ -51,6 +51,23 @@ the answering model's estimate carries origin `model-estimate` with the model's 
 and what it rests on, and the claim stating it is `assumed`. A value's evidence or record is
 cited by its claim. The browser's `ClaimValue` mirrors it (`check:plan`).
 
+## The open web
+
+`web_search` (ADR-015) is a tool like the others, and each call is a request of its own:
+`llm.web_search` sends the query to the first Anthropic model of the `index` route with
+Anthropic's web search tool and no answer schema, and returns that model's report in words and the
+pages the searches listed. The planning conversation reads the report and each page's id, title
+and address; a page's own text never enters it.
+
+- A claim cites a page in `webIds` (`web:<hash of its address>`), and the plan carries the cited
+  pages in `web`, each a `WebSource` (`id`, `url`, `title`, `pageAge`, `query`).
+- A claim that cites a page is `unverified`, whatever else it cites. A number read off a report is
+  the model's estimate, in the claim's values, and makes the claim `assumed`.
+- `OPENFERMENT_WEB_SEARCH` is how many searches a call may make: 3 when unset, 8 at most, 0 for
+  off. Each search is charged at 0.01 USD beside the call's tokens, on the question that asked.
+- The tool refuses in words when the web is off, when `OPENFERMENT_FIXTURES` is set, with no key,
+  at the day's cap, and when the API refuses (web search switched off in the Anthropic Console).
+
 ## The page's writes
 
 The page keeps writing its Live conversations through `PUT /api/state/conversations/{id}`

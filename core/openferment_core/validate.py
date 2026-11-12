@@ -340,6 +340,8 @@ class SeenSet:
     # read returns for it: learned from the Evidence the tool that keeps one
     # returns, and from a read's row (OF-BLD-020 §3.4, §4.2, §5.4).
     runs: dict[str, str] = field(default_factory=dict)
+    # Web pages by id (ADR-015), as web_search returned them.
+    web: dict[str, Any] = field(default_factory=dict)
 
     def add(self, result: Any) -> None:
         # A refused result was read as a refusal: nothing in it is citable.
@@ -353,6 +355,8 @@ class SeenSet:
             kind = KEPT_RUNS.get(getattr(getattr(e, "basis", None), "tool", None) or "")
             if kind:
                 self.runs[e.id] = f"{kind[0]}/{kind[1]}/{e.id}"
+        for w in getattr(result, "web", None) or []:
+            self.web[w.id] = w
         for r in getattr(result, "rows", None) or []:
             self.rows[r.ref] = r
             if (r.module, r.kind) in KEPT_RUNS.values():
@@ -447,8 +451,8 @@ def validate_plan(raw_claims: list[dict[str, Any]], seen: SeenSet, pool: Any, *,
 
     1. Its text holds a number.
     2. A record id does not resolve in the evidence pool.
-    3. A record, passage, evidence id or module ref was never returned by a
-       tool call in this run. A kept run (a simulation, a vessel design or a
+    3. A record, passage, evidence id, module ref or web page was never
+       returned by a tool call in this run. A kept run (a simulation, a vessel design or a
        train run, KEPT_RUNS) a read returned only as a row is cited by that
        row's ref, and a claim citing it by evidence id is told so (OF-BLD-020
        §3.4, §4.2, §5.4).
@@ -465,7 +469,8 @@ def validate_plan(raw_claims: list[dict[str, Any]], seen: SeenSet, pool: Any, *,
     Its provenance is the weakest of its records, computed values and module
     rows that carry a mark, and `assumed` when it states the model's
     estimate (`model`, at `at`); a claim resting on quotes or unmarked rows
-    alone is `unverified`. Its papers are derived from its records and
+    alone is `unverified`, and a claim that cites a web page (ADR-015) is no
+    stronger than `unverified` whatever else it cites. Its papers are derived from its records and
     passages, never taken from the model.
     """
     from datetime import datetime, timezone
@@ -483,6 +488,7 @@ def validate_plan(raw_claims: list[dict[str, Any]], seen: SeenSet, pool: Any, *,
         evidence_ids = [str(e) for e in (raw.get("evidenceIds") or [])]
         module_refs = [str(m) for m in (raw.get("moduleRefs") or [])]
         refs = [r for r in (raw.get("passages") or []) if isinstance(r, dict)]
+        web_ids = [str(w) for w in (raw.get("webIds") or [])]
         support = raw.get("support") or "direct"
         if support not in ("direct", "inferred", "unsupported"):
             support = "direct"
@@ -512,6 +518,7 @@ def validate_plan(raw_claims: list[dict[str, Any]], seen: SeenSet, pool: Any, *,
             + [str(r.get("passageId")) for r in refs if str(r.get("passageId")) not in seen.passages]
             + [e for e in evidence_ids if e not in seen.evidence]
             + [m for m in module_refs if m not in seen.rows]
+            + [w for w in web_ids if w not in seen.web]
         )
         if unseen:
             reject(f"cites what no tool returned in this run: {', '.join(unseen)}")
@@ -541,7 +548,7 @@ def validate_plan(raw_claims: list[dict[str, Any]], seen: SeenSet, pool: Any, *,
             elif v.quantity.origin.kind == "record" and v.source not in record_ids:
                 record_ids.append(v.source)
         estimated = any(v.quantity.origin.kind == "model-estimate" for v in values)
-        if not (record_ids or refs or evidence_ids or module_refs) and support != "unsupported":
+        if not (record_ids or refs or evidence_ids or module_refs or web_ids) and support != "unsupported":
             reject(f"cites nothing and support is '{support}', not 'unsupported'")
             continue
 
@@ -550,6 +557,10 @@ def validate_plan(raw_claims: list[dict[str, Any]], seen: SeenSet, pool: Any, *,
         classes += [seen.rows[m].provenance for m in module_refs if seen.rows[m].provenance]
         if not classes and (refs or module_refs):
             classes = ["unverified"]
+        # A web page is held by nobody here (ADR-015): whatever else a claim
+        # cites, resting on one makes it no stronger than unverified.
+        if web_ids:
+            classes.append("unverified")
         if estimated:
             classes.append("assumed")
         papers = {pool.record(r)["paperId"] for r in record_ids}
@@ -566,6 +577,7 @@ def validate_plan(raw_claims: list[dict[str, Any]], seen: SeenSet, pool: Any, *,
                 evidenceIds=evidence_ids,
                 moduleRefs=module_refs,
                 values=values,
+                webIds=web_ids,
             )
         )
     return out

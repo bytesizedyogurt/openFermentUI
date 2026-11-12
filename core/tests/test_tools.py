@@ -197,7 +197,7 @@ NAMES = (["search_records", "convert_units", "search_passages", "yield_ceiling",
                                        "study_scenario", "study_compare", "study_read",
                                        "literature_sources", "literature_document",
                                        "flowsheet_library", "flowsheet_import", "flowsheet_read",
-                                       "catalogue_read", "catalogue_write"])
+                                       "catalogue_read", "catalogue_write", "web_search"])
 
 
 def test_only_the_whitelisted_names_may_register():

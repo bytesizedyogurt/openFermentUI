@@ -26,8 +26,9 @@ documents it holds; then alpha 2.1's `flowsheet_library`, `flowsheet_import`
 (a free write through `writes.import_flowsheet`) and `flowsheet_read` over
 the SFF toolkit's reference files and the project's records; and
 `catalogue_read` and `catalogue_write` over the project's catalogues of
-strains, products, skills and lessons. Forty-eight names. A tool outside it is
-a new decision.
+strains, products, skills and lessons; then `web_search` (ADR-015), a look at
+the open web whose pages a claim cites as unverified. Forty-nine names. A tool
+outside it is a new decision.
 `test_tools.NAMES` is the one literal list the tests hold the registry to;
 every other count is derived from `WHITELIST`. `docs/TOOLS.md` is written
 from this registry (`pnpm gen:tools`).
@@ -140,6 +141,9 @@ WHITELIST = (
     # free write through writes.keep_catalogue).
     "catalogue_read",
     "catalogue_write",
+    # ADR-015 (12 November 2026): the open web, a look at a time through
+    # Anthropic's web search tool in a request of its own; loose.
+    "web_search",
 )
 # The fields a number may stand in outside a quantity: how many results to return.
 COUNT_FIELDS = frozenset({"k", "limit"})
@@ -416,6 +420,7 @@ def run(name: str, raw: Any, ctx: ToolContext | None = None) -> ToolResult:
                 "summary": {},
                 "recordIds": [],
                 "rows": [],
+                "web": [],
                 "passages": [],
                 "evidence": [],
                 "data": None,
@@ -446,3 +451,4 @@ from . import runbook as _runbook  # noqa: E402,F401
 from . import studies as _studies  # noqa: E402,F401
 from . import thermo as _thermo  # noqa: E402,F401
 from . import units as _units  # noqa: E402,F401
+from . import web as _web  # noqa: E402,F401

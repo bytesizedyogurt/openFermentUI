@@ -2597,6 +2597,8 @@ export interface components {
             /** Turnid */
             turnId?: string | null;
             usage?: components["schemas"]["Usage"];
+            /** Web */
+            web?: components["schemas"]["WebSource"][];
         };
         /**
          * Artifact
@@ -3097,6 +3099,8 @@ export interface components {
             text: string;
             /** Values */
             values?: components["schemas"]["ClaimValue"][];
+            /** Webids */
+            webIds?: string[];
         };
         /**
          * ClaimValue
@@ -6016,6 +6020,8 @@ export interface components {
                 [key: string]: unknown;
             };
             usage?: components["schemas"]["Usage"];
+            /** Web */
+            web?: components["schemas"]["WebSource"][];
         };
         /**
          * TraceStep
@@ -6401,6 +6407,28 @@ export interface components {
             simulation?: string | null;
             /** Vesseltype */
             vesselType?: ("stirred-tank" | "bubble-column") | null;
+        };
+        /**
+         * WebSource
+         * @description A web page a search returned (ADR-015): what a claim cites when it
+         *     rests on the open web. It is a pointer, never a record: the page is held
+         *     by nobody here, so a claim resting on it alone is `unverified`, and a
+         *     number read off it is the model's estimate.
+         */
+        WebSource: {
+            /** Id */
+            id: string;
+            /** Pageage */
+            pageAge?: string | null;
+            /**
+             * Query
+             * @default
+             */
+            query: string;
+            /** Title */
+            title: string;
+            /** Url */
+            url: string;
         };
     };
     responses: never;

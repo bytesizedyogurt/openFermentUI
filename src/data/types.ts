@@ -1174,6 +1174,20 @@ export interface Claim {
   moduleRefs?: string[];
   /** ADR-006: the numbers it states, each typed with its origin; its text holds none. Absent on older plans. */
   values?: ClaimValue[];
+  /** ADR-015: web pages it rests on, by the id web_search returned. Absent on older plans. */
+  webIds?: string[];
+}
+
+/**
+ * A web page a search returned (ADR-015; models.py WebSource): a pointer, held
+ * by nobody here, so a claim resting on one is unverified.
+ */
+export interface WebSource {
+  id: string;
+  url: string;
+  title: string;
+  pageAge?: string | null;
+  query?: string;
 }
 
 /**
@@ -1393,6 +1407,8 @@ export interface AnswerPlan {
   coverage?: CoverageMap | null;
   /** OF-BLD-015 §7.2: the module rows the claims cite. Absent on older plans. */
   rows?: ModuleRow[];
+  /** ADR-015: the web pages the claims cite. Absent on older plans. */
+  web?: WebSource[];
   /** The conversation and turn the service kept this answer as; null when none was kept. */
   conversationId?: string | null;
   turnId?: string | null;
@@ -2295,6 +2311,8 @@ export interface ToolResult {
   draft: RunbookDraft | null;
   /** Module rows a plan may cite (OF-BLD-015 §7.2). */
   rows: ModuleRow[];
+  /** Web pages a plan may cite (ADR-015). */
+  web: WebSource[];
   /** The whole of what a summary cuts to the cap, for the endpoint and the MCP server; never citable (OF-BLD-019 §6.1). */
   data: Record<string, unknown> | null;
 }

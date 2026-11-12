@@ -18,7 +18,7 @@ LABEL = re.compile(r"^- (R|P|C): \S")
 SECTIONS = ("Mission and scope", "Run and test", "Verified constraints and sources", "Architecture decisions",
             "Communication contracts", "Working assumptions", "Open questions", "Revisit conditions",
             "Stop conditions", "Where the history lives")
-RECORDS = range(0, 15)
+RECORDS = range(0, 16)
 
 
 def _lines() -> list[str]:

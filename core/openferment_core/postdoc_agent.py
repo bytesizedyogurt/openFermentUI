@@ -37,6 +37,11 @@ the same question read those sources afresh and forgets the module reads
 cached before it. A spent daily budget is not an outage another model can fix,
 and ends the question.
 
+THE OPEN WEB (ADR-015). `web_search` is a tool like the others: one call is
+one request of its own to a model with Anthropic's web search tool, and the
+loop reads its report and its pages as a tool result. A page is cited by its
+id and leaves its claim unverified.
+
 Every claim the model writes is held to `validate_plan`: no number in its
 text, nothing cited that no tool returned in this run, every quote verbatim
 in its passage, and every number it states in its typed `values` (ADR-006):
@@ -220,7 +225,18 @@ estimate as a measurement or a record's value, and never state a number a tool \
 returned as your estimate.
 20. The project's literature: literature_sources lists the documents it holds; \
 literature_document reads one document's sections, and the passages of one \
-section, each citable by a whole sentence as search_passages' are."""
+section, each citable by a whole sentence as search_passages' are.
+21. The open web: web_search looks something up and returns a report in words \
+and the pages it read, each with an id. Use it for what the project does not \
+hold: a current price, a statistic, a recent result, a paper or report to bring \
+in. Search the project first. A page is cited by its id in webIds, and a claim \
+that cites one is unverified, because nobody here holds the page. A number from \
+the report is never a record's value: state it in values as your estimate, \
+naming the page in its basis. When a page is a paper or a report with an \
+identifier (a PMC id, a DOI, an OSTI id), bring it into the project with \
+intake_write fetch, then read it and quote its own sentences; say in gaps what \
+you brought in. When web_search refuses, say so in gaps and answer from what \
+the project holds."""
 )
 
 
@@ -278,7 +294,13 @@ def _plan_schema() -> dict[str, Any]:
             "required": ["label", "evidenceId", "recordId", "estimate"],
         },
     }
-    claim["required"] = ["id", "text", "recordIds", "support", "passages", "evidenceIds", "moduleRefs", "values"]
+    claim["properties"]["webIds"] = {
+        "type": "array",
+        "items": {"type": "string"},
+        "description": "Ids of web pages web_search returned (`web:…`), exactly as given; empty when it rests on none.",
+    }
+    claim["required"] = ["id", "text", "recordIds", "support", "passages", "evidenceIds", "moduleRefs", "values",
+                         "webIds"]
     claim["properties"]["paperIds"]["description"] = "Paper ids the evidence came from. The server derives them anyway."
     return schema
 
@@ -425,6 +447,8 @@ def _summary_line(name: str, inp: dict[str, Any], result: ToolResult) -> str:
     if name == "literature_document":
         section = f", {inp['section']}" if inp.get("section") else ""
         return f"Read {inp.get('document')}{section} · {_count(len(result.passages), 'passage')}"
+    if name == "web_search":
+        return f'Searched the web for "{inp.get("query", "")}" · {_count(len(result.web), "page")}'
     if name == "stream_table":
         cut = f", {result.summary.get('leftOut')} left out" if result.summary.get("leftOut") else ""
         return f"Read the stream table of run {inp.get('artifactId')} · {_count(int(result.summary.get('shown', 0)), 'stream')}{cut}"
@@ -737,6 +761,7 @@ def ask(
     cited_evidence = {e for c in result.claims for e in c.evidenceIds}
     cited_passages = {r.passageId for c in result.claims for r in c.passages}
     cited_rows = {m for c in result.claims for m in c.moduleRefs}
+    cited_web = {w for c in result.claims for w in c.webIds}
     run.step(kind="final", tool=None, input=None,
              summary=f"Answered: {_count(len(result.claims), 'claim')} kept, {result.rejected} dropped", ms=0, ok=True)
     return AnswerPlan(
@@ -754,4 +779,5 @@ def ask(
         runbookDraft=run.draft,
         coverage=run.coverage,
         rows=[run.seen.rows[m] for m in sorted(cited_rows)],
+        web=[run.seen.web[w] for w in sorted(cited_web)],
     )

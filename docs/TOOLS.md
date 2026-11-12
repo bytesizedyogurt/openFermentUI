@@ -22,7 +22,7 @@ the registry holds, it holds for each of them.
 - **Writes**: a tool marked *writes* keeps something new in the project, audited as its caller's,
   through `tools/writes.py`; a read keeps nothing but the computations it caches.
 
-48 tools.
+49 tools.
 
 ## The registry
 
@@ -76,6 +76,7 @@ the registry holds, it holds for each of them.
 | `flowsheet_read` | flowsheets | read | project |
 | `catalogue_read` | catalogues | read | project |
 | `catalogue_write` | catalogues | writes | project |
+| `web_search` | web | read | project |
 
 ## Records
 

@@ -71,6 +71,22 @@ def renamed_provenance(value: Any) -> Any:
 Support = Literal["direct", "inferred", "unsupported"]
 
 
+class WebSource(BaseModel):
+    """A web page a search returned (ADR-015): what a claim cites when it
+    rests on the open web. It is a pointer, never a record: the page is held
+    by nobody here, so a claim resting on it alone is `unverified`, and a
+    number read off it is the model's estimate."""
+
+    # `web:<hash of the url>`, what a claim cites.
+    id: str
+    url: str
+    title: str
+    # The page's age as the search states it, in its words; None when it states none.
+    pageAge: str | None = None
+    # The search this page answered.
+    query: str = ""
+
+
 class Claim(BaseModel):
     """One assertion, and everything it rests on."""
 
@@ -96,6 +112,8 @@ class Claim(BaseModel):
     moduleRefs: list[str] = Field(default_factory=list)
     # ADR-006: the numbers it states, each typed with its origin; its text holds none.
     values: list[ClaimValue] = Field(default_factory=list)
+    # ADR-015: web pages it rests on, by the id web_search returned in this run.
+    webIds: list[str] = Field(default_factory=list)
 
 
 class PassageRef(BaseModel):
@@ -304,6 +322,8 @@ class AnswerPlan(BaseModel):
     coverage: CoverageMap | None = None
     # OF-BLD-015 §7.2: the module rows the claims cite.
     rows: list[ModuleRow] = Field(default_factory=list)
+    # ADR-015: the web pages the claims cite.
+    web: list[WebSource] = Field(default_factory=list)
     # OF-BLD-014 §9.2: a runbook the agent drafted, its numbers written by the
     # service (runbook_draft.py), for a person to adopt and lock.
     runbookDraft: "RunbookDraft | None" = None
@@ -1432,6 +1452,8 @@ class ToolResult(BaseModel):
     draft: "RunbookDraft | None" = None
     # Module rows a plan may cite (OF-BLD-015 §7.2).
     rows: list[ModuleRow] = Field(default_factory=list)
+    # Web pages a plan may cite (ADR-015).
+    web: list[WebSource] = Field(default_factory=list)
     # The whole of what a summary cuts to the cap, for the HTTP endpoint and
     # the MCP server: a model reads `summary` alone (OF-BLD-019 §6.1:
     # `stream_table`'s whole stream table). Nothing here is citable.
