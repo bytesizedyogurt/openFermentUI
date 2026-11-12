@@ -3963,3 +3963,10 @@ On `claude/alpha-2-2-fixes`, cut from `claude/alpha-2-2-bughunt` at `fa8db4a`, i
     `check:state`, `check:guild`, `check:plan`, `check:figures`, `test:reconcile`, `gen:components --check`,
     `gen:api --check`, `pnpm smoke` (20 screens) and `pnpm prove --steps 9` (55 checks) pass; `test_project_state.py` 74
     passed; `pnpm test:core` 3084 passed, 1 skipped, 175 deselected (5 min 19 s). No model was called.
+- The second review of the H7-04 fix (c264fb4), held to S1 and S2 at the owner's word: one S2, confirmed and fixed. A
+  flush counted every write it took as one that may have reached the service, those after the first unanswered write
+  among them, so while the service was away each change to a scope queued a write of its own and the outbox grew with
+  every keystroke. A write counts so once its request goes out (`flush`'s `sending`); `check:state` holds a scope at two
+  owed writes while the service is away, and fails on c264fb4's line. The S3 findings stand unfixed: a clash on a key
+  never kept reads "taken back", an older reading with no `chosenBy` names "another page", and `StateKept`'s docstring
+  still reads "as the page sent it" for whole rows.

@@ -697,6 +697,24 @@ const three = [e('sc-1', { id: 'sc-1' }), e('sc-2', null, 'q'), e('sc-3', { id: 
       kept() === JSON.stringify([anOverride(scope, 'titre', 7)]) && useStore.getState().activity.length === 0,
       JSON.stringify({ kept: kept(), activity: useStore.getState().activity.map((x) => x.text) }));
 
+    // The service is away: the first write's request goes out and gets no answer, and the person types on. Each later
+    // write replaces the last one the flush never reached, so the page owes the scope twice at most.
+    service();
+    page({});
+    globalThis.fetch = (async () => {
+      throw new TypeError('fetch failed');
+    }) as typeof fetch;
+    change(scope, [anOverride(scope, 'titre', 1)]);
+    await useStore.getState().flushProjectState();
+    for (let n = 2; n <= 6; n++) {
+      change(scope, [anOverride(scope, 'titre', n)]);
+      await useStore.getState().flushProjectState();
+    }
+    const owedAway = useStore.getState().stateOutbox;
+    check('while the service is away a scope’s writes stay two at most: the one that went out, and the latest',
+      owedAway.length === 2 && JSON.stringify((owedAway[1].value as Override[])[0]?.value) === '6',
+      JSON.stringify(owedAway.map((x) => (x.value as Override[])[0]?.value)));
+
     // Two tabs' queued writes of one scope, taken at load (another tab's may have been sent): Ada's titre lands, Ben's
     // is refused, and a price the person adds while the round is out lands without Ben's titre.
     service();

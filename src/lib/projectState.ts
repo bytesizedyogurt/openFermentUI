@@ -232,9 +232,14 @@ interface Flushed {
  * service's answer and the row is dropped with its reason; a service that does
  * not answer stops the flush, and everything from there on is kept. `still`,
  * asked before each row, stops the flush the same way when it answers false
- * (the browser's data was cleared while the flush ran).
+ * (the browser's data was cleared while the flush ran). `sending` is told of each row just before its request goes
+ * out, the moment it may reach the service.
  */
-export async function flush(outbox: OutboxEntry[], still: () => boolean = () => true): Promise<Flushed> {
+export async function flush(
+  outbox: OutboxEntry[],
+  still: () => boolean = () => true,
+  sending: (e: OutboxEntry) => void = () => {},
+): Promise<Flushed> {
   const refused: Flushed['refused'] = [];
   const kept: Flushed['kept'] = [];
   let sent = 0;
@@ -243,6 +248,7 @@ export async function flush(outbox: OutboxEntry[], still: () => boolean = () => 
     const e = outbox[i];
     const path = `/api/state/${encodeURIComponent(e.kind)}/${encodeURIComponent(e.id)}`;
     const headers = { 'X-OpenFerment-Project': e.project };
+    sending(e);
     try {
       if (e.value === null) {
         await call(`${path}?by=${encodeURIComponent(e.by)}`, { method: 'DELETE', headers });

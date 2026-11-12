@@ -1209,9 +1209,9 @@ export const useStore = create<OFState>()((set, get) => ({
         const pending = get().stateOutbox;
         if (!pending.length) return;
         const epoch = stateEpoch;
-        // From here each of these writes may reach the service, so a later write of a scope's overrides follows it.
-        for (const e of pending) unsent.delete(e);
-        const { left, sent, refused, kept } = await flush(pending, () => epoch === stateEpoch);
+        // A write whose request goes out may reach the service, so a later write of a scope's overrides follows it; a
+        // write the flush never reaches stays one a later write may replace.
+        const { left, sent, refused, kept } = await flush(pending, () => epoch === stateEpoch, (e) => unsent.delete(e));
         // The browser's data was cleared while the flush ran: the flush sent nothing after the clear, what it had not
         // sent went with the browser's data, and what was made since is sent from the top.
         if (epoch !== stateEpoch) continue;
