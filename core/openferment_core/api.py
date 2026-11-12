@@ -2847,8 +2847,9 @@ def _state_refused(said: str) -> dict[str, Any]:
 @app.put("/api/state/{kind}/{item_id}", response_model=StateKept, responses=_state_refused(
     "A kind the project does not keep, an id of another shape, a row naming another id, a row that does not read "
     "as its kind's model or holds a number JSON cannot carry, a second lock, a locked runbook's predictions or "
-    "measures changed, a kept deposition rewritten, or a scope's override changed by another page since this page "
-    "read it and changed by this page too: nothing kept"))
+    "measures changed, a kept deposition rewritten, an id the project keeps as a study's scenario or a model's kept "
+    "train, or a scope's override changed by another page since this page read it and changed by this page too: "
+    "nothing kept"))
 def state_put(kind: str, item_id: str, write: StateWrite) -> StateKept:
     """One row kept, read as its kind's model first (project_state.py): a
     scope's overrides sent with the rows the page read are laid on what the

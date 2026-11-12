@@ -642,3 +642,33 @@ def test_a_live_conversation_is_served_whole_an_older_turn_among_them():
     served = client().get("/api/state").json()["conversations"]
     assert served == [c.model_dump(mode="json") for c in conversations.listed()] == [KEPT]
     assert list(served[0]) == list(LiveConversation.model_fields)
+
+
+@pytest.mark.parametrize(("kind", "item_id", "row", "other", "words"), [
+    ("scenarios", "sc-1", SCENARIO, "engine", "a study's scenario"),
+    ("trains", "tr-2", BUILT, "kept", "a train a model built"),
+])
+def test_a_write_naming_a_row_another_kind_keeps_is_refused_in_words_and_the_row_stays(kind, item_id, row, other, words):
+    """Bug hunt H5-03: a study's scenario and a model's kept train share
+    their tables with a page's scenarios and trains; a page's write under
+    one's id is refused, naming that row, and the row stays as it was."""
+    table = project_state.KINDS[kind].table
+    kept = {"id": item_id, "a placeholder field": "as the other door kept it"}
+
+    async def keep() -> None:
+        async with db.session() as s:
+            await rows.put(s, table, projects.current(), item_id, kept, by="Ada Moreno", kind=other)
+
+    async def held() -> tuple[str, Any, str]:
+        async with db.session() as s:
+            r = (await s.execute(table.select().where(table.c.project_id == projects.current(),
+                                                      table.c.id == item_id))).one()
+            return r.kind, r.body, r.created_by
+
+    db.run(keep())
+    with pytest.raises(project_state.StateRefused, match=f"keeps {item_id} as {words}"):
+        project_state.put(kind, item_id, row, "Ben Okafor")
+    r = client().put(f"/api/state/{kind}/{item_id}", json={"by": "Ben Okafor", "value": row})
+    assert r.status_code == 422 and words in r.json()["detail"]
+    assert db.run(held()) == (other, kept, "Ada Moreno")
+    assert [a.action for a in audit.read()] == []

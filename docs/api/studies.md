@@ -116,7 +116,10 @@ in words. A write that does not read is a 422 naming the fields, nothing kept. `
 answers a `ProjectState`: each row as the page sent it, a field the page left out staying out (a
 deposition, measured evidence, a scenario and a saved train keep the fields their models do not
 name), and a row kept before its kind had a model that does not read named in `refused` with its
-kind, its id and why, while every other row loads.
+kind, its id and why, while every other row loads. A Proforma scenario and a train the Builder
+saved share their tables with a study's scenario and a model's kept train; a page's write under the
+id of one of those is refused in words naming it, and that row stays as its own door kept it (bug
+hunt H5-03).
 
 A scope's overrides are one row a key (bug hunt H7-04). A page writes a scope with
 `PUT /api/state/overrides/{scope}`, `{by, value, base}`: `value` the scope's list as the page now

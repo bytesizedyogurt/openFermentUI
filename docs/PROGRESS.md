@@ -111,7 +111,8 @@ session continues from this file and `git log` alone.
    (H5-01) is done, and so is the concept-graph build race its review found; group 2 (H7-01, the
    browser's shared pending-writes snapshot) is done; group 3 (H7-04, a scope's overrides written
    whole) is done, each write of a scope laid on key by key against the rows it read; group 4 (H5-03,
-   a write under one kind replacing another kind's row, in the same `_put`) is next. Groups 16
+   a write under one kind replacing another kind's row, in the same `_put`) is done; group 5 (P-02,
+   `biorepo._is_gold` reads a decision's provenance label) is next. Groups 16
    and 19 change how a key is read, a stop condition, and wait on the owner (the Log, Fixes after the
    bug hunt).
 
@@ -579,6 +580,7 @@ the line that records the decision and the decision record it stands under.
 
 | Debt | Paid at | Commit |
 |---|---|---|
+| A page's write of a scenario or a train under the id of a study's scenario or a model's kept train replaced that row in place, its kind, body and audit with it (H5-03, S1); `_put` refuses it in words naming the row the project keeps, and the row stays | the bug hunt's fix run, group 4 (12 November 2026) | the commit after `2512e3f` |
 | A scope's overrides went to the service as one list and the service replaced the scope whole, so of two tabs on one Proforma scenario's panel the second's write deleted the first's kept override with no word on either page (H7-04, S1); a write of a scope now names the rows its view stood on and the service lays it on key by key, keeping another page's keys and refusing in words a key both pages changed, nothing kept, after which the page reads the project's overrides again | the bug hunt's fix run, group 3 (12 November 2026) | the commit after `6b93984` |
 | Review decisions were keyed by record id alone in the browser's snapshot, so of two projects' offline decisions on one record id (a record id is made from a paper and its words, and one paper may be held by two projects) the later stood and the other was never sent; each is keyed by its project and record now (`decisionKey`, `decisionsIn`), and a decision kept by its record alone leaves once the page saves it under its project | the bug hunt's fix run, the fourth round of the H7-01 fix (11 November 2026) | the commit after `c12687b` |
 | Two concept-graph builds at once (`pnpm lit:graph` for two projects) could lose one project's document from an entity's `document_ids`: each build batch read `kg_entities`, merged in Python and wrote the arrays back with no lock, so the entity kept the description the lost document's passage produced and `graph.entities` showed it to the other project. Every build batch's transaction now holds one advisory lock (`graph.GRAPH_LOCK`), and a test makes two builds overlap every time | the bug hunt's fix run, 11 November 2026 (found by group 1's review) | on `claude/alpha-2-2-fixes`, after `e173803` (the Log, Fixes after the bug hunt) |
@@ -3970,3 +3972,13 @@ On `claude/alpha-2-2-fixes`, cut from `claude/alpha-2-2-bughunt` at `fa8db4a`, i
   owed writes while the service is away, and fails on c264fb4's line. The S3 findings stand unfixed: a clash on a key
   never kept reads "taken back", an older reading with no `chosenBy` names "another page", and `StateKept`'s docstring
   still reads "as the page sent it" for whole rows.
+- Group 4, H5-03 (S1): `PUT /api/state/scenarios/{id}` naming a study's scenario, and `PUT /api/state/trains/{id}`
+  naming a model's kept train, answered 200 and replaced the row in place: `_held` read the page's kind alone (scenarios
+  of kind `proforma`, trains of kind `made`) and `rows.put` upserts on the project and id. `_put` now asks the table for
+  the id under any kind (`_held_as_other`) when the page's kind holds none, and refuses in words naming the row the
+  project keeps ("the project keeps ssc-… as a study's scenario, kept through the studies routes"), nothing kept. A
+  take-back already read the page's kind and leaves the other row. The Builder's copy of a kept train takes an id of
+  its own, so no page write meets the refusal. `test_project_state.py` holds both cases (a 422 in words, the row's kind,
+  body and maker as they were, no audit), each failing without the guard; `bash bughunt/repro/H5-03/run.sh` twice reads
+  `RESULT: NO-DEFECT` (`after-fix-run1.log`, `after-fix-run2.log`). Checks: `gen:api` regenerated (the route's refusals);
+  `test_project_state.py` 76 passed; `pnpm test:core` 3086 passed, 1 skipped, 175 deselected (5 min 50 s).

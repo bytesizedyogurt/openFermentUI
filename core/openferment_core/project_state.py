@@ -642,6 +642,26 @@ async def _held(s: AsyncSession, kind: str, project_id: str, item_id: str) -> bo
     return (await s.execute(q.limit(1))).first() is not None
 
 
+# What a row of a shared table is, by its kind column, when a page's kind does not read it: a study's scenario and a
+# train a model built share their tables with a page's (migration 0004; pureos/kept.py), each written by its own door.
+OTHER_KINDS = {("scenarios", "engine"): "a study's scenario, kept through the studies routes",
+               ("trains", "kept"): "a train a model built, kept through pureOS's kept store"}
+
+
+async def _held_as_other(s: AsyncSession, kind: str, project_id: str, item_id: str) -> str | None:
+    """What the project keeps under `item_id` in this kind's table as another
+    kind, in words, when it keeps one; None when it keeps none (bug hunt
+    H5-03: the write would replace that row in place)."""
+    k = KINDS.get(kind)
+    if k is None or not k.where():
+        return None
+    q = select(k.table.c.kind).where(k.table.c.project_id == project_id, k.table.c.id == item_id)
+    other = (await s.execute(q.limit(1))).scalar()
+    if other is None:
+        return None
+    return OTHER_KINDS.get((kind, other), f"a {kind} row of kind {other!r}")
+
+
 async def _frozen(s: AsyncSession, project_id: str, runbook_id: str) -> str | None:
     """The digest a runbook's lock froze, or None while it is unlocked."""
     q = select(t.runbook_locks.c.lock_hash).where(t.runbook_locks.c.project_id == project_id,
@@ -691,6 +711,11 @@ async def _put(project_id: str, kind: str, item_id: str, value: Any, by: str,
         # writes are held against the row they follow the same way.
         await db.lock(s, "state", project_id, "runbooks" if kind == LOCKS else kind, item_id)
         existed = await _held(s, kind, project_id, item_id)
+        if not existed:
+            other = await _held_as_other(s, kind, project_id, item_id)
+            if other:
+                raise StateRefused(f"the project keeps {item_id} as {other}; a {kind} row a page keeps cannot take its "
+                                   "id, so nothing was kept")
         if kind == "runbooks":
             frozen = await _frozen(s, project_id, item_id)
             if frozen is not None and not frozen_as(value, frozen):

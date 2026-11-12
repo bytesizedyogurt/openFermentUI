@@ -14579,7 +14579,7 @@ export interface operations {
                     "application/json": components["schemas"]["Refusal"];
                 };
             };
-            /** @description A kind the project does not keep, an id of another shape, a row naming another id, a row that does not read as its kind's model or holds a number JSON cannot carry, a second lock, a locked runbook's predictions or measures changed, a kept deposition rewritten, or a scope's override changed by another page since this page read it and changed by this page too: nothing kept, in words (a list of field errors when the request's own fields are refused). */
+            /** @description A kind the project does not keep, an id of another shape, a row naming another id, a row that does not read as its kind's model or holds a number JSON cannot carry, a second lock, a locked runbook's predictions or measures changed, a kept deposition rewritten, an id the project keeps as a study's scenario or a model's kept train, or a scope's override changed by another page since this page read it and changed by this page too: nothing kept, in words (a list of field errors when the request's own fields are refused). */
             422: {
                 headers: {
                     [name: string]: unknown;
