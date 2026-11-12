@@ -143,6 +143,34 @@ def test_a_key_another_page_changed_since_this_page_read_it_refuses_the_write_in
     assert project_state.load()["overrides"] == {}
 
 
+def test_a_refusal_over_a_chosen_reading_names_who_chose_it_and_the_reading():
+    """A reading's `by` and `at` are its depositor's and the time it was
+    taken; the person who set the parameter to it is `chosenBy`, the row's
+    maker, and the refusal names them and the reading."""
+    reading = {"scope": SCOPE, "key": "titre", "value": 7.2, "by": "Dana Reyes", "at": "2026-10-01T08:00:00Z",
+               "origin": "measurement", "ref": "dep-1/de-1", "unit": "placeholder-unit", "chosenBy": "Ada Moreno"}
+    project_state.put("overrides", SCOPE, [reading], "Ada Moreno", base=[])
+    with pytest.raises(project_state.StateRefused) as refused:
+        project_state.put("overrides", SCOPE, [_o("titre", 6.0, "Ben Okafor")], "Ben Okafor", base=[])
+    words = str(refused.value)
+    assert "titre was set to the reading dep-1/de-1 by Ada Moreno" in words
+    assert "Dana Reyes" not in words and "2026-10-01T08:00:00Z" not in words
+
+
+def test_the_answer_is_the_scope_as_the_next_load_serves_it():
+    """A changed key is written again, so a load serves it after the rows
+    the write left; the answer lists the scope in that order, each row as a
+    load serves it."""
+    c = client()
+    feed, titre = _o("feed", 1.0), _o("titre", 2.0)
+    project_state.put("overrides", SCOPE, [feed, titre], "Ada Moreno", base=[])
+    r = c.put(f"/api/state/overrides/{SCOPE}",
+              json={"by": "Ada Moreno", "value": [titre, {**feed, "value": 3.0}], "base": [feed, titre]})
+    assert r.status_code == 200, r.text
+    served = c.get("/api/state").json()["overrides"][SCOPE]
+    assert r.json()["value"] == served == [titre, {**feed, "value": 3.0}]
+
+
 def test_two_pages_that_set_a_key_alike_are_one_change_and_a_number_reads_as_the_page_reads_it():
     project_state.put("overrides", SCOPE, [_o("titre", 3.0)], "Ada Moreno", base=[])
     # The other page read nothing and sends the same row: the scope already holds what it sends.

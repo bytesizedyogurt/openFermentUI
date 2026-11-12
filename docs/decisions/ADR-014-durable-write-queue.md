@@ -140,8 +140,14 @@ the queue in Chromium.
 
 A write of a scope's overrides names the rows the page's view stood on (`base`), and the service lays it on what it
 keeps key by key (bug hunt H7-04; `docs/api/studies.md`). An owed write the outbox carries keeps the rows its view
-stood on: a later write of the scope that replaces it stands on them too, a write made while the scope's write was out
-stands on what that write sent, and a write an older page queued with none replaces the scope whole, as it was made
-to. So an older copy of a scope's write changes the keys it changed alone, and one that meets a key another page
-changed since is refused in words, after which the page reads the project's overrides again. A row the service keeps
-whole (a scenario, a train) still takes whichever copy reaches it last (the Open table).
+stood on. A later write of the scope replaces it only while it has never been sent, and then stands on those rows too;
+a write a flush took (out, answered, or left when its answer was lost) or one the page took from the browser's snapshot
+at load may have reached the service, so it stays queued and the later write follows it on the rows it was made from.
+Sent in order, each lands whether or not the one before it was kept: a write the service kept already changes nothing
+the second time. A write an older page queued with no rows read replaces the scope whole, as it was made to. So an
+older copy of a scope's write changes the keys it changed alone, and one that meets a key another page changed since
+is refused in words, after which the page reads the project's overrides again; the newest read alone is laid, and a
+scope whose write the service answered while the read was out keeps what the page holds. Two copies of one write that
+added a key still land twice: the second puts back a key taken back between them, since the service cannot tell a key
+never kept from one taken back. A row the service keeps whole (a scenario, a train) takes whichever copy reaches it
+last (the Open table).

@@ -124,10 +124,11 @@ holds it, `base` the list the page's view stood on (`[]` for a scope it held non
 lays the write on what it keeps key by key (`project_state._merged`): a key the page set or took
 back is changed, a key the page left as it read it stays as kept (another page's keys among them),
 and a key another page changed since the page read it, which this write changes too, refuses the
-whole write, a 422 in words naming the key and who kept it, nothing kept. Two rows compare as the
-`Override` model reads them, so `3` and `3.0` are one value. The answer's `value` is the scope as
-it then holds, which the page shows; a page whose write was refused reads the project's overrides
-again. A write without `base` replaces the scope whole, as every write did before; a write of
+whole write, a 422 in words naming the key and who made the row the scope keeps (for a deposition's
+reading, the person who chose it and the reading), nothing kept. Two rows compare as the `Override`
+model reads them, so `3` and `3.0` are one value. The answer's `value` is the scope as the next
+load serves it, in its order, which the page shows when it differs from the rows it sent; a page
+whose write was refused reads the project's overrides again. A write without `base` replaces the scope whole, as every write did before; a write of
 another kind naming a `base` is refused in words. Each key is written on its own, so a row the write
 leaves as kept keeps its maker and its time. A list naming one key twice is refused in words.
 

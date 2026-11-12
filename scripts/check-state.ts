@@ -52,6 +52,7 @@ import {
   conversationsHeld,
   enqueue,
   flush,
+  sameOverrides,
   type OutboxEntry,
   type ProjectState,
 } from '../src/lib/projectState';
@@ -91,7 +92,7 @@ import { fmt } from '../src/engine/units';
 import { interpolate } from '../src/engine/interp';
 import { awaitingReadBack, correctedBy, correctionOf } from '../src/engine/readings';
 import { lockIntact, runbookLockHash } from '../src/engine/lock';
-import { assumptionOfOverride, byMakers, projectStateOf, snapshotOf, useStore } from '../src/store';
+import { assumptionOfOverride, byMakers, projectStateOf, queueOwed, snapshotOf, useStore } from '../src/store';
 import {
   EMPTY_SNAPSHOT,
   decisionKey,
@@ -526,31 +527,100 @@ const three = [e('sc-1', { id: 'sc-1' }), e('sc-2', null, 'q'), e('sc-3', { id: 
   const w = (value: Override[] | null, at: string, base?: Override[]): OutboxEntry =>
     ({ project: 'p', kind: 'overrides', id: scope, value, by: 'Ada', at, ...(base ? { base } : {}) });
   const queuedOnce = enqueue([w([a], '1', [])], [w([a, b], '2', [a])]);
-  check('a later write of a scope, replacing one still unsent, stands on what that write stood on',
+  check('a later write of a scope, replacing one never sent, stands on what that write stood on',
     queuedOnce.length === 1 && JSON.stringify(queuedOnce[0].base) === '[]' && queuedOnce[0].value !== null,
     JSON.stringify(queuedOnce));
   const olderPage = enqueue([w([a], '1')], [w([a, b], '2', [a])]);
   check('a later write replacing one an older page queued with no rows read replaces the scope whole, as that one did',
     olderPage.length === 1 && !('base' in olderPage[0]), JSON.stringify(olderPage));
+  const mayHave = enqueue([w([a], '1', [])], [w([a, b], '2', [a])], () => true);
+  check('a later write of a scope whose last write may have reached the service follows it, on the rows it was made from',
+    mayHave.length === 2 && JSON.stringify(mayHave[1].base) === JSON.stringify([a]), JSON.stringify(mayHave));
+  check('a scenario’s later write replaces its last queued write, sent or not',
+    enqueue([e('sc-1', 1)], [e('sc-1', 2)], () => true).length === 1);
+  check('two lists of a scope’s overrides read alike in any order, a field’s place and a null aside',
+    sameOverrides([a, { ...b, note: null }], [{ ...b }, { origin: a.origin, at: a.at, by: a.by, value: a.value, key: a.key, scope: a.scope }]) &&
+      !sameOverrides([a], [{ ...a, value: 6 }]) && !sameOverrides([a], [a, b]));
 
-  // The service stands in: each PUT body is kept, and each answer is the scope as the service holds it.
+  // The service stands in, laying each write on what it keeps key by key as project_state._merged does, and answering
+  // the scope as it then holds; a key both a write and another page changed refuses the write in words.
   const real = globalThis.fetch;
-  const bodies: { base?: unknown; value: unknown }[] = [];
-  const standIn = (answer: (body: { base?: unknown; value: unknown }, n: number) => Response, held: Override[] = []) => {
+  type Body = { base?: Override[]; value: Override[] };
+  const bodies: Body[] = [];
+  let held: Record<string, Override[]> = {};
+  let loseNext = 0;
+  let getHeld: (() => void) | null = null;
+  let deferGets = false;
+  const like = (x?: Override, y?: Override) => (x === undefined || y === undefined ? x === y : sameOverrides([x], [y]));
+  const service = () => {
     bodies.length = 0;
-    globalThis.fetch = (async (_url: string, init?: RequestInit) => {
-      if (!init?.method || init.method === 'GET') return new Response(JSON.stringify({ ...EMPTY_STATE, overrides: { [scope]: held } }), { status: 200 });
-      const body = JSON.parse(String(init.body)) as { base?: unknown; value: unknown };
+    held = {};
+    loseNext = 0;
+    deferGets = false;
+    globalThis.fetch = (async (url: string, init?: RequestInit) => {
+      const id = decodeURIComponent(String(url).split('/api/state/overrides/')[1] ?? '');
+      if (!init?.method || init.method === 'GET') {
+        const answer = () => new Response(JSON.stringify({ ...EMPTY_STATE, overrides: structuredClone(held) }), { status: 200 });
+        if (!deferGets) return answer();
+        const now = structuredClone(held);
+        return new Promise<Response>((resolve) => {
+          getHeld = () => resolve(new Response(JSON.stringify({ ...EMPTY_STATE, overrides: now }), { status: 200 }));
+        });
+      }
+      const body = JSON.parse(String(init.body)) as Body;
       bodies.push(body);
-      return answer(body, bodies.length);
+      if (!id) return new Response('{}', { status: 200 });
+      const kept = new Map((held[id] ?? []).map((o) => [o.key, o]));
+      let rows = body.value;
+      if (body.base !== undefined) {
+        const read = new Map(body.base.map((o) => [o.key, o]));
+        const sentRows = new Map(body.value.map((o) => [o.key, o]));
+        const out = new Map(kept);
+        const clashes: string[] = [];
+        for (const key of [...read.keys(), ...[...sentRows.keys()].filter((k) => !read.has(k))]) {
+          const was = read.get(key);
+          const now = sentRows.get(key);
+          if (like(was, now)) continue;
+          const there = kept.get(key);
+          if (like(there, was)) {
+            if (now) out.set(key, now);
+            else out.delete(key);
+          } else if (!like(there, now)) clashes.push(key);
+        }
+        if (clashes.length)
+          return new Response(JSON.stringify({ detail: `the overrides of ${id} changed since this page read them: ${clashes.join(', ')}` }), { status: 422 });
+        rows = [...out.values()];
+      }
+      held = { ...held, [id]: rows };
+      if (loseNext > 0) {
+        loseNext -= 1;
+        throw new TypeError('fetch failed');
+      }
+      return new Response(JSON.stringify({ kind: 'overrides', id, value: rows }), { status: 200 });
     }) as typeof fetch;
   };
-  const keptAs = (value: unknown) => new Response(JSON.stringify({ kind: 'overrides', id: scope, value }), { status: 200 });
   const settle = async () => {
     for (let i = 0; i < 5; i++) await new Promise((r) => setTimeout(r, 0));
   };
+  // The page's view of the project's overrides, and a person's change as the store's subscription queues it.
+  const page = (overrides: Record<string, Override[]>) => {
+    useStore.setState({ projectId: 'p', parameterOverrides: overrides, stateOutbox: [], activity: [] });
+    useStore.setState({ stateSeen: projectStateOf(useStore.getState()) });
+  };
+  const change = (id: string, rows: Override[]) =>
+    useStore.setState((x) => {
+      const next = { ...x, parameterOverrides: { ...x.parameterOverrides, [id]: rows } };
+      return {
+        parameterOverrides: next.parameterOverrides,
+        stateOutbox: queueOwed(x.stateOutbox, changes(x.stateSeen!, projectStateOf(next), 'p', 'Ada')),
+        stateSeen: projectStateOf(next),
+      };
+    });
+  const view = (id = scope) => JSON.stringify(useStore.getState().parameterOverrides[id] ?? null);
+  const kept = (id = scope) => JSON.stringify(held[id] ?? null);
   try {
-    standIn(() => keptAs([a, b]));
+    service();
+    held = { [scope]: [a] };
     const flushed = await flush([w([b], '3', [])]);
     check('an overrides write sends the rows it read beside the rows it keeps, and takes back the scope as answered',
       JSON.stringify(bodies[0]?.base) === '[]' && JSON.stringify(flushed.kept[0]?.value) === JSON.stringify([a, b]),
@@ -559,54 +629,142 @@ const three = [e('sc-1', { id: 'sc-1' }), e('sc-2', null, 'q'), e('sc-3', { id: 
     check('a write of another kind sends no rows read', bodies.length === 2 && !('base' in bodies[1]) && scenarioFlush.sent === 1,
       JSON.stringify(bodies));
 
-    // The store's own flush: the page's view stood on [b]; the service answers the scope with tab A's key beside it.
-    const page = (overrides: Override[]) => {
-      useStore.setState({ projectId: 'p', parameterOverrides: { [scope]: overrides } });
-      useStore.setState({ stateSeen: projectStateOf(useStore.getState()) });
-    };
-    page([b]);
-    useStore.setState({ stateOutbox: [w(useStore.getState().parameterOverrides[scope], '4', [])] });
+    // Tab A kept titre; this page, whose view of the scope held nothing, sets price: the service keeps both, and the
+    // page shows tab A's key beside its own.
+    service();
+    held = { [scope]: [a] };
+    page({});
+    change(scope, [b]);
     await useStore.getState().flushProjectState();
     const laid = useStore.getState();
     check('the page shows the scope as the service answered it, another page’s key beside its own',
-      JSON.stringify(laid.parameterOverrides[scope]) === JSON.stringify([a, b]) &&
+      kept() === JSON.stringify([a, b]) && view() === JSON.stringify([a, b]) &&
         laid.stateSeen?.overrides[scope] === laid.parameterOverrides[scope] && laid.stateOutbox.length === 0 &&
         (laid.proformaAssumptions['sc-h704'] ?? []).length === 2,
-      JSON.stringify({ view: laid.parameterOverrides[scope], owed: laid.stateOutbox.length }));
+      JSON.stringify({ view: view(), kept: kept(), owed: laid.stateOutbox.length }));
     check('the scope laid in is no new write', laid.stateSeen !== null && changes(laid.stateSeen, projectStateOf(laid), 'p', 'Ada').length === 0);
+    const own = useStore.getState().parameterOverrides[scope];
+    change(scope, [...own.filter((o) => o.key !== 'price'), { ...b, value: 2.5 }]);
+    const sentRows = useStore.getState().parameterOverrides[scope];
+    await useStore.getState().flushProjectState();
+    check('an answer holding the rows the page sent leaves the page’s rows as they stand',
+      useStore.getState().parameterOverrides[scope] === sentRows && kept() === JSON.stringify([a, { ...b, value: 2.5 }]), view());
 
-    // A change made while the write is out, to the key the write set: it stands on the rows the write sent, which
-    // the service kept, so the service reads it as this page's own second change.
+    // A change made while the scope's write is out, to the key the write set: it follows that write, on the rows the
+    // write sent, so the service reads it as this page's own second change.
+    service();
     const titreOne = anOverride(scope, 'titre', 1);
     const titreTwo = anOverride(scope, 'titre', 2);
-    page([]);
-    useStore.setState({ parameterOverrides: { [scope]: [titreOne] } });
-    useStore.setState((x) => ({ stateOutbox: enqueue(x.stateOutbox, changes(x.stateSeen!, projectStateOf(x), 'p', 'Ada')), stateSeen: projectStateOf(x) }));
-    standIn((body, n) => {
-      if (n === 1)
-        useStore.setState((x) => {
-          const next = { ...x, parameterOverrides: { [scope]: [titreTwo] } };
-          return { parameterOverrides: next.parameterOverrides, stateOutbox: enqueue(x.stateOutbox, changes(x.stateSeen!, projectStateOf(next), 'p', 'Ada')), stateSeen: projectStateOf(next) };
-        });
-      return keptAs(body.value);
-    });
+    page({});
+    change(scope, [titreOne]);
+    let typed = false;
+    const plain = globalThis.fetch;
+    globalThis.fetch = (async (url: string, init?: RequestInit) => {
+      if (!typed && init?.method === 'PUT') {
+        typed = true;
+        change(scope, [titreTwo]);
+      }
+      return plain(url, init);
+    }) as typeof fetch;
     await useStore.getState().flushProjectState();
-    check('a change made while its scope’s write was out stands on the rows that write sent',
+    check('a change made while its scope’s write was out follows that write, on the rows it sent',
       bodies.length === 2 && JSON.stringify(bodies[1].base) === JSON.stringify([titreOne]) &&
-        JSON.stringify(useStore.getState().parameterOverrides[scope]) === JSON.stringify([titreTwo]) && useStore.getState().stateOutbox.length === 0,
-      JSON.stringify(bodies));
+        view() === JSON.stringify([titreTwo]) && kept() === JSON.stringify([titreTwo]) && useStore.getState().stateOutbox.length === 0,
+      JSON.stringify({ bodies, kept: kept() }));
 
-    // The service refuses the write in words: the page says so and reads the project's overrides again.
-    page([b]);
-    useStore.setState({ stateOutbox: [w(useStore.getState().parameterOverrides[scope], '5', [])], activity: [] });
-    standIn(() => new Response(JSON.stringify({ detail: `the overrides of ${scope} changed since this page read them` }), { status: 422 }), [a]);
+    // The service keeps a write and its answer is lost; the person then takes the key back before the page sends
+    // again. The write the service kept goes again first, changing nothing, and the take-back follows it.
+    service();
+    page({});
+    change(scope, [anOverride(scope, 'titre', 5)]);
+    loseNext = 1;
+    await useStore.getState().flushProjectState();
+    const leftAfterLoss = useStore.getState().stateOutbox.length;
+    change(scope, []);
+    await useStore.getState().flushProjectState();
+    check('a key taken back after a write whose answer was lost is taken back on the service and on the page',
+      leftAfterLoss === 1 && kept() === '[]' && view() === '[]' && useStore.getState().stateOutbox.length === 0,
+      JSON.stringify({ leftAfterLoss, kept: kept(), view: view(), bodies }));
+    // The same with a value changed: the page's second value stands, and nothing is refused.
+    service();
+    page({});
+    change(scope, [anOverride(scope, 'titre', 6)]);
+    loseNext = 1;
+    await useStore.getState().flushProjectState();
+    change(scope, [anOverride(scope, 'titre', 7)]);
+    await useStore.getState().flushProjectState();
+    check('a value changed after a write whose answer was lost stands, and the page’s own write is never refused as another page’s',
+      kept() === JSON.stringify([anOverride(scope, 'titre', 7)]) && useStore.getState().activity.length === 0,
+      JSON.stringify({ kept: kept(), activity: useStore.getState().activity.map((x) => x.text) }));
+
+    // Two tabs' queued writes of one scope, taken at load (another tab's may have been sent): Ada's titre lands, Ben's
+    // is refused, and a price the person adds while the round is out lands without Ben's titre.
+    service();
+    page({});
+    const titreAda = anOverride(scope, 'titre', 5);
+    const titreBen = anOverride(scope, 'titre', 6, { by: 'Ben' });
+    const loadedA = w([titreAda], '6', []);
+    const loadedB = w([titreBen], '7', []);
+    useStore.setState({ parameterOverrides: { [scope]: loadedB.value as Override[] }, stateOutbox: [loadedA, loadedB] });
+    useStore.setState({ stateSeen: projectStateOf(useStore.getState()) });
+    const price = anOverride(scope, 'price', 1.25);
+    let added = false;
+    const plainTwo = globalThis.fetch;
+    globalThis.fetch = (async (url: string, init?: RequestInit) => {
+      if (!added && init?.method === 'PUT') {
+        added = true;
+        change(scope, [titreBen, price]);
+      }
+      return plainTwo(url, init);
+    }) as typeof fetch;
     await useStore.getState().flushProjectState();
     await settle();
-    const reread = useStore.getState();
+    check('a refused write’s value stays refused when a change made while it was out follows it',
+      kept() === JSON.stringify([titreAda, price]) && view() === JSON.stringify([titreAda, price]) &&
+        useStore.getState().activity.some((x) => x.text.includes('changed since this page read them')),
+      JSON.stringify({ kept: kept(), view: view(), bases: bodies.map((x) => x.base) }));
+
+    // The service refuses a write in words: the page says so and reads the project's overrides again.
+    service();
+    held = { [scope]: [a] };
+    page({});
+    change(scope, [{ ...a, value: 9 }]);
+    held = { [scope]: [{ ...a, value: 8 }] };
+    await useStore.getState().flushProjectState();
+    await settle();
     check('a refused write of a scope is said in the service’s words, and the page shows the scope as the service keeps it',
-      reread.activity.some((x) => x.text.includes('changed since this page read them')) &&
-        JSON.stringify(reread.parameterOverrides[scope]) === JSON.stringify([a]) && reread.stateSeen?.overrides === reread.parameterOverrides,
-      JSON.stringify({ view: reread.parameterOverrides[scope], activity: reread.activity.map((x) => x.text) }));
+      useStore.getState().activity.some((x) => x.text.includes('changed since this page read them')) &&
+        view() === JSON.stringify([{ ...a, value: 8 }]) && useStore.getState().stateSeen?.overrides === useStore.getState().parameterOverrides,
+      JSON.stringify({ view: view(), activity: useStore.getState().activity.map((x) => x.text) }));
+
+    // The read after a refusal is out while another scope's write is kept: the read predates that write, and the page
+    // keeps the scope as the service answered it.
+    service();
+    const other = 'proforma:sc-h704-other';
+    const j = anOverride(other, 'j', 5);
+    held = { [scope]: [a] };
+    page({});
+    change(scope, [{ ...a, value: 9 }]);
+    held = { [scope]: [{ ...a, value: 8 }] };
+    deferGets = true;
+    let madeOther = false;
+    const plainThree = globalThis.fetch;
+    globalThis.fetch = (async (url: string, init?: RequestInit) => {
+      if (!madeOther && init?.method === 'PUT') {
+        madeOther = true;
+        change(other, [j]);
+      }
+      return plainThree(url, init);
+    }) as typeof fetch;
+    await useStore.getState().flushProjectState();
+    await settle();
+    const before704 = view(other);
+    (getHeld as (() => void) | null)?.();
+    await settle();
+    check('a read of the overrides that predates a write the service answered leaves that scope as answered',
+      before704 === JSON.stringify([j]) && view(other) === JSON.stringify([j]) && view() === JSON.stringify([{ ...a, value: 8 }]) &&
+        useStore.getState().stateSeen?.overrides === useStore.getState().parameterOverrides,
+      JSON.stringify({ before704, after: view(other), view: view(), kept: kept(other) }));
   } finally {
     globalThis.fetch = real;
     useStore.setState({ projectId: null, parameterOverrides: {}, proformaAssumptions: {}, stateSeen: null, stateOutbox: [], activity: [] });

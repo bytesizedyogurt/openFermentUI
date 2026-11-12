@@ -75,6 +75,7 @@ import {
   flush,
   loadProjectState,
   rowKey,
+  sameOverrides,
   type OutboxEntry,
   type ProjectRows,
   type ProjectState,
@@ -1108,7 +1109,7 @@ export const useStore = create<OFState>()((set, get) => ({
       });
     // Rows this browser kept before alpha 2.0 go to the open project, once.
     const legacy = get().stateLegacy;
-    const outbox = legacy ? enqueue(get().stateOutbox, changes(EMPTY_STATE, legacy, project, decidedBy())) : get().stateOutbox;
+    const outbox = legacy ? queueOwed(get().stateOutbox, changes(EMPTY_STATE, legacy, project, decidedBy())) : get().stateOutbox;
     // What this browser still owes the service stands over what it holds.
     get().applyProjectState(applyEntries(held, outbox.filter((e) => e.project === project)));
     set({ stateSeen: projectStateOf(get()), stateOutbox: outbox, stateLegacy: null, stateProblem: null });
@@ -1208,35 +1209,34 @@ export const useStore = create<OFState>()((set, get) => ({
         const pending = get().stateOutbox;
         if (!pending.length) return;
         const epoch = stateEpoch;
+        // From here each of these writes may reach the service, so a later write of a scope's overrides follows it.
+        for (const e of pending) unsent.delete(e);
         const { left, sent, refused, kept } = await flush(pending, () => epoch === stateEpoch);
         // The browser's data was cleared while the flush ran: the flush sent nothing after the clear, what it had not
         // sent went with the browser's data, and what was made since is sent from the top.
         if (epoch !== stateEpoch) continue;
+        for (const { entry } of kept) if (entry.kind === 'overrides') overridesAnswered.set(rowKey(entry), ++overridesAnswers);
         set((s) => {
-          // A change made while the flush ran replaces its row's last unsent write, the one the page's view stood on.
-          // A scope's overrides changed while their write was out stood on that write, which the service kept: the
-          // change stands on the rows the write sent (bug hunt H7-04).
-          const answered = new Map(kept.map((k) => [rowKey(k.entry), k]));
-          const made = s.stateOutbox
-            .filter((e) => !pending.includes(e))
-            .map((e) => {
-              const was = answered.get(rowKey(e));
-              return was && e.kind === 'overrides' && e.value !== null ? { ...e, base: was.entry.value ?? [] } : e;
-            });
+          // A change made while the flush ran replaces its row's last unsent write, the one the page's view stood on;
+          // a scope's overrides changed while their write was out follow that write, on the rows it sent (`queueOwed`).
+          const made = s.stateOutbox.filter((e) => !pending.includes(e));
           // The scope as the service answered it, another page's keys among them, where the page's view still stands
-          // on the write it sent: the page shows it, and its next change stands on it.
-          const madeRows = new Set(made.map(rowKey));
+          // on the write it sent and no later write of the scope waits: the page shows it, and its next change stands
+          // on it. An answer holding the rows the page sent changes nothing on the page.
+          const waiting = new Set([...made, ...left].map(rowKey));
+          const answered = new Map(kept.map((k) => [rowKey(k.entry), k]));
           let parameterOverrides = s.parameterOverrides;
           let seen = s.stateSeen?.overrides ?? {};
           for (const { entry, value } of answered.values()) {
             if (entry.kind !== 'overrides' || entry.value === null || entry.project !== s.projectId || !Array.isArray(value)) continue;
-            if (madeRows.has(rowKey(entry)) || parameterOverrides[entry.id] !== entry.value || seen[entry.id] !== entry.value) continue;
+            if (waiting.has(rowKey(entry)) || parameterOverrides[entry.id] !== entry.value || seen[entry.id] !== entry.value) continue;
+            if (sameOverrides(value, entry.value)) continue;
             parameterOverrides = { ...parameterOverrides, [entry.id]: value as Override[] };
             seen = { ...seen, [entry.id]: value as Override[] };
           }
           const laid = parameterOverrides !== s.parameterOverrides && s.stateSeen !== null;
           return {
-            stateOutbox: enqueue(left, made),
+            stateOutbox: queueOwed(left, made),
             ...(laid && s.stateSeen
               ? {
                   parameterOverrides,
@@ -2627,7 +2627,7 @@ export const useStore = create<OFState>()((set, get) => ({
         // The project rows still owed to the service, and the rows this
         // browser kept itself before alpha 2.0, carried to the open project
         // when its rows load (hydrateProjectState).
-        stateOutbox: enqueue(snap.outbox ?? [], s.stateOutbox),
+        stateOutbox: enqueue(snap.outbox ?? [], s.stateOutbox, mayHaveLanded),
         stateLegacy: legacyStateOf(snap),
         durableReady: durableAvailable(),
         // This project's decisions alone (a decision saved before decisions named their project is this page's).
@@ -3814,15 +3814,44 @@ function owedLedger(ledger: Guild, owed: Guild | undefined): Guild {
 let stateFlushing = false;
 
 /**
+ * The writes this page made that no flush has taken yet. Each may give way to a later write of its row; a write a
+ * flush took, or one the page took from the browser's snapshot at load, may have reached the service already.
+ */
+const unsent = new WeakSet<OutboxEntry>();
+const mayHaveLanded = (e: OutboxEntry) => !unsent.has(e);
+
+/**
+ * Queue the page's own `entries` behind `outbox` (lib/projectState.ts `enqueue`): a later write of a row replaces its
+ * last write still unsent, and a scope's overrides follow a write of the scope that may have reached the service, on
+ * the rows they were made from, so the two land in order (bug hunt H7-04).
+ */
+export function queueOwed(outbox: OutboxEntry[], entries: OutboxEntry[]): OutboxEntry[] {
+  const queued = enqueue(outbox, entries, mayHaveLanded);
+  for (const e of queued.slice(queued.length - entries.length)) unsent.add(e);
+  return queued;
+}
+
+/** Each scope's overrides the service answered, by `rowKey`, with the count of answers when it did. */
+const overridesAnswered = new Map<string, number>();
+let overridesAnswers = 0;
+/** The newest read of the project's overrides; an older one that answers later is set aside. */
+let overridesReads = 0;
+
+/**
  * Read the open project's overrides again once the service refused a write of a scope's overrides (bug hunt H7-04):
  * the page shows each scope as the service keeps it, what this browser still owes laid over it, and the next change
- * stands on that. What was read is laid while the same project stays open; a read that fails is said in words.
+ * stands on that. A scope whose write the service answered while the read was out keeps what the page holds, since the
+ * read may predate that write; the newest read alone is laid, while the same project stays open. A read that fails is
+ * said in words.
  */
 async function rereadOverrides(project: string): Promise<void> {
+  const read = ++overridesReads;
+  const from = overridesAnswers;
   let held: ProjectState;
   try {
     held = await loadProjectState();
   } catch (e) {
+    if (read !== overridesReads) return;
     useStore.getState().logActivity({
       at: stamp(),
       icon: 'alert',
@@ -3832,9 +3861,17 @@ async function rereadOverrides(project: string): Promise<void> {
     });
     return;
   }
+  if (read !== overridesReads) return;
   useStore.setState((s) => {
     if (s.projectId !== project || !s.stateSeen) return {};
     const overrides = applyEntries(held, s.stateOutbox.filter((e) => e.project === project)).overrides;
+    for (const [row, n] of overridesAnswered) {
+      if (n <= from) continue;
+      const scope = row.split('\u0000')[2];
+      if (!row.startsWith(`${project}\u0000overrides\u0000`) || scope === undefined) continue;
+      if (scope in s.parameterOverrides) overrides[scope] = s.parameterOverrides[scope];
+      else delete overrides[scope];
+    }
     return { parameterOverrides: overrides, proformaAssumptions: assumptionsFromOverrides(overrides), stateSeen: { ...s.stateSeen, overrides } };
   });
 }
@@ -3877,7 +3914,7 @@ if (typeof window !== 'undefined') {
       return;
     const now = projectStateOf(s);
     const owed = changes(s.stateSeen, now, s.projectId, decidedBy());
-    useStore.setState(owed.length ? { stateSeen: now, stateOutbox: enqueue(s.stateOutbox, owed) } : { stateSeen: now });
+    useStore.setState(owed.length ? { stateSeen: now, stateOutbox: queueOwed(s.stateOutbox, owed) } : { stateSeen: now });
     if (owed.length) void useStore.getState().flushProjectState();
   });
 }

@@ -626,7 +626,7 @@ the line that records the decision and the decision record it stands under.
 | Component tests on fixtures recorded from the real service (`pnpm record:fixtures`, alpha 2.0 prompt §9.3) are unbuilt; the walk and the smoke run against the real service | a stage after alpha 2.2 that builds `pnpm record:fixtures` |
 | No offline test computes on a published genome-scale model (Yeast9 and iMM904 need their fetched files, caches kept outside git; Departures, §5.5 stage 2); a model add-on applied in the worker, and a metabolite-defined product's demand through the worker, are untested | a test under the marker `slow` or `live`, on a host that holds the fetched files |
 | Two concept-graph builds at once (`pnpm lit:graph` for two projects that share a document) can each send a batch of a shared passage to the model before either stamps it, and pay for that batch twice; `GRAPH_LOCK` keeps the graph whole, and the spend is the same as two builds run one after the other with no stamp between them (found by the review of the graph lock, 11 November 2026) | a build that reads the stamps again inside the lock before it asks the model, or one build at a time for the instance |
-| Two pages owing one row send it each on its own: a copy a loading page took at load, a tab's own queue, or what a closing tab left (`foldParting`) can reach the service after another page's later write of the row, and a row the service keeps whole (a scenario, a train, a runbook, a scenario's fits) then takes the older copy (found by the reviews of the H7-01 fix, 11 November 2026; ADR-014's note). A scope's overrides are laid on key by key since group 3 (H7-04), so an older copy of one changes its own keys alone and a key changed since is refused in words | a write that names the version of the row it read, refused in words when the row changed since, for each kind the service keeps whole |
+| Two pages owing one row send it each on its own: a copy a loading page took at load, a tab's own queue, or what a closing tab left (`foldParting`) can reach the service after another page's later write of the row, and a row the service keeps whole (a scenario, a train, a runbook, a scenario's fits) then takes the older copy (found by the reviews of the H7-01 fix, 11 November 2026; ADR-014's note). A scope's overrides are laid on key by key since group 3 (H7-04), so an older copy of one changes its own keys alone and a key changed since is refused in words; two copies of one write that added a key still land twice, and the second puts back a key taken back between them (found by the review of the H7-04 fix, 12 November 2026) | a write that carries an id of its own, which the service keeps and answers a second time as kept, for every kind; and a write that names the version of the row it read, refused in words when the row changed since, for each kind the service keeps whole |
 | `units.json` maps `wt%` and `% (w/w)` to `% CDW`, aliases written for the PHA program; changing them changes how a stored record converts | the vocabulary review, after alpha 2.2, with a migration for the records it converts |
 | RunbookDetail's held-for-review panel keeps words of Dominion's era: candidates near a claimed identity band, a ruling with legal consequences, and two rulings (a boundary accepted as mapped; candidates excluded pending counsel) that `store.resolveRunbookReview` writes into the held stage, with a boundary map among the runbook's outputs. No code in this build sets a runbook held for review, so the panel answers only a row kept in that state | the stage that lets a runbook be held for review, with that state's own words and rulings |
 | `fermos.forecast_run` keeps `duration_h`, a length the calling code sets as its own convention, which the tests and their stand-ins pass (`standins.py`, `test_fermos.py`, `test_fermos_3r.py`, `test_proforma_fermos.py`, `test_proforma_ceiling.py`); the routes, the tools and the engine set a forecast's length as a typed `t_end` | the change that has those tests set a typed `t_end`, or reach `fermos.forecast()` through a helper of their own |
@@ -3920,7 +3920,7 @@ On `claude/alpha-2-2-fixes`, cut from `claude/alpha-2-2-bughunt` at `fa8db4a`, i
     kept, a key taken back since refused, number forms, a kept row's maker and time, and the refusals of a base. Eleven
     in `scripts/check-state.ts` (a scope's overrides from two pages): the rows a write carries, what a replacing write
     stands on, the body sent and the answer taken back, the store laying the answer in, a change made while its
-    scope's write was out, and a refusal said and read again; the in-flight check fails with the rebase line removed.
+    scope's write was out, and a refusal said and read again (the review below rewrote the in-flight case).
   - The reproduction: `bash bughunt/repro/H7-04/run.sh`, twice in Chromium over the built app, reads
     `RESULT: NO-DEFECT` (`after-fix-run1.log`, `after-fix-run2.log`): after tab B typed `titre=5.678` the service held
     `feed_glucose_conc=1.234` and `titre=5.678`, and tab A after a reload showed its value overridden.
@@ -3930,3 +3930,36 @@ On `claude/alpha-2-2-fixes`, cut from `claude/alpha-2-2-bughunt` at `fa8db4a`, i
     `check:guild`, `test:reconcile`, `gen:components --check`, `pnpm build`, `pnpm smoke` (20 screens) and
     `pnpm prove --steps 9` (55 checks) pass; `test_project_state.py` 72 passed; `pnpm test:core` 3082 passed, 1
     skipped, 175 deselected (5 min 59 s). No model was called.
+- The review of the H7-04 fix (4d224fd): three readers (the service's merge, the page's queue, regressions and
+  records), a verifier per claim; 11 claims, 9 confirmed, 1 refuted and 1 confirmed of the same order, read below as
+  one S3.
+  - Fixed, the page's queue (four claims, two S2): a later write of a scope replaced the scope's last queued write and
+    took its rows read, even when that write had reached the service (its answer lost, sent and saved at a closing
+    page, or another tab's taken at load), so a key taken back stayed kept, or the page's own second change was refused
+    as another page's; and the rebase after a round took the rows of the row's last kept write, so a change made while
+    a refused write was out could carry the refused value in. A later write now replaces only a write this page never
+    handed to a flush (`unsent`, `queueOwed`); any other stays queued, and the later write follows it on the rows
+    `changes` gave it. Sent in order, each lands whether or not the one before was kept. The rebase is gone.
+  - Fixed, the read after a refusal (two claims, one S2): a read that predated a write the service answered while it
+    was out laid the older scope over the page. The newest read alone is laid, and a scope the service answered since
+    the read began keeps what the page holds (`rereadOverrides`).
+  - Fixed, the refusal's words (two claims, S3): a chosen reading's depositor and reading time were named as who kept
+    the key and when; the words name the row's maker and, for a reading, the reading (`_changed_since`).
+  - Fixed, the answer's order (S3): a changed key is written again and a load serves it last, while the answer kept it
+    in place, so the page laid in a reordered list and the panel resolved again. The answer is the scope as the next
+    load serves it (`_put` reads the scope again; `_served`), and the page lays an answer in only when its rows differ
+    from those it sent (`sameOverrides`).
+  - Recorded (S3): two copies of one write that added a key (two tabs holding one owed write, H7-01) both land, and
+    the second puts back a key taken back between them; comparing rows cannot tell a key never kept from one taken
+    back. A copy replaced the scope whole before the fix. The Open row names the remedy, a write that carries an id
+    the service keeps, and ADR-014's note says so.
+  - Tests: two in `test_project_state.py` (a refusal over a chosen reading names who chose it and the reading; the
+    answer is the scope as the next load serves it), each failing on 4d224fd's lines. `check:state`'s H7-04 section
+    runs the store against a stand-in that merges as `_merged` does: a write whose answer was lost, then a take-back or
+    a second value; two tabs' writes taken at load, one refused, with a change made while it was out; a read that
+    predates a write the service answered; an answer holding the rows sent. Five fail with the replacement rule
+    removed, one with the read's guard removed, one with the answer's comparison removed.
+  - Checks: `pnpm typecheck`, `pnpm build`, the reproduction twice (`RESULT: NO-DEFECT`, the logs beside the hunt's),
+    `check:state`, `check:guild`, `check:plan`, `check:figures`, `test:reconcile`, `gen:components --check`,
+    `gen:api --check`, `pnpm smoke` (20 screens) and `pnpm prove --steps 9` (55 checks) pass; `test_project_state.py` 74
+    passed; `pnpm test:core` 3084 passed, 1 skipped, 175 deselected (5 min 19 s). No model was called.

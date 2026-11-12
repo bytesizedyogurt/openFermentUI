@@ -575,6 +575,29 @@ def _as_read(o: dict[str, Any] | None) -> dict[str, Any] | None:
         return None
 
 
+def _changed_since(key: str, o: dict[str, Any] | None) -> str:
+    """How another page changed a key since this page read it, in words: who
+    made the row the scope keeps (a reading by the person who chose it, its
+    depositor and its time staying the reading's own), or that the key was
+    taken back."""
+    if o is None:
+        return f"{key} was taken back"
+    who = _override_maker(o, "") or "another page"
+    if o.get("origin") == "measurement":
+        return f"{key} was set to the reading {o.get('ref') or 'of a deposition'} by {who}"
+    return f"{key} was kept by {who}" + (f" at {o['at']}" if isinstance(o.get("at"), str) and o["at"] else "")
+
+
+def _served(o: dict[str, Any]) -> dict[str, Any] | None:
+    """An override as a load serves it (`state`, api.AS_KEPT): read as its
+    model, the fields it was sent with alone; None for a row that does not
+    read, which a load leaves out."""
+    try:
+        return READERS[OVERRIDES][0].validate_python(o).model_dump(mode="json", exclude_unset=True)
+    except ValidationError:
+        return None
+
+
 def _merged(item_id: str, kept: list[dict[str, Any]], base: list[dict[str, Any]],
             value: list[dict[str, Any]]) -> list[dict[str, Any]]:
     """A scope's overrides once a page's write is laid on what the service
@@ -599,9 +622,7 @@ def _merged(item_id: str, kept: list[dict[str, Any]], base: list[dict[str, Any]]
             else:
                 out.pop(key, None)
         elif there != now:
-            o = held.get(key)
-            clashes.append(f"{key} was taken back" if there is None else
-                           f"{key} was kept by {o.get('by') or 'another page'} at {o.get('at') or 'a later time'}")
+            clashes.append(_changed_since(key, held.get(key) if there is not None else None))
     if clashes:
         raise StateRefused(f"the overrides of {item_id} changed since this page read them: {'; '.join(clashes)}; this "
                            "page changed the same, so nothing in this write was kept, and the scope as the service "
@@ -710,6 +731,9 @@ async def _put(project_id: str, kind: str, item_id: str, value: Any, by: str,
                                                           t.overrides.c.scope == item_id, t.overrides.c.key == o["key"]))
                 await s.execute(insert(t.overrides).values(project_id=project_id, scope=item_id, key=o["key"], body=o,
                                                            created_by=_override_maker(o, by)))
+            # What was kept is the scope as the next load serves it, in its order: the rows the write left first, as
+            # they were kept, then each it changed or added.
+            value = (await _overrides(s, project_id, item_id)).get(item_id, [])
         else:
             k = KINDS[kind]
             body = {"id": item_id, "byInput": value} if kind == "fits" else value
@@ -755,7 +779,7 @@ def put(kind: str, item_id: str, value: Any, by: str, base: Any = None) -> Any:
     kept = db.run(_put(projects.current(), kind, item_id, checked, (by or "").strip() or UNNAMED, read))
     # The scope answered as a load serves it: a row kept before its kind had a model, that does not read, stays kept
     # and unserved (`state`).
-    return [o for o in kept if _as_read(o) is not None] if kind == OVERRIDES else kept
+    return [row for o in kept if (row := _served(o)) is not None] if kind == OVERRIDES else kept
 
 
 async def _remove(project_id: str, kind: str, item_id: str, by: str) -> None:

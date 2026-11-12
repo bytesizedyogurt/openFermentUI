@@ -160,10 +160,20 @@ export function conversationsHeld(saved: LiveConversation[], current: LiveConver
 }
 
 /**
- * Add `entries` to `outbox`, a later write of a row replacing an earlier one still unsent. The later write of a
- * scope's overrides stands on what the one it replaces stood on, which the service has not seen changed (`base`).
+ * Add `entries` to `outbox`, a later write of a row replacing an earlier one still unsent.
+ *
+ * A scope's overrides are laid on key by key against the rows a write read (`base`), so a later write of a scope
+ * replaces the scope's last queued write only while that write has never been sent (`mayHaveLanded` says no): it then
+ * stands on what that write stood on, which the service has not seen changed. A write that may have reached the
+ * service (sent, its answer lost, or taken from another tab at load) stays queued, and the later write follows it on
+ * the rows it was made from, so the two land in order whether or not the first was kept (bug hunt H7-04).
  */
-export function enqueue(outbox: OutboxEntry[], entries: OutboxEntry[]): OutboxEntry[] {
+export function enqueue(
+  outbox: OutboxEntry[],
+  entries: OutboxEntry[],
+  mayHaveLanded: (e: OutboxEntry) => boolean = () => false,
+): OutboxEntry[] {
+  const merges = (e: OutboxEntry) => e.kind === 'overrides' && e.value !== null;
   const later = new Set(entries.map(rowKey));
   // The page's row stands on the last queued write of it, which the new write replaces; an earlier write of the
   // row, another tab's that the page took at load, stays for the service to rule on in order (durable.ts).
@@ -171,14 +181,37 @@ export function enqueue(outbox: OutboxEntry[], entries: OutboxEntry[]): OutboxEn
   outbox.forEach((e, i) => {
     if (later.has(rowKey(e))) last.set(rowKey(e), i);
   });
-  const replaced = new Set(last.values());
+  const replaced = new Set<number>();
   const added = entries.map((e) => {
     const i = last.get(rowKey(e));
-    if (i === undefined || e.kind !== 'overrides' || e.value === null) return e;
+    if (i === undefined) return e;
+    if (!merges(e)) {
+      replaced.add(i);
+      return e;
+    }
+    if (mayHaveLanded(outbox[i])) return e;
+    replaced.add(i);
     const { base: _stood, ...rest } = e;
     return 'base' in outbox[i] ? { ...rest, base: outbox[i].base } : rest;
   });
   return [...outbox.filter((_, i) => !replaced.has(i)), ...added];
+}
+
+/** Whether two lists of a scope's overrides hold the same rows, each read by its key and its fields, in any order. */
+export function sameOverrides(a: unknown, b: unknown): boolean {
+  if (!Array.isArray(a) || !Array.isArray(b) || a.length !== b.length) return false;
+  const canon = (v: unknown): string =>
+    Array.isArray(v)
+      ? `[${v.map(canon).join(',')}]`
+      : v !== null && typeof v === 'object'
+        ? `{${Object.keys(v as Record<string, unknown>)
+            .filter((k) => (v as Record<string, unknown>)[k] !== undefined && (v as Record<string, unknown>)[k] !== null)
+            .sort()
+            .map((k) => `${JSON.stringify(k)}:${canon((v as Record<string, unknown>)[k])}`)
+            .join(',')}}`
+        : JSON.stringify(v);
+  const rows = (l: unknown[]) => l.map(canon).sort();
+  return JSON.stringify(rows(a)) === JSON.stringify(rows(b));
 }
 
 interface Flushed {
