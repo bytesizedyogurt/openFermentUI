@@ -10,7 +10,7 @@ from __future__ import annotations
 import asyncio
 import json
 import threading
-from datetime import date, timedelta
+from datetime import date, datetime, timezone, timedelta
 from pathlib import Path
 
 import pytest
@@ -37,7 +37,16 @@ from openferment_core.models import (
 )
 
 FIXTURE = Path(__file__).parent / "fixtures" / "competence.json"
-TODAY = date.today().isoformat()
+
+
+def _utc_today() -> date:
+    """The day as the service stamps it. The local calendar's day is a day
+    behind UTC's for part of every evening west of Greenwich, and a test that
+    took the local day failed in those hours."""
+    return datetime.now(timezone.utc).date()
+
+
+TODAY = _utc_today().isoformat()
 
 
 @pytest.fixture(autouse=True)
@@ -101,7 +110,7 @@ def team():
     guild.write_person(person("p-eric", "Eric Habimana"))
     guild.write_person(person("p-patrick", "Patrick Mugisha"))
     guild.write_person(person("p-qa", "Client QA", "auditor"))
-    day = (date.today() - timedelta(days=20)).isoformat()
+    day = (_utc_today() - timedelta(days=20)).isoformat()
     guild.write_evidence(entry("e-desig-eric", "p-eric", "designation", day, observer="p-sean"))
     guild.write_evidence(entry("e-pat-k", "p-patrick", "knowledge", day))
     for i in range(3):
@@ -173,7 +182,7 @@ def test_a_run_calls_every_criterion_and_says_what_was_seen(team):
     bad = good.model_copy(update={"results": [*good.results[:-1], CheckResult(skillId="SK-OD", criterion=99, meets=True)]})
     refused("results", checks.record, c.id, bad)
     refused("note", checks.record, c.id, all_ok(c.id, note=" "))
-    refused("date", checks.record, c.id, good.model_copy(update={"at": (date.today() + timedelta(days=5)).isoformat()}))
+    refused("date", checks.record, c.id, good.model_copy(update={"at": (_utc_today() + timedelta(days=5)).isoformat()}))
     assert guild.read().evidence[-1].kind == "supervised", "nothing refused reached the ledger"
 
     done = checks.record(c.id, good)
@@ -271,9 +280,9 @@ def test_a_run_on_the_ledger_with_its_check_still_open_is_closed_from_the_ledger
 
 def test_a_run_is_dated_on_or_after_its_proposal(team):
     (c,) = checks.propose(None)
-    early = (date.today() - timedelta(days=5)).isoformat()
+    early = (_utc_today() - timedelta(days=5)).isoformat()
     refused("date", checks.record, c.id, all_ok(c.id).model_copy(update={"at": early}))
-    yesterday = (date.today() - timedelta(days=1)).isoformat()
+    yesterday = (_utc_today() - timedelta(days=1)).isoformat()
     assert checks.record(c.id, all_ok(c.id).model_copy(update={"at": yesterday})).state == "done", "a day of slack for the bench's calendar"
 
 

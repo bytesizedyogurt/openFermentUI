@@ -27,6 +27,7 @@
 - C: `pnpm ready` (or `pnpm ready --offline`) says in rows whether the service can run: the database, both schemas, pgvector, the embedder, the model routes and the key.
 - C: `pnpm eval seed` and `pnpm eval run [--live]` keep and score Postdoc's evaluation set in the project `OPENFERMENT_PROJECT` names; `--suite ethanol` is the owner's twelve, `--tag` names a route table, `--judge` and `pnpm eval judge` add the `judge` route's scores, and `pnpm eval summary` sets the tags side by side (`docs/api/postdoc.md`).
 - C: `pnpm gen:api`, `pnpm gen:tools` and `pnpm gen:components` write `docs/api/openapi.json` with `src/api/types.gen.ts`, `docs/TOOLS.md` and `COMPONENTS.md`; verify fails on drift, so regenerate a generated file and leave it unedited by hand.
+- C: `bash start.sh` (or `openFerment.command` on a Mac) sets up and starts everything from a fresh folder on a PostgreSQL of the folder's own in `.openferment/pg`, with no Node needed when `dist/` is there; `pnpm package` writes the download, a zip of HEAD with the built app (`START-HERE.md`).
 - C: `pnpm smoke` opens every rail entry against the real service and needs a build; `pnpm dev` serves the client on Vite.
 - R: `pnpm test:core` green before every commit; push after every step; never force-push; never commit `core/.env` or a database dump (§11.2).
 - C: `test:sim` and `test:lit` green before a push that touches what they test (§11.2 held them to each stage gate of the build).

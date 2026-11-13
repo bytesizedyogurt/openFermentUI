@@ -67,6 +67,12 @@ could not reach Europe PMC or Hugging Face, so nothing here was asked of a live 
 - **Added, the open web** (ADR-015): `web_search`, the forty-ninth tool; a claim cites a page in
   `webIds`, and the answer shows the pages under the claim, marked unverified. Held by stand-ins
   (`test_web_search.py`); the first live search is owed (Live owed).
+- **Added, the download**: `start.sh` sets up and starts everything from a fresh folder (tools
+  through Homebrew on a Mac, `uv sync`, a PostgreSQL of the folder's own in `.openferment/pg` on a
+  port of its own, the key asked for once, migrate, ready, the service on loopback serving
+  `dist/`), `openFerment.command` is its double-click on a Mac, and `pnpm package` writes the zip
+  (HEAD plus the built app; no key, no database). Run here on Linux as a fresh user: set up,
+  started, a plant run through it, stopped clean. Not run on macOS in this session.
 - **Opus**: nothing to change. The answer chain is Claude Opus 5.5 then Claude Sonnet 5.5 by
   default (`llm.DEFAULT_PRIMARY`), and `pnpm ready` says which models a key reaches. What holds a
   live answer is the account's usage limit (Blockers), which only the owner can raise.

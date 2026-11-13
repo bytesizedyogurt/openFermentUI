@@ -4,6 +4,9 @@ dist/
 *.local
 .vite/
 .cache/
+# start.sh's own database and state, and what scripts/package.sh writes.
+.openferment/
+.package/
 
 # ── the service (core/) ────────────────────────────────────────────────
 # The API key lives in core/.env and must never be committed. This entry is

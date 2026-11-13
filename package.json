@@ -35,6 +35,8 @@
     "intake:extract": "cd core && uv run python -m openferment_core.extract",
     "geneos:fetch": "cd core && uv run --all-extras python -m openferment_core.geneos fetch",
     "prototype:up": "bash scripts/prototype-up.sh",
+    "start": "bash start.sh",
+    "package": "bash scripts/package.sh",
     "check:guild": "tsx scripts/check-guild.ts",
     "check:state": "tsx scripts/check-state.ts",
     "smoke": "tsx scripts/smoke.ts",

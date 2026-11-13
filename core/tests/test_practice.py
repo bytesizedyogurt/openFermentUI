@@ -241,7 +241,15 @@ def test_the_endpoints(monkeypatch):
 
 # ── the tutor (§4.2) ───────────────────────────────────────────────────
 
-from datetime import date  # noqa: E402
+from datetime import date, datetime, timezone  # noqa: E402
+
+
+def _utc_today() -> date:
+    """The day as the service stamps it. The local calendar's day is a day
+    behind UTC's for part of every evening west of Greenwich, and a test that
+    took the local day failed in those hours."""
+    return datetime.now(timezone.utc).date()
+
 
 from openferment_core import guild  # noqa: E402
 from openferment_core.competence import Competence  # noqa: E402
@@ -324,7 +332,7 @@ def test_the_last_answer_closes_the_session_and_puts_practice_on_the_ledger(team
     entry = next(e for e in guild.read().evidence if e.id == held.evidenceId)
     assert (entry.kind, entry.personId, entry.skillId, entry.observerId) == ("scenario", "p-olivier", "SK-OD", None)
     assert entry.source.kind == "scenario" and entry.source.ref == held.id and "Was unsure" in entry.raw
-    level = Competence(guild.read().evidence, guild.skills(), date.today().isoformat()).level("p-olivier", "SK-OD")
+    level = Competence(guild.read().evidence, guild.skills(), _utc_today().isoformat()).level("p-olivier", "SK-OD")
     assert level == 1, "practice is Learning, and no more"
     turn_refused("closed", sc, reply("why"), session=held)
 
@@ -414,7 +422,7 @@ def test_the_ledger_takes_practice_only_from_a_closed_session_of_that_person(tea
     held = answer(sc)
 
     def entry(eid: str, ref: str, person: str = "p-olivier", skill: str = "SK-OD") -> GuildEvidence:
-        return GuildEvidence(id=eid, personId=person, skillId=skill, kind="scenario", at=date.today().isoformat(),
+        return GuildEvidence(id=eid, personId=person, skillId=skill, kind="scenario", at=_utc_today().isoformat(),
                              source=EvidenceSource(kind="scenario", ref=ref), raw="Practice")
 
     for e, why in [(entry("e-prac-open", held.id), "still open"), (entry("e-prac-none", "pt-nope"), "not a practice session")]:
@@ -432,7 +440,7 @@ def test_the_ledger_takes_practice_only_from_a_closed_session_of_that_person(tea
     assert caught.value.rule == "duplicate"
     from openferment_core.models import GuildWithdrawal
 
-    guild.withdraw(GuildWithdrawal(evidenceId=held.evidenceId, by="p-sean", at=date.today().isoformat(), reason="Testing the rules"))
+    guild.withdraw(GuildWithdrawal(evidenceId=held.evidenceId, by="p-sean", at=_utc_today().isoformat(), reason="Testing the rules"))
     with pytest.raises(guild.GuildRefused) as caught:
         guild.write_evidence(entry("e-prac-backdated", held.id).model_copy(update={"at": "2026-01-01"}))
     assert caught.value.rule == "date"
