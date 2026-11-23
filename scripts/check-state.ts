@@ -2216,6 +2216,9 @@ async function callAgainst(answer: { status: number; body?: unknown }, healthy =
   };
   const g = globalThis as { EventSource?: unknown };
   const realSource = g.EventSource;
+  // Node 21 and later have a global navigator; Node 20 (CI's) has none, so the check brings its own.
+  const hadNavigator = typeof globalThis.navigator === 'object' && globalThis.navigator !== null;
+  if (!hadNavigator) Object.defineProperty(globalThis, 'navigator', { value: {}, configurable: true, writable: true });
   const nav = globalThis.navigator as unknown as Record<string, unknown>;
   Object.defineProperty(nav, 'locks', { value: locks, configurable: true });
   g.EventSource = StandInSource;
@@ -2259,6 +2262,7 @@ async function callAgainst(answer: { status: number; body?: unknown }, healthy =
     other.close();
     g.EventSource = realSource;
     delete nav.locks;
+    if (!hadNavigator) delete (globalThis as { navigator?: unknown }).navigator;
   }
 }
 
