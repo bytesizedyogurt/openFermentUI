@@ -1,0 +1,35 @@
+tree: core/openferment_core differs from 2047f5a
+[1] find_number, word form beside its caught twin
+  caught 'two'   | twin caught '2'     | The minimum selling price was two dollars per gallon in the base case.
+  caught 'Ten'   | twin caught 'Ten'   | Ten per cent of the sugar was lost to by-products.
+  caught 'Ten'   | twin caught 'Ten'   | Ten tonnes of stover were fed each day.
+  caught 'thirds' | twin caught 'Half'  | Two thirds of the glucan was converted to ethanol.
+  caught 'Hundreds' | twin caught 'hundred' | Hundreds of litres of broth were made.
+  caught '²'     | twin caught '½'     | The yield was ² of theory.
+  caught         | (named in practice.py:73-76)   | Ethanol was made at pH5 throughout.
+  caught         | (named in practice.py:73-76)   | The titre improved x10 over the parent.
+  caught         | (named in practice.py:73-76)   | The titre doubled when the strain was switched.
+
+[2] the pool's record r1: value 0.72 USD kg⁻¹, class verified (biorepo.provenance_of: verified)
+
+[3] validate_plan (the call postdoc_agent.py:752 makes on the model's claims), each citing r1
+  dropped        w1: The minimum selling price was two dollars per gallon in the base case.
+  dropped        w2: Ten per cent of the sugar was lost to by-products.
+  dropped        w3: Ten tonnes of stover were fed each day.
+  dropped        w4: Two thirds of the glucan was converted to ethanol.
+  dropped        w5: Hundreds of litres of broth were made.
+  dropped        w6: The yield was ² of theory.
+  dropped        d1: The minimum selling price was 2 dollars per gallon in the base case.
+  dropped        d2: Ten percent of the sugar was lost to by-products.
+  dropped        d3: Ten kilograms of stover were fed each day.
+  dropped        d4: Half of the glucan was converted to ethanol.
+  dropped        d5: A hundred litres of broth were made.
+  dropped        d6: The yield was ½ of theory.
+  rejected 12: w1: claim text contains a number ('two') — values come from the record; w2: claim text contains a number ('Ten') — values come from the record; w3: claim text contains a number ('Ten') — values come from the record; w4: claim text contains a number ('thirds') — values come from the record; w5: claim text contains a number ('Hundreds') — values come from the record; w6: claim text contains a number ('²') — values come from the record; d1: claim text contains a number ('2') — values come from the record; d2: claim text contains a number ('Ten') — values come from the record; d3: claim text contains a number ('Ten') — values come from the record; d4: claim text contains a number ('Half') — values come from the record; d5: claim text contains a number ('hundred') — values come from the record; d6: claim text contains a number ('½') — values come from the record
+
+[4] held_to_rule_one keeps the gap: []
+
+
+EXPECTED: each claim whose words state a number (two dollars per gallon, ten per cent, ten tonnes, two thirds, hundreds of litres, a superscript two) dropped and counted with its reason, as its twin in digits or in a caught word is (CLAUDE.md:55; ADR-006:26; validate.py:12, :58, :137)
+OBSERVED: word-form claims kept as verified 0/6 (); twins dropped and counted 6/6; rejected 12; pairs passing find_number 0/6
+RESULT: NO-DEFECT

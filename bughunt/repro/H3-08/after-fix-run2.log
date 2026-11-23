@@ -1,0 +1,58 @@
+database: bh_r_h3_08_units (fresh, migrated to head)
+== Part A: units.normalize and units.convert ==
+control  normalize('g/g'                       ) = 'g g⁻¹'
+control  normalize('g EtOH/g glucose'          ) = 'g g⁻¹'
+control  normalize('gx/g'                      ) = 'g g⁻¹'
+control  normalize('gDW gglucose⁻¹'            ) = 'g g⁻¹'
+control  normalize('g biomass [g glucose]⁻¹'   ) = 'g g⁻¹'
+control  normalize('gal'                       ) = None
+control  normalize('gmol'                      ) = None
+control  normalize('gpm'                       ) = None
+control  normalize('g/furlong'                 ) = None
+probe    normalize('g/gal'                     ) = None  family None
+probe    normalize('gal/g'                     ) = None  family None
+probe    normalize('g/gmol'                    ) = None  family None
+probe    normalize('gmol/g'                    ) = None  family None
+probe    normalize('g gal-1'                   ) = None  family None
+probe    normalize('gal g-1'                   ) = None  family None
+probe    normalize('g/gallon'                  ) = None  family None
+probe    normalize('gpm/gpm'                   ) = None  family None
+probe    normalize('g/gpm'                     ) = None  family None
+for comparison: normalize('g mol-1') = 'g mol⁻¹' family 'molarMass'
+convert(180.16, 'g/gmol', 'g g⁻¹') raises UnitError: Unknown unit: g/gmol
+convert(1, 'gal/g', 'kg kg⁻¹') raises UnitError: Unknown unit: gal/g
+convert(1, 'g/gal', 'mg g⁻¹') raises UnitError: Unknown unit: g/gal
+
+== Part B: validate.anchor_candidate ==
+ethanol_yield_substrate = 0.45 'g/gal' on 'The broth held 0.45 g/gal of residual ethanol at harvest.'
+    refused on rule 'unit': unit 'g/gal' does not normalise
+control: ethanol_yield_substrate = 0.45 'g/furlong' on 'The broth held 0.45 g/furlong of residual ethanol at harvest.'
+    refused on rule 'unit': unit 'g/furlong' does not normalise
+
+== Part C: biorepo.write in a fresh database ==
+skipped: the candidate did not anchor
+
+the records row the accept left (openferment.records):
+
+== Part D: the browser's engine (src/engine/units.ts) ==
+BROWSER control normalizeUnit("g EtOH/g glucose") = "g g⁻¹"
+BROWSER control normalizeUnit("gx/g") = "g g⁻¹"
+BROWSER control normalizeUnit("gal") = null
+BROWSER control normalizeUnit("gmol") = null
+BROWSER control normalizeUnit("g/furlong") = null
+BROWSER probe   normalizeUnit("g/gal") = null
+BROWSER probe   normalizeUnit("gal/g") = null
+BROWSER probe   normalizeUnit("g/gmol") = null
+BROWSER probe   normalizeUnit("gmol/g") = null
+BROWSER probe   normalizeUnit("g gal-1") = null
+BROWSER probe   normalizeUnit("gal g-1") = null
+BROWSER probe   normalizeUnit("g/gallon") = null
+BROWSER probe   normalizeUnit("gpm/gpm") = null
+BROWSER probe   normalizeUnit("g/gpm") = null
+BROWSER convert(180.16, "g/gmol", "g g⁻¹") throws Unknown unit: g/gmol
+BROWSER convert(1, "gal/g", "kg kg⁻¹") throws Unknown unit: gal/g
+
+EXPECTED: normalize names a gram labelled by what it weighs (g EtOH/g glucose, gx/g, gDW gglucose⁻¹) g g⁻¹ and returns None for a spelling holding gallons (gal), gram-moles (gmol) or gallons per minute (gpm), as it does for 'gal', 'gmol', 'gpm' and 'g/furlong'; convert raises UnitError ('Unknown unit') for g/gmol, gal/g and g/gal; anchoring refuses 0.45 'g/gal' for ethanol_yield_substrate on rule 'unit', as it refuses 0.45 'g/furlong'
+OBSERVED: controls held; 0 of 9 probes normalise to 'g g⁻¹' (); convert returned a number for 0 of 3 pairs (180.16 g/gmol = 180.16 g g⁻¹, 1 gal/g = 1 kg kg⁻¹, 1 g/gal = 1000 mg g⁻¹); 0.45 'g/gal' refused, control 'g/furlong' refused on rule unit; biorepo.write did not store it
+OBSERVED: the browser's normalizeUnit names 'g g⁻¹' for 0 of 9 probes (src/engine/units.ts:369-372, the same two patterns)
+RESULT: NO-DEFECT
