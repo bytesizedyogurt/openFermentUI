@@ -16,6 +16,54 @@ fixes. Until then `main` holds alpha 2.1, whose `install.sh` looks for `pg_isrea
 where Homebrew's keg-only `postgresql@17` puts none, and stops at step 3 with "PostgreSQL is not
 installed". Every `main` in this runbook is `main` after that merge.
 
+## The quick path
+
+The whole install in the order the steps below give it, for a Mini with Homebrew. Each line's step says
+what it does and what to do when it stops. Until the merge into `main`, install from the branch the pull
+request holds: a checkout on that branch takes every later fix with `scripts/host/deploy.sh`, and once the
+merge lands, `git checkout main && git pull --ff-only` moves it to `main`.
+
+```
+# step 0: the tools, PostgreSQL at power-on, the checkout
+brew install node pnpm uv postgresql@17 pgvector graphviz tailscale && uv python install 3.13
+sudo brew services start --sudo-service-user="$(id -un)" postgresql@17
+sudo brew services start tailscale && sudo tailscale up
+if [ -d ~/openferment ]; then   # a Mini that ran alpha 1.0: stop its jobs, keep a copy of its records
+  cd ~/openferment && scripts/host/install.sh --uninstall
+  [ -e ~/openferment-alpha-1.0-data ] || cp -Rp core/data ~/openferment-alpha-1.0-data
+else
+  git clone https://github.com/bytesizedyogurt/openFermentUI ~/openferment && cd ~/openferment
+fi
+git fetch origin && git checkout claude/alpha-2-2-fixes && git pull --ff-only   # or main, after the merge
+
+# step 1: the key and the budgets
+cd core && [ -e .env ] || (umask 077 && sed '/^OPENFERMENT_DATABASE_URL=/d' .env.example > .env); chmod 600 .env; cd ..
+# then open core/.env and set ANTHROPIC_API_KEY, OPENFERMENT_DAILY_BUDGET_USD=150, OPENFERMENT_ASK_BUDGET_USD=8
+
+# step 2: packages and the build
+pnpm install --frozen-lockfile
+(cd core && uv sync --frozen --all-extras --python 3.13)
+pnpm geneos:fetch && pnpm build
+
+# step 2a: the Ethanol project from the build (the dump file in your home folder)
+shasum -a 256 ~/openferment-ethanol-2026-11-23.dump   # b5444a40bd490f674f0123c99b25df27b84d551f037f96e69862e55ba56ce633
+bin="$(brew --prefix postgresql@17)/bin"
+"$bin/createdb" -h 127.0.0.1 openferment
+"$bin/pg_restore" -h 127.0.0.1 -d openferment --no-owner --no-privileges ~/openferment-ethanol-2026-11-23.dump
+
+# step 3: the database line, the migration, the jobs, the network
+scripts/host/install.sh
+# a Mini that ran alpha 1.0 stops here once: run step 5, then scripts/host/install.sh again
+
+# steps 4 and 6: check it, and name the project the nightly job extracts
+pnpm ready
+printf '\nOPENFERMENT_PROJECT=ethanol\n' >> core/.env   # the project step 2a carried; another project's id otherwise
+sudo launchctl kickstart -k system/com.umutuzo.openferment
+```
+
+Then open the address `install.sh` printed from your phone or laptop on the tailnet. Home lists the
+Ethanol project.
+
 ## 0. What the Mini needs first
 
 | Need | How | Check |
