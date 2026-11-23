@@ -2170,5 +2170,97 @@ async function callAgainst(answer: { status: number; body?: unknown }, healthy =
   }
 }
 
+// ── one stream a browser (src/lib/events.ts, shared mode) ──
+// Where the browser has Web Locks and BroadcastChannel, one tab holds a project's stream for every tab: the tab
+// holding the lock named for the project opens it and passes each event on, and a tab waiting for the lock hears
+// the events from the channel with no stream of its own. Holding the lock later, it opens the stream from the last
+// event it heard. The lock here is a stand-in the check grants by hand, the other tab a channel of the same name.
+{
+  type Heard = (m: { data: string }) => void;
+  const opened: string[] = [];
+  const sources: { heard: Record<string, Heard[]>; closed: boolean }[] = [];
+  class StandInSource {
+    heard: Record<string, Heard[]> = {};
+    closed = false;
+    onopen: (() => void) | null = null;
+    onerror: (() => void) | null = null;
+    constructor(url: string) {
+      if (url.includes('project=r')) {
+        opened.push(url);
+        sources.push(this);
+      }
+    }
+    addEventListener(type: string, f: Heard) {
+      (this.heard[type] ??= []).push(f);
+    }
+    close() {
+      this.closed = true;
+    }
+  }
+  const waits: { name: string; grant: () => Promise<unknown> }[] = [];
+  let released = 0;
+  const locks = {
+    request(name: string, _options: unknown, cb: () => unknown) {
+      return new Promise((done) => {
+        waits.push({
+          name,
+          grant: async () => {
+            const held = cb();
+            await held;
+            released++;
+            done(undefined);
+          },
+        });
+      });
+    },
+  };
+  const g = globalThis as { EventSource?: unknown };
+  const realSource = g.EventSource;
+  const nav = globalThis.navigator as unknown as Record<string, unknown>;
+  Object.defineProperty(nav, 'locks', { value: locks, configurable: true });
+  g.EventSource = StandInSource;
+  const other = new BroadcastChannel('openferment-events:r');
+  const relayed: unknown[] = [];
+  other.onmessage = (m) => relayed.push(m.data);
+  const tick = () => new Promise((r) => setTimeout(r, 20));
+  try {
+    const { watchEvents } = await import('../src/lib/events');
+    const heard: number[] = [];
+    const stop = watchEvents('r', (e) => heard.push(e.id));
+    await tick();
+    check(
+      'a tab that waits for the project’s lock opens no stream and asks the tab holding it how the stream stands',
+      opened.length === 0 && waits.length === 1 && waits[0].name === 'openferment-events:r' &&
+        relayed.some((d) => (d as { type?: string }).type === 'hello'),
+      JSON.stringify({ opened, waits: waits.map((w) => w.name), relayed }),
+    );
+    other.postMessage({ type: 'event', event: { id: 5, type: 'job.running', at: AT, project: 'r', data: {} } });
+    await tick();
+    check('it hears each event the tab holding the stream passes on', heard.join() === '5', JSON.stringify(heard));
+    const held = waits[0].grant();
+    await tick();
+    check(
+      'holding the lock, it opens the project’s one stream from the last event it heard',
+      opened.length === 1 && opened[0] === '/api/events?project=r&after=5',
+      JSON.stringify(opened),
+    );
+    relayed.length = 0;
+    for (const f of sources[0].heard['job.done'] ?? []) f({ data: JSON.stringify({ id: 6, type: 'job.done', at: AT, project: 'r', data: {} }) });
+    await tick();
+    check(
+      'it reads each event itself and passes it on to the other tabs',
+      heard.join() === '5,6' && relayed.some((d) => (d as { event?: { id?: number } }).event?.id === 6),
+      JSON.stringify({ heard, relayed }),
+    );
+    stop();
+    await held;
+    check('its last reader stopping closes the stream and gives the lock up', sources[0].closed && released === 1, JSON.stringify({ closed: sources[0].closed, released }));
+  } finally {
+    other.close();
+    g.EventSource = realSource;
+    delete nav.locks;
+  }
+}
+
 console.log(fails ? `\n✗ ${fails} check(s) failed` : '\n✓ The project rows are sent as the page changes them, and kept until the service answers; a refusal is never an outage.');
 process.exit(fails ? 1 : 0);

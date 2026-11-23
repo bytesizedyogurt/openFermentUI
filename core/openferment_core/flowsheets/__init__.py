@@ -18,8 +18,9 @@ module in KNOWN that is evaluated case by case exposes:
               the objects the worker reads the run's tables from after the
               base case: `system`, and where the flowsheet prices a product,
               `tea`, `product`, `feedstock`, the solved `price` (USD per kg
-              of the product stream), `basis_flow` (kg/hr the price is per)
-              and `basis` (what that flow is, in words)
+              of the flow `basis_flow` names, as `product.price` reads it),
+              `basis_flow` (kg/hr the price is per) and `basis` (what that
+              flow is, in words)
 
 The published plants of the `biorefineries` package are the library
 shelf's (engine/library.py), run whole on their package's own defaults; the

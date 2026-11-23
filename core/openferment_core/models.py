@@ -2400,8 +2400,9 @@ class TeaBreakdown(BaseModel):
     teaClass: str
     product: str
     feedstock: str | None = None
-    # The product stream's price per kg as the run solved it (or as the
-    # package left it), and the flow in kg/hr the per-unit lines divide by.
+    # The product's price per kg of the flow `basisFlow` names, as the run
+    # solved it (or as the package left it), and that flow in kg/hr, which the
+    # per-unit lines divide by.
     productPrice: float | None = None
     basisFlow: float | None = None
     basis: str | None = None

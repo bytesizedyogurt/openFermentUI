@@ -115,8 +115,8 @@ session continues from this file and `git log` alone.
    a decision made gold by its label) and 6 (H6-02, the alpha 1.0 import past the estimate rule) are
    done, ahead of the Mini's install, whose step 5 runs that import; groups 7 (H3-01), 10 to 15 (H8-01,
    H8-04, H2-01, H1-04, H4-02, R1-03) and 17 (H14-02) are done, with the findings of two testers on the
-   Mini's rehearsal install. Groups 8 (H3-08, the unit engine's loose spellings) and 9 (H3-02, number
-   forms in a claim's words), both S1, are next. Groups 16
+   Mini's rehearsal install, and groups 8 (H3-08, the unit engine's loose spellings) and 9 (H3-02,
+   number forms in a claim's words) are done; every S1 group of the report is closed. Groups 16
    and 19 change how a key is read, a stop condition, and wait on the owner (the Log, Fixes after the
    bug hunt).
 
@@ -585,6 +585,8 @@ the line that records the decision and the decision record it stands under.
 
 | Debt | Paid at | Commit |
 |---|---|---|
+| `units.normalize` read a gallon, a gram-mole or a gallon per minute joined to a `g` as a labelled gram, so 0.45 g/gal was kept as a verified yield of 0.45 g g⁻¹ (H3-08, S1); folded an upper-case SI prefix or symbol onto a lower-case key, so 1 Mg converted to 1e-06 kg (H3-07, S3); and read no micro unit spelled with Greek mu (H3-16, S3). A joined label never completes a unit word, a run of one or two letters starting with M, G, T, P or S keeps its case (a lone M stays the molar), and Greek mu reads as the micro sign, in `units.py` and `src/engine/units.ts` alike, each spelling a fixture pair | the bug hunt's fix run, group 8 (23 November 2026) | the commit after `e3795ab` |
+| `validate.find_number` let through "two dollars per gallon", "Ten per cent", "Ten tonnes", "Two thirds", "Hundreds of litres" and "²" (H3-02, S1), and "doubled", "halved", "quadrupled", "Table IV", "x10", "pH7" and "pH-4" (H9-04, S3), so a Postdoc claim stating any of them kept its record's class; each is found now, and the names and counts the rule is tuned to let through ("a double mutant", "photosystem II", "within seconds", "one of the strains") pass, as do all 307 texts in the Ethanol project's turns that passed before | the bug hunt's fix run, group 9 (23 November 2026) | the commit after `e3795ab` |
 | Anchoring compared a quote's number bare when its unit did not convert into the candidate's, and labelled the match converted, so "$2.15/gal" anchored 2.15 USD kg⁻¹ and "45% (v/v)" anchored 45 g L⁻¹ (H3-01, S1); rule 3 now refuses on rule `value` in the unit engine's words, a currency written before the number joins the unit after it, a unit the sentence writes past what the table reads (a label word, a bracketed denominator, a middle dot, a share named in words) compares bare, a share compares bare into a percentage alone, and a plain accept anchors the record's own quote again whatever its basis | the bug hunt's fix run, group 7 and its two checks (23 November 2026) | the commit after `9feb0eb` |
 | The kit's dedupe hash folds letter case, and `kit._store` linked any duplicate as the same text, so a paste reading "2000 Mg" was kept as the earlier "2000 mg" (H8-01, S1); `_store` compares the held chunks' words with the entry's, case kept, and refuses a case variant in words | the bug hunt's fix run, group 10 (23 November 2026) | the commit after `9feb0eb` |
 | `collectors.uploaded` decoded an XML upload as UTF-8 with replacement, so a Latin-1 JATS file lost "µ" and "°" (H8-04, S1); the parser reads the file's bytes and its declared encoding, and a byte that encoding does not hold is refused in words | the bug hunt's fix run, group 11 (23 November 2026) | the commit after `9feb0eb` |
@@ -4066,4 +4068,34 @@ On `claude/alpha-2-2-fixes`, cut from `claude/alpha-2-2-bughunt` at `fa8db4a`, i
     `setopt interactivecomments`, so zsh reads its comment lines as comments.
   - Checks: `pnpm verify` on all sixteen stages (12 min 40 s; `test:core` 3134 passed, 1 skipped, 175 deselected;
     `test:sim` 142 passed; `test:lit` 10 passed; smoke 20 screens) and `pnpm prove` offline, 99 of 99 checks in 191 s,
+    with no model call.
+- Groups 8 and 9 (23 November 2026), the last S1 groups, and one stream a browser.
+  - Group 8, H3-08 (S1) with H3-07 and H3-16 (S3), `units.normalize` and the browser's `normalizeUnit`: a label joined
+    to its gram never completes a unit word (`_LABELLED_GRAM`), so 'g/gal', 'gal/g', 'g/gmol', 'gmol/g', 'g gal-1',
+    'gal g-1', 'g/gallon', 'gpm/gpm' and 'g/gpm' normalise to nothing, and anchoring refuses 0.45 g/gal on rule
+    `unit`; a run of one or two letters that starts with M, G, T, P or S keeps its case past the case-blind steps
+    (`_CASE_CARRIES`), so 'Mg', 'MG', 'ML', 'Mm', 'MM', 'S' and 'G' normalise to nothing while 'M' stays the molar and
+    'mM' the millimolar; Greek mu reads as the micro sign before any lookup. Each spelling is a fixture pair the
+    browser's engine records (`pnpm export:unit-fixtures`). Over every key, alias and fixture spelling of the unit
+    table, 320 in all, the readings that moved are the report's own and 'G/L', 'G L-1' and 'MG/L', which follow from
+    'G' and 'MG'.
+  - Group 9, H3-02 (S1) with H9-04 (S3), `validate.find_number`: the Latin-1 superscripts ¹ ² ³ count as digits; the
+    plurals of counting words (thirds, hundreds, thousands) count as numbers, "seconds" and "ones" left out; money and
+    mass words and "per" join the unit words a determiner stands before; a multiplying verb (doubled, halved,
+    quadrupling) states a quantity, its adjective ("a double mutant") left out; a table or figure in Roman numerals
+    states its number, a Roman numeral elsewhere ("photosystem II") left out; and a pH or a multiplier against its
+    number ("pH7", "x10") is read before identifiers are blanked. `test_number_rule_forms.py` holds the fifteen forms
+    and thirteen names and counts that pass; of the 391 texts in the Ethanol project's Postdoc turns, the 307 that
+    passed before all pass.
+  - One stream a browser (`src/lib/events.ts`): the tab that holds the Web Lock named for a project opens its stream
+    and passes each event to the other tabs on a BroadcastChannel; a tab waiting for the lock opens none, and holding
+    it later opens the stream from the last event it heard. A browser without either keeps one stream a page, closed
+    while hidden. Measured in Chromium against the built app: seven tabs of the Ethanol project held one stream and an
+    eighth tab's request answered in 55 ms, where the stream a page held six and the seventh tab's page load waited
+    past 15 s; closing the tab that held it, the other tab opened it. `check:state` holds the shared path with a
+    stand-in lock.
+  - The H4-02 words: `flowsheets/__init__.py` and `TeaBreakdown.productPrice` name the price per kg of the flow
+    `basis_flow` names.
+  - Checks: `pnpm verify` on all sixteen stages (12 min 44 s; `test:core` 3206 passed, 1 skipped, 175 deselected;
+    `test:sim` 142 passed; `test:lit` 10 passed; smoke 20 screens) and `pnpm prove` offline, 99 of 99 checks in 189 s,
     with no model call.

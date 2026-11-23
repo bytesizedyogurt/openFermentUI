@@ -343,3 +343,32 @@ def test_a_percent_weight_per_volume_is_grams_per_hundred_millilitres():
     assert convert(4, "% w/v", "g/L") == pytest.approx(40)
     assert convert(4, "% w/v", "g/100 mL") == pytest.approx(4)
 
+
+
+# ── the unit engine's loose spellings (bug hunt group 8) ───────────────
+
+
+@pytest.mark.parametrize("raw", ["g/gal", "gal/g", "g/gmol", "gmol/g", "g gal-1", "gal g-1", "g/gallon", "gpm/gpm", "g/gpm"])
+def test_a_label_joined_to_its_gram_never_completes_a_unit_word(raw):
+    # H3-08: 'gal', 'gmol' and 'gpm' are units of their own; 0.45 g/gal is no yield.
+    assert normalize(raw) is None
+    with pytest.raises(UnitError):
+        convert(1.0, raw, "g g⁻¹")
+
+
+@pytest.mark.parametrize("raw", ["Mg", "MG", "ML", "Mm", "MM", "S", "G", "MG/L", "G/L"])
+def test_a_letter_case_that_carries_an_si_prefix_is_never_folded(raw):
+    # H3-07: a megagram is no milligram, a siemens no second.
+    assert normalize(raw) is None
+    with pytest.raises(UnitError):
+        convert(1.0, raw, "kg")
+
+
+def test_a_lone_m_is_the_molar_and_mm_the_millimolar():
+    assert normalize("M") == "mol L⁻¹" and normalize("mM") == "mmol L⁻¹" and normalize("mm") == "mm"
+
+
+@pytest.mark.parametrize("greek, micro", [("\u03bcg/mL", "µg/mL"), ("\u03bcL", "µL"), ("\u03bcM", "µM")])
+def test_greek_mu_reads_as_the_micro_sign(greek, micro):
+    # H3-16: every micro key is spelled with U+00B5; a paper may write U+03BC.
+    assert normalize(greek) is not None and normalize(greek) == normalize(micro)

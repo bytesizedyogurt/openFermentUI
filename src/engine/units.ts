@@ -366,16 +366,30 @@ const ALIASES: Record<string, string> = {
  * stand alone after its separator, so g kg⁻¹ and mg g⁻¹ never match. Read
  * against the stripped spelling; units.py holds the same two patterns.
  */
+// A label joined to its gram never completes a unit word: 'gal', 'gallon',
+// 'gmol' and 'gpm' are units of their own, so 'g/gal' is no yield (H3-08).
+const LABELLED_GRAM = String.raw`g(?!(?:al(?:lon)?s?|mol|pm)(?![a-z]))(?:\s*[a-z]+)?`;
 export const LABELLED_MASS_RATIO = [
-  /^g(?:\s*[a-z]+)?\s*\/\s*g(?:\s*[a-z]+)?$/,
-  /^g(?:\s*[a-z]+)?(?:\s*\[\s*|\s+)g(?:\s*[a-z]+)?\s*\]?\s*-1$/,
+  new RegExp(String.raw`^${LABELLED_GRAM}\s*\/\s*${LABELLED_GRAM}$`),
+  new RegExp(String.raw`^${LABELLED_GRAM}(?:\s*\[\s*|\s+)${LABELLED_GRAM}\s*\]?\s*-1$`),
 ];
 
+/**
+ * A spelling's letter case carries an SI prefix or symbol where a run of one
+ * or two letters starts with M, G, T, P or S: Mg is a megagram, ML a
+ * megalitre, S a siemens, G a giga (H3-07). The case-blind steps never fold
+ * such a run onto a lower-case key; a lone M is the molar the aliases read.
+ * units.py holds the same pattern.
+ */
+const CASE_CARRIES = /(?<![A-Za-zµ])(?!M(?![A-Za-z]))[MGTPS][A-Za-z]?(?![A-Za-z])/;
+
 export function normalizeUnit(raw: string): string | null {
-  const t = raw.trim();
+  // Greek small mu is the micro sign every key is spelled with (H3-16).
+  const t = raw.trim().replace(/\u03bc/g, '\u00b5');
   if (t in U) return t;
   const lower = t.toLowerCase();
   if (ALIASES[t]) return ALIASES[t];
+  if (CASE_CARRIES.test(t)) return null;
   if (ALIASES[lower]) return ALIASES[lower];
   // Try unicode-superscript-insensitive match
   // The middot separators (mg·L⁻¹, mg⋅L⁻¹) are read as the space the table

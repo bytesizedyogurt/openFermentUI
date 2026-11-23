@@ -105,10 +105,24 @@ _WS = re.compile(r"\s+")
 # gx/g, gDW gglucose⁻¹, g biomass [g glucose]⁻¹. The browser's
 # LABELLED_MASS_RATIO in src/engine/units.ts, pattern for pattern; read
 # against the stripped spelling, after every key has missed.
+# A label joined to its gram never completes a unit word: 'gal', 'gallon',
+# 'gmol' and 'gpm' are units of their own, so 'g/gal' is no yield (bug hunt
+# H3-08) and normalises to nothing, as 'g/furlong' does.
+_LABELLED_GRAM = r"g(?!(?:al(?:lon)?s?|mol|pm)(?![a-z]))(?:\s*[a-z]+)?"
 LABELLED_MASS_RATIO = (
-    re.compile(r"^g(?:\s*[a-z]+)?\s*/\s*g(?:\s*[a-z]+)?$"),
-    re.compile(r"^g(?:\s*[a-z]+)?(?:\s*\[\s*|\s+)g(?:\s*[a-z]+)?\s*\]?\s*-1$"),
+    re.compile(rf"^{_LABELLED_GRAM}\s*/\s*{_LABELLED_GRAM}$"),
+    re.compile(rf"^{_LABELLED_GRAM}(?:\s*\[\s*|\s+){_LABELLED_GRAM}\s*\]?\s*-1$"),
 )
+
+# A spelling's letter case carries an SI prefix or symbol where a run of one
+# or two letters starts with M, G, T, P or S: Mg is a megagram, ML a
+# megalitre, S a siemens, G a giga (bug hunt H3-07). The case-blind steps
+# never fold such a run onto a lower-case key, and the spelling normalises to
+# nothing; a lone M is the molar the aliases read. The browser's CASE_CARRIES.
+_CASE_CARRIES = re.compile(r"(?<![A-Za-zµ])(?!M(?![A-Za-z]))[MGTPS][A-Za-z]?(?![A-Za-z])")
+# Greek small mu (U+03BC) is the micro sign (U+00B5) every key and alias is
+# spelled with (bug hunt H3-16); folded before any lookup, as in the browser.
+_MU = ("\u03bc", "\u00b5")
 
 
 def _strip(s: str) -> str:
@@ -126,8 +140,11 @@ def normalize(raw: str) -> str | None:
     labelled (LABELLED_MASS_RATIO). The order matters — 'mm' is a
     key (millimetres) and is found first, while 'mM' misses the key, misses
     the alias as typed, and reaches millimolar through the lower-cased alias.
+    Greek mu reads as the micro sign first, and a spelling whose case carries
+    an SI prefix or symbol ('Mg', 'ML', 'S') stops before the case-blind
+    steps (`_CASE_CARRIES`).
     """
-    t = raw.strip()
+    t = raw.strip().replace(*_MU)
     table = tables()["table"]
     aliases = tables()["aliases"]
     if t in table:
@@ -135,6 +152,8 @@ def normalize(raw: str) -> str | None:
     lower = t.lower()
     if aliases.get(t):
         return aliases[t]
+    if _CASE_CARRIES.search(t):
+        return None
     if aliases.get(lower):
         return aliases[lower]
     target = _strip(t)

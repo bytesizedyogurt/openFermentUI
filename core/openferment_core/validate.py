@@ -57,7 +57,7 @@ from .units import (
 # Digits in any form a model might reach for: 4, 4.2, 4,200, 1e6, ½, ٤ (Arabic
 # -Indic), Ⅳ (Roman numeral forms), ² (superscript). `\d` in Python is already
 # Unicode-aware, which covers most non-ASCII digit sets on its own.
-_DIGIT = re.compile(r"[\d¼-¾⅐-↏⁰-₟]")
+_DIGIT = re.compile(r"[\d¼-¾⅐-↏⁰-₟¹²³]")  # ¹ ² ³ sit in Latin-1, outside ⁰-₟ (bug hunt H3-02)
 
 # Written numerals, and the words that turn them into quantities. Bounded with
 # explicit boundaries rather than \b so that "oneself", "tension" and "often"
@@ -74,6 +74,33 @@ _WORD_NUMBERS = (
 _WORD_NUMBER = re.compile(
     r"(?<![a-z])(" + "|".join(_WORD_NUMBERS) + r")(?![a-z])", re.IGNORECASE
 )
+
+# The plurals of counting words state a quantity as their singular does: "two
+# thirds", "hundreds of litres" (bug hunt H3-02). A closed list, so "seconds"
+# (a unit word in a sentence that states no number) and "ones" still pass.
+_PLURAL_NUMBERS = (
+    "tens dozens hundreds thousands millions billions trillions halves thirds quarters fourths fifths sixths "
+    "sevenths eighths ninths tenths twenties thirties forties fifties sixties seventies eighties nineties"
+).split()
+_PLURAL_NUMBER = re.compile(r"(?<![a-z])(" + "|".join(_PLURAL_NUMBERS) + r")(?![a-z])", re.IGNORECASE)
+
+# A multiplying verb states a quantity: "the titre doubled", "halved",
+# "quadrupling" (bug hunt H9-04; the plan prompt's own example of a discarded
+# claim). The verb's forms alone, so "a double mutant" and "a triple knockout"
+# name strains and pass.
+_MULTIPLYING = re.compile(r"(?<![a-z])(?:doubl|tripl|quadrupl|halv)(?:ed|es|ing)(?![a-z])", re.IGNORECASE)
+
+# A table or figure numbered in Roman numerals states its number as "Table 4"
+# does (H9-04). Held to the reference words, so "photosystem II" and "type IV
+# secretion" name things and pass.
+_ROMAN_REFERENCE = re.compile(
+    r"(?<![A-Za-z])(?:Tables?|Figs?\.?|Figures?|Schemes?)\s+([IVX]{1,5})(?![A-Za-z])"
+)
+
+# A pH or a multiplier written against its number reads as an identifier's
+# letters-then-digit ("pH7", "pH-4", "x10") and is a quantity (H9-04). Read
+# before identifiers are blanked; the strain X33 keeps its capital.
+_PH_OR_TIMES = re.compile(r"(?<![A-Za-z])(?:pH\s*-?\s*\d+(?:\.\d+)?|x\s?\d+)")
 
 # Ranges and comparisons written without digits are quantities too: "roughly
 # an order of magnitude higher" is a number wearing a coat.
@@ -144,7 +171,10 @@ _UNIT_WORDS = frozenset(
     "liters millilitre millilitres milliliter milliliters mole moles percent fold times degree degrees "
     # A score is a measure too: "two of the three points" is a grade, and a
     # grade the tutor gives is a number of its own (test_practice).
-    "point points mark marks score scores".split()
+    "point points mark marks score scores "
+    # Money and mass a sentence counts in words: "two dollars per gallon",
+    # "Ten per cent", "Ten tonnes" (bug hunt H3-02).
+    "dollar dollars cent cents euro euros pound pounds yen per tonne tonnes ton tons gallon gallons".split()
 )
 _STEP_LABEL = re.compile(
     r"(?<![A-Za-z])(?i:" + "|".join(STEP_WORDS) + r")\s+(?:20|1[0-9]|[1-9])(?![\d.,])(?P<rest>\s*\S*)"
@@ -203,14 +233,15 @@ def find_number(text: str) -> str | None:
     # ("HB-co-3HV" in P(3HB-co-3HV)) and strand its leading locant.
     masked = _CHEMISTRY.sub(lambda m: " " * len(m.group(0)), text)
     masked = _NAMED_TERMS.sub(lambda m: " " * len(m.group(0)), masked)
+    if m := _PH_OR_TIMES.search(masked):
+        return m.group(0)
+    if m := _ROMAN_REFERENCE.search(masked):
+        return m.group(1)
     masked = _IDENTIFIER.sub(lambda m: " " * len(m.group(0)), masked)
     masked = _blank_prose_counts(masked)
-    if m := _DIGIT.search(masked):
-        return m.group(0)
-    if m := _WORD_NUMBER.search(masked):
-        return m.group(0)
-    if m := _MAGNITUDE.search(masked):
-        return m.group(0)
+    for pattern in (_DIGIT, _WORD_NUMBER, _PLURAL_NUMBER, _MAGNITUDE, _MULTIPLYING):
+        if m := pattern.search(masked):
+            return m.group(0)
     return None
 
 

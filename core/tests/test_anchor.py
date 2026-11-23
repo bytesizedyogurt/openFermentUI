@@ -931,3 +931,11 @@ def test_biorepo_write_reanchors_a_plain_accept_on_a_candidate_kept_as_exact(hel
     stored = biorepo.write(accepted("cl1-U3-00000002"))
     assert stored.status == "verified" and stored.quote is None, "the decision is kept as sent"
     assert sorted(biorepo.decisions()) == ["cl1-U3-00000002"]
+
+
+def test_a_gram_per_gallon_is_refused_on_the_unit():
+    # H3-08: 0.45 g/gal anchored as a verified yield of 0.45 g g⁻¹; it does not
+    # normalise now, and anchoring refuses it on rule 'unit' as it refuses g/furlong.
+    c, rule, detail = _on_its_sentence("ethanol_yield_substrate", 0.45, "g/gal",
+                                       "The broth held 0.45 g/gal of residual ethanol at harvest.")
+    assert c is None and rule == "unit", detail
