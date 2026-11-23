@@ -455,7 +455,8 @@ def test_gold_on_a_recorded_absence_reads_its_zero_from_the_sentence():
     assert rec["value"] == 0 and rec["negativeResult"] is True
     assert not any(ch.isdigit() for ch in rec["quote"])
     fetch_saying("T3", "cl1-T3-00000003", f"Even after prolonged incubation, {rec['quote']}.")
-    stored = biorepo.write(decision("cl1-T3-00000003", "verified", provenance="gold"))
+    stored = biorepo.write(decision("cl1-T3-00000003", "verified", provenance="gold",
+                                    gold=Quantity(value=0, unit="% of total expressed")))
     assert stored.status == "verified"
 
 
@@ -466,9 +467,19 @@ def test_gold_on_a_value_derived_from_the_quote_still_refuses_with_a_reason():
     rec = planted("cl1-T4-00000001")
     fetch_saying("T4", "cl1-T4-00000001", f"The particle was {rec['quote']}.")
     with pytest.raises(biorepo.WriteRefused) as caught:
-        biorepo.write(decision("cl1-T4-00000001", "verified", provenance="gold"))
+        biorepo.write(decision("cl1-T4-00000001", "verified", provenance="gold", gold=Quantity(value=0.24, unit="h⁻¹")))
     assert caught.value.rule == "quote"
     assert "derived from the quote" in caught.value.why
+
+
+def test_a_verified_decision_labelled_gold_with_no_gold_value_is_kept_and_served_verified():
+    """Bug hunt P-02: the gold value alone makes a record gold; the label a
+    request carries is the browser's, and the service computes the class."""
+    fetch_t5()
+    planted("cl1-T5-00000003")
+    stored = biorepo.write(decision("cl1-T5-00000003", "verified", provenance="gold"))
+    assert stored.status == "verified" and stored.provenance == "verified" and stored.gold is None
+    assert biorepo.provenance_of(decision("cl1-T5-00000003", "verified", provenance="gold")) == "verified"
 
 
 # ── the check the browser asks before the keystroke (F1.5) ─────────────

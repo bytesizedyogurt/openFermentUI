@@ -10,10 +10,11 @@ the first time; afterwards `scripts/host/deploy.sh` alone brings the Mini to `ma
 Every step runs as yourself in Terminal; a command that needs root carries its own `sudo`, and
 `install.sh` stops when started with `sudo`. Nothing here prints the key.
 
-**The install waits for alpha 2.2's merge into `main`** (PROGRESS.md, Blockers). Until then `main`
-holds alpha 2.1, whose `install.sh` looks for `pg_isready` on the PATH, where Homebrew's keg-only
-`postgresql@17` puts none, and stops at step 3 with "PostgreSQL is not installed". Every `main`
-in this runbook is `main` after that merge.
+**The install waits for alpha 2.2's merge into `main`** (PROGRESS.md, Blockers): the branch
+`claude/alpha-2-2-fixes`, which holds `claude/alpha-2-2-base`, the bug hunt of November 2026 and its
+fixes. Until then `main` holds alpha 2.1, whose `install.sh` looks for `pg_isready` on the PATH,
+where Homebrew's keg-only `postgresql@17` puts none, and stops at step 3 with "PostgreSQL is not
+installed". Every `main` in this runbook is `main` after that merge.
 
 ## 0. What the Mini needs first
 
@@ -126,6 +127,34 @@ fetches the genome-scale models geneOS computes on into `core/data/models/`; the
 each against its pinned hash and fails the night while one is missing. The first FastEmbed use
 fetches the embedding model from Hugging Face once into `~/.cache/fastembed`
 (`FASTEMBED_CACHE_PATH` moves it).
+
+## 2a. The Ethanol project from the build, once (optional)
+
+The build's container holds the Ethanol project of alpha 2.2's stage F: its 22 documents with their
+814 indexed chunks, the extraction candidates, 6 engine runs with their artifacts, and Postdoc's 35
+conversations with the evaluation runs and the spend they cost. A dump of that database, made on
+23 November 2026 at both schemas' newest revisions (`openferment` 0010, `sci_rag` 0006), carries it
+to the Mini so nothing is paid for twice. It holds no key, no Guild person and no engine verdict.
+It goes from the session to you as a file, never through git. Skip this step for a Mini that starts
+with no project.
+
+Put the file in your home folder as `~/openferment-ethanol-2026-11-23.dump`, check it arrived whole
+(the hash below is the session's), and read it into the live database before step 3:
+
+```
+shasum -a 256 ~/openferment-ethanol-2026-11-23.dump
+# b5444a40bd490f674f0123c99b25df27b84d551f037f96e69862e55ba56ce633
+bin="$(brew --prefix postgresql@17)/bin"
+"$bin/createdb" -h 127.0.0.1 openferment
+"$bin/pg_restore" -h 127.0.0.1 -d openferment --no-owner --no-privileges ~/openferment-ethanol-2026-11-23.dump
+```
+
+Step 3 then finds the database `openferment`, names it in `core/.env` and migrates it (nothing to
+do at these revisions); step 5 adds the alpha 1.0 records as a project of their own beside it.
+`OPENFERMENT_PROJECT=ethanol` in `core/.env` (step 6) points the nightly extraction at it. A
+`createdb` that answers "already exists" means a database is there: read it with
+`"$bin/psql" -h 127.0.0.1 -d openferment -c 'select id, name from openferment.projects'` before
+going on, and restore into it only when it holds no project.
 
 ## 3. The database, the jobs, the network
 

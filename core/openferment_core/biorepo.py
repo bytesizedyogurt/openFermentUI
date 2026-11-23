@@ -254,7 +254,9 @@ def _is_promotion(d: ReviewDecision) -> bool:
 
 
 def _is_gold(d: ReviewDecision) -> bool:
-    return d.provenance == "gold" or d.gold is not None
+    """A decision that sets a gold value: the value alone makes a record gold,
+    whatever label the request carried (ADR-006; bug hunt P-02)."""
+    return d.gold is not None
 
 
 def _is_withdrawal(d: ReviewDecision) -> bool:

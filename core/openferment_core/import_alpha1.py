@@ -15,7 +15,11 @@ before anything is written, and everything is written in one transaction: an
 import lands whole or not at all. A database the migrations have yet to bring
 to the newest schema is refused in words that name `pnpm db:migrate`. The stores' rules are not run again on old
 records (several cite records alpha 2.0 does not hold); each ran when its
-record was written. A decision's provenance is the one thing computed again,
+record was written. The estimate rule is the one rule run on every decision
+before anything is written (ADR-006; bug hunt H6-02): a decision holding a
+model's estimate or anything assumed refuses the whole import in words naming
+the file and the record, as `biorepo.write` refuses it. A decision's
+provenance is the one thing computed again,
 as `biorepo.write` computes it from what the decision is (ADR-006); the label
 alpha 1.0's browser sent goes. The files are left where they are, to be moved
 aside by a person.
@@ -37,6 +41,7 @@ from sqlalchemy import insert, text, update
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from . import artifacts, biorepo, db, projects
+from .basis import EstimateRefused, refuse_estimates
 from .db import migrate
 from .db import models as t
 from .db import rows
@@ -161,6 +166,18 @@ async def _revision(s: AsyncSession) -> str | None:
     return (await s.execute(text(f'SELECT version_num FROM "{db.SCHEMA}".alembic_version'))).scalar()
 
 
+def _no_estimates(found: Found, data: Path) -> None:
+    """Refuse, in words naming the file and the record, an import whose
+    decisions hold a model's estimate or anything assumed: BioRepo keeps
+    records, and `biorepo.write` refuses such a decision (ADR-006)."""
+    for record_id, decision in found.repo.decisions.items():
+        try:
+            refuse_estimates(decision, "BioRepo")
+        except EstimateRefused as e:
+            raise ImportRefused(f"{data / 'biorepo.json'} holds decision {record_id}, which a project cannot keep: {e}; "
+                                "nothing was imported") from None
+
+
 async def _write(found: Found, asked: ProjectCreate) -> str:
     async with db.session() as s:
         # A database the migrations have yet to bring to the newest schema
@@ -226,6 +243,7 @@ def carry(data: Path, name: str, by: str) -> tuple[str, dict[str, int]]:
     """Make a project named `name` in `by`'s name and carry `data` into it,
     whole or not at all; the project's id and what was carried."""
     found = read(data)
+    _no_estimates(found, data)
     pid = db.run(_write(found, ProjectCreate(name=name, by=by, description=f"Carried from {data} (alpha 1.0).")))
     return pid, found.counts()
 

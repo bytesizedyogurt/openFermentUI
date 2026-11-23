@@ -28,6 +28,7 @@ from openferment_core.models import (
     KeptTrain,
     ModuleRead,
     Proposal,
+    Quantity,
     TrainSpec,
 )
 from openferment_core.tools import reference
@@ -50,7 +51,7 @@ ACCEPTED, GOLD, REJECTED = "cl1-T4-00000001", "cl1-T5-00000001", "cl1-T5-0000000
 def _decided_pool():
     return evidence_pool.build(CANDIDATES, {
         ACCEPTED: decision(ACCEPTED, "verified"),
-        GOLD: decision(GOLD, "verified", provenance="gold"),
+        GOLD: decision(GOLD, "verified", provenance="gold", gold=Quantity(value=8.5, unit="d")),
         REJECTED: decision(REJECTED, "rejected", rejectReason="a placeholder reason")}, papers=PAPERS)
 
 

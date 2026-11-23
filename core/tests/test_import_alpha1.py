@@ -106,6 +106,19 @@ def test_a_file_that_cannot_be_read_refuses_the_whole_directory_and_writes_nothi
     assert [p.id for p in projects.listed()] == ["test-project"]
 
 
+def test_a_decision_holding_a_models_estimate_refuses_the_whole_import_and_writes_nothing(alpha1):
+    """Bug hunt H6-02: BioRepo keeps records, and an estimate never enters
+    one; the import refuses it in words naming the file and the record, as
+    biorepo.write refuses it, before anything is written."""
+    estimated = LABELLED.model_copy(update={"gold": Quantity(value=3.0, unit="mg L-1",
+                                                             origin={"kind": "model-estimate", "by": "a-placeholder-model"})})
+    (alpha1 / "biorepo.json").write_text(BioRepo(decisions={CANDIDATE.id: DECISION, PROMOTED.id: estimated},
+                                                 records=[CANDIDATE, PROMOTED]).model_dump_json())
+    with pytest.raises(import_alpha1.ImportRefused, match=f"biorepo.json holds decision {PROMOTED.id}.*model's estimate"):
+        import_alpha1.carry(alpha1, "Alpha 1.0 records", "Ada Moreno")
+    assert [p.id for p in projects.listed()] == ["test-project"]
+
+
 def test_a_write_that_fails_part_way_leaves_no_project_behind(alpha1, monkeypatch):
     real = db.rows.put
     calls = {"n": 0}
