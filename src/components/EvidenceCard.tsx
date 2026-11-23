@@ -3,8 +3,10 @@
 // The value is the artifact's, carried in the plan's `evidence`; the model
 // cited it by id and wrote none of it. Its provenance is computed from its
 // basis on the service, and the basis opens to every input and where each
-// came from, with a link to the stored artifact that replays it.
+// came from, with a link to the stored artifact that replays it, or to the
+// flowsheet record when the basis is an SFF file (lib/artifacts.artifactPath).
 import { ExternalLink } from 'lucide-react';
+import { artifactPath } from '@/lib/artifacts';
 import type { ExtractionRecord } from '@/lib/review';
 import type { Evidence } from '@/lib/postdoc';
 import type { BasisInput } from '@/lib/studies';
@@ -81,7 +83,7 @@ export function EvidenceCard({ evidence }: { evidence: Evidence }) {
           </ul>
           <a
             className="mt-1 inline-flex items-center gap-1 text-caption text-ink-soft hover:text-accent"
-            href={href(`/biorepo/artifacts/${b.artifactId}`)}
+            href={href(artifactPath(b.artifactId))}
           >
             Artifact {b.artifactId} <ExternalLink size={10} aria-hidden />
           </a>

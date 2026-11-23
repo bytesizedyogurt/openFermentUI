@@ -1857,8 +1857,9 @@ export interface paths {
         };
         /**
          * Proforma Runs
-         * @description A scenario's newest run on this service: the newest
-         *     stored `proforma.run` whose basis names the scenario (`latest_run`, the
+         * @description A scenario's newest run on this service: of the stored `proforma.run`
+         *     artifacts whose basis names the scenario, the one asked for last, a
+         *     request asked again making the run it kept the newest (`latest_run`, the
          *     one pureOS and selling_price read), or none. A read: it runs nothing and
          *     starts no simulator. The scenario is named by id, and a link opens what
          *     it names.

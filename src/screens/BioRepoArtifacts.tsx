@@ -8,7 +8,7 @@
 import { useEffect, useState } from 'react';
 import { Box, RotateCcw } from 'lucide-react';
 import type { Artifact, BasisSource } from '@/lib/studies';
-import { ArtifactRefused, ArtifactsDown, getArtifact, headline, listArtifacts, replayArtifact, type ReplayResult } from '@/lib/artifacts';
+import { ArtifactRefused, ArtifactsDown, artifactPath, getArtifact, headline, listArtifacts, replayArtifact, type ReplayResult } from '@/lib/artifacts';
 import { listComparisons } from '@/lib/studies';
 import { stamp, stampsIn } from '@/lib/proforma';
 import { href, navigate } from '@/router';
@@ -155,7 +155,7 @@ function SourceChip({ source }: { source: BasisSource }) {
       return source.id ? <CitationChip recordId={source.id} /> : <span className="text-ink-soft">a record, unnamed</span>;
     case 'artifact':
       return source.id ? (
-        <a className="chip font-mono" href={href(`/biorepo/artifacts/${source.id}`)}>
+        <a className="chip font-mono" href={href(artifactPath(source.id))}>
           artifact {source.id}
         </a>
       ) : (

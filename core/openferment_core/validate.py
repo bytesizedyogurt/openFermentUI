@@ -660,6 +660,31 @@ _NEGATION = re.compile(
 # the unit.
 _UNIT_GAP = re.compile(r"[\s~\u2248|]{0,3}")
 _UNIT_TOKENS = 4
+# A currency a sentence writes before its number: '$2.15/gal' is 2.15 in
+# USD gal⁻¹, and 'USD 12 thousand/kg' is 12000 in USD kg⁻¹. The mark joins
+# the unit written after the number, and the unit table reads the two as one.
+_CURRENCY_BEFORE = re.compile(r"(?:(?<![A-Za-z])(?:US\$|USD|EUR|GBP)|\$|€|£) ?$")
+# A unit the table reads can stop short of the unit the sentence wrote. In
+# 'g ethanol per litre', 'g DCW/L', 'g EtOH L-1' or '12% of total soluble
+# protein' the table reads the first token alone, and the words after it say
+# what the gram weighs or what the share is of. The sentence's unit runs on
+# when, after up to three label words, a '/', a 'per' or a unit token comes
+# ('L-1', 'h'), or when 'of' follows a percentage. A bracketed qualifier
+# ('45% (v/v)') qualifies the unit read and ends it.
+_UNIT_LABEL_WORDS = 3
+_LABEL_WORD = re.compile(r"[A-Za-z][A-Za-z0-9-]*")
+_UNIT_FACTOR = re.compile(r"[A-Za-zµ]+-\d+")  # 'L-1', 'h-1', 'g-1': a unit and its exponent
+_RUNS_ON = re.compile(r"\s*/|\s+per(?![A-Za-z])", re.IGNORECASE)
+_PERCENT_OF = re.compile(r"\s+of(?![A-Za-z])", re.IGNORECASE)
+# A denominator the sentence wrote in brackets after the label words, with
+# its exponent or a slash: 'g ethanol (g glucose)-1', 'g (DCW)/L',
+# 'g glucose (g DCW)-1 h-1'. A bracket closed with nothing after it
+# ('45% (v/v)') is a qualifier, and ends the unit as before.
+_BRACKET_DENOMINATOR = re.compile(
+    r"(?:\s+[A-Za-z][A-Za-z0-9-]*){0,3}?\s*\([^()]{1,40}\)\s*(?:[-\u2212\u207b^]\s*[\d\u00b9\u00b2\u00b3\u2070-\u2079]|/)"
+)
+# A product the sentence joined with a middle dot: 'g ethanol·L-1'.
+_MIDDLE_DOT = re.compile(r"[\u00b7\u22c5\u2219]")
 _RANGE_CONNECTOR = re.compile(r"\s*(?:-|to|through)\s*", re.IGNORECASE)
 _BETWEEN = re.compile(r"between\s*$", re.IGNORECASE)
 _AND_CONNECTOR = re.compile(r"\s*and\s*", re.IGNORECASE)
@@ -678,6 +703,10 @@ class QuoteQuantity:
     end: int
     """Where the number ends; `unitEnd` is where its unit token ends."""
     unitEnd: int
+    unitWhole: bool = True
+    """Whether `unit` is the whole unit the sentence wrote. False where the
+    sentence's unit runs on past it ('g ethanol per litre'): the number then
+    compares bare (`_unit_compared`)."""
 
 
 @dataclass(frozen=True)
@@ -706,12 +735,14 @@ def _numbers_with_spans(text: str) -> list[tuple[int, int, float]]:
     return sorted(found, key=lambda t: t[0])
 
 
-def _unit_after(text: str, end: int) -> tuple[str | None, int]:
+def _unit_after(text: str, end: int, currency: str = "") -> tuple[str | None, int]:
     """The unit token a sentence attached to the number ending at `end`.
 
     Longest first, so 'g L-1' wins over 'g'. Nothing is read as a unit when
     the next thing is another number — in '12-15 mg/L' the 12 is bare, and
-    reading '-15' as its unit would be reading the range as a unit."""
+    reading '-15' as its unit would be reading the range as a unit.
+    `currency` is the mark the sentence wrote before the number, read with
+    the token after it: '$' and '/gal' are USD gal⁻¹."""
     gap = _UNIT_GAP.match(text, end)
     at = gap.end() if gap else end
     rest = text[at:]
@@ -722,10 +753,52 @@ def _unit_after(text: str, end: int) -> tuple[str | None, int]:
         spelled = " ".join(tokens[:n]).rstrip(".,;:)]")
         if not spelled:
             continue
-        normalised = normalize_unit(spelled)
+        if currency:
+            joined = f"{currency}{spelled}" if spelled.startswith("/") else f"{currency} {spelled}"
+            normalised = normalize_unit(joined)
+        else:
+            normalised = normalize_unit(spelled)
         if normalised:
             return normalised, at + len(spelled)
     return None, end
+
+
+def _is_unit_token(token: str) -> bool:
+    return bool(token) and (normalize_unit(token) is not None or bool(_UNIT_FACTOR.fullmatch(token)))
+
+
+def _unit_runs_on(text: str, unit: str, unit_end: int) -> bool:
+    """Whether the unit the sentence wrote runs on past the part `_unit_after`
+    read, which ends at `unit_end`: a '/', a 'per' or a unit token after up to
+    three label words ('g EtOH L-1', 'g DCW/L'), or 'of' after a percentage.
+    Punctuation ends the unit."""
+    rest = text[unit_end:]
+    if _RUNS_ON.match(rest) or (unit == "%" and _PERCENT_OF.match(rest)):
+        return True
+    if _BRACKET_DENOMINATOR.match(rest):
+        return True
+    if not rest[:1].isspace():
+        return False
+    for i, token in enumerate(rest.split()[: _UNIT_LABEL_WORDS + 1]):
+        bare = token.rstrip(".,;:)]")
+        if bare.lower() == "per" or bare.startswith("/") or _is_unit_token(bare):
+            return True
+        parts = _MIDDLE_DOT.split(bare)
+        if len(parts) > 1 and any(_is_unit_token(p) for p in parts[1:]):
+            return True
+        # A share the sentence names in words: '12% total soluble protein'.
+        # It compares bare, and only into a candidate unit that is itself a
+        # percentage (`_states_nothing_in`).
+        if i == 0 and unit == "%" and bare == token and _LABEL_WORD.fullmatch(bare):
+            return True
+        word, slash, _ = bare.partition("/")
+        if not _LABEL_WORD.fullmatch(word):
+            return False
+        if slash:
+            return True
+        if bare != token:
+            return False
+    return False
 
 
 def parse_quantities(text: str) -> list[QuoteQuantity]:
@@ -756,7 +829,10 @@ def parse_quantities(text: str) -> list[QuoteQuantity]:
                 value, end = value * nxt[2], nxt[1]
                 i += 1
         unit, unit_end = _unit_after(norm, end)
-        out.append(QuoteQuantity(value=value, unit=unit, start=start, end=end, unitEnd=unit_end))
+        if unit is None and (mark := _CURRENCY_BEFORE.search(norm, 0, start)):
+            unit, unit_end = _unit_after(norm, end, mark.group(0).strip())
+        whole = unit is None or not _unit_runs_on(norm, unit, unit_end)
+        out.append(QuoteQuantity(value=value, unit=unit, start=start, end=end, unitEnd=unit_end, unitWhole=whole))
         i += 1
     return out
 
@@ -777,16 +853,70 @@ def parse_ranges(text: str) -> list[QuoteRange]:
     return out
 
 
-def _as_candidate_unit(value: float, unit: str | None, candidate_unit: str) -> float:
-    """A quote's number in the candidate's unit. Bare when either side has no
-    unit, and bare when the two do not convert — which is what rule 3 did for
-    every number before F1.2, so conversion only ever lets more through."""
-    if not unit or not candidate_unit:
-        return value
+def _unconvertible(unit: str, candidate_unit: str) -> str | None:
+    """Why a quote's unit does not convert into the candidate's, in the unit
+    engine's words, or None when it converts."""
     try:
-        return convert(value, unit, candidate_unit)
+        convert(1.0, unit, candidate_unit)
+    except UnitError as e:
+        return e.reason or str(e)
+    except (ValueError, TypeError) as e:
+        return str(e)
+    return None
+
+
+def _rule_4_takes(number: float, unit: str, field_id: str) -> bool:
+    """Whether rule 4 takes the candidate's unit for its field: the unit
+    normalises and stands in the field's family."""
+    if not unit:
+        return False
+    try:
+        to_canonical(number, unit, field_id)
     except (UnitError, ValueError, TypeError):
-        return value
+        return False
+    return True
+
+
+def _as_candidate_unit(
+    value: float, unit: str | None, candidate_unit: str, *, unit_accepted: bool = True
+) -> tuple[float, bool] | None:
+    """A quote's number in the candidate's unit, and whether `convert` moved
+    it there. Bare when either side has no unit. When the quote's unit does
+    not convert into the candidate's, the sentence states no number in the
+    candidate's unit, and the answer is None: rule 3 finds nothing there.
+    With `unit_accepted` False (a candidate unit rule 4 refuses in its own
+    words) the number compares bare, so rule 4 gives its reason."""
+    if not unit or not candidate_unit:
+        return value, False
+    try:
+        moved = convert(value, unit, candidate_unit)
+    except (UnitError, ValueError, TypeError):
+        return None if unit_accepted else (value, False)
+    return moved, unit != normalize_unit(candidate_unit)
+
+
+def _unit_compared(*quantities: QuoteQuantity) -> str | None:
+    """The unit a stated number is compared in: that of the first of
+    `quantities` with one, when it is the whole unit the sentence wrote.
+    Where the sentence's unit runs on past it ('g ethanol per litre'), none:
+    the number compares bare, as rule 3 compared it before F1.2, so nothing
+    is converted from a unit read in part and nothing is refused on one."""
+    for q in quantities:
+        if q.unit:
+            return q.unit if q.unitWhole else None
+    return None
+
+
+def _states_nothing_in(q: QuoteQuantity, candidate_unit: str, *, unit_accepted: bool) -> bool:
+    """Whether a percentage read in part ('12% total soluble protein', '90%
+    of theoretical') states nothing in the candidate's unit. It says a share
+    of something, so it compares bare into a candidate unit that is itself a
+    percentage ('% TSP', '%') and into none other: '12% total soluble
+    protein' states no 12 g/L. With no candidate unit, or one rule 4 refuses,
+    the number compares bare as before, so rule 4 gives its reason."""
+    if q.unit != "%" or q.unitWhole or not candidate_unit or not unit_accepted:
+        return False
+    return not (normalize_unit(candidate_unit) or candidate_unit).startswith("%")
 
 
 def _close(a: float, b: float) -> bool:
@@ -815,10 +945,16 @@ def value_basis(
     *,
     recorded_range: tuple[float, float] | None = None,
     negative_result: bool = False,
+    unit_accepted: bool = True,
 ) -> str | None:
     """How this sentence says this number, or None when it does not (§2.4
     rule 3 as F1.2 rewrites it). Computed here and nowhere else: no model
-    output and no reviewer sets it."""
+    output and no reviewer sets it. A number the sentence writes in a unit
+    that does not convert into the candidate's states nothing in it;
+    `unit_accepted` False (rule 4 refuses the candidate's unit) compares
+    such a number bare, so rule 4 gives its reason. A number whose unit the
+    sentence writes past what the unit table reads ('g DCW/L') compares bare
+    too (`_unit_compared`)."""
     norm = normalize_text(quote)
 
     # A range the record carries, stated by the sentence in whatever units
@@ -826,8 +962,15 @@ def value_basis(
     if recorded_range is not None:
         low, high = recorded_range
         for r in parse_ranges(norm):
-            a = _as_candidate_unit(r.low.value, r.low.unit or r.high.unit, candidate_unit)
-            b = _as_candidate_unit(r.high.value, r.high.unit or r.low.unit, candidate_unit)
+            if any(_states_nothing_in(e, candidate_unit, unit_accepted=unit_accepted) for e in (r.low, r.high)):
+                continue
+            said_low = _as_candidate_unit(r.low.value, _unit_compared(r.low, r.high), candidate_unit,
+                                          unit_accepted=unit_accepted)
+            said_high = _as_candidate_unit(r.high.value, _unit_compared(r.high, r.low), candidate_unit,
+                                           unit_accepted=unit_accepted)
+            if said_low is None or said_high is None:
+                continue
+            a, b = said_low[0], said_high[0]
             if not (_close(a, low) and _close(b, high)):
                 continue
             if _close(number, (a + b) / 2):
@@ -843,10 +986,14 @@ def value_basis(
         return "negation"
 
     for q in parse_quantities(norm):
-        if not _close(_as_candidate_unit(q.value, q.unit, candidate_unit), number):
+        if _states_nothing_in(q, candidate_unit, unit_accepted=unit_accepted):
             continue
-        converted = bool(q.unit) and bool(candidate_unit) and q.unit != normalize_unit(candidate_unit)
-        return "converted" if converted else "exact"
+        said = _as_candidate_unit(q.value, _unit_compared(q), candidate_unit, unit_accepted=unit_accepted)
+        if said is None or not _close(said[0], number):
+            continue
+        # 'converted' names a conversion `convert` made; a number compared
+        # in the unit the sentence wrote, or bare, is 'exact'.
+        return "converted" if said[1] else "exact"
     return None
 
 
@@ -862,7 +1009,8 @@ FIELD_DROP_REASONS = ("carbonSource",)
 # ── the paper's wording, resolved (OF-BLD-014 §2.1) ────────────────────
 #
 # Two vocabularies resolve a paper's wording: a project's strain aliases
-# (none until its records carry them) and the carbon sources with their
+# (each kept strain's name and other names, from the project's strain
+# catalogue) and the carbon sources with their
 # spellings (`schema/vocabulary.yaml`, mirrored by `CARBON_SOURCES` in
 # src/data/vocabulary.ts). The rule that reads them is `matchWholeWord` in
 # vocabulary.ts, and this is its mirror, step for step: the fixture
@@ -870,25 +1018,47 @@ FIELD_DROP_REASONS = ("carbonSource",)
 # tests/test_validate.py asserts the same here.
 
 
-@lru_cache(maxsize=4)
 def vocabulary(path: str | None = None) -> dict[str, dict[str, str]]:
     """The strain aliases and the carbon-source spellings: two maps from a
-    lower-case spelling to an id. With no path, the carbon sources this
-    package ships (`schema/vocabulary.yaml`) and no strain alias: strains
-    arrive with a project's records (alpha 2.0 stage 2). A path names a JSON
-    file holding `strainAliases` and `carbonSources`, how a test hands the
-    resolver a vocabulary of its own."""
+    lower-case spelling to an id. With no path, the open project's strain
+    aliases (`strain_aliases`) and the carbon sources this package ships
+    (`schema/vocabulary.yaml`). A path names a JSON file holding
+    `strainAliases` and `carbonSources`."""
     if path:
-        raw = json.loads(Path(path).read_text())
-        if "strainAliases" not in raw or "carbonSources" not in raw:
-            raise ValueError(f"{path} carries no `strainAliases` or `carbonSources` key")
-        strains, carbon = dict(raw["strainAliases"]), raw["carbonSources"]
-    else:
-        import yaml
+        return _vocabulary_file(path)
+    return {"strains": strain_aliases(), "carbon": _carbon_spellings()}
 
-        strains = {}
-        carbon = yaml.safe_load((SCHEMA / "vocabulary.yaml").read_text(encoding="utf-8"))["carbonSources"]
-    return {"strains": strains, "carbon": {sp: c["id"] for c in carbon for sp in c["spellings"]}}
+
+@lru_cache(maxsize=4)
+def _vocabulary_file(path: str) -> dict[str, dict[str, str]]:
+    raw = json.loads(Path(path).read_text())
+    if "strainAliases" not in raw or "carbonSources" not in raw:
+        raise ValueError(f"{path} carries no `strainAliases` or `carbonSources` key")
+    carbon = raw["carbonSources"]
+    return {"strains": dict(raw["strainAliases"]),
+            "carbon": {sp: c["id"] for c in carbon for sp in c["spellings"]}}
+
+
+@lru_cache(maxsize=1)
+def _carbon_spellings() -> dict[str, str]:
+    """Each carbon source's spellings, lower-cased, to its id (`schema/vocabulary.yaml`)."""
+    import yaml
+
+    carbon = yaml.safe_load((SCHEMA / "vocabulary.yaml").read_text(encoding="utf-8"))["carbonSources"]
+    return {sp: c["id"] for c in carbon for sp in c["spellings"]}
+
+
+def strain_aliases() -> dict[str, str]:
+    """The open project's strain aliases: each kept strain's name and other
+    names, lower-cased, to its id, as the strain catalogue holds them
+    (`catalogues.as_strain_aliases`, which reads them once a project and
+    afresh after a keep). Where no project is open there are none, so a
+    wording read outside a project stays as the paper wrote it."""
+    from . import catalogues, projects
+
+    if projects.current_or_none() is None:
+        return {}
+    return catalogues.as_strain_aliases()
 
 
 def unit_operations() -> list[dict[str, Any]]:
@@ -930,13 +1100,14 @@ def match_whole_word(text: str, aliases: dict[str, str]) -> str | None:
 
 
 def strain_id(text: str) -> str | None:
-    """`normalizeStrain`: the strain id a paper's wording names, or None."""
-    return match_whole_word(text, vocabulary()["strains"])
+    """`normalizeStrain`: the strain id a paper's wording names, or None,
+    by the open project's strain catalogue (`strain_aliases`)."""
+    return match_whole_word(text, strain_aliases())
 
 
 def carbon_source_id(text: str) -> str | None:
     """`carbonSourceId`: the carbon source a paper's wording names, or None."""
-    return match_whole_word(text, vocabulary()["carbon"])
+    return match_whole_word(text, _carbon_spellings())
 
 
 def content_id(
@@ -995,6 +1166,7 @@ def _why_not_in_quote(
     norm_quote: str,
     recorded: tuple[float, float] | None,
     negative: bool,
+    candidate_unit: str = "",
 ) -> str:
     """Why rule 3 refused, said so a reviewer knows what to do about it."""
     head = f"no number in the quote equals {number} within {VALUE_TOLERANCE:.1%}"
@@ -1006,6 +1178,12 @@ def _why_not_in_quote(
             f"{head}; the record is marked a negative result, and the quote does not "
             "state an absence in any of the words the corpus uses for one"
         )
+    for q in parse_quantities(norm_quote) if candidate_unit else []:
+        if q.unit and _close(q.value, number) and (why := _unconvertible(q.unit, candidate_unit)):
+            return (
+                f"the quote states {q.value:g} {q.unit}, and {q.unit} does not convert into {candidate_unit} "
+                f"({why}); a record's value stands in the quote in the candidate's unit"
+            )
     if parse_quantities(norm_quote):
         return (
             f"{head}; the value is derived from the quote's numbers; edit it to the "
@@ -1128,11 +1306,16 @@ def anchor_candidate(
             return None, "value", "value is NaN"
         recorded = recorded_range(raw)
         negative = bool(raw.get("negativeResult"))
+        # A quote's number in a unit that does not convert into the
+        # candidate's states nothing in the candidate's unit, and rule 3
+        # refuses it, once rule 4 below would take the candidate's unit.
+        # A unit rule 4 refuses keeps rule 4's own words.
         basis = value_basis(
-            number, norm_quote, unit_normalised, recorded_range=recorded, negative_result=negative
+            number, norm_quote, unit_normalised, recorded_range=recorded, negative_result=negative,
+            unit_accepted=_rule_4_takes(number, unit_normalised, field_id),
         )
         if basis is None:
-            return None, "value", _why_not_in_quote(number, norm_quote, recorded, negative)
+            return None, "value", _why_not_in_quote(number, norm_quote, recorded, negative, unit_normalised)
 
         # 4. The unit normalises, into the field's family.
         unit = unit_normalised

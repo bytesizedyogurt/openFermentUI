@@ -239,6 +239,11 @@ def _database(test_database, monkeypatch):
     from openferment_core.postdoc import conversations
 
     conversations._answering.clear()
+    # The strain aliases held for the test project were read inside the
+    # rolled-back transaction: the next test reads its own.
+    from openferment_core import catalogues
+
+    catalogues._ALIASES.changed()
     db.bind(previous)
     if binding.connection is not None:
         db.run(binding.close())

@@ -20,6 +20,18 @@ const JOB_COMPONENT: Record<Job['kind'], ComponentName> = {
   runbook: 'Runbook',
 };
 
+/**
+ * The component whose engine a simulation runs on (ADR-015), by the engine's name on the service's event stream:
+ * the core's three by name, and an engine registered beside them under Proforma, whose run pages show every engine's runs.
+ */
+const ENGINE_COMPONENT = new Map<string, ComponentName>([
+  ['biosteam', 'Proforma'],
+  ['kinetics', 'fermOS'],
+  ['train', 'pureOS'],
+]);
+export const componentOf = (j: Pick<Job, 'kind' | 'engine'>): ComponentName =>
+  ENGINE_COMPONENT.get(j.engine ?? '') ?? JOB_COMPONENT[j.kind];
+
 export function JobsPanel({ onClose }: { onClose: () => void }) {
   const jobs = useStore((s) => s.jobs);
   const clearJobs = useStore((s) => s.clearJobs);
@@ -100,7 +112,7 @@ export function JobsPanel({ onClose }: { onClose: () => void }) {
               </div>
               <div className="pl-6 mt-0.5">
                 <ComponentTag
-                  component={JOB_COMPONENT[j.kind]}
+                  component={componentOf(j)}
                   action={j.status === 'failed' ? 'failed' : j.status === 'done' ? 'complete' : 'working'}
                 />
               </div>

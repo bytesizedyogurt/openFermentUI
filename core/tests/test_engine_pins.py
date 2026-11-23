@@ -173,9 +173,11 @@ PINS: dict[str, tuple[str, str]] = {
     # base as the panel's overrides based them, with the line saying so, so
     # the id moved from ed33c02's 7fd5c088e90f6689, captured through the
     # retired older field, to the one the panel's overrides gave the same
-    # values at b6a85d0; the output hash is ed33c02's.
+    # values at b6a85d0 (87a47693d171d91d); and the bug hunt's fix of H1-04
+    # moved it again, its run version 'shelf run 3' hashed in the id, since the
+    # plant's recycles now run to convergence. The output hash is ed33c02's.
     "proforma.run": (
-        "87a47693d171d91d", "865d88ab811e3553dfff6549983fca62a2cf1cf01410b20fa5599493646f0fcf"),
+        "9f210c13eac9204b", "865d88ab811e3553dfff6549983fca62a2cf1cf01410b20fa5599493646f0fcf"),
     "library.run": (
         "dfb8df271dc2f58d", "16534ffcf199ba8a7532b52c8fd28961fb997ee9bd7f0e5173950bb9ecafee10"),
     "library.run on its own defaults": (
@@ -198,6 +200,8 @@ PINS: dict[str, tuple[str, str]] = {
 ED33C02_SAMPLE_COMPARISON = "b939060b54056cec"
 # The Proforma run's id at ed33c02, on the basis the older `assumptions` field built.
 ED33C02_PROFORMA = "7fd5c088e90f6689"
+# Its id on the panel's basis at b6a85d0, the pin's until the fix of H1-04.
+B6A85D0_PROFORMA = "87a47693d171d91d"
 
 
 def under_fixed_dispatch() -> bool:
@@ -361,7 +365,13 @@ def test_a_proforma_run_on_the_stand_in_evaluator_holds_its_pin(evaluator):
                                 "overrides for one release; a basis without this input read the older field alone"))]
     version = artifacts.registered(proforma.RUN).version_for(panel)
     assert artifacts.artifact_id(proforma.RUN, version, panel, 0) == r.artifactId
-    assert artifacts.artifact_id(proforma.RUN, version, older, 0) == ED33C02_PROFORMA
+    # The bug hunt's fix of H1-04 moved the run version alone: under the
+    # version ed33c02 and b6a85d0 ran ('shelf run 2'), the same two bases give
+    # their ids as they were.
+    assert proforma.RUN_VERSION == "shelf run 3"
+    before = version.replace(proforma.RUN_VERSION, "shelf run 2", 1)
+    assert artifacts.artifact_id(proforma.RUN, before, panel, 0) == B6A85D0_PROFORMA
+    assert artifacts.artifact_id(proforma.RUN, before, older, 0) == ED33C02_PROFORMA
     row = runs.get(r.artifactId)
     assert (row.engine, row.tool, row.plant, row.scenarioId) == ("biosteam", proforma.RUN, ETHANOL, MADE_HERE)
 

@@ -113,6 +113,25 @@ export const measuresOf = (r: Pick<Runbook, 'measurementSchema'>): Measure[] => 
 /** What a complete runbook hands over; a row that set none hands over none. */
 export const outputsOf = (r: Pick<Runbook, 'outputs'>): string[] => r.outputs ?? [];
 
+/**
+ * Where a runbook stands, as its page and the board read it. A stage, a spend a person authorised or a person's
+ * ruling moves a row's status (src/store.ts), and the bench moves a row those left at `draft` once its predictions are
+ * locked: a closed deposition that waits for its reconciliation holds it for a person, a deposition staged or running
+ * runs it, and a reconciliation recorded completes it. A screen computes it from the row and the project's
+ * depositions each time it reads them, as the ledger's counts are computed (src/engine/ledger.ts).
+ */
+export function runbookStatusOf(
+  r: Pick<Runbook, 'id' | 'status' | 'lockedAt'>,
+  depositions: Pick<Deposition, 'runbookId' | 'state' | 'reconciliation'>[],
+): RunbookStatus {
+  if (r.status !== 'draft' || r.lockedAt == null) return r.status;
+  const mine = depositions.filter((d) => d.runbookId === r.id);
+  if (mine.some((d) => d.state === 'closed' && d.reconciliation == null)) return 'needs_review';
+  if (mine.some((d) => d.state !== 'closed')) return 'running';
+  if (mine.some((d) => d.reconciliation != null)) return 'complete';
+  return 'draft';
+}
+
 /** One of the toolkit's reference SFF files at the pinned commit. */
 export type SFFLibraryEntry = components['schemas']['SFFLibraryEntry'];
 /** An engine registered here, with its things, its worker and its last conformance verdict (GET /api/engines). */

@@ -24,7 +24,9 @@ import {
   decisionToCheck,
   locateQuote,
   paperHeld,
+  publishedOf,
   refusalOf,
+  unsignedRefusal,
   writeRefusal,
   type Refusal,
   type DecisionCheck,
@@ -368,11 +370,18 @@ export default function Guild() {
     // glycan_species) are corrected by rejecting with a reason, not by typing
     // a number into a unit-aware field.
     if (typeof target.value !== 'number') return;
+    // A correction is signed like every decision (OF-BLD-012.1 F2): with no
+    // reviewer name the editor stays shut and the reviewer hears why.
+    const unsigned = unsignedRefusal(reviewerName());
+    if (unsigned) {
+      toast({ text: unsigned.why, kind: 'error' });
+      return;
+    }
     setEditBase({ value: target.value, unit: target.unit });
     setDraft({ value: target.value, unit: target.unit });
     setRejecting(false);
     setEditing(true);
-  }, []);
+  }, [toast]);
 
   const saveEdit = useCallback(
     (thenAccept: boolean) => {
@@ -381,7 +390,9 @@ export default function Guild() {
       if (!id || !draft) return;
       const before = state.records.find((r) => r.id === id);
       const changed = !before || before.value !== draft.value || before.unit !== draft.unit;
-      if (changed) editRecord(id, draft.value, draft.unit);
+      // A refused correction leaves the record as it was and the editor open:
+      // nothing is accepted on a value the reviewer did not mean.
+      if (changed && !editRecord(id, draft.value, draft.unit)) return;
       if (thenAccept) {
         recordTiming();
         reviewDecide(id, 'accept');
@@ -505,10 +516,11 @@ export default function Guild() {
       '--- Records -------------------------------------------------------',
     ];
     for (const r of queueRecords) {
+      const published = publishedOf(r);
       lines.push('');
       lines.push(`[${r.id}] ${fieldName(r.field)} — ${r.paperId} §${r.sectionId}`);
       lines.push(
-        `  as published: ${fmt(r.value)} ${r.unit}    SI: ${fmt(r.si.value)} ${r.si.unit}    confidence ${r.confidence.toFixed(2)}`,
+        `  as published: ${fmt(published.value)} ${published.unit}    SI: ${fmt(published.si.value)} ${published.si.unit}    confidence ${r.confidence.toFixed(2)}`,
       );
       lines.push(
         `  status: ${r.gold ? 'verified · gold set' : r.status}${r.reviewer ? ` (reviewer ${r.reviewer})` : ''}${
@@ -848,6 +860,8 @@ export default function Guild() {
   const section = paper?.sections.find((s) => s.id === record.sectionId);
   const ctx = section ? spanContext(section.text, record.quote) : null;
   const prov = provOf(record);
+  // What the paper published, which a correction leaves as it stands; the correction shows beside it.
+  const published = publishedOf(record);
   const draftSI = draft ? toSI(draft.value, draft.unit) : null;
 
   // §2.3 — what the service would refuse. The predicate in review.ts is the
@@ -860,6 +874,8 @@ export default function Guild() {
   const acceptBlocked = asked ? refusalOf(asked.accept, localAccept) : localAccept;
   const goldBlocked = asked ? refusalOf(asked.gold, localGold) : localGold;
   blocked.current = { accept: acceptBlocked, reject: rejectBlocked, gold: goldBlocked };
+  // A correction is refused with no reviewer name whether the service answers or not (`editRecord`).
+  const editBlocked = unsignedRefusal(reviewer);
 
   return (
     <>
@@ -920,16 +936,29 @@ export default function Guild() {
 
           {/* value block */}
           <div className="grid sm:grid-cols-3 gap-3 mt-4">
-            <div className="rounded-card border border-line p-3">
+            <div className="rounded-card border border-line p-3" data-testid="review-as-published">
               <div className="text-caption uppercase tracking-wide text-ink-soft">As published</div>
               <div className="font-num text-display leading-tight">
-                {fmt(record.value)}
-                {record.unit && <span className="text-section-title text-ink-soft ml-1">{record.unit}</span>}
+                {fmt(published.value)}
+                {published.unit && <span className="text-section-title text-ink-soft ml-1">{published.unit}</span>}
               </div>
             </div>
+            {record.corrected && (
+              <div className="rounded-card border border-accent/45 p-3" data-testid="review-corrected">
+                <div className="text-caption uppercase tracking-wide text-ink-soft">Corrected to</div>
+                <div className="font-num text-display leading-tight">
+                  {fmt(record.corrected.value)}
+                  {record.corrected.unit && (
+                    <span className="text-section-title text-ink-soft ml-1">{record.corrected.unit}</span>
+                  )}
+                </div>
+              </div>
+            )}
             {record.si.unit !== record.unit && (
               <div className="rounded-card border border-line p-3">
-                <div className="text-caption uppercase tracking-wide text-ink-soft">In the field&rsquo;s unit</div>
+                <div className="text-caption uppercase tracking-wide text-ink-soft">
+                  {record.corrected ? 'Corrected, in the field’s unit' : 'In the field’s unit'}
+                </div>
                 <div className="font-num text-display leading-tight">
                   {fmt(record.si.value)}
                   {record.si.unit && (
@@ -1000,7 +1029,7 @@ export default function Guild() {
               <p className="text-caption text-ink-soft mt-2">
                 Saving keeps the original extraction —{' '}
                 <span className="font-num">
-                  {fmt(record.value)} {record.unit}
+                  {fmt(published.value)} {published.unit}
                 </span>{' '}
                 — as a from/to entry in the audit trail.
               </p>
@@ -1182,7 +1211,11 @@ export default function Guild() {
                 <Ban size={14} /> Reject
                 <Hint k="r" faded={usedKeyboard} />
               </Button>
-              <Button onClick={openEdit} title="Correct the value inline — shortcut e">
+              <Button
+                onClick={openEdit}
+                disabled={blocks(editBlocked)}
+                title={editBlocked?.why ?? 'Correct the value inline — shortcut e'}
+              >
                 <Pencil size={14} /> Edit value
                 <Hint k="e" faded={usedKeyboard} />
               </Button>

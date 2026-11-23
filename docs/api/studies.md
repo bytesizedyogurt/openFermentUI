@@ -149,13 +149,17 @@ block it reads from its outputs.values. A value another engine's run names as a 
 its own (`price.<key>`, `outputs.<key>`) shares that output's row: a Proforma run's solved price
 (`price.solvedPrice`) and a library run's meet on one row with its change. A comparison kept at
 version 1 over such a run replays at version 2, and its first difference names the two versions.
-The artifact's output:
+`study comparison 3` is a comparison whose runs state some output in two or more units, its rows
+a unit (H2-01); one kept at version 1 or 2 over such runs, its one row of mixed units with a
+change read across them, replays at version 3 and says so, and the same runs compared again
+compute afresh under an id of their own. Runs that state each output in one unit keep version 1
+or 2 and their id. The artifact's output:
 
 | Key | What it is |
 |---|---|
 | `runs` | Each run's artifact id, plant (a contract engine's run names its thing, a Proforma run its flowsheet), configuration and provenance |
-| `rows` | `[{key, unit, values, change}]`: every output any run answers, each run's value (null for a run with no output of that key), and its relative change from the first run's. A library run's are every number of its price block (`price.<key>`, in BioSTEAM's TEA units) and of a flowsheet's outputs (`outputs.<key>`), read from its artifact as they have always been read; a run of any other engine's are its outputs.values (`values.<name>`, each in its unit; `docs/api/runs.md`, Outputs), a value named `price.<key>` or `outputs.<key>` in the library's row of that key |
-| `values` | `[{key, values: [{value, unit, origin, by}]}]`: every value any run set for itself (`basis.is_set`: a person's assumption, a model's estimate, a deposition's reading; a contract engine's run's by its basis name, `value <key>`), each run's value with its origin, a reading's cell with its `ref` beside. At version 1, a run that set none has the library's own default (`library-default`, `by` the package module). At version 2, a library run that set none has that default where its plant declares the value, and every other cell of a value its run holds none of has `value`, `unit`, `origin` and `by` null: a contract engine's artifact keeps no default |
+| `rows` | `[{key, unit, values, change}]`: every output any run answers, each run's value (null for a run with no output of that key), and its relative change from the first run's. A library run's are every number of its price block (`price.<key>`, in BioSTEAM's TEA units) and of a flowsheet's outputs (`outputs.<key>`), read from its artifact as they have always been read; a run of any other engine's are its outputs.values (`values.<name>`, each in its unit; `docs/api/runs.md`, Outputs), a value named `price.<key>` or `outputs.<key>` in the library's row of that key. A key the runs state in two or more units has a row a unit, standing together in the order the runs give the units, each run's value in the row of the unit it states and null in the others, so each change is reckoned within one unit; a row in a unit the first run states no value in holds no change |
+| `values` | `[{key, values: [{value, unit, origin, by}]}]`: every value any run set for itself (`basis.is_set`: a person's assumption, a model's estimate, a deposition's reading; a contract engine's run's by its basis name, `value <key>`), each run's value with its origin, a reading's cell with its `ref` beside. At version 1, a run that set none has the library's own default (`library-default`, `by` the package module). At version 2, a library run that set none has that default where its plant declares the value, and every other cell of a value its run holds none of has `value`, `unit`, `origin` and `by` null: a contract engine's artifact keeps no default. At version 3, the cells are version 1's for library runs alone and version 2's for a comparison that holds a run of another engine |
 
 A run its plant refused has no artifact and is refused here in words; so are one run alone, a run
 named twice, and a run the project does not hold.

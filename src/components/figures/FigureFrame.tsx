@@ -9,6 +9,7 @@ import { Download, Table2 } from 'lucide-react';
 import type { ComputedBasis, Provenance } from '@/lib/studies';
 import { exportCSV } from '@/lib/csv';
 import { plainNote } from '@/lib/proforma';
+import { artifactPath } from '@/lib/artifacts';
 import { href } from '@/router';
 import { cx } from '@/components/ui';
 import { DASH_ARRAY, ENCODING, LINE_WIDTH, markColor } from './encoding';
@@ -96,7 +97,7 @@ export function FigureFrame({ title, drawn, axes, table, csvName, sources, basis
               <li key={b.artifactId} className="text-caption">
                 <div className="text-ink">
                   {b.tool} <span className="font-num text-ink-soft">{b.toolVersion}</span> ·{' '}
-                  <a className="font-num hover:text-accent" href={href(`/biorepo/artifacts/${b.artifactId}`)}>
+                  <a className="font-num hover:text-accent" href={href(artifactPath(b.artifactId))}>
                     {b.artifactId}
                   </a>
                 </div>

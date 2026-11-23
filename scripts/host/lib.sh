@@ -119,29 +119,30 @@ env_setting() {
   printf '%s' "$value"
 }
 
-# PostgreSQL, the one store (alpha 2.0, ADR-001): Homebrew's postgresql@17
+# PostgreSQL, the one store (alpha 2.0, ADR-001): Homebrew's postgresql@18 (Homebrew's pgvector
+# builds for postgresql@18 and @19 alone)
 # with pgvector, answering on this Mac, a database named `openferment`, and
 # its address in core/.env. Makes what is missing and says what it made.
 ensure_database() {
-  # Homebrew keeps postgresql@17 keg-only: its tools live under its own prefix,
+  # Homebrew keeps postgresql@18 keg-only: its tools live under its own prefix,
   # which goes first on the path whenever the formula is installed.
   local keg
-  if command -v brew >/dev/null && keg="$(brew --prefix --installed postgresql@17 2>/dev/null)"; then
+  if command -v brew >/dev/null && keg="$(brew --prefix --installed postgresql@18 2>/dev/null)"; then
     PATH="$keg/bin:$PATH"
   fi
   # `sudo brew services` starts it at power-on, as the server's LaunchDaemon
   # starts, and --sudo-service-user runs it as the owner of its data directory.
   local start
-  start="sudo brew services start --sudo-service-user=$(id -un) postgresql@17"
+  start="sudo brew services start --sudo-service-user=$(id -un) postgresql@18"
   command -v pg_isready >/dev/null ||
-    die "PostgreSQL is not installed. Run: brew install postgresql@17 pgvector && $start"
+    die "PostgreSQL is not installed. Run: brew install postgresql@18 pgvector && $start"
   pg_isready -q -h 127.0.0.1 ||
     die "PostgreSQL is not answering on 127.0.0.1. Run: $start"
   # Homebrew's LaunchAgent starts PostgreSQL at your login; an always-on host needs its LaunchDaemon.
-  if [ -f "$HOME/Library/LaunchAgents/homebrew.mxcl.postgresql@17.plist" ] &&
-    [ ! -f /Library/LaunchDaemons/homebrew.mxcl.postgresql@17.plist ]; then
+  if [ -f "$HOME/Library/LaunchAgents/homebrew.mxcl.postgresql@18.plist" ] &&
+    [ ! -f /Library/LaunchDaemons/homebrew.mxcl.postgresql@18.plist ]; then
     echo "PostgreSQL here starts at your login, so after a power cut the service waits for a login to reach its database."
-    echo "For an always-on host: brew services stop postgresql@17 && $start"
+    echo "For an always-on host: brew services stop postgresql@18 && $start"
   fi
   local named vector
   named="$(env_setting OPENFERMENT_DATABASE_URL)"
@@ -172,15 +173,15 @@ ensure_database() {
 # 7). The dump is written beside its name and moved into place once whole, so
 # a failed night keeps the seven as they were. Guild's ledger, personnel data,
 # is in every dump, so the folder and its files are the owner's alone.
-# Homebrew keeps postgresql@17 keg-only, so pg_dump comes from the keg's
+# Homebrew keeps postgresql@18 keg-only, so pg_dump comes from the keg's
 # prefix, else from the path.
 backup_database() {
   local dir="$HOME/openferment-backups" keep=7 keg tool file past old
-  if command -v brew >/dev/null && keg="$(brew --prefix --installed postgresql@17 2>/dev/null)" &&
+  if command -v brew >/dev/null && keg="$(brew --prefix --installed postgresql@18 2>/dev/null)" &&
     [ -x "$keg/bin/pg_dump" ]; then
     tool="$keg/bin/pg_dump"
   elif ! tool="$(command -v pg_dump)"; then
-    echo "no pg_dump on this Mac, so tonight's dump waits. Run: brew install postgresql@17" >&2
+    echo "no pg_dump on this Mac, so tonight's dump waits. Run: brew install postgresql@18" >&2
     return 1
   fi
   mkdir -p "$dir" && chmod 700 "$dir" || return 1

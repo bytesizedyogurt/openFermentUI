@@ -57,9 +57,22 @@ export type ExtractionRecord = Omit<Candidate, 'field'> & {
   corrected?: ReviewDecision['corrected'];
   reviewer?: ReviewDecision['reviewer'];
   audit: AuditLine[];
-  original?: { value: number | string; unit: string; quote: string; sectionId: string };
+  original?: { value: number | string; unit: string; si: Candidate['si']; quote: string; sectionId: string };
   absentFromRun?: boolean;
 };
+
+/**
+ * What the paper published for a record: the value, the unit and their SI
+ * twin stamped as the record entered the store, which no correction moves.
+ * The card and the column labelled "as published" read this, and the
+ * correction stands beside it. A record with no stamp carries the paper's own
+ * value, since every decision lands on a stamped record.
+ */
+export function publishedOf(r: ExtractionRecord): { value: number | string; unit: string; si: Candidate['si'] } {
+  return r.original
+    ? { value: r.original.value, unit: r.original.unit, si: r.original.si }
+    : { value: r.value, unit: r.unit, si: r.si };
+}
 
 /**
  * A candidate as a record entering the store, with no decision yet and an
@@ -235,6 +248,21 @@ export interface Refusal {
 }
 
 /**
+ * The refusal of a decision nobody signed (OF-BLD-012.1 F2), null when a
+ * reviewer name is set. A correction asks it whether the service answers or
+ * not, so no unsigned correction is kept and none is later sent under a name
+ * set after it; an accept, a reject and gold ask it through `writeRefusal`.
+ */
+export function unsignedRefusal(reviewer: string | null): Refusal | null {
+  if (reviewer && reviewer.trim()) return null;
+  return {
+    rule: 'reviewer',
+    browserOnly: false,
+    why: 'Set your reviewer name in Settings before deciding — the project records who decided what.',
+  };
+}
+
+/**
  * THE OFFLINE FALLBACK (OF-BLD-012.1 F1.5). While the service is up, Guild
  * asks `POST /api/biorepo/check` and gates on THAT answer: the rules live in
  * `biorepo.write` and are not mirrored here, because a mirror of a rule is a
@@ -265,13 +293,8 @@ export function writeRefusal(
   // A decision nobody signed is not a decision the project can keep
   // (OF-BLD-012.1 F2). Asked first, because it is the one refusal the
   // reviewer can clear in five seconds.
-  if (!reviewer || !reviewer.trim()) {
-    return {
-      rule: 'reviewer',
-      browserOnly: false,
-      why: 'Set your reviewer name in Settings before deciding — the project records who decided what.',
-    };
-  }
+  const unsigned = unsignedRefusal(reviewer);
+  if (unsigned) return unsigned;
   if (!paperHeld(paper)) {
     return {
       rule: 'paper',

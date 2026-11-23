@@ -67,6 +67,23 @@ function locateSpans(text: string, recs: ExtractionRecord[]): Span[] {
   return kept;
 }
 
+/**
+ * Bring a rail row into view inside the rail's own list, the nearest way, and
+ * move no other scroller. A row's scrollIntoView scrolls the page as well: beside
+ * the sticky rail it stopped a deep link's scroll to the text at the paper's
+ * top, and where the rail sits beneath the text it carried the page down to it.
+ */
+export function revealInList(
+  list: { scrollTop: number; getBoundingClientRect(): { top: number; bottom: number } } | null,
+  row: { getBoundingClientRect(): { top: number; bottom: number } } | null | undefined,
+): void {
+  if (!list || !row) return;
+  const l = list.getBoundingClientRect();
+  const r = row.getBoundingClientRect();
+  if (r.top < l.top) list.scrollTop -= l.top - r.top;
+  else if (r.bottom > l.bottom) list.scrollTop += r.bottom - l.bottom;
+}
+
 function provOf(r: ExtractionRecord): ProvKind {
   return r.status === 'rejected' ? 'rejected' : provenanceOf(r);
 }
@@ -126,6 +143,7 @@ export default function PaperReader({
   const spanRefs = useRef<Record<string, HTMLElement | null>>({});
   const quoteRef = useRef<HTMLElement | null>(null);
   const rowRefs = useRef<Record<string, HTMLButtonElement | null>>({});
+  const railListRef = useRef<HTMLDivElement | null>(null);
   const sectionRefs = useRef<Record<string, HTMLElement | null>>({});
 
   const behavior: ScrollBehavior = reducedMotion ? 'auto' : 'smooth';
@@ -213,21 +231,30 @@ export default function PaperReader({
     return () => window.clearTimeout(t);
   }, [sectionId, spanId, quoted, paperId, behavior, drawn]);
 
-  // Deep link: select, scroll into view, pulse once.
+  // Deep link: select, scroll into view, pulse once. The rail's row comes into
+  // view inside the rail's list, and the text's scroll is the page's one scroll.
+  // It waits for the text's fonts: a face that arrives after the scroll sets out
+  // rewraps the paper and moves the span away from where the scroll ends.
   useEffect(() => {
     if (!spanId) return;
     setActiveId(spanId);
     const key = `${paperId}?${spanId}`;
     if (scrolledTo.current === key) return;
+    let live = true;
     const t = window.setTimeout(() => {
-      const el = spanRefs.current[spanId];
-      if (!el) return;
-      scrolledTo.current = key;
-      el.scrollIntoView({ behavior, block: 'center' });
-      rowRefs.current[spanId]?.scrollIntoView({ block: 'nearest' });
-      setPulseId(spanId);
+      void (document.fonts?.ready ?? Promise.resolve()).then(() => {
+        const el = spanRefs.current[spanId];
+        if (!live || !el || scrolledTo.current === key) return;
+        scrolledTo.current = key;
+        revealInList(railListRef.current, rowRefs.current[spanId]);
+        el.scrollIntoView({ behavior, block: 'center' });
+        setPulseId(spanId);
+      });
     }, 60);
-    return () => window.clearTimeout(t);
+    return () => {
+      live = false;
+      window.clearTimeout(t);
+    };
   }, [spanId, paperId, behavior, drawn]);
 
   useEffect(() => {
@@ -585,7 +612,7 @@ export default function PaperReader({
             }
           />
         ) : (
-          <div className="max-h-[46vh] overflow-y-auto -mx-1 px-1">
+          <div ref={railListRef} className="max-h-[46vh] overflow-y-auto -mx-1 px-1">
             {(fullText ? railRecords.filter((x) => x.located) : railRecords).map(({ record: r, located }) => {
               const p = provOf(r);
               const isActive = activeId === r.id;

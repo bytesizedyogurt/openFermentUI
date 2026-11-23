@@ -24,7 +24,16 @@ import {
   Link2,
   Wallet,
 } from 'lucide-react';
-import { measuresOf, outputsOf, predictionsOf, stagesOf, type Runbook } from '@/lib/studies';
+import {
+  measuresOf,
+  outputsOf,
+  predictionsOf,
+  runbookStatusOf,
+  stagesOf,
+  type Deposition,
+  type Runbook,
+  type RunbookStatus,
+} from '@/lib/studies';
 import { useStore } from '@/store';
 import { href, navigate } from '@/router';
 import { RUNBOOK_STATUS_LABEL, RUNBOOK_STATUS_NOTE } from '@/data/labels';
@@ -36,6 +45,7 @@ import { ProcessTrain } from '@/components/ProcessTrain';
 import { RunbookStatusIcon, StageIcon, stageMeta } from '@/components/RunbookBits';
 import { ComponentTag } from '@/components/ComponentTag';
 import { Tick } from '@/components/Provenance';
+import { artifactPath } from '@/lib/artifacts';
 import {
   Bar,
   Button,
@@ -61,7 +71,98 @@ function looksLikeVocabularyId(value: string): boolean {
 
 // ── the state panel — what this runbook is waiting on ──────────────────
 
-function StatePanel({ runbook }: { runbook: Runbook }) {
+/**
+ * Where the bench has taken a locked runbook its stages left at draft (`runbookStatusOf`): a deposition recording
+ * against it, a closed one waiting for a person to reconcile it, or the reconciliation a person recorded. Each names
+ * the deposition it reads.
+ */
+function BenchPanel({ runbook, status, mine }: { runbook: Runbook; status: RunbookStatus; mine: Deposition[] }) {
+  const promote = useStore((s) => s.promoteRunbook);
+
+  if (status === 'needs_review') {
+    const waiting = mine.find((d) => d.state === 'closed' && d.reconciliation == null);
+    return (
+      <Card className="p-4 border-signal-warn/40" data-testid="runbook-bench-state">
+        <div className="text-caption uppercase tracking-wide text-ink-soft mb-1">Held for a person</div>
+        <h2 className="font-serif text-section-title font-semibold leading-snug">
+          A closed deposition waits for its reconciliation.
+        </h2>
+        <p className="text-body text-ink-soft mt-1.5 max-w-3xl">
+          Its readings stand beside these predictions on the deposition&rsquo;s page, where a person records whether
+          they held. The ledger counts a prediction once that outcome is recorded.
+        </p>
+        {waiting && (
+          <div className="flex flex-wrap gap-2 mt-3">
+            <LinkButton to={`/runbooks/depositions/${waiting.id}`}>
+              <FileCheck2 size={14} /> Reconcile the deposition
+            </LinkButton>
+          </div>
+        )}
+      </Card>
+    );
+  }
+
+  if (status === 'running') {
+    const open = mine.find((d) => d.state !== 'closed');
+    return (
+      <Card className="p-4" data-testid="runbook-bench-state">
+        <div className="text-caption uppercase tracking-wide text-ink-soft mb-1">At the bench</div>
+        <h2 className="font-serif text-section-title font-semibold leading-snug">
+          A deposition is recording against these predictions.
+        </h2>
+        <p className="text-body text-ink-soft mt-1.5 max-w-3xl">
+          Once it is closed, a person sets its readings beside the predictions and records what they found.
+        </p>
+        {open && (
+          <div className="flex flex-wrap gap-2 mt-3">
+            <LinkButton to={`/runbooks/depositions/${open.id}`}>
+              <Play size={14} /> Open the deposition
+            </LinkButton>
+          </div>
+        )}
+      </Card>
+    );
+  }
+
+  // Complete: the latest reconciliation a person recorded against this runbook.
+  const latest = mine
+    .flatMap((d) => (d.reconciliation ? [{ d, r: d.reconciliation }] : []))
+    .sort((a, b) => (a.r.at < b.r.at ? 1 : -1))[0];
+  if (!latest) return null;
+  return (
+    <Card className="p-4" data-testid="runbook-bench-state">
+      <div className="text-caption uppercase tracking-wide text-ink-soft mb-1">Reconciled · {latest.r.outcome}</div>
+      <h2 className="font-serif text-section-title font-semibold leading-snug">
+        A person recorded the bench&rsquo;s readings as {latest.r.outcome}.
+      </h2>
+      {latest.r.note && <p className="text-body text-ink-soft mt-1.5 max-w-3xl">{latest.r.note}</p>}
+      {runbook.kind === 'research' && latest.r.outcome === 'confirmed' && (
+        <p className="text-body text-ink-soft mt-1.5 max-w-3xl">
+          A research runbook that finds something becomes an industrial one in a single action, its host, its
+          product, its predictions and its measures carried across.
+        </p>
+      )}
+      <div className="flex flex-wrap gap-2 mt-3">
+        <LinkButton to={`/runbooks/depositions/${latest.d.id}`}>
+          <FileCheck2 size={14} /> Open the deposition
+        </LinkButton>
+        {runbook.kind === 'research' && latest.r.outcome === 'confirmed' && (
+          <Button
+            variant="primary"
+            onClick={() => {
+              const id = promote(runbook.id);
+              if (id) navigate(`/runbooks/${id}`);
+            }}
+          >
+            <GitBranch size={14} /> Promote to an industrial runbook
+          </Button>
+        )}
+      </div>
+    </Card>
+  );
+}
+
+function StatePanel({ runbook, status, mine }: { runbook: Runbook; status: RunbookStatus; mine: Deposition[] }) {
   const resolveInput = useStore((s) => s.resolveRunbookInput);
   const authorise = useStore((s) => s.authoriseRunbookBudget);
   const resolveReview = useStore((s) => s.resolveRunbookReview);
@@ -70,6 +171,11 @@ function StatePanel({ runbook }: { runbook: Runbook }) {
   const stages = stagesOf(runbook);
   const blockedStage = stages.find((s) => s.status === 'blocked');
   const reviewStage = stages.find((s) => s.status === 'review');
+
+  // The bench moves a locked runbook its stages left at draft, and its panel names the deposition that moved it.
+  if (runbook.status === 'draft' && status !== 'draft') {
+    return <BenchPanel runbook={runbook} status={status} mine={mine} />;
+  }
 
   if (runbook.status === 'blocked_unverified') {
     return (
@@ -211,11 +317,15 @@ function StatePanel({ runbook }: { runbook: Runbook }) {
   }
 
   if (runbook.status === 'draft') {
+    const locked = runbook.lockedAt != null;
     return (
       <Card className="p-4">
-        <div className="text-caption uppercase tracking-wide text-ink-soft mb-1">Scoped only</div>
+        <div className="text-caption uppercase tracking-wide text-ink-soft mb-1">
+          {locked ? 'Locked, waiting for the bench' : 'Scoped only'}
+        </div>
         <h2 className="font-serif text-section-title font-semibold leading-snug">
-          {stages[0]?.detail ?? 'Nothing has been run yet.'}
+          {stages[0]?.detail ??
+            (locked ? 'The predictions are frozen, and no deposition has started against them.' : 'Nothing has been run yet.')}
         </h2>
         <p className="text-body text-ink-soft mt-1.5 max-w-3xl">{runbook.note}</p>
       </Card>
@@ -332,7 +442,7 @@ function PredictionPanel({ runbook }: { runbook: Runbook }) {
                       {/* A study's runbook predicts an engine run's outputs, and the run's id is its artifact's. */}
                       <a
                         className="font-num underline underline-offset-2 hover:text-accent"
-                        href={href(runbook.id.startsWith('rb-study-') ? `/proforma/runs/${p.artifactId}` : `/biorepo/artifacts/${p.artifactId}`)}
+                        href={href(runbook.id.startsWith('rb-study-') ? `/proforma/runs/${p.artifactId}` : artifactPath(p.artifactId))}
                         data-testid="prediction-artifact"
                       >
                         {runbook.id.startsWith('rb-study-') ? 'the run' : 'its artifact'} {p.artifactId}
@@ -572,6 +682,7 @@ function RunbookLedgerFigure({ runbook }: { runbook: Runbook }) {
 
 export default function RunbookDetail({ runbookId }: { runbookId: string }) {
   const runbooks = useStore((s) => s.runbooks);
+  const depositions = useStore((s) => s.depositions);
   const products = useStore((s) => s.products);
   const strains = useStore((s) => s.strains);
 
@@ -606,13 +717,16 @@ export default function RunbookDetail({ runbookId }: { runbookId: string }) {
   const done = stages.filter((s) => s.status === 'done').length;
   // A row served as kept may leave out its progress, which then stands at none.
   const progress = runbook.progressPct ?? 0;
+  // Where it stands: its row's status, moved on by its lock, its depositions and their reconciliations.
+  const mine = depositions.filter((d) => d.runbookId === runbook.id);
+  const status = runbookStatusOf(runbook, mine);
 
   return (
     <>
       <PageHeader
         eyebrow={`Runbooks · ${runbook.kind}`}
         title={runbook.title}
-        subtitle={RUNBOOK_STATUS_NOTE[runbook.status]}
+        subtitle={RUNBOOK_STATUS_NOTE[status]}
         actions={
           <LinkButton to="/runbooks">
             <ArrowRight size={14} className="rotate-180" /> All runbooks
@@ -621,9 +735,9 @@ export default function RunbookDetail({ runbookId }: { runbookId: string }) {
       />
 
       <div className="flex flex-wrap items-center gap-2 mb-4">
-        <span className="chip inline-flex items-center gap-1.5">
-          <RunbookStatusIcon status={runbook.status} size={13} />
-          {RUNBOOK_STATUS_LABEL[runbook.status]}
+        <span className="chip inline-flex items-center gap-1.5" data-testid="runbook-status">
+          <RunbookStatusIcon status={status} size={13} />
+          {RUNBOOK_STATUS_LABEL[status]}
         </span>
         <span
           className={cx(
@@ -655,9 +769,9 @@ export default function RunbookDetail({ runbookId }: { runbookId: string }) {
               value={progress}
               max={100}
               className={
-                runbook.status === 'blocked_unverified'
+                status === 'blocked_unverified'
                   ? 'bg-signal-error'
-                  : runbook.status === 'needs_review'
+                  : status === 'needs_review'
                     ? 'bg-signal-warn'
                     : undefined
               }
@@ -688,7 +802,7 @@ export default function RunbookDetail({ runbookId }: { runbookId: string }) {
       </Card>
 
       <div className="mb-5">
-        <StatePanel runbook={runbook} />
+        <StatePanel runbook={runbook} status={status} mine={mine} />
       </div>
 
       <Card className="p-4 mb-6">

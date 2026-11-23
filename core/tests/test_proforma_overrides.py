@@ -169,8 +169,11 @@ def panel_line():
 
 
 # Each run's artifact id through the panel's overrides at b6a85d0, measured
-# there on these stand-ins, eight samples, no host drawing the diagram.
-PANEL_IDS = {"held": "52e1bc2d2c215e81", "held with titre": "b1931d595489ef2e", "made here": "66845418720c7794"}
+# there on these stand-ins, eight samples, no host drawing the diagram. Moved
+# by the bug hunt's fix of H1-04, whose run version 'shelf run 3' a run's id
+# hashes, from 52e1bc2d2c215e81, b1931d595489ef2e and 66845418720c7794: the
+# plant's recycles now run to convergence, so a run kept before computes afresh.
+PANEL_IDS = {"held": "100a68527245099d", "held with titre": "c2b8c177968a68dd", "made here": "530e54ce0f6b1a00"}
 
 
 def test_a_panel_run_sent_as_inputs_keeps_the_artifact_id_its_overrides_gave(standin, monkeypatch):

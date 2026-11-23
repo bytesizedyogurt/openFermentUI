@@ -10,8 +10,8 @@ call a model, over one project (alpha 2.2 F.5; ADR-002, Implementation F).
 (`literature/graph.py`). `--dry-run` reads the passages a build would send and
 prints the batches, the prompts' characters, the kit's token estimate, and
 what their input and the most a build could cost come to on the route's first
-model (each batch's whole answer, the figure the day's cap holds against); it
-calls no model.
+model (each batch's whole answer, the figure the day's cap holds against),
+each batch priced as the one request a build sends for it; it calls no model.
 
 `report --project` runs the project's lanes (`literature/report.py`): the
 ground truth built from its kept candidates, retrieval in each configuration,
@@ -105,11 +105,14 @@ def graph_command(args: argparse.Namespace) -> int:
             model = llm.chain("index")[0]
             chars = sum(len(p) for p in prompts)
             answer = max(graph.ANSWER_TOKENS, llm.KIT_ROOM[llm.routes()["index"].effort])
+            # A build sends each batch as a request of its own, and a request's own prompt sets its price's tier
+            # (llm.LONG_PROMPT_PRICES), so each prompt is priced alone, as its call is charged and held, and the
+            # prices are summed: one batch keeps one price at any batch count.
+            input_usd = sum(llm.cost_usd(model, round(len(p) / 4), 0) for p in prompts)
+            most_usd = sum(llm.cost_usd(model, len(p) // llm.CHARS_PER_TOKEN_ESTIMATE + 1, answer) for p in prompts)
             _print({"project": args.project, "chunks": len(rows), "batches": len(prompts), "promptCharacters": chars,
                     "kitTokens": round(chars / 4), "model": model,
-                    "inputUsd": round(llm.cost_usd(model, round(chars / 4), 0), 6),
-                    "mostUsd": round(llm.cost_usd(model, chars // llm.CHARS_PER_TOKEN_ESTIMATE + len(prompts),
-                                                  answer * len(prompts)), 6)})
+                    "inputUsd": round(input_usd, 6), "mostUsd": round(most_usd, 6)})
             return 0
         with llm.tally() as spent:
             built = db.run(graph.build(args.project, llm=llm.kit_client("extraction"), limit=args.limit,

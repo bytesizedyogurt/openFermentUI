@@ -797,7 +797,9 @@ def plant_of(art) -> dict[str, Any]:
 # 2 (OF-BLD-019 §2.R): the basis names the utility prices and cost index and
 # whether the diagram is drawn; the product's stream row carries the solved
 # price; the plant builds as in a fresh worker.
-RUN_VERSION = "shelf run 2"
+# 3 (H1-04): every recycle loop runs to a recycle converged to the float's
+# half precision.
+RUN_VERSION = "shelf run 3"
 
 
 def _register_run() -> None:
@@ -928,6 +930,10 @@ def computed(req, pool=None):
                                            parts=parts, finance=finance) + values_read(sets),
                    by=req.by, seed=req.seed, records_by_id=pool.records_by_id, scenario_id=req.scenarioId,
                    configuration=parts_configuration(parts.vessel.id, parts.train.id) if parts is not None else None)
+    # The run this request was answered with, kept now or kept before, is
+    # the scenario's latest (`latest_run`); so is a run whose samples hold
+    # no price, which `run` refuses after this.
+    asked(req.scenarioId, art.id)
     return art, inputs, info
 
 
@@ -1051,11 +1057,69 @@ def evidence_of(art):
         provenance=art.provenance, basis=artifacts.basis_of(art), figure="distribution")
 
 
+# The run of each scenario asked for last, kept in the project's settings
+# under this key: {scenario id: {"run": the run's artifact id, "at": when}}.
+# The same request asked again is answered by the run it kept (`keep_run`),
+# whose time stays the time it was first kept, so a scenario run A, then B,
+# then A again read B as its latest after a reload (bug hunt, a tester on
+# the owner's data); `asked` keeps A as the run asked for last, and
+# `latest_run` reads it.
+ASKED_KEY = "proformaAsked"
+
+
+def _instant(iso: str):
+    from datetime import datetime
+
+    return datetime.fromisoformat(iso.replace("Z", "+00:00"))
+
+
+async def _keep_asked(project_id: str, scenario_id: str, run_id: str, at: str) -> None:
+    from sqlalchemy import select, update
+
+    from . import db
+    from .db import models as t
+
+    async with db.session() as s:
+        held = (await s.execute(select(t.projects.c.settings).where(t.projects.c.id == project_id)
+                                .with_for_update())).scalar_one_or_none()
+        if held is None:
+            return
+        asked_now = {**(held.get(ASKED_KEY) or {}), scenario_id: {"run": run_id, "at": at}}
+        await s.execute(update(t.projects).where(t.projects.c.id == project_id)
+                        .values(settings={**held, ASKED_KEY: asked_now}))
+
+
+def asked(scenario_id: str, run_id: str) -> None:
+    """Keep `run_id` as the run of `scenario_id` asked for last, at this
+    moment to the microsecond: a run kept now, or a kept run the same
+    request answered again."""
+    from datetime import datetime, timezone
+
+    from . import db, projects
+
+    at = datetime.now(timezone.utc).isoformat(timespec="microseconds").replace("+00:00", "Z")
+    db.run(_keep_asked(projects.current(), scenario_id, run_id, at))
+
+
+async def _last_asked(project_id: str, scenario_id: str) -> dict | None:
+    from sqlalchemy import select
+
+    from . import db
+    from .db import models as t
+
+    async with db.session() as s:
+        held = (await s.execute(select(t.projects.c.settings).where(t.projects.c.id == project_id))).scalar_one_or_none()
+    last = ((held or {}).get(ASKED_KEY) or {}).get(scenario_id)
+    return last if isinstance(last, dict) else None
+
+
 def latest_run(scenario_id: str):
-    """The most recent stored run of a scenario, or None: a run whose basis
-    names the scenario, or one stored before a basis named its scenario
-    whose flowsheet is the kept scenario's."""
-    from . import artifacts
+    """The run of a scenario asked for last, or None: of the stored runs
+    whose basis names the scenario, or that were stored before a basis
+    named its scenario and ran the kept scenario's flowsheet, each stands
+    at the time it was kept, and the run of it asked for last (`asked`) at
+    the time it was asked. The one standing latest is answered."""
+    from . import artifacts, db, projects
 
     own = {s["id"]: s.get("modelId") for s in held_scenarios()}.get(scenario_id)
 
@@ -1066,7 +1130,20 @@ def latest_run(scenario_id: str):
         return own is not None and str(_named(a.inputs, "flowsheet") or "") == own
 
     runs = [a for a in artifacts.all_artifacts() if a.tool == RUN and belongs(a)]
-    return max(runs, key=lambda a: a.createdAt) if runs else None
+    if not runs:
+        return None
+    last = db.run(_last_asked(projects.current(), scenario_id))
+
+    def stands(a):
+        made = _instant(a.createdAt)
+        if last is not None and last.get("run") == a.id:
+            try:
+                return max(made, _instant(str(last.get("at"))))
+            except (TypeError, ValueError):
+                return made
+        return made
+
+    return max(runs, key=lambda a: (stands(a), a.id))
 
 
 # ── Glucose to ethanol, and every scenario the shelf can run (OF-BLD-019 §2.3) ──

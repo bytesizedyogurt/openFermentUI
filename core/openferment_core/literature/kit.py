@@ -12,7 +12,12 @@ THE PROJECT IS THE SCOPE. A document a project collects is stored with source
 `project:<id>:<collector>` (`source`), and `documents_link` holds a row for
 each project that holds it, with the selection that brought it in. A document
 the kit already holds (the same text, whoever collected it) is linked, not
-stored again, so `documents_link` is the authority on who holds what. Every
+stored again, so `documents_link` is the authority on who holds what. The
+kit finds a held document by a key that folds letter case and white space, so
+the held passages are read before a link is made (`_differs`): a text that
+differs from them in letter case alone ("2000 mg" beside a held "2000 Mg") is
+answered `failed` with the first word that differs, and the project links
+nothing for it. Every
 read a project makes is narrowed to its linked documents: their sources go to
 the kit as its `sources` allowlist, and every other document from those
 sources as `exclude_document_ids` (`visible`). A project that holds nothing
@@ -38,6 +43,7 @@ test's transaction binds.
 """
 from __future__ import annotations
 
+import contextvars
 import dataclasses
 import json
 import os
@@ -55,8 +61,10 @@ from sci_rag.db import models as kit_models
 from sci_rag.db.models import Chunk, Document, DocumentCitation
 from sci_rag.domain import load_domain
 from sci_rag.embed.provider import EmbeddingProvider
+from sci_rag.ingest.chunker import chunk_document
 from sci_rag.ingest.ingester import IngestOutcome, ingest_entries
 from sci_rag.ingest.manifest import CorpusEntry
+from sci_rag.ingest.parsers import parse_file
 from sci_rag.llm.client import LLMClient
 from sci_rag.retrieve import Retriever
 from sci_rag.retrieve.types import RetrievalResult, RetrievalScope
@@ -146,10 +154,19 @@ def model(role: str = "answer") -> LLMClient:
     return _MODEL(role)
 
 
+#: The failures of the answers the model streams in this context, kept for
+#: `answer` to say. The kit catches a failed answer, logs its words and sends
+#: its class name; the installed client's words say why it failed, in the
+#: service's own words for a missing key or the Anthropic account's usage
+#: limit (llm.py), which never hold a key's value.
+_FAILURES: contextvars.ContextVar[list[Exception] | None] = contextvars.ContextVar("kit_answer_failures", default=None)
+
+
 class _ModelOnDemand(LLMClient):
     """The installed model client, looked up each time the kit generates: a
     search that generates nothing needs none, and a client installed after
-    the service was built is the one used."""
+    the service was built is the one used. A streamed answer that fails is
+    kept in `_FAILURES`, when its caller set one (`answer`)."""
 
     def __init__(self, role: str) -> None:
         self.role = role
@@ -163,9 +180,17 @@ class _ModelOnDemand(LLMClient):
             prompt, system=system, temperature=temperature, max_tokens=max_tokens, json_mode=json_mode
         )
 
-    def stream(self, prompt: str, *, system: str | None = None, temperature: float = 0.2,
-               max_tokens: int = 2048) -> AsyncIterator[str]:
-        return model(self.role).stream(prompt, system=system, temperature=temperature, max_tokens=max_tokens)
+    async def stream(self, prompt: str, *, system: str | None = None, temperature: float = 0.2,  # type: ignore[override]
+                     max_tokens: int = 2048) -> AsyncIterator[str]:
+        try:
+            async for piece in model(self.role).stream(prompt, system=system, temperature=temperature,
+                                                       max_tokens=max_tokens):
+                yield piece
+        except Exception as e:  # the kit catches it next and sends its class name
+            failures = _FAILURES.get()
+            if failures is not None:
+                failures.append(e)
+            raise
 
     async def generate_json(self, prompt: str, *, system: str | None = None, max_tokens: int = 4096) -> Any:
         return await model(self.role).generate_json(prompt, system=system, max_tokens=max_tokens)
@@ -645,6 +670,38 @@ class Stored:
     chunks: int = 0
 
 
+async def _differs(entry: CorpusEntry, document_id: str) -> str:
+    """Words for an entry the kit answered with a held document of other text,
+    or "" when the held document holds this entry's text. The kit keys a
+    document on its passages' words with white space collapsed and letter case
+    folded (`content_hash_for` in `sci_rag.ingest.ingester`), so a paste of
+    "2000 mg" finds a held "2000 Mg" and comes back `skipped_duplicate` with
+    that document's id, and its unique `content_hash` keeps one document for
+    the two. The entry is parsed and chunked again as the ingester does, with
+    its defaults, and its words are set beside the held passages' words with
+    white space collapsed and letter case kept."""
+    given = " ".join(d.body for d in chunk_document(parse_file(entry.path))).split()
+    async with kit_engine.session_scope() as session:
+        chunks = (await session.execute(
+            select(Chunk).where(Chunk.document_id == document_id).order_by(Chunk.chunk_index)
+        )).scalars().all()
+    held = " ".join(body_of(c) for c in chunks).split()
+    if given == held:
+        return ""
+    at = next((i for i, (a, b) in enumerate(zip(held, given, strict=False)) if a != b), min(len(held), len(given)))
+
+    def word(words: list[str]) -> str:
+        return repr(words[at]) if at < len(words) else "the text's end"
+
+    how = " in letter case alone" if " ".join(held).lower() == " ".join(given).lower() else ""
+    return (
+        f"document {document_id} holds a text that differs from this one{how}, first at word {at + 1} "
+        f"(held {word(held)}, given {word(given)}); the kit keys the two alike, since it folds letter case "
+        f"and white space when it keys a text, and keeps one document for both, so a link would show this "
+        f"project the held words"
+    )
+
+
 async def _store(entries: list[CorpusEntry], *, project_id: str, selections: list[dict[str, Any]],
                  by: str) -> list[Stored]:
     stored: list[Stored] = []
@@ -657,6 +714,11 @@ async def _store(entries: list[CorpusEntry], *, project_id: str, selections: lis
         if outcome.document_id is None:
             stored.append(Stored("failed", None, outcome.detail))
             continue
+        if outcome.status == "skipped_duplicate":
+            differs = await _differs(entry, outcome.document_id)
+            if differs:
+                stored.append(Stored("failed", None, differs))
+                continue
         if outcome.status == "ingested" and selection.get("sourceRef"):
             # A file written for the ingester has no address worth keeping;
             # the document points back to how it came instead.
@@ -872,11 +934,16 @@ def answer(query: str, *, project_id: str, top_k: int = 8, profile: str = "inter
     for a synchronous caller (a streaming route): `retrieval_done`, `delta`
     (text), `citations` (every source, its passage id, and whether the answer
     cited it), `done`, or `error`. The model is the installed client, through
-    llm.py; what the kit passes between its own steps is left out."""
+    llm.py; what the kit passes between its own steps is left out. An answer
+    the model failed to write ends in an `error` whose message is the
+    failure's own words, llm.py's for a missing key or the account's usage
+    limit, as Postdoc and Extract say them."""
     events: queue.Queue[Any] = queue.Queue()
     end = object()
+    failures: list[Exception] = []
 
     async def pump() -> None:
+        _FAILURES.set(failures)
         try:
             with projects.using(project_id):
                 async for event in service().answer_stream(query, profile=profile, top_k=top_k, max_tokens=max_tokens):
@@ -895,6 +962,9 @@ def answer(query: str, *, project_id: str, top_k: int = 8, profile: str = "inter
             yield {"type": "error", "code": type(item).__name__, "message": str(item)}
             continue
         data = {k: v for k, v in item.data.items() if not k.startswith("_")}
+        if item.type == "error" and data.get("code") == "generation_failed" and failures:
+            # The kit's message names the failure's class; the failure's words say why.
+            data["message"] = str(failures[-1]) or data.get("message")
         if item.type == "citations":
             where = db.run(_where([c["chunk_id"] for c in data.get("citations", []) if c.get("chunk_id")]))
             for c in data.get("citations", []):

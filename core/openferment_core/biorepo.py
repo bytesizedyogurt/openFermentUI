@@ -22,7 +22,9 @@ that stand.
              anchoring; or a gold decision has no quote that anchors at all,
              its own or the record's, because gold means "this sentence in
              this paper says this number" and a gold record without a
-             sentence is a typed value wearing a badge
+             sentence is a typed value wearing a badge; or a plain accept on
+             a record whose number anchoring read as converted from another
+             unit, when that number no longer anchors on the record's quote
   paper      the record's paper is not a document the project holds — a
              decision stands on a text a reader can look up (§7.4)
   unit       a typed value — corrected or gold — is not a number, or its unit
@@ -368,7 +370,15 @@ def write(decision: ReviewDecision, *, dry_run: bool = False) -> ReviewDecision:
         section_id = decision.sectionId or rec.sectionId
         if quote is None and (_is_gold(decision) or typed):
             quote = rec.quote
-        if quote is not None:
+        # A plain accept places the record's own number, anchored on the
+        # record's own quote again under today's rules, so a record kept while
+        # rule 3 compared a number in a unit that does not convert bare
+        # (H3-01: '$2.15/gal' kept as 'exact' on 2.15 USD kg⁻¹, or one kept as
+        # 'converted') is refused here. The decision is kept as sent.
+        anchored_on = quote
+        if anchored_on is None and rec.quote:
+            anchored_on = rec.quote
+        if anchored_on is not None:
             # Every value the promoted record will carry has to sit in the
             # quote: the correction (which becomes the record's value) and
             # the gold value, or the record's own when neither was typed.
@@ -382,7 +392,7 @@ def write(decision: ReviewDecision, *, dry_run: bool = False) -> ReviewDecision:
                     "field": rec.field,
                     "value": value_unit.value,
                     "unit": value_unit.unit,
-                    "quote": quote,
+                    "quote": anchored_on,
                     "method": rec.method,
                     # What the record carries about the value (F1.3). A
                     # gold decision on a record whose source states a range
@@ -399,6 +409,7 @@ def write(decision: ReviewDecision, *, dry_run: bool = False) -> ReviewDecision:
                         "quote",
                         f"the quote for {decision.recordId} fails anchoring on rule '{rule}': {detail}",
                     )
+        if quote is not None:
             stored.quote = quote
             stored.sectionId = section_id
 

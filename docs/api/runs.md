@@ -117,7 +117,7 @@ keeps it, through `compute_kept`:
 |---|---|
 | `engine`, `plant`, `configuration` | `biosteam`; the scenario's flowsheet; no configuration, or for a flowsheet built from a vessel and a train (`custom_train_v1`) the two it was built from, `vessel <id>, train run <id>` |
 | `id`, `artifactId` | The `proforma.run` artifact's id, over its basis and its seed: the same request at any door is one row |
-| `tool`, `toolVersion` | `proforma.run` at `shelf run 2 · biosteam <version> · biorefineries <version>` |
+| `tool`, `toolVersion` | `proforma.run` at `shelf run 3 · biosteam <version> · biorefineries <version>` |
 | `inputs` | The artifact's basis as quantities with their origins: the flowsheet, the scenario, the packages the flowsheet borrows, the samples and whether the diagram is drawn, each record a binding rests on, each fit's value and band, and each value a request set with its low and high (`inputs`, converted at Proforma's door into the Override of `proforma:<scenario id>`), a composite's parts and its Finance group beside them. A reading chosen on a scenario's parameter panel enters in its own value and unit, the lookup sets it in the parameter's unit, and the basis names it as a `deposition` source, its value, low and high held fixed at the value set |
 | `outputs` | `values`: the run's price block (Outputs, below), its solved price named as a library run names its own (`price.solvedPrice`) |
 | `versions` | The biosteam engine's `version()`: biosteam, thermosteam and biorefineries as installed, the distributions the Proforma worker ran on (the basis names no simulator) |
@@ -133,6 +133,13 @@ block. A run whose samples hold no price is kept done, its `values` empty where 
 the Runs screen says the run holds no price. A request Proforma refuses before anything runs (an
 input that waits for a source, a value its input cannot take, a part of a composite that cannot
 stand) keeps nothing.
+
+A scenario's latest run (`GET /api/proforma/runs?scenarioId=`, `proforma.latest_run`, the run
+Proforma's pages, pureOS's train page, BioRepo Compare and `selling_price` read) is the one asked
+for last: the same request asked again is answered by the run it kept, and that run becomes the
+latest again (`proforma.asked`, kept by scenario in the project's settings under `proformaAsked`).
+A run kept with no request behind it (`proforma.run_flowsheet`, a test's or a fixture's) stands at
+the time it was kept.
 
 A run that sets a value writes one convention more in its basis, `assumptions read from:
 overrides`, in the words the parameter panel's overrides wrote before a run took typed inputs:

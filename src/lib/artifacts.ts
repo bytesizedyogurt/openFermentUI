@@ -73,6 +73,24 @@ export const replayArtifact = (id: string) =>
   call<ReplayResult>(`/api/biorepo/artifacts/${encodeURIComponent(id)}/replay`, { method: 'POST' });
 
 /**
+ * An SFF flowsheet record's id, as engine/sff.py makes it: `sff-<hash>` for a
+ * file imported or fetched from the toolkit's library, and `run-<artifact id>`
+ * for the file a run wrote. A kept artifact's id is sixteen hex digits alone.
+ */
+const FLOWSHEET_RECORD = /^(sff|run)-/;
+
+/**
+ * Where the id a basis, a source or an origin names opens: a flowsheet
+ * record on its flowsheet's page (`/flowsheets/<id>`, served by
+ * GET /api/flowsheets/{id}), and a kept artifact on BioRepo's artifact page
+ * (`/biorepo/artifacts/<id>`).
+ */
+export function artifactPath(id: string): string {
+  const at = encodeURIComponent(id);
+  return FLOWSHEET_RECORD.test(id) ? `/flowsheets/${at}` : `/biorepo/artifacts/${at}`;
+}
+
+/**
  * What a table shows for an artifact's value. A tool's output is its own
  * shape; by convention a tool puts the value a person reads first under
  * `label`, `value` and `unit`, and an output without them shows none. A

@@ -12,7 +12,10 @@ scenario's run among them, are its outputs.values (engine/runs.py
 `values_of`), so runs of any engine compare. A value named as a library run
 names its own (`price.<key>`, `outputs.<key>`: a Proforma run's solved
 price, `price.solvedPrice`) shares that output's row, so a library run's
-price and a Proforma run's meet on one row with its change.
+price and a Proforma run's meet on one row with its change. An output the
+runs state in more than one unit, a titre in g L-1 and in mg L-1, has a row
+a unit, each run's value in the row of the unit it states, so every change
+is reckoned within one unit.
 
 A comparison is computed as one `study.comparison` artifact whose inputs
 are the runs' artifacts, so its provenance is the weakest of theirs
@@ -22,7 +25,14 @@ comparison 1` for library runs alone, read as they have always been read,
 and `study comparison 2` for one that holds a run of another engine (D3),
 whose outputs.values it reads and whose value cells name a default only
 where a library run's plant declares one. A comparison kept at version 1
-over such a run replays at version 2 and says so. It is kept as a row of
+over such a run replays at version 2 and says so. `study comparison 3` is
+one whose runs state some output in two or more units (H2-01): a row a
+unit, its value cells as version 1 or 2 gives them by the runs it holds. A
+comparison kept at version 1 or 2 over such runs, its one row of mixed
+units with a change read across them, replays at version 3 and says so,
+and the same runs compared again compute afresh under an id of their own.
+A comparison whose runs state each output in one unit keeps its version
+and its id. It is kept as a row of
 `comparisons` under that artifact's id, with its title: the same runs in
 the same order are one comparison. A run its plant refused has no artifact
 and is not compared.
@@ -52,9 +62,11 @@ from ..models import (
 )
 
 COMPARISON = "study.comparison"
-# Library runs alone; and a comparison that holds a run of another engine (D3).
+# Library runs alone; a comparison that holds a run of another engine (D3);
+# and one whose runs state some output in two or more units, a row a unit (H2-01).
 VERSION = "study comparison 1"
 VERSION_ENGINES = "study comparison 2"
+VERSION_UNITS = "study comparison 3"
 # The price block's entries that are a run's numbers (the rest name things).
 SKIP = {"priced", "teaClass", "product", "feedstock", "units", "why", "solvedPriceRefused"}
 
@@ -108,11 +120,28 @@ def _typed_in(a: Artifact, block: str, key: str) -> dict[str, Any] | None:
     return _typed(a).get(key if block == "values" else f"{block}.{key}")
 
 
+def _by_unit(values: list[Any], units: list[str | None]) -> list[tuple[str | None, list[Any]]]:
+    """A key's values, a row for each unit a run states one in, in the
+    order the runs give those units: each row holds the values stated in
+    its unit and null for a run whose value stands in another unit or that
+    holds none, so the same quantity in g L-1 and in mg L-1 is two rows and
+    each row's change is reckoned within its one unit. A key no run holds a
+    value of keeps one row, in the first unit any run names for it."""
+    stated = list(dict.fromkeys(u for v, u in zip(values, units) if v is not None))
+    if not stated:
+        return [(next((u for u in units if u is not None), None), values)]
+    return [(unit, [v if v is not None and u == unit else None for v, u in zip(values, units)])
+            for unit in stated]
+
+
 def _rows(arts: list[Artifact]) -> list[dict[str, Any]]:
     """Each output any run answers, in the order the first run gives them:
     a library run's `price.<key>` and `outputs.<key>`, and any other run's
     `values.<name>`, a value named as a library run names its own sharing
-    that row (`_row_of`)."""
+    that row (`_row_of`). A key the runs state in two or more units has a
+    row a unit (`_by_unit`), its rows standing together, each change from
+    the first run's value in that row's unit; a row in a unit the first run
+    states none in holds no change."""
     keys: list[tuple[str, str]] = []
     for a in arts:
         price, outputs = _block(a, "price"), _block(a, "outputs")
@@ -132,9 +161,9 @@ def _rows(arts: list[Artifact]) -> list[dict[str, Any]]:
             units = [q["unit"] if q is not None else
                      (_block(a, "price").get("units") or {}).get(key) if block == "price"
                      else _block(a, "outputUnits").get(key) for a, q in zip(arts, held)]
-        unit = next((u for u in units if u is not None), None)
-        out.append({"key": f"{block}.{key}", "unit": unit, "values": values,
-                    "change": [_change(v, values[0]) for v in values]})
+        for unit, held_in in _by_unit(values, units):
+            out.append({"key": f"{block}.{key}", "unit": unit, "values": held_in,
+                        "change": [_change(v, held_in[0]) for v in held_in]})
     return out
 
 
@@ -202,11 +231,22 @@ def _holds_other_engines(arts: list[Artifact]) -> bool:
     return any(a.tool != library.LIBRARY_RUN for a in arts)
 
 
+def _states_in_units(arts: list[Artifact]) -> bool:
+    """Whether the runs state some output in two or more units, so that
+    output has a row a unit (`_by_unit`)."""
+    keys = [r["key"] for r in _rows(arts)]
+    return len(set(keys)) < len(keys)
+
+
 def _version_of(inputs: Sequence[BasisInput]) -> str:
-    """What a comparison computes, by the runs it compares: VERSION for
-    library runs alone, VERSION_ENGINES when it holds a run of another
-    engine."""
-    return VERSION_ENGINES if _holds_other_engines(_compared(inputs)) else VERSION
+    """What a comparison computes, by the runs it compares: VERSION_UNITS
+    when they state some output in two or more units (`_states_in_units`),
+    whatever engines they ran on; else VERSION for library runs alone and
+    VERSION_ENGINES when it holds a run of another engine."""
+    arts = _compared(inputs)
+    if _states_in_units(arts):
+        return VERSION_UNITS
+    return VERSION_ENGINES if _holds_other_engines(arts) else VERSION
 
 
 def _compare(inputs: list[BasisInput], seed: int | None) -> dict[str, Any]:

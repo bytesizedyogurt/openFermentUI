@@ -762,7 +762,7 @@ def _unanswered(server: Any, e: BaseException, what: str) -> ConformRefused:
 
     return ConformRefused(f"the PostgreSQL server {URL_SETTING} names ({server.render_as_string(hide_password=True)}) "
                           f"could not {what}: {type(e).__name__}: {_cut(_words(e), 200)}. Start it (pnpm db:up), on the "
-                          "live host with sudo brew services start --sudo-service-user=\"$(id -un)\" postgresql@17, "
+                          "live host with sudo brew services start --sudo-service-user=\"$(id -un)\" postgresql@18, "
                           f"or set {URL_SETTING} in the environment or in core/.env to a server with pgvector that "
                           "answers")
 

@@ -113,8 +113,10 @@ session continues from this file and `git log` alone.
    whole) is done, each write of a scope laid on key by key against the rows it read; group 4 (H5-03,
    a write under one kind replacing another kind's row, in the same `_put`) is done; groups 5 (P-02,
    a decision made gold by its label) and 6 (H6-02, the alpha 1.0 import past the estimate rule) are
-   done, ahead of the Mini's install, whose step 5 runs that import; group 7 (H3-01, anchoring a
-   number across units) is next. Groups 16
+   done, ahead of the Mini's install, whose step 5 runs that import; groups 7 (H3-01), 10 to 15 (H8-01,
+   H8-04, H2-01, H1-04, H4-02, R1-03) and 17 (H14-02) are done, with the findings of two testers on the
+   Mini's rehearsal install. Groups 8 (H3-08, the unit engine's loose spellings) and 9 (H3-02, number
+   forms in a claim's words), both S1, are next. Groups 16
    and 19 change how a key is read, a stop condition, and wait on the owner (the Log, Fixes after the
    bug hunt).
 
@@ -568,7 +570,7 @@ USD and an ask's 8 USD (`core/.env`, the prompt's §4).
 | Since | Blocker | Next command |
 |---|---|---|
 | 2026-11-08 04:28 UTC | The Anthropic account's own usage limit: "You have reached your specified API usage limits. You will regain access on 2026-12-01 at 00:00 UTC." It refuses every model call; openFerment's daily cap stood at 25.28 USD of 150 that day. It stops stage F's live steps where they stand: the opus-max table's other ten questions (eq-eth-05 to eq-eth-14), the second judge (Sonnet alone at max over every tag's newest runs), the measure of the plan's larger room (F.2g), the fourteen on the Postdoc screen on the final routes (F.3), `pnpm prove --live` (F.4) and the retrieval lanes that call a model (F.5: the concept graph, HyDE, the judge's grading and the answer lane) | The owner raises the limit in the Anthropic console (Settings, Limits), or waits for 2026-12-01; then the five steps `docs/reports/model-routing-2026-11.md` lists under the alpha 2.2 part's "To finish it" (from line 491), in its order, `OPENFERMENT_MAX` standing for the opus-max table it writes out: `pnpm ready --probe`, its probe row green; the larger room's measure, `OPENFERMENT_PROJECT=ethanol OPENFERMENT_ROUTES="$OPENFERMENT_MAX" pnpm eval run --live --suite ethanol --tag opus-max-room --judge --only eq-eth-01,eq-eth-02,eq-eth-03,eq-eth-04`; the table's other ten on the same table and tag, `--only eq-eth-05,eq-eth-06,eq-eth-07,eq-eth-08,eq-eth-09,eq-eth-10,eq-eth-11,eq-eth-12,eq-eth-13,eq-eth-14`; the Sonnet pass, `OPENFERMENT_PROJECT=ethanol OPENFERMENT_ROUTES='{"judge":{"models":["claude-sonnet-5-5"],"effort":"max"}}' pnpm eval judge --suite ethanol`; and `OPENFERMENT_PROJECT=ethanol pnpm eval summary --suite ethanol --rows`. The tag `opus-max` keeps the old room's four answers. Then F.3, F.4 and F.5's live run, in Resume item 5's order |
-| 2026-10-30 | Owner action, before the first alpha 2.0 deploy on the live Mini: its records are files under `core/data/` until carried into a project. The files keep as they are while the owner waits: since stage 2 the service writes every record to the database | Once alpha 2.2 is merged into `main` (`claude/alpha-2-2-fixes`, which holds `claude/alpha-2-2-base`, the bug hunt and its fixes; until then `main` holds alpha 2.1, whose `install.sh` stops at step 3 with Homebrew's keg-only PostgreSQL off its PATH), on the Mini, in its checkout `~/openferment`, as `docs/runbooks/live-host-install.md` steps 0 to 5 give it, with no alpha 1.0 deploy first (alpha 1.0's `deploy.sh --keep-decisions` commits the decisions and pushes them to GitHub): `brew install postgresql@17 pgvector && sudo brew services start --sudo-service-user="$(id -un)" postgresql@17` (PostgreSQL from power-on; `brew services --help` lists the flag); alpha 1.0's own `scripts/host/install.sh --uninstall`, `[ -e ~/openferment-alpha-1.0-data ] || cp -Rp core/data ~/openferment-alpha-1.0-data` and `git pull --ff-only`; `core/.env` kept, or made from the example without its database line; `scripts/host/install.sh`, which makes the database `openferment`, names it in `core/.env` and stops at its deploy step while `core/data/biorepo.json` holds the Mini's decisions; then a copy of the file outside the checkout, `pnpm db:migrate && pnpm db:import-alpha1 --name "Alpha 1.0 records" --by "<your name>"`, `git checkout -- core/data/biorepo.json` and `scripts/host/install.sh` again; then `pnpm ready` (step 4) and `OPENFERMENT_PROJECT` as step 6 says |
+| 2026-10-30 | Owner action, before the first alpha 2.0 deploy on the live Mini: its records are files under `core/data/` until carried into a project. The files keep as they are while the owner waits: since stage 2 the service writes every record to the database | Once alpha 2.2 is merged into `main` (`claude/alpha-2-2-fixes`, which holds `claude/alpha-2-2-base`, the bug hunt and its fixes; until then `main` holds alpha 2.1, whose `install.sh` stops at step 3 with Homebrew's keg-only PostgreSQL off its PATH), on the Mini, in its checkout `~/openferment`, as `docs/runbooks/live-host-install.md` steps 0 to 5 give it, with no alpha 1.0 deploy first (alpha 1.0's `deploy.sh --keep-decisions` commits the decisions and pushes them to GitHub): `brew install postgresql@18 pgvector && sudo brew services start --sudo-service-user="$(id -un)" postgresql@18` (PostgreSQL 18: Homebrew's pgvector builds for 18 and 19 alone) (PostgreSQL from power-on; `brew services --help` lists the flag); alpha 1.0's own `scripts/host/install.sh --uninstall`, `[ -e ~/openferment-alpha-1.0-data ] || cp -Rp core/data ~/openferment-alpha-1.0-data` and `git pull --ff-only`; `core/.env` kept, or made from the example without its database line; `scripts/host/install.sh`, which makes the database `openferment`, names it in `core/.env` and stops at its deploy step while `core/data/biorepo.json` holds the Mini's decisions; then a copy of the file outside the checkout, `pnpm db:migrate && pnpm db:import-alpha1 --name "Alpha 1.0 records" --by "<your name>"`, `git checkout -- core/data/biorepo.json` and `scripts/host/install.sh` again; then `pnpm ready` (step 4) and `OPENFERMENT_PROJECT` as step 6 says |
 | 2026-10-31, the step written 2026-11-08 | Owner action: the live instance's backup runs from the first night after the owner's first install. The place is the alpha 2.2 prompt's §3: `scripts/host/nightly.sh` dumps the database `openferment` first each night with the keg's `pg_dump` (`backup_database` in `scripts/host/lib.sh`) into `~/openferment-backups/openferment-<date>.dump`, the folder and its files the owner's alone, the newest seven kept, tested on stand-ins in `core/tests/test_host.py`. Guild's decisions live in the database since stage 2, and `pnpm ready`'s backup row left at 8.5. Guild's ledger is personnel data and never enters git | The live-host install (the row above), once alpha 2.2 is merged into `main`; the morning after its first night, `ls -l ~/openferment-backups/` names the night's dump, and `~/Library/Logs/openferment/nightly.log` says what the dump step did. `docs/runbooks/live-host-install.md` step 7 reads a dump back into a database of its own |
 | 2026-10-30, again 2026-11-02 (HTTP 403, twice) | The session's git relay refuses tag pushes (branch pushes work): `git push origin alpha-1.0 alpha-2.1` ends with "RPC failed; HTTP 403" and "unexpected disconnect while reading sideband packet". The tags `alpha-1.0` (`d19224f`) and `alpha-2.1` (`fa1b744`, #16's head) exist in this container only; both commits stay reachable from `main` | On the owner's machine, in any clone: `git fetch origin && git push origin d19224ff0b6eb809b21492d1b7a2e8fd895a0f44:refs/tags/alpha-1.0 fa1b7448a5b5e5a2b943b3fc9546f8a420a8ef10:refs/tags/alpha-2.1`, which runs the same in a clone that holds the tags already |
 | 2026-11-04 (11, 12), 2026-11-08 (13) | Owner questions 11 (the label of a run resting on a bench reading and a weaker record), 12 (an address a model names for the service to fetch an SFF file from) and 13 (how `has_key` reads the key line) are open; each default stands in the tree, and 12 and 13 each touch a stop condition (a widening of what the service reaches outbound; a change to how a key is read) | The owner answers each in the Owner questions table; a changed answer is one commit with its test: 11 in `basis.basis_provenance` (ADR-006), 12 at the import door (`POST /api/flowsheets/import-url`, `flowsheet_import`), 13 in `scripts/host/lib.sh` with `core/tests/test_host.py` |
@@ -583,6 +585,14 @@ the line that records the decision and the decision record it stands under.
 
 | Debt | Paid at | Commit |
 |---|---|---|
+| Anchoring compared a quote's number bare when its unit did not convert into the candidate's, and labelled the match converted, so "$2.15/gal" anchored 2.15 USD kg⁻¹ and "45% (v/v)" anchored 45 g L⁻¹ (H3-01, S1); rule 3 now refuses on rule `value` in the unit engine's words, a currency written before the number joins the unit after it, a unit the sentence writes past what the table reads (a label word, a bracketed denominator, a middle dot, a share named in words) compares bare, a share compares bare into a percentage alone, and a plain accept anchors the record's own quote again whatever its basis | the bug hunt's fix run, group 7 and its two checks (23 November 2026) | the commit after `9feb0eb` |
+| The kit's dedupe hash folds letter case, and `kit._store` linked any duplicate as the same text, so a paste reading "2000 Mg" was kept as the earlier "2000 mg" (H8-01, S1); `_store` compares the held chunks' words with the entry's, case kept, and refuses a case variant in words | the bug hunt's fix run, group 10 (23 November 2026) | the commit after `9feb0eb` |
+| `collectors.uploaded` decoded an XML upload as UTF-8 with replacement, so a Latin-1 JATS file lost "µ" and "°" (H8-04, S1); the parser reads the file's bytes and its declared encoding, and a byte that encoding does not hold is refused in words | the bug hunt's fix run, group 11 (23 November 2026) | the commit after `9feb0eb` |
+| A comparison row took the first run's unit for every value, so a titre in g L⁻¹ beside one in mg L⁻¹ read as a +99,900 % change (H2-01, S1); each unit of a key has its row, each change reckoned within one unit, under `study comparison 3` | the bug hunt's fix run, group 12 and its check (23 November 2026) | the commit after `9feb0eb` |
+| `ethanol_glucose_v0.simulate` kept BioSTEAM's default recycle tolerances, so near 1000 t/yr the sieve recycle stopped after one or two passes and a run's fixed samples priced apart from its base case (H1-04, S1); every loop runs to a recycle converged at the float's half precision, under `shelf run 3`, and a run's page reads its own latest run | the bug hunt's fix run, group 13 and its check (23 November 2026) | the commit after `9feb0eb` |
+| `custom_train_v1.parts` paired a per-stream price with a per-kg-contained basis, so a train's cost card summed to a price its label did not name (H4-02, S1); the card's lines close on the price per kg of product contained, the stream's own price and the sales as before | the bug hunt's fix run, group 14 (23 November 2026) | the commit after `9feb0eb` |
+| `graph_command`'s dry run priced the summed prompts as one request, at the long-prompt rate (R1-03, S1); each batch is priced as its own request, 0.0440 USD of input and at most 0.4648 USD for the Ethanol project's graph | the bug hunt's fix run, group 15 (23 November 2026) | the commit after `9feb0eb` |
+| `validate.vocabulary()` handed anchoring an empty strain map, so a record naming a strain's alias resolved to no strain (H14-02, S2); anchoring and fermOS's binding read the open project's strain catalogue, held a project and read again after a keep | the bug hunt's fix run, group 17 and its check (23 November 2026) | the commit after `9feb0eb` |
 | `biorepo._is_gold` read a decision's label, so a verified decision labelled gold with no gold value was kept and served as gold while the browser showed it verified (P-02, S1); the gold value alone makes a record gold | the bug hunt's fix run, group 5 (23 November 2026) | the commit after `a565e52` |
 | `pnpm db:import-alpha1` inserted decisions past the estimate rule, so a gold value with a model-estimate origin entered BioRepo as gold (H6-02, S1); the import runs `basis.refuse_estimates` on every decision before anything is written and refuses the whole import in words naming the file and the record | the bug hunt's fix run, group 6 (23 November 2026) | the commit after `a565e52` |
 | A page's write of a scenario or a train under the id of a study's scenario or a model's kept train replaced that row in place, its kind, body and audit with it (H5-03, S1); `_put` refuses it in words naming the row the project keeps, and the row stays | the bug hunt's fix run, group 4 (12 November 2026) | the commit after `2512e3f` |
@@ -627,7 +637,7 @@ the line that records the decision and the decision record it stands under.
 
 | Debt | Paid by |
 |---|---|
-| The retrieval lanes that ask a model, over the Ethanol project's own corpus: the concept graph (at most 2.3239 USD on `claude-haiku-5-5` by the dry run), `full_deep`, `no_graph` and `no_hyde`, the judge's grading, and the answer lane that `explain`'s default rests on (ADR-008, Implementations 17 and 18). Alpha 1.0 owed them as its paid lanes (Live owed, §4.5) | stage F's live run, once the account answers (Blockers): `pnpm lit:graph --project ethanol --by <name>`, then `pnpm lit:report --project ethanol --by <name> --judge --render` |
+| The retrieval lanes that ask a model, over the Ethanol project's own corpus: the concept graph (at most 0.4648 USD on `claude-haiku-5-5` by the dry run, each batch priced as its own request), `full_deep`, `no_graph` and `no_hyde`, the judge's grading, and the answer lane that `explain`'s default rests on (ADR-008, Implementations 17 and 18). Alpha 1.0 owed them as its paid lanes (Live owed, §4.5) | stage F's live run, once the account answers (Blockers): `pnpm lit:graph --project ethanol --by <name>`, then `pnpm lit:report --project ethanol --by <name> --judge --render` |
 | The host scripts' PostgreSQL steps (`ensure_database`, the migration in `deploy.sh`, the nightly's settings and its dump) have run as `bash -n`, under ShellCheck 0.11.0 and against stand-ins for Homebrew and the PostgreSQL tools on Linux's bash 5 (stage G and the close review; `core/tests/test_host.py`): the scripts were read against macOS's bash 3.2 and BSD tools, and the owner's first install runs them | the owner's first install on the Mini, once alpha 2.2 is merged into `main` (Blockers) |
 | `pnpm db:up` (compose.yaml, `pgvector/pgvector:pg17`) has never run here: this container has no Docker daemon; CI runs the same image as a service | its first run on a machine with Docker, the owner's |
 | Component tests on fixtures recorded from the real service (`pnpm record:fixtures`, alpha 2.0 prompt §9.3) are unbuilt; the walk and the smoke run against the real service | a stage after alpha 2.2 that builds `pnpm record:fixtures` |
@@ -3392,7 +3402,7 @@ F.2f on, on `llm.ROUTES`' defaults (ADR-008, Implementation 17);
   (ADR-002, Implementation F). On the landed tree (`311990d`): `pnpm build`; the service this session started
   restarted on 127.0.0.1:8800, `/api/health` answering and `pnpm ready` (no probe) ready. `pnpm lit:graph --project
   ethanol --dry-run`, which calls no model, measured the build the concept graph waits on: 814 passages in 92 batches,
-  1,758,899 prompt characters (439,725 kit tokens), 0.2199 USD of input on `claude-haiku-5-5` and at most 2.3239 USD,
+  1,758,899 prompt characters (439,725 kit tokens), 0.0440 USD of input on `claude-haiku-5-5` and at most 0.4648 USD, each batch priced as its own request (the dry run printed 0.2199 and 2.3239 USD then, the summed prompts priced as one request, R1-03),
   each batch's whole answer counted (2.8 s). Then, with nothing else heavy running, `pnpm lit:report --project ethanol
   --by "Claude Code (build session)" --configs interactive,vector_only,keyword_only --render`: its ground truth built
   by code from the project's kept candidates, 130 questions from 457 of its 457 candidates in 130 groups by document,
@@ -4004,3 +4014,56 @@ On `claude/alpha-2-2-fixes`, cut from `claude/alpha-2-2-bughunt` at `fa8db4a`, i
   grants, scanned for a key (none) and read back here into a fresh database by step 2a's two commands; `pnpm
   db:migrate` found nothing to do, and `GET /api/state` served the Ethanol project with nothing refused (35
   conversations; 6 runs; 22 documents, 814 chunks). It holds no Guild person and no engine verdict.
+- Groups 7, 10 to 15 and 17 (23 November 2026), each fix followed by a check that read it against its finding for an
+  S1 or S2 left open, and the fixes the checks asked for; then two testers walked a rehearsal of the Mini's install
+  (a fresh clone at `9feb0eb` serving the carry dump's Ethanol project on 127.0.0.1:8810), one through the literature
+  and Postdoc, one through the engines and the bench, and their findings were fixed the same way.
+  - Group 7, H3-01 (S1), `validate.py` and `biorepo.py`: a quote's number in a unit that does not convert into the
+    candidate's states nothing in it, and rule 3 refuses on rule `value` in the unit engine's words ("the quote states
+    2.15 USD gal⁻¹, and USD gal⁻¹ does not convert into USD kg⁻¹"); `converted` names a conversion `convert` made. A
+    currency written before a number joins the unit after it (`_CURRENCY_BEFORE`). The first check found that a unit
+    the sentence writes past what the unit table reads ('g ethanol per litre', 'g DCW/L') was then refused; such a unit
+    compares bare (`unitWhole`, `_unit_runs_on`), and the second check found three more spellings of it, each now read
+    the same way: a bracketed denominator ('g ethanol (g glucose)-1', 'g (DCW)/L'), a middle dot ('g ethanol·L-1') and
+    a share named in words ('12% total soluble protein'). A percentage read in part compares bare into a percentage
+    alone (`_states_nothing_in`), so '12% of total soluble protein' states no 12 g/L. A plain accept anchors the
+    record's own quote again whatever its basis, so a record kept as 'exact' under the old rule ('$2.15/gal' on
+    2.15 USD kg⁻¹) is refused at `biorepo.write`. A dry run of a plain accept over all 457 candidates the Ethanol
+    project holds, on a copy of `openferment_dev`, accepted all 457. The BioRepo tests' stand-in paper holds the
+    planted records' quotes in its section `s1`, as a kept candidate's paper does.
+  - Group 10, H8-01 (S1), `kit._store`: a duplicate is linked as the held text only when the held chunks' words are
+    the entry's, case kept; a case variant is refused in words.
+  - Group 11, H8-04 (S1), `collectors.uploaded`: the JATS parser reads the upload's bytes and its declared encoding.
+  - Group 12, H2-01 (S1), `comparisons._rows`: a row a unit, each change reckoned within one unit; a comparison that
+    splits a key by unit computes under `study comparison 3`, and one whose runs state each key in one unit keeps its
+    version and id.
+  - Group 13, H1-04 (S1), `ethanol_glucose_v0.simulate`: the system and its subsystems run to a recycle converged at
+    the float's half precision (`set_tolerance`, `sqrt(eps)`), under `shelf run 3`; the four id pins a run's version
+    hashes moved with it, each named beside its old id, and under `shelf run 2` both bases still give ed33c02's and
+    b6a85d0's ids. A run's page reads its scenario's latest run (`proforma.asked`).
+  - Group 14, H4-02 (S1), `custom_train_v1.parts`: the cost card's lines close on the price per kg of product
+    contained, and the stream's own price and the sales are as before (`_PricedPerContained`).
+  - Group 15, R1-03 (S1), `graph_command`: each batch priced as its own request; the records take 0.0440 USD of input
+    and at most 0.4648 USD.
+  - Group 17, H14-02 (S2), `validate.strain_aliases`, `catalogues._HeldAliases`: anchoring and fermOS's binding read
+    the open project's strain catalogue, held a project and read again after a keep; the tool door's hand-written
+    candidate warms the hold before its transaction (`extract.add_candidate`), and each test's database teardown
+    clears it.
+  - The testers' findings, each fixed with a check of its own: the paper reader's deep link scrolls once to the
+    record's words; a cited answer that fails says why in the model's words; a link to an SFF record opens the
+    flowsheet's page (`artifactPath`, a drafted runbook's prediction among the links); a protocol run reopened after a
+    reload resumes its open deposition and closes it (`resumeDeposition`); Guild and Intake show the paper's value as
+    published beside a correction, the audit trail is rebuilt from the service's decisions, an edit with no reviewer
+    name is refused in words, and a decision the browser held is sent under the reviewer who made it, one held with no
+    name kept unsent and said once; fermOS → Forecast reads the fits the project keeps; the jobs tray lists every
+    engine run the project's stream announces, on one stream a page shared by its readers and closed while the tab is
+    hidden, opened again from the last event it read; a runbook's status follows its lock, its depositions and its
+    reconciliation.
+  - The Mini's install, read against macOS by an audit of the runbook and `scripts/host/`: Homebrew's pgvector 0.8.7
+    builds for PostgreSQL 18 and 19 alone, so the runbook, `lib.sh`, `ready.py`'s start line and `conform`'s words
+    name `postgresql@18` (`test_host.py` follows); the install needs Apple Silicon and macOS 15 or later, where
+    Homebrew's bottles and the wheels of onnxruntime, numba and llvmlite exist; and the quick path's first line is
+    `setopt interactivecomments`, so zsh reads its comment lines as comments.
+  - Checks: `pnpm verify` on all sixteen stages (12 min 40 s; `test:core` 3134 passed, 1 skipped, 175 deselected;
+    `test:sim` 142 passed; `test:lit` 10 passed; smoke 20 screens) and `pnpm prove` offline, 99 of 99 checks in 191 s,
+    with no model call.

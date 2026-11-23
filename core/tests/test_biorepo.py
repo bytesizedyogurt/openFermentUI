@@ -135,7 +135,13 @@ def drop_candidates() -> None:
 
 
 def fetch_t5():
-    HELD["T5"] = structural_passages()
+    # The structural fixture's sections, and the passage the planted T5
+    # records cite, which holds their quotes as a kept candidate's paper does:
+    # a plain accept anchors the record's own quote again (round 3 of H3-01).
+    said = ", ".join(row["quote"] for row in PLANTED["T5"])
+    HELD["T5"] = [
+        {**p, "text": f"{p['text']} In our hands {said}."} if p["id"] == "s1" else p for p in structural_passages()
+    ]
 
 
 def extract_t5(monkeypatch):
@@ -228,7 +234,7 @@ def test_gold_needs_a_quote_that_anchors_its_own_will_not_do_here():
     # The candidate's quote is about colonies; the structural fixture
     # standing in for T5's text says nothing of the kind. Gold means "this
     # sentence in this paper says this number", so without one, it is refused.
-    fetch_t5()
+    HELD["T5"] = structural_passages()
     planted("cl1-T5-00000001")
     with pytest.raises(biorepo.WriteRefused) as caught:
         biorepo.write(decision("cl1-T5-00000001", "verified", provenance="gold", gold=Quantity(value=8.5, unit="d")))
@@ -296,12 +302,26 @@ def test_refuses_gold_that_is_not_verified():
 
 
 def test_accept_without_a_quote_proceeds_on_a_fetched_paper():
-    fetch_t5()
-    planted("cl1-T5-00000001")
+    # A plain accept places the record's own number on the record's own quote
+    # (round 3 of H3-01), so the paper's text holds that quote here.
+    fetch_saying("T5", "cl1-T5-00000001",
+                 "Results. In our hands colonies appear on selection in 7–10 days for strain ab12 on plates.")
     stored = biorepo.write(decision("cl1-T5-00000001", "verified"))
-    assert stored.quote is None and stored.status == "verified"
+    assert stored.quote is None and stored.status == "verified", "the decision is kept as sent"
     assert biorepo.read().decisions["cl1-T5-00000001"] == stored
     assert [c.id for c in biorepo.read().records] == ["cl1-T5-00000001"], "the candidate is kept beside its decision"
+
+
+def test_a_plain_accept_on_a_record_whose_quote_the_paper_does_not_hold_is_refused():
+    # The record's own quote is anchored again on a plain accept: a record
+    # whose quote is nowhere in the paper's text promotes nothing.
+    HELD["T5"] = structural_passages()
+    planted("cl1-T5-00000001")
+    for dry_run in (True, False):
+        with pytest.raises(biorepo.WriteRefused) as refused:
+            biorepo.write(decision("cl1-T5-00000001", "verified"), dry_run=dry_run)
+        assert refused.value.rule == "quote" and "rule 'quote'" in refused.value.why
+    assert biorepo.decisions() == {}
 
 
 def test_gold_on_a_candidate_anchors_on_its_quote_and_keeps_both(monkeypatch):

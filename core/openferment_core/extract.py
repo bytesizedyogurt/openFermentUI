@@ -50,7 +50,7 @@ from .db import models as t
 from .literature import collectors, kit
 from .models import AuditEvent, Candidate, ExtractionSummary, ExtractResponse, Usage
 from .units import tables
-from .validate import ANCHOR_RULES, anchor_all, anchor_candidate
+from .validate import ANCHOR_RULES, anchor_all, anchor_candidate, strain_aliases
 
 log = logging.getLogger("openferment.extract")
 
@@ -656,6 +656,11 @@ def add_candidate(paper_id: str, raw: dict[str, Any], *, who: str) -> tuple[Cand
     The extractor's file is never created, read or replaced here (§1.R
     finding 3): the paper stays as extracted, or as unextracted, as it was."""
     sections = passages(paper_id)
+    # Anchoring resolves the organism through the project's strain aliases,
+    # and below it runs on the database loop, where the strain catalogue
+    # cannot be read. Read here once, the aliases are held for it, after a
+    # restart of the service too.
+    strain_aliases()
     return db.run(_add_candidate(projects.current(), paper_id, raw, sections, who))
 
 

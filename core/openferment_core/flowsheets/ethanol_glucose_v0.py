@@ -40,6 +40,8 @@ included) so the screen can name its source.
 """
 from __future__ import annotations
 
+import math
+import sys
 from typing import Any
 
 import biosteam as bst
@@ -223,6 +225,21 @@ def simulate(b: Built, values: dict[str, float]) -> None:
     # (measured: carried over, the same case moved its price in the fourth
     # digit; emptied, what remains is BioSTEAM's own last-digit noise).
     b.system.empty_recycles()
+    # Each loop (the beer column's heat integration and the sieves'
+    # recycle) then iterates until a pass moves its recycle by less than the
+    # square root of a float's epsilon (about 1.5e-8, half the digits a
+    # float carries), in kmol an hour or as a share of the flow, and in
+    # kelvin or as a share of the temperature. BioSTEAM's defaults stop a
+    # loop once a pass moves its recycle by less than one kmol an hour or
+    # one per cent; at a plant of 1000 t/yr the sieves' whole recycle is
+    # about one kmol an hour, so the loop stopped after one pass or two, and
+    # a run's base case and its later cases of the same inputs priced apart,
+    # each on an unconverged recycle (H1-04). Held this tight, every loop
+    # ran to its converged recycle in two passes or three at every scale
+    # measured, 10 to 1,000,000 t/yr; what remains between cases is the
+    # last-digit noise named above.
+    tight = math.sqrt(sys.float_info.epsilon)
+    b.system.set_tolerance(mol=tight, rmol=tight, T=tight, rT=tight, subsystems=True)
     try:
         b.system.simulate()
     except Exception as e:

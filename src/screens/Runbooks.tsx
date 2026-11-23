@@ -11,7 +11,7 @@
 // running at all and will not be until somebody acts.
 import { useMemo } from 'react';
 import { GitBranch } from 'lucide-react';
-import { stagesOf, type Runbook, type RunbookStatus } from '@/lib/studies';
+import { runbookStatusOf, stagesOf, type Runbook, type RunbookStatus } from '@/lib/studies';
 import { useStore } from '@/store';
 import { href } from '@/router';
 import { RUNBOOK_STATUS_LABEL, RUNBOOK_STATUS_NOTE, RUNBOOK_STATUS_ORDER } from '@/data/labels';
@@ -21,7 +21,7 @@ import { Bar, Card, EmptyState, Explain, LinkButton, PageHeader, SectionTitle, c
 import { OwnerTabs } from '@/components/OwnerTabs';
 import { RUNBOOK_TABS } from '@/data/tabs';
 
-function RunbookCard({ r }: { r: Runbook }) {
+function RunbookCard({ r, status }: { r: Runbook; status: RunbookStatus }) {
   const products = useStore((s) => s.products);
   const product = r.productId ? products.find((p) => p.id === r.productId) : undefined;
   const stages = stagesOf(r);
@@ -69,9 +69,9 @@ function RunbookCard({ r }: { r: Runbook }) {
           value={progress}
           max={100}
           className={
-            r.status === 'blocked_unverified'
+            status === 'blocked_unverified'
               ? 'bg-signal-error'
-              : r.status === 'needs_review'
+              : status === 'needs_review'
                 ? 'bg-signal-warn'
                 : undefined
           }
@@ -79,6 +79,7 @@ function RunbookCard({ r }: { r: Runbook }) {
       </div>
 
       <div className="flex flex-wrap items-center gap-x-3 gap-y-0.5 text-caption text-ink-soft mt-1.5">
+        {r.lockedAt != null && <span>locked</span>}
         <span className="font-num">{progress}%</span>
         <span>
           <span className="font-num">{done}</span>/<span className="font-num">{stages.length}</span>{' '}
@@ -103,26 +104,34 @@ function RunbookCard({ r }: { r: Runbook }) {
 
 export default function Runbooks() {
   const runbooks = useStore((s) => s.runbooks);
+  const depositions = useStore((s) => s.depositions);
+
+  // Each runbook where it stands: its row's status, moved on by its lock, its depositions and their reconciliations.
+  const statusOf = useMemo(
+    () => new Map(runbooks.map((r) => [r.id, runbookStatusOf(r, depositions)])),
+    [runbooks, depositions],
+  );
 
   const columns = useMemo(() => {
     const by = new Map<RunbookStatus, Runbook[]>();
     for (const r of runbooks) {
-      const arr = by.get(r.status);
+      const status = statusOf.get(r.id) ?? r.status;
+      const arr = by.get(status);
       if (arr) arr.push(r);
-      else by.set(r.status, [r]);
+      else by.set(status, [r]);
     }
     return RUNBOOK_STATUS_ORDER.filter((s) => (by.get(s)?.length ?? 0) > 0).map((status) => ({
       status,
       items: by.get(status)!,
     }));
-  }, [runbooks]);
+  }, [runbooks, statusOf]);
 
   const waiting = useMemo(
     () =>
       runbooks.filter((r) =>
-        ['blocked_unverified', 'needs_review', 'awaiting_budget'].includes(r.status),
+        ['blocked_unverified', 'needs_review', 'awaiting_budget'].includes(statusOf.get(r.id) ?? r.status),
       ).length,
-    [runbooks],
+    [runbooks, statusOf],
   );
   const spend = useMemo(
     () => runbooks.reduce((n, r) => n + (r.estCostUsd ?? 0), 0),
@@ -185,7 +194,7 @@ export default function Runbooks() {
             </p>
             <div className="space-y-3">
               {items.map((r) => (
-                <RunbookCard key={r.id} r={r} />
+                <RunbookCard key={r.id} r={r} status={status} />
               ))}
             </div>
           </section>

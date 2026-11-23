@@ -13,7 +13,7 @@ Every step runs as yourself in Terminal; a command that needs root carries its o
 **The install waits for alpha 2.2's merge into `main`** (PROGRESS.md, Blockers): the branch
 `claude/alpha-2-2-fixes`, which holds `claude/alpha-2-2-base`, the bug hunt of November 2026 and its
 fixes. Until then `main` holds alpha 2.1, whose `install.sh` looks for `pg_isready` on the PATH,
-where Homebrew's keg-only `postgresql@17` puts none, and stops at step 3 with "PostgreSQL is not
+where Homebrew's keg-only `postgresql@18` puts none, and stops at step 3 with "PostgreSQL is not
 installed". Every `main` in this runbook is `main` after that merge.
 
 ## The quick path
@@ -24,17 +24,21 @@ request holds: a checkout on that branch takes every later fix with `scripts/hos
 merge lands, `git checkout main && git pull --ff-only` moves it to `main`.
 
 ```
+setopt interactivecomments 2>/dev/null || true
+
 # step 0: the tools, PostgreSQL at power-on, the checkout
-brew install node pnpm uv postgresql@17 pgvector graphviz tailscale && uv python install 3.13
-sudo brew services start --sudo-service-user="$(id -un)" postgresql@17
+brew install node pnpm uv postgresql@18 pgvector graphviz tailscale && uv python install 3.13
+sudo brew services start --sudo-service-user="$(id -un)" postgresql@18
 sudo brew services start tailscale && sudo tailscale up
-if [ -d ~/openferment ]; then   # a Mini that ran alpha 1.0: stop its jobs, keep a copy of its records
+# a Mini that ran alpha 1.0 holds ~/openferment: stop its jobs and keep a copy of its records
+if [ -d ~/openferment ]; then
   cd ~/openferment && scripts/host/install.sh --uninstall
   [ -e ~/openferment-alpha-1.0-data ] || cp -Rp core/data ~/openferment-alpha-1.0-data
 else
   git clone https://github.com/bytesizedyogurt/openFermentUI ~/openferment && cd ~/openferment
 fi
-git fetch origin && git checkout claude/alpha-2-2-fixes && git pull --ff-only   # or main, after the merge
+# the branch of the pull request; after the merge, main
+git fetch origin && git checkout claude/alpha-2-2-fixes && git pull --ff-only
 
 # step 1: the key and the budgets
 cd core && [ -e .env ] || (umask 077 && sed '/^OPENFERMENT_DATABASE_URL=/d' .env.example > .env); chmod 600 .env; cd ..
@@ -45,19 +49,20 @@ pnpm install --frozen-lockfile
 (cd core && uv sync --frozen --all-extras --python 3.13)
 pnpm geneos:fetch && pnpm build
 
-# step 2a: the Ethanol project from the build (the dump file in your home folder)
-shasum -a 256 ~/openferment-ethanol-2026-11-23.dump   # b5444a40bd490f674f0123c99b25df27b84d551f037f96e69862e55ba56ce633
-bin="$(brew --prefix postgresql@17)/bin"
+# step 2a: the Ethanol project from the build, from the dump file in your home folder
+# its SHA-256 is b5444a40bd490f674f0123c99b25df27b84d551f037f96e69862e55ba56ce633
+shasum -a 256 ~/openferment-ethanol-2026-11-23.dump
+bin="$(brew --prefix postgresql@18)/bin"
 "$bin/createdb" -h 127.0.0.1 openferment
 "$bin/pg_restore" -h 127.0.0.1 -d openferment --no-owner --no-privileges ~/openferment-ethanol-2026-11-23.dump
 
 # step 3: the database line, the migration, the jobs, the network
-scripts/host/install.sh
 # a Mini that ran alpha 1.0 stops here once: run step 5, then scripts/host/install.sh again
+scripts/host/install.sh
 
-# steps 4 and 6: check it, and name the project the nightly job extracts
+# steps 4 and 6: check it, and name the project the nightly job extracts (ethanol, from step 2a)
 pnpm ready
-printf '\nOPENFERMENT_PROJECT=ethanol\n' >> core/.env   # the project step 2a carried; another project's id otherwise
+printf '\nOPENFERMENT_PROJECT=ethanol\n' >> core/.env
 sudo launchctl kickstart -k system/com.umutuzo.openferment
 ```
 
@@ -68,29 +73,40 @@ Ethanol project.
 
 | Need | How | Check |
 |---|---|---|
-| macOS with Homebrew | https://brew.sh | `brew --version` |
+| A Mac with Apple Silicon on macOS 15 (Sequoia) or later, with Homebrew | https://brew.sh | `uname -m` prints `arm64`, `sw_vers -productVersion` 15 or later, `brew --version` |
 | Node and pnpm | `brew install node pnpm` | `node --version` (the build has run on Node 22 in this build's container and on Node 20 in CI; Homebrew's `node` is Node 26 on 8 November 2026, unrun in this build); `pnpm --version` inside `~/openferment` prints `10.33.0`, the version `package.json` names in `packageManager`, which pnpm runs inside the checkout |
 | uv, with Python 3.13 | `brew install uv && uv python install 3.13` | `uv python find 3.13` names it; the service has run on 3.12 and 3.13 |
-| PostgreSQL 17 with pgvector, started at power-on | `brew install postgresql@17 pgvector && sudo brew services start --sudo-service-user="$(id -un)" postgresql@17` | `"$(brew --prefix postgresql@17)/bin/pg_isready" -h 127.0.0.1` answers "accepting connections" |
+| PostgreSQL 18 with pgvector, started at power-on | `brew install postgresql@18 pgvector && sudo brew services start --sudo-service-user="$(id -un)" postgresql@18` | `"$(brew --prefix postgresql@18)/bin/pg_isready" -h 127.0.0.1` answers "accepting connections" |
 | Graphviz, for Proforma's flowsheet diagrams | `brew install graphviz` | `dot -V`; without it Proforma lists a flowsheet's units in run order |
 | Tailscale's background service, signed in | `brew install tailscale && sudo brew services start tailscale && sudo tailscale up` | `tailscale status` lists the Mini |
 | The checkout at `~/openferment`, outside Desktop, Documents, Downloads and iCloud Drive | `git clone https://github.com/bytesizedyogurt/openFermentUI ~/openferment`; a Mini that ran alpha 1.0 has it already (below) | macOS privacy protection stops background jobs reading those four places, and `install.sh` checks |
 
-Homebrew keeps `postgresql@17` keg-only, so its tools live under `$(brew --prefix postgresql@17)/bin`,
+Homebrew keeps `postgresql@18` keg-only, so its tools live under `$(brew --prefix postgresql@18)/bin`,
 where `install.sh` finds them. `sudo brew services` installs the service as a LaunchDaemon, which
 runs from power-on, before anyone logs in, as the server's own LaunchDaemon runs, and
 `--sudo-service-user` runs it as you, the owner of its data directory (PostgreSQL refuses to run as
 root). This build read the flag in Homebrew's source and could not run it: confirm it on the Mini
 with `brew services --help`, which lists `--sudo-service-user`. A Mini that started PostgreSQL with
-`brew services start postgresql@17` runs it from your login; `install.sh` says so, and `brew services
-stop postgresql@17` followed by the `sudo` line above moves it. Tailscale's background service likewise
+`brew services start postgresql@18` runs it from your login; `install.sh` says so, and `brew services
+stop postgresql@18` followed by the `sudo` line above moves it. Tailscale's background service likewise
 runs from power-on, and `install.sh` says so when it finds the Tailscale app running.
 
-Homebrew's formulae for `postgresql@17` and `pgvector` carry bottles for Apple Silicon alone, so on
-an Intel Mini `brew install` builds both from source with the Command Line Tools (run
-`xcode-select --install` first), and pgvector's build brings in `postgresql@18` as a build
-dependency. `brew info postgresql@17` says `bottled` beside the version when a bottle serves this
-Mac.
+The Mini needs Apple Silicon and macOS 15 or later. Homebrew carries bottles of every formula above
+for Apple Silicon on macOS 15 and later alone, and the service's Python packages ship for Apple
+Silicon alone (onnxruntime, which the embedder runs on, has no Intel macOS wheel; numba and llvmlite,
+which BioSTEAM's thermodynamics run on, none either), so an Intel Mini stops at `uv sync`.
+`brew info postgresql@18` says `bottled` beside the version when a bottle serves this Mac.
+
+PostgreSQL 18 is the Mini's database because Homebrew's `pgvector` builds its extension for
+`postgresql@18` and `postgresql@19` alone (its formula, 23 November 2026): with `postgresql@17`
+the `vector` extension is missing, step 2a's restore fails at `CREATE EXTENSION vector` and
+`install.sh` stops at its pgvector check. A Mini that already runs `postgresql@17` for something of
+its own stops it first (`brew services stop postgresql@17`), since both listen on port 5432. The
+service runs on PostgreSQL 16 or later (CLAUDE.md), and the dump, made by PostgreSQL 16's
+`pg_dump`, reads into 18.
+
+The quick path runs in macOS's own shell, zsh, whose interactive sessions read `#` as a comment once
+`setopt interactivecomments` has run, the block's first line.
 
 A Mini that ran alpha 1.0 holds its checkout at `~/openferment` already (alpha 1.0's README cloned
 it there), and `core/data/` there holds every alpha 1.0 record step 5 carries. Run no alpha 1.0
@@ -192,7 +208,7 @@ Put the file in your home folder as `~/openferment-ethanol-2026-11-23.dump`, che
 ```
 shasum -a 256 ~/openferment-ethanol-2026-11-23.dump
 # b5444a40bd490f674f0123c99b25df27b84d551f037f96e69862e55ba56ce633
-bin="$(brew --prefix postgresql@17)/bin"
+bin="$(brew --prefix postgresql@18)/bin"
 "$bin/createdb" -h 127.0.0.1 openferment
 "$bin/pg_restore" -h 127.0.0.1 -d openferment --no-owner --no-privileges ~/openferment-ethanol-2026-11-23.dump
 ```
@@ -250,7 +266,7 @@ shows `!` on `embedder` until the first document is collected (FastEmbed fetches
 then), on `intake` until a project holds a document, on `rag` until `core/.env` holds an
 `OPENFERMENT_RAG_KEY` (a program that searches the literature through `/rag` sends that key), and
 on each engine row until its checks have run here. On the Mini, PostgreSQL starts with `sudo brew
-services start --sudo-service-user="$(id -un)" postgresql@17`, the command the `data` row names
+services start --sudo-service-user="$(id -un)" postgresql@18`, the command the `data` row names
 beside `pnpm db:up` (the development database in Docker); its address is the one `install.sh`
 wrote in `core/.env`. The last line names the lane: `full` with a
 key the Models API accepted and Europe PMC answering, `model-only` with that key alone, `none`
@@ -334,7 +350,7 @@ done in a container.
 | Restart the service by hand, after a change to `core/.env` among other times | `sudo launchctl kickstart -k system/com.umutuzo.openferment`; the nightly job is `com.umutuzo.openferment.nightly`, and `scripts/host/nightly.sh` runs its work by hand |
 | Make `core/.venv` again, after it was removed | `cd ~/openferment/core && uv sync --frozen --all-extras --python 3.13 && bash ../scripts/engines-local.sh`, which installs each engine `core/engines.local` names beside the lock; a deploy's sync keeps the environment's Python, and one made with no `--python` takes the newest Python uv finds |
 | The service's log, and the nightly job's | `~/Library/Logs/openferment/server.log`, `~/Library/Logs/openferment/nightly.log` |
-| A backup | the nightly job's first step, in the place the alpha 2.2 prompt's §3 names: the keg's `pg_dump` (`backup_database` in `scripts/host/lib.sh`; Homebrew keeps `pg_dump` off the jobs' PATH) dumps the database `openferment` at 03:00 into `~/openferment-backups/openferment-<date>.dump`, in PostgreSQL's custom format, the folder and its files yours alone, and the newest seven are kept; `scripts/host/nightly.sh` makes one by hand. To read one back, into a database of its own: `bin="$(brew --prefix postgresql@17)/bin"; "$bin/createdb" -h 127.0.0.1 openferment_restored && "$bin/pg_restore" -h 127.0.0.1 -d openferment_restored ~/openferment-backups/openferment-<date>.dump`. The first night after the owner's first install runs the step on macOS for the first time (PROGRESS.md, Known debts) |
+| A backup | the nightly job's first step, in the place the alpha 2.2 prompt's §3 names: the keg's `pg_dump` (`backup_database` in `scripts/host/lib.sh`; Homebrew keeps `pg_dump` off the jobs' PATH) dumps the database `openferment` at 03:00 into `~/openferment-backups/openferment-<date>.dump`, in PostgreSQL's custom format, the folder and its files yours alone, and the newest seven are kept; `scripts/host/nightly.sh` makes one by hand. To read one back, into a database of its own: `bin="$(brew --prefix postgresql@18)/bin"; "$bin/createdb" -h 127.0.0.1 openferment_restored && "$bin/pg_restore" -h 127.0.0.1 -d openferment_restored ~/openferment-backups/openferment-<date>.dump`. The first night after the owner's first install runs the step on macOS for the first time (PROGRESS.md, Known debts) |
 | The tags alpha 1.0 and alpha 2.1 | once, from any clone: `git fetch origin && git push origin d19224ff0b6eb809b21492d1b7a2e8fd895a0f44:refs/tags/alpha-1.0 fa1b7448a5b5e5a2b943b3fc9546f8a420a8ef10:refs/tags/alpha-2.1`, which runs the same in a clone that holds the tags already (PROGRESS.md, Blockers) |
 
 ## What is not covered

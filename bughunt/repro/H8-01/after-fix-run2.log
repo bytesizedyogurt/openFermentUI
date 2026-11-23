@@ -1,0 +1,15 @@
+service: http://127.0.0.1:10240  database: bh_r_h8_01_case (fresh)
+Traceback (most recent call last):
+  File "/home/user/openFermentUI/bughunt/repro/H8-01/probe.py", line 44, in <module>
+    held_b = passages(rb, gb["documentId"])
+  File "/home/user/openFermentUI/bughunt/repro/H8-01/probe.py", line 31, in passages
+    paper = c.get("/api/biorepo/overlay").json()["papers"][doc]
+            ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~^^^^^
+KeyError: None
+the kit's chunk rows (sci_rag.chunks) naming 2000 of a gram unit:
+  2000 Mg | 1
+  2000 kg | 1
+chunk rows holding rb's own words "2000 mg": 0
+EXPECTED: rb's "... 2000 mg ..." is other text from ra's "... 2000 Mg ..." (docs/api/intake.md:53, linked means the kit held the same text): rb's paste is ingested as a document of its own and rb's passage reads "2000 mg".
+OBSERVED: rb's paste kept its own words, or the steps did not complete (see the lines above).
+RESULT: NO-DEFECT

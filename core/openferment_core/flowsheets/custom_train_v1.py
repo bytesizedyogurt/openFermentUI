@@ -342,6 +342,40 @@ def read_back(b: Built) -> dict[str, float]:
     return out
 
 
+def _per_contained(stream_price: float, stream: Any, chemical: str) -> float:
+    """A price per kg of `stream` as a price per kg of the `chemical` it
+    contains: the stream's price times its mass over the chemical's, the
+    same money a year."""
+    return stream_price * float(stream.F_mass) / float(stream.imass[chemical])
+
+
+class _PricedPerContained:
+    """The train's product stream as `parts` hands it to the worker, priced
+    per kg of the product it contains, the flow the run's price is per.
+    `price` reads the stream's own price (BioSTEAM's, per kg of the whole
+    stream) on that basis, and setting it sets the stream's own price to the
+    same money a year; every other attribute is the stream's. So the price
+    the worker sets on the product while it reads the run's tables, the TEA's
+    sales at that price, and the cost card's lines, each divided by the
+    product contained, stand on one basis: the lines sum to the card's
+    product price, and that price is the run's base-case price (bug hunt
+    H4-02)."""
+
+    def __init__(self, stream: Any, chemical: str) -> None:
+        self._stream, self._chemical = stream, chemical
+
+    @property
+    def price(self) -> float:
+        return _per_contained(float(self._stream.price), self._stream, self._chemical)
+
+    @price.setter
+    def price(self, value: float) -> None:
+        self._stream.price = value * float(self._stream.imass[self._chemical]) / float(self._stream.F_mass)
+
+    def __getattr__(self, name: str) -> Any:
+        return getattr(self._stream, name)
+
+
 def evaluate(b: Built, values: dict[str, float]) -> dict[str, Any]:
     simulate(b, values)
     tea, product = b.tea, b.product
@@ -353,9 +387,8 @@ def evaluate(b: Built, values: dict[str, float]) -> dict[str, Any]:
     tea._sales = 0
     b.price = float(tea.solve_price(product))
     # The price per kg of the product the train traces, contained in its
-    # product stream (as a flowsheet prices per kg of its product contained):
-    # the stream's price times its mass over the product's.
-    price = b.price * float(product.F_mass) / contained
+    # product stream (as a flowsheet prices per kg of its product contained).
+    price = _per_contained(b.price, product, b.product_chemical)
     hours = float(tea.operating_hours)
     per_kg = 1 / (contained * hours)
     media = sum(s.cost for s in (b.glucose, b.water) if s.price) * hours * per_kg
@@ -378,9 +411,13 @@ def evaluate(b: Built, values: dict[str, float]) -> dict[str, Any]:
 def parts(b: Built) -> dict[str, Any]:
     """What the worker reads the run's tables from after the base case: the
     whole system (fermenter and train), the corn plant's TEA, the train's
-    product stream, the glucose as the main feedstock, the price the TEA
-    solved for that stream, and the product it contains as the flow the
-    price is per (so pureOS traces that product through the run)."""
-    return {"system": b.system, "tea": b.tea, "product": b.product, "feedstock": b.glucose, "price": b.price,
+    product stream priced per kg of the product it contains, the glucose as
+    the main feedstock, the price the TEA solved for that stream on that
+    basis (the run's base-case price), and the product it contains as the
+    flow the price is per (so pureOS traces that product through the run,
+    and the cost card's lines sum to the price)."""
+    price = None if b.price is None else _per_contained(b.price, b.product, b.product_chemical)
+    return {"system": b.system, "tea": b.tea, "product": _PricedPerContained(b.product, b.product_chemical),
+            "feedstock": b.glucose, "price": price,
             "basis_flow": float(b.product.imass[b.product_chemical]),
             "basis": f"kg of {b.product_chemical} contained in the train's product stream"}

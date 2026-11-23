@@ -98,6 +98,32 @@ def test_a_dry_run_measures_what_a_build_would_send_and_calls_no_model(tmp_path,
     assert kit._MODEL is None, "a dry run installs no model client"
 
 
+def test_a_dry_run_prices_each_batch_as_the_one_request_a_build_sends_for_it(tmp_path, monkeypatch, capsys):
+    """Each batch's prompt stands under the long-prompt threshold and their sum passes it: each batch is
+    priced at the short pair as the request it is sent as, and one batch keeps one price at any batch count
+    (R1-03, where the summed prompts read as one request priced every batch at the long pair)."""
+    _store(tmp_path, "The placeholder organism grew.")
+    model, (threshold, _) = next(iter(llm.LONG_PROMPT_PRICES.items()))
+    monkeypatch.setenv("OPENFERMENT_INDEX_MODEL", model)
+    size = threshold  # characters: a quarter of the threshold in kit tokens, a half at the guard's estimate
+    answer = max(graph.ANSWER_TOKENS, llm.KIT_ROOM[llm.routes()["index"].effort])
+
+    def dry(batches: int) -> dict:
+        monkeypatch.setattr(graph, "prompts", lambda rows: ["x" * size] * batches)
+        assert literature_live.main(["graph", "--project", HERE, "--dry-run"]) == 0
+        return _said(capsys)
+
+    one, many = dry(1), dry(5)
+    alone_in, alone_most = round(size / 4), size // llm.CHARS_PER_TOKEN_ESTIMATE + 1
+    assert alone_in < alone_most <= threshold < many["kitTokens"] and many["batches"] == 5
+    assert llm.prices_for(model, alone_most) == llm.PRICES[model] != llm.prices_for(model, many["kitTokens"])
+    assert one["model"] == many["model"] == model
+    assert one["inputUsd"] == llm.cost_usd(model, alone_in, 0)
+    assert one["mostUsd"] == llm.cost_usd(model, alone_most, answer)
+    assert many["inputUsd"] == pytest.approx(5 * one["inputUsd"], abs=1e-6)
+    assert many["mostUsd"] == pytest.approx(5 * one["mostUsd"], abs=1e-6)
+
+
 def test_a_build_is_audited_under_the_person_named(tmp_path, monkeypatch, capsys):
     _store(tmp_path, "The placeholder organism grew.")
     model = Quiet()

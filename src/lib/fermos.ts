@@ -2,9 +2,12 @@
 //
 // A deposition's series go to the service, which fits them and keeps the fit
 // as an artifact; a forecast is asked of a kept fit, or of the sample run's
-// fit inline. The fitted curve drawn through the points is the closed form
-// the service fitted, evaluated here on its parameters; it computes nothing
-// the fit did not already hold. Shares lib/http.ts's call and its failures.
+// fit inline. The kept fits are read back from BioRepo's artifacts
+// (`GET /api/biorepo/artifacts?tool=kinetic_fit`), so Forecast offers every
+// fit the project keeps after a reload. The fitted curve drawn through the
+// points is the closed form the service fitted, evaluated here on its
+// parameters; it computes nothing the fit did not already hold. Shares
+// lib/http.ts's call and its failures.
 //
 // A SIMULATION (OF-BLD-020 §3.3, D1) is asked of the service whole: the
 // families (`GET /api/fermos/families`), what binds and what waits with the
@@ -21,7 +24,7 @@
 // deposition and the runbook it was taken on are the project's rows, as
 // lib/studies.ts names them.
 import type { components } from '@/api/types.gen';
-import type { Deposition, Runbook } from './studies';
+import type { Artifact, Deposition, Runbook } from './studies';
 import { seriesOf } from '@/engine/series';
 import type { TimeCourseProps, TrajectorySeries } from '@/components/figures';
 import { ServiceDown, ServiceRefused, call } from './http';
@@ -78,6 +81,42 @@ export const isFitFamily = (id: string | null | undefined): id is FitFamily => (
 
 export const fermosFit = (depositionId: string, series: FermosSeries[], sample = false, signal?: AbortSignal, family: FitFamily = LOGISTIC) =>
   post<FermosFitResponse>('/api/fermos/fit', { depositionId, series, sample, family }, signal);
+
+// ── the fits Forecast offers ───────────────────────────────────────────
+
+/** A fit Forecast offers: the run it was made on, its kinetic fit, and the artifact the fit is kept as (none for a fit kept nowhere). */
+export type ForecastFit = Pick<FermosFitResponse, 'depositionId' | 'kinetic' | 'kineticArtifactId'>;
+/** A fit the project keeps, by the artifact it is kept as. */
+export type KeptFit = ForecastFit & { kineticArtifactId: string };
+
+/** The tool a kept kinetic fit is the artifact of (fermos.KINETIC). */
+const KINETIC_TOOL = 'kinetic_fit';
+
+/**
+ * The project's kept kinetic fits, newest first (`GET /api/biorepo/artifacts?tool=kinetic_fit`). The service keeps a
+ * fit's artifact with the fit as its output (fermos.fit_of reads it so) and the run's series as inputs that name the
+ * deposition. Forecast reads them, so a fit made before a reload, or in another tab, stays one to forecast from.
+ */
+export async function keptFits(signal?: AbortSignal): Promise<KeptFit[]> {
+  const kept = await call<Artifact[]>(`/api/biorepo/artifacts?tool=${KINETIC_TOOL}`, { signal });
+  return kept.flatMap((a) => {
+    const depositionId = a.inputs.find((i) => i.source.kind === 'deposition')?.source.id;
+    return a.tool === KINETIC_TOOL && depositionId ? [{ depositionId, kinetic: a.output as KineticFit, kineticArtifactId: a.id }] : [];
+  });
+}
+
+/**
+ * The fits Forecast offers, each under the key its chooser holds: the session's own (by run, and by family beside the
+ * logistic, as the store keeps them), then each kept fit the session does not hold, by its artifact id. A fit with no
+ * fitted parameters, one a run's readings could not give, is offered nowhere.
+ */
+export function forecastFits(session: Record<string, ForecastFit>, kept: KeptFit[]): [string, ForecastFit][] {
+  const fitted = (f: ForecastFit) => (f.kinetic?.params?.length ?? 0) > 0;
+  const held = Object.entries(session).filter(([, f]) => fitted(f));
+  const heldIds = new Set(held.map(([, f]) => f.kineticArtifactId));
+  const more = kept.filter((f) => fitted(f) && !heldIds.has(f.kineticArtifactId)).map((f): [string, ForecastFit] => [f.kineticArtifactId, f]);
+  return [...held, ...more];
+}
 
 // ── a simulation (OF-BLD-020 §3.3) ─────────────────────────────────────
 

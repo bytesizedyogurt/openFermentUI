@@ -62,9 +62,10 @@ import {
   type TrainMade,
 } from '@/lib/durable';
 import { DecisionRefused, IntakeDown, extractPaper, loadOverlay, postDecision } from '@/lib/intake';
-import { blocks, recordOf, writeRefusal, type ReviewAction } from '@/lib/review';
+import { blocks, recordOf, unsignedRefusal, writeRefusal, type ReviewAction } from '@/lib/review';
 import { isFieldId } from '@/data/ontology';
 import { call } from '@/lib/http';
+import { watchEvents, type ServiceEvent } from '@/lib/events';
 import { addressedProject, openProjectId, projectAddress, projectSettled, setOpenProjectId, type Project } from '@/lib/project';
 import {
   EMPTY_STATE,
@@ -141,7 +142,56 @@ export interface Job {
   href?: string;
   /** What the job is on, by its id (the document an extraction reads), so a page finds it; `title` names it in words. */
   subject?: string;
+  /** The engine a simulation runs on, as the service's event stream names it (`job.*`), so the tray names its component. */
+  engine?: string;
   startedAt: number;
+}
+
+const wordOf = (v: unknown): string | null => (typeof v === 'string' && v.trim() ? v.trim() : null);
+
+/**
+ * The jobs after one event of the project's stream (lib/events.ts; core/openferment_core/engine/runs.py `_job`).
+ * The service says every engine run queued and running as it starts, whichever door asked for it (Proforma, Studies,
+ * pureOS, Postdoc or the API), and the run enters the jobs as a running simulation, by its run id, named by the
+ * scenario that asked for it where the page holds that scenario; its `job.done` ends it done, with the run's page to
+ * view, and its `job.failed` ends it failed in the service's words. A run asked again after it ended enters again.
+ * Any other event, and the end of a run the page never saw start, leaves the jobs as they are.
+ */
+export function jobsAfterEvent(jobs: Job[], e: ServiceEvent, scenarios: readonly Pick<Scenario, 'id' | 'name'>[] = []): Job[] {
+  const d = e.data;
+  const runId = wordOf(d.id);
+  if (!e.type.startsWith('job.') || !runId) return jobs;
+  const id = `run-${runId}`;
+  const held = jobs.find((j) => j.id === id);
+  if (e.type === 'job.queued' || e.type === 'job.running') {
+    if (held?.status === 'running') return jobs;
+    const thing = wordOf(d.plant) ?? runId;
+    const configuration = wordOf(d.configuration);
+    const scenario = wordOf(scenarios.find((sc) => sc.id === d.scenarioId)?.name);
+    const job: Job = {
+      id,
+      title: `Engine run · ${scenario ?? (configuration ? `${thing} (${configuration})` : thing)}`,
+      kind: 'simulation',
+      engine: wordOf(d.engine) ?? undefined,
+      stages: [{ label: 'Simulate', ms: 0 }],
+      stageIndex: 0,
+      stageProgress: 0,
+      status: 'running',
+      href: `#/proforma/runs/${encodeURIComponent(runId)}`,
+      subject: runId,
+      startedAt: Date.parse(e.at) || Date.now(),
+    };
+    return [...jobs.filter((j) => j.id !== id), job];
+  }
+  if (held?.status !== 'running') return jobs;
+  if (e.type === 'job.done')
+    return jobs.map((j) => (j.id === id ? { ...j, stageIndex: j.stages.length, stageProgress: 1, status: 'done' } : j));
+  const words = wordOf(d.words);
+  const reason =
+    d.status === 'refused'
+      ? `The engine refused the values${words ? `: ${words}` : '.'}`
+      : (words ?? 'The service says the run failed, and names no reason.');
+  return jobs.map((j) => (j.id === id ? { ...j, status: 'failed', failReason: reason } : j));
 }
 
 /** Something that went other than the protocol says, written at the step it happened at. */
@@ -215,9 +265,8 @@ const nextId = (prefix: string) => `${prefix}-${++seq}`;
 /** An id that stays unique across reloads: the time, and a counter for ties. */
 export const timeId = (prefix: string) => `${prefix}-${Date.now().toString(36)}-${++seq}`;
 
-/** Deterministic clock-free timestamp label for audit entries. */
-function stamp(): string {
-  const d = new Date();
+/** Deterministic clock-free timestamp label for audit entries: now, or the moment a decision names. */
+function stamp(d = new Date()): string {
   const p = (n: number) => String(n).padStart(2, '0');
   return `${d.getFullYear()}-${p(d.getMonth() + 1)}-${p(d.getDate())} ${p(d.getHours())}:${p(d.getMinutes())}`;
 }
@@ -232,6 +281,7 @@ function decisionOf(
   r: ExtractionRecord,
   span: { quote: string; sectionId: string } | null,
   at: string,
+  signer?: string,
 ): ReviewDecision {
   return {
     status: r.status,
@@ -239,15 +289,26 @@ function decisionOf(
     gold: r.gold,
     corrected: r.corrected,
     rejectReason: r.rejectReason,
-    // The CURRENT name, not the one the record was stamped with: a decision
-    // made before a name was set is posted under the name once there is one,
-    // and an undo is signed by whoever undid it.
-    reviewer: reviewerName() ?? r.reviewer ?? '',
+    // A decision made now is signed by the current name, an undo by whoever
+    // undid it. One the browser held is signed by the reviewer who made it
+    // (`signer`, from `syncDecisions`), never by whoever set a name since.
+    reviewer: signer ?? reviewerName() ?? r.reviewer ?? '',
     recordId: r.id,
     at,
     ...(span ? { quote: span.quote, sectionId: span.sectionId } : {}),
   };
 }
+
+/**
+ * Whether a held decision decides nothing: 'unverified' with nothing typed
+ * and nothing rejected, which is what an undo keeps (biorepo._is_withdrawal).
+ */
+function withdraws(d: DurableReviewDecision): boolean {
+  return d.status === 'unverified' && !d.gold && !d.corrected && !d.rejectReason && d.provenance !== 'gold';
+}
+
+/** Whether this page has said that it holds unsigned decisions it will not send. */
+let unsignedSaid = false;
 
 /**
  * The span a decision re-anchored the record to (§7.3), when one did: the
@@ -272,7 +333,7 @@ function reanchoredSpan(r: ExtractionRecord): { quote: string; sectionId: string
 function stampOriginal(r: ExtractionRecord): ExtractionRecord {
   return r.original
     ? r
-    : { ...r, original: { value: r.value, unit: r.unit, quote: r.quote, sectionId: r.sectionId } };
+    : { ...r, original: { value: r.value, unit: r.unit, si: r.si, quote: r.quote, sectionId: r.sectionId } };
 }
 
 /**
@@ -340,7 +401,50 @@ function applyDecision(r: ExtractionRecord, d: DurableReviewDecision | ReviewDec
       next.sectionId = r.original.sectionId;
     }
   }
+  // The lines the decision adds to the record's trail (§7.3). A record that already stands as the decision says
+  // gains none, so a decision applied again on every load adds nothing, and a reload rebuilds the trail from it.
+  const lines = auditOf(r, d);
+  if (lines.length) next.audit = [...r.audit, ...lines];
   return next;
+}
+
+type AuditEntry = ExtractionRecord['audit'][number];
+type Measured = { value: number | string; unit: string } | null | undefined;
+
+/** Two quantities of a decision read alike by their value and unit; a field the service adds, and a null, aside. */
+function sameQuantity(a: Measured, b: Measured): boolean {
+  return (a?.value ?? null) === (b?.value ?? null) && (a?.unit ?? null) === (b?.unit ?? null);
+}
+
+/**
+ * The trail a decision from the service or the Durable tier amounts to on a
+ * record, signed by its reviewer at its own time: the correction it makes or
+ * withdraws, from the value the record carried, and the status it gives. What
+ * the record already stands at adds no line.
+ */
+function auditOf(r: ExtractionRecord, d: DurableReviewDecision | ReviewDecision): AuditEntry[] {
+  const when = d.at ? new Date(d.at) : null;
+  const at = when && Number.isFinite(when.getTime()) ? stamp(when) : '—';
+  const who = d.reviewer?.trim() || 'this browser';
+  const lines: AuditEntry[] = [];
+  if (d.corrected && !sameQuantity(d.corrected, r.corrected)) {
+    lines.push({ at, who, action: 'edited value', from: `${r.value} ${r.unit}`, to: `${d.corrected.value} ${d.corrected.unit}` });
+  } else if (!d.corrected && r.corrected && r.original) {
+    lines.push({ at, who, action: 'withdrew the correction', from: `${r.value} ${r.unit}`, to: `${r.original.value} ${r.original.unit}` });
+  }
+  const moved = d.status !== r.status || !sameQuantity(d.gold, r.gold) || (d.rejectReason ?? null) !== (r.rejectReason ?? null);
+  if (moved) {
+    const action =
+      d.status === 'rejected'
+        ? `rejected — ${d.rejectReason ?? 'unspecified'}`
+        : d.gold
+          ? 'flagged for gold set'
+          : d.status === 'verified'
+            ? 'verified'
+            : 'returned to undecided';
+    lines.push({ at, who, action });
+  }
+  return lines;
 }
 
 function sameDecision(a: ExtractionRecord, b: ExtractionRecord): boolean {
@@ -501,7 +605,12 @@ interface OFState {
     action: 'accept' | 'reject' | 'skip' | 'gold',
     payload?: { reason?: string },
   ) => void;
-  editRecord: (id: string, value: number, unit: string) => void;
+  /**
+   * A reviewer's correction of a record's value, signed by the reviewer name.
+   * With no name set the correction is refused in words and nothing changes,
+   * whether the service answers or not. True when the correction stands.
+   */
+  editRecord: (id: string, value: number, unit: string) => boolean;
   setRecordStatus: (id: string, status: RecordStatus, reason?: string) => void;
   undoReview: () => void;
   advanceReview: (delta: number) => void;
@@ -650,6 +759,19 @@ interface OFState {
   /** Running → closed. Append-only throughout; closing stops new entries. */
   closeDeposition: (depositionId: string) => void;
   /**
+   * Take up a protocol deposition the project keeps, staged or running, at
+   * its protocol's run, and answer the run's id: the run in this page's
+   * memory that writes into it, or, when a reload or a closed tab ended that
+   * run, a fresh one on the protocol's current version at `scale` (the run
+   * that ended held its scale, and the deposition keeps none). The fresh run
+   * keeps the deposition's start and operator and opens at the step its
+   * latest reading or observation was recorded at, with no step marked: the
+   * marks went with the page that made them. Null for a closed deposition,
+   * one of the readings alone, or one whose protocol the project does not
+   * hold.
+   */
+  resumeDeposition: (depositionId: string, scale: number) => string | null;
+  /**
    * Record the verdict and release the measured values into BioRepo as
    * evidence. Never writes a parameter override (§5).
    */
@@ -783,7 +905,8 @@ interface OFState {
   /**
    * OF-BLD-014 §7.4 — fermOS's fits made in this session, by deposition id,
    * so Forecast can offer them. Ephemeral: a fit is kept by the service as
-   * an artifact.
+   * an artifact, and Forecast reads the project's kept fits from the service
+   * beside these (lib/fermos.ts `keptFits`), so a reload loses none.
    */
   fermosFits: Record<string, FermosFitResponse>;
   keepFermosFit: (fit: FermosFitResponse) => void;
@@ -1038,6 +1161,11 @@ export const useStore = create<OFState>()((set, get) => ({
           set({ projects: listed, projectsProblem: null, projectId: keep });
         }
         projectSettled();
+        // The jobs tray lists the project's engine runs as the service starts and ends them, from any screen, from
+        // Postdoc and from the API (`jobsAfterEvent`); the page keeps its project until it reloads, so one stream,
+        // opened once the project settles, serves the page.
+        const project = get().projectId;
+        if (project) watchEvents(project, (e) => set((s) => ({ jobs: jobsAfterEvent(s.jobs, e, s.scenarios) })));
       })();
       return firstProjects;
     }
@@ -1404,6 +1532,15 @@ export const useStore = create<OFState>()((set, get) => ({
 
   editRecord: (id, value, unit) => {
     const s = get();
+    // OF-BLD-012.1 F2 — a correction is a decision, and a decision is signed. With no reviewer name it is
+    // refused in words as an accept and a reject are, in every state of the service: a correction kept unsigned
+    // would be sent later under whichever name was set by then.
+    const who = reviewerName();
+    if (!who) {
+      get().toast({ text: unsignedRefusal(who)!.why, kind: 'error' });
+      return false;
+    }
+    if (!s.records.some((r) => r.id === id)) return false;
     const frame: UndoFrame = {
       records: structuredClone(s.records),
       recordIds: [id],
@@ -1419,11 +1556,12 @@ export const useStore = create<OFState>()((set, get) => ({
         value,
         unit,
         si,
+        reviewer: who,
         audit: [
           ...r.audit,
           {
             at: stamp(),
-            who: decidedBy(),
+            who,
             action: 'edited value',
             from: `${r.value} ${r.unit}`,
             to: `${value} ${unit}`,
@@ -1450,6 +1588,7 @@ export const useStore = create<OFState>()((set, get) => ({
         void get().postReviewDecision(decisionOf(after, reanchoredSpan(after), now));
       }
     }
+    return true;
   },
 
   setRecordStatus: (id, status, reason) =>
@@ -2369,6 +2508,44 @@ export const useStore = create<OFState>()((set, get) => ({
     });
   },
 
+  resumeDeposition: (depositionId, scale) => {
+    const s = get();
+    const d = s.depositions.find((x) => x.id === depositionId);
+    if (!d || d.protocolId === null || d.state === 'closed') return null;
+    const live = liveRunOf(s.runs, depositionId);
+    if (live) {
+      set({ activeRunId: live.id });
+      return live.id;
+    }
+    const protocol = s.protocols.find((p) => p.id === d.protocolId);
+    if (!protocol) return null;
+    const steps = protocol.versions.find((v) => v.version === protocol.currentVersion)?.steps ?? [];
+    const runId = s.startRun(protocol.id, protocol.currentVersion, Number.isFinite(scale) && scale > 0 ? scale : 1);
+    const began = Date.parse(d.startedAt);
+    const at = latestStepOf(d);
+    set((st) => ({
+      runs: {
+        ...st.runs,
+        [runId]: {
+          ...st.runs[runId],
+          depositionId,
+          startedAt: Number.isFinite(began) ? began : st.runs[runId].startedAt,
+          currentStep: Math.max(0, at === null ? 0 : steps.findIndex((x) => x.id === at)),
+        },
+      },
+    }));
+    // The operator the deposition names performs on; one that names nobody takes whoever is signing.
+    get().setRunOperator(runId, d.operatorId ?? get().runs[runId].operatorId ?? null);
+    get().logActivity({
+      at: stamp(),
+      icon: 'run',
+      text: `Deposition taken up — ${protocol.title}`,
+      href: `#/runbooks/depositions/${depositionId}`,
+      provenance: 'user',
+    });
+    return runId;
+  },
+
   // ── scenarios ────────────────────────────────────────────────────────
   togglePin: (id) =>
     set((s) => ({
@@ -2824,6 +3001,7 @@ export const useStore = create<OFState>()((set, get) => ({
     const epoch = stateEpoch;
     const pending: ReviewDecision[] = [];
     let kept = 0;
+    let unsigned = 0;
     for (const [id, mine] of Object.entries(local.decisions)) {
       // Another project's decision is sent by a page open on that project.
       if (mine.project && mine.project !== s.projectId) continue;
@@ -2837,14 +3015,33 @@ export const useStore = create<OFState>()((set, get) => ({
       if (s.refusedDecisions[id]) continue; // refused this session; the record has not changed since
       const record = s.records.find((r) => r.id === id);
       if (!record) continue; // a candidate not in this overlay; nothing to post it about
+      // A held decision is signed by the reviewer who made it. One held with
+      // no name on it (a correction made before an edit needed a name) stays
+      // in this browser and is never sent under whoever sets a name next; an
+      // undo decides nothing and is signed by whoever is reviewing now.
+      const signer = mine.reviewer?.trim() || (withdraws(mine) ? reviewerName() : null);
+      if (!signer) {
+        unsigned++;
+        continue;
+      }
       // What the service would refuse is not posted, and not posted again on
       // every load: an accept on an unfetched paper stays this browser's.
       const paper = s.papers.find((p) => p.id === record.paperId);
-      if (writeRefusal(actionOf(record), record, paper, true, reviewerName())) {
+      if (writeRefusal(actionOf(record), record, paper, true, signer)) {
         kept++;
         continue;
       }
-      pending.push(decisionOf(record, reanchoredSpan(record), madeAt));
+      pending.push(decisionOf(record, reanchoredSpan(record), madeAt, signer));
+    }
+    if (unsigned && !unsignedSaid) {
+      unsignedSaid = true;
+      get().toast({
+        text:
+          `${unsigned} review decision${unsigned === 1 ? ' was' : 's were'} made in this browser with no reviewer name, ` +
+          `and ${unsigned === 1 ? 'it is' : 'they are'} kept here unsent: the project records who decided what. ` +
+          'Make the decision again under your name to send it.',
+        kind: 'warn',
+      });
     }
     for (const d of pending) {
       // A clear of this browser's data while the sync runs ends it: nothing more is sent.
@@ -3516,6 +3713,40 @@ function runOperatorDefault(s: OFState): string | null {
   const id = actingIdOf(s);
   const p = id ? guildView(s).people.find((x) => x.id === id) : undefined;
   return p && p.active && p.role !== 'auditor' ? p.id : null;
+}
+
+/** The run in this page's memory that writes into a deposition and has not finished; a reload or a closed tab ends it. */
+export function liveRunOf(runs: Record<string, RunState>, depositionId: string): RunState | null {
+  return Object.values(runs).find((r) => r.depositionId === depositionId && r.finishedAt === undefined) ?? null;
+}
+
+/** The step a deposition's latest reading or observation was recorded at; null when it holds none. */
+function latestStepOf(d: Deposition): string | null {
+  const recorded = [...d.entries.map((e) => ({ at: e.correctedAt ?? e.at, stepId: e.stepId })), ...d.observations];
+  return recorded.reduce<{ at: string; stepId: string } | null>((was, x) => (was === null || x.at >= was.at ? x : was), null)?.stepId ?? null;
+}
+
+/**
+ * Where a deposition's record takes it to the bench: the readings alone to
+ * their own bench (alpha 2.2 C.5); a protocol's steps to the run in this
+ * page's memory that writes into it, or, once a reload or a closed tab ended
+ * that run, to its protocol, where `resumeDeposition` takes it up. A closed
+ * deposition goes to no bench, and nor does one whose protocol the project
+ * does not hold.
+ */
+export type BenchOffer =
+  | { kind: 'readings'; to: string }
+  | { kind: 'run'; to: string }
+  | { kind: 'take-up'; protocol: Protocol }
+  | { kind: 'none'; why: 'closed' | 'no-protocol' };
+
+export function benchOf(d: Deposition, runs: Record<string, RunState>, protocols: readonly Protocol[]): BenchOffer {
+  if (d.state === 'closed') return { kind: 'none', why: 'closed' };
+  if (d.protocolId === null) return { kind: 'readings', to: `/runbooks/depositions/${encodeURIComponent(d.id)}/bench` };
+  const live = liveRunOf(runs, d.id);
+  if (live) return { kind: 'run', to: `/runbooks/protocols/${live.protocolId}/run/${live.id}` };
+  const protocol = protocols.find((p) => p.id === d.protocolId);
+  return protocol ? { kind: 'take-up', protocol } : { kind: 'none', why: 'no-protocol' };
 }
 
 type StoreSet = (partial: Partial<OFState> | ((s: OFState) => Partial<OFState>)) => void;

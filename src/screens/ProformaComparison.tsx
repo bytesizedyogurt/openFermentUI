@@ -11,7 +11,8 @@
 //                twin, CSV, the comparison's provenance on every bar), each
 //                change the artifact's own (`rows[].change`), drawn in percent;
 //   the rows     every number of the price block and of a flowsheet's outputs,
-//                in its unit, each run's value and its change;
+//                in its unit, each run's value and its change; an output the
+//                runs state in two or more units has a row a unit;
 //   the values   every value any run set for itself, each run's with its
 //                origin, the library's default where a library run set none;
 //                a dash marks a run that holds no such value (a comparison
@@ -123,7 +124,8 @@ export default function ProformaComparison({ comparisonId }: { comparisonId: str
   const c = report?.comparison ?? null;
   const out = report ? comparedOf(report) : null;
   // A comparison of library runs alone is `study comparison 1`; one holding another engine's run is version 2
-  // (studies/comparisons.py), whose outputs each come in the unit their run's artifact states.
+  // (studies/comparisons.py), whose outputs each come in the unit their run's artifact states, and one whose runs
+  // state an output in two or more units is version 3, a row a unit.
   const libraryOnly = report?.artifact.toolVersion === 'study comparison 1';
   const names = (out?.runs ?? []).map((_, i) => `Run ${i + 1}`);
   // The outputs no later run moved take no row in the figure; the sentence under it names them.
@@ -132,6 +134,8 @@ export default function ProformaComparison({ comparisonId }: { comparisonId: str
   const moved = changed.filter((r) => r.values.some((v) => v !== 0));
   const rowsHead = ['Output', 'Unit', ...names, ...names.slice(1).map((n) => `${n}: change`)];
   const rowsBody = (out?.rows ?? []).map((r) => [r.key, r.unit || '—', ...r.values.map(shown), ...r.change.slice(1).map(pct)]);
+  // Each row is known by its key and its unit: a key the runs state in two units is two rows.
+  const rowKeys = (out?.rows ?? []).map((r) => JSON.stringify([r.key, r.unit]));
   const valuesHead = ['Value', ...names];
   const valuesBody = (out?.values ?? []).map((v) => [
     v.key,
@@ -235,8 +239,8 @@ export default function ProformaComparison({ comparisonId }: { comparisonId: str
                   </tr>
                 </thead>
                 <tbody>
-                  {rowsBody.map((r) => (
-                    <tr key={r[0]} className="border-b border-line/50" data-testid="comparison-row">
+                  {rowsBody.map((r, i) => (
+                    <tr key={rowKeys[i]} className="border-b border-line/50" data-testid="comparison-row">
                       {r.map((cell, j) => (
                         <td key={j} className={j < 2 ? 'py-1 pr-2 font-num' : 'py-1 px-1.5 text-right font-num'}>
                           {cell}

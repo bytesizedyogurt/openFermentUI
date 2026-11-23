@@ -52,7 +52,7 @@ MARKS = {"ok": "✓", "warn": "!", "fail": "✗", "skip": "·"}
 PLACEHOLDER_KEY = "sk-ant-..."
 # How the live host starts its PostgreSQL, from power-on and as its owner
 # (docs/runbooks/live-host-install.md, step 0).
-LIVE_START = 'sudo brew services start --sudo-service-user="$(id -un)" postgresql@17'
+LIVE_START = 'sudo brew services start --sudo-service-user="$(id -un)" postgresql@18'
 # A PMCID the Europe PMC check asks about: one search says whether it answers.
 PROBE_PMCID = "PMC8471596"
 # Where FastEmbed fetches its model file from, once (ADR-002).

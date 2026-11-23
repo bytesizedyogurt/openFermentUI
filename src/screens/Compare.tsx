@@ -17,6 +17,7 @@ import { useStore } from '@/store';
 import { href, navigate } from '@/router';
 import type { FlowsheetInfo, Scenario } from '@/lib/proforma';
 import { listComparisons, type Artifact, type StudyComparison } from '@/lib/studies';
+import { artifactPath } from '@/lib/artifacts';
 import { fmt } from '@/engine/units';
 import { exportCSV } from '@/lib/csv';
 import { PageHeader, Card, Button, EmptyState, Callout, cx } from '@/components/ui';
@@ -398,7 +399,7 @@ function BiosteamCompare({ scenarios }: { scenarios: Scenario[] }) {
                           {' '}
                           <a
                             className="text-accent underline underline-offset-2"
-                            href={href(`/biorepo/artifacts/${encodeURIComponent(i.by)}`)}
+                            href={href(artifactPath(i.by))}
                             data-testid="compare-input-artifact"
                           >
                             open the artifact

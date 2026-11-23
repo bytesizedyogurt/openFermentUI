@@ -3,7 +3,7 @@
 // its provenance attached. This is the screen that makes the corpus auditable.
 import { useCallback, useMemo, useState } from 'react';
 import { ClipboardCheck, Download, Gauge, Table2 } from 'lucide-react';
-import type { ExtractionRecord } from '@/lib/review';
+import { publishedOf, type ExtractionRecord } from '@/lib/review';
 import { fieldName } from '@/data/ontology';
 import { useStore, provenanceOf } from '@/store';
 import { href, navigate, useRoute } from '@/router';
@@ -32,6 +32,8 @@ import { SubsystemShelf } from '@/components/ReferenceView';
 
 interface ExRow {
   rec: ExtractionRecord;
+  /** What the paper published, which a correction leaves as it stands (`publishedOf`). */
+  published: ReturnType<typeof publishedOf>;
   prov: ProvKind;
   family: string;
   band: string;
@@ -154,6 +156,7 @@ export default function Intake() {
         .filter((rec) => !paperParam || rec.paperId === paperParam)
         .map((rec) => ({
         rec,
+        published: publishedOf(rec),
         prov: provOf(rec),
         family: unitFamily(rec.unit) ?? 'unrecognised',
         band: bandOf(rec.confidence),
@@ -216,6 +219,8 @@ export default function Intake() {
         'Unit (as published)',
         'Value (SI)',
         'Unit (SI)',
+        'Corrected value',
+        'Corrected unit',
         'Unit family',
         'Confidence',
         'Confidence band',
@@ -230,7 +235,7 @@ export default function Intake() {
         'Section ID',
         'Last updated',
       ],
-      source.map(({ rec, prov, family, band, updated }) => [
+      source.map(({ rec, prov, family, band, updated, published }) => [
         rec.id,
         rec.paperId,
         papers.find((p) => p.id === rec.paperId)?.title ?? '',
@@ -238,10 +243,12 @@ export default function Intake() {
         fieldName(rec.field),
         rec.organism ?? '',
         rec.componentTag ?? '',
-        rec.value,
-        rec.unit,
-        rec.si.value,
-        rec.si.unit,
+        published.value,
+        published.unit,
+        published.si.value,
+        published.si.unit,
+        rec.corrected?.value ?? '',
+        rec.corrected?.unit ?? '',
         FAMILY_LABEL[family] ?? family,
         rec.confidence,
         band,
@@ -299,21 +306,29 @@ export default function Intake() {
       width: '110px',
       numeric: true,
       priority: 1,
-      // Always converts from the stored pair, never from a displayed string.
-      render: ({ rec }) => (
-        <Quantity value={rec.value} unit="" si={{ value: rec.si.value, unit: '' }} mode={unitMode} />
+      // Always converts from the stored pair, never from a displayed string. The paper's value stands in the
+      // cell, and a reviewer's correction shows beneath it in the same unit mode.
+      render: ({ rec, published }) => (
+        <span className="inline-flex flex-col items-end">
+          <Quantity value={published.value} unit="" si={{ value: published.si.value, unit: '' }} mode={unitMode} />
+          {rec.corrected && (
+            <span className="text-caption text-accent whitespace-nowrap" data-testid="intake-corrected" title="A reviewer’s correction">
+              → <Quantity value={rec.corrected.value} unit={rec.corrected.unit} si={rec.si} mode={unitMode} />
+            </span>
+          )}
+        </span>
       ),
-      value: ({ rec }) => (si ? rec.si.value : rec.value),
+      value: ({ published }) => (si ? published.si.value : published.value),
     },
     {
       key: 'unit',
       header: 'Unit',
       width: '116px',
       priority: 1,
-      render: ({ rec }) => (
-        <span className="font-num text-ink-soft whitespace-nowrap">{(si ? rec.si.unit : rec.unit) || '—'}</span>
+      render: ({ published }) => (
+        <span className="font-num text-ink-soft whitespace-nowrap">{(si ? published.si.unit : published.unit) || '—'}</span>
       ),
-      value: ({ rec }) => (si ? rec.si.unit : rec.unit) || '—',
+      value: ({ published }) => (si ? published.si.unit : published.unit) || '—',
     },
     {
       key: 'paper',

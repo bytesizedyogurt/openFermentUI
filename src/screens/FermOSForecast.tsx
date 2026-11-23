@@ -6,6 +6,11 @@
 // a changed value is that person's assumption, and the forecast becomes
 // `assumed`. The band leaves out run-to-run variation, and says so.
 //
+// The fits it offers are the session's own (the store's `fermosFits`), then
+// each kinetic fit the project keeps that the session does not hold, read
+// from the service (lib/fermos.ts `keptFits`, `forecastFits`): after a reload
+// every fit the service keeps stays one to forecast from.
+//
 // THE CONDITIONS ARE THE PANEL'S (OF-BLD-020 §3.3, E.1‴). A logistic_v0 fit's
 // start values and length are the scope `fermos:forecast:<fit id>`, served
 // by the service bound to the fitted run's own, in the run's own units; a
@@ -58,12 +63,15 @@ import {
   fermosSimulate,
   fitFigureSeries,
   fitSeriesOf,
+  forecastFits,
   forecastScope,
   hasRole,
+  keptFits,
   paramAskOf,
   simulateFromFitPath,
   timeCourseOf,
   type ForecastResult,
+  type KeptFit,
   type SimulateAsk,
   type SimulationResult,
 } from '@/lib/fermos';
@@ -123,11 +131,27 @@ export function SendToProforma({ artifactId, tool }: { artifactId: string; tool:
 }
 
 export default function FermOSForecast() {
-  const fits = useStore((s) => s.fermosFits);
+  const sessionFits = useStore((s) => s.fermosFits);
   const depositions = useStore((s) => s.depositions);
   const runbooks = useStore((s) => s.runbooks);
-  const usable = Object.entries(fits).filter(([, f]) => f.kinetic?.params?.length);
-  const [chosen, setChosen] = useState<string>(usable[0]?.[0] ?? '');
+  // The project's kept fits, read from the service; null while the read is in hand.
+  const [kept, setKept] = useState<KeptFit[] | null>(null);
+  const [keptProblem, setKeptProblem] = useState<string | null>(null);
+  useEffect(() => {
+    const ctrl = new AbortController();
+    keptFits(ctrl.signal)
+      .then(setKept)
+      .catch((e: unknown) => {
+        if (ctrl.signal.aborted) return;
+        setKept([]);
+        setKeptProblem(problemOf(e));
+      });
+    return () => ctrl.abort();
+  }, []);
+  const usable = useMemo(() => forecastFits(sessionFits, kept ?? []), [sessionFits, kept]);
+  const [picked, setPicked] = useState<string>('');
+  // The fit a person picked, or the first offered until they pick one.
+  const chosen = usable.some(([key]) => key === picked) ? picked : (usable[0]?.[0] ?? '');
   const [result, setResult] = useState<ForecastResult | null>(null);
   const [sim, setSim] = useState<SimulationResult | null>(null);
   const [problem, setProblem] = useState<string | null>(null);
@@ -138,7 +162,7 @@ export default function FermOSForecast() {
   const [scopeProblem, setScopeProblem] = useState<string | null>(null);
   // What waits among the family's parameters this panel does not show (a batch fit's simulation).
   const [elsewhere, setElsewhere] = useState<string[]>([]);
-  const fit = fits[chosen];
+  const fit = usable.find(([key]) => key === chosen)?.[1];
   const model = fit?.kinetic?.model ?? LOGISTIC;
   const fitId = fit?.kineticArtifactId ?? null;
   const batchAsk: SimulateAsk | null =
@@ -228,6 +252,20 @@ export default function FermOSForecast() {
   }, [sim, fit, depositions, runbooks]);
 
   if (usable.length === 0) {
+    if (kept === null) {
+      return (
+        <p className="text-caption text-ink-soft" data-testid="forecast-reading">
+          Reading the fits this project keeps…
+        </p>
+      );
+    }
+    if (keptProblem) {
+      return (
+        <Callout kind="warn" title="The fits this project keeps could not be read">
+          {keptProblem}
+        </Callout>
+      );
+    }
     return (
       <Callout kind="info" title="No fit to forecast from yet">
         A forecast is drawn from a fit of a deposited run. Deposit a run with timed biomass, product and substrate readings in
@@ -246,7 +284,7 @@ export default function FermOSForecast() {
             aria-label="Fit"
             value={chosen}
             onChange={(e) => {
-              setChosen(e.target.value);
+              setPicked(e.target.value);
               setResult(null);
               setSim(null);
             }}
@@ -254,6 +292,7 @@ export default function FermOSForecast() {
             {usable.map(([key, f]) => (
               <option key={key} value={key}>
                 {f.depositionId} · {f.kinetic?.model ?? LOGISTIC}
+                {f.kineticArtifactId ? ` · ${f.kineticArtifactId}` : ''}
               </option>
             ))}
           </select>
@@ -267,6 +306,11 @@ export default function FermOSForecast() {
           </span>
         )}
       </div>
+      {keptProblem && (
+        <p className="text-caption text-signal-warn" data-testid="forecast-kept-problem">
+          The fits listed are this session&rsquo;s alone; the fits this project keeps could not be read: {keptProblem}
+        </p>
+      )}
       {batchAsk ? (
         <p className="text-caption text-ink-soft">
           A {model} fit is simulated from, not drawn from its covariance: the curves are its central values and what it held as

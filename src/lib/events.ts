@@ -44,10 +44,89 @@ export interface ServiceEvent {
   data: Record<string, unknown>;
 }
 
+/** One page's reader of a project's stream: what it is told of each event and of the stream's state. */
+interface Reader {
+  onEvent: (e: ServiceEvent) => void;
+  onOpen?: (open: boolean) => void;
+}
+
 /**
- * Open the project's stream: `onEvent` is called with each event as it
+ * A project's one stream on this page, shared by every reader: the store's
+ * jobs tray and Home's trace cards read the same EventSource. The service is
+ * plain HTTP/1.1, where a browser keeps six connections to one address across
+ * all its tabs, and an open stream holds one of them for as long as it is
+ * open; a stream a tab kept per reader, and kept while hidden, filled that pool
+ * with six of them, and then every request of every tab waited with no word.
+ * So a page holds one stream a project, and none while it is hidden: it closes
+ * as the tab is hidden and opens again as it is shown, from the last event it
+ * read (`?after=`), so what happened meanwhile still arrives while the service
+ * holds it.
+ */
+interface Shared {
+  readers: Set<Reader>;
+  source: EventSource | null;
+  last: number | null;
+  open: boolean;
+}
+
+const shared = new Map<string, Shared>();
+const watched = new WeakSet<object>();
+
+function hidden(): boolean {
+  return typeof document !== 'undefined' && document.visibilityState === 'hidden';
+}
+
+function tell(s: Shared, open: boolean): void {
+  if (s.open === open) return;
+  s.open = open;
+  for (const r of [...s.readers]) r.onOpen?.(open);
+}
+
+function connect(project: string, s: Shared): void {
+  if (s.source || hidden() || typeof EventSource === 'undefined') return;
+  const at = `/api/events?project=${encodeURIComponent(project)}`;
+  const source = new EventSource(s.last === null ? at : `${at}&after=${s.last}`);
+  s.source = source;
+  const handle = (m: MessageEvent<string>) => {
+    let e: ServiceEvent;
+    try {
+      e = JSON.parse(m.data) as ServiceEvent;
+    } catch {
+      return; // A line that is not an event says nothing.
+    }
+    if (typeof e.id === 'number') {
+      if (s.last !== null && e.id <= s.last) return; // read already, before the stream opened again
+      s.last = e.id;
+    }
+    for (const r of [...s.readers]) r.onEvent(e);
+  };
+  for (const t of EVENT_TYPES) source.addEventListener(t, handle as EventListener);
+  source.onopen = () => tell(s, true);
+  source.onerror = () => tell(s, false);
+}
+
+function disconnect(s: Shared): void {
+  s.source?.close();
+  s.source = null;
+  tell(s, false);
+}
+
+function watchVisibility(): void {
+  if (typeof document === 'undefined' || watched.has(document)) return;
+  watched.add(document);
+  document.addEventListener('visibilitychange', () => {
+    for (const [project, s] of shared) {
+      if (hidden()) disconnect(s);
+      else connect(project, s);
+    }
+  });
+}
+
+/**
+ * Read the project's stream: `onEvent` is called with each event as it
  * arrives, `onOpen` with whether the stream is open now. Returns the function
- * that closes it. Outside a browser it opens nothing.
+ * that stops this reader; the page's stream closes when its last reader
+ * stops. Outside a browser it opens nothing.
  */
 export function watchEvents(
   project: string,
@@ -55,16 +134,22 @@ export function watchEvents(
   onOpen?: (open: boolean) => void,
 ): () => void {
   if (typeof EventSource === 'undefined') return () => undefined;
-  const source = new EventSource(`/api/events?project=${encodeURIComponent(project)}`);
-  const handle = (m: MessageEvent<string>) => {
-    try {
-      onEvent(JSON.parse(m.data) as ServiceEvent);
-    } catch {
-      // A line that is not an event says nothing.
+  watchVisibility();
+  let s = shared.get(project);
+  if (!s) {
+    s = { readers: new Set(), source: null, last: null, open: false };
+    shared.set(project, s);
+  }
+  const reader: Reader = { onEvent, onOpen };
+  s.readers.add(reader);
+  if (s.open) onOpen?.(true);
+  connect(project, s);
+  const mine = s;
+  return () => {
+    mine.readers.delete(reader);
+    if (mine.readers.size === 0) {
+      disconnect(mine);
+      if (shared.get(project) === mine) shared.delete(project);
     }
   };
-  for (const t of EVENT_TYPES) source.addEventListener(t, handle as EventListener);
-  source.onopen = () => onOpen?.(true);
-  source.onerror = () => onOpen?.(false);
-  return () => source.close();
 }

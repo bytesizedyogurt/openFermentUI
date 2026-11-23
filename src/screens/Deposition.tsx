@@ -21,6 +21,11 @@
 // capture box, the read-back beat and the corrections a protocol's steps
 // carry. A reading a person confirms there is one a scenario's value may
 // name as a measurement (GET /api/depositions/readings).
+//
+// A run lives in this page's memory, so a reload or a closed tab ends it. The
+// deposition it wrote into stays on the service, and the deposition's record
+// takes it up again here (store `resumeDeposition`), staged or running, or
+// closes it.
 import { useEffect, useMemo, useRef, useState } from 'react';
 import {
   ArrowLeft,
@@ -129,6 +134,8 @@ export default function Deposition({ protocolId, runId }: { protocolId: string; 
   const runbook = useStore((s) =>
     deposition ? (s.runbooks.find((r) => r.id === deposition.runbookId) ?? null) : null,
   );
+  // The project's depositions as the service keeps them, the ones a reload leaves open among them.
+  const depositions = useStore((s) => s.depositions);
   const beginDeposition = useStore((s) => s.beginDeposition);
   const closeDeposition = useStore((s) => s.closeDeposition);
   const startRun = useStore((s) => s.startRun);
@@ -291,23 +298,51 @@ export default function Deposition({ protocolId, runId }: { protocolId: string; 
   }
 
   if (!run) {
+    // A deposition on this protocol that is still open: its record takes it up at this protocol's run, or closes it.
+    const open = depositions.filter((d) => d.protocolId === protocolId && d.state !== 'closed');
     return (
-      <div className="p-8">
+      <div className="p-8" data-testid="deposition-run-ended">
         <EmptyState
           title="This run is no longer active"
-          body="A run at the bench lives in this page's memory, so a reload ends it; every run offers its text log to export before you leave it. The protocol stands as the project keeps it, and a fresh run starts from its current version."
+          body={
+            open.length > 0
+              ? `A run at the bench lives in this page's memory, so a reload ends it, and a deposition it wrote into stays on the service with every reading and observation. ${open.length === 1 ? 'This protocol has one deposition still open: its record takes it' : `This protocol has ${open.length} depositions still open: each one's record takes it`} up again at this protocol's run, or closes it.`
+              : "A run at the bench lives in this page's memory, so a reload ends it; every run offers its text log to export before you leave it. The protocol stands as the project keeps it, and a fresh run starts from its current version."
+          }
           action={
-            <div className="flex gap-2">
-              <Button
-                variant="primary"
-                onClick={() => {
-                  const id = startRun(protocolId, protocol.currentVersion, 1);
-                  navigate(`/runbooks/protocols/${protocolId}/run/${id}`);
-                }}
-              >
-                Start a fresh run
-              </Button>
-              <Button onClick={() => navigate(`/runbooks/protocols/${protocolId}`)}>Open the protocol</Button>
+            <div className="flex flex-col items-center gap-3">
+              {open.length > 0 && (
+                <ul className="space-y-2" data-testid="deposition-run-ended-open">
+                  {open.map((d) => (
+                    <li key={d.id}>
+                      <Button
+                        variant="primary"
+                        style={{ minHeight: 44 }}
+                        onClick={() => navigate(`/runbooks/depositions/${encodeURIComponent(d.id)}`)}
+                      >
+                        Deposition <span className="font-num">{d.id}</span> · {d.state} ·{' '}
+                        <span className="font-num">{d.entries.length}</span> measured ·{' '}
+                        <span className="font-num">{d.observations.length}</span> observed
+                      </Button>
+                    </li>
+                  ))}
+                </ul>
+              )}
+              <div className="flex gap-2">
+                <Button
+                  variant={open.length > 0 ? 'default' : 'primary'}
+                  style={{ minHeight: 44 }}
+                  onClick={() => {
+                    const id = startRun(protocolId, protocol.currentVersion, 1);
+                    navigate(`/runbooks/protocols/${protocolId}/run/${id}`);
+                  }}
+                >
+                  Start a fresh run
+                </Button>
+                <Button style={{ minHeight: 44 }} onClick={() => navigate(`/runbooks/protocols/${protocolId}`)}>
+                  Open the protocol
+                </Button>
+              </div>
             </div>
           }
         />
@@ -420,7 +455,8 @@ export default function Deposition({ protocolId, runId }: { protocolId: string; 
             >
               <Play size={17} /> Begin recording
             </Button>
-            <Button style={{ minHeight: 56 }} onClick={() => navigate(`/runbooks/protocols/${protocolId}`)}>
+            {/* Its record keeps it staged on the service, and takes it up again or closes it. */}
+            <Button style={{ minHeight: 56 }} onClick={() => navigate(`/runbooks/depositions/${encodeURIComponent(deposition.id)}`)}>
               Not yet
             </Button>
             <ComponentTag component="Deposition" action="staged" />
@@ -1116,9 +1152,9 @@ export function DepositionBench({ depositionId }: { depositionId: string }) {
       ? ['Deposition not found', `This project holds no deposition ${depositionId}, or its rows have not loaded from the service yet.`]
       : !runbook
         ? ['Its runbook is not here', `Deposition ${deposition.id} tests runbook ${deposition.runbookId}, which this project does not hold, so there is no measure to record against.`]
-        : deposition.protocolId !== null
-          ? ['A protocol’s steps record this one', `Deposition ${deposition.id} runs protocol ${deposition.protocolId}; its bench opens from that protocol’s run.`]
-          : ['This deposition is closed', `Deposition ${deposition.id} takes no new entries. What is in it is what happened.`];
+        : deposition.state === 'closed'
+          ? ['This deposition is closed', `Deposition ${deposition.id} takes no new entries. What is in it is what happened.`]
+          : ['A protocol’s steps record this one', `Deposition ${deposition.id} runs protocol ${deposition.protocolId}; its record takes it up again at that protocol’s run, or closes it.`];
     return (
       <div className="h-full overflow-y-auto bg-surface-0" data-testid="deposition-bench" data-state={deposition?.state ?? 'missing'}>
         <div className="max-w-[860px] mx-auto p-6">

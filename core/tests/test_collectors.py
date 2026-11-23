@@ -222,6 +222,37 @@ def test_an_upload_is_split_by_its_kind_or_passed_as_it_is():
     assert notes.licence == FetchLicense(text="Mine to share") and notes.licence_class == "unknown"
 
 
+def _jats(encoding: str, words: str) -> bytes:
+    """A JATS file declaring `encoding` and written in it."""
+    return (f'<?xml version="1.0" encoding="{encoding}"?>\n<article><front><article-meta><title-group>'
+            f"<article-title>Assay at 30 °C</article-title></title-group></article-meta></front>"
+            f"<body><sec><title>Assay</title><p>{words}</p></sec></body></article>\n").encode(encoding)
+
+
+def test_an_xml_upload_is_read_in_the_encoding_it_declares():
+    words = "The supernatant held 5 µg/L of furfural at 30 °C."
+    latin = _jats("ISO-8859-1", words)
+    assert b"5 \xb5g/L" in latin and b"30 \xb0C" in latin
+    found = collectors.uploaded("assay.xml", latin)
+    assert f"## Assay\n\n{words}" in found.text and "\ufffd" not in found.text
+    assert found.citation.title == "Assay at 30 °C"
+
+
+@pytest.mark.parametrize(
+    ("declared", "why"),
+    [
+        ("UTF-8", "not well-formed"),
+        ("x-unheard-of", "unknown encoding"),
+        ("Shift_JIS", "multi-byte encodings are not supported"),
+    ],
+)
+def test_an_xml_upload_its_declared_encoding_cannot_read_is_refused_in_words(declared, why):
+    data = _jats("ISO-8859-1", "5 µg/L at 30 °C").replace(b'encoding="ISO-8859-1"', f'encoding="{declared}"'.encode())
+    with pytest.raises(NotCollected) as refused:
+        collectors.uploaded("assay.xml", data)
+    assert "XML did not parse" in str(refused.value) and why in str(refused.value)
+
+
 @pytest.mark.parametrize(
     ("name", "data", "chosen", "why"),
     [

@@ -14,8 +14,8 @@ import numpy as np
 import pytest
 from fastapi.testclient import TestClient
 
-from openferment_core import (artifacts, binding, evidence_pool, fermos, intake, kinetics, module_stores, proforma,
-                              units, validate)
+from openferment_core import (artifacts, binding, catalogues, evidence_pool, fermos, intake, kinetics, module_stores,
+                              proforma, units, validate)
 from openferment_core.models import Override, SimulationRequest
 from standins import as_inputs, family_units, inputs_json
 
@@ -135,11 +135,13 @@ def test_the_proforma_gate_and_statistic_are_the_ones_records_bind_through(store
 # ── the strain, the organism and the sugar ─────────────────────────────
 
 
-def test_the_strain_filter_and_every_strain_each_bind_what_they_should(store, catalogue, monkeypatch):
-    # A paper's words resolve to a strain through the aliases validate reads;
-    # the test names its own, as it names its catalogue.
-    held = validate.vocabulary()
-    monkeypatch.setattr(validate, "vocabulary", lambda path=None: {**held, "strains": {"cen.pk113-7d": CENPK}})
+def test_the_strain_filter_and_every_strain_each_bind_what_they_should(store, catalogue):
+    # A paper's words resolve to a strain through the aliases validate reads,
+    # the strain catalogue's: the test keeps its strain there with its other name.
+    catalogues.keep(catalogues.CatalogueEntry(kind="strain", id=CENPK, name=HOSTS[0]["name"],
+                                              species="Saccharomyces cerevisiae", aliases=["CEN.PK113-7D"]),
+                    by="openFerment test fixture")
+    assert validate.strain_id("CEN.PK113-7D") == CENPK
     pool = pool_of(
         rec("mu-cenpk", "growth_rate_mu", 0.30, "h-1", strain=CENPK),
         rec("mu-alias", "growth_rate_mu", 0.32, "h-1", organism="CEN.PK113-7D"),
@@ -170,6 +172,8 @@ def test_the_strain_filter_and_every_strain_each_bind_what_they_should(store, ca
     # A strain is named by its id among the hosts the catalogue holds.
     with pytest.raises(fermos.SimulationRefused, match="there is no catalogued strain"):
         bind(pool, strain="s-cerevisiae-nowhere")
+    # The kept strain rolls back with the test's transaction; its held aliases go with it.
+    catalogues._ALIASES.changed()
 
 
 def test_the_carbon_source_filter(store):

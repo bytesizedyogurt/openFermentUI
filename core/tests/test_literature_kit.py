@@ -453,3 +453,67 @@ def test_an_answer_streams_its_words_and_citations_with_passage_ids(tmp_path, mo
     [cited] = [c for k, d in events if k == "citations" for c in d["citations"] if c["cited"]]
     assert cited["document_id"] == mine.document_id and cited["passage_id"].startswith("p")
     assert all("_" not in key[:1] for _, d in events for key in d), "nothing internal to the kit is sent"
+
+
+def test_an_answer_with_no_key_says_so_in_the_words_postdoc_and_extract_give(tmp_path, monkeypatch):
+    """Found on the owner's data: BioRepo's 'Answer with citations' read
+    "ModelUnavailable: generation failed (see server logs)" while Postdoc and
+    Extract on the same service said that no key was set. The kit catches the
+    model's failure and sends its class name; the stream says why, in
+    llm.py's words, through the real client the service installs."""
+    import json
+
+    from openferment_core import llm
+    from openferment_core.api import app
+
+    monkeypatch.delenv("ANTHROPIC_API_KEY", raising=False)
+    monkeypatch.setattr(kit, "_MODEL", llm.kit_client)
+    with pytest.raises(llm.ModelUnavailable) as said:
+        llm.call(system="", user="q", schema=None, max_tokens=16, family="explain")
+    _store(tmp_path, HERE, "keyless answer")
+    with TestClient(app).stream("POST", "/api/literature/answer", json={"question": "keyless answer placeholder"}) as r:
+        assert r.status_code == 200
+        raw = "".join(r.iter_text())
+    events = [(block.split("\n")[0][len("event: "):], json.loads(block.split("\n")[1][len("data: "):]))
+              for block in raw.strip().split("\n\n")]
+    [error] = [d for k, d in events if k == "error"]
+    assert "ANTHROPIC_API_KEY is not set" in error["message"]
+    assert error["message"] == str(said.value), "the words Postdoc and Extract give for a missing key"
+    assert "see server logs" not in error["message"]
+
+
+def test_an_answer_past_the_accounts_usage_limit_says_so_and_never_names_the_key(tmp_path, monkeypatch):
+    """The owner's Mac meets the Anthropic account's own usage limit as a 400
+    on every call: the answer's error says so in llm.py's words, the date the
+    API names with it, and the key's value appears in no event."""
+    import json
+
+    import anthropic
+    import httpx
+
+    from openferment_core import llm
+
+    key = f"sk-ant-standin-{uuid.uuid4().hex}"
+    limit = "You have reached your specified API usage limits. You will regain access on 2026-12-01 at 00:00 UTC."
+
+    class Refusing:
+        """The API as it answers past the account's usage limit."""
+
+        def __init__(self) -> None:
+            self.messages = self
+
+        def stream(self, **_):
+            raise anthropic.BadRequestError(
+                message=limit, response=httpx.Response(400, request=httpx.Request("POST", "https://x")), body=None)
+
+    monkeypatch.setenv("ANTHROPIC_API_KEY", key)
+    monkeypatch.setattr(llm, "make_client", lambda **_: Refusing())
+    monkeypatch.setattr(kit, "_MODEL", llm.kit_client)
+    with pytest.raises(llm.UsageLimitReached) as said:
+        llm.call(system="", user="q", schema=None, max_tokens=16, family="explain")
+    _store(tmp_path, HERE, "limited answer")
+    events = list(kit.answer("limited answer placeholder", project_id=HERE))
+    [error] = [e for e in events if e["type"] == "error"]
+    assert error["message"] == str(said.value), "the words the rest of the service gives for the usage limit"
+    assert error["message"].startswith("The Anthropic account's usage limit is reached until 2026-12-01 at 00:00 UTC")
+    assert key not in json.dumps(events, default=str)

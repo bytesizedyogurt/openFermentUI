@@ -158,15 +158,20 @@ WORDING_SECTION = [
 
 
 @pytest.fixture(autouse=True)
-def _test_strains(monkeypatch):
-    """A strain alias table of fictional strains: the service ships none, since
-    strains arrive with a project's records (alpha 2.0, ADR-010)."""
-    import openferment_core.validate as module
+def _test_strains():
+    """Two fictional strains kept in the test project's strain catalogue with
+    their other names, which anchoring reads (validate.strain_id): the service
+    ships none, since strains arrive with a project (alpha 2.0, ADR-010)."""
+    from openferment_core import catalogues
 
-    real = module.vocabulary()
-    monkeypatch.setattr(module, "vocabulary", lambda path=None: {
-        **real, "strains": {"ab12": "strain-ab12", "ab12-3": "strain-ab12", "cd34": "strain-cd34"},
-    })
+    for sid, name, aliases in (("strain-ab12", "Test strain AB12", ["AB12", "AB12-3"]),
+                               ("strain-cd34", "Test strain CD34", ["CD34"])):
+        catalogues.keep(catalogues.CatalogueEntry(kind="strain", id=sid, name=name, species="Testus organismus",
+                                                  aliases=aliases), by="A test fixture")
+    yield
+    # The test's rows roll back with its transaction; the aliases held for
+    # the test project go with them.
+    catalogues._ALIASES.changed()
 
 
 def _anchored(organism: str):
@@ -206,6 +211,78 @@ def test_resolving_the_organism_does_not_move_the_content_id():
     # A decision keyed by content stays on its candidate when anchoring
     # learns to resolve the wording it was made about.
     assert _anchored("Testus organismus AB12").id == _anchored("Testus organismus").id
+
+
+def test_a_strain_kept_with_an_alias_resolves_a_record_naming_that_alias():
+    # H14-02: anchoring reads the project's strain catalogue, and reads it
+    # afresh once a strain is kept, so a strain kept after an anchoring run
+    # resolves the next one.
+    from openferment_core import catalogues, validate
+
+    wording = "Testus organismus Ethanol Grey"
+    before = _anchored(wording)
+    assert before.organism == wording and before.organismText is None, "no strain names it yet"
+    catalogues.keep(catalogues.CatalogueEntry(kind="strain", id="ethanol-grey", name="Ethanol Grey",
+                                              species="Testus organismus", aliases=[wording]), by="A test fixture")
+    after = _anchored(wording)
+    assert after.organism == "ethanol-grey", "the strain's id, which the strain page and the Hosts counts match on"
+    assert after.organismText == wording
+    assert validate.vocabulary()["strains"][wording.lower()] == "ethanol-grey"
+    # Its name alone, standing in a longer wording, resolves it too.
+    assert _anchored("an Ethanol Grey culture").organism == "ethanol-grey"
+
+
+def test_a_candidate_written_by_hand_resolves_its_organism_inside_its_transaction(held_documents):
+    # The tool door's hand-written candidate anchors inside its transaction,
+    # on the database loop, where no read of the catalogue can run: the
+    # aliases a strain keep read again are held for it.
+    from openferment_core import catalogues, extract
+
+    held_documents["W2"] = WORDING_SECTION
+    raw = {"sectionId": "s1", "field": "titer_secreted", "value": 15, "unit": "mg L-1",
+           "quote": "secreted the reporter to 15 mg L-1", "organism": "Testus organismus AB12"}
+    made, rule, detail = extract.add_candidate("W2", raw, who="A test fixture")
+    assert made is not None, (rule, detail)
+    assert made.organism == "strain-ab12" and made.organismText == "Testus organismus AB12"
+    # The evidence pool's record, which fermOS's strain filter reads, names the strain.
+    from openferment_core.evidence_pool import candidate_record
+
+    assert candidate_record(made, {})["strainId"] == "strain-ab12"
+    # After the aliases held are let go, the next candidate is kept too.
+    catalogues._ALIASES.changed()
+    again, rule, detail = extract.add_candidate("W2", {**raw, "organism": "AB12"}, who="A test fixture")
+    assert again is not None, (rule, detail)
+
+
+def test_a_candidate_written_by_hand_after_a_restart_resolves_its_organism(held_documents):
+    # A restarted service holds no strain aliases until something reads them
+    # off the database loop. add_candidate reads them before its transaction,
+    # so a hand-written candidate naming a kept strain's alias resolves.
+    from openferment_core import catalogues, db, extract, projects
+
+    held_documents["W3"] = WORDING_SECTION
+    raw = {"sectionId": "s1", "field": "titer_secreted", "value": 15, "unit": "mg L-1",
+           "quote": "secreted the reporter to 15 mg L-1", "organism": "Testus organismus AB12"}
+    catalogues._ALIASES.changed()
+    made, rule, detail = extract.add_candidate("W3", raw, who="A test fixture")
+    assert made is not None, (rule, detail)
+    assert made.organism == "strain-ab12" and made.organismText == "Testus organismus AB12"
+    # On the database loop with nothing held, the candidate is kept with its
+    # wording as the paper wrote it.
+    catalogues._ALIASES.changed()
+    sections = extract.passages("W3")
+    kept, rule, detail = db.run(extract._add_candidate(projects.current(), "W3", raw, sections, "A test fixture"))
+    assert kept is not None, (rule, detail)
+    assert kept.organism == "Testus organismus AB12" and kept.organismText is None
+
+
+def test_with_no_project_open_a_wording_stays_as_the_paper_wrote_it():
+    from openferment_core import projects, validate
+
+    with projects.using(None):
+        assert validate.strain_aliases() == {}
+        assert validate.strain_id("Testus organismus AB12") is None
+        assert _anchored("Testus organismus AB12").organism == "Testus organismus AB12"
 
 
 # ── the carbon source at anchoring ─────────────────────────────────────

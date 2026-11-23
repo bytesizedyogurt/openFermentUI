@@ -46,6 +46,11 @@
  *    one it picks); it says what would fill it when the run kept no stream;
  *    it stands on the grammar, is exported from the index, and pureOS →
  *    Builder draws with it.
+ * 11. A basis's link opens where its id is kept (bug hunt 2026-11, links):
+ *    an SFF flowsheet record (`sff-<hash>`, `run-<artifact id>`) on its
+ *    flowsheet's page, any other id on BioRepo's artifact page; rendered,
+ *    an evidence card and a figure's basis link each so, and BioRepo's
+ *    source chip and the comparison's artifact input build theirs the same way.
  */
 import { readFileSync, readdirSync, statSync } from 'node:fs';
 import { join, relative } from 'node:path';
@@ -74,7 +79,10 @@ import { fmt } from '../src/engine/units';
 import { toTable as timeCourseTable, type TimeCourseProps } from '../src/components/figures/TimeCourse';
 import type { TrainUnit } from '../src/lib/pureos';
 import { gatherLinks } from '../src/components/Dossier';
-import { ArtifactsDown, ArtifactRefused } from '../src/lib/artifacts';
+import { ArtifactsDown, ArtifactRefused, artifactPath } from '../src/lib/artifacts';
+import { EvidenceCard } from '../src/components/EvidenceCard';
+import { FigureFrame } from '../src/components/figures/FigureFrame';
+import type { Evidence } from '../src/lib/postdoc';
 import { YIELD_FIELD, yieldFieldKnown, yieldsOnSugar } from '../src/lib/geneos';
 
 const problems: string[] = [];
@@ -452,6 +460,49 @@ ok.push('an assumed mark is held out of the median, a ceiling keeps its provenan
   if (!/export \{ PurityByStream,/.test(readFileSync('src/components/figures/index.ts', 'utf8'))) problems.push('the figures index does not export PurityByStream');
   if (!/<PurityByStream\b/.test(readFileSync('src/screens/PureOSBuilder.tsx', 'utf8'))) problems.push('pureOS → Builder does not draw purity by stream through the grammar');
   ok.push(`tables: purity by stream ${rows.length}, one row per stream; ${bars} bars for the streams with a share, the product stream the service's alone; PurityByStream stands on toTable, ENCODING and FigureFrame`);
+}
+
+// 11 — a basis's link opens where its id is kept: an SFF flowsheet record on
+// its flowsheet's page (GET /api/flowsheets/{id} answers it), and a kept
+// artifact on BioRepo's (GET /api/biorepo/artifacts/{id} answers it).
+{
+  const SFF = 'sff-be74817c298f211b';
+  const RUN_FILE = 'run-e953f85cb5dc338a';
+  const KEPT = '0ad61c3c719cdc5e';
+  const paths: [string, string][] = [
+    [SFF, `/flowsheets/${SFF}`],
+    [RUN_FILE, `/flowsheets/${RUN_FILE}`],
+    [KEPT, `/biorepo/artifacts/${KEPT}`],
+  ];
+  for (const [id, want] of paths) {
+    const got = artifactPath(id);
+    if (got !== want) problems.push(`artifactPath(${id}) is ${got}; ${id} opens at ${want}`);
+  }
+  const basis = (artifactId: string) => ({ tool: 'engine.sff', toolVersion: 'e236e32', inputs: [], artifactId, at: '2026-11-23T00:00:00Z', seed: null });
+  const card = (artifactId: string): Evidence => ({
+    id: `sff:${artifactId}:units`, label: 'the units the file lists', value: 4, unit: '', provenance: 'computed',
+    basis: basis(artifactId), interval: null, figure: null,
+  });
+  const hrefs = (html: string) => [...html.matchAll(/href="([^"]*)"/g)].map((m) => m[1]);
+  for (const [id, want] of paths) {
+    const links = hrefs(renderToStaticMarkup(createElement(EvidenceCard, { evidence: card(id) })));
+    if (!links.includes(`#${want}`)) problems.push(`an evidence card whose basis is ${id} links to ${links.join(', ') || 'nothing'}; it opens at #${want}`);
+  }
+  const frame = hrefs(renderToStaticMarkup(createElement(FigureFrame, {
+    title: 't', drawn: 'd', table: { headers: [], rows: [] }, csvName: 'c', basis: paths.map(([id]) => basis(id)), children: null,
+  })));
+  for (const [id, want] of paths) {
+    if (!frame.includes(`#${want}`)) problems.push(`a figure whose basis is ${id} links to ${frame.join(', ') || 'nothing'}; it opens at #${want}`);
+  }
+  const built = [
+    ['src/screens/BioRepoArtifacts.tsx', /href=\{href\(artifactPath\(source\.id\)\)\}/, "BioRepo's source chip"],
+    ['src/screens/Compare.tsx', /href=\{href\(artifactPath\(i\.by\)\)\}/, "the comparison's artifact input"],
+    ['src/screens/RunbookDetail.tsx', /: artifactPath\(p\.artifactId\)\)\}/, "a drafted runbook prediction's artifact"],
+  ] as const;
+  for (const [file, pattern, what] of built) {
+    if (!pattern.test(readFileSync(file, 'utf8'))) problems.push(`${what} (${file}) builds its link without artifactPath`);
+  }
+  ok.push(`links: ${paths.length} ids, an SFF record on its flowsheet's page and a kept artifact on BioRepo's, from the evidence card, the figure's basis, the source chip, the comparison and a drafted runbook's prediction`);
 }
 
 if (problems.length) {

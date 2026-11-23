@@ -68,6 +68,7 @@ import io
 import json
 import logging
 import re
+import threading
 from datetime import datetime, timezone
 from typing import Annotated, Any, Literal, get_args
 
@@ -485,6 +486,8 @@ def keep(entry: CatalogueEntry, *, by: str, agent: Literal["model", "person"] = 
     through = (via or "postdoc") if agent == "model" else None
     kept = entry.model_copy(update={"by": who, "at": _now(), "agent": agent, "via": through})
     db.run(_keep(projects.current(), [kept], {} if audited and agent == "person" else None))
+    if kept.kind == "strain":
+        _ALIASES.kept(projects.current())
     return kept
 
 
@@ -576,6 +579,8 @@ def intake(kind: str, data: bytes, filename: str, *, by: str) -> CatalogueIntake
         out.kept.append(e.id)
     if good:
         db.run(_keep(projects.current(), good, {"file": filename or "the file"}))
+        if good[0].kind == "strain":
+            _ALIASES.kept(projects.current())
     return out
 
 
@@ -597,13 +602,65 @@ def as_hosts() -> list[dict[str, Any]]:
             for e in _entries("strain")]
 
 
+class _HeldAliases:
+    """Each project's strain aliases as the catalogue last answered them.
+    Anchoring resolves every organism it reads through them, and fermOS's
+    binding every record of a pool (validate.strain_id), so the catalogue is
+    read once a project and read afresh after a strain is kept in this
+    process (`kept`). A read that began before a keep is answered and left
+    unheld, so a keep is never hidden behind what was read before it."""
+
+    def __init__(self) -> None:
+        self._lock = threading.Lock()
+        self._held: dict[str, dict[str, str]] = {}
+        self._keeps = 0
+
+    def of(self, project_id: str | None) -> dict[str, str]:
+        with self._lock:
+            held = self._held.get(project_id) if project_id else None
+            keeps = self._keeps
+        if held is not None:
+            return dict(held)
+        if db.on_database_thread():
+            # A coroutine on the database loop cannot wait on a read of its
+            # own (a hand-written candidate anchors inside its transaction):
+            # it takes the aliases held, and here none are.
+            return {}
+        out: dict[str, str] = {}
+        for e in _entries("strain"):
+            for name in (e.name, *e.aliases):
+                out.setdefault(name.strip().lower(), e.id)
+        if project_id:
+            with self._lock:
+                if keeps == self._keeps:
+                    self._held[project_id] = dict(out)
+        return out
+
+    def kept(self, project_id: str) -> None:
+        """A strain kept in `project_id`: its aliases are read again now, so
+        the next anchoring finds them held, on the database loop too."""
+        with self._lock:
+            self._keeps += 1
+            self._held.pop(project_id, None)
+        try:
+            self.of(project_id)
+        except Exception as e:  # the keep stands; the next reader reads them
+            log.warning("the strain aliases of %s were not read again after a keep: %s", project_id, e)
+
+    def changed(self) -> None:
+        """Every project's aliases read afresh at their next reader."""
+        with self._lock:
+            self._keeps += 1
+            self._held.clear()
+
+
+_ALIASES = _HeldAliases()
+
+
 def as_strain_aliases() -> dict[str, str]:
-    """Each other name of a strain, and its name, lower-cased, to its id."""
-    out: dict[str, str] = {}
-    for e in _entries("strain"):
-        for name in (e.name, *e.aliases):
-            out.setdefault(name.strip().lower(), e.id)
-    return out
+    """Each other name of a strain, and its name, lower-cased, to its id:
+    the open project's, read once and again after a keep (`_HeldAliases`)."""
+    return _ALIASES.of(projects.current_or_none())
 
 
 def as_products() -> list[dict[str, Any]]:

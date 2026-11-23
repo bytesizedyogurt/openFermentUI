@@ -24502,7 +24502,7 @@
     },
     "/api/proforma/runs": {
       "get": {
-        "description": "A scenario's newest run on this service: the newest\nstored `proforma.run` whose basis names the scenario (`latest_run`, the\none pureOS and selling_price read), or none. A read: it runs nothing and\nstarts no simulator. The scenario is named by id, and a link opens what\nit names.",
+        "description": "A scenario's newest run on this service: of the stored `proforma.run`\nartifacts whose basis names the scenario, the one asked for last, a\nrequest asked again making the run it kept the newest (`latest_run`, the\none pureOS and selling_price read), or none. A read: it runs nothing and\nstarts no simulator. The scenario is named by id, and a link opens what\nit names.",
         "operationId": "proforma_runs_api_proforma_runs_get",
         "parameters": [
           {

@@ -16,8 +16,9 @@ Marked `sim` (the real Proforma worker): a vessel designed for a stand-in
 simulation and a three-unit train run on its harvest broth price on stand-in
 assumptions and converge; the stream table's units are the feed mixer, the
 vessel's class and the train's types; pureOS reads the run as any run; the
-finance read back is the package's, and a person's where they set it; and the
-run replays.
+cost card's lines sum to the price they are read at, the run's base-case
+price per kg of the product contained; the finance read back is the
+package's, and a person's where they set it; and the run replays.
 
 Every STAND-IN here is an `assumption` of this test, typed under the
 fixture's name and noted STAND-IN; none is a measurement, a published value
@@ -463,7 +464,19 @@ def test_a_vessel_and_a_three_unit_train_price_and_converge_and_every_reader_rea
     tr = pureos.train(r.artifactId)
     assert tr.product == "Ethanol" and tr.productStream == "D1_hot_gas" and tr.overallRecovery is not None
     assert [u.id for u in tr.units] == ["M1", p.design.unitId, "C1", "F1", "D1"]
-    assert proforma.tables_of(artifacts.get(r.artifactId)).flowsheet == FLOWSHEET
+    t = proforma.tables_of(artifacts.get(r.artifactId))
+    assert t.flowsheet == FLOWSHEET
+    # The cost card closes on the run's price (bug hunt H4-02): the TEA's
+    # breakdown is per kg of the Ethanol the product stream contains, its
+    # lines sum to its product price on that basis, and that price is the
+    # run's base-case price; the stream's own row carries the same sales per
+    # kg of the whole stream, which holds more than its Ethanol.
+    stream = next(s for s in t.streams if s.id == t.tea.product)
+    assert stream.massFlow > stream.massFlows["Ethanol"]
+    assert t.tea.basisFlow == pytest.approx(stream.massFlows["Ethanol"], rel=1e-12)
+    assert sum(line.perUnit for line in t.tea.lines) == pytest.approx(t.tea.productPrice, rel=1e-9)
+    assert t.tea.productPrice == pytest.approx(r.basePrice, rel=1e-12)
+    assert stream.price * stream.massFlow == pytest.approx(t.tea.productPrice * t.tea.basisFlow, rel=1e-12)
     assert artifacts.replay(r.artifactId).identical
 
 
@@ -491,7 +504,10 @@ def test_a_yield_the_vessels_reaction_cannot_reach_is_a_case_it_cannot_hold(real
 
 # Each composite run's artifact id through the panel's overrides at b6a85d0,
 # measured there on these stand-ins, three samples, no host drawing the diagram.
-PANEL_IDS = {"inputs": "5787b339a1c448e9", "inputs and a Finance value": "f32cbb91635cb3d5"}
+# Moved by the bug hunt's fix of H1-04, whose run version 'shelf run 3' a run's
+# id hashes, from 5787b339a1c448e9 and f32cbb91635cb3d5: the plant's recycles
+# now run to convergence, so a run kept before computes afresh.
+PANEL_IDS = {"inputs": "f9a7a46afb94c395", "inputs and a Finance value": "f14d854340c48baf"}
 
 
 def test_a_composite_run_sent_as_inputs_keeps_the_artifact_id_its_overrides_gave(parts, worker, monkeypatch):

@@ -997,8 +997,12 @@ def _license(root: ET.Element) -> FetchLicense | None:
     return FetchLicense(href=href or None, text=text)
 
 
-def split_jats(xml: str, *, paper_id: str = "", pmcid: str | None = None) -> FetchResult:
+def split_jats(xml: str | bytes, *, paper_id: str = "", pmcid: str | None = None) -> FetchResult:
     """JATS XML → a FetchResult whose sections are the paper's own words.
+
+    A file's bytes go to the parser as they are, so it reads them in the
+    encoding the file declares, UTF-8 when it declares none; a string is
+    parsed as the words it holds.
 
     Order: the abstract first as 'abstract'; then every body <sec>, depth-first,
     as 's1', 's2', … with nested headings prefixed; then every <table-wrap> as
@@ -1010,16 +1014,20 @@ def split_jats(xml: str, *, paper_id: str = "", pmcid: str | None = None) -> Fet
     citations in brackets or parentheses is dropped (`_uncite`). The
     <license> element is read into `license`.
 
-    A parse failure — malformed XML, or a document with no article body — is
-    returned as `failed:parse` with the reason, never raised.
+    A parse failure — malformed XML, a byte the declared encoding does not
+    hold, an encoding the parser cannot read, or a document with no article
+    body — is returned as `failed:parse` with the reason, never raised.
     """
     now = datetime.now(timezone.utc).isoformat()
+    size = len(xml) if isinstance(xml, bytes) else len(xml.encode("utf-8"))
     try:
         root = ET.fromstring(xml)
-    except ET.ParseError as e:
+    except (ET.ParseError, LookupError, ValueError) as e:
+        # LookupError: an encoding name the codecs do not know; ValueError: a
+        # multi-byte encoding expat does not read.
         return FetchResult(
             paperId=paper_id, pmcid=pmcid, status="failed:parse",
-            reason=f"XML did not parse: {e}", fetchedAt=now, bytes=len(xml.encode("utf-8")),
+            reason=f"XML did not parse: {e}", fetchedAt=now, bytes=size,
         )
 
     # Europe PMC wraps a missing article in an error document rather than a 404.
@@ -1028,7 +1036,7 @@ def split_jats(xml: str, *, paper_id: str = "", pmcid: str | None = None) -> Fet
         return FetchResult(
             paperId=paper_id, pmcid=pmcid, status="failed:parse",
             reason=f"no <article> element (root is <{root.tag}>)", fetchedAt=now,
-            bytes=len(xml.encode("utf-8")),
+            bytes=size,
         )
 
     sections: list[FetchedSection] = []
@@ -1048,7 +1056,7 @@ def split_jats(xml: str, *, paper_id: str = "", pmcid: str | None = None) -> Fet
             paperId=paper_id, pmcid=pmcid, status="failed:parse",
             reason="article has no <body> — Europe PMC serves abstracts for some records, not full text",
             fetchedAt=now, license=_license(article), sections=sections,
-            bytes=len(xml.encode("utf-8")),
+            bytes=size,
         )
 
     walked: list[tuple[str, str]] = []
@@ -1087,7 +1095,7 @@ def split_jats(xml: str, *, paper_id: str = "", pmcid: str | None = None) -> Fet
 
     return FetchResult(
         paperId=paper_id, pmcid=pmcid, status="complete", fetchedAt=now,
-        license=_license(article), sections=sections, bytes=len(xml.encode("utf-8")),
+        license=_license(article), sections=sections, bytes=size,
     )
 
 
@@ -1320,13 +1328,14 @@ def _year(value: object) -> int | None:
     return int(found.group(1)) if found else None
 
 
-def jats_citation(xml: str) -> Citation:
+def jats_citation(xml: str | bytes) -> Citation:
     """The article's own front matter: its title, its authors as 'Given
     Surname', its year of publication, its DOI, its journal and its PMCID.
-    What the XML does not hold stays empty."""
+    What the XML does not hold stays empty. Bytes are read in the encoding
+    the file declares, as `split_jats` reads them."""
     try:
         root = ET.fromstring(xml)
-    except ET.ParseError:
+    except (ET.ParseError, LookupError, ValueError):
         return Citation()
     article = root if root.tag == "article" else root.find(".//article")
     if article is None:
@@ -1685,9 +1694,11 @@ def uploaded(filename: str, data: bytes, *, title: str = "", licence_class: str 
             text=markdown(result_title, result.sections), sections=len(result.sections), stated_class=chosen,
         )
     if suffix == ".xml":
-        xml = data.decode("utf-8", errors="replace")
-        result = _complete(split_jats(xml, paper_id=name))
-        citation = jats_citation(xml)
+        # The parser takes the file's bytes and reads the encoding it declares,
+        # so an ISO-8859-1 file keeps its µ and °; a byte its encoding does not
+        # hold refuses the file in words.
+        result = _complete(split_jats(data, paper_id=name))
+        citation = jats_citation(data)
         citation.title = title.strip() or citation.title or stem
         return Collected(
             collector="upload", identifier=name, citation=citation, licence=stated or result.license,

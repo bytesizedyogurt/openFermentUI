@@ -104,6 +104,60 @@ def test_the_newest_run_of_each_scenario_is_found_by_the_scenario_its_basis_name
     assert client.get("/api/proforma/runs?scenarioId=sc-other-1").json()["artifact"] is None
 
 
+def test_the_latest_run_is_the_run_asked_for_last_when_a_kept_run_answers_again(client, standin, monkeypatch):
+    """A tester on the owner's data: a scenario run on valid values (A), then
+    with a yield above the theoretical (B, refused and kept), then on A's
+    values again, which the route answers with A as kept; the page showed A,
+    and after a reload it read B, the run kept latest. The scenario's latest
+    run is the run asked for last, at the route Proforma's pages and BioRepo
+    Compare read and in `latest_run`, which pureOS and selling_price read."""
+    from datetime import datetime, timedelta, timezone
+
+    def ask(*values):
+        inputs = [i.model_dump(mode="json", exclude_none=True) for i in assumed_inputs([*ASSUMED, *values])]
+        return client.post("/api/proforma/run", json={"scenarioId": HELD, "samples": 4, "inputs": inputs})
+
+    def latest() -> str:
+        return client.get(f"/api/proforma/runs?scenarioId={HELD}").json()["artifact"]["id"]
+
+    # A is kept a minute back, so B is the run kept latest whatever the
+    # second the three requests share.
+    now = artifacts._now
+    past = (datetime.now(timezone.utc) - timedelta(minutes=1)).isoformat(timespec="seconds").replace("+00:00", "Z")
+    monkeypatch.setattr(artifacts, "_now", lambda: past)
+    a = ask()
+    assert a.status_code == 200
+    a_id = a.json()["artifactId"]
+    monkeypatch.setattr(artifacts, "_now", now)
+    above = assume("yield", standins.STANDIN_THEORETICAL * 1.2)
+    b = ask(above)
+    assert b.status_code == 422 and "no sample the flowsheet could hold" in b.json()["detail"]
+    [b_id] = [x.id for x in artifacts.all_artifacts() if x.tool == proforma.RUN and x.id != a_id]
+    assert b_id in b.json()["detail"] and latest() == b_id
+    again = ask()
+    assert again.status_code == 200 and again.json()["artifactId"] == a_id
+    assert latest() == a_id and proforma.latest_run(HELD).id == a_id
+    # B asked again is answered by B as kept, and B is the latest once more.
+    assert ask(above).status_code == 422 and latest() == b_id == proforma.latest_run(HELD).id
+    # Another scenario's request leaves this one's latest run as it stands.
+    proforma.run(ProformaRunRequest(scenarioId=MADE_HERE, flowsheet=ETHANOL, inputs=assumed_inputs(ASSUMED),
+                                    samples=4), pool=standin)
+    assert latest() == b_id
+
+
+def test_a_run_kept_before_every_recycle_converged_is_never_the_answer_now(standin):
+    """Bug hunt H1-04: the flowsheet's recycle loops now run to a converged
+    recycle, so the same inputs compute a different run. A run's id hashes
+    its tool's version, its inputs and its seed, and the version moved with
+    the fix: a run kept on the version before it keeps its own id, and the
+    same request now is computed afresh."""
+    kept = proforma.run(ProformaRunRequest(scenarioId=HELD, inputs=assumed_inputs(ASSUMED), samples=4), pool=standin)
+    art = artifacts.get(kept.artifactId)
+    before = art.toolVersion.replace(proforma.RUN_VERSION, "shelf run 2")
+    assert before != art.toolVersion
+    assert artifacts.artifact_id(proforma.RUN, before, art.inputs, art.seed) != art.id
+
+
 def test_a_blank_scenario_is_refused_in_words(client):
     r = client.get("/api/proforma/runs?scenarioId=%20")
     assert r.status_code == 422 and "names the scenario" in r.json()["detail"]

@@ -219,7 +219,7 @@ def test_the_environment_names_a_setting_as_it_stands(tmp_path):
 
 
 def _postgres_stand_ins(tmp_path: Path, *, vector: str = "1") -> Path:
-    """Homebrew with postgresql@17 keg-only: brew answers the keg's prefix,
+    """Homebrew with postgresql@18 keg-only: brew answers the keg's prefix,
     and the keg holds pg_isready (answering), psql (answering `vector` for
     pgvector and no row for the database) and createdb; each call is written
     to `calls`. The PATH to run with."""
@@ -228,7 +228,7 @@ def _postgres_stand_ins(tmp_path: Path, *, vector: str = "1") -> Path:
     keg.mkdir(parents=True)
     calls = tmp_path / "calls"
     tools = {
-        stand_ins / "brew": f'[ "$*" = "--prefix --installed postgresql@17" ] && echo "{keg.parent}" && exit 0\nexit 1',
+        stand_ins / "brew": f'[ "$*" = "--prefix --installed postgresql@18" ] && echo "{keg.parent}" && exit 0\nexit 1',
         keg / "pg_isready": "exit 0",
         keg / "psql": f'case "$*" in *pg_available_extensions*) echo "{vector}" ;; esac',
         keg / "createdb": "",
@@ -248,7 +248,7 @@ def test_the_database_is_made_from_the_keg_and_named_once_on_a_line_of_its_own(t
     done = _lib(tmp_path, "ensure_database", {"PATH": path})
     assert done.returncode == 0, done.stderr
     calls = (tmp_path / "calls").read_text().splitlines()
-    assert calls[:2] == ["brew --prefix --installed postgresql@17", "pg_isready -q -h 127.0.0.1"], \
+    assert calls[:2] == ["brew --prefix --installed postgresql@18", "pg_isready -q -h 127.0.0.1"], \
         "the keg's tools go first on the path"
     assert "createdb -h 127.0.0.1 openferment" in calls
     assert all(c.startswith("psql -X ") for c in calls if c.startswith("psql")), "psql reads no ~/.psqlrc"
@@ -282,7 +282,7 @@ def test_a_missing_pgvector_and_a_login_started_postgresql_are_said(tmp_path):
     path = f"{_postgres_stand_ins(tmp_path, vector='')}:/usr/bin:/bin"
     agents = tmp_path / "home" / "Library" / "LaunchAgents"
     agents.mkdir(parents=True)
-    (agents / "homebrew.mxcl.postgresql@17.plist").write_text("")
+    (agents / "homebrew.mxcl.postgresql@18.plist").write_text("")
     done = _lib(tmp_path, "ensure_database", {"PATH": path})
     assert done.returncode == 1 and "pgvector is not installed for this PostgreSQL" in done.stderr
     assert "starts at your login" in done.stdout and "sudo brew services start --sudo-service-user=" in done.stdout

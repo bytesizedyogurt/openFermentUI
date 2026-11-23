@@ -30,6 +30,9 @@
  * bench's rules are the service's (checks.py, core/tests/test_checks.py).
  * Part 12 holds a skill kept in the skill catalogue with no policy, which
  * Guild rates nobody on (alpha 2.2 E.12; competence.unrated on the service).
+ * Part 13 holds a protocol's deposition after a reload: its record takes it
+ * up again at its protocol's run, staged or running, or closes it (store
+ * `benchOf`, `resumeDeposition`).
  *
  * Runs with no service and no network: the service is a stub `fetch` here.
  */
@@ -811,6 +814,78 @@ async function main() {
     check('it is never ready for a check', !readyForCheck(tom12, open));
     const path12 = pathOf({ personId: 'p-tom', skills: [open], status: map12, lessonsFor: {}, passed: () => false, soon: new Set(), today: TODAY });
     check('a path says it waits for its policy', path12[0]?.section === 'waiting' && path12[0]?.step.kind === 'unrated');
+  }
+
+  // ── 13. a protocol's deposition after a reload (the bug hunt's bench finding) ──
+  // A run at the bench lives in this page's memory and a reload ends it; the
+  // deposition it wrote into stays on the service. Its record takes it up again at the
+  // protocol's run, staged or running, or closes it, and a staged one left
+  // before Begin is taken up or closed the same way.
+  {
+    const { benchOf } = await import('../src/store');
+    const od = TEST_PROTOCOLS.find((p) => p.id === 'PR-OD-01')!;
+    const odSteps = od.versions.find((v) => v.version === od.currentVersion)?.steps ?? [];
+    useStore.setState({
+      serviceUp: false,
+      protocols: TEST_PROTOCOLS,
+      depositions: [],
+      runs: {},
+      activeRunId: null,
+      guild: ledger([person('p-lead', 'lead'), person('p-ann')]),
+      guildActingId: 'p-ann',
+    });
+    const reload = () => useStore.setState({ runs: {}, activeRunId: null });
+    const depOf = (id: string) => s().depositions.find((d) => d.id === id)!;
+    const offer = (id: string) => (typeof benchOf === 'function' ? benchOf(depOf(id), s().runs, s().protocols) : null);
+    const resume = (id: string, scale: number) => (typeof s().resumeDeposition === 'function' ? s().resumeDeposition(id, scale) : undefined);
+
+    const opened = s().openDeposition('rb-bench', od.id, 2)!;
+    const dep = opened.depositionId;
+    s().beginDeposition(dep);
+    s().captureDeposition(dep, odSteps[1].id, 'od came in at 0.42', { measureId: 'm-od', value: 0.42, unit: 'AU' });
+    s().confirmEntry(dep, depOf(dep).entries[0].id);
+    s().captureDeposition(dep, odSteps[2].id, 'the broth foamed at the top', null);
+    reload();
+    check('after a reload the deposition stays running with its reading and observation', depOf(dep).state === 'running' && depOf(dep).entries.length === 1 && depOf(dep).entries[0].confirmed && depOf(dep).observations.length === 1);
+    check('and its record offers to take it up at its protocol’s run', offer(dep)?.kind === 'take-up', JSON.stringify(offer(dep)?.kind ?? 'the store exports no benchOf'));
+    useStore.setState({ guildActingId: 'p-lead' });
+    const taken = resume(dep, 2);
+    const run = taken ? s().runs[taken] : undefined;
+    check(
+      'taking it up starts a run that writes into it, on the protocol’s current version at the scale given',
+      !!run && run.depositionId === dep && run.protocolId === od.id && run.version === od.currentVersion && run.scale === 2,
+      taken === undefined ? 'the store has no resumeDeposition' : JSON.stringify(run ?? null),
+    );
+    check(
+      'the run opens at the step the latest recording was made at, with the deposition’s start and operator',
+      !!run && run.currentStep === 2 && Object.keys(run.completed).length === 0 && run.startedAt === Date.parse(depOf(dep).startedAt) && run.operatorId === 'p-ann',
+      JSON.stringify(run ? [run.currentStep, run.startedAt, run.operatorId] : null),
+    );
+    check('and the record now goes to that run', !!taken && JSON.stringify(offer(dep)) === JSON.stringify({ kind: 'run', to: `/runbooks/protocols/${od.id}/run/${taken}` }), JSON.stringify(offer(dep)));
+    const count = Object.keys(s().runs).length;
+    check('taking it up again goes back to the same run', !!taken && resume(dep, 5) === taken && Object.keys(s().runs).length === count);
+    reload();
+    s().closeDeposition(dep);
+    check('closed from its record after a reload, it takes no run and keeps what it holds', depOf(dep).state === 'closed' && depOf(dep).closedAt !== null && depOf(dep).entries.length === 1 && depOf(dep).observations.length === 1);
+    check('a closed deposition is taken up by no run', resume(dep, 1) === null && offer(dep)?.kind === 'none' && Object.keys(s().runs).length === 0);
+
+    const staged = s().openDeposition('rb-bench', od.id, 1)!.depositionId;
+    reload();
+    check('a staged deposition left before Begin is offered again after a reload', depOf(staged).state === 'staged' && offer(staged)?.kind === 'take-up');
+    const again = resume(staged, 1);
+    check('taken up, it opens staged at its run and waits for Begin', !!again && s().runs[again]?.depositionId === staged && depOf(staged).state === 'staged');
+    reload();
+    s().closeDeposition(staged);
+    check('and closed before Begin, it closes with its time', depOf(staged).state === 'closed' && depOf(staged).closedAt !== null);
+
+    const elsewhere = 'dep-protocol-not-here';
+    useStore.setState((st) => ({ depositions: [{ ...depOf(staged), id: elsewhere, protocolId: 'PR-NOT-HERE', state: 'running', closedAt: null }, ...st.depositions] }));
+    const noRun = resume(elsewhere, 1) === null && JSON.stringify(offer(elsewhere)) === JSON.stringify({ kind: 'none', why: 'no-protocol' });
+    s().closeDeposition(elsewhere);
+    check('one whose protocol the project does not hold is taken up by no run, and closes', noRun && depOf(elsewhere).state === 'closed');
+    const alone = 'dep-readings-alone';
+    useStore.setState((st) => ({ depositions: [{ ...depOf(staged), id: alone, protocolId: null, state: 'running', closedAt: null }, ...st.depositions] }));
+    check('the readings alone keep their own bench', resume(alone, 1) === null && offer(alone)?.kind === 'readings');
   }
 
   // ── two versions of a protocol, compared (alpha 2.2 E.gate) ──

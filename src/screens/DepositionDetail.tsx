@@ -2,16 +2,18 @@
 //
 // RunMode is where a deposition is written; this is where it is read. The
 // distinction matters because a Deposition outlives the session that produced
-// it: the run state died with the tab, and this did not.
+// it: the run state died with the tab, and this did not. So an open one is
+// taken up again from here, at its own bench or its protocol's run (store
+// `benchOf`, `resumeDeposition`), and closed here.
 //
 // The page is organised around the one thing that makes the record worth
 // keeping — measured values sit above observations, because the measurements
 // are what can be reconciled and the observations are what nobody predicted.
 import { useEffect, useMemo, useState } from 'react';
-import { ArrowRight, ClipboardList, Eye, FlaskConical, GitBranch, Ruler, Scale as ScaleIcon } from 'lucide-react';
+import { ArrowRight, Check, ClipboardList, Eye, FlaskConical, GitBranch, Play, Ruler, Scale as ScaleIcon } from 'lucide-react';
 import { predictionsOf, type Deposition } from '@/lib/studies';
-import { useStore } from '@/store';
-import { href, useRoute } from '@/router';
+import { benchOf, liveRunOf, useStore } from '@/store';
+import { href, navigate, useRoute } from '@/router';
 import { awaitingReadBack, correctedBy } from '@/engine/readings';
 import { ComponentTag } from '@/components/ComponentTag';
 import { TimeSeriesPanel } from '@/components/TimeSeriesPanel';
@@ -30,6 +32,7 @@ import {
   EmptyState,
   Explain,
   LinkButton,
+  Modal,
   PageHeader,
   SectionTitle,
   cx,
@@ -209,7 +212,17 @@ export default function DepositionDetail({ depositionId }: { depositionId: strin
   const depositions = useStore((s) => s.depositions);
   const runbooks = useStore((s) => s.runbooks);
   const protocols = useStore((s) => s.protocols);
+  const protocolsRead = useStore((s) => s.protocolsRead);
   const structure = useStore((s) => s.structureObservation);
+  // The runs at the bench in this page's memory: the record takes a deposition up again at one, and closes it.
+  const runs = useStore((s) => s.runs);
+  const resumeDeposition = useStore((s) => s.resumeDeposition);
+  const closeDeposition = useStore((s) => s.closeDeposition);
+  const finishRun = useStore((s) => s.finishRun);
+  const toast = useStore((s) => s.toast);
+  const [takingUp, setTakingUp] = useState(false);
+  const [scale, setScale] = useState(1);
+  const [closing, setClosing] = useState(false);
 
   const deposition = depositions.find((d) => d.id === depositionId);
   // The operator as Guild's ledger names them (OF-BLD-013 §2).
@@ -269,6 +282,9 @@ export default function DepositionDetail({ depositionId }: { depositionId: strin
   const state = STATE_COPY[deposition.state];
   // A number a later entry corrects waits for nothing: the correction stands (engine/readings.ts).
   const unconfirmed = awaitingReadBack(deposition).length;
+  // The readings alone resume at their own bench (alpha 2.2 C.5); a protocol's steps at the run in this page's
+  // memory, or, once a reload or a closed tab ended it, at a run that takes the deposition up again.
+  const bench = benchOf(deposition, runs, protocols);
 
   return (
     <>
@@ -279,15 +295,20 @@ export default function DepositionDetail({ depositionId }: { depositionId: strin
         wrap
         actions={
           <>
-            {/* The readings alone are recorded at their own bench, which resumes from the record (alpha 2.2 C.5). */}
-            {deposition.protocolId === null && deposition.state !== 'closed' && (
-              <LinkButton
-                to={`/runbooks/depositions/${encodeURIComponent(deposition.id)}/bench`}
-                variant="primary"
-                className="min-h-[44px]"
-              >
+            {(bench.kind === 'readings' || bench.kind === 'run') && (
+              <LinkButton to={bench.to} variant="primary" className="min-h-[44px]">
                 <Ruler size={14} /> Continue at the bench
               </LinkButton>
+            )}
+            {bench.kind === 'take-up' && (
+              <Button variant="primary" className="min-h-[44px]" data-testid="deposition-take-up" onClick={() => setTakingUp(true)}>
+                <Play size={14} /> Take it up at the bench
+              </Button>
+            )}
+            {deposition.state !== 'closed' && (
+              <Button className="min-h-[44px]" data-testid="deposition-close" onClick={() => setClosing(true)}>
+                <Check size={14} /> Close the deposition
+              </Button>
             )}
             {runbook && (
               <LinkButton to={`/runbooks/${runbook.id}`}>
@@ -325,6 +346,15 @@ export default function DepositionDetail({ depositionId }: { depositionId: strin
           </a>
         )}
       </div>
+
+      {bench.kind === 'none' && bench.why === 'no-protocol' && protocolsRead && (
+        <div className="mb-4" data-testid="deposition-no-protocol">
+          <Callout kind="warn" title="Its protocol is not here">
+            This deposition runs protocol {deposition.protocolId}, which the project does not hold, so no run can take it
+            up again. Closing it keeps every reading and observation it holds, and the reconciliation reads them.
+          </Callout>
+        </div>
+      )}
 
       {unconfirmed > 0 && (
         <div className="mb-4">
@@ -561,6 +591,84 @@ export default function DepositionDetail({ depositionId }: { depositionId: strin
           </a>
         )}
       </div>
+
+      {bench.kind === 'take-up' && (
+        <Modal open={takingUp} onClose={() => setTakingUp(false)} title="Take it up at the bench" width={520}>
+          <p className="text-body text-ink mb-3">
+            The run that wrote into this deposition ended with the page that ran it. A run on{' '}
+            {bench.protocol.title} v{bench.protocol.currentVersion} takes it up again:{' '}
+            {deposition.state === 'staged'
+              ? 'it opens staged, and recording starts when you begin.'
+              : `its ${deposition.entries.length} measured and ${deposition.observations.length} observed stand as kept, and it opens at the step the latest of them was recorded at. The steps the ended run marked went with its page, so none shows marked.`}
+          </p>
+          <label className="block text-caption text-ink-soft mb-1" htmlFor="take-up-scale">
+            Scale versus the protocol&rsquo;s base batch, as the ended run held it
+          </label>
+          <input
+            id="take-up-scale"
+            className="input font-num mb-3"
+            style={{ minHeight: 44 }}
+            type="number"
+            min={0.1}
+            step={0.1}
+            value={scale}
+            onChange={(e) => setScale(Math.max(0.1, Number(e.target.value) || 1))}
+            aria-label="Scale multiplier"
+          />
+          <div className="flex justify-end gap-2 flex-wrap">
+            <Button className="min-h-[44px]" onClick={() => setTakingUp(false)}>
+              Not yet
+            </Button>
+            <Button
+              variant="primary"
+              className="min-h-[44px]"
+              data-testid="deposition-take-up-confirm"
+              onClick={() => {
+                setTakingUp(false);
+                const runId = resumeDeposition(deposition.id, scale);
+                if (runId) navigate(`/runbooks/protocols/${bench.protocol.id}/run/${runId}`);
+                else toast({ text: `Deposition ${deposition.id} could not be taken up: it is closed, or its protocol is not here.`, kind: 'error' });
+              }}
+            >
+              <Play size={15} /> Take it up
+            </Button>
+          </div>
+        </Modal>
+      )}
+
+      <Modal open={closing && deposition.state !== 'closed'} onClose={() => setClosing(false)} title="Close this deposition?">
+        <p className="text-body text-ink mb-3">
+          <span className="font-num">{deposition.entries.length}</span> measurement{deposition.entries.length === 1 ? '' : 's'} and{' '}
+          <span className="font-num">{deposition.observations.length}</span> observation{deposition.observations.length === 1 ? '' : 's'} recorded.
+          {unconfirmed > 0 && (
+            <span className="text-signal-warn">
+              {' '}
+              {unconfirmed} value{unconfirmed === 1 ? ' was' : 's were'} never read back and stay{unconfirmed === 1 ? 's' : ''} unconfirmed in the record.
+            </span>
+          )}{' '}
+          Closing stops new entries and ends any run at the bench that writes into it; the record is append-only either way,
+          and the reconciliation reads it once it is closed.
+        </p>
+        <div className="flex justify-end gap-2 flex-wrap">
+          <Button className="min-h-[44px]" onClick={() => setClosing(false)}>
+            Stay open
+          </Button>
+          <Button
+            variant="primary"
+            className="min-h-[44px]"
+            data-testid="deposition-close-confirm"
+            onClick={() => {
+              setClosing(false);
+              const live = liveRunOf(runs, deposition.id);
+              closeDeposition(deposition.id);
+              if (live) finishRun(live.id);
+              toast({ text: 'Deposition closed. Reconcile it against the runbook when you are ready.', kind: 'success' });
+            }}
+          >
+            <Check size={15} /> Close the deposition
+          </Button>
+        </div>
+      </Modal>
     </>
   );
 }

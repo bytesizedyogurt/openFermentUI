@@ -113,8 +113,9 @@ below asks a model and runs once the account answers, in this order, `<name>` th
 
 1. The concept graph, on the `index` route: `pnpm lit:graph --project ethanol --by <name>`. Its dry run (`pnpm lit:graph
    --project ethanol --dry-run`, which calls no model) measured 814 passages in 92 batches and 1,758,899 prompt
-   characters (439,725 kit tokens): their input comes to 0.2199 USD on `claude-haiku-5-5`, and the most the build could
-   cost, each batch's whole answer counted, to 2.3239 USD.
+   characters (439,725 kit tokens): each batch priced as the one request the build sends for it, their input comes to
+   0.0440 USD on `claude-haiku-5-5`, and the most the build could cost, each batch's whole answer counted, to 0.4648
+   USD (R1-03: the dry run's first figures, 0.2199 and 2.3239 USD, priced the summed prompts as one request).
 2. The configurations that ask a model, `full_deep`, `no_graph` and `no_hyde`, which measure the graph and HyDE layers
    each by its removal; the judge's grading of the top ten of `interactive` and `full_deep`, on the `judge` route; and
    the answer lane, the kit's answer through `interactive` and `full_deep` on the `explain` route, graded blind for
