@@ -1,0 +1,24 @@
+NOTICE:  database "bh_r_r1_03_run" does not exist, skipping
+the real dry run, the first 40 passages: python -m openferment_core.literature_live graph --project r103 --dry-run --limit 40
+{"project": "r103", "chunks": 40, "batches": 4, "promptCharacters": 170820, "kitTokens": 42705, "model": "claude-haiku-5-5", "inputUsd": 0.00427, "mostUsd": 0.024925}
+the real dry run, every passage: python -m openferment_core.literature_live graph --project r103 --dry-run
+{"project": "r103", "chunks": 120, "batches": 12, "promptCharacters": 512460, "kitTokens": 128115, "model": "claude-haiku-5-5", "inputUsd": 0.064058, "mostUsd": 0.373881}
+build: 12 batches run, 12 requests sent, 120 passages read; each request 42705 to 42705 characters, about 10676 kit tokens (21353 at the guard's estimate); each asks {8192} output tokens
+model claude-haiku-5-5: 0.1/0.5 USD a million up to 100000 prompt tokens a request, 0.5/2.5 past it (llm.py:330-345)
+the dry run measured the same requests: True (12 batches, 512460 characters)
+dry run, --limit 40 (4 batches, 42705 kit tokens): inputUsd 0.00427, mostUsd 0.024925; input a batch 0.001068 USD
+dry run, whole   (12 batches, 128115 kit tokens): inputUsd 0.064058, mostUsd 0.373881; input a batch 0.005338 USD
+each request priced as itself: input 0.012816 USD, most 0.074772 USD; the dry run says 5.00 and 5.00 times that
+F.5's measure through graph_command: batches 92, promptCharacters 1758899, kitTokens 439725, inputUsd 0.219862, mostUsd 2.32393
+F.5's 92 requests priced each as itself: input 0.0440 USD, most 0.4648 USD (the largest a batch can be is 42705 characters, under the threshold at either estimate)
+EXPECTED: the dry run's inputUsd and mostUsd are the sums of each batch request's own price: 0.012816 and 0.074772 USD for this database's 12 batches, and 0.0440 and 0.4648 USD for F.5's 92 (each request far under 100000 prompt tokens)
+OBSERVED: the dry run prints 0.064058 and 0.373881 USD here (5.0 times), and 0.219862 and 2.32393 USD for F.5's measure, the records' 0.2199 and 2.3239; the same batch is priced at 0.1 USD a million input tokens in a 4-batch dry run and 0.5 in a 12-batch one
+CHECK: {"samePrompts": true, "freshWrong": true, "f5MatchesRecords": true, "batchPriceJumps": true}
+VERDICT: DEFECT
+the records that carry the dry run's figures (git grep at 2047f5a):
+2047f5a:docs/PROGRESS.md:609:| The retrieval lanes that ask a model, over the Ethanol project's own corpus: the concept graph (at most 2.3239 USD on `claude-haiku-5-5` by the dry run), `full_deep`, `no_graph` and `no_hyd
+2047f5a:docs/PROGRESS.md:3372:  1,758,899 prompt characters (439,725 kit tokens), 0.2199 USD of input on `claude-haiku-5-5` and at most 2.3239 USD,
+2047f5a:docs/reports/literature-retrieval.md:116:   characters (439,725 kit tokens): their input comes to 0.2199 USD on `claude-haiku-5-5`, and the most the build could
+2047f5a:docs/reports/literature-retrieval.md:117:   cost, each batch's whole answer counted, to 2.3239 USD.
+OBSERVED: 3 line(s) of docs/ at 2047f5a carry 2.3239 USD, the dry run's sum-priced ceiling
+RESULT: DEFECT

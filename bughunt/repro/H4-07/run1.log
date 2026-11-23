@@ -1,0 +1,14 @@
+NOTICE:  database "bh_r_h4_07_run" does not exist, skipping
+service: http://127.0.0.1:10010 over a fresh bh_r_h4_07_run (keyless), tree at a667bbc; files of core, src, scripts and examples differing from 2047f5a: 0
+run 6bcc5c975cc3e312 (done): typed feed_glucose_conc 150 g L-1, titre 70 g L-1, yield 0.45 g g-1, productivity 2 g L-1 h-1
+read back: beerEthanolGPerL 61.8303, batchTimeH 35, fermenterConversion 0.8799; basePrice 1.0536688973428538 USD/kg; baseInfeasible None
+feed x yield = 67.5 g L-1 (the titre typed is +2.5 above it); titre / productivity = 35 h; beer / batch time = 1.7666 g L-1 h-1 (productivity typed 2)
+source: core/openferment_core/flowsheets/ethanol_glucose_v0.py:54: "titre": ("ethanol titre at harvest", "g L-1", None),
+source: core/openferment_core/flowsheets/ethanol_glucose_v0.py:219: b.R1.tau = v["titre"] / v["productivity"]
+source: core/openferment_core/flowsheets/shelf.py:87: note="with the productivity, sets the batch time; the beer's own ethanol follows from "
+served shelf note for the titre input (GET /api/proforma/shelf): 'ethanol titre at harvest': "with the productivity, sets the batch time; the beer's own ethanol follows from the feed's glucose and the yield, and the run reads it back"
+served panel gloss for the titre input (GET /api/params/proforma:...?flowsheet=ethanol_glucose_v0): "with the productivity, sets the batch time; the beer's own ethanol follows from the feed's glucose and the yield, and the run reads it back"
+EXPECTED: (candidate) beer at the titre the run names, or a refusal in words when feed x yield cannot make it; (the input's served description) the titre sets the batch time with the productivity, the beer's ethanol follows from the feed's glucose and the yield, and the run reads the beer back
+OBSERVED: beer 61.83 g L-1 under a titre of 70, batch time 35 h = titre / productivity, priced at 1.0537 USD/kg with no refusal (behaviour as the candidate says: True); the served shelf note says so (beer follows from feed and yield, read back: True); the panel shows it as the input's gloss (True); the run reads back beer and batch time (True)
+verdict: the run does what the titre input's declared note says it does (batch time from titre and productivity; beer from feed and yield, read back), so the candidate's contract is the input's label alone
+RESULT: NO-DEFECT

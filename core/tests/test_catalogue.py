@@ -32,6 +32,7 @@ from fastapi.testclient import TestClient
 
 from openferment_core import intake, params, proforma
 from openferment_core.models import Override, ParameterSpec, ParamResolveRequest, UnitSpecs, UnitType
+from standins import resolve_json
 from openferment_core.pureos import catalogue
 from openferment_core.validate import unit_operations
 from test_pureos import _biosteam_unit_classes
@@ -257,15 +258,17 @@ def test_the_unit_scope_serves_defaults_and_waits_for_what_the_class_requires(wo
     assert "a record of step_recovery" in values["split"]["detail"]
     assert any("Needs split" in n for n in body["notes"]) and any("Not offered: solids" in n for n in body["notes"])
     # A person's value is their assumption, named in what a run would add.
-    r = client.post(f"{base}/resolve", json={"unitType": "centrifugation",
-                                             "overrides": [override("moisture_content", 0.25).model_dump()]})
+    scope = "pureos:unit:t1:u1"
+    r = client.post(f"{base}/resolve", json={"unitType": "centrifugation", "inputs": resolve_json(
+        scope, [override("moisture_content", 0.25)], unitType="centrifugation")})
     assert r.status_code == 200
     got = {v["key"]: v for v in r.json()["values"]}
     assert got["moisture_content"]["origin"] == "assumption" and got["moisture_content"]["overriddenBy"] == BY
     assert [b["name"] for b in r.json()["basisInputs"]] == ["moisture_content"]
     assert r.json()["basisInputs"][0]["source"]["kind"] == "assumption"
     # A template is set per component on a train's unit, never as itself.
-    r = client.post(f"{base}/resolve", json={"unitType": "centrifugation", "overrides": [override("split", 0.5).model_dump()]})
+    r = client.post(f"{base}/resolve", json={"unitType": "centrifugation", "inputs": resolve_json(
+        scope, [override("split", 0.5)], unitType="centrifugation")})
     assert r.status_code == 422 and "split.<component>" in r.json()["detail"]
     # An in-house unit's required parameters wait for a record or a person;
     # an optional one reads as the class's own reading of None.

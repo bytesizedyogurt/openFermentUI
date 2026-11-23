@@ -25,7 +25,7 @@ class _Store(type(Path())):
 
 @pytest.fixture()
 def store(tmp_path, monkeypatch, pool, held_documents):  # noqa: F811
-    """Every file store the writes reach, under tmp_path; the audit log is
+    """The data directory the writes reach, under tmp_path; the audit log is
     the test's rolled-back database; the documents the project holds in
     `store.held`."""
     monkeypatch.setattr(intake, "DATA_DIR", tmp_path)
@@ -115,6 +115,26 @@ def test_a_gated_action_writes_nothing_and_comes_back_proposed(pool, store, modu
     assert (line.agent, line.who, line.module, line.action, line.state, line.askId, line.effort) == \
         ("model", "claude-haiku-5-5", module, action, "proposed", "ask-test", "medium")
     assert not (store / "guild.json").exists() and not (store / "checks.json").exists()
+
+
+def test_a_models_write_carries_the_effort_of_the_plan_route(pool, store, monkeypatch):  # noqa: F811
+    """alpha 2.2 F.2a: a write of Postdoc's names the effort the plan route
+    answers at, so the writes asked on a route table carry the table's
+    effort; core/.env's single setting stands where the table cannot be read."""
+    monkeypatch.setenv("OPENFERMENT_ROUTES", json.dumps({"plan": {"effort": "high"}, "judge": {"effort": "max"}}))
+    write("runbooks", ctx(pool), "lock", target="rb-1")
+    [line] = audit.read()
+    assert (line.agent, line.who, line.effort) == ("model", "claude-haiku-5-5", "high"), "the plan route's effort"
+    monkeypatch.setenv("OPENFERMENT_ROUTES", "{not json")
+    c = ctx(pool, ask="ask-two")
+    c.model = "claude-haiku-5-5"
+    write("runbooks", c, "lock", target="rb-2")
+    assert audit.read()[-1].effort == "medium", "core/.env's single setting"
+    monkeypatch.delenv("OPENFERMENT_EFFORT")
+    c = ctx(pool, ask="ask-three")
+    c.model = "claude-haiku-5-5"
+    write("runbooks", c, "lock", target="rb-3")
+    assert audit.read()[-1].effort == "high", "the single setting's default, the plan route's (DEFAULT_EFFORT)"
 
 
 def test_a_proposal_shows_on_home_read(pool, store):  # noqa: F811
@@ -378,9 +398,24 @@ def test_the_routes_list_carry_out_and_dismiss(pool, store, client):  # noqa: F8
 
 
 def test_the_endpoint_runs_a_write_tool_like_the_loop(pool, store, client):  # noqa: F811
-    r = client.post("/api/tools/runbooks_write", json={"action": "lock", "target": "rb-1", "fields": {}, "note": "n"})
+    asked = {"action": "lock", "target": "rb-1", "fields": {}, "note": "n"}
+    nobody = client.post("/api/tools/runbooks_write", json=asked)
+    assert nobody.status_code == 422 and "this call names nobody" in nobody.json()["detail"]
+    assert proposals.open_ones() == [], "a write that names nobody runs nothing"
+    r = client.post("/api/tools/runbooks_write", params={"by": "Ada Lovelace"}, json=asked)
     assert r.status_code == 200 and r.json()["summary"]["state"] == "proposed"
     assert [p.askId for p in proposals.open_ones()] == [None]
+    # The person ?by= names is the write's author: the proposal and its audit
+    # row are hers, with no effort, and it waits for a person as every proposal does.
+    (made,) = proposals.open_ones()
+    assert made.by == "Ada Lovelace" and made.state == "proposed"
+    (line,) = audit.read()
+    assert (line.agent, line.who, line.action, line.state, line.effort) == ("person", "Ada Lovelace", "lock",
+                                                                            "proposed", None)
+    note = client.post("/api/tools/home_write", params={"by": "Ada Lovelace"},
+                       json={"action": "note", "target": "", "fields": {}, "note": "a placeholder note"})
+    assert note.status_code == 200 and note.json()["error"] is None
+    assert [(a.agent, a.who) for a in audit.read()][-1] == ("person", "Ada Lovelace")
 
 
 def test_the_log_reads_its_newest_rows_newest_last(store):

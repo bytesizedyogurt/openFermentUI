@@ -1,4 +1,4 @@
-"""One write tool per module, the pair of its read tool (OF-BLD-015 §7.3).
+"""One write tool per module, the pair of its read tool.
 
 `runbooks_write`, `geneos_write`, `fermos_write`, `pureos_write`,
 `proforma_write`, `biorepo_write`, `guild_write`, `primer_write`,
@@ -10,14 +10,18 @@ module's own write function, where the module's rules already live:
 `extract.add_candidate` (anchoring, §2.4), `intake.collect`,
 `extract.extract_paper`, and `checks.request` in a person's name. A module
 with no write function on the service refuses in words with the reason
-(Primer holds no lessons yet; pureOS's vocabulary and unit catalogue are
-curated; a person writes protocols and depositions on their pages), and that
+(a Primer lesson is a catalogue entry, kept with catalogue_write; pureOS's
+vocabulary and unit catalogue are curated; a person writes protocols and
+depositions on their pages), and that
 refusal is a result Postdoc reports in `gaps`. `check:tools` greps this file for a store write and fails on one.
 
 THE MARK. Every write that goes through carries `agent: model`, the model
-id, the effort and the ask id into the audit log (`audit.py`), and what it
-made lands in the open lane: an artifact with its basis, a candidate
-`unverified`, a fetched paper. A person or a run promotes it.
+id, the effort the plan route answers at and the ask id into the audit log
+(`audit.py`; alpha 2.2 F.2a), with the note
+its call carried, and what it made lands in the open lane: an artifact with
+its basis, a candidate `unverified`, a fetched paper. A person or a run
+promotes it. The call's answer names the row by its id (`auditIds`,
+`tools.run`).
 
 THE GATES. An action in `gates.GATES` writes nothing: it becomes a proposal
 with `state: proposed`, and Home shows it with one button (§7.4). The spend
@@ -25,22 +29,28 @@ gate is reached at run time, when the budget refuses an extraction. A
 flowsheet run is at no gate: it spends no model money and keeps one artifact
 in the open lane, as a ceiling does.
 
-ONE RUN, TWO NAMES (OF-BLD-019 §6.1). `proforma_write`'s `run` and the
+ONE RUN, TWO NAMES. `proforma_write`'s `run` and the
 registry's `run_flowsheet` (tools/proforma.py) both run a scenario through
 `run_scenario` below, so the one call to `proforma.run` stays in this file,
 where `check:tools` reads it, and both are refused, run and audited alike.
-So with a simulation (OF-BLD-020 §3.4): `fermos_write`'s `simulate` and the
+So with a simulation: `fermos_write`'s `simulate` and the
 registry's `fermos_simulate` (tools/fermos.py) both run `run_simulation`
 below, the one call to `fermos.simulate`, free (compute, no model money) and
-at no gate, audited with the model as agent. So with a vessel (OF-BLD-020
-§4.2): `fermos_write`'s `design_vessel` and the registry's `fermos_vessel`
+at no gate, audited with the model as agent. So with a vessel: `fermos_write`'s `design_vessel` and the registry's `fermos_vessel`
 (tools/fermos.py) both design through `design_vessel` below, the one call to
-`vessel.design`. So with a train (OF-BLD-020 §5.4): `pureos_write`'s
+`vessel.design`. So with a train: `pureos_write`'s
 `new_train`, `add_unit`, `remove_unit`, `set_from_record` and `run_train` and
 the registry's `pureos_build` (tools/pureos.py) share one function an action
 below, so the calls to `pureos.kept.keep_train` (the one write to the store of
 the trains a model built) and to `pureos.train_spec.run_train` stay in this
-file; each is free, at no gate, and audited with the model as agent.
+file; each is free, at no gate, and audited with the model as agent. So with
+a forecast (alpha 2.2 D3): `fermos_write`'s `forecast` and the registry's
+`growth_forecast` (tools/fermos.py) both forecast through `run_forecast`
+below, the one call to `fermos.forecast_run`, whose kept forecast is a run of
+the kinetics engine in its caller's name. A simulation, a vessel design and a
+kept forecast each keep one runs row (fermos_engine.py), and so does a
+train's run (the train engine, pureos/engine.py), its created_by the caller
+`_actor` names.
 
 THE STUDY TOOLS (alpha 2.0 stage 6). `engine_run` (tools/engine.py) runs
 through `run_engine` below, the one call to `engine.runs.run` and to
@@ -63,6 +73,7 @@ from typing import Any, Callable
 from pydantic import BaseModel, ConfigDict, Field
 
 from .. import llm, module_stores
+from ..basis import SET_PARAM_ORIGINS
 from ..models import ToolResult
 from . import Tool, ToolContext, register
 from . import gates
@@ -147,18 +158,19 @@ ACTIONS: dict[str, dict[str, tuple[str, tuple[str, ...]]]] = {
 }
 
 NO_WRITE = {
-    "primer": "Primer holds no lessons yet, and the service has no write function for them",
+    "primer": "primer_write keeps nothing and has no write function, since a lesson is a catalogue entry kept with "
+              "catalogue_write",
 }
 # What a module that writes some things keeps curated beside them, said when an
 # action is not one of its own (OF-BLD-020 §5.4: pureOS keeps a model's train,
 # and its vocabulary and catalogue stay curated).
 CURATED_NOTE = {
-    "pureos": "pureOS's unit operations and its unit catalogue are curated (schema/vocabulary.yaml, "
-              "core/openferment_core/pureos/catalogue.py); the service has no write function for them",
+    "pureos": "pureOS's unit operations and its unit catalogue are curated (core/openferment_core/schema/"
+              "vocabulary.yaml, core/openferment_core/pureos/catalogue.py); the service has no write function for them",
 }
 NO_WRITE_ACTION = {
-    ("runbooks", "revise_protocol"): "a protocol is revised by a person in the protocol editor; the service has no "
-                                     "write function for protocols",
+    ("runbooks", "revise_protocol"): "a person keeps a protocol's new version in the protocol editor, in their own "
+                                     "name, and no tool writes one (ADR-017)",
     ("runbooks", "draft"): "use the draft_runbook tool: it takes the evidence ids and record ids this run returned and "
                            "writes every number from them",
     ("fermos", "fit"): "a person fits a deposition's series on fermOS's fit page, which sends it to POST /api/fermos/fit; "
@@ -169,7 +181,8 @@ NO_WRITE_ACTION = {
                            "you would decide and why",
     ("intake", "add"): "a document enters the project's literature through intake_write fetch, by its identifier; "
                        "a file or pasted text is added by a person on Intake",
-    ("primer", "lesson"): "Primer holds no lessons yet, and the service has no write function for them",
+    ("primer", "lesson"): "a lesson is a catalogue entry kept with catalogue_write, and primer_write has no write "
+                          "function for one",
     ("guild", "record_check"): "a check is run by an assessor at the bench (/guild/checks/:id/run), one criterion at a "
                                "time, and its entries are written in their name; a model may propose a check and never "
                                "record one",
@@ -186,21 +199,48 @@ class ModuleWriteInput(BaseModel):
     note: str = Field(description="Why, in your own words; kept on the audit line and the proposal.")
 
 
+def _plan_effort() -> str:
+    """The effort the plan route's models answer at, the route Postdoc's loop
+    answers on (`llm.routes`): a route table's own, so a write made on a table
+    carries the table's effort, and core/.env's single effort setting where
+    the table cannot be read."""
+    try:
+        return llm.routes()["plan"].effort
+    except llm.RoutesInvalid:
+        return llm.effort()
+
+
 def _who(ctx: ToolContext | None = None) -> tuple[str, str]:
-    """The model this write is marked with: the one answering the run when a
-    loop owns it (§7.R finding 7), else the chain's first name."""
+    """The model a write is marked with when no person calls: the one
+    answering the run when a loop owns it (§7.R finding 7), else the chain's
+    first name; and the plan route's effort."""
     model = getattr(ctx, "model", "") or llm.chain("answer")[0]
-    return model, llm.effort()
+    return model, _plan_effort()
 
 
 def _actor(ctx: ToolContext) -> tuple[str, str]:
-    """Who a study write is marked with: the model answering, the person the
-    HTTP endpoint names, else the chain's first model."""
+    """Who every write is marked with: the model answering, the person the
+    HTTP endpoint names (`?by=`), else the chain's first model."""
     if ctx.model.strip():
         return "model", ctx.model.strip()
     if ctx.person.strip():
         return "person", ctx.person.strip()
     return "model", _who(ctx)[0]
+
+
+def _effort(ctx: ToolContext, agent: str) -> str | None:
+    """The effort the service's own model ran at, for a write of Postdoc's:
+    the plan route's (`_plan_effort`); a person's write carries none, and so
+    does an outside assistant's (`ToolContext.via`), since no model of the
+    service ran for it."""
+    return _plan_effort() if agent == "model" and not getattr(ctx, "via", "") else None
+
+
+def _detail(ctx: ToolContext, agent: str, detail: dict[str, Any]) -> dict[str, Any]:
+    """An audit row's detail, with the door a write in the model's lane came
+    in by (`via`: postdoc, mcp or http; ToolContext.door)."""
+    door = ctx.door() if agent == "model" else None
+    return {**detail, "via": door} if door else detail
 
 
 def _audit_as(ctx: ToolContext, module: str, action: str, state: str, target: str | None,
@@ -209,28 +249,27 @@ def _audit_as(ctx: ToolContext, module: str, action: str, state: str, target: st
 
     agent, who = _actor(ctx)
     audit.append(agent=agent, who=who, module=module, action=action, state=state, target=target,
-                 ask_id=getattr(ctx, "ask_id", None) or None, effort=llm.effort() if agent == "model" else None,
-                 detail=detail)
+                 ask_id=getattr(ctx, "ask_id", None) or None, effort=_effort(ctx, agent),
+                 detail=_detail(ctx, agent, detail))
 
 
 def _audit(ctx: ToolContext, module: str, action: str, state: str, target: str | None, detail: dict[str, Any]) -> None:
-    from .. import audit
-
-    model, effort = _who(ctx)
-    audit.append(agent="model", who=model, module=module, action=action, state=state, target=target,
-                 ask_id=getattr(ctx, "ask_id", None), effort=effort, detail=detail)
+    """A module write's audit row, marked as its caller's (`_actor`)."""
+    _audit_as(ctx, module, action, state, target, detail)
 
 
 def _propose(ctx: ToolContext, module: str, action: str, gate: gates.Gate, inp: ModuleWriteInput, title: str, why: str) -> ToolResult:
     from .. import proposals
 
-    model, effort = _who(ctx)
+    agent, who = _actor(ctx)
     try:
         # The store holds a proposal's words to Rule 1 and refuses an open
-        # twin in the same ask (OF-BLD-016 §1.R findings 2, 5 and 8).
-        made = proposals.propose(module=module, action=action, gate=gate, title=title, why=why, by=model,
+        # twin in the same ask (OF-BLD-016 §1.R findings 2, 5 and 8). The
+        # proposal waits for a person to carry it out, whoever proposed it.
+        made = proposals.propose(module=module, action=action, gate=gate, title=title, why=why, by=who, agent=agent,
                                  target=inp.target or None, fields=inp.fields, note=inp.note,
-                                 ask_id=getattr(ctx, "ask_id", None), effort=effort)
+                                 ask_id=getattr(ctx, "ask_id", None), effort=_effort(ctx, agent),
+                                 via=ctx.door() if agent == "model" else None)
     except proposals.ProposalRefused as e:
         return ToolResult(error=f"{module}_write refused {action}: {e}. Nothing was proposed. Say so in gaps.")
     return ToolResult(summary={
@@ -281,26 +320,41 @@ def _geneos(action: str, inp: ModuleWriteInput, ctx: ToolContext) -> ToolResult:
     _audit(ctx, "geneos", action, "open", f["modelId"], {"artifactId": r.artifactId, "evidenceId": ev.id, "note": inp.note})
     return ToolResult(
         summary={"state": "open", "artifactId": r.artifactId, "evidenceId": ev.id, "what": ev.label, "provenance": ev.provenance,
-                 "meaning": "kept as an artifact in the open lane, marked as the model's in the audit log; cite the evidence id"},
+                 "meaning": "kept as an artifact in the open lane, marked as its caller's in the audit log; cite the evidence id"},
         evidence=[ev],
     )
 
 
-def _fermos_forecast(inp: ModuleWriteInput, ctx: ToolContext) -> ToolResult:
+def run_forecast(tool: str, fit: str, note: str, ctx: ToolContext) -> Any:
+    """A band for the next run from a kept kinetic fit, under the fitted
+    run's own start values and length, kept as one `growth_forecast` artifact
+    and as a run of the kinetics engine in its caller's name (`_actor`), and
+    audited as its caller's (alpha 2.2 D3). `growth_forecast` and
+    `fermos_write`'s `forecast` both forecast here, so the one call to
+    `fermos.forecast_run` stays in this file. Ids in: the fit's artifact id;
+    a start value or a length of a person's own is set at fermOS → Forecast.
+    Answers the forecast, or the refusal in words as the tool's result."""
     from .. import artifacts, fermos
 
+    try:
+        r = fermos.forecast_run(fit_artifact=fit, by=_actor(ctx)[1])
+    except (fermos.FitRefused, artifacts.ArtifactNotFound, artifacts.ArtifactDamaged) as e:
+        return ToolResult(error=f"{tool} refused: {e}")
+    _audit(ctx, "fermos", "forecast", "open", fit, {"artifactId": r.artifactId, "evidenceId": r.evidence.id,
+                                                    "tool": tool, "note": note})
+    return r
+
+
+def _fermos_forecast(inp: ModuleWriteInput, ctx: ToolContext) -> ToolResult:
     need = _need(inp, "fitArtifactId")
     if need:
         return ToolResult(error=f"fermos_write refused: {need}")
-    try:
-        r = fermos.forecast_run(fit_artifact=inp.fields["fitArtifactId"])
-    except (fermos.FitRefused, artifacts.ArtifactNotFound, artifacts.ArtifactDamaged) as e:
-        return ToolResult(error=f"fermos_write refused: {e}")
-    _audit(ctx, "fermos", "forecast", "open", inp.fields["fitArtifactId"], {"artifactId": r.artifactId, "evidenceId": r.evidence.id,
-                                                                            "note": inp.note})
+    r = run_forecast("fermos_write", inp.fields["fitArtifactId"], inp.note, ctx)
+    if isinstance(r, ToolResult):
+        return r
     return ToolResult(summary={"state": "open", "artifactId": r.artifactId, "evidenceId": r.evidence.id,
                                "provenance": r.evidence.provenance,
-                               "meaning": "kept as an artifact in the open lane, marked as the model's; cite the evidence id"},
+                               "meaning": "kept as an artifact in the open lane, marked as its caller's; cite the evidence id"},
                       evidence=[r.evidence])
 
 
@@ -311,8 +365,9 @@ VESSEL_WAITS = ("A named person types the plant scale (or one vessel's batch vol
 def design_vessel(tool: str, simulation: str, fit: str, vessel_type: str, kla_method: str, note: str,
                   ctx: ToolContext) -> ToolResult:
     """Design the vessel a kept simulation (or, anaerobic, a kept fit) needs
-    on BioSTEAM, keep it as one `fermos.vessel` artifact, and mark it as the
-    model's (OF-BLD-020 §4.2, D13). `fermos_vessel` and `fermos_write`'s
+    on BioSTEAM, keep it as one `fermos.vessel` artifact and as a run of the
+    kinetics engine in its caller's name (alpha 2.2 D3), and mark it as the
+    model's. `fermos_vessel` and `fermos_write`'s
     `design_vessel` both run here, so the one call to `vessel.design` stays
     in this file. Ids and words in: the artifact, the vessel type, the kLa
     correlation by BioSTEAM's name. A person's plant scale or batch volume is
@@ -332,7 +387,7 @@ def design_vessel(tool: str, simulation: str, fit: str, vessel_type: str, kla_me
         return ToolResult(error=f"{tool} refused: a vessel type is {' or '.join(vessel.VESSEL_TYPES)}; {kind!r} is neither")
     try:
         d = vessel.design(VesselRequest(simulation=sim or None, fit=fitted or None, vesselType=kind,
-                                        klaMethod=(kla_method or "").strip() or None))
+                                        klaMethod=(kla_method or "").strip() or None, by=_actor(ctx)[1]))
     except vessel.VesselRefused as e:
         waits = f" {VESSEL_WAITS}" if "plant_scale" in str(e) else ""
         return ToolResult(error=f"{tool} refused: {e}.{waits}")
@@ -345,7 +400,7 @@ def design_vessel(tool: str, simulation: str, fit: str, vessel_type: str, kla_me
                                                                    "tool": tool, "note": note})
     return ToolResult(summary={"state": "open", **_vessel_summary(d), "evidenceId": ev.id,
                                "meaning": "the vessel is designed on BioSTEAM and kept as one artifact in the open lane, "
-                                          "marked as the model's in the audit log; cite its numbers by the evidence id, "
+                                          "marked as its caller's in the audit log; cite its numbers by the evidence id, "
                                           "which is its artifact id; never state them yourself"},
                       evidence=[ev])
 
@@ -395,23 +450,54 @@ RUN_WAITS = ("A named person types each waiting input in Proforma, on the scenar
              "name; a model never supplies one. Say in gaps which inputs wait.")
 
 
-def run_engine(tool: str, plant: str, configuration: str, scenario_id: str, note: str, ctx: ToolContext) -> ToolResult:
-    """Run a library plant at the library's defaults, or a study scenario
-    with its values, as an engine run, keep it and mark it as the caller's
-    (alpha 2.0 stage 6). A plant's refusal is kept as the run's receipt
-    (engine/runs.py) and comes back in the plant's words."""
+def run_engine(tool: str, plant: str, configuration: str, scenario_id: str, note: str, ctx: ToolContext, *,
+               engine: Any = None) -> ToolResult:
+    """Run a thing of BioSTEAM's at its defaults (a library plant, a
+    composed flowsheet or a scenario's flowsheet, through the biosteam
+    engine's own run: a plant that takes a configuration, asked with none,
+    runs in its default), or a study scenario with its values, as an engine
+    run, keep it and mark it as the caller's (alpha 2.0 stage 6). A plant's
+    refusal is kept as the run's receipt (engine/runs.py) and comes back in
+    the plant's words. `engine`, when it names a registered engine beside
+    BioSTEAM (docs/api/engines.md), runs one of its things at its defaults,
+    kept the same way."""
     from ..engine import library, runs
+    from ..engine import EngineBroken, EngineRefused
+    from ..engine.biosteam import ENGINE as BIOSTEAM
     from ..studies import scenarios
     from ..workers import WorkerCrashed, WorkerError, WorkerTimeout
     from .engine import run_result
 
     _, who = _actor(ctx)
     sid, pid = scenario_id.strip(), plant.strip()
+    if engine is not None:
+        if sid or not pid:
+            return ToolResult(error=f"{tool} refused: on the {engine.name} engine, name one of its things to run "
+                                    "at its defaults (engine_plants lists them); a study scenario runs on BioSTEAM")
+        try:
+            report = runs.run_with(engine, pid, configuration.strip() or None, [], by=who)
+        except runs.RunRefused as e:
+            _audit_as(ctx, "proforma", "engine_run", "refused", e.run_id, {"tool": tool, "engine": engine.name,
+                                                                             "note": note})
+            return ToolResult(error=f"{tool}: the {engine.name} engine refused, in its words: {e}. The refusal is "
+                                    f"kept as run {e.run_id}'s receipt.")
+        except EngineRefused as e:
+            return ToolResult(error=f"{tool} refused: {e}")
+        except EngineBroken as e:
+            return ToolResult(error=f"{tool} refused: the {engine.name} engine broke its contract, and no run was "
+                                    f"kept: {e}")
+        except (WorkerError, WorkerCrashed, WorkerTimeout) as e:
+            return ToolResult(error=f"{tool} could not run it on the {engine.name} engine: {e}")
+        run = report.run
+        _audit_as(ctx, "proforma", "engine_run", "open", run.id, {"tool": tool, "engine": engine.name,
+                                                                  "artifactId": run.artifactId, "note": note})
+        return run_result(report)
     if bool(sid) == bool(pid):
         return ToolResult(error=f"{tool} refused: name a plant to run at the library's defaults, or a scenario to "
                                 "run with its values; one of the two")
     try:
-        report = scenarios.run(sid, by=who) if sid else runs.run(pid, configuration.strip() or None, [], by=who)
+        report = (scenarios.run(sid, by=who) if sid else
+                  runs.run_with(BIOSTEAM, pid, configuration.strip() or None, [], by=who))
     except scenarios.ScenarioNotFound as e:
         return ToolResult(error=f"{tool} refused: {str(e).strip(chr(39))} (study_read lists them)")
     except runs.RunRefused as e:
@@ -419,8 +505,10 @@ def run_engine(tool: str, plant: str, configuration: str, scenario_id: str, note
                                                                          "note": note})
         return ToolResult(error=f"{tool}: the plant refused these values, in its words: {e}. The refusal is kept as "
                                 f"run {e.run_id}'s receipt.")
-    except library.LibraryRefused as e:
+    except (library.LibraryRefused, EngineRefused, scenarios.ScenarioRefused) as e:
         return ToolResult(error=f"{tool} refused: {e}")
+    except library.PlantNotFound as e:
+        return ToolResult(error=f"{tool} refused: {str(e).strip(chr(39))} (engine_plants lists them)")
     except (WorkerError, WorkerCrashed, WorkerTimeout) as e:
         return ToolResult(error=f"{tool} could not run the plant: {e}")
     run = report.run
@@ -455,13 +543,21 @@ def import_flowsheet(tool: str, file_id: str, note: str, ctx: ToolContext) -> To
     return record_result(record)
 
 
-CATALOGUE_MODULES = {"strain": "geneos", "product": "pureos", "skill": "guild", "lesson": "primer"}
+# What a kept entry's source says of the door it came in by (ToolContext.door).
+CATALOGUE_SOURCES = {"postdoc": "Postdoc ({who})", "mcp": "{who}, over MCP", "http": "{who}, at the HTTP endpoint"}
+CATALOGUE_KEPT = ("kept in the project's catalogue, marked as yours: a person may replace it, and so may a later write "
+                  "of yours through the same kind of door under the same name.")
 
 
 def keep_catalogue(tool: str, inp: Any, ctx: ToolContext) -> ToolResult:
     """One entry kept in the project's catalogue of its kind (alpha 2.1,
-    debt 1), marked as the caller's and audited under the module that reads
-    that kind; refused in words when the kind does not take it."""
+    debt 1), marked as the caller's, in the caller's lane and through the
+    door it came in by, and audited under the module that reads that kind;
+    refused in words when the kind does not take it, and, for a model's write
+    (alpha 2.2 D.0), when the id holds an entry a person or another caller
+    kept (catalogues.keep). Its summary is the entry as kept, a protein's
+    sequence left to catalogue_read, with `state` and the service's word on
+    the keep (`meaning`)."""
     from .. import catalogues
 
     kind = str(inp.kind).strip().lower()
@@ -469,14 +565,17 @@ def keep_catalogue(tool: str, inp: Any, ctx: ToolContext) -> ToolResult:
         return ToolResult(error=f"{tool} refused: there is no catalogue of {kind!r}; the catalogues are "
                                 f"{', '.join(catalogues.KINDS)}")
     agent, who = _actor(ctx)
+    door = ctx.door() if agent == "model" else None
     fields = {k: v for k, v in inp.model_dump().items() if k != "kind" and v not in ("", [], None)}
     try:
-        kept = catalogues.keep_fields(kind, fields, by=who, source=f"Postdoc ({who})" if agent == "model" else who)
+        source = CATALOGUE_SOURCES[door].format(who=who) if door else who
+        kept = catalogues.keep_fields(kind, fields, by=who, source=source, agent=agent, via=door)
     except catalogues.CatalogueRefused as e:
         return ToolResult(error=f"{tool} refused: {e}")
-    _audit_as(ctx, CATALOGUE_MODULES[kind], tool, "open", f"{kind}/{kept.id}", {"tool": tool, "kind": kind})
-    return ToolResult(summary={"state": "open", "kind": kind, "id": kept.id, "name": kept.name, "by": kept.by,
-                               "note": "kept in the project's catalogue, marked as yours; a person may replace it."})
+    _audit_as(ctx, catalogues.MODULES[kind], tool, "open", f"{kind}/{kept.id}",
+              {"tool": tool, "kind": kind, "note": inp.note})
+    entry = kept.model_dump(mode="json", exclude_none=True, exclude={"sequence"})
+    return ToolResult(summary={"state": "open", **entry, "meaning": CATALOGUE_KEPT})
 
 
 def make_scenario(tool: str, inp: Any, ctx: ToolContext) -> ToolResult:
@@ -499,7 +598,8 @@ def make_scenario(tool: str, inp: Any, ctx: ToolContext) -> ToolResult:
     except scenarios.ScenarioRefused as e:
         return ToolResult(error=f"{tool} refused: {e}")
     _audit_as(ctx, "proforma", "study_scenario", "open", made.id, {"tool": tool, "plant": made.plant,
-                                                                   "keys": [v.key for v in made.values]})
+                                                                   "keys": [v.key for v in made.values],
+                                                                   "note": inp.note})
     return ToolResult(summary={
         "state": "open", "scenarioId": made.id, "title": made.title, "plant": made.plant,
         "configuration": made.configuration, "runIds": made.runIds,
@@ -527,14 +627,17 @@ def make_comparison(tool: str, title: str, run_ids: list[str], ctx: ToolContext)
 
 def run_scenario(tool: str, scenario_id: str, note: str, ctx: ToolContext) -> ToolResult:
     """Run one of the project's BioSTEAM scenarios as its page runs it, keep
-    the run and mark it as the model's (OF-BLD-019 §6.1): the overrides a
+    the run and mark it as the caller's: the overrides a
     person set on its page and the fits chosen for it are read from the
-    project's rows (`project_state.run_request`), and the model adds no value. An
-    input nothing binds waits, and the refusal is proforma.run's own words
-    (what `POST /api/proforma/run` answers with a 422)."""
+    project's rows (`project_state.run_request`), and the model adds no
+    value. The run is kept as one row of the biosteam engine, created by the
+    caller (`_actor`). An input nothing binds waits, and the refusal is
+    proforma.run's own words (what `POST /api/proforma/run` answers with a
+    422)."""
     from .. import proforma, project_state, pureos
     from ..workers import WorkerCrashed, WorkerError, WorkerTimeout
 
+    _, who = _actor(ctx)
     sid = (scenario_id or "").strip()
     if not sid:
         return ToolResult(error=f"{tool} refused: name the scenario to run by its id (proforma_read lists them)")
@@ -544,7 +647,7 @@ def run_scenario(tool: str, scenario_id: str, note: str, ctx: ToolContext) -> To
         return ToolResult(error=f"{tool} refused: {sid} is not a BioSTEAM scenario this project keeps; its BioSTEAM "
                                 f"scenarios are {kept}, and a person makes one with New scenario in Proforma")
     try:
-        r = proforma.run(project_state.run_request(held[sid]), pool=ctx.pool)
+        r = proforma.run(project_state.run_request(held[sid], by=who), pool=ctx.pool)
     except proforma.ScenarioRefused as e:
         waits = f" {RUN_WAITS}" if "wait for a source" in str(e) else ""
         return ToolResult(error=f"{tool} refused: {e}.{waits}")
@@ -576,7 +679,7 @@ def run_scenario(tool: str, scenario_id: str, note: str, ctx: ToolContext) -> To
             "units": len(r.units),
             "leavesOut": r.leavesOut,
             "meaning": "the scenario ran as the service binds it and is kept as one run artifact in the open lane, "
-                       "marked as the model's in the audit log; cite its price, a cost line or a recovery by the "
+                       "marked as its caller's in the audit log; cite its price, a cost line or a recovery by the "
                        "evidence id; stream_table reads its streams and pureos_read its train",
         },
         evidence=[ev],
@@ -594,16 +697,18 @@ SIM_WAITS = ("A named person types each waiting parameter in fermOS → Simulate
              "for it in recordsByParam. Say in gaps which parameters wait.")
 # How each origin is said, in words: what bound the parameter, never its value.
 BOUND_BY = {"fit": "a fit", "record": "records", "simulation": "a kept simulation", "assumption": "a named person",
-            "model-estimate": "a model's estimate", "convention": "a stated convention",
-            "library-default": "the library's own default", "artifact": "an artifact"}
+            "model-estimate": "a model's estimate", "measurement": "a deposition's reading",
+            "convention": "a stated convention", "library-default": "the library's own default",
+            "artifact": "an artifact"}
 MAX_FLAG_CHARS = 300
 
 
 def _bound_by(v: Any, named: set[str], fields_of: dict[str, str]) -> dict[str, Any]:
     """What bound one parameter, in words and counts: the records by how many
     and of which field, and whether they were named for it; a fit or a kept
-    simulation by its artifact id; a convention by its word when it is one.
-    Never a number of the parameter's, which the artifact holds."""
+    simulation by its artifact id; a deposition's reading by its ref and the
+    person who deposited it; a convention by its word when it is one. Never a
+    number of the parameter's, which the artifact holds."""
     line: dict[str, Any] = {"key": v.key, "origin": v.origin}
     src = v.source
     if v.origin == "record":
@@ -616,7 +721,10 @@ def _bound_by(v: Any, named: set[str], fields_of: dict[str, str]) -> dict[str, A
         line["boundBy"] = f"{BOUND_BY[v.origin]}, {src.id}" if src and src.id else BOUND_BY[v.origin]
         if v.origin == "fit" and v.identified is False:
             line["identified"] = False
-    elif v.origin in ("assumption", "model-estimate"):
+    elif v.origin == "measurement":
+        reading = f", {src.id}" if src and src.id else ""
+        line["boundBy"] = f"{BOUND_BY[v.origin]}{reading}, deposited by {v.overriddenBy}"
+    elif v.origin in SET_PARAM_ORIGINS:
         line["boundBy"] = f"{BOUND_BY[v.origin]}, {v.overriddenBy}"
     elif v.origin == "waiting":
         line["boundBy"] = "nothing: this setting of the family does not read it"
@@ -643,8 +751,7 @@ def _simulation_evidence(r: Any) -> Any:
 
 
 def _summary_flags(r: Any) -> list[str]:
-    """The simulation's flags as the summary says them (OF-BLD-020 §3.R,
-    finding 20): a value outside its bounds by its key alone, never the
+    """The simulation's flags as the summary says them: a value outside its bounds by its key alone, never the
     value or its ends, which the artifact holds with the bounds and their
     reason; any other flag whole, or cut at a sentence or clause under
     MAX_FLAG_CHARS and said to be cut; each ending at a full stop."""
@@ -671,8 +778,9 @@ def _sig(x: Any) -> Any:
 
 
 def run_simulation(tool: str, req: Any, note: str, ctx: ToolContext) -> ToolResult:
-    """Simulate one model family as the service binds it, keep it and mark it
-    as the model's (OF-BLD-020 §3.4). The request carries ids and words: a
+    """Simulate one model family as the service binds it, keep it as a run of
+    the kinetics engine in its caller's name and mark it as the model's
+    (alpha 2.2 D3). The request carries ids and words: a
     family, a strain, a product, a sugar, the records named for a parameter,
     a fit, a start and a run-length preset. A person's assumptions are the
     project's overrides, and this call reads none: a parameter nothing binds
@@ -683,7 +791,7 @@ def run_simulation(tool: str, req: Any, note: str, ctx: ToolContext) -> ToolResu
     family = (req.family or "").strip()
     if not family:
         return ToolResult(error=f"{tool} refused: name the model family to simulate by its id ({', '.join(kinetics.FAMILIES)})")
-    req = req.model_copy(update={"family": family, "overrides": []})
+    req = req.model_copy(update={"family": family, "inputs": [], "by": _actor(ctx)[1]})
     try:
         r = fermos.simulate(req, by_pool=ctx.pool)
     except fermos.SimulationRefused as e:
@@ -723,7 +831,7 @@ def run_simulation(tool: str, req: Any, note: str, ctx: ToolContext) -> ToolResu
             "massBalanceCloses": r.massBalance.ok,
             "flags": _summary_flags(r),
             "meaning": "the family ran as the service binds it and is kept as one simulation artifact in the open lane, "
-                       "marked as the model's in the audit log; each parameter says what bound it, and its value is in "
+                       "marked as its caller's in the audit log; each parameter says what bound it, and its value is in "
                        "the artifact. Its numbers are read from the artifact, never stated: cite the simulation by the "
                        "evidence id, which is its artifact id; fermos_read reads it again as kind simulation",
         },
@@ -798,9 +906,10 @@ def new_train(tool: str, product: str, inlet_ref: str, note: str, ctx: ToolConte
         spec, said = build.new_spec(product, inlet_ref)
     except build.BuildRefused as e:
         return _train_refused(tool, e)
-    model, effort = _who(ctx)
+    agent, who = _actor(ctx)
     try:
-        k = kept.keep_train(None, lambda _: spec, model, ask_id=getattr(ctx, "ask_id", None) or None, effort=effort)
+        k = kept.keep_train(None, lambda _: spec, who, agent, ask_id=getattr(ctx, "ask_id", None) or None,
+                            effort=_effort(ctx, agent))
     except kept.KeptTrainRefused as e:
         return _train_refused(tool, e)
     return _kept_result(tool, "new_train", k, note, ctx, {"read": said})
@@ -818,10 +927,11 @@ def add_unit(tool: str, train_id: str, unit_type: str, after: str, note: str, ct
         made.append(uid)
         return spec
 
-    model, effort = _who(ctx)
+    agent, who = _actor(ctx)
     try:
         build.kept_or_refuse(train_id)
-        k = kept.keep_train(train_id.strip(), change, model, ask_id=getattr(ctx, "ask_id", None) or None, effort=effort)
+        k = kept.keep_train(train_id.strip(), change, who, agent, ask_id=getattr(ctx, "ask_id", None) or None,
+                            effort=_effort(ctx, agent))
     except (build.BuildRefused, kept.KeptTrainRefused) as e:
         return _train_refused(tool, e)
     return _kept_result(tool, "add_unit", k, note, ctx, {"added": made[-1]})
@@ -832,11 +942,11 @@ def remove_unit(tool: str, train_id: str, unit_id: str, note: str, ctx: ToolCont
     pureos_write remove_unit)."""
     from ..pureos import build, kept
 
-    model, effort = _who(ctx)
+    agent, who = _actor(ctx)
     try:
         build.kept_or_refuse(train_id)
-        k = kept.keep_train(train_id.strip(), lambda cur: build.without_unit(cur, unit_id), model,
-                            ask_id=getattr(ctx, "ask_id", None) or None, effort=effort)
+        k = kept.keep_train(train_id.strip(), lambda cur: build.without_unit(cur, unit_id), who, agent,
+                            ask_id=getattr(ctx, "ask_id", None) or None, effort=_effort(ctx, agent))
     except (build.BuildRefused, kept.KeptTrainRefused) as e:
         return _train_refused(tool, e)
     return _kept_result(tool, "remove_unit", k, note, ctx, {"removed": unit_id.strip()})
@@ -866,9 +976,10 @@ def set_from_record(tool: str, train_id: str, unit_id: str, records_by_param: di
             raise build.BuildRefused(f"train {base.id} changed while its records were checked; ask again")
         return spec
 
-    model, effort = _who(ctx)
+    agent, who = _actor(ctx)
     try:
-        k = kept.keep_train(base.id, change, model, ask_id=getattr(ctx, "ask_id", None) or None, effort=effort)
+        k = kept.keep_train(base.id, change, who, agent, ask_id=getattr(ctx, "ask_id", None) or None,
+                            effort=_effort(ctx, agent))
     except (build.BuildRefused, kept.KeptTrainRefused) as e:
         return _train_refused(tool, e)
     return _kept_result(tool, "set_from_record", k, note, ctx, {"unit": unit_id.strip(), "bound": bound})
@@ -876,12 +987,15 @@ def set_from_record(tool: str, train_id: str, unit_id: str, records_by_param: di
 
 def run_train(tool: str, train_id: str, note: str, ctx: ToolContext) -> ToolResult:
     """Run a kept train in the Proforma worker as the service binds it and
-    keep the run as one `pureos.train_run` artifact (pureos_build run,
-    pureos_write run_train). The service holds no person's value, so none is
-    passed: a value nothing binds waits, and the refusal is run_train's own
-    words (what `POST /api/pureos/train/run` answers with a 422). Returns the
-    run as one Evidence whose id is the artifact's, a summary a model reads,
-    and the whole run in `data`, which no model reads."""
+    keep the run as one `pureos.train_run` artifact and as a run of the
+    train engine in its caller's name (`_actor`; alpha 2.2 D3: one `runs`
+    row, its SFF file written) (pureos_build run, pureos_write run_train).
+    The tool takes ids and words (rule E.4‴), and the service holds no
+    person's value, so no value is passed: a value nothing binds waits, and
+    the refusal is run_train's own words (what `POST /api/pureos/train/run`
+    answers with a 422). Returns the run as one Evidence whose id is the
+    artifact's, a summary a model reads, and the whole run in `data`, which
+    no model reads."""
     from .. import artifacts
     from ..pureos import build, train_spec
     from ..workers import WorkerCrashed, WorkerError, WorkerTimeout
@@ -891,7 +1005,7 @@ def run_train(tool: str, train_id: str, note: str, ctx: ToolContext) -> ToolResu
     except build.BuildRefused as e:
         return _train_refused(tool, e)
     try:
-        r = train_spec.run_train(k.spec, None, None)
+        r = train_spec.run_train(k.spec, None, _actor(ctx)[1])
     except train_spec.TrainRefused as e:
         waits = f" {TRAIN_WAITS}" if " waits" in str(e) else ""
         return ToolResult(error=f"{tool} refused: {str(e).rstrip('.')}.{waits}")
@@ -905,7 +1019,7 @@ def run_train(tool: str, train_id: str, note: str, ctx: ToolContext) -> ToolResu
     return ToolResult(
         summary={"state": "open", **build.run_summary(r), "evidenceId": ev.id,
                  "meaning": "the train ran as the service binds it in the Proforma worker, where BioSTEAM builds it, and "
-                            "the run is kept as one artifact in the open lane, marked as the model's in the audit log; "
+                            "the run is kept as one artifact in the open lane, marked as its caller's in the audit log; "
                             "its numbers are read from the artifact, never stated: cite a recovery or a purity by the "
                             "evidence id, which is its artifact id; pureos_read reads it again as kind train-run"},
         evidence=[ev], data=r.model_dump(mode="json"))
@@ -955,9 +1069,10 @@ def propose_train(tool: str, product: str, host: str, inlet_ref: str, note: str,
     except (ValueError, LookupError) as e:
         return _train_refused(tool, e)
     spec = spec.model_copy(update={"id": build.new_id()})
-    model, effort = _who(ctx)
+    agent, who = _actor(ctx)
     try:
-        k = kept.keep_train(None, lambda _: spec, model, ask_id=getattr(ctx, "ask_id", None) or None, effort=effort)
+        k = kept.keep_train(None, lambda _: spec, who, agent, ask_id=getattr(ctx, "ask_id", None) or None,
+                            effort=_effort(ctx, agent))
     except kept.KeptTrainRefused as e:
         return _train_refused(tool, e)
     words = [r.model_dump(mode="json") if hasattr(r, "model_dump") else r for r in reasons]
@@ -993,6 +1108,7 @@ def _pureos(action: str, inp: ModuleWriteInput, ctx: ToolContext) -> ToolResult:
 
 def _biorepo_candidate(inp: ModuleWriteInput, ctx: ToolContext) -> ToolResult:
     from .. import extract
+    from ..evidence_pool import candidate_record
 
     need = _need(inp, "paperId", "sectionId", "field", "value", "unit", "quote")
     if need:
@@ -1014,19 +1130,19 @@ def _biorepo_candidate(inp: ModuleWriteInput, ctx: ToolContext) -> ToolResult:
             if word not in ("true", "false"):
                 return ToolResult(error=f"biorepo_write refused: {flag} is the word true or false, or left out")
             raw[flag] = word == "true"
-    model, _ = _who(ctx)
+    _, who = _actor(ctx)
     try:
-        made, rule, detail = extract.add_candidate(inp.fields["paperId"], raw, who=model)
+        made, rule, detail = extract.add_candidate(inp.fields["paperId"], raw, who=who)
     except extract.ExtractUnavailable as e:
         return ToolResult(error=f"biorepo_write refused: {e}")
     if made is None:
         return ToolResult(error=f"biorepo_write refused on rule {rule}: {detail}")
-    row = module_stores.Row("biorepo", "candidate", made.id, made.field, "proposed", "unverified", provenance="unverified",
-                            detail={"paperId": made.paperId, "field": made.field, "by": model})
+    # The row biorepo_read lists the candidate as, read by the same rule.
+    row = module_stores.record_row(candidate_record(made, {}))
     _audit(ctx, "biorepo", "candidate", "proposed", made.id, {"paperId": made.paperId, "field": made.field, "note": inp.note})
     return ToolResult(
         summary={"state": "proposed", "ref": row.ref, "candidateId": made.id, "field": made.field, "provenance": "unverified",
-                 "meaning": "an unverified candidate in the review queue, anchored to the sentence, marked as the model's; "
+                 "meaning": "an unverified candidate in the review queue, anchored to the sentence, marked as its caller's; "
                             "a person accepts or rejects it on Guild; cite its ref in moduleRefs"},
         rows=[row.model()],
     )
@@ -1035,15 +1151,15 @@ def _biorepo_candidate(inp: ModuleWriteInput, ctx: ToolContext) -> ToolResult:
 def _intake_fetch(inp: ModuleWriteInput, ctx: ToolContext) -> ToolResult:
     from .. import intake, projects
 
-    model, _ = _who(ctx)
-    r = intake.collect(inp.target, project_id=projects.current(), by=model, reason=inp.note or "")
+    _, who = _actor(ctx)
+    r = intake.collect(inp.target, project_id=projects.current(), by=who, reason=inp.note or "")
     if r.status == "failed":
         return ToolResult(error=f"intake_write could not collect {inp.target}: {r.reason}")
     _audit(ctx, "intake", "fetch", module_stores.intake_state(r.status), inp.target,
            {"status": r.status, "documentId": r.documentId, "note": inp.note})
     return ToolResult(summary={"state": module_stores.intake_state(r.status), "documentId": r.documentId,
                                "status": r.status, "passages": r.chunks, "licenceClass": r.licenceClass,
-                               "meaning": "the document is in the project's literature, collected under the model's "
+                               "meaning": "the document is in the project's literature, collected under its caller's "
                                           "name; extract it next, by its documentId"})
 
 
@@ -1064,7 +1180,7 @@ def _intake_extract(inp: ModuleWriteInput, ctx: ToolContext, gate: gates.Gate) -
                                                               "costUsd": r.usage.costUsd, "note": inp.note})
     return ToolResult(summary={"state": "proposed", "paperId": inp.target, "candidates": len(r.candidates), "rejected": r.rejected,
                                "costUsd": r.usage.costUsd,
-                               "meaning": "candidates anchored and queued for review, unverified, marked as the model's run"},
+                               "meaning": "candidates anchored and queued for review, unverified, marked as its caller's run"},
                       usage=r.usage)
 
 
@@ -1123,6 +1239,10 @@ def _description(module: str) -> str:
         return (f"Write to {label}: nothing can be written here by a model. {NO_WRITE[module]}. Every call is refused in "
                 "words; report the refusal in gaps and name the person who could make the change.")
     for action, (what, fields) in ACTIONS[module].items():
+        # An action every call refuses is listed with the refusal's words and no fields.
+        if (module, action) in NO_WRITE_ACTION:
+            lines.append(f"{action}: refused, every call ({NO_WRITE_ACTION[(module, action)]})")
+            continue
         g = gates.gated(module, action)
         tail = (f" [gated: {g.covers}; becomes a proposal a person carries out on Home]" if g and g.id != "spend"
                 else " [at the budget, gated: becomes a spend proposal a person carries out on Home]" if g else "")
@@ -1131,7 +1251,7 @@ def _description(module: str) -> str:
             f" {CURATED_NOTE[module]}: every other call is refused in words." if module in CURATED_NOTE else "")
     return (f"Write to {label}, through the module's own write function. Actions — " + "; ".join(lines) + f".{seed} "
             "Pass action, target (an id), fields (names to words) and note (why). What is written lands in the open lane "
-            "marked as the model's, in the audit log, until a person promotes it; a refusal says why, and goes in gaps.")
+            "marked as its caller's, in the audit log, until a person promotes it; a refusal says why, and goes in gaps.")
 
 
 TOOLS = {

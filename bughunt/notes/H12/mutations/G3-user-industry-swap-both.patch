@@ -1,0 +1,39 @@
+diff --git a/core/openferment_core/models.py b/core/openferment_core/models.py
+index 4a83d2f..06467c1 100644
+--- a/core/openferment_core/models.py
++++ b/core/openferment_core/models.py
+@@ -33,8 +33,8 @@ Provenance = Literal[
+     "curated",
+     "computed",
+     "unverified",
+-    "user",
+     "industry-estimate",
++    "user",
+     "assumed",
+ ]
+ 
+@@ -50,8 +50,8 @@ PROVENANCE_ORDER: list[str] = [
+     "curated",
+     "computed",
+     "unverified",
+-    "user",
+     "industry-estimate",
++    "user",
+     "assumed",
+ ]
+ 
+diff --git a/src/store.ts b/src/store.ts
+index 677dd09..082c081 100644
+--- a/src/store.ts
++++ b/src/store.ts
+@@ -3809,8 +3809,8 @@ export const PROVENANCE_RANK: Record<Provenance, number> = {
+   curated: 3,
+   computed: 4,
+   unverified: 5,
+-  user: 6,
+-  'industry-estimate': 7,
++  user: 7,
++  'industry-estimate': 6,
+   assumed: 8,
+ };
+ 

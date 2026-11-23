@@ -1,0 +1,15 @@
+service http://127.0.0.1:10380 over fresh database bh_r_h14_08_home, no key
+step 1: project h14-08 made
+step 2: GET /api/engines names biosteam, kinetics, train
+  train: {"name": "train", "version": {"biosteam": "2.54.0", "thermosteam": "0.54.2", "biorefineries": "2.35.1", "train run": "2"}, "worker": "openferment_core.workers.proforma_worker", "entryPoint": "openferment_core.pureos.engine:ENGINE"}
+step 3: Home of the built app in Chromium, the pureOS destination: "pureOS | harvest, capture, recovery | 45 unit operations · no process model"
+step 4: /p/h14-08/pureos subtitle: "Everything after the fermenter: harvest, disruption, capture, polishing, recovery and storage. pureOS builds a train unit by unit from a catalogue of BioSTEAM's units and runs it, and reads the train a flowsheet ran from the run Proforma priced; Proforma prices a train, pureOS decides it: whether centrifugation or filtration suits a cell-wall-deficient host is a process question."
+step 5: /p/h14-08/pureos footer: "Produced by pureOS · 45 operations; trains built here and read from runs"
+step 6: the source at 2047f5a:
+  src/screens/Home.tsx:235: * What each destination actually has, right now (§7).
+  src/screens/Home.tsx:291:    pureOS: { now: `${UNIT_OPERATIONS.length} unit operations · no process model`, built: true },
+  src/screens/PureOS.tsx:409:pureOS builds a train unit by unit from a catalogue of BioSTEAM's units and runs it
+  core/pyproject.toml:55:train = "openferment_core.pureos.engine:ENGINE"
+EXPECTED: Home's pureOS line says what pureOS holds now (Home.tsx:235 "What each destination actually has, right now"): trains built in the Builder and run on BioSTEAM through the registered train engine, as pureOS's own page says
+OBSERVED: train engine registered on the service; Home reads "pureOS | harvest, capture, recovery | 45 unit operations · no process model" while pureOS's page reads "pureOS builds a train unit by unit from a catalogue of BioSTEAM's units and runs it" and "Produced by pureOS · 45 operations; trains built here and read from runs"
+RESULT: DEFECT

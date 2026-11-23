@@ -17,9 +17,8 @@ import {
   Loader2,
   MessageSquare,
 } from 'lucide-react';
-import type { ExtractionRecord, FieldId, Job, Paper } from '@/data/types';
-import { fieldName } from '@/data/ontology';
-import { useStore, provenanceOf, tickClass } from '@/store';
+import { fieldName, type FieldId } from '@/data/ontology';
+import { useStore, provenanceOf, tickClass, type Job } from '@/store';
 import { href, navigate } from '@/router';
 import { Quantity } from '@/components/QuantityField';
 import { ProvenanceLegend, provMeta, type ProvKind } from '@/components/Provenance';
@@ -32,8 +31,9 @@ import {
   SectionTitle,
   cx,
 } from '@/components/ui';
-import { locateQuote } from '@/lib/review';
-import { fetchSourceName } from '@/lib/intake';
+import { locateQuote, type ExtractionRecord, type Paper } from '@/lib/review';
+import { fetchSourceName, licenceWords } from '@/lib/intake';
+import { idTail, shortCite } from '@/lib/cite';
 
 const STAGE_KEYS = ['fetch', 'parse', 'chunk', 'embed', 'extract'] as const;
 const STAGE_LABELS = ['Fetch', 'Parse', 'Chunk', 'Embed', 'Extract'];
@@ -67,6 +67,23 @@ function locateSpans(text: string, recs: ExtractionRecord[]): Span[] {
   return kept;
 }
 
+/**
+ * Bring a rail row into view inside the rail's own list, the nearest way, and
+ * move no other scroller. A row's scrollIntoView scrolls the page as well: beside
+ * the sticky rail it stopped a deep link's scroll to the text at the paper's
+ * top, and where the rail sits beneath the text it carried the page down to it.
+ */
+export function revealInList(
+  list: { scrollTop: number; getBoundingClientRect(): { top: number; bottom: number } } | null,
+  row: { getBoundingClientRect(): { top: number; bottom: number } } | null | undefined,
+): void {
+  if (!list || !row) return;
+  const l = list.getBoundingClientRect();
+  const r = row.getBoundingClientRect();
+  if (r.top < l.top) list.scrollTop -= l.top - r.top;
+  else if (r.bottom > l.bottom) list.scrollTop += r.bottom - l.bottom;
+}
+
 function provOf(r: ExtractionRecord): ProvKind {
   return r.status === 'rejected' ? 'rejected' : provenanceOf(r);
 }
@@ -81,7 +98,7 @@ function ingestJobFor(jobs: Job[], paperId: string): Job | undefined {
   for (let i = jobs.length - 1; i >= 0; i--) {
     const j = jobs[i];
     if (j.kind !== 'ingest') continue;
-    if (j.href?.endsWith(`/${paperId}`) || j.title.includes(paperId)) return j;
+    if (j.href?.endsWith(`/${paperId}`) || j.subject === paperId) return j;
   }
   return undefined;
 }
@@ -126,6 +143,7 @@ export default function PaperReader({
   const spanRefs = useRef<Record<string, HTMLElement | null>>({});
   const quoteRef = useRef<HTMLElement | null>(null);
   const rowRefs = useRef<Record<string, HTMLButtonElement | null>>({});
+  const railListRef = useRef<HTMLDivElement | null>(null);
   const sectionRefs = useRef<Record<string, HTMLElement | null>>({});
 
   const behavior: ScrollBehavior = reducedMotion ? 'auto' : 'smooth';
@@ -171,6 +189,13 @@ export default function PaperReader({
       });
   }, [paper, recs, sectionSpans]);
 
+  // Each anchored entry's place in the rail, the number its mark carries in the text.
+  const railNumber = useMemo(() => {
+    const m = new Map<string, number>();
+    railRecords.filter((x) => x.located).forEach((x, i) => m.set(x.record.id, i + 1));
+    return m;
+  }, [railRecords]);
+
   // Deep link to a sentence (OF-BLD-014 §4.4): where it sits in its section,
   // or null when the section's text does not hold it.
   const quoted = useMemo(() => {
@@ -186,43 +211,71 @@ export default function PaperReader({
     return () => window.clearTimeout(t);
   }, [quoted, paperId, behavior]);
 
+  // A deep link scrolls once, when what it names has drawn: on a fresh load
+  // the document's sections and its records arrive after the first render,
+  // so each scroll waits for its element and runs again as they arrive.
+  const drawn = (paper?.sections.length ?? 0) + recs.length;
+  const scrolledTo = useRef<string | null>(null);
+
   // Deep link to a section: scroll to its heading, nothing selected.
   useEffect(() => {
     if (!sectionId || spanId || quoted) return;
+    const key = `${paperId}#${sectionId}`;
+    if (scrolledTo.current === key) return;
     const t = window.setTimeout(() => {
-      sectionRefs.current[sectionId]?.scrollIntoView({ behavior, block: 'start' });
+      const el = sectionRefs.current[sectionId];
+      if (!el) return;
+      scrolledTo.current = key;
+      el.scrollIntoView({ behavior, block: 'start' });
     }, 60);
     return () => window.clearTimeout(t);
-  }, [sectionId, spanId, quoted, paperId, behavior]);
+  }, [sectionId, spanId, quoted, paperId, behavior, drawn]);
 
-  // Deep link: select, scroll into view, pulse once.
+  // Deep link: select, scroll into view, pulse once. The rail's row comes into
+  // view inside the rail's list, and the text's scroll is the page's one scroll.
+  // It waits for the text's fonts: a face that arrives after the scroll sets out
+  // rewraps the paper and moves the span away from where the scroll ends.
   useEffect(() => {
     if (!spanId) return;
     setActiveId(spanId);
-    const t1 = window.setTimeout(() => {
-      spanRefs.current[spanId]?.scrollIntoView({ behavior, block: 'center' });
-      rowRefs.current[spanId]?.scrollIntoView({ block: 'nearest' });
-      setPulseId(spanId);
+    const key = `${paperId}?${spanId}`;
+    if (scrolledTo.current === key) return;
+    let live = true;
+    const t = window.setTimeout(() => {
+      void (document.fonts?.ready ?? Promise.resolve()).then(() => {
+        const el = spanRefs.current[spanId];
+        if (!live || !el || scrolledTo.current === key) return;
+        scrolledTo.current = key;
+        revealInList(railListRef.current, rowRefs.current[spanId]);
+        el.scrollIntoView({ behavior, block: 'center' });
+        setPulseId(spanId);
+      });
     }, 60);
-    const t2 = window.setTimeout(() => setPulseId(null), 1500);
     return () => {
-      window.clearTimeout(t1);
-      window.clearTimeout(t2);
+      live = false;
+      window.clearTimeout(t);
     };
-  }, [spanId, paperId, behavior]);
+  }, [spanId, paperId, behavior, drawn]);
+
+  useEffect(() => {
+    if (!pulseId) return;
+    const t = window.setTimeout(() => setPulseId(null), 1500);
+    return () => window.clearTimeout(t);
+  }, [pulseId]);
 
   const topField = useMemo(() => {
     const counts = new Map<FieldId, number>();
     for (const r of recs) counts.set(r.field, (counts.get(r.field) ?? 0) + 1);
+    // The field most of the paper's records name; none for a paper with no record, and the ask then names none.
     let best: FieldId | null = null;
     let bestN = 0;
-    counts.forEach((n, f) => {
+    for (const [f, n] of counts) {
       if (n > bestN) {
         bestN = n;
         best = f;
       }
-    });
-    return best as FieldId | null;
+    }
+    return best;
   }, [recs]);
 
   if (!paper) {
@@ -330,7 +383,7 @@ export default function PaperReader({
           }}
         >
           {text.slice(s.start, s.end)}
-          <sup>{r.id}</sup>
+          {railNumber.has(r.id) && <sup>{railNumber.get(r.id)}</sup>}
         </mark>,
       );
       cursor = s.end;
@@ -368,45 +421,46 @@ export default function PaperReader({
     <article className="flex-1 min-w-0 max-w-[760px]">
       <div className="mb-3 flex items-center gap-2 text-caption text-ink-soft">
         <a href={href('/biorepo')} className="inline-flex items-center gap-1 hover:text-accent">
-          <ArrowLeft size={12} /> Library
+          <ArrowLeft size={12} /> BioRepo
         </a>
         <span aria-hidden>/</span>
-        <span className="font-num">{paper.id}</span>
+        <span className="truncate" title={paper.id}>
+          {shortCite(paper, 40)}
+        </span>
       </div>
 
       <h1 className="font-serif text-page-title font-semibold leading-snug">{paper.title}</h1>
 
-      {(paper.authors.length > 0 || paper.year || paper.venue) && (
+      {(paper.authors.length > 0 || paper.year || paper.journal) && (
         <div className="mt-2 text-body text-ink-soft">
           {[
-            paper.authors.length > 0 ? <span key="authors">{paper.authors.join(', ')}</span> : null,
+            paper.authors.length > 0 ? <span key="authors">{paper.authors.join('; ')}</span> : null,
             paper.year ? <span key="year" className="font-num">{paper.year}</span> : null,
-            paper.venue ? <span key="venue" className="italic">{paper.venue}</span> : null,
+            paper.journal ? <span key="journal" className="italic">{paper.journal}</span> : null,
           ]
             .filter((part) => part !== null)
             .flatMap((part, i) => (i === 0 ? [part] : [<span key={`sep-${i}`}>{' · '}</span>, part]))}
         </div>
       )}
 
-      <div className="mt-2 flex flex-wrap items-center gap-1.5">
-        {paper.organisms.map((o) => (
-          <span key={o} className="chip italic">
-            {o}
-          </span>
-        ))}
-        {paper.topics.map((t) => (
-          <span key={t} className="chip text-ink-soft">
-            {t}
-          </span>
-        ))}
-      </div>
-
       {paper.textSource === 'full-text' && (
         <div className="mt-2 text-caption text-accent flex items-start gap-1.5">
           <span className="inline-block w-[3px] h-3 rounded-[1px] shrink-0 mt-[3px] bg-accent" aria-hidden />
           <span>
-            {paper.fetchedFrom === 'paste' ? 'The full text as it was pasted' : `Full text from ${fetchSourceName(paper.fetchedFrom)}`}
-            {paper.license ? <> · licence <span className="font-num">{paper.license}</span></> : null}.
+            {paper.source === 'paste' ? 'The full text as it was pasted' : `Full text from ${fetchSourceName(paper.source)}`}
+            {' · '}
+            {licenceWords(paper.licenceClass ?? 'unknown')}
+            {paper.license && /^https?:\/\//.test(paper.license) ? (
+              <>
+                {' · '}
+                <a className="underline underline-offset-2" href={paper.license} target="_blank" rel="noreferrer">
+                  source page
+                </a>
+              </>
+            ) : paper.license ? (
+              <>: {paper.license.trim().replace(/\.+$/, '')}</>
+            ) : null}
+            .
             The sections below are the document&rsquo;s own words; a record whose quote is not found in
             them is listed in the rail as pending verification.
           </span>
@@ -446,7 +500,6 @@ export default function PaperReader({
           <Callout kind="error" title="Section boundaries not detected — full text unavailable">
             <p className="mb-2">
               The parser could not segment this paper into sections, so extraction spans cannot be anchored.
-              The abstract below is the raw-text fallback.
             </p>
             <div className="flex gap-2">
               <LinkButton to="/intake/ingest" size="sm">
@@ -458,15 +511,6 @@ export default function PaperReader({
       )}
 
       <>
-          {paper.textSource !== 'full-text' && (
-            <section className="mt-6">
-              <h2 className="font-serif text-section-title font-semibold mb-1">Abstract</h2>
-              <div className="prose-reading">
-                <p>{paper.abstract}</p>
-              </div>
-            </section>
-          )}
-
           {quote && sectionId && !paper.sections.some((s) => s.id === sectionId) && (
             <p className="mt-4 text-caption text-signal-warn" data-testid="quote-missing">
               The passage from the search is in section {sectionId} of the fetched text, which this
@@ -484,9 +528,7 @@ export default function PaperReader({
                 extraction spans are anchored here.
               </p>
               <div className="card p-3 bg-surface-0 font-num text-caption leading-relaxed whitespace-pre-line max-h-[420px] overflow-y-auto">
-                {paper.sections.length > 0
-                  ? paper.sections.map((s) => `${s.heading}\n${s.text}`).join('\n\n')
-                  : paper.abstract}
+                {paper.sections.map((s) => `${s.heading}\n${s.text}`).join('\n\n')}
               </div>
             </section>
           ) : (
@@ -561,7 +603,7 @@ export default function PaperReader({
             body={
               parseFailed
                 ? 'Nothing can be extracted until the paper parses into sections. Retry the ingest, or continue with abstract-only text from the ingest board.'
-                : 'Nothing has been pulled from this paper yet. Extraction runs through the service: Extract on the ingest board, or pnpm intake:extract.'
+                : 'Nothing has been pulled from this paper yet. Extract on the ingest board runs it through the service.'
             }
             action={
               <LinkButton to="/intake/ingest" size="sm">
@@ -570,7 +612,7 @@ export default function PaperReader({
             }
           />
         ) : (
-          <div className="max-h-[46vh] overflow-y-auto -mx-1 px-1">
+          <div ref={railListRef} className="max-h-[46vh] overflow-y-auto -mx-1 px-1">
             {(fullText ? railRecords.filter((x) => x.located) : railRecords).map(({ record: r, located }) => {
               const p = provOf(r);
               const isActive = activeId === r.id;
@@ -605,8 +647,10 @@ export default function PaperReader({
                 >
                   <span className="sr-only">{`${provMeta(p).label}. `}</span>
                   <span className="flex items-baseline justify-between gap-2">
-                    <span className="truncate">{fieldName(r.field)}</span>
-                    <span className="font-num text-caption text-ink-soft shrink-0">{r.id}</span>
+                    <span className="min-w-0 flex-1 truncate">{fieldName(r.field)}</span>
+                    <span className="font-num text-caption text-ink-soft" title={r.id}>
+                      {idTail(r.id)}
+                    </span>
                   </span>
                   <span className="flex items-baseline justify-between gap-2 mt-0.5">
                     <Quantity value={r.value} unit={r.unit} si={r.si} mode={unitMode} />
@@ -665,8 +709,10 @@ export default function PaperReader({
                         title={`${r.id}: the quoted text was not found in this paper's sections`}
                       >
                         <span className="flex items-baseline justify-between gap-2">
-                          <span className="truncate">{fieldName(r.field)}</span>
-                          <span className="font-num text-caption text-ink-soft shrink-0">{r.id}</span>
+                          <span className="min-w-0 flex-1 truncate">{fieldName(r.field)}</span>
+                          <span className="font-num text-caption text-ink-soft" title={r.id}>
+                            {idTail(r.id)}
+                          </span>
                         </span>
                         <span className="flex items-baseline justify-between gap-2 mt-0.5">
                           <Quantity value={r.value} unit={r.unit} si={r.si} mode={unitMode} />
@@ -710,8 +756,7 @@ export default function PaperReader({
           </Button>
         </div>
         <p className="text-caption text-ink-soft mt-2">
-          Extraction runs through the service: Extract on the ingest board, or{' '}
-          <span className="font-mono">pnpm intake:extract</span>.
+          Extract on the ingest board runs extraction through the service.
         </p>
       </Card>
     </aside>

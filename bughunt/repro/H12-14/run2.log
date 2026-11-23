@@ -1,0 +1,40 @@
+== worktree /tmp/claude-0/-home-user-openFermentUI/cfbc5c9f-640a-5002-a705-5ceaf850fdc6/scratchpad/bh/work/H12-14/wt-15001 at 2047f5a, diff:  1 file changed, 1 insertion(+), 1 deletion(-)
+== fresh database bh_r_h12_14_probe made and migrated (the probe runs with it as OPENFERMENT_DATABASE_URL)
+== 1. the contract
+   models.py: 
+   models.py: # The provenance classes, strongest first and weakest last; the browser's union
+   models.py: # is generated from this one (`src/api/types.gen.ts`). The order IS the ranking:
+   models.py: # `weakest_provenance` walks PROVENANCE_ORDER below, which `check:plan` holds to
+   models.py: # these classes, so adding a class in the wrong place silently changes what a
+   models.py: # The same order as PROVENANCE_RANK in src/store.ts, member for member;
+   models.py: # `check:plan` parses both and fails on any difference (OF-BLD-014 §3.1, E.4).
+   check-plan.mjs:  *   - models.py's `Provenance` union and `PROVENANCE_ORDER` name the same classes;
+   check-plan.mjs:  *   - the order starts at `measured`, ranks `measured` above `gold`, and ranks an
+   check-plan.mjs:  *     unverified extraction at least as high as an industry estimate;
+   check-plan.mjs:  *   - `PROVENANCE_RANK` gives each class a rank of its own, in the order's order,
+   check-plan.mjs:  *     member for member.
+   test_basis.py: def test_computed_sits_after_every_experimental_class_and_before_unverified():
+   test_basis.py:     i = PROVENANCE_ORDER.index("computed")
+   test_basis.py:     assert PROVENANCE_ORDER[:i] == ["measured", "gold", "verified", "curated"]
+   test_basis.py:     assert PROVENANCE_ORDER[i + 1] == "unverified"
+   test_basis.py:     assert set(PROVENANCE_ORDER) == set(Provenance.__args__)
+   test files holding a 'user' class beside an 'industry-estimate' one: 0
+== 2. G1: - user: 6, - 'industry-estimate': 7, + user: 7, + 'industry-estimate': 6,
+   G2: PROVENANCE_ORDER's "user" moved below "industry-estimate" (1 file changed, 1 insertion(+), 1 deletion(-))
+   check:plan exit: tree 0; G1 (rank alone) 1; G2 (order alone) 1
+   caught: - PROVENANCE_RANK orders measured > gold > verified > curated > computed > unverified > industry-estimate > user > assumed; PROVENANCE_ORDER orders measured > gold > verified > curated > computed > unverified > user > industry-estimate > assumed
+   caught: - PROVENANCE_RANK orders measured > gold > verified > curated > computed > unverified > user > industry-estimate > assumed; PROVENANCE_ORDER orders measured > gold > verified > curated > computed > unverified > industry-estimate > user > assumed
+== 3. module: core/openferment_core/models.py
+   tree: weakest(user, industry-estimate) = industry-estimate; basis_provenance(user artifact + industry record) = industry-estimate
+         Literal tail unverified > user > industry-estimate > assumed; PROVENANCE_ORDER tail unverified > user > industry-estimate > assumed (same)
+   G4 applied: 2 files changed, 3 insertions(+), 3 deletions(-) (PROVENANCE_ORDER and PROVENANCE_RANK; the Literal untouched)
+   G4:   weakest(user, industry-estimate) = user; basis_provenance(user artifact + industry record) = user
+         Literal tail unverified > user > industry-estimate > assumed; PROVENANCE_ORDER tail unverified > industry-estimate > user > assumed (differ)
+   check:plan with G4: exit 0, '✓ PROVENANCE_RANK holds PROVENANCE_ORDER, member for member.'
+== 4. pytest test_basis.py test_validate.py test_evidence_pool.py test_postdoc_agent.py test_openapi.py with G4
+   185 passed in 9.94s
+   control G3 (the Literal swapped too), test_openapi.py: 1 failed, 3 passed in 5.23s (exit 1)
+   FAILED tests/test_openapi.py::test_the_committed_document_is_the_services - A...
+EXPECTED: a check or test that holds user above industry-estimate, as the Literal (strongest first) and PROVENANCE_RANK order them, so swapping the two in both ranking copies fails something (models.py:23-27, 41-42; check-plan.mjs:10-14)
+OBSERVED: check:plan exit tree 0, G1 1, G2 1, G4 0; with G4 a basis on a user artifact and an industry-estimate record is 'user' (tree 'industry-estimate'), the Literal and PROVENANCE_ORDER differ, and the five files: 185 passed in 9.94s (exit 0); the control G3 fails test_openapi (exit 1)
+RESULT: DEFECT

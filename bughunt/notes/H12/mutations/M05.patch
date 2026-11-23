@@ -1,0 +1,12 @@
+--- a/core/openferment_core/basis.py
++++ b/core/openferment_core/basis.py
+@@ -198,8 +198,7 @@
+     `<deposition id>/<entry id>`, its note saying when the reading was
+     taken. A deposition naming a whole series (the readings a kinetic fit is
+     made on, fermos.py) is the bench's record the fit rests on."""
+-    return (source.kind == "deposition" and bool(READING_REF.fullmatch(source.id or ""))
+-            and bool(_MEASURED.match(source.note or "")))
++    return (source.kind == "deposition" and bool(READING_REF.fullmatch(source.id or "")))
+ 
+ 
+ def is_set(source: BasisSource) -> bool:

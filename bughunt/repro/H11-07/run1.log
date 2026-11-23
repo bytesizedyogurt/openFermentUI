@@ -1,0 +1,26 @@
+EXPECTED: test_host.py's docstring says 'the night's dump run[s] against stand-ins' (core/tests/test_host.py:5-7), and
+EXPECTED: test_host.py:347 is named 'the nightly dumps before the night's work and counts a failed dump'; so a
+EXPECTED: nightly.sh whose dump line (nightly.sh:33, 'backup_database || status=$?') is commented out, which makes
+EXPECTED: no dump, fails at least one test.
+setup: worktree at 2047f5a; nightly.sh:33 reads: backup_database || status=$?
+OBSERVED: [2047f5a as it is] pytest tests/test_host.py tests/test_nightly_checks.py::test_the_nightly_job_checks_after_extraction: 53 passed in 4.08s
+OBSERVED: [2047f5a as it is] the three dump tests (keeps-the-newest-seven, failed-dump-keeps, nightly-dumps-before): PASSED PASSED PASSED
+OBSERVED: [2047f5a as it is] nightly.sh on stand-ins: exit 0; pg_dump calls 1; dumps in ~/openferment-backups 1
+OBSERVED: [2047f5a as it is]   steps called: pg_dump -h 127.0.0.1 --format=custom openferment;python extract --all;python nightly_checks;python checks propose;python checks brief --missing
+OBSERVED: [2047f5a as it is]   log: openferment dumped into …/home/openferment-backups/openferment-2026-11-10.dump;── 2026-11-10 23:48:05 done, exit 0
+setup: control, the line deleted: 0	1	scripts/host/nightly.sh (added, removed, file)
+OBSERVED: [control: line 33 deleted] pytest tests/test_host.py tests/test_nightly_checks.py::test_the_nightly_job_checks_after_extraction: 1 failed, 52 passed in 3.04s
+OBSERVED: [control: line 33 deleted] the three dump tests (keeps-the-newest-seven, failed-dump-keeps, nightly-dumps-before): PASSED PASSED FAILED
+OBSERVED: [control: line 33 deleted]   FAILED tests/test_host.py::test_the_nightly_dumps_before_the_nights_work_and_counts_a_failed_dump
+setup: mutation, nightly.sh:33 now reads: # backup_database || status=$?
+setup:   diff -backup_database || status=$?
+setup:   diff +# backup_database || status=$?
+OBSERVED: [mutation: line 33 commented out] pytest tests/test_host.py tests/test_nightly_checks.py::test_the_nightly_job_checks_after_extraction: 53 passed in 2.64s
+OBSERVED: [mutation: line 33 commented out] the three dump tests (keeps-the-newest-seven, failed-dump-keeps, nightly-dumps-before): PASSED PASSED PASSED
+OBSERVED: [mutation: line 33 commented out] nightly.sh on stand-ins: exit 0; pg_dump calls 0; dumps in ~/openferment-backups 0
+OBSERVED: [mutation: line 33 commented out]   steps called: python extract --all;python nightly_checks;python checks propose;python checks brief --missing
+OBSERVED: [mutation: line 33 commented out]   log: ── 2026-11-10 23:48:13 done, exit 0
+OBSERVED: summary: as it is: tests '53 passed in 4.08s', night pg_dump calls 1, dumps kept 1;
+OBSERVED: summary: control (deleted): failed 1, dump tests PASSED PASSED FAILED;
+OBSERVED: summary: mutation (commented): tests '53 passed in 2.64s', night pg_dump calls 0, dumps kept 0, exit 0
+RESULT: DEFECT

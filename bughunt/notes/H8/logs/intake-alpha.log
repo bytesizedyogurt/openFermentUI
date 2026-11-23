@@ -1,0 +1,109 @@
+[upload] empty .md: 200 {"status": "failed", "reason": "empty.md is empty", "documentId": null, "title": "", "identifier": "empty.md", "chunks": 0, "licenceClass": "unknown"}
+[upload] whitespace-only .md: 200 {"status": "failed", "reason": "the kit did not store it: no extractable text", "documentId": null, "title": "blank", "identifier": "blank.md", "chunks": 0, "licenceClass": "unknown"}
+[upload] heading-only .md: 200 {"status": "failed", "reason": "the kit did not store it: no extractable text", "documentId": null, "title": "Only a title", "identifier": "heading-only.md", "chunks": 0, "licenceClass": "unknown"}
+[upload] UTF-16 .md: 200 {"status": "failed", "reason": "the kit did not store it: parse error: 'utf-8' codec can't decode byte 0xff in position 0: invalid start byte", "documentId": null, "title": "utf16", "identifier": "utf16.md", "chunks": 0, "licenceClass": "unknown"}
+[upload] Latin-1 .txt: 200 {"status": "failed", "reason": "the kit did not store it: parse error: 'utf-8' codec can't decode byte 0xe9 in position 26: invalid continuation byte", "documentId": null, "title": "latin1", "identifier": "latin1.txt", "chunks": 0, "licenceClass": "unknown"}
+[upload] invalid UTF-8 .md: 200 {"status": "failed", "reason": "the kit did not store it: parse error: 'utf-8' codec can't decode byte 0xff in position 14: invalid start byte", "documentId": null, "title": "H8 bad", "identifier": "badutf8.md", "chunks": 0, "licenceClass": "unknown"}
+[upload] PDF with no text layer: 200 {"status": "failed", "reason": "the PDF has no text layer on any of its 2 pages", "documentId": null, "title": "", "identifier": "blank.pdf", "chunks": 0, "licenceClass": "unknown"}
+[upload] damaged PDF: 200 {"status": "failed", "reason": "the PDF did not parse: Stream has ended unexpectedly", "documentId": null, "title": "", "identifier": "damaged.pdf", "chunks": 0, "licenceClass": "unknown"}
+[upload] PDF with text: 200 {"status": "ingested", "reason": null, "documentId": "f457c9e3c8cf4464b23c70f2c7daecd9", "title": "H8 text PDF", "identifier": "text.pdf", "chunks": 1, "licenceClass": "unknown"}
+[upload] PDF with text, again (same bytes): 200 {"status": "held", "reason": null, "documentId": "f457c9e3c8cf4464b23c70f2c7daecd9", "title": "H8 text PDF", "identifier": "text.pdf", "chunks": 0, "licenceClass": "unknown"}
+[upload] JATS UTF-8: 200 {"status": "ingested", "reason": null, "documentId": "480be5f27747431fbf0a711a2af9a1f8", "title": "H8 JATS café study", "identifier": "jats.xml", "chunks": 2, "licenceClass": "unknown"}
+[upload] JATS UTF-16: 200 {"status": "failed", "reason": "XML did not parse: not well-formed (invalid token): line 1, column 0", "documentId": null, "title": "", "identifier": "jats-utf16.xml", "chunks": 0, "licenceClass": "unknown"}
+[upload] JATS Latin-1: 200 {"status": "held", "reason": null, "documentId": "480be5f27747431fbf0a711a2af9a1f8", "title": "H8 JATS caf� study", "identifier": "jats-latin1.xml", "chunks": 0, "licenceClass": "unknown"}
+[upload] non-JATS XML: 200 {"status": "failed", "reason": "no <article> element (root is <root>)", "documentId": null, "title": "", "identifier": "x.xml", "chunks": 0, "licenceClass": "unknown"}
+[upload] XML entity bomb: 200 {"status": "failed", "reason": "XML did not parse: limit on input amplification factor (from DTD and entities) breached: line 1, column 342", "documentId": null, "title": "", "identifier": "bomb.xml", "chunks": 0, "licenceClass": "unknown"}
+[upload] XML external entity: 200 {"status": "failed", "reason": "XML did not parse: undefined entity &x;: line 1, column 122", "documentId": null, "title": "", "identifier": "xxe.xml", "chunks": 0, "licenceClass": "unknown"}
+[upload] wrong suffix .docx: 200 {"status": "failed", "reason": "paper.docx is not one of .pdf, .md, .markdown, .txt, .html, .htm, .xml", "documentId": null, "title": "", "identifier": "paper.docx", "chunks": 0, "licenceClass": "unknown"}
+[upload] no suffix: 200 {"status": "failed", "reason": "README is not one of .pdf, .md, .markdown, .txt, .html, .htm, .xml", "documentId": null, "title": "", "identifier": "README", "chunks": 0, "licenceClass": "unknown"}
+[upload] HTML with script: 200 {"status": "ingested", "reason": null, "documentId": "fb047f57442b43dba92889acaed248f1", "title": "H8 page", "identifier": "page.html", "chunks": 1, "licenceClass": "unknown"}
+[upload] same identifier, other bytes (1): 200 {"status": "ingested", "reason": null, "documentId": "4e43f52344c24c278194859b1c1589da", "title": "Same name", "identifier": "same-name.md", "chunks": 1, "licenceClass": "unknown"}
+[upload] same identifier, other bytes (2): 200 {"status": "ingested", "reason": null, "documentId": "569f9f08c1bd4ff180f32bfe5b81279a", "title": "Same name", "identifier": "same-name.md", "chunks": 1, "licenceClass": "unknown"}
+[upload] dot-dot name: 200 {"status": "ingested", "reason": null, "documentId": "dc038a3d36be4c9b9c5e605b4cf3e8c0", "title": "Traversal", "identifier": "passwd.md", "chunks": 1, "licenceClass": "unknown"}
+[upload] percent-encoded dot-dot name: 200 {"status": "ingested", "reason": null, "documentId": "8afb4cca5437409dac81791ea3799f4b", "title": "Traversal two", "identifier": "passwd2.md", "chunks": 1, "licenceClass": "unknown"}
+[upload] very long name: 200 {"status": "ingested", "reason": null, "documentId": "ee17b330a1d14b4d84a644fd21cda2ac", "title": "Long name", "identifier": "nnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnn
+[upload] unicode name: 200 {"status": "ingested", "reason": null, "documentId": "c7a96beef7e847dfb5cc83bcc453faec", "title": "Unicode name", "identifier": "résumé ✓ 文献.md", "chunks": 1, "licenceClass": "unknown"}
+[upload] HTML in the name: 200 {"status": "ingested", "reason": null, "documentId": "a5251ff5fba8436cabb6ff2f600b0e19", "title": "HTML name", "identifier": "<img src=x onerror=alert(1)>.md", "chunks": 1, "licenceClass": "unknown"}
+[upload] script in the name: 200 {"status": "ingested", "reason": null, "documentId": "deb2c9710efb4d2cac8ece282f11abe3", "title": "Script name", "identifier": "script>.md", "chunks": 1, "licenceClass": "unknown"}
+[upload] NUL in the name: 500 "Internal Server Error"
+Traceback (most recent call last):
+  File "/home/user/openFermentUI/core/.venv/lib/python3.13/site-packages/httpx/_transports/default.py", line 101, in map_httpcore_exceptions
+    yield
+  File "/home/user/openFermentUI/core/.venv/lib/python3.13/site-packages/httpx/_transports/default.py", line 250, in handle_request
+    resp = self._pool.handle_request(req)
+  File "/home/user/openFermentUI/core/.venv/lib/python3.13/site-packages/httpcore/_sync/connection_pool.py", line 256, in handle_request
+    raise exc from None
+  File "/home/user/openFermentUI/core/.venv/lib/python3.13/site-packages/httpcore/_sync/connection_pool.py", line 236, in handle_request
+    response = connection.handle_request(
+        pool_request.request
+    )
+  File "/home/user/openFermentUI/core/.venv/lib/python3.13/site-packages/httpcore/_sync/connection.py", line 103, in handle_request
+    return self._connection.handle_request(request)
+           ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~^^^^^^^^^
+  File "/home/user/openFermentUI/core/.venv/lib/python3.13/site-packages/httpcore/_sync/http11.py", line 136, in handle_request
+    raise exc
+  File "/home/user/openFermentUI/core/.venv/lib/python3.13/site-packages/httpcore/_sync/http11.py", line 106, in handle_request
+    ) = self._receive_response_headers(**kwargs)
+        ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~^^^^^^^^^^
+  File "/home/user/openFermentUI/core/.venv/lib/python3.13/site-packages/httpcore/_sync/http11.py", line 177, in _receive_response_headers
+    event = self._receive_event(timeout=timeout)
+  File "/home/user/openFermentUI/core/.venv/lib/python3.13/site-packages/httpcore/_sync/http11.py", line 217, in _receive_event
+    data = self._network_stream.read(
+        self.READ_NUM_BYTES, timeout=timeout
+    )
+  File "/home/user/openFermentUI/core/.venv/lib/python3.13/site-packages/httpcore/_backends/sync.py", line 126, in read
+    with map_exceptions(exc_map):
+         ~~~~~~~~~~~~~~^^^^^^^^^
+  File "/usr/lib/python3.13/contextlib.py", line 162, in __exit__
+    self.gen.throw(value)
+    ~~~~~~~~~~~~~~^^^^^^^
+  File "/home/user/openFermentUI/core/.venv/lib/python3.13/site-packages/httpcore/_exceptions.py", line 14, in map_exceptions
+    raise to_exc(exc) from exc
+httpcore.ReadError: [Errno 104] Connection reset by peer
+
+The above exception was the direct cause of the following exception:
+
+Traceback (most recent call last):
+  File "/home/user/openFermentUI/bughunt/notes/H8/scripts/intake_fuzz.py", line 78, in <module>
+    upload("licence class not a class", "lc.md", b"# LC\n\nwords for the licence class test\n", licenceClass="cc-by")
+    ~~~~~~^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/home/user/openFermentUI/bughunt/notes/H8/scripts/intake_fuzz.py", line 36, in upload
+    r = c.post("/api/intake/upload", files={"file": (name, data, "application/octet-stream")}, data=fields)
+  File "/home/user/openFermentUI/core/.venv/lib/python3.13/site-packages/httpx/_client.py", line 1144, in post
+    return self.request(
+           ~~~~~~~~~~~~^
+        "POST",
+        ^^^^^^^
+    ...<11 lines>...
+        extensions=extensions,
+        ^^^^^^^^^^^^^^^^^^^^^^
+    )
+    ^
+  File "/home/user/openFermentUI/core/.venv/lib/python3.13/site-packages/httpx/_client.py", line 825, in request
+    return self.send(request, auth=auth, follow_redirects=follow_redirects)
+           ~~~~~~~~~^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/home/user/openFermentUI/core/.venv/lib/python3.13/site-packages/httpx/_client.py", line 914, in send
+    response = self._send_handling_auth(
+        request,
+    ...<2 lines>...
+        history=[],
+    )
+  File "/home/user/openFermentUI/core/.venv/lib/python3.13/site-packages/httpx/_client.py", line 942, in _send_handling_auth
+    response = self._send_handling_redirects(
+        request,
+        follow_redirects=follow_redirects,
+        history=history,
+    )
+  File "/home/user/openFermentUI/core/.venv/lib/python3.13/site-packages/httpx/_client.py", line 979, in _send_handling_redirects
+    response = self._send_single_request(request)
+  File "/home/user/openFermentUI/core/.venv/lib/python3.13/site-packages/httpx/_client.py", line 1014, in _send_single_request
+    response = transport.handle_request(request)
+  File "/home/user/openFermentUI/core/.venv/lib/python3.13/site-packages/httpx/_transports/default.py", line 249, in handle_request
+    with map_httpcore_exceptions():
+         ~~~~~~~~~~~~~~~~~~~~~~~^^
+  File "/usr/lib/python3.13/contextlib.py", line 162, in __exit__
+    self.gen.throw(value)
+    ~~~~~~~~~~~~~~^^^^^^^
+  File "/home/user/openFermentUI/core/.venv/lib/python3.13/site-packages/httpx/_transports/default.py", line 118, in map_httpcore_exceptions
+    raise mapped_exc(message) from exc
+httpx.ReadError: [Errno 104] Connection reset by peer

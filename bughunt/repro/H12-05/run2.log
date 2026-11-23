@@ -1,0 +1,18 @@
+worktree /tmp/claude-0/-home-user-openFermentUI/cfbc5c9f-640a-5002-a705-5ceaf850fdc6/scratchpad/bh/work/H12-05/wt-21101 at 2047f5a; database bh_r_h12_05_db (fresh)
+the tests import /tmp/claude-0/-home-user-openFermentUI/cfbc5c9f-640a-5002-a705-5ceaf850fdc6/scratchpad/bh/work/H12-05/wt-21101/core/openferment_core/__init__.py
+1. baseline, test_no_seed.py on the tree as it is: exit 0, 47 passed in 3.73s
+2. control, src/data/control.ts exporting RECORDS: exit 1, 1 failed, 46 passed in 3.13s
+   AssertionError: ['src/data/control.ts: RECORDS']
+3. planted (git status in the worktree, the linked venv left out):
+   ?? core/openferment_core/typical_values.py
+   ?? src/data/yields.ts
+   typical_values.py:2:ETHANOL_TITRE_G_PER_L = 92.0          # a titre: S. cerevisiae CEN.PK113-7D, fed-batch, from a paper's table 2
+   typical_values.py:3:ETHANOL_YIELD_G_PER_G = 0.48          # a yield
+   typical_values.py:4:CORN_STOVER_GLUCAN_FRACTION = 0.35    # a composition
+   typical_values.py:5:ENZYME_PRICE_USD_PER_KG = 4.24        # a price
+   src/data/yields.ts:2:export const TYPICAL_YIELDS = [
+   test_no_seed.py with the plant: exit 0, 47 passed in 2.61s
+   test_no_seed.py, test_boundaries.py and test_guidance.py with the plant: exit 0, 69 passed in 4.21s
+EXPECTED: test_no_seed.py fails on core/openferment_core/typical_values.py (a titre 92.0 g/L, a yield 0.48 g/g, a glucan fraction 0.35, an enzyme price 4.24 USD/kg) and on src/data/yields.ts exporting TYPICAL_YIELDS by strain, as it fails on the control's RECORDS export (CLAUDE.md:11; ADR-011 'test_no_seed.py holds acceptance A4')
+OBSERVED: baseline exit 0 (47 passed in 3.73s); control exit 1 (1 failed, 46 passed in 3.13s); with the 4 typed values and the yield table planted, test_no_seed.py exits 0 (47 passed in 2.61s), and with test_boundaries.py and test_guidance.py exits 0 (69 passed in 4.21s)
+RESULT: DEFECT

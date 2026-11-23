@@ -1,4 +1,4 @@
-"""Proposals (OF-BLD-015 §7.4): what a model asked for at a gate, kept
+"""Proposals: what a model asked for at a gate, kept
 until a person carries it out or dismisses it.
 
 A write tool whose action a gate covers (`tools/gates.py`) writes nothing:
@@ -14,7 +14,7 @@ Each proposal is a row of the project's `proposals` table (ADR-001), written
 under the project's proposals lock (`db.lock`) with its audit row in the same
 transaction.
 
-THE RULES (OF-BLD-016 §1.R). A proposal's words reach Home and the model's
+THE RULES. A proposal's words reach Home and the model's
 next ask, so its title, why, note, target and field values hold no number
 (`validate.find_number`, Rule 1), and its target is an id: a proposal that
 breaks either is refused whole, never repaired. One ask makes one open
@@ -29,7 +29,6 @@ from __future__ import annotations
 
 import uuid
 from datetime import datetime, timezone
-from typing import Any
 
 from sqlalchemy.ext.asyncio import AsyncSession
 
@@ -109,17 +108,23 @@ def propose(
     note: str = "",
     ask_id: str | None = None,
     effort: str | None = None,
+    agent: str = "model",
+    via: str | None = None,
 ) -> Proposal:
+    """A proposal kept for a person to carry out, by `by`: the model that
+    proposed it, or the person a tool's HTTP door names (`agent` "person"),
+    as its audit row says; a model's row names the door its call came in by
+    (`via`: postdoc, mcp or http)."""
     _held_to_rule_one(title=title, why=why, note=note, target=target, fields=fields or {})
     made = Proposal(
         id=f"pr-{uuid.uuid4().hex[:12]}", at=_now(), module=module, action=action, gate=gate.id,  # type: ignore[arg-type]
         title=title, why=why, how=gate.how, route=gate.route, server=gate.server,
         target=target or None, fields=fields or {}, note=note, by=by, askId=ask_id or None,
     )
-    return db.run(_keep(projects.current(), made, effort))
+    return db.run(_keep(projects.current(), made, effort, agent, via))
 
 
-async def _keep(pid: str, made: Proposal, effort: str | None) -> Proposal:
+async def _keep(pid: str, made: Proposal, effort: str | None, agent: str = "model", via: str | None = None) -> Proposal:
     """The proposal and its audit row, written together, unless one of its
     kind already waits in this ask."""
     async with db.session() as s:
@@ -133,9 +138,9 @@ async def _keep(pid: str, made: Proposal, effort: str | None) -> Proposal:
             raise ProposalRefused(f"{made.module} {made.action}{on} is already proposed in this ask ({twin.id}) and "
                                   "waits for a person")
         await _put(s, pid, made)
-        await audit.add(pid, agent="model", who=made.by, module=made.module, action=made.action, state="proposed",
+        await audit.add(pid, agent=agent, who=made.by, module=made.module, action=made.action, state="proposed",
                         target=made.target, ask_id=made.askId, effort=effort,
-                        detail={"proposalId": made.id, "gate": made.gate})
+                        detail={"proposalId": made.id, "gate": made.gate, **({"via": via} if via else {})})
     return made
 
 
@@ -185,7 +190,7 @@ def _run(p: Proposal, person: str, acting: str | None = None) -> str:
     if (p.module, p.action) == ("home", "note"):
         # The notebook arrives with OF-BLD-017 §5.3; until then the note is
         # kept here, under the person's name, and the audit line says so.
-        return f"note kept on this proposal under {person}'s name until the notebook lands (OF-BLD-017 §5.3)"
+        return f"note kept on this proposal under {person}'s name until a notebook exists"
     if p.server:
         # A server gate the server has no action for runs nothing, so it is
         # never marked done (§1.R finding 12): it stays open to be dismissed.
@@ -283,8 +288,3 @@ def listed(state: str | None = None) -> list[Proposal]:
     """Every proposal, or those in one state, as `shown`: what
     GET /api/proposals serves."""
     return [shown(p) for p in db.run(_read(projects.current(), state))]
-
-
-def as_rows(limit: int = 20) -> list[dict[str, Any]]:
-    """Open proposals as `home_read` lists them."""
-    return [shown(p).model_dump(mode="json") for p in open_ones()[:limit]]

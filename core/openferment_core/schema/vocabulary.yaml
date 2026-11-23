@@ -85,12 +85,12 @@ unitOperations:
 - id: nanofiltration
   label: Nanofiltration
   stage: concentration
-  note: oligosaccharide retention
+  note: 'a tight membrane: water and small ions pass, larger solutes stay'
   biosteamClasses: []
 - id: electrodialysis
   label: Electrodialysis
   stage: desalting
-  note: HMO salt removal
+  note: ions leave the stream through charged membranes under an electric field
   biosteamClasses: []
 - id: iex
   label: Ion exchange chromatography
@@ -115,7 +115,7 @@ unitOperations:
 - id: sec
   label: Size exclusion chromatography
   stage: polish
-  note: low throughput, high resolution
+  note: separates by molecular size through a porous bed
   biosteamClasses: []
 - id: mixed-mode
   label: Mixed-mode chromatography
@@ -125,12 +125,12 @@ unitOperations:
 - id: heat-step
   label: Thermal clarification
   stage: capture
-  note: thermostable enzymes only — huge cost saver for Taq-class products
+  note: the stream is heated so host proteins denature and settle out, and a heat-stable product stays in solution
   biosteamClasses: []
 - id: refolding
   label: Inclusion body solubilisation + refolding
   stage: recovery
-  note: E. coli intracellular route
+  note: insoluble aggregates dissolve in a denaturant, and the protein folds again as the denaturant leaves
   biosteamClasses: []
 - id: protease-cleavage
   label: Protease tag cleavage
@@ -150,8 +150,8 @@ unitOperations:
   biosteamClasses: []
 - id: lle
   label: Liquid-liquid extraction
-  stage: recovery
-  note: terpene recovery
+  stage: capture
+  note: the product moves from the broth into an immiscible solvent
   biosteamClasses:
   - LLEUnit
   - LLESettler
@@ -163,7 +163,7 @@ unitOperations:
 - id: distillation
   label: Distillation / rectification
   stage: purification
-  note: terpene finishing; the beer column and rectifier of an ethanol plant
+  note: separates by volatility; the beer column and rectifier of an ethanol plant
   biosteamClasses:
   - Distillation
   - BinaryDistillation
@@ -171,25 +171,25 @@ unitOperations:
   - AdiabaticMultiStageVLEColumn
 - id: molecular-sieve
   label: Molecular sieve dehydration
-  stage: purification
+  stage: polish
   note: adsorbs the water distillation cannot take past the ethanol-water azeotrope
   biosteamClasses:
   - MolecularSieve
 - id: spray-dry
   label: Spray drying
   stage: drying
-  note: ambient-stable powder
+  note: the liquid, atomised into hot gas, dries to a powder
   biosteamClasses:
   - SprayDryer
 - id: lyophilisation
   label: Lyophilisation
   stage: drying
-  note: highest stability, highest cost
+  note: water sublimes from the frozen product under vacuum
   biosteamClasses: []
 - id: granulation
   label: Granulation
   stage: formulation
-  note: dust-free industrial enzyme
+  note: a powder bound into granules
   biosteamClasses: []
 - id: sterile-filtration
   label: Sterile filtration
@@ -199,12 +199,12 @@ unitOperations:
 - id: endotoxin-removal
   label: Endotoxin clearance
   stage: polish
-  note: mandatory for E. coli-derived research/clinical proteins
+  note: lipopolysaccharide removed from the product stream
   biosteamClasses: []
 - id: nuclease-clearance
   label: Nuclease/residual-DNA clearance
   stage: polish
-  note: defining step for molecular-biology enzyme grade
+  note: nucleic acid digested or bound and removed from the product stream
   biosteamClasses: []
 - id: pressure-filtration
   label: Pressure filtration
@@ -244,7 +244,7 @@ unitOperations:
   - MultiEffectEvaporator
 - id: lle-multistage
   label: Counter-current extraction
-  stage: recovery
+  stage: capture
   note: mixer-settlers in series, the solvent against the broth
   biosteamClasses:
   - MultiStageMixerSettlers

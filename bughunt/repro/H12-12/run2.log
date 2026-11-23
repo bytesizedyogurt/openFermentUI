@@ -1,0 +1,31 @@
+== worktree /tmp/claude-0/-home-user-openFermentUI/cfbc5c9f-640a-5002-a705-5ceaf850fdc6/scratchpad/bh/work/H12-12/wt-26662 at 2047f5a, diff:  1 file changed, 1 insertion(+), 1 deletion(-)
+== 1. the contract, and the tests that ask which entry corrects a reading
+   measurements.py: def corrected_by(deposition: dict[str, Any], entry: dict[str, Any]) -> str | None:
+   measurements.py:     """The id of the entry that corrects `entry` in its deposition, or None
+   measurements.py:     when `entry` is the reading that stands for its measure: the latest
+   measurements.py:     entry on the same measure that shares its sample time, or that has none
+   measurements.py:     when `entry` has none (the module's docstring). Entries are appended, so
+   measurements.py:     a later one stands after an earlier one in the list."""
+   core/tests/test_measurements.py:125:    ("de-1", 3.0, "kg/hr", "kg/hr", {}, "reading dep-1/de-1 was corrected by dep-1/de-3, the reading that stands"),
+   core/tests/test_measurements.py:126:    ("de-5", 1.0, "placeholder-unit", "placeholder-unit", {}, "reading dep-1/de-5 was corrected by dep-1/de-7"),
+   core/tests/test_measurements.py:163:    with pytest.raises(MeasurementRefused, match="reading dep-1/de-3 was corrected by dep-1/de-10, which waits for a "
+   core/tests/test_measurements.py:204:    assert corrected_by(body, by_id["de-1"]) == "de-3" and corrected_by(body, by_id["de-3"]) is None
+   core/tests/test_measurements.py:205:    assert corrected_by(body, by_id["de-5"]) == "de-7" and corrected_by(body, by_id["de-6"]) is None
+   core/tests/test_measurements.py:206:    assert corrected_by(body, by_id["de-7"]) is None
+   core/tests/test_measurements.py:342:    assert ran.status_code == 422 and "reading dep-1/de-3 was corrected by dep-1/de-10" in ran.json()["detail"]
+   each asks about a reading whose deposition holds one correction after it:
+     ENTRIES: de-1 -> de-3 (m-flow, no time), de-5 -> de-7 (m-series at sample time 1)
+     [*ENTRIES, de-10]: the lookup asks about de-3, whose one correction is de-10
+   tests asking about a reading corrected twice (de-1 with de-3 and de-10 after it): 0
+== 2. a flow read three times on bh_r_h12_12_probe: de-1, its correction de-3, a second correction de-10 waiting
+   module: core/openferment_core/measurements.py
+   as it stands:  corrected_by(de-1) = de-10; corrected_by(de-3) = de-10
+                  looked_up(de-1) refused: stream.sugarcane.F_mass: reading dep-asis/de-1 was corrected by dep-asis/de-10, which waits for a person to confirm its number at the bench
+   M37 applied:   - return str(later[-1].get("id")) if later else None + return str(later[0].get("id")) if later else None
+   with M37:      corrected_by(de-1) = de-3; corrected_by(de-3) = de-10
+                  looked_up(de-1) refused: stream.sugarcane.F_mass: reading dep-m37/de-1 was corrected by dep-m37/de-3, the reading that stands for its measure now
+== 3. pytest test_measurements.py test_basis.py test_finite_inputs.py with M37
+   139 passed in 8.05s
+EXPECTED: corrected_by names the latest correction of a reading corrected twice (de-10, measurements.py:90-95), the refusal says de-10 waits, and a test of a reading with two corrections fails when the first (de-3) is named
+OBSERVED: tree names de-10; M37 names de-3 and says "dep-m37/de-3, the reading that stands for its measure now"; tests asking about a reading corrected twice: 0; the three files with M37: 139 passed in 8.05s (exit 0)
+RESULT: DEFECT

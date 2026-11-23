@@ -21,8 +21,10 @@ import {
   Timer as TimerIcon,
   Wrench,
 } from 'lucide-react';
-import type { ExtractionRecord, Protocol, ProtocolVersion, RunState, Step } from '@/data/types';
-import { useSkillById, useStore } from '@/store';
+import type { MaterialStock, Protocol, ProtocolReference, ProtocolVersion, Step } from '@/lib/protocols';
+import type { RunState } from '@/store';
+import type { ExtractionRecord } from '@/lib/review';
+import { useProtocol, useSkillById, useStore } from '@/store';
 import { href, navigate } from '@/router';
 import {
   batchLabel,
@@ -31,7 +33,7 @@ import {
   scaleMaterials,
   type ScaledMaterial,
 } from '@/engine/scale';
-import { diffVersions } from '@/engine/diff';
+import { diffVersions, materialChanges, stepChanges } from '@/engine/diff';
 import { convert, fmt, normalizeUnit, sameFamily } from '@/engine/units';
 import { CitationChip } from '@/components/Chip';
 import { Markdown, inlineMarkdown } from '@/components/Markdown';
@@ -89,7 +91,7 @@ function stepProvenance(
   const paperIds = new Set<string>();
   for (const ref of step.refs ?? []) (ref.startsWith('r-') ? recordIds : paperIds).add(ref);
   for (const m of step.text.matchAll(PLACEHOLDER_SCAN)) {
-    const mat = version.materials.find((x) => x.name === m[1]);
+    const mat = (version.materials ?? []).find((x) => x.name === m[1]);
     if (mat?.sourceRecordId) recordIds.add(mat.sourceRecordId);
   }
   return provenanceFromRefs(recordIds, paperIds, records);
@@ -145,11 +147,11 @@ interface OtherChange {
   after?: string;
 }
 
-function refKey(r: { paperId?: string; recordId?: string; note?: string }): string {
+function refKey(r: ProtocolReference): string {
   return `${r.paperId ?? ''}|${r.recordId ?? ''}|${r.note ?? ''}`;
 }
 
-function refLabel(r: { paperId?: string; recordId?: string; note?: string }): string {
+function refLabel(r: ProtocolReference): string {
   const id = r.recordId ?? r.paperId ?? '—';
   return r.note ? `${id} — ${r.note}` : id;
 }
@@ -187,20 +189,20 @@ function otherChanges(a: ProtocolVersion, b: ProtocolVersion): OtherChange[] {
       after: fmtMinutes(b.estMinutes.total),
     });
 
-  for (const e of b.equipment) if (!a.equipment.includes(e)) out.push({ label: 'Equipment added', after: e });
-  for (const e of a.equipment) if (!b.equipment.includes(e)) out.push({ label: 'Equipment removed', before: e });
-  for (const s of b.safety) if (!a.safety.includes(s)) out.push({ label: 'Safety note added', after: s });
-  for (const s of a.safety) if (!b.safety.includes(s)) out.push({ label: 'Safety note removed', before: s });
+  for (const e of (b.equipment ?? [])) if (!(a.equipment ?? []).includes(e)) out.push({ label: 'Equipment added', after: e });
+  for (const e of (a.equipment ?? [])) if (!(b.equipment ?? []).includes(e)) out.push({ label: 'Equipment removed', before: e });
+  for (const s of (b.safety ?? [])) if (!(a.safety ?? []).includes(s)) out.push({ label: 'Safety note added', after: s });
+  for (const s of (a.safety ?? [])) if (!(b.safety ?? []).includes(s)) out.push({ label: 'Safety note removed', before: s });
 
-  const aRefs = a.references.map(refKey);
-  const bRefs = b.references.map(refKey);
-  for (const r of b.references)
+  const aRefs = (a.references ?? []).map(refKey);
+  const bRefs = (b.references ?? []).map(refKey);
+  for (const r of (b.references ?? []))
     if (!aRefs.includes(refKey(r))) out.push({ label: 'Reference added', after: refLabel(r) });
-  for (const r of a.references)
+  for (const r of (a.references ?? []))
     if (!bRefs.includes(refKey(r))) out.push({ label: 'Reference removed', before: refLabel(r) });
 
-  const aSteps = new Map(a.steps.map((s) => [s.id, s]));
-  for (const s of b.steps) {
+  const aSteps = new Map((a.steps ?? []).map((s) => [s.id, s]));
+  for (const s of (b.steps ?? [])) {
     const prev = aSteps.get(s.id);
     if (!prev) continue;
     if ((prev.note ?? '') !== (s.note ?? ''))
@@ -218,13 +220,13 @@ function otherChanges(a: ProtocolVersion, b: ProtocolVersion): OtherChange[] {
         after: (s.refs ?? []).join(', ') || '—',
       });
   }
-  const sharedInB = b.steps.filter((s) => aSteps.has(s.id)).map((s) => s.id);
-  const sharedInA = a.steps.filter((s) => b.steps.some((x) => x.id === s.id)).map((s) => s.id);
+  const sharedInB = (b.steps ?? []).filter((s) => aSteps.has(s.id)).map((s) => s.id);
+  const sharedInA = (a.steps ?? []).filter((s) => (b.steps ?? []).some((x) => x.id === s.id)).map((s) => s.id);
   if (sharedInA.join('>') !== sharedInB.join('>'))
     out.push({ label: 'Step order', before: sharedInA.join(' → '), after: sharedInB.join(' → ') });
 
-  const aMats = new Map(a.materials.map((m) => [m.name, m]));
-  for (const m of b.materials) {
+  const aMats = new Map((a.materials ?? []).map((m) => [m.name, m]));
+  for (const m of (b.materials ?? [])) {
     const prev = aMats.get(m.name);
     if (!prev) continue;
     if (prev.precision !== m.precision)
@@ -233,7 +235,7 @@ function otherChanges(a: ProtocolVersion, b: ProtocolVersion): OtherChange[] {
         before: `${fmt(prev.precision)} ${prev.unit}`,
         after: `${fmt(m.precision)} ${m.unit}`,
       });
-    const stockOf = (s?: { conc: number; unit: string }, unit?: string) =>
+    const stockOf = (s?: MaterialStock | null, unit?: string) =>
       s ? `${fmt(s.conc)} ${unit} per ${s.unit}` : 'no stock solution';
     if (JSON.stringify(prev.stock ?? null) !== JSON.stringify(m.stock ?? null))
       out.push({
@@ -313,7 +315,7 @@ function StepCard({
               <StepText step={step} version={version} scale={scale} />
             </div>
 
-            {(step.timerSec !== undefined || (step.refs?.length ?? 0) > 0 || (step.skills?.length ?? 0) > 0) && (
+            {(step.timerSec != null || (step.refs?.length ?? 0) > 0 || (step.skills?.length ?? 0) > 0) && (
               <div className="flex flex-wrap items-center gap-1.5">
                 {/* OF-BLD-013 §1.4 — what a person needs to perform this step. */}
                 {(step.skills ?? []).map((sk) => (
@@ -326,7 +328,7 @@ function StepCard({
                     {SKILL_BY_ID[sk]?.name ?? sk}
                   </a>
                 ))}
-                {step.timerSec !== undefined && (
+                {step.timerSec != null && (
                   <span
                     className="chip text-signal-info border-signal-info/40"
                     title="Deposition starts this countdown when the step opens"
@@ -474,6 +476,16 @@ function MaterialsTable({
 
 // ── version compare ────────────────────────────────────────────────────
 
+/** The skills a step needs on one side of a compare, by name where the skill catalogue holds them. */
+function StepSkills({ ids }: { ids: string[] }) {
+  const byId = useSkillById();
+  return (
+    <div className="text-caption text-ink-soft mt-1" data-testid="compare-step-skills">
+      {ids.length === 0 ? 'needs no skill' : `needs ${ids.map((id) => byId[id]?.name ?? id).join(', ')}`}
+    </div>
+  );
+}
+
 function ChangeBadge({ kind }: { kind: 'added' | 'removed' | 'modified' | 'unchanged' }) {
   const cls =
     kind === 'added'
@@ -548,7 +560,7 @@ function CompareBody({
         {picker}
         <EmptyState
           title="Version unavailable"
-          body="One of the selected versions is no longer in this session."
+          body={`The project keeps no version ${a ? bVersion : aVersion} of this protocol; choose one of the versions it keeps above.`}
         />
       </>
     );
@@ -645,9 +657,10 @@ function CompareBody({
                       </td>
                       <td className="px-2 py-1.5">
                         <ChangeBadge kind={m.kind} />
-                        {m.kind === 'modified' && m.a && m.b && m.a.scaling !== m.b.scaling && (
-                          <div className="text-caption text-ink-soft mt-0.5">
-                            scaling {m.a.scaling} → {m.b.scaling}
+                        {m.kind === 'modified' && m.a && m.b && (
+                          <div className="text-caption text-ink-soft mt-0.5" data-testid="compare-material-changes">
+                            {materialChanges(m.a, m.b).join(', ')}
+                            {m.a.scaling !== m.b.scaling && ` (scaling ${m.a.scaling} → ${m.b.scaling})`}
                           </div>
                         )}
                       </td>
@@ -686,17 +699,8 @@ function CompareBody({
                   <span className="font-num text-caption text-ink-soft">{id}</span>
                   <ChangeBadge kind={d.kind} />
                   {d.kind === 'modified' && d.a && d.b && (
-                    <span className="text-caption text-ink-soft">
-                      {[
-                        d.a.text !== d.b.text ? 'instruction' : null,
-                        d.a.timerSec !== d.b.timerSec ? 'timer' : null,
-                        JSON.stringify(d.a.multiCheck ?? null) !==
-                        JSON.stringify(d.b.multiCheck ?? null)
-                          ? 'sub-checks'
-                          : null,
-                      ]
-                        .filter(Boolean)
-                        .join(', ')}
+                    <span className="text-caption text-ink-soft" data-testid="compare-step-changes">
+                      {stepChanges(d.a, d.b).join(', ')}
                     </span>
                   )}
                 </div>
@@ -705,32 +709,34 @@ function CompareBody({
                     <div className="rounded-input border border-signal-error/30 bg-signal-error/[0.05] p-2">
                       <div className="text-caption text-ink-soft font-num mb-1">v{a.version}</div>
                       <div className="text-body">{renderStepText(d.a!, a, 1)}</div>
-                      {d.a!.timerSec !== undefined && (
+                      {d.a!.timerSec != null && (
                         <div className="text-caption text-ink-soft font-num mt-1">
                           timer {fmtTimer(d.a!.timerSec)}
                         </div>
                       )}
-                      {d.a!.multiCheck && (
+                      {(d.a!.multiCheck?.length ?? 0) > 0 && (
                         <div className="text-caption text-ink-soft mt-1">
-                          {d.a!.multiCheck.length} sub-check
-                          {d.a!.multiCheck.length === 1 ? '' : 's'}
+                          {d.a!.multiCheck?.length} sub-check
+                          {d.a!.multiCheck?.length === 1 ? '' : 's'}
                         </div>
                       )}
+                      {stepChanges(d.a!, d.b!).includes('skills') && <StepSkills ids={d.a!.skills ?? []} />}
                     </div>
                     <div className="rounded-input border border-accent/30 bg-accent-wash/60 p-2">
                       <div className="text-caption text-ink-soft font-num mb-1">v{b.version}</div>
                       <div className="text-body">{renderStepText(d.b!, b, 1)}</div>
-                      {d.b!.timerSec !== undefined && (
+                      {d.b!.timerSec != null && (
                         <div className="text-caption text-ink-soft font-num mt-1">
                           timer {fmtTimer(d.b!.timerSec)}
                         </div>
                       )}
-                      {d.b!.multiCheck && (
+                      {(d.b!.multiCheck?.length ?? 0) > 0 && (
                         <div className="text-caption text-ink-soft mt-1">
-                          {d.b!.multiCheck.length} sub-check
-                          {d.b!.multiCheck.length === 1 ? '' : 's'}
+                          {d.b!.multiCheck?.length} sub-check
+                          {d.b!.multiCheck?.length === 1 ? '' : 's'}
                         </div>
                       )}
+                      {stepChanges(d.a!, d.b!).includes('skills') && <StepSkills ids={d.b!.skills ?? []} />}
                     </div>
                   </div>
                 ) : (
@@ -762,8 +768,8 @@ function CompareBody({
         <SectionTitle>Other changes</SectionTitle>
         {other.length === 0 ? (
           <p className="text-body text-ink-soft">
-            No other field differs — equipment, safety, timings, references, step order and material
-            specs are identical.
+            No other field differs: the equipment, the safety notes, the timings, the references and the step
+            order are the same.
           </p>
         ) : (
           <ul className="space-y-1.5">
@@ -787,7 +793,8 @@ function CompareBody({
 // ── screen ─────────────────────────────────────────────────────────────
 
 export default function ProtocolDetail({ protocolId }: { protocolId: string }) {
-  const protocol = useStore((s) => s.protocols.find((p) => p.id === protocolId));
+  // A protocol made after the page opened is read from the service by its id (useProtocol).
+  const { protocol, state: protocolState, problem: protocolProblem } = useProtocol(protocolId);
   const records = useStore((s) => s.records);
   const strains = useStore((s) => s.strains);
   const runs = useStore((s) => s.runs);
@@ -849,8 +856,20 @@ export default function ProtocolDetail({ protocolId }: { protocolId: string }) {
         <PageHeader title="Protocol not found" eyebrow="Protocols" />
         <Card>
           <EmptyState
-            title="No such protocol"
-            body={`Nothing in this session has the id “${protocolId}”. It may have been renamed, or the link is from a different build.`}
+            title={
+              protocolState === 'problem'
+                ? 'The protocols could not be read'
+                : protocolState === 'reading'
+                  ? 'Reading the project\u2019s protocols'
+                  : 'No such protocol'
+            }
+            body={
+              protocolState === 'problem'
+                ? (protocolProblem ?? '')
+                : protocolState === 'reading'
+                  ? 'The protocols are read from the service as the page opens.'
+                  : `The project keeps no protocol “${protocolId}”. The link may be from another project.`
+            }
             icon={<ClipboardList size={22} />}
             action={<LinkButton to="/runbooks/protocols">Back to all protocols</LinkButton>}
           />
@@ -864,8 +883,8 @@ export default function ProtocolDetail({ protocolId }: { protocolId: string }) {
   const caps = capabilitiesOf(version);
   const prov = protocolProvenance(version, records);
   const isCurrent = version.version === protocol.currentVersion;
-  const citedMaterials = version.materials.filter((m) => m.sourceRecordId).length;
-  const citedSteps = version.steps.filter((s) => (s.refs?.length ?? 0) > 0).length;
+  const citedMaterials = (version.materials ?? []).filter((m) => m.sourceRecordId).length;
+  const citedSteps = (version.steps ?? []).filter((s) => (s.refs?.length ?? 0) > 0).length;
   const extreme = scale > 20 || scale < 0.1;
 
   const setBatch = (t: string) => {
@@ -1018,11 +1037,11 @@ export default function ProtocolDetail({ protocolId }: { protocolId: string }) {
             <Glyph size={11} aria-hidden />
             {meta.label}
           </span>
-          {protocol.organisms.length === 0 ? (
+          {(protocol.organisms ?? []).length === 0 ? (
             <span className="text-caption text-ink-soft">Organism-independent</span>
           ) : (
             <span className="flex flex-wrap items-center gap-1">
-              {protocol.organisms.map((o) => {
+              {(protocol.organisms ?? []).map((o) => {
                 const s = strainLabel(o, strains);
                 return (
                   <a
@@ -1045,7 +1064,7 @@ export default function ProtocolDetail({ protocolId }: { protocolId: string }) {
           </span>
           <span className="text-caption text-ink-soft font-num">
             {fmtMinutes(version.estMinutes.active)} active · {fmtMinutes(version.estMinutes.total)}{' '}
-            total · {version.steps.length} steps
+            total · {(version.steps ?? []).length} steps
           </span>
           <span className="flex items-center gap-1">
             {capabilityKeys(caps).map((k) => {
@@ -1064,11 +1083,11 @@ export default function ProtocolDetail({ protocolId }: { protocolId: string }) {
           <p className="text-caption text-ink-soft flex-1 min-w-0">
             {inlineMarkdown(protocol.provenanceNote, 'provnote')}{' '}
             <span className="font-num">
-              {citedMaterials}/{version.materials.length}
+              {citedMaterials}/{(version.materials ?? []).length}
             </span>{' '}
             materials and{' '}
             <span className="font-num">
-              {citedSteps}/{version.steps.length}
+              {citedSteps}/{(version.steps ?? []).length}
             </span>{' '}
             steps cite a source. Everything else is a value authored for this protocol, with no source behind it.
           </p>
@@ -1082,13 +1101,13 @@ export default function ProtocolDetail({ protocolId }: { protocolId: string }) {
             <SectionTitle>Overview</SectionTitle>
             <Card className="p-4">
               <Markdown md={protocol.purpose} className="prose-reading" />
-              {version.references.length > 0 && (
+              {(version.references ?? []).length > 0 && (
                 <div className="mt-3 pt-3 border-t border-line">
                   <div className="text-caption uppercase tracking-wide text-ink-soft mb-1.5">
                     Rationale and sources
                   </div>
                   <ul className="space-y-1.5">
-                    {version.references.map((r, i) => (
+                    {(version.references ?? []).map((r, i) => (
                       <li key={i} className="text-body flex flex-wrap items-baseline gap-1.5">
                         {r.recordId && <CitationChip recordId={r.recordId} />}
                         {!r.recordId && r.paperId && <CitationChip paperId={r.paperId} />}
@@ -1103,15 +1122,15 @@ export default function ProtocolDetail({ protocolId }: { protocolId: string }) {
 
           <section>
             <SectionTitle>Safety</SectionTitle>
-            {version.safety.length === 0 ? (
+            {(version.safety ?? []).length === 0 ? (
               <Callout kind="warn" title="No safety notes on this version">
                 This version records no hazards. Treat that as an omission, not an all-clear — check
                 your local risk assessment before running it.
               </Callout>
             ) : (
-              <Callout kind="warn" title={`BSL-${protocol.bsl} · ${version.safety.length} hazard notes`}>
+              <Callout kind="warn" title={`BSL-${protocol.bsl} · ${(version.safety ?? []).length} hazard notes`}>
                 <ul className="list-disc pl-4 space-y-1">
-                  {version.safety.map((s, i) => (
+                  {(version.safety ?? []).map((s, i) => (
                     <li key={i}>{inlineMarkdown(s, `safety-${i}`)}</li>
                   ))}
                 </ul>
@@ -1123,13 +1142,13 @@ export default function ProtocolDetail({ protocolId }: { protocolId: string }) {
             <SectionTitle
               right={
                 <span className="text-caption text-ink-soft font-num">
-                  {version.steps.length} steps at {batchLabel(version, scale)}
+                  {(version.steps ?? []).length} steps at {batchLabel(version, scale)}
                 </span>
               }
             >
               Steps
             </SectionTitle>
-            {version.steps.length === 0 ? (
+            {(version.steps ?? []).length === 0 ? (
               <Card>
                 <EmptyState
                   title="This version has no steps"
@@ -1139,7 +1158,7 @@ export default function ProtocolDetail({ protocolId }: { protocolId: string }) {
               </Card>
             ) : (
               <div className="space-y-2">
-                {version.steps.map((s, i) => (
+                {(version.steps ?? []).map((s, i) => (
                   <StepCard
                     key={s.id}
                     step={s}
@@ -1276,11 +1295,11 @@ export default function ProtocolDetail({ protocolId }: { protocolId: string }) {
           {/* Equipment */}
           <Card className="p-3">
             <SectionTitle>Equipment</SectionTitle>
-            {version.equipment.length === 0 ? (
+            {(version.equipment ?? []).length === 0 ? (
               <p className="text-body text-ink-soft">This version declares no equipment.</p>
             ) : (
               <ul className="space-y-1">
-                {version.equipment.map((e, i) => (
+                {(version.equipment ?? []).map((e, i) => (
                   <li key={i} className="flex items-start gap-1.5 text-body">
                     <Wrench size={13} className="mt-[4px] shrink-0 text-ink-soft" aria-hidden />
                     <span>{e}</span>
@@ -1311,7 +1330,7 @@ export default function ProtocolDetail({ protocolId }: { protocolId: string }) {
                 {protocolRuns.map((r) => {
                   const rv =
                     protocol.versions.find((v) => v.version === r.version) ?? version;
-                  const total = rv.steps.length;
+                  const total = (rv.steps ?? []).length;
                   const done = Object.keys(r.completed).length;
                   const skipped = Object.keys(r.skipped).length;
                   const minutes = r.finishedAt

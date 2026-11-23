@@ -1,0 +1,11 @@
+--- a/core/openferment_core/measurements.py
++++ b/core/openferment_core/measurements.py
+@@ -166,7 +166,7 @@
+     q, origin = value.quantity, value.quantity.origin
+     assert origin is not None  # a measurement, as `looked_up` and `readings` hand it
+     name, ref = value.name, (origin.ref or "").strip()
+-    if entry.get("confirmed") is not True:
++    if entry.get("confirmed") is False:
+         raise MeasurementRefused(f"{name}: reading {ref} waits for a person to confirm its number at the bench, and "
+                                  "an unconfirmed number is no measurement")
+     newer = corrected_by(deposition, entry)

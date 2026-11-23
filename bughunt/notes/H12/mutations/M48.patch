@@ -1,0 +1,11 @@
+--- a/core/openferment_core/engine/registry.py
++++ b/core/openferment_core/engine/registry.py
+@@ -172,7 +172,7 @@
+     for name, eps in named.items():
+         if len(eps) > 1:
+             core = [ep for ep in eps if _distribution(ep) == CORE_DISTRIBUTION]
+-            if len(core) != 1:
++            if len(core) > 1:
+                 found[name] = Found(name, eps[0].value, None, f"{len(eps)} packages register an engine named "
+                                     f"{name!r} ({' and '.join(ep.value for ep in eps)}), so none is used")
+                 continue

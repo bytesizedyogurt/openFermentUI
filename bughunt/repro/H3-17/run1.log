@@ -1,0 +1,9 @@
+service: http://127.0.0.1:9500 over a fresh bh_r_h3_17_svc (keyless), tree at 3f2840c, core/ as at 2047f5a: yes
+contract (docs/api/intake.md:103): 422 with a list of field errors for a field the kind does not take
+model (core/openferment_core/catalogues.py:204): class CatalogueEntry(BaseModel):; model_config in the class: 0
+control, a species on a product: 422 {"detail":[{"type":"value_error","loc":["body","entry"],"msg":"Value error, a species, a chemical set and other names belong to a strain","input":{"kind":"product","id":"p-h317","name":"H3-17 product","species":"Saccharo
+keep, a titre on a strain: 200; answer names titre: False; answer's keys: ['agent', 'aliases', 'at', 'blocks', 'by', 'category', 'checkpoint', 'criticality', 'family', 'id', 'kind', 'location', 'mastery', 'minutes', 'name', 'note', 'prerequisites', 'program', 'recencyDays', 'sequence', 'sequenceSource', 'skills', 'source', 'species', 'summary', 'supervisedRuns', 'via']
+read back /api/catalogues/strain/s-h317: 200; holds titre: False; by='Ada Lovelace'
+EXPECTED: the keep of strain s-h317 carrying titre refused with a 422 whose field errors name titre, and nothing kept under s-h317
+OBSERVED: the keep answered 200, the entry s-h317 was kept and titre dropped without a word (control 422: True); read back /api/catalogues/strain/s-h317: 200; holds titre: False; by='Ada Lovelace'
+RESULT: DEFECT

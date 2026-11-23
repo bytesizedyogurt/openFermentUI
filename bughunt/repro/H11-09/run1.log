@@ -1,0 +1,18 @@
+EXPECTED: scripts/host/install.sh, deploy.sh and nightly.sh, each run from the checkout as the runbook writes them
+EXPECTED: (docs/runbooks/live-host-install.md:133 'scripts/host/install.sh', :253 'scripts/host/deploy.sh',
+EXPECTED: :257 'scripts/host/nightly.sh'), run the same with CDPATH exported as '.:$HOME' as with no CDPATH:
+EXPECTED: lib.sh's REPO is the checkout's one absolute path, and each script gets past its first cd.
+setup: worktree 2047f5a; lib.sh:6 reads: REPO="$(cd "$(dirname "${BASH_SOURCE[0]}")/../.." && pwd)"
+== CDPATH unset
+   lib.sh's REPO: <checkout>
+   scripts/host/install.sh: exit 0; no cd failure; last line: Is it all wired:  pnpm ready
+   scripts/host/deploy.sh: exit 0; no cd failure; last line: ── Checking the live loop
+   scripts/host/nightly.sh: exit 0; no cd failure; last line: ── 2026-11-10 23:51:49 done, exit 0
+== CDPATH='.:$HOME' exported
+   lib.sh's REPO: $'<checkout>\n<checkout>'
+   scripts/host/install.sh: exit 1; scripts/host/install.sh: line 23: cd: $'<checkout>\n<checkout>': No such file or directory; last line: scripts/host/install.sh: line 23: cd: $'<checkout>\n<checkout>': No such file or directory
+   scripts/host/deploy.sh: exit 1; scripts/host/deploy.sh: line 17: cd: $'<checkout>\n<checkout>': No such file or directory; last line: scripts/host/deploy.sh: line 17: cd: $'<checkout>\n<checkout>': No such file or directory
+   scripts/host/nightly.sh: exit 1; scripts/host/nightly.sh: line 18: cd: $'<checkout>\n<checkout>/core': No such file or directory; last line: scripts/host/nightly.sh: line 18: cd: $'<checkout>\n<checkout>/core': No such file or directory
+OBSERVED: CDPATH unset: REPO is the checkout, 0 cd failures, 0 of 3 scripts exit non-zero.
+OBSERVED: CDPATH='.:$HOME': REPO is $'<checkout>\n<checkout>', 3 cd failures, 3 of 3 scripts exit non-zero, each at its first cd.
+RESULT: DEFECT

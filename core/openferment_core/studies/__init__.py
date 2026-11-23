@@ -3,8 +3,9 @@ plants and keeps of the answers.
 
     scenarios   a plant on the shelf, its configuration and the values it
                 sets, each a quantity whose origin is a named person's
-                assumption or a model's estimate (ADR-006); run as an engine
-                run (engine/runs.py)
+                assumption, a model's estimate (ADR-006) or a deposition's
+                reading, looked up in the project's depositions
+                (measurements.py); run as an engine run (engine/runs.py)
     comparisons engine runs set side by side, kept as an artifact
     runbooks    a runbook made from an engine run, its predictions the
                 run's outputs in their units, locked on the service under

@@ -2,7 +2,14 @@
 
 BioSTEAM, thermosteam, biorefineries, the vendored SFF toolkit and cobra run in worker processes
 (execution prompt §7.1, §7.3): a cold BioSTEAM import takes about thirty seconds, and the
-service stays light. The service's side is `SimWorker` (`core/openferment_core/workers/__init__.py`);
+service stays light. An engine registered through the contract (`docs/api/engines.md`) with a
+worker runs in a worker of its own, which speaks this protocol too; an engine whose `worker` is
+`None` computes in the service's process, and its computation may call a worker of the core's
+own: the core's `kinetics` integrates fermOS's families with SciPy in the service, and its vessel
+design runs in the Proforma worker (`vessel_specs`, `vessel_design`). The core's `train` names
+the Proforma worker as its worker: a train is built and run there (`train_run`) and its file
+written there (`sff_export`). The service's side is
+`SimWorker` (`core/openferment_core/workers/__init__.py`);
 the worker's side is `serve`. The Proforma worker is reached through
 `core/openferment_core/engine/simulator.py`, which starts it on first use (or with the service
 when `OPENFERMENT_WARM_PROFORMA=1`) and reports `cold`, `starting`, `ready` or `failed`.
@@ -21,8 +28,11 @@ out  {"id": 1, "ok": false, "error": "Refused: there is no flowsheet x; there ar
 - An unknown op, a handler that raises, or a result JSON cannot hold (NaN, infinity) is an error
   response, `"<ExceptionType>: <words>"`, and the worker answers the next request. A request the
   worker refuses in words raises `Refused`, so its error begins `Refused: `.
-- Only responses reach stdout: descriptor 1 is pointed at stderr while the worker serves, so a
-  library that prints cannot corrupt the stream.
+- Only responses reach stdout. `SimWorker` starts every worker through a launcher
+  (`workers.LAUNCH`) that keeps a duplicate of descriptor 1 for the responses, points descriptor 1
+  at stderr, and then runs the module as `python -m <module>` would; so a library that prints,
+  from Python or from C, as the module is imported or while it serves, writes to stderr. A module
+  started by hand with `python -m` moves descriptor 1 when `serve` starts.
 - A request that takes longer than the call's timeout kills the process; the next call starts a
   new one. A crash reports the tail of the worker's stderr. No worker stops in a debugger
   (`PYTHONBREAKPOINT=0`).
@@ -31,17 +41,82 @@ out  {"id": 1, "ok": false, "error": "Refused: there is no flowsheet x; there ar
 
 | Worker | Module | Imports | Ops |
 |---|---|---|---|
-| `proforma` | `workers/proforma_worker.py` (with `flowsheets/`, `workers/library_plants.py`, `workers/sff_toolkit.py`, `vendor/pisces_sff`) | biosteam, thermosteam, biorefineries, the SFF toolkit | `benchmark`, `evaluate`, `grid`, `montecarlo`, `run`, `reference`, `thermo_props`, `volatility`, `vessel_specs`, `vessel_design`, `catalogue_specs`, `catalogue_unit_check`, `train_specs`, `flowsheet_unit_values`, `train_run`, `sff_export`, `sff_validate`, `sff_score`, `library_discover`, `library_parameters`, `library_run`, `library_cases` |
+| `proforma` | `workers/proforma_worker.py` (with `flowsheets/`, `workers/library_plants.py`, `workers/kept_references.py`, `workers/sff_toolkit.py`, `vendor/pisces_sff`) | biosteam, thermosteam, biorefineries, the SFF toolkit | `evaluate`, `grid`, `montecarlo`, `run`, `replay_reference`, `replay_benchmark`, `thermo_props`, `volatility`, `vessel_specs`, `vessel_design`, `catalogue_specs`, `catalogue_unit_check`, `train_specs`, `flowsheet_unit_values`, `train_run`, `sff_export`, `sff_validate`, `sff_score`, `library_discover`, `library_parameters`, `library_run`, `library_cases` |
 | `geneos` | `workers/geneos_worker.py` | cobra | `describe`, `ceiling`, `frontier`, `mix` |
 | `echo` | `workers/echo_worker.py` | nothing heavy | the protocol's own tests |
+| `sample` | `workers/sample_worker.py` | nothing heavy | `things`, `parameters`, `run`, `sff_export`, `environment`: the engine contract's own tests (`engine/sample.py`, which no entry point registers) |
+| an engine's | the module its `worker` names | what the engine declares in `heavy` | `things`, `parameters`, `run`, `sff_export` (below) |
 
 Each module's docstring describes its ops; this page gives every op's request and result.
 
-## Proforma's flowsheet ops (Proforma worker; OF-BLD-014 §8, OF-BLD-019 §2, `proforma.py`)
+## Engine ops (an engine's worker; ADR-015, `docs/api/engines.md`)
+
+A worker an engine names answers four ops, which `WorkerEngine` (`engine/contract.py`) calls; its
+process starts with `core/` as its working directory and an environment less every variable
+`workers.withheld` names: each whose name begins `ANTHROPIC_` or `SCI_RAG_`, and each whose name
+holds `KEY`, `TOKEN`, `SECRET`, `PASSWORD`, `PASSWD`, `DATABASE_URL` or `CREDENTIAL` anywhere, in
+any case (`docs/api/engines.md`, The worker). Each handler takes the request's `args` as one dict
+and returns the result object. The shapes of `EngineThing` and `EngineParameter` are those of
+`docs/api/openapi.json`.
+
+Every op that names a thing refuses one it does not run, by raising `Refused`. An answer outside
+the shapes below (a result key missing, outputs that are no list of names, values and units, a
+number that is NaN or infinite, two outputs of one name, an output's name blank or longer than
+200 characters, diagnostics outside the outputs' shape or more than 50 of them, a thing whose
+default or titled configuration is none of its configurations, a configuration's title blank or
+longer than 200 characters, a flowsheet that is no JSON object) breaks the contract: the service
+raises `EngineBroken`, keeps no runs row and answers 503 in words. A break in `run` keeps
+nothing; a break in `sff_export` comes after the run's artifact is kept, and the next ask answers
+the computation from it and asks `sff_export` again.
+
+### `things`
+
+`{}` → `{"things": [EngineThing, …]}`: what the engine runs, each with its configurations, the
+configuration a run takes when it names none, the words a person reads for each configuration
+where the worker gives them (`configurationTitles`, by configuration name, optional, null read as
+`{}`), and the precision a replay is held to. The service asks it once per process and keeps the
+answer.
+
+### `parameters`
+
+`{"thing", "configuration"}` → `{"parameters": [EngineParameter, …]}`: what the thing takes, each a
+`ParameterSpec` with its default `value` and the default's `origin` (`library-default` with `ref`,
+or `convention` with `note`), or, for a parameter with no default, `value` and `origin` null and
+a `sourceRule` naming `assumption`: a run sets it. These two are a worker's; the other origins a
+default may rest on (`record`, `artifact`, `person-assumption`) belong to things a project holds
+(`docs/api/engines.md`, `EngineParameter`). The service sends the configuration a run of
+the thing would use: the one named, else the thing's default, and `null` for a thing that takes
+none. An unknown thing is refused in words.
+
+### `run`
+
+`{"thing", "configuration", "inputs": [{"name", "value", "unit"}, …]}` → `{"outputs": [{"name",
+"value", "unit"}, …], "diagnostics": [{"name", "value", "unit"}, …]}`, the `diagnostics` left out
+by a worker that reports none. The inputs are the values the run sets, already checked by the
+service against the thing's parameters, a value for every parameter with no default among them:
+the service refuses in words, keeping nothing, a run that leaves one unset. They arrive in key
+order, each number a JSON float and each finite. Each output is a finite number or a string in a
+unit (`""` for a pure number or for words), each name its own and at most 200 characters, and
+every output a function of the request alone, in the same order on every run of it, since a
+replay compares the outputs in order. The `diagnostics` are what the computation reports about
+itself, the time it took or the iterations it made: at most 50, each a finite number or a string
+in a unit, each name its own among them and at most 200 characters. The service keeps them on
+the run's row and outside its artifact, so a replay compares the outputs alone; the time a
+computation took goes here, since an output that moves between two runs of one request makes the
+replay differ. A run the engine cannot make, an unknown thing among them, is refused in words
+(`Refused: …`), and the service keeps the refusal as the run's receipt.
+
+### `sff_export`
+
+The same request as `run` → `{"flowsheet": <an SFF document>}`, which the service validates and
+scores in the Proforma worker and keeps as the run's flowsheet record; or `Refused: <words>` when
+the engine has no plant, which the service keeps as the run's `sffRefused`.
+
+## Proforma's flowsheet ops (Proforma worker, `proforma.py`)
 
 A flowsheet is an id in `flowsheets.KNOWN`: the shelf's ids and the test-only `toy`. Every op that
-names a `flowsheet` refuses an id outside it with the words of `flowsheets.load`'s `KeyError`,
-which `str()` quotes: `Refused: 'there is no flowsheet x; there are …'`. The toy,
+names a `flowsheet` refuses an id outside it in the words of `flowsheets.load`'s `KeyError`, as
+written: `Refused: there is no flowsheet x; there are …`. The toy,
 `ethanol_glucose_v0` and `custom_train_v1` run case by case: the worker builds each once inside
 `package_defaults()` and keeps it warm, and each case sets its inputs on the built objects and
 simulates again. A scenario flowsheet prices every case on BioSTEAM's default utility prices and
@@ -49,19 +124,22 @@ plant cost index. `custom_train_v1` is built from a `structure`, `{"fermenter", 
 "financeKeys"}` as `composite.structure_of` reads it from the run's basis, and the worker keeps its
 four newest structured builds (`STRUCTURES_KEPT`). A structure `custom_train_v1` cannot build (a
 TEA parameter the corn plant's TEA does not take, a train unit whose id clashes with the
-flowsheet's own, say) is refused in that module's words, through its own `Refused`. The reference
-biorefineries (`cornstover_benchmark`, `corn_drygrind`) run whole through `reference`.
-`evaluate`, `grid`, `montecarlo` and `run` refuse a reference biorefinery, `custom_train_v1`
-without a `structure`, and any other flowsheet given one.
+flowsheet's own, say) is refused in that module's words, through its own `Refused`. `evaluate`,
+`grid`, `montecarlo` and `run` refuse `custom_train_v1` without a `structure`, and any other
+flowsheet given one. The published plants of `biorefineries`, run whole on their package's
+defaults, are the library's (`library_run`, below); the shelf's two hand-written reference entries
+retired at alpha 2.2 (D8), and the runs a person kept from them replay through `replay_reference`
+and `replay_benchmark` alone.
 
-### `benchmark`
+### `replay_benchmark`
 
-The benchmark (OF-BLD-014 §8.2): `biorefineries.cornstover`'s plant built afresh inside
-`package_defaults()`, its ethanol price solved by the package's TEA
-(`flowsheets/cornstover_benchmark.run`). Request `{}`; the handler reads no field. Result
-`{"package", "biosteam", "mespUsdPerGal", "mespUsdPerKg", "ethanolDensityKgPerGal", "settings":
-{"rateOfReturn", "operatingDays", "incomeTax", "startYear", "endYear"}, "references": [string,
-…]}`. `proforma.py` keeps it as one `proforma_benchmark` artifact and cites `mespUsdPerGal`.
+A kept `proforma_benchmark` artifact recomputed for its replay (alpha 2.2 D8):
+`biorefineries.cornstover`'s plant built afresh inside `package_defaults()`, its ethanol price
+solved by the package's TEA (`workers/kept_references.benchmark`). Request `{}`; the handler reads
+no field. Result `{"package", "biosteam", "mespUsdPerGal", "mespUsdPerKg",
+"ethanolDensityKgPerGal", "settings": {"rateOfReturn", "operatingDays", "incomeTax", "startYear",
+"endYear"}, "references": [string, …]}`, the output the artifact holds. No route or tool makes a
+new one.
 
 ### `evaluate`
 
@@ -82,30 +160,30 @@ it with the case.
 
 ### `grid`
 
-Request `{"flowsheet", "axes": {input key: [number, …]}, "base": {input key: number}}`, with one
-to three axes; each cell is `base` with one value of each axis set over it. Result `{"axes",
+Request `{"flowsheet", "axes": {input key: [number, …]}, "base": {input key: number},
+"structure"}`, with one to three axes; each cell is `base` with one value of each axis set over it,
+and `structure` is `custom_train_v1`'s, as `evaluate` takes it. Result `{"axes",
 "base", "cells": [{"at": {input key: number}, "outputs", "infeasible"}, …]}`, the cells in
 `itertools.product` order over the axes as given. `outputs` is `evaluate`'s result, null for a case
 the flowsheet cannot hold. `infeasible` is null for a case that ran and `{"reason", "detail"}` for
 one that did not: `reason` is the flowsheet's `Infeasible.reason`, or `error` for any other
-exception, whose `detail` is then `"<ExceptionType>: <words>"`. The handler passes no
-`structure`, so `custom_train_v1` is refused here. Fewer than one axis or more than three is
-refused, and a refusal in any case ends the op.
+exception, whose `detail` is then `"<ExceptionType>: <words>"`. Fewer than one axis or more than
+three is refused, and a refusal in any case ends the op.
 
 ### `montecarlo`
 
 Request `{"flowsheet", "specs": {input key: spec}, "n" (default 500), "seed" (default 0), "base":
-{input key: number}}`. A spec is `{"kind": "fixed", "value"}`, `{"kind": "uniform", "low",
-"high"}` or `{"kind": "triangular", "low", "mode", "high"}`. The `n` samples are a Latin hypercube
+{input key: number}, "structure"}`, `structure` as `evaluate` takes it. A spec is `{"kind":
+"fixed", "value"}`, `{"kind": "uniform", "low", "high"}` or `{"kind": "triangular", "low",
+"mode", "high"}`. The `n` samples are a Latin hypercube
 over the spec keys (`scipy.stats.qmc.LatinHypercube`, seeded with `seed`); each sample's inputs
 are `base` with every spec's draw set over it. Result `{"n", "seed", "samples": [{"inputs",
 "outputs", "infeasible"}, …]}`, with `outputs` and `infeasible` as `grid`'s cells hold them. A
-spec of another kind is refused. The handler passes no `structure`, and a refusal in any sample
-ends the op.
+spec of another kind is refused, and a refusal in any sample ends the op.
 
 ### `run`
 
-One whole run (OF-BLD-019 §2.1), which `proforma.py` keeps as one `proforma.run` artifact. Request
+One whole run, which `proforma.py` keeps as one `proforma.run` artifact. Request
 `{"flowsheet", "base", "specs", "samples" (default 0), "seed" (default 0), "axes", "diagram",
 "structure"}`: `base`, `specs` and `axes` as `evaluate`, `montecarlo` and `grid` take them (`axes`
 null for no grid), `samples` the number of samples, `diagram` what the run's basis says of its
@@ -120,30 +198,33 @@ when the base case failed; `grid` is `grid`'s result, null without `axes`; `mont
 `readBack`; each sample's `inputs`, price output and `infeasible.reason`; each cell's price output
 and `costLines`; and every key of `tables`. A refusal in any case ends the run.
 
-### `reference`
+### `replay_reference`
 
-A reference biorefinery run whole on its package's defaults (OF-BLD-019 §2.2): built afresh inside
-`package_defaults()` and read before the worker's settings go back. Request `{"flowsheet",
-"digits" (1–17, default 17), "diagram"}`; `proforma.py` sends the digits the basis states
-(`REFERENCE_DIGITS`, 10) and `diagram` as `run` takes it. Result, every float rounded to `digits`
-significant digits: `{"flowsheet", "simulator": "biosteam <version>", "measured": {expression:
-number}, "readBack"}`, with the module's `outputs()` and the run's tables (below) beside them.
-The outputs are `cornstover_benchmark`'s `package`, `mespUsdPerGal`, `mespUsdPerKg`,
-`ethanolDensityKgPerGal`, `settings` and `references`, or `corn_drygrind`'s `package`,
-`ethanolPriceUsdPerKg`, `IRR`, `ethanolKgPerH`, `cornKgPerH` and `references`. `measured` holds
-the quantities the package's test asserts, keyed by the expression the test writes: `tea.IRR`,
-`feedstock.price`, `product.price`, `tea.sales`, `tea.material_cost`,
+A kept `proforma.reference` artifact recomputed for its replay (alpha 2.2 D8):
+the plant of the retired entry its basis names, built afresh inside `package_defaults()` and read
+before the worker's settings go back (`workers/kept_references.py`). Request `{"flowsheet",
+"digits" (1–17, default 17), "diagram"}`; `proforma.py` sends the entry its basis names, the digits
+the basis states (`REFERENCE_DIGITS`, 10, where it names none) and `diagram` as `run` takes it.
+Result, every float rounded to `digits` significant digits: `{"flowsheet", "simulator": "biosteam
+<version>", "measured": {expression: number}, "readBack"}`, with the plant's outputs and the run's
+tables (below) beside them. The outputs are `cornstover_benchmark`'s `package`, `mespUsdPerGal`,
+`mespUsdPerKg`, `ethanolDensityKgPerGal`, `settings` and `references`, or `corn_drygrind`'s
+`package`, `ethanolPriceUsdPerKg`, `IRR`, `ethanolKgPerH`, `cornKgPerH` and `references`.
+`measured` holds the quantities the package's test asserts, keyed by the expression the test
+writes: `tea.IRR`, `feedstock.price`, `product.price`, `tea.sales`, `tea.material_cost`,
 `tea.installed_equipment_cost`, `tea.utility_cost`, `units.get_heating_duty()`,
 `units.get_cooling_duty()`, `units.get_electricity_consumption()` and
-`units.get_electricity_production()`. `readBack` is the module's `read_back()`, every input the
-shelf lists for `corn_drygrind`, and `{}` for `cornstover_benchmark`, which has none.
-`proforma.py` adds `regression` and `checks` before it keeps the `proforma.reference` artifact. A
-flowsheet with no `load` (one run case by case) is refused, and so are `digits` outside 1–17.
+`units.get_electricity_production()`. `readBack` is every input the dry-grind corn entry listed,
+read back, and `{}` for `cornstover_benchmark`, which listed none. `proforma.py` adds `regression`
+and `checks`, the library plant's package test (`engine/library.regression`) beside what the replay
+measured, as the run added them. An entry other than the two is refused in words (`Refused: <id> is
+no retired reference entry whose kept runs replay here; they are cornstover_benchmark,
+corn_drygrind`), and so are `digits` outside 1–17.
 
 ### `tables`
 
-What `run` returns as `tables`, and what `reference` and `library_run` return beside their other
-keys: every table of the base case, read from the objects it left (`tables()` in
+What `run` returns as `tables`, and what `replay_reference` and `library_run` return beside their
+other keys: every table of the base case, read from the objects it left (`tables()` in
 `proforma_worker.py`). Where the flowsheet solved a price, the product stream carries it while the
 tables are read.
 
@@ -196,18 +277,32 @@ Request:
 |---|---|---|
 | `flowsheet` | string | a shelf flowsheet id (`flowsheets.KNOWN`) |
 | `path` | string | where the file is written |
-| `base` | object, key → number | a flowsheet run case by case: the run's base values. Left out for a reference biorefinery |
+| `base` | object, key → number | a flowsheet run case by case: the run's base values |
 | `structure` | object | a structured flowsheet (`custom_train_v1`): what it is built from |
 | `metadata` | object | written as `metadata.openferment` in the file |
 | `title` | string or null | written as `metadata.process_title` |
 | `library` | string | in place of `flowsheet` for a library run: the `biorefineries` plant, with `configuration` and `overrides` as `library_run` takes them |
+| `train` | object | in place of `flowsheet` for a pureOS train run: the `train_run` request its run's basis gives (`system`, `inlet`, `units`, as `train_run` takes them; `train_spec.plant_of`) |
 
-A reference biorefinery (a flowsheet module with `load`) is built afresh inside
-`package_defaults()`; any other is the worker's warm plant set to `base` and simulated, its
-solved price on the product while the file is written; a library plant is built afresh and
-set as its run set it. The toolkit's JSON writer is taught, for the export alone, to write a
-thermosteam reaction in its own words and a stream by its id (`docs/api/sff.md`). Result:
-`checked` (below) plus `"simulator": "BioSTEAM <version>"`.
+A shelf flowsheet is the worker's warm plant set to `base` and simulated, its
+solved price on the product while the file is written (a Proforma scenario's run asks it as the
+run is kept, from the run's basis alone, `proforma.plant_of`; the service asks it of no run whose
+base case could not run, which keeps its words as `sffRefused`); a library plant is built afresh and
+set as its run set it; a train is rebuilt from `train` and simulated whole as `train_run`
+simulates it, inside `package_defaults()`, then written with no TEA, once the toolkit's schema
+leaves the TEA year to the file (below). The toolkit's JSON writer is
+taught, for the export alone, to write a thermosteam reaction in its own words and a stream by its
+id (`docs/api/sff.md`). Result: `checked` (below) plus `"simulator": "BioSTEAM <version>"`.
+
+A train carries no TEA. While the schema the toolkit ships requires every file's
+`metadata.TEA_year` (read from its schema file, `sff_toolkit.metadata_required`), which its
+exporter reads from the system's TEA, a train is refused before anything is built: `Refused: a
+train carries no TEA, and the SFF schema the toolkit ships (<schema version>) requires every
+file's metadata.TEA_year, the year its costs are reported in, which the toolkit's exporter reads
+from the system's TEA (export/_export.py)`. Once the schema leaves the year to the file, the train
+is rebuilt and written, and what the toolkit cannot write then is refused with its own words
+quoted after: `Refused: the toolkit's exporter could not write the train's file (<ExceptionType>:
+<words>)`. The run keeps the words as its `sffRefused` (`docs/api/runs.md`, A train run).
 
 ### `sff_validate`
 
@@ -300,7 +395,7 @@ case sets every settable parameter to its library default and then its own value
 (recycles emptied, the TEA's sales guess cleared) and runs. Result: one entry per case, `{"values",
 "price", "outputs"}` or `{"values", "refused"}`, rounded to `digits`. The A→B→A gate runs here.
 
-## Thermo ops (Proforma worker; OF-BLD-019 §4.2, OF-BLD-020 §7.1, `thermo.py`)
+## Thermo ops (Proforma worker, `thermo.py`)
 
 The worker looks up each chemical in thermosteam's library by its name and makes one property
 package per set of names, kept for the worker's life. A question naming a chemical the library
@@ -365,7 +460,7 @@ and `azeotropeMassFraction` are `chemical`'s fractions in that liquid, and `azeo
 bubble point at `P`. `units` gives K for the temperatures, Pa for `P`, and mol/mol and kg/kg for
 the fractions. The op refuses a missing `chemical` or `partner`, and the two the same.
 
-## Vessel and catalogue ops (Proforma worker; OF-BLD-020 §4.1, §5.1, `vessel.py`, `pureos/catalogue.py`)
+## Vessel and catalogue ops (Proforma worker, `vessel.py`, `pureos/catalogue.py`)
 
 `vessel_specs` and `catalogue_specs` read what BioSTEAM alone knows of a unit class: its defaults
 (from its signatures, class attributes and a probe instance), the choices its tables and setters
@@ -492,8 +587,8 @@ are keyed by the class's own parameter names, and `defaults`, `choices` and `ref
 catalogue's keys. A value is plain: null, a number as a float, a bool as `"true"` or `"false"`, and
 anything else as its text. A per-component split the class fills itself adds `byComponent`
 (`{chemical: share}`) to its `defaults` entry. `chemicals` is the yeast program's chemical IDs.
-`catalogue.specs_of` serves the answer as `UnitSpecs`. An unknown type is an error
-`CatalogueUnknown: there is no unit type …`.
+`catalogue.specs_of` serves the answer as `UnitSpecs`. A type the catalogue does not hold is
+refused in the catalogue's words: `Refused: there is no unit type …`.
 
 ### `catalogue_unit_check`
 
@@ -511,11 +606,11 @@ lists. Result `{"unitClass", "ins": [stream, …], "outs": [stream, …], "desig
 "purchaseCost", "installedCost", "utilityCost", "power", "heatDuties": [number, …], "held":
 {attribute: value}}`, each stream `{"id", "massFlow", "phase", "massFlows": {chemical: kg/hr}}`.
 Costs are in USD, `utilityCost` in USD/hr, `power` in kW and each heat duty in kJ/hr. `held` gives
-each attribute as the built unit holds it, or `"unreadable: <ExceptionType>"`. The op raises no
-`Refused`: an unknown type is `CatalogueUnknown: …`, and a unit that cannot be built or simulated
-is the class's own exception and words.
+each attribute as the built unit holds it, or `"unreadable: <ExceptionType>"`. A type the catalogue
+does not hold is refused in the catalogue's words (`Refused: there is no unit type …`); a unit that
+cannot be built or simulated is the class's own exception and words.
 
-## pureOS train ops (Proforma worker; OF-BLD-020 §5.2, `pureos/train_spec.py`)
+## pureOS train ops (Proforma worker, `pureos/train_spec.py`)
 
 A train is an inlet and an ordered list of catalogue units. The service resolves and names every
 value (`pureos/train_spec.py`); the worker builds the BioSTEAM objects (`flowsheets/train.py`) and
@@ -541,8 +636,9 @@ A per-component parameter comes per chemical as `<key>.<chemical>`, the light an
 from `LHK`, an evaporator's pressures come as `P.<n>` with `effects`, and a bool comes as `"true"`
 or `"false"`. `unread` names, with why, each parameter the unit holds as None or as something
 other than a number or a word; the class's own default stands for it. The op refuses
-`custom_train_v1` (its units are the fermenter's and a train run's own), a reference biorefinery,
-a unit ID the flowsheet lacks, and a unit that is not an instance of the catalogue type's class.
+`custom_train_v1` (its units are the fermenter's and a train run's own), a flowsheet the shelf
+does not hold, a type the catalogue does not hold, a unit ID the flowsheet lacks, and a unit that is not an
+instance of the catalogue type's class.
 
 ### `train_run`
 
@@ -552,7 +648,7 @@ prices and cost index, and a fresh flowsheet. `train_spec.py` builds the request
 (`_run_train`) and keeps the answer as one `pureos.train_run` artifact. Request:
 
 ```
-{"system", "product", "diagram",
+{"system", "diagram",
  "inlet": {"flows": {chemical: kg/hr} | null, "concentrations": {chemical: g L⁻¹} | null,
            "brothFlow": m³/hr | null, "balance": chemical | null, "T", "P", "phase"},
  "units": [{"id", "type", "values": {key: value},
@@ -560,7 +656,8 @@ prices and cost index, and a fresh flowsheet. `train_spec.py` builds the request
             "sides": {port: {chemical: kg/hr}}}, …]}
 ```
 
-`system` names the system and its flowsheet (`train_spec.py` sends `pureos_<train id>`). With
+`system` names the system and its flowsheet (`train_spec.py` sends `pureos_<train id>`); `sff_export`
+takes the same request as its `train` (above) to write a kept run's file. With
 `flows`, the inlet carries those flows. With `concentrations` and `brothFlow`, it carries each
 concentration over the broth flow, and the `balance` chemical (`Water` when null) at the mass that
 brings the mixture's volume, as thermosteam computes it at the inlet's `T` and `P`, to
@@ -568,8 +665,8 @@ brings the mixture's volume, as thermosteam computes it at the inlet's `T` and `
 before it (the train's inlet for the first); an outlet routed `recycle:<unit id>` joins the inlet
 from upstream of the unit it names; a side port takes the flows `sides` gives it; a port the unit
 sizes itself is an empty stream; and every outlet is a stream named `<unit id>_<port>`. `diagram`
-is as `run` takes it. `train_spec.py` also sends `product`, the chemical the train traces; the
-handler does not read it, and the product stream is the last unit's onward outlet. Result
+is as `run` takes it. The product stream is the last unit's onward outlet, and `train_spec.py`
+reads the chemical the train traces from the run's basis. Result
 `{"tablesSource", "streams", "units", "utilities", "diagram", "diagramNote", "unitOrder",
 "tableUnits"}` as the tables (above) hold them, with no `tea`, `utilities` over every unit of the
 train and `unitOrder` the system's units; and beside them `"inlet": {"flows", "T", "P", "phase",
@@ -577,12 +674,13 @@ train and `unitOrder` the system's units; and beside them `"inlet": {"flows", "T
 `"costs": [{"unit", "unitClass", "purchaseCost", "installedCost", "items": {item: USD},
 "utilityCost"}, …]`, `"utilitySettings"` and `"versions"`. `inlet` is the inlet as built, with its
 `volume` in m³/hr, `water` the balance's mass in kg/hr (null for given flows) and `waterNote` how
-it was found. The op refuses, in `flowsheets/train.py`'s words (its own `Refused`): an inlet whose
-other components take the whole broth flow, or whose balance chemical cannot fill it; a unit that
-cannot be built (`unit <id> (<type>, <class>) could not be built: BioSTEAM said: …`); a unit that
-does not converge; and a train that does not converge as a whole.
+it was found. The op refuses a unit type the catalogue does not hold in the catalogue's words
+(`Refused: there is no unit type …`), and refuses in `flowsheets/train.py`'s words (its own
+`Refused`): an inlet whose other components take the whole broth flow, or whose balance chemical
+cannot fill it; a unit that cannot be built (`unit <id> (<type>, <class>) could not be built:
+BioSTEAM said: …`); a unit that does not converge; and a train that does not converge as a whole.
 
-## geneos ops (geneos worker; OF-BLD-014 §6.2, §6.3, `geneos.py`)
+## geneos ops (geneos worker, `geneos.py`)
 
 Every request names a model, `{"modelId", "path"}`: `modelId` is a model on the shelf
 (`geneos_models.SHELF`) or `toy`, the hand-worked test network, and `path` is the local file of a

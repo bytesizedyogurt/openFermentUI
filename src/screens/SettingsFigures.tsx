@@ -6,7 +6,7 @@
 // latest of each is drawn here beside the records it is held against; with
 // none kept, or no service, the legend stands alone.
 import { useEffect, useMemo, useState } from 'react';
-import type { Artifact, ExtractionRecord } from '@/data/types';
+import type { Artifact } from '@/lib/studies';
 import { useStore } from '@/store';
 import { href } from '@/router';
 import { listArtifacts } from '@/lib/artifacts';
@@ -48,11 +48,13 @@ export function FiguresSection() {
     const substrate = String(ceiling.output.substrate ?? inputOf(ceiling, 'substrate') ?? '');
     const model = String(ceiling.output.modelId ?? inputOf(ceiling, 'model') ?? 'model');
     const words = productWords(product);
+    const found = yieldsOnSugar(records, substrate, product);
     return {
       product,
       substrate,
       words,
-      on: yieldsOnSugar(records as ExtractionRecord[], substrate, product).on,
+      on: found.on,
+      elsewhere: found.elsewhere,
       ceilings: [{ value: ceiling.output.gPerG as number, model: `${model} ceiling`, provenance: ceiling.provenance }],
     };
   }, [ceiling, records]);
@@ -97,6 +99,7 @@ export function FiguresSection() {
           unit={UNIT}
           quantity={ceilingFigure.words.quantity}
           ceilings={ceilingFigure.ceilings}
+          sugar={{ name: ceilingFigure.substrate, elsewhere: ceilingFigure.elsewhere }}
           csvName={`ceiling-gap-${ceilingFigure.product}-${ceilingFigure.substrate}`}
         />
       )}

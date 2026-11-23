@@ -50,7 +50,6 @@
 // This screen may be extended. Keep this header's reasoning with it.
 import { useEffect, useMemo, useState } from 'react';
 import { FlaskConical } from 'lucide-react';
-import type { FermosFitResponse, FermosSeries, FitParam, UnidentifiedReason } from '@/data/types';
 import { useStore } from '@/store';
 import { href, navigate, useRoute } from '@/router';
 import { Callout, EmptyState, PageHeader, SectionTitle } from '@/components/ui';
@@ -63,6 +62,8 @@ import { TrajectoryBand } from '@/components/figures';
 import { FERMOS_TABS } from '@/data/tabs';
 import { stubsFor } from '@/data/subsystems';
 import { fmt } from '@/engine/units';
+import { shortTitle } from '@/lib/cite';
+import { plainNote } from '@/lib/proforma';
 import {
   FIT_FAMILIES,
   FIT_FAMILY_WORDS,
@@ -75,6 +76,10 @@ import {
   isFitFamily,
   qualifies,
   simulateFromFitPath,
+  type FermosFitResponse,
+  type FermosSeries,
+  type FitParam,
+  type UnidentifiedReason,
 } from '@/lib/fermos';
 import FermOSForecast from './FermOSForecast';
 import FermOSSimulate from './FermOSSimulate';
@@ -257,7 +262,7 @@ function Fits() {
             'a simulation from it'
           )}{' '}
           integrates the family with them.
-          {(result.kinetic.notes ?? []).length > 0 && ` ${(result.kinetic.notes ?? []).join(' ')}`}
+          {(result.kinetic.notes ?? []).length > 0 && ` ${(result.kinetic.notes ?? []).map(plainNote).join(' ')}`}
         </p>
       )}
       {result && chosen && (
@@ -266,7 +271,7 @@ function Fits() {
             title={`What did ${chosen} do, and what curve fits it?`}
             series={fitFigureSeries(seriesFor(chosen), result.kinetic)}
             readingProvenance="measured"
-            notes={result.notes}
+            notes={result.notes?.map(plainNote)}
             csvName={`fit-${chosen}`}
           />
           <section aria-label="Growth rate" className="text-body" data-testid="growth-fit">
@@ -286,7 +291,7 @@ function Fits() {
               <p className="text-ink-soft">No growth rate: {result.growth?.reason}.</p>
             )}
           </section>
-          {result.kinetic?.params.length ? (
+          {result.kinetic?.params?.length ? (
             <ParamTable params={result.kinetic.params} />
           ) : (
             <p className="text-body text-ink-soft">No kinetic fit: {result.kinetic?.reason}.</p>
@@ -311,8 +316,10 @@ function Fits() {
 
 function BrothProperties() {
   const records = useStore((s) => s.records);
+  const papers = useStore((s) => s.papers);
   const titres = useMemo(
-    () => records.filter((r) => r.field === TITRE_FIELD && typeof r.value === 'number' && r.status !== 'rejected'),
+    () =>
+      records.flatMap((r) => (r.field === TITRE_FIELD && typeof r.value === 'number' && r.status !== 'rejected' ? [{ ...r, value: r.value }] : [])),
     [records],
   );
   const [picked, setPicked] = useState('');
@@ -327,8 +334,8 @@ function BrothProperties() {
               <select className="input" aria-label="Titre record" value={picked} onChange={(e) => setPicked(e.target.value)}>
                 <option value="">pick one</option>
                 {titres.map((r) => (
-                  <option key={r.id} value={r.id}>
-                    {r.id} · {fmt(r.value as number)} {r.unit} · {r.paperId}
+                  <option key={r.id} value={r.id} title={r.id}>
+                    {fmt(r.value)} {r.unit} · {shortTitle(papers.find((p) => p.id === r.paperId)?.title ?? r.paperId, 40)}
                   </option>
                 ))}
               </select>
@@ -424,7 +431,7 @@ export default function FermOS() {
             is the harvest step, and it carries a decision made back in geneOS:{' '}
             <strong>secreted or intracellular</strong>. A secreted product starts at centrifuge
             and filter; an intracellular one starts at lysis and inherits every problem after it.
-            The handoff has to carry product location, not just a titre.
+            The handoff carries the product&rsquo;s location beside its titre.
           </p>
         </Callout>
       </div>
@@ -432,7 +439,10 @@ export default function FermOS() {
       <SubsystemShelf owner="fermOS" />
 
       <div className="mt-5">
-        <ComponentTag component="fermOS" action={`kinetics, operating modes, transport and scale live; ${stubs.length} subsystems named and not built`} />
+        <ComponentTag
+          component="fermOS"
+          action={`kinetics, operating modes, transport and scale live; ${stubs.length} subsystem${stubs.length === 1 ? '' : 's'} named and unbuilt`}
+        />
       </div>
     </>
   );

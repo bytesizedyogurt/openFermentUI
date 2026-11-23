@@ -1,0 +1,11 @@
+--- a/core/openferment_core/basis.py
++++ b/core/openferment_core/basis.py
+@@ -226,8 +226,6 @@
+     if isinstance(value, Mapping):
+         if value.get("kind") == "model-estimate":
+             return path or "the value"
+-        if value.get("provenance") == "assumed":
+-            return f"{path}.provenance" if path else "provenance"
+         for k, v in value.items():
+             found = estimate_in(v, f"{path}.{k}" if path else str(k))
+             if found:

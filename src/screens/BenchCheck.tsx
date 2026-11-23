@@ -19,7 +19,7 @@
 // source.
 import { useEffect, useMemo, useState } from 'react';
 import { ArrowLeft, ArrowRight, Check as Tick, X } from 'lucide-react';
-import type { Check, CheckResult } from '@/data/types';
+import type { Check, CheckResult } from '@/lib/checks';
 import { useStore } from '@/store';
 import { useSkillById } from '@/store';
 import { Button, cx } from '@/components/ui';
@@ -377,7 +377,7 @@ function Run({ ctx, check }: { ctx: GuildContext; check: Check }) {
         <>
           {/* ink, not ink-soft: ≥7:1 contrast at arm's length */}
           <p className="text-ink font-medium mb-5" style={{ fontSize: 21, lineHeight: '31px' }}>
-            {skill?.mastery[item.index]}
+            {skill?.mastery?.[item.index]}
           </p>
           <div className="grid grid-cols-2 gap-3">
             <button
@@ -425,7 +425,7 @@ function Run({ ctx, check }: { ctx: GuildContext; check: Check }) {
                   <span className={cx('chip shrink-0 text-ink border-2', calls[key(i.skillId, i.index)] ? 'border-accent' : 'border-signal-error')}>
                     {calls[key(i.skillId, i.index)] ? 'Meets' : 'Needs work'}
                   </span>
-                  <span>{skill?.mastery[i.index]}</span>
+                  <span>{skill?.mastery?.[i.index]}</span>
                 </li>
               ))}
           </ul>

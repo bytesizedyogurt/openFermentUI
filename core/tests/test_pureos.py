@@ -276,10 +276,31 @@ def test_a_train_opens_by_scenario_or_by_run_and_refuses_anything_else_in_words(
     arts = [old, new, fit]
     assert pureos.train("sc-a", arts=arts, scenarios=SCENARIOS).artifactId == new.id
     assert pureos.train(old.id, arts=arts, scenarios=SCENARIOS).artifactId == old.id
-    with pytest.raises(pureos.TrainNotFound, match="kinetic_fit artifact, not a Proforma run"):
+    with pytest.raises(pureos.TrainNotFound, match="kinetic_fit artifact; a train is read from a Proforma run, a library"):
         pureos.train(fit.id, arts=arts, scenarios=SCENARIOS)
-    with pytest.raises(pureos.TrainNotFound, match="no Proforma run of sc-none is on file here: run the scenario in Proforma"):
+    with pytest.raises(pureos.TrainNotFound, match="no run of sc-none is on file here: run the scenario from Studies or "
+                                                   "Proforma"):
         pureos.train("sc-none", arts=arts, scenarios=SCENARIOS)
+
+
+def test_a_library_run_is_a_train_keyed_by_the_study_scenario_its_runs_row_names(monkeypatch):
+    """Seen on the sweep: every scenario run of the project was a library run,
+    and pureOS read trains from Proforma runs and train runs alone, so Trains
+    said none was on file beside six runs. A library run's tables hold a
+    Proforma run's keys; its train is known by the study scenario its runs
+    row names, else by its own id, and named by that scenario's title."""
+    old = _art("aaaaaaaaaaaaaab1", tool="library.run", created="2026-10-01T00:00:00Z")
+    new = _art("aaaaaaaaaaaaaab2", tool="library.run", created="2026-10-02T00:00:00Z")
+    alone = _art("aaaaaaaaaaaaaab3", tool="library.run", created="2026-10-03T00:00:00Z")
+    named = {old.id: ("ssc-standin", "A stand-in study"), new.id: ("ssc-standin", "A stand-in study"),
+             alone.id: (None, None)}
+    monkeypatch.setattr(pureos, "library_scenarios", lambda kept: named)
+    every = pureos.trains(arts=[old, new, alone], scenarios=[])
+    assert [(t.scenarioId, t.artifactId, t.runs, t.scenarioName) for t in every] == [
+        (None, alone.id, 1, None), ("ssc-standin", new.id, 2, "A stand-in study")]
+    tr = pureos.train("ssc-standin", arts=[old, new, alone], scenarios=[])
+    assert tr.artifactId == new.id and tr.product == "E" and tr.overallRecovery is not None
+    assert pureos.train(alone.id, arts=[old, new, alone], scenarios=[]).artifactId == alone.id
 
 
 # ── the endpoints ────────────────────────────────────────────────────────
@@ -320,7 +341,7 @@ def test_get_train_reads_by_scenario_or_run_and_404s_in_words(stored):
     assert by_scenario["artifactId"] == stored.id and [u["id"] for u in by_scenario["units"]] == ["R", "C", "D", "W"]
     assert c.get(f"/api/pureos/train/{LINE}").json()["overallRecovery"] == pytest.approx(0.9)
     missing = c.get("/api/pureos/train/sc-nothing")
-    assert missing.status_code == 404 and "run the scenario in Proforma" in missing.json()["detail"]
+    assert missing.status_code == 404 and "run the scenario from Studies or Proforma" in missing.json()["detail"]
 
 
 def test_the_page_and_pureos_read_give_one_train_one_provenance(tmp_path, monkeypatch, pool):  # noqa: F811

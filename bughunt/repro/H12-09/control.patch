@@ -1,0 +1,11 @@
+--- a/core/openferment_core/guard.py
++++ b/core/openferment_core/guard.py
+@@ -75,7 +75,7 @@
+         return True
+     except ValueError:
+         pass
+-    return "." not in host or host.endswith(OWN_SUFFIXES)
++    return "." not in host or host.endswith((*OWN_SUFFIXES, ".com"))
+ 
+ 
+ def same_site(origin: str | None, host: str | None) -> bool:

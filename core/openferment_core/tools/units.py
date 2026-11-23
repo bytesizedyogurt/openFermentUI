@@ -1,4 +1,4 @@
-"""`convert_units`: a record's own value in another unit (OF-BLD-014 §3.4).
+"""`convert_units`: a record's own value in another unit.
 
 The model names a record and a unit; the value is the record's, read from the
 pool, and the conversion is `units.convert`, the same engine the browser runs.

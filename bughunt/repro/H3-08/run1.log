@@ -1,0 +1,60 @@
+database: bh_r_h3_08_units (fresh, migrated to head)
+== Part A: units.normalize and units.convert ==
+control  normalize('g/g'                       ) = 'g g⁻¹'
+control  normalize('g EtOH/g glucose'          ) = 'g g⁻¹'
+control  normalize('gx/g'                      ) = 'g g⁻¹'
+control  normalize('gDW gglucose⁻¹'            ) = 'g g⁻¹'
+control  normalize('g biomass [g glucose]⁻¹'   ) = 'g g⁻¹'
+control  normalize('gal'                       ) = None
+control  normalize('gmol'                      ) = None
+control  normalize('gpm'                       ) = None
+control  normalize('g/furlong'                 ) = None
+probe    normalize('g/gal'                     ) = 'g g⁻¹'  family 'yield'
+probe    normalize('gal/g'                     ) = 'g g⁻¹'  family 'yield'
+probe    normalize('g/gmol'                    ) = 'g g⁻¹'  family 'yield'
+probe    normalize('gmol/g'                    ) = 'g g⁻¹'  family 'yield'
+probe    normalize('g gal-1'                   ) = 'g g⁻¹'  family 'yield'
+probe    normalize('gal g-1'                   ) = 'g g⁻¹'  family 'yield'
+probe    normalize('g/gallon'                  ) = 'g g⁻¹'  family 'yield'
+probe    normalize('gpm/gpm'                   ) = 'g g⁻¹'  family 'yield'
+probe    normalize('g/gpm'                     ) = 'g g⁻¹'  family 'yield'
+for comparison: normalize('g mol-1') = 'g mol⁻¹' family 'molarMass'
+convert(180.16, 'g/gmol', 'g g⁻¹') = 180.16
+convert(1, 'gal/g', 'kg kg⁻¹') = 1.0
+convert(1, 'g/gal', 'mg g⁻¹') = 1000.0
+
+== Part B: validate.anchor_candidate ==
+ethanol_yield_substrate = 0.45 'g/gal' on 'The broth held 0.45 g/gal of residual ethanol at harvest.'
+    ANCHORED as 0.45 g g⁻¹, valueBasis 'exact'
+control: ethanol_yield_substrate = 0.45 'g/furlong' on 'The broth held 0.45 g/furlong of residual ethanol at harvest.'
+    refused on rule 'unit': unit 'g/furlong' does not normalise
+
+== Part C: biorepo.write in a fresh database ==
+accept cl1-R1-00000001: stored, provenance 'verified'
+BioRepo: cl1-R1-00000001  field ethanol_yield_substrate  status verified  provenance verified  value 0.45 g g⁻¹  quote 'The broth held 0.45 g/gal of residual ethanol at harvest.'
+
+the records row the accept left (openferment.records):
+cl1-R1-00000001 | ethanol_yield_substrate | 0.45 | g g⁻¹ | verified | The broth held 0.45 g/gal of residual ethanol at harvest.
+
+== Part D: the browser's engine (src/engine/units.ts) ==
+BROWSER control normalizeUnit("g EtOH/g glucose") = "g g⁻¹"
+BROWSER control normalizeUnit("gx/g") = "g g⁻¹"
+BROWSER control normalizeUnit("gal") = null
+BROWSER control normalizeUnit("gmol") = null
+BROWSER control normalizeUnit("g/furlong") = null
+BROWSER probe   normalizeUnit("g/gal") = "g g⁻¹"
+BROWSER probe   normalizeUnit("gal/g") = "g g⁻¹"
+BROWSER probe   normalizeUnit("g/gmol") = "g g⁻¹"
+BROWSER probe   normalizeUnit("gmol/g") = "g g⁻¹"
+BROWSER probe   normalizeUnit("g gal-1") = "g g⁻¹"
+BROWSER probe   normalizeUnit("gal g-1") = "g g⁻¹"
+BROWSER probe   normalizeUnit("g/gallon") = "g g⁻¹"
+BROWSER probe   normalizeUnit("gpm/gpm") = "g g⁻¹"
+BROWSER probe   normalizeUnit("g/gpm") = "g g⁻¹"
+BROWSER convert(180.16, "g/gmol", "g g⁻¹") = 180.16
+BROWSER convert(1, "gal/g", "kg kg⁻¹") = 1
+
+EXPECTED: normalize names a gram labelled by what it weighs (g EtOH/g glucose, gx/g, gDW gglucose⁻¹) g g⁻¹ and returns None for a spelling holding gallons (gal), gram-moles (gmol) or gallons per minute (gpm), as it does for 'gal', 'gmol', 'gpm' and 'g/furlong'; convert raises UnitError ('Unknown unit') for g/gmol, gal/g and g/gal; anchoring refuses 0.45 'g/gal' for ethanol_yield_substrate on rule 'unit', as it refuses 0.45 'g/furlong'
+OBSERVED: controls held; 9 of 9 probes normalise to 'g g⁻¹' (g/gal, gal/g, g/gmol, gmol/g, g gal-1, gal g-1, g/gallon, gpm/gpm, g/gpm); convert returned a number for 3 of 3 pairs (180.16 g/gmol = 180.16 g g⁻¹, 1 gal/g = 1 kg kg⁻¹, 1 g/gal = 1000 mg g⁻¹); 0.45 'g/gal' ANCHORED as 0.45 g g⁻¹ valueBasis 'exact', control 'g/furlong' refused on rule unit; biorepo.write stored it with provenance 'verified'
+OBSERVED: the browser's normalizeUnit names 'g g⁻¹' for 9 of 9 probes (src/engine/units.ts:369-372, the same two patterns)
+RESULT: DEFECT

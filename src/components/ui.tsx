@@ -4,7 +4,7 @@ import React, { useEffect, useRef, useState, type ReactNode } from 'react';
 import { createPortal } from 'react-dom';
 import { X, AlertTriangle, Info, CheckCircle2, XCircle } from 'lucide-react';
 import { useStore } from '@/store';
-import { navigate } from '@/router';
+import { navigate, href } from '@/router';
 
 export function cx(...parts: (string | false | null | undefined)[]): string {
   return parts.filter(Boolean).join(' ');
@@ -17,16 +17,19 @@ export function PageHeader({
   subtitle,
   actions,
   eyebrow,
+  wrap = false,
 }: {
   /** null mounts the screen under an owner's header — see the note below. */
   title: ReactNode | null;
   subtitle?: ReactNode;
   actions?: ReactNode;
   eyebrow?: ReactNode;
+  /** The actions go below the title where the two do not fit side by side (a tablet's 810 px). */
+  wrap?: boolean;
 }) {
   return (
-    <div className="flex items-start justify-between gap-6 mb-5">
-      <div className="min-w-0">
+    <div className={cx('flex items-start justify-between mb-5', wrap ? 'flex-wrap gap-x-6 gap-y-3' : 'gap-6')}>
+      <div className={cx('min-w-0', wrap && 'flex-1 basis-[22rem]')}>
         {eyebrow && (
           <div className="text-caption uppercase tracking-wide text-ink-soft mb-1">{eyebrow}</div>
         )}
@@ -39,7 +42,7 @@ export function PageHeader({
         )}
         {subtitle && <div className="text-body text-ink-soft mt-1 max-w-3xl">{subtitle}</div>}
       </div>
-      {actions && <div className="flex items-center gap-2 shrink-0">{actions}</div>}
+      {actions && <div className={cx('flex items-center gap-2', wrap ? 'flex-wrap' : 'shrink-0')}>{actions}</div>}
     </div>
   );
 }
@@ -132,7 +135,7 @@ export function LinkButton({
 }) {
   return (
     <a
-      href={`#${to}`}
+      href={href(to)}
       className={cx('btn', variant === 'primary' && 'btn-primary', size === 'sm' && 'btn-sm', className)}
     >
       {children}
@@ -156,19 +159,26 @@ export function Popover({
   label?: string;
 }) {
   const [open, setOpen] = useState(false);
-  const [pos, setPos] = useState({ top: 0, left: 0 });
+  const [pos, setPos] = useState({ top: 0, left: 0, maxHeight: 0 });
   const ref = useRef<HTMLButtonElement>(null);
   const timer = useRef<number>();
   const panelRef = useRef<HTMLDivElement>(null);
 
+  // The panel opens below its trigger, or above it when the room above is the
+  // larger and the panel outgrows the room below; either way it stays 8 px
+  // inside the window and scrolls within the room it has.
   const place = () => {
     const r = ref.current?.getBoundingClientRect();
     if (!r) return;
-    const top = r.bottom + 6;
+    const below = r.bottom + 6;
     const left = Math.max(8, Math.min(window.innerWidth - width - 8, r.left));
-    const flipUp = top + 260 > window.innerHeight && r.top > 280;
-    setPos({ top: flipUp ? r.top - 6 : top, left });
-    if (flipUp && panelRef.current) panelRef.current.style.transform = 'translateY(-100%)';
+    const tall = panelRef.current?.scrollHeight ?? 260;
+    const roomBelow = window.innerHeight - below - 8;
+    const roomAbove = r.top - 6 - 8;
+    const flipUp = tall > roomBelow && roomAbove > roomBelow;
+    const room = Math.max(80, flipUp ? roomAbove : roomBelow);
+    const top = flipUp ? Math.max(8, r.top - 6 - Math.min(tall, room)) : below;
+    setPos({ top, left, maxHeight: room });
   };
 
   useEffect(() => {
@@ -213,7 +223,7 @@ export function Popover({
             role="dialog"
             aria-label={label}
             className="fixed z-50 overlay rounded-card p-3 anim-in text-body"
-            style={{ top: pos.top, left: pos.left, width }}
+            style={{ top: pos.top, left: pos.left, width, maxHeight: pos.maxHeight || undefined, overflowY: 'auto' }}
             onMouseEnter={() => window.clearTimeout(timer.current)}
             onMouseLeave={() => {
               if (!openOnHover) return;
@@ -364,10 +374,11 @@ export function Toasts() {
         return (
           <div key={t.id} className="overlay rounded-card p-3 flex items-start gap-2 anim-in">
             <Icon size={16} className={cx('mt-[2px] shrink-0', TOAST_COLOR[t.kind])} />
-            <div className="flex-1 text-body">{t.text}</div>
+            {/* A long unbroken word (a document's id, an address) breaks inside the toast, so its buttons stay in it. */}
+            <div className="flex-1 min-w-0 text-body break-words [overflow-wrap:anywhere]">{t.text}</div>
             {t.href && (
               <button
-                className="btn btn-sm"
+                className="btn btn-sm shrink-0"
                 onClick={() => {
                   navigate(t.href!.replace(/^#/, ''));
                   dismiss(t.id);
@@ -376,7 +387,7 @@ export function Toasts() {
                 {t.hrefLabel ?? 'Open'}
               </button>
             )}
-            <button className="text-ink-soft hover:text-ink" onClick={() => dismiss(t.id)} aria-label="Dismiss">
+            <button className="shrink-0 text-ink-soft hover:text-ink" onClick={() => dismiss(t.id)} aria-label="Dismiss">
               <X size={14} />
             </button>
           </div>
@@ -452,11 +463,11 @@ export function Callout({
 }
 
 /** Explainer popover trigger — the ambient-pedagogy affordance (§4). */
-export function Explain({ children, label = 'What is this?' }: { children: ReactNode; label?: string }) {
+export function Explain({ children, label = 'What is this?', width = 320 }: { children: ReactNode; label?: string; width?: number }) {
   return (
     <Popover
       label={label}
-      width={320}
+      width={width}
       trigger={(p) => (
         <button
           {...p}

@@ -17,8 +17,7 @@
 // the panel by it, so a new thing mounts a new panel.
 import { useEffect, useRef, useState, type ReactNode } from 'react';
 import { ExternalLink, FlaskConical } from 'lucide-react';
-import type { Artifact, ThermoPropsRequest } from '@/data/types';
-import { PROPERTY_ROWS, ThermoDown, ThermoRefused, propsOf, thermoAsk, thermoStored } from '@/lib/thermo';
+import { PROPERTY_ROWS, ThermoDown, ThermoRefused, thermoAsk, thermoStored, type ThermoPropsAnswer, type ThermoPropsRequest } from '@/lib/thermo';
 import { fmt } from '@/engine/units';
 import { href } from '@/router';
 import { ProvenanceBadge } from '@/components/Provenance';
@@ -27,7 +26,7 @@ type State =
   | { kind: 'reading' }
   | { kind: 'none' }
   | { kind: 'asking' }
-  | { kind: 'answer'; art: Artifact }
+  | { kind: 'answer'; answer: ThermoPropsAnswer }
   | { kind: 'refused'; text: string }
   | { kind: 'down'; text: string };
 
@@ -60,7 +59,7 @@ export function PropertiesPanel({ title, question }: { title: ReactNode; questio
     const ctrl = new AbortController();
     setState({ kind: 'reading' });
     thermoStored(question, ctrl.signal)
-      .then((art) => !ctrl.signal.aborted && setState(art ? { kind: 'answer', art } : { kind: 'none' }))
+      .then((answer) => !ctrl.signal.aborted && setState(answer ? { kind: 'answer', answer } : { kind: 'none' }))
       .catch((e) => !ctrl.signal.aborted && setState(said(e)));
     return () => {
       ctrl.abort();
@@ -76,7 +75,7 @@ export function PropertiesPanel({ title, question }: { title: ReactNode; questio
     asking.current = ctrl;
     setState({ kind: 'asking' });
     thermoAsk(question, ctrl.signal)
-      .then((art) => !ctrl.signal.aborted && setState({ kind: 'answer', art }))
+      .then((answer) => !ctrl.signal.aborted && setState({ kind: 'answer', answer }))
       .catch((e) => !ctrl.signal.aborted && setState(said(e)));
   };
 
@@ -113,24 +112,27 @@ export function PropertiesPanel({ title, question }: { title: ReactNode; questio
           {state.text}
         </p>
       )}
-      {state.kind === 'answer' && <Answer art={state.art} />}
+      {state.kind === 'answer' && <Answer answer={state.answer} />}
     </div>
   );
 }
 
-function Answer({ art }: { art: Artifact }) {
-  const p = propsOf(art);
+function Answer({ answer }: { answer: ThermoPropsAnswer }) {
+  const { artifact: art, props: p } = answer;
   return (
     <div data-testid="thermo-props">
       <table className="w-full text-caption">
         <tbody>
-          {PROPERTY_ROWS.map(({ key, label }) => (
-            <tr key={key} className="border-b border-line/60" data-testid="thermo-row" data-key={key}>
-              <td className="py-1 pr-2 text-ink-soft">{label}</td>
-              <td className="py-1 pr-2 font-num text-right text-ink">{p[key] == null ? '—' : fmt(p[key] as number, 4)}</td>
-              <td className="py-1 font-num text-ink-soft">{p[key] == null ? 'not computed' : p.units[key]}</td>
-            </tr>
-          ))}
+          {PROPERTY_ROWS.map(({ key, label }) => {
+            const v = p[key];
+            return (
+              <tr key={key} className="border-b border-line/60" data-testid="thermo-row" data-key={key}>
+                <td className="py-1 pr-2 text-ink-soft">{label}</td>
+                <td className="py-1 pr-2 font-num text-right text-ink">{v == null ? '—' : fmt(v, 4)}</td>
+                <td className="py-1 font-num text-ink-soft">{v == null ? 'not computed' : p.units[key]}</td>
+              </tr>
+            );
+          })}
         </tbody>
       </table>
       <p className="text-caption text-ink-soft mt-1.5">

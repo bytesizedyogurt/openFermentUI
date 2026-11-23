@@ -1,0 +1,34 @@
+database: bh_r_h3_11_doors (fresh, migrated to head)
+== the two rules as the tree writes them ==
+356:                return [], f"value {n} ({label}): an estimate's basis holds a number ({found!r})"
+279:                        "basis": {"type": "string", "description": "What the estimate rests on, in words, with no number."},
+318:    note: str = Field(default="", max_length=600, description="What the value rests on, in words.")
+495:        out["origin"] = origin.model_copy(update={"note": (note or "").strip() or None}).model_dump(
+92:                       note=f"estimated on {at}" + (f": {note}" if note else ""))
+
+== one ask with a stand-in model ==
+INFO openferment.api: serving the built app from /home/user/openFermentUI/dist at /
+WARNING openferment.postdoc_agent: agent: validator dropped 1/2 claims: c1: value 1 (the cane's price): an estimate's basis holds a number ('3')
+stand-in model calls: 3; the answering route's model id: 'claude-opus-5-5'
+find_number on WORDS 'about 30% above the 2011 design report': '3'; on PLAIN "a delivered price above the package's": None
+
+== the claim door (validate.claim_values, through the answer path) ==
+plan: 1 kept, 1 dropped
+  dropped  c1: value 1 (the cane's price): an estimate's basis holds a number ('3')
+  kept     c2 (assumed) | origin model-estimate by h3-11-standin note "a delivered price above the package's"
+
+== the tool door (tools.run: numbers_in, stamped), the same ask ==
+  scenario ssc-1fd1c18ab4e6 by claude-opus-5-5 | stream.sugarcane.price = 0.05 USD/kg | origin model-estimate by claude-opus-5-5 at 2026-11-10T23:43:40.735160Z note 'about 30% above the 2011 design report'
+  run c30de832165fda4c (done, assumed) by claude-opus-5-5
+    input stream.sugarcane.price: origin model-estimate by claude-opus-5-5 note 'estimated on 2026-11-10T23:43:40.735160Z: about 30% above the 2011 design report'
+  artifact c30de832165fda4c (assumed) | basis input stream.sugarcane.price = 0.05 USD/kg | source model-estimate by claude-opus-5-5 note 'estimated on 2026-11-10T23:43:40.735160Z: about 30% above the 2011 design report'
+
+
+the rows the ask left (openferment.scenarios, openferment.runs), read with psql:
+scenario | ssc-1fd1c18ab4e6 | model-estimate | about 30% above the 2011 design report
+run | c30de832165fda4c | model-estimate | estimated on 2026-11-10T23:43:40.735160Z: about 30% above the 2011 design report
+core/, src/, scripts/, examples/: unchanged by this run
+
+EXPECTED: one rule for what a model's estimate rests on, in words: WORDS (find_number finds a number in it) drops claim c1 at the claim door and is refused in words at the tool door, so no scenario, no run and no basis note carries it; c2 (no number) kept
+OBSERVED: claim door: c1 dropped (basis holds a number), c2 kept; tool door: the scenario KEPT with the model-estimate note 'about 30% above the 2011 design report'; the run's artifact basis note 'estimated on 2026-11-10T23:43:40.735160Z: about 30% above the 2011 design report'
+RESULT: DEFECT

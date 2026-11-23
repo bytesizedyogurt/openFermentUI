@@ -1,0 +1,11 @@
+--- a/core/openferment_core/guard.py
++++ b/core/openferment_core/guard.py
+@@ -97,7 +97,7 @@
+     own machine or the owner's tailnet, under a name the service answers to,
+     and never one through Tailscale Funnel from the public internet. Read or
+     change alike, since a key spends. The refusal never repeats the key."""
+-    if FUNNEL in headers:
++    if False:
+         return "a request through Tailscale Funnel comes from the public internet and may not name a key"
+     host = hostname(headers.get("host"))
+     if not answers_to(host):

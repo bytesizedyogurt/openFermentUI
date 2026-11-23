@@ -1,0 +1,20 @@
+== 1. docs/PROGRESS.md at 2047f5a
+   line 467, under "## Departures from the execution prompt", row "alpha 2.2 D7, C.5"
+   its Why: No store holds a protocol in this build, and D7's walk deposits a reading at the bench on step 5's locked runbook. §11.5 keeps Deposition as it is beyond the store and type changes that reach it, so the gate (C.7) recorded the extension as a decision of its own: ADR-016
+   later steps the row names (E.12a, E.12, ADR-017): 0
+   the same table, line 503, row "alpha 2.2 §6.5, E.12", says:
+     A project keeps its protocols on the service since E.12a (ADR-017), and the protocol screens, Guild's Matrix and skills, Primer's path and the bench read them; neither of the two named libs is about protocols 
+   the Decisions row of ADR-016 (line 435): alpha 2.2 E.12a: its first revisit condition met by ADR-017, the readings-alone mode standing beside a protocol's steps
+   docs/decisions/ADR-016-bench-readings-alone.md:51: ## Implementation note (alpha 2.2 E.12a)
+   core/openferment_core/db/alembic/versions/0010_protocols.py:28: op.create_table('protocols',
+   docs/api/openapi.json protocol paths: /api/protocols /api/protocols/{protocol_id} /api/protocols/{protocol_id}/versions
+== 2. the store: a fresh database bh_r_r1_02_store, the service on 127.0.0.1:10940
+   after migration to head, information_schema.tables holds: openferment.protocols
+   POST /api/projects: {"id":"bh-r1-02","name":"bh-r1-02","description":"","createdBy":"bughunt","createdAt":"2026-11-11T00:11:08.606070+00:00"
+   POST /api/protocols: HTTP 200, kept PR-PLACEHOLDER version ['1.0'] by ['Ada']
+   GET /api/protocols: [PR-PLACEHOLDER]
+   SELECT count(*) FROM openferment.protocols WHERE project_id = 'bh-r1-02': 1
+== service on 10940 stopped (nothing listens); databases bh_r_r1_02_* left: 0
+EXPECTED: the Departures row "alpha 2.2 D7, C.5" gives a reason true of the tree at 2047f5a, or names E.12a as the Decisions row of ADR-016 and ADR-016's note do: the readings-alone mode stands beside a project's protocols (ADR-017), which the store keeps since E.12a
+OBSERVED: line 467 of docs/PROGRESS.md ("## Departures from the execution prompt") says "No store holds a protocol in this build" and names no step after C.7 (matches of E.12a, E.12 or ADR-017 in the row: 0); line 503 of the same table says a project keeps its protocols on the service since E.12a; the store at 2047f5a has the table openferment.protocols, POST /api/protocols answered 200, GET /api/protocols lists [PR-PLACEHOLDER], the table holds 1 row(s)
+RESULT: DEFECT

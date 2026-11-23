@@ -1,0 +1,25 @@
+tree: 14e7caa; core/ src/ scripts/ examples/ as at 2047f5a: yes
+service on http://127.0.0.1:9470 over fresh database bh_r_h10_05_svc
+project r1: {"id":"r1","name":"r1","description":"","createdBy":"bughunt","createdAt":"2026-
+
+-- POST /api/biorepo/check with body {} (a 422 from the endpoint means the guard let it through; the guard refuses with 403)
+  Host evil.localhost:9470 -> 422 {"detail":[{"type":"missing","loc":["body","status"],"msg":"Field required","input":{}},{"type":"missing","loc":["body","provenance"],"msg":"Field req
+  Host evil.local:9470   -> 422 {"detail":[{"type":"missing","loc":["body","status"],"msg":"Field required","input":{}},{"type":"missing","loc":["body","provenance"],"msg":"Field req
+  Host evil.example.com:9470 -> 403 {"detail":"this service does not answer to 'evil.example.com'. Add the name to OPENFERMENT_ALLOWED_HOSTS if it is yours"}
+
+-- the tree
+  core/openferment_core/guard.py:22-24: A host this service answers to: an IP address, a name with no dot, a `.local`
+  core/openferment_core/guard.py:22-24: name (Bonjour), a `.ts.net` name (Tailscale's names for the owner's devices),
+  core/openferment_core/guard.py:22-24: or one listed in OPENFERMENT_ALLOWED_HOSTS. Each of these is answered by the
+  core/openferment_core/guard.py:37:OWN_SUFFIXES = (".local", ".localhost", ".ts.net")
+  core/openferment_core/api.py:200:_OWN_NAMES = ", ".join(f"`{s}`" for s in guard.OWN_SUFFIXES[:-1]) + f" or `{guard.OWN_SUFFIXES[-1]}`"
+  core/tests/test_openapi.py:53:    assert all(f"`{suffix}`" in said for suffix in guard.OWN_SUFFIXES), "every name the guard admits, as guard.py lists"
+
+  OWN_SUFFIXES = ('.local', '.localhost', '.ts.net')
+  each suffix in guard.py's docstring: {'.local': True, '.localhost': False, '.ts.net': True}
+  each suffix in openapi.json's info.description: {'.local': True, '.localhost': True, '.ts.net': True}
+  openapi.json says: '... a name ending `.local`, `.localhost` or `.ts.net` ...'
+
+EXPECTED: guard.py's docstring, the list of hosts 'this service answers to' (guard.py:22-24), names every suffix OWN_SUFFIXES holds and the guard admits, as api.py's DESCRIPTION (written from OWN_SUFFIXES) does in openapi.json: `.local`, `.localhost`, `.ts.net`
+OBSERVED: the docstring reads 'A host this service answers to: an IP address, a name with no dot, a `.local` name (Bonjour), a `.ts.net` name (Tailscale's names for the owner's devices), or one listed in OPENFERMENT_ALLOWED_HOSTS. ...'; it leaves out ['.localhost']; POST under Host evil.localhost answers 422 (passed the guard), under evil.local 422, under evil.example.com 403 (refused); openapi.json lists `.localhost`: True
+RESULT: DEFECT

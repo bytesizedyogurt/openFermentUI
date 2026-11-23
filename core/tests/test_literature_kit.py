@@ -104,6 +104,115 @@ def test_a_project_that_holds_nothing_sees_nothing(tmp_path, two_projects):
     assert kit.stats(THERE)["documents"] == 0
 
 
+def _raced(tmp_path, monkeypatch, topic: str) -> tuple[kit.Stored, kit.Stored]:
+    """H5-01's race, made to happen every time: THERE collects a document and
+    HERE links it, so HERE's scope names THERE's paste source; HERE's scope is
+    read; then THERE commits a private note under that source. `visible`
+    answers HERE with the scope read before the note existed, as a search
+    that began before THERE's commit reads it. The shared document and the
+    note are returned."""
+    text = _text(topic)
+    shared = _store(tmp_path, THERE, topic, text)
+    assert _store(tmp_path, HERE, topic, text).status == "linked"
+    before = db.run(kit.visible(HERE))
+    private = _store(tmp_path, THERE, f"{topic} private note")
+    assert kit.source(THERE, "paste") in before.sources and private.document_id not in before.excluded
+    real = kit.visible
+
+    async def read_before_the_commit(project_id: str) -> kit.Visible:
+        return before if project_id == HERE else await real(project_id)
+
+    monkeypatch.setattr(kit, "visible", read_before_the_commit)
+    return shared, private
+
+
+def test_a_document_committed_under_a_shared_source_during_a_search_stays_out_of_it(tmp_path, two_projects,
+                                                                                    monkeypatch):
+    shared, private = _raced(tmp_path, monkeypatch, "racing feed study")
+    query = "racing feed study private note placeholder vessel"
+
+    async def as_the_kit_alone_ranks_it():
+        with projects.using(HERE):
+            scope = await kit._narrowed(None)
+            return await kit.Retriever.retrieve(kit.service().retriever, query, limit=1, scope=scope,
+                                                profile="interactive")
+
+    assert [i.document_id for i in db.run(as_the_kit_alone_ranks_it()).items] == [private.document_id], \
+        "the scope read before the commit lets the note through, and the kit ranks it first"
+    hits, _ = kit.search(query, project_id=HERE, top_k=20)
+    assert {h.document_id for h in hits} == {shared.document_id}
+    top, _ = kit.search(query, project_id=HERE, top_k=1)
+    assert [h.document_id for h in top] == [shared.document_id], "the search runs again without the note"
+    assert {i.document_id for i in kit.retrieve(query, project_id=THERE, top_k=20).items} == {
+        shared.document_id, private.document_id}
+
+
+def test_an_answer_during_a_commit_under_a_shared_source_cites_only_the_projects_documents(tmp_path, two_projects,
+                                                                                          monkeypatch):
+    shared, _ = _raced(tmp_path, monkeypatch, "racing xylose study")
+    mock = MockLLM(responses=["Xylose was studied [1]."])
+    monkeypatch.setattr(kit, "_MODEL", lambda role: mock)
+    events = _answer("racing xylose study private note placeholder vessel", HERE, profile="interactive")
+    cited = next(e.data["citations"] for e in events if e.type == "citations")
+    assert {c["document_id"] for c in cited} == {shared.document_id}
+
+
+def test_a_stray_every_run_returns_is_dropped_and_each_run_excludes_the_strays_before_it(monkeypatch):
+    """The kit's retrieval stood in for: each run returns a new document the
+    project does not hold, as when the other project keeps committing. The
+    reruns exclude the strays seen so far, and the last run's stray is
+    dropped while the project's own item stays."""
+    from sci_rag.retrieve.types import RetrievalResult, RetrievalScope, RetrievedItem
+
+    def item(document: str) -> RetrievedItem:
+        return RetrievedItem(kind="chunk", id=f"c-{document}", score=1.0, layers=["vector"], title=document,
+                             content=document, document_id=document)
+
+    excluded: list[tuple[str, ...]] = []
+
+    async def kit_retrieve(self, query, **kw):
+        excluded.append(kw["scope"].exclude_document_ids)
+        n = len(excluded)
+        return RetrievalResult(items=[item(f"theirs-{n}")] + ([item("mine")] if n > 1 else []), traces=[],
+                               profile="interactive")
+
+    async def holding(project_id, ids):
+        return {"mine"} & set(ids)
+
+    async def visible(project_id):
+        return kit.Visible(("mine",), ("a-source",), ("theirs-0",))
+
+    monkeypatch.setattr(kit.Retriever, "retrieve", kit_retrieve)
+    monkeypatch.setattr(kit, "holding", holding)
+    monkeypatch.setattr(kit, "visible", visible)
+
+    async def go():
+        with projects.using(HERE):
+            return await kit.service().retriever.retrieve("q", limit=2, scope=RetrievalScope(sources=("a-source",)))
+
+    result = db.run(go())
+    assert [i.document_id for i in result.items] == ["mine"]
+    assert excluded == [(), ("theirs-0", "theirs-1"), ("theirs-0", "theirs-1", "theirs-2")]
+    assert len(excluded) == 1 + kit.ProjectRetriever.RERUNS
+
+
+def test_the_retriever_asks_for_the_project_before_it_reads_anything(monkeypatch):
+    monkeypatch.delenv(projects.ENV, raising=False)
+
+    async def read(*_a, **_k):
+        raise AssertionError("the kit's retrieval ran before the project was asked for")
+
+    monkeypatch.setattr(kit.Retriever, "retrieve", read)
+
+    async def go():
+        with projects.using(None):
+            return await kit.service().retriever.retrieve("anything", limit=1)
+
+    with pytest.raises(ApiError) as refused:
+        db.run(go())
+    assert refused.value.status == 422 and refused.value.code == "project_required"
+
+
 def test_a_document_the_project_does_not_hold_is_not_found(tmp_path, two_projects):
     theirs = _store(tmp_path, THERE, "a report held elsewhere")
     with pytest.raises(ApiError) as missing:
@@ -119,6 +228,24 @@ def test_stats_count_the_projects_documents(tmp_path):
     assert counts["documents"] == len(db.run(kit.visible(HERE)).documents) >= 1
     assert counts["sources"] == {kit.source(HERE, "paste"): counts["documents"]}
     assert counts["chunks"] >= stored.chunks
+    # The concept graph is the project's (test_literature_graph.py): no build
+    # has read these passages, whatever other tests' builds left in the kit.
+    assert (counts["entities"], counts["relationships"], counts["communities"]) == (0, 0, 0)
+
+
+def test_stats_ask_for_the_project_before_they_read_the_database(monkeypatch):
+    def unreachable():
+        raise AssertionError("the database was read before the project was asked for")
+
+    monkeypatch.setattr(kit.service(), "session_factory", unreachable)
+
+    async def go():
+        with projects.using(None):
+            return await kit.service().stats()
+
+    with pytest.raises(ApiError) as refused:
+        db.run(go())
+    assert refused.value.code == "project_required"
 
 
 def test_the_kits_settings_are_openferments_whatever_the_environment_says(monkeypatch, tmp_path):
@@ -326,3 +453,67 @@ def test_an_answer_streams_its_words_and_citations_with_passage_ids(tmp_path, mo
     [cited] = [c for k, d in events if k == "citations" for c in d["citations"] if c["cited"]]
     assert cited["document_id"] == mine.document_id and cited["passage_id"].startswith("p")
     assert all("_" not in key[:1] for _, d in events for key in d), "nothing internal to the kit is sent"
+
+
+def test_an_answer_with_no_key_says_so_in_the_words_postdoc_and_extract_give(tmp_path, monkeypatch):
+    """Found on the owner's data: BioRepo's 'Answer with citations' read
+    "ModelUnavailable: generation failed (see server logs)" while Postdoc and
+    Extract on the same service said that no key was set. The kit catches the
+    model's failure and sends its class name; the stream says why, in
+    llm.py's words, through the real client the service installs."""
+    import json
+
+    from openferment_core import llm
+    from openferment_core.api import app
+
+    monkeypatch.delenv("ANTHROPIC_API_KEY", raising=False)
+    monkeypatch.setattr(kit, "_MODEL", llm.kit_client)
+    with pytest.raises(llm.ModelUnavailable) as said:
+        llm.call(system="", user="q", schema=None, max_tokens=16, family="explain")
+    _store(tmp_path, HERE, "keyless answer")
+    with TestClient(app).stream("POST", "/api/literature/answer", json={"question": "keyless answer placeholder"}) as r:
+        assert r.status_code == 200
+        raw = "".join(r.iter_text())
+    events = [(block.split("\n")[0][len("event: "):], json.loads(block.split("\n")[1][len("data: "):]))
+              for block in raw.strip().split("\n\n")]
+    [error] = [d for k, d in events if k == "error"]
+    assert "ANTHROPIC_API_KEY is not set" in error["message"]
+    assert error["message"] == str(said.value), "the words Postdoc and Extract give for a missing key"
+    assert "see server logs" not in error["message"]
+
+
+def test_an_answer_past_the_accounts_usage_limit_says_so_and_never_names_the_key(tmp_path, monkeypatch):
+    """The owner's Mac meets the Anthropic account's own usage limit as a 400
+    on every call: the answer's error says so in llm.py's words, the date the
+    API names with it, and the key's value appears in no event."""
+    import json
+
+    import anthropic
+    import httpx
+
+    from openferment_core import llm
+
+    key = f"sk-ant-standin-{uuid.uuid4().hex}"
+    limit = "You have reached your specified API usage limits. You will regain access on 2026-12-01 at 00:00 UTC."
+
+    class Refusing:
+        """The API as it answers past the account's usage limit."""
+
+        def __init__(self) -> None:
+            self.messages = self
+
+        def stream(self, **_):
+            raise anthropic.BadRequestError(
+                message=limit, response=httpx.Response(400, request=httpx.Request("POST", "https://x")), body=None)
+
+    monkeypatch.setenv("ANTHROPIC_API_KEY", key)
+    monkeypatch.setattr(llm, "make_client", lambda **_: Refusing())
+    monkeypatch.setattr(kit, "_MODEL", llm.kit_client)
+    with pytest.raises(llm.UsageLimitReached) as said:
+        llm.call(system="", user="q", schema=None, max_tokens=16, family="explain")
+    _store(tmp_path, HERE, "limited answer")
+    events = list(kit.answer("limited answer placeholder", project_id=HERE))
+    [error] = [e for e in events if e["type"] == "error"]
+    assert error["message"] == str(said.value), "the words the rest of the service gives for the usage limit"
+    assert error["message"].startswith("The Anthropic account's usage limit is reached until 2026-12-01 at 00:00 UTC")
+    assert key not in json.dumps(events, default=str)

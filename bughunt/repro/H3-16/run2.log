@@ -1,0 +1,59 @@
+database: bh_r_h3_16_svc (fresh, migrated to head); tree at d1cb6df, core/ and src/ as at 2047f5a: yes
+service: http://127.0.0.1:9200 over bh_r_h3_16_svc (keyless)
+
+== the contract lines, as written ==
+121:    """The table key for a unit as somebody wrote it, or None.
+92:tidy, never translate a unit. The value must appear inside the quote, as the \
+111:Give the unit as the paper wrote it. Give confidence as your own estimate \
+186:                                "description": "The unit as the paper wrote it; '' for a categorical field.",
+1137:         # 4. The unit normalises, into the field's family.
+1138:         unit = unit_normalised
+1139:         if not unit and unit_raw.strip():
+1140:             return None, "unit", f"unit {unit_raw!r} does not normalise"
+the fold the engine applies before comparing keys (units.py:91-101), U+03BC absent from it:
+  91: _STRIP_STEPS = (
+  92:     ("·", " "),
+  93:     ("⋅", " "),
+  94:     ("\u2212", "-"),
+  95:     ("\u2013", "-"),
+  96:     ("⁻¹", "-1"),
+  97:     ("⁻²", "-2"),
+  98:     ("⁻³", "-3"),
+  99:     ("³", "3"),
+ 100:     ("²", "2"),
+ 101: )
+lines holding U+03BC in core/openferment_core/units.py: 0; holding U+00B5: 0
+lines holding U+03BC in core/openferment_core/schema/units.json: 0; holding U+00B5: 33
+lines holding U+03BC in src/engine/units.ts: 0; holding U+00B5: 24
+a live extraction emitted the Greek-mu spelling (core/tests/test_units_minus.py, the units of dropped values):
+18:    'colonies/μg DNA', 'day−1', 'dwt%', 'fold', 'g L−1', 'g L−1 h−1', 'g product/L/h',
+
+== part 1: units.normalize on each spelling ==
+unicodedata.normalize('NFKC', U+00B5) = U+03BC   (Unicode's compatibility form of the micro sign is the Greek small letter mu)
+  micro sign 'µg/mL'          -> 'µg mL⁻¹'            Greek mu 'μg/mL'          -> None
+  micro sign 'µg/L'           -> 'µg L⁻¹'             Greek mu 'μg/L'           -> None
+  micro sign 'µL'             -> 'µL'                 Greek mu 'μL'             -> None
+  micro sign 'µM'             -> 'µmol L⁻¹'           Greek mu 'μM'             -> None
+  micro sign 'µl'             -> 'µL'                 Greek mu 'μl'             -> None
+  micro sign 'µmol/m²/s'      -> 'µmol m⁻² s⁻¹'       Greek mu 'μmol/m²/s'      -> None
+  micro sign 'µg mL⁻¹'        -> 'µg mL⁻¹'            Greek mu 'μg mL⁻¹'        -> None
+  units.convert(150, 'μg/mL', 'g L⁻¹') -> UnitError: Unknown unit: μg/mL
+  table keys holding U+00B5: 10; holding U+03BC: 0; alias keys holding U+00B5: 5; holding U+03BC: 0
+
+== part 2: the service, biorepo_write candidate, the unit copied as each document wrote it ==
+project made: 201
+paste (greek: U+03BC): 200 status='ingested' documentId='5b02fbb6ebb54822afe922607b22b64f'
+paste (micro: U+00B5): 200 status='ingested' documentId='c52342ac78df404ea91cdb5a2b4f5162'
+  greek doc, unit as written (U+03BC): HTTP 200; error="biorepo_write refused on rule unit: unit 'μg/mL' does not normalise"; state=None candidateId=None
+  micro doc, unit as written (U+00B5): HTTP 200; error=None; state='proposed' candidateId='mw1-c52342ac78df404ea91cdb5a2b4f5162-0000'
+  greek doc, unit retyped with U+00B5 (workaround): HTTP 200; error=None; state='proposed' candidateId='mw1-5b02fbb6ebb54822afe922607b22b64f-0000'
+
+
+== the browser's engine on the same spellings (src/engine/units.ts, read only) ==
+  browser normalizeUnit: micro sign "µg/mL" -> "µg mL⁻¹"   Greek mu "μg/mL" -> null
+  browser normalizeUnit: micro sign "µL" -> "µL"   Greek mu "μL" -> null
+  browser normalizeUnit: micro sign "µM" -> "µmol L⁻¹"   Greek mu "μM" -> null
+
+EXPECTED: 'μg/mL' (U+03BC) normalises to 'µg mL⁻¹' as 'µg/mL' (U+00B5) does, the two spellings of one unit a paper prints, and a candidate copying the unit as the paper wrote it is proposed under either spelling
+OBSERVED: normalize gives a key for the micro sign and None for the Greek mu on 7 of 7 spellings; biorepo_write on the Greek-mu document answered "biorepo_write refused on rule unit: unit 'μg/mL' does not normalise"; on the micro-sign document proposed=True; the Greek-mu quote with the unit retyped in U+00B5 proposed=True
+RESULT: DEFECT

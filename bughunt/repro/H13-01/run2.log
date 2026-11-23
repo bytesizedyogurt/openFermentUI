@@ -1,0 +1,49 @@
+NOTICE:  database "bh_r_h13_01_ctl" does not exist, skipping
+fresh clone: /tmp/claude-0/-home-user-openFermentUI/cfbc5c9f-640a-5002-a705-5ceaf850fdc6/scratchpad/bh/work/H13-01/wt at 2047f5a; core/.env present: no
+PostgreSQL on 127.0.0.1 (compose.yaml's role and port): 127.0.0.1:5432 - accepting connections
+
+== 0. README.md:41 `pnpm db:migrate` on the fresh clone (the real entry point, in its core/)
+   refused: OPENFERMENT_DATABASE_URL is not set. Put it in core/.env: postgresql://openferment:openferment@127.0.0.1:5432/openferment_dev for `pnpm db:up`, then run `pnpm db:migrate`; on the live host scripts/host/install.sh writes it (the database openferment).
+   exit 2
+
+== 1a. scripts/session-start.sh, keyless, no core/.env (prototype-up.sh:29 runs it)
+   ── the database
+   pnpm db:migrate (stand-in) refused: OPENFERMENT_DATABASE_URL is not set. Put it in core/.env: postgresql://openferment:openferment@127.0.0.1:5432/openferment_dev for `pnpm db:up`, then run `pnpm db:migrate`; on the live host scripts/host/install.sh writes it (the database openferment).
+   the database is not migrated; pnpm ready says what is missing
+   
+   ── pnpm ready
+   pnpm --silent ready (stand-in: skipped)
+   core/.env after the run: absent; lines naming OPENFERMENT_DATABASE_URL: 0
+
+== 1b. the same, core/.env holding a placeholder key line alone (the case with a key)
+   ── the database
+   OPENFERMENT_DATABASE_URL added to core/.env (the development address)
+   pnpm db:migrate (stand-in): would migrate postgresql+asyncpg://openferment:***@127.0.0.1:5432/openferment_dev; nothing connected
+   
+   ── pnpm ready
+   pnpm --silent ready (stand-in: skipped)
+   lines naming OPENFERMENT_DATABASE_URL in core/.env after the run: 1
+
+== 2. the service and the app as prototype-up.sh starts them on the keyless clone
+   GET /api/health (prototype-up.sh:51-56 waits on it): {"ok":true,"service":"openferment-core","model":"claude-opus-5-5","fallbackModel":"claude-sonnet-5-5","hasKey":false}
+   GET / through the app server: 200
+   GET /api/projects (Home's list): [503] {"detail":"OPENFERMENT_DATABASE_URL is not set. Put it in core/.env: postgresql://openferment:openferment@127.0.0.1:5432/openferment_dev for `pnpm db:up`, then run `pnpm db:migrate`; on the live host scripts/host/install.sh writes it (the database openferment)."}
+   POST /api/projects (Home's New project): [503] {"detail":"OPENFERMENT_DATABASE_URL is not set. Put it in core/.env: postgresql://openferment:openferment@127.0.0.1:5432/openferment_dev for `pnpm db:up`, then run `pnpm db:migrate`; on the live host scripts/host/install.sh writes it (the database openferment)."}
+
+== 3. control: the same service over a fresh database named in OPENFERMENT_DATABASE_URL
+NOTICE:  database "bh_r_h13_01_ctl" does not exist, skipping
+   POST /api/projects: [201]; GET /api/projects: [200] [{"id":"keyless","name":"Keyless","description":"","createdBy":"a stranger","createdAt":"2026-11-10T23:18:54.137438+00:00"}]
+
+== the contract and the guard, as the tree holds them
+   README.md:41: pnpm db:up && pnpm db:migrate     # PostgreSQL 16 or later with pgvector; or name a server in core/.env
+   README.md:46-47: settings an install sets most). The service binds `127.0.0.1` alone. Without a key the app runs
+   README.md:46-47: whole, and the steps that need a model say so.
+   scripts/session-start.sh:18-20: #   4. the database (ADR-001): when PostgreSQL answers on 127.0.0.1 and
+   scripts/session-start.sh:18-20: #      core/.env names none, the development address (compose.yaml's) joins
+   scripts/session-start.sh:18-20: #      core/.env; then pnpm db:migrate, whatever it exits with
+   scripts/session-start.sh:62-63: if [ -e core/.env ] && ! grep -q '^OPENFERMENT_DATABASE_URL=' core/.env && command -v pg_isready >/dev/null && pg_isready -q -h 127.0.0.1; then
+   scripts/session-start.sh:62-63:   printf 'OPENFERMENT_DATABASE_URL=postgresql://openferment:openferment@127.0.0.1:5432/openferment_dev\n' >> core/.env
+
+EXPECTED: by session-start.sh:18-20, PostgreSQL answering on 127.0.0.1 and core/.env naming no address, the development address joins core/.env and db:migrate migrates it; by README.md:46-47 the keyless app then runs whole, Home listing and making projects (as the control service over a named database does: POST [201], GET [200])
+OBSERVED: README.md:41's db:migrate exits 2 refused; session-start.sh with no core/.env leaves core/.env absent with 0 address lines (with a key line present it writes 1); the service prototype-up.sh starts there answers health ok=True, / [200], GET /api/projects [503], POST /api/projects [503]
+RESULT: DEFECT

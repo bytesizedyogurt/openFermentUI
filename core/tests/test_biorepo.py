@@ -135,7 +135,13 @@ def drop_candidates() -> None:
 
 
 def fetch_t5():
-    HELD["T5"] = structural_passages()
+    # The structural fixture's sections, and the passage the planted T5
+    # records cite, which holds their quotes as a kept candidate's paper does:
+    # a plain accept anchors the record's own quote again (round 3 of H3-01).
+    said = ", ".join(row["quote"] for row in PLANTED["T5"])
+    HELD["T5"] = [
+        {**p, "text": f"{p['text']} In our hands {said}."} if p["id"] == "s1" else p for p in structural_passages()
+    ]
 
 
 def extract_t5(monkeypatch):
@@ -228,7 +234,7 @@ def test_gold_needs_a_quote_that_anchors_its_own_will_not_do_here():
     # The candidate's quote is about colonies; the structural fixture
     # standing in for T5's text says nothing of the kind. Gold means "this
     # sentence in this paper says this number", so without one, it is refused.
-    fetch_t5()
+    HELD["T5"] = structural_passages()
     planted("cl1-T5-00000001")
     with pytest.raises(biorepo.WriteRefused) as caught:
         biorepo.write(decision("cl1-T5-00000001", "verified", provenance="gold", gold=Quantity(value=8.5, unit="d")))
@@ -296,12 +302,26 @@ def test_refuses_gold_that_is_not_verified():
 
 
 def test_accept_without_a_quote_proceeds_on_a_fetched_paper():
-    fetch_t5()
-    planted("cl1-T5-00000001")
+    # A plain accept places the record's own number on the record's own quote
+    # (round 3 of H3-01), so the paper's text holds that quote here.
+    fetch_saying("T5", "cl1-T5-00000001",
+                 "Results. In our hands colonies appear on selection in 7–10 days for strain ab12 on plates.")
     stored = biorepo.write(decision("cl1-T5-00000001", "verified"))
-    assert stored.quote is None and stored.status == "verified"
+    assert stored.quote is None and stored.status == "verified", "the decision is kept as sent"
     assert biorepo.read().decisions["cl1-T5-00000001"] == stored
     assert [c.id for c in biorepo.read().records] == ["cl1-T5-00000001"], "the candidate is kept beside its decision"
+
+
+def test_a_plain_accept_on_a_record_whose_quote_the_paper_does_not_hold_is_refused():
+    # The record's own quote is anchored again on a plain accept: a record
+    # whose quote is nowhere in the paper's text promotes nothing.
+    HELD["T5"] = structural_passages()
+    planted("cl1-T5-00000001")
+    for dry_run in (True, False):
+        with pytest.raises(biorepo.WriteRefused) as refused:
+            biorepo.write(decision("cl1-T5-00000001", "verified"), dry_run=dry_run)
+        assert refused.value.rule == "quote" and "rule 'quote'" in refused.value.why
+    assert biorepo.decisions() == {}
 
 
 def test_gold_on_a_candidate_anchors_on_its_quote_and_keeps_both(monkeypatch):
@@ -340,7 +360,7 @@ def test_a_decided_candidate_outlives_its_extraction(monkeypatch):
     # No run — the extraction is gone — but the record is still a record,
     # kept with its decision, and a later decision about it still resolves.
     assert witness.runs() == []
-    assert [c.id for c in witness.new_candidates()] == ["cl1-T5-276fbb61"]
+    assert [c.id for c in biorepo.records()] == ["cl1-T5-276fbb61"]
     again = biorepo.write(decision("cl1-T5-276fbb61", "rejected", rejectReason="on reflection, a placeholder"))
     assert again.status == "rejected" and len(biorepo.read().records) == 1
 
@@ -455,7 +475,8 @@ def test_gold_on_a_recorded_absence_reads_its_zero_from_the_sentence():
     assert rec["value"] == 0 and rec["negativeResult"] is True
     assert not any(ch.isdigit() for ch in rec["quote"])
     fetch_saying("T3", "cl1-T3-00000003", f"Even after prolonged incubation, {rec['quote']}.")
-    stored = biorepo.write(decision("cl1-T3-00000003", "verified", provenance="gold"))
+    stored = biorepo.write(decision("cl1-T3-00000003", "verified", provenance="gold",
+                                    gold=Quantity(value=0, unit="% of total expressed")))
     assert stored.status == "verified"
 
 
@@ -466,9 +487,19 @@ def test_gold_on_a_value_derived_from_the_quote_still_refuses_with_a_reason():
     rec = planted("cl1-T4-00000001")
     fetch_saying("T4", "cl1-T4-00000001", f"The particle was {rec['quote']}.")
     with pytest.raises(biorepo.WriteRefused) as caught:
-        biorepo.write(decision("cl1-T4-00000001", "verified", provenance="gold"))
+        biorepo.write(decision("cl1-T4-00000001", "verified", provenance="gold", gold=Quantity(value=0.24, unit="h⁻¹")))
     assert caught.value.rule == "quote"
     assert "derived from the quote" in caught.value.why
+
+
+def test_a_verified_decision_labelled_gold_with_no_gold_value_is_kept_and_served_verified():
+    """Bug hunt P-02: the gold value alone makes a record gold; the label a
+    request carries is the browser's, and the service computes the class."""
+    fetch_t5()
+    planted("cl1-T5-00000003")
+    stored = biorepo.write(decision("cl1-T5-00000003", "verified", provenance="gold"))
+    assert stored.status == "verified" and stored.provenance == "verified" and stored.gold is None
+    assert biorepo.provenance_of(decision("cl1-T5-00000003", "verified", provenance="gold")) == "verified"
 
 
 # ── the check the browser asks before the keystroke (F1.5) ─────────────

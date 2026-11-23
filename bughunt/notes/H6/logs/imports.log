@@ -1,0 +1,232 @@
+== tag (--name 'Alpha 1.0 tag')
+warning: The `UV_NATIVE_TLS` environment variable is deprecated and will be removed in a future release. Use `UV_SYSTEM_CERTS` instead.
+carried $BH_WORK/H6/a1data/tag into project alpha-1-0-tag:
+       0  decisions
+       0  people
+       0  entries
+       0  checks
+       0  practice scenarios
+       0  practice sessions
+       0  proposals
+       0  audit rows
+       0  artifacts
+       0  extractions
+       0  hand-written candidate files
+       0  kept trains
+The files under $BH_WORK/H6/a1data/tag are left as they were; move them aside once the project reads right.
+   exit 0, 6 s
+   projects: alpha-1-0-tag
+== full (--name 'Alpha 1.0 full')
+warning: The `UV_NATIVE_TLS` environment variable is deprecated and will be removed in a future release. Use `UV_SYSTEM_CERTS` instead.
+carried $BH_WORK/H6/a1data/full into project alpha-1-0-full:
+       3  decisions
+       2  people
+       1  entries
+       1  checks
+       1  practice scenarios
+       1  practice sessions
+       1  proposals
+       2  audit rows
+       1  artifacts
+       1  extractions
+       1  hand-written candidate files
+       1  kept trains
+The files under $BH_WORK/H6/a1data/full are left as they were; move them aside once the project reads right.
+   exit 0, 3 s
+   projects: alpha-1-0-tag, alpha-1-0-full
+== bad-json (--name 'Alpha 1.0 bad-json')
+warning: The `UV_NATIVE_TLS` environment variable is deprecated and will be removed in a future release. Use `UV_SYSTEM_CERTS` instead.
+refused: $BH_WORK/H6/a1data/bad-json/biorepo.json cannot be read as BioRepo: $BH_WORK/H6/a1data/bad-json/biorepo.json cannot be read: Unterminated string starting at: line 1 column 194 (char 193)
+   exit 2, 2 s
+   projects: alpha-1-0-tag, alpha-1-0-full
+== bad-shape (--name 'Alpha 1.0 bad-shape')
+warning: The `UV_NATIVE_TLS` environment variable is deprecated and will be removed in a future release. Use `UV_SYSTEM_CERTS` instead.
+refused: $BH_WORK/H6/a1data/bad-shape/biorepo.json cannot be read as BioRepo: 1 validation error for BioRepo
+   exit 2, 3 s
+   projects: alpha-1-0-tag, alpha-1-0-full
+== estimate (--name 'Alpha 1.0 estimate')
+warning: The `UV_NATIVE_TLS` environment variable is deprecated and will be removed in a future release. Use `UV_SYSTEM_CERTS` instead.
+carried $BH_WORK/H6/a1data/estimate into project alpha-1-0-estimate:
+       3  decisions
+       2  people
+       1  entries
+       1  checks
+       1  practice scenarios
+       1  practice sessions
+       1  proposals
+       2  audit rows
+       1  artifacts
+       1  extractions
+       1  hand-written candidate files
+       1  kept trains
+The files under $BH_WORK/H6/a1data/estimate are left as they were; move them aside once the project reads right.
+   exit 0, 3 s
+   projects: alpha-1-0-tag, alpha-1-0-full, alpha-1-0-estimate
+== noreviewer (--name 'Alpha 1.0 noreviewer')
+warning: The `UV_NATIVE_TLS` environment variable is deprecated and will be removed in a future release. Use `UV_SYSTEM_CERTS` instead.
+carried $BH_WORK/H6/a1data/noreviewer into project alpha-1-0-noreviewer:
+       3  decisions
+       2  people
+       1  entries
+       1  checks
+       1  practice scenarios
+       1  practice sessions
+       1  proposals
+       2  audit rows
+       1  artifacts
+       1  extractions
+       1  hand-written candidate files
+       1  kept trains
+The files under $BH_WORK/H6/a1data/noreviewer are left as they were; move them aside once the project reads right.
+   exit 0, 2 s
+   projects: alpha-1-0-tag, alpha-1-0-full, alpha-1-0-estimate, alpha-1-0-noreviewer
+== mismatch (--name 'Alpha 1.0 mismatch')
+warning: The `UV_NATIVE_TLS` environment variable is deprecated and will be removed in a future release. Use `UV_SYSTEM_CERTS` instead.
+carried $BH_WORK/H6/a1data/mismatch into project alpha-1-0-mismatch:
+       3  decisions
+       2  people
+       1  entries
+       1  checks
+       1  practice scenarios
+       1  practice sessions
+       1  proposals
+       2  audit rows
+       1  artifacts
+       1  extractions
+       1  hand-written candidate files
+       1  kept trains
+The files under $BH_WORK/H6/a1data/mismatch are left as they were; move them aside once the project reads right.
+   exit 0, 3 s
+   projects: alpha-1-0-tag, alpha-1-0-full, alpha-1-0-estimate, alpha-1-0-noreviewer, alpha-1-0-mismatch
+== empty-file (--name 'Alpha 1.0 empty-file')
+warning: The `UV_NATIVE_TLS` environment variable is deprecated and will be removed in a future release. Use `UV_SYSTEM_CERTS` instead.
+refused: $BH_WORK/H6/a1data/empty-file/biorepo.json cannot be read as BioRepo: $BH_WORK/H6/a1data/empty-file/biorepo.json cannot be read: Expecting value: line 1 column 1 (char 0)
+   exit 2, 3 s
+   projects: alpha-1-0-tag, alpha-1-0-full, alpha-1-0-estimate, alpha-1-0-noreviewer, alpha-1-0-mismatch
+== empty-dir (--name 'Alpha 1.0 empty-dir')
+warning: The `UV_NATIVE_TLS` environment variable is deprecated and will be removed in a future release. Use `UV_SYSTEM_CERTS` instead.
+carried $BH_WORK/H6/a1data/empty-dir into project alpha-1-0-empty-dir:
+       0  decisions
+       0  people
+       0  entries
+       0  checks
+       0  practice scenarios
+       0  practice sessions
+       0  proposals
+       0  audit rows
+       0  artifacts
+       0  extractions
+       0  hand-written candidate files
+       0  kept trains
+The files under $BH_WORK/H6/a1data/empty-dir are left as they were; move them aside once the project reads right.
+   exit 0, 2 s
+   projects: alpha-1-0-tag, alpha-1-0-full, alpha-1-0-estimate, alpha-1-0-noreviewer, alpha-1-0-mismatch, alpha-1-0-empty-dir
+== dup-person (--name 'Alpha 1.0 dup-person')
+warning: The `UV_NATIVE_TLS` environment variable is deprecated and will be removed in a future release. Use `UV_SYSTEM_CERTS` instead.
+carried $BH_WORK/H6/a1data/dup-person into project alpha-1-0-dup-person:
+       3  decisions
+       3  people
+       1  entries
+       1  checks
+       1  practice scenarios
+       1  practice sessions
+       1  proposals
+       2  audit rows
+       1  artifacts
+       1  extractions
+       1  hand-written candidate files
+       1  kept trains
+The files under $BH_WORK/H6/a1data/dup-person are left as they were; move them aside once the project reads right.
+   exit 0, 3 s
+   projects: alpha-1-0-tag, alpha-1-0-full, alpha-1-0-estimate, alpha-1-0-noreviewer, alpha-1-0-mismatch, alpha-1-0-empty-dir, alpha-1-0-dup-person
+== dup-paper (--name 'Alpha 1.0 dup-paper')
+warning: The `UV_NATIVE_TLS` environment variable is deprecated and will be removed in a future release. Use `UV_SYSTEM_CERTS` instead.
+Traceback (most recent call last):
+  File "$BH_WORK/H6/wt-head/core/.venv/lib/python3.13/site-packages/sqlalchemy/dialects/postgresql/asyncpg.py", line 605, in _prepare_and_execute
+    self._rows = deque(await prepared_stmt.fetch(*parameters))
+                       ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "$BH_WORK/H6/wt-head/core/.venv/lib/python3.13/site-packages/asyncpg/prepared_stmt.py", line 177, in fetch
+    data = await self.__bind_execute(args, 0, timeout)
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "$BH_WORK/H6/wt-head/core/.venv/lib/python3.13/site-packages/asyncpg/prepared_stmt.py", line 268, in __bind_execute
+    data, status, _ = await self.__do_execute(
+                      ^^^^^^^^^^^^^^^^^^^^^^^^
+        lambda protocol: protocol.bind_execute(
+        ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+            self._state, args, '', limit, True, timeout))
+            ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "$BH_WORK/H6/wt-head/core/.venv/lib/python3.13/site-packages/asyncpg/prepared_stmt.py", line 257, in __do_execute
+    return await executor(protocol)
+           ^^^^^^^^^^^^^^^^^^^^^^^^
+  File "asyncpg/protocol/protocol.pyx", line 197, in bind_execute
+asyncpg.exceptions.UniqueViolationError: duplicate key value violates unique constraint "pk_candidates"
+DETAIL:  Key (project_id, document_id, source)=(alpha-1-0-dup-paper, P1, model) already exists.
+The above exception was the direct cause of the following exception:
+Traceback (most recent call last):
+  File "$BH_WORK/H6/wt-head/core/.venv/lib/python3.13/site-packages/sqlalchemy/engine/base.py", line 1958, in _exec_single_context
+    self.dialect.do_execute(
+    ~~~~~~~~~~~~~~~~~~~~~~~^
+        cursor, str_statement, effective_parameters, context
+        ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+    )
+    ^
+   exit 1, 3 s
+   projects: alpha-1-0-tag, alpha-1-0-full, alpha-1-0-estimate, alpha-1-0-noreviewer, alpha-1-0-mismatch, alpha-1-0-empty-dir, alpha-1-0-dup-person
+== dup-artifact (--name 'Alpha 1.0 dup-artifact')
+warning: The `UV_NATIVE_TLS` environment variable is deprecated and will be removed in a future release. Use `UV_SYSTEM_CERTS` instead.
+carried $BH_WORK/H6/a1data/dup-artifact into project alpha-1-0-dup-artifact:
+       3  decisions
+       2  people
+       1  entries
+       1  checks
+       1  practice scenarios
+       1  practice sessions
+       1  proposals
+       2  audit rows
+       2  artifacts
+       1  extractions
+       1  hand-written candidate files
+       1  kept trains
+The files under $BH_WORK/H6/a1data/dup-artifact are left as they were; move them aside once the project reads right.
+   exit 0, 3 s
+   projects: alpha-1-0-tag, alpha-1-0-full, alpha-1-0-estimate, alpha-1-0-noreviewer, alpha-1-0-mismatch, alpha-1-0-empty-dir, alpha-1-0-dup-person, alpha-1-0-dup-artifact
+== big (--name 'Alpha 1.0 big')
+warning: The `UV_NATIVE_TLS` environment variable is deprecated and will be removed in a future release. Use `UV_SYSTEM_CERTS` instead.
+carried $BH_WORK/H6/a1data/big into project alpha-1-0-big:
+   30000  decisions
+       2  people
+       1  entries
+       1  checks
+       1  practice scenarios
+       1  practice sessions
+       1  proposals
+       2  audit rows
+       1  artifacts
+       1  extractions
+       1  hand-written candidate files
+       1  kept trains
+The files under $BH_WORK/H6/a1data/big are left as they were; move them aside once the project reads right.
+   exit 0, 18 s
+   projects: alpha-1-0-tag, alpha-1-0-full, alpha-1-0-estimate, alpha-1-0-noreviewer, alpha-1-0-mismatch, alpha-1-0-empty-dir, alpha-1-0-dup-person, alpha-1-0-dup-artifact, alpha-1-0-big
+== full again, under the name it was carried under
+== full (--name 'Alpha 1.0 full')
+warning: The `UV_NATIVE_TLS` environment variable is deprecated and will be removed in a future release. Use `UV_SYSTEM_CERTS` instead.
+carried $BH_WORK/H6/a1data/full into project alpha-1-0-full-2:
+       3  decisions
+       2  people
+       1  entries
+       1  checks
+       1  practice scenarios
+       1  practice sessions
+       1  proposals
+       2  audit rows
+       1  artifacts
+       1  extractions
+       1  hand-written candidate files
+       1  kept trains
+The files under $BH_WORK/H6/a1data/full are left as they were; move them aside once the project reads right.
+   exit 0, 2 s
+   projects: alpha-1-0-tag, alpha-1-0-full, alpha-1-0-estimate, alpha-1-0-noreviewer, alpha-1-0-mismatch, alpha-1-0-empty-dir, alpha-1-0-dup-person, alpha-1-0-dup-artifact, alpha-1-0-big, alpha-1-0-full-2
+== packages before and after (empty = the command changed none):
+(none)
+171

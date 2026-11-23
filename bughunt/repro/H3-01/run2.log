@@ -1,0 +1,41 @@
+database: bh_r_h3_01_anchor (fresh, migrated to head)
+== Part A: validate.anchor_candidate ==
+minimum_selling_price = 2.15 USD/kg  on  'The minimum ethanol selling price was 2.15 USD/gal in the base case.'
+    the quote states 2.15 'USD gal⁻¹'; units.convert(2.15, 'USD gal⁻¹', 'USD kg⁻¹'): UnitError: A price per gallon and a price per kilogram are not interconvertible without the density of the product. Record the density the analysis assumes for it and the conversion becomes possible; guessing it would fabricate a price.
+    ANCHORED as 2.15 USD kg⁻¹, valueBasis 'converted'
+ethanol_titre = 45 g/L  on  'The final ethanol concentration was 45% (v/v) after fermentation.'
+    the quote states 45.0 '%'; units.convert(45.0, '%', 'g L⁻¹'): UnitError: Incompatible units: % (percent) vs g L⁻¹ (massConc)
+    ANCHORED as 45.0 g L⁻¹, valueBasis 'converted'
+ethanol_titre = 5 g/L  on  'Ethanol reached 5 mol/L in the broth.'
+    the quote states 5.0 'mol L⁻¹'; units.convert(5.0, 'mol L⁻¹', 'g L⁻¹'): UnitError: Incompatible units: mol L⁻¹ (molar) vs g L⁻¹ (massConc)
+    ANCHORED as 5.0 g L⁻¹, valueBasis 'converted'
+ethanol_yield_substrate = 0.45 g/g  on  'The specific growth rate was 0.45 h-1 on glucose.'
+    the quote states 0.45 'h⁻¹'; units.convert(0.45, 'h⁻¹', 'g g⁻¹'): UnitError: Incompatible units: h⁻¹ (rate) vs g g⁻¹ (yield)
+    ANCHORED as 0.45 g g⁻¹, valueBasis 'converted'
+specific_oxygen_uptake = 2 mmol/g/h  on  'The specific oxygen uptake rate was 2 mg/g/h in the run.'
+    the quote states 2.0 'mg g⁻¹ h⁻¹'; units.convert(2.0, 'mg g⁻¹ h⁻¹', 'mmol g⁻¹ h⁻¹'): UnitError: A rate in moles per gram per hour and one in grams per gram per hour differ by the molar mass of what is taken up or made. Record which substance it is and convert by its molar mass as a stated step; the engine will not assume it.
+    ANCHORED as 2.0 mmol g⁻¹ h⁻¹, valueBasis 'converted'
+minimum_selling_price = 1.2 USD/kg  on  'The minimum selling price was 1.2 EUR kg-1 for the product.'
+    the quote states 1.2 'EUR kg⁻¹'; units.convert(1.2, 'EUR kg⁻¹', 'USD kg⁻¹'): UnitError: Currency conversion needs an exchange rate with a date attached. The engine will not invent one — record the rate and the date as an explicit assumption.
+    ANCHORED as 1.2 USD kg⁻¹, valueBasis 'converted'
+minimum_selling_price = 2.15 USD/kg  on  'The minimum ethanol selling price was $2.15/gal in the base case.'
+    the quote parses as 2.15 None
+    ANCHORED as 2.15 USD kg⁻¹, valueBasis 'exact'
+control: ethanol_titre = 45 g/L  on  'The final ethanol concentration was 45 mg/L after fermentation.'
+    refused on rule 'value': no number in the quote equals 45.0 within 0.5%; the value is derived from the quote's numbers; edit it to the paper's spelling or record the derivation
+
+== Part B: biorepo.write in a fresh database ==
+kept candidates: cl1-R1-00000001 2.15 USD kg⁻¹ (converted); cl1-R1-00000002 45.0 g L⁻¹ (converted); cl1-R1-00000003 0.045 g L⁻¹ (converted)
+accept cl1-R1-00000001 (2.15 USD kg-1 on '2.15 USD/gal'): stored, provenance 'verified'
+gold 45 g/L on cl1-R1-00000002 ('45% (v/v)'): stored, provenance 'gold'
+control: gold 45 g/L on cl1-R1-00000003 ('45 mg/L'): refused: quote: the quote for cl1-R1-00000003 fails anchoring on rule 'value': no number in the quote equals 45.0 within 0.5%; the value is derived from the quote's numbers; edit it to the paper's spelling or record the derivation
+BioRepo: cl1-R1-00000001  status verified  provenance verified  gold None  value 2.15 USD kg⁻¹  quote 'The minimum ethanol selling price was 2.15 USD/gal in the base case.'
+BioRepo: cl1-R1-00000002  status verified  provenance gold  gold 45.0  value 45.0 g L⁻¹  quote 'The final ethanol concentration was 45% (v/v) after fermentation.'
+
+the database's records rows (openferment.records) the decisions left:
+cl1-R1-00000001 | minimum_selling_price | 2.15 | USD kg⁻¹ | verified | The minimum ethanol selling price was 2.15 USD/gal in the base case.
+cl1-R1-00000002 | ethanol_titre | 45 | g L⁻¹ | gold | The final ethanol concentration was 45% (v/v) after fermentation.
+
+EXPECTED: each of the six candidates whose quote states its number in a unit that does not convert into the candidate's is refused on rule 'value', as the same-family control (45 g/L on '45 mg/L') is; biorepo.write refuses to promote 2.15 USD kg-1 on '2.15 USD/gal' and gold 45 g/L on '45% (v/v)'
+OBSERVED: 6 of 6 cross-unit candidates ANCHORED with valueBasis 'converted' (no conversion exists; units.convert refuses each pair), the '$2.15/gal' one 'exact'; control refused; biorepo.write: accept stored, provenance 'verified'; gold on '45% (v/v)' stored, provenance 'gold'; control gold refused
+RESULT: DEFECT

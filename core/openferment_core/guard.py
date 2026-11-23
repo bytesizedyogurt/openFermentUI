@@ -1,4 +1,4 @@
-"""Which requests may change something (OF-BLD-012 §B.6).
+"""Which requests may change something.
 
 The service has no login. Bound to loopback and published by `tailscale
 serve`, only the owner's own devices reach it. Two browser tricks would still

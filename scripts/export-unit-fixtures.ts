@@ -138,6 +138,31 @@ const NORMALIZE_INPUTS = [
   'kg h-1',
   'kg/kg',
   't/d',
+  // A label joined to its gram never completes a unit word (bug hunt H3-08).
+  'g/gal',
+  'gal/g',
+  'g/gmol',
+  'gmol/g',
+  'g gal-1',
+  'gal g-1',
+  'g/gallon',
+  'gpm/gpm',
+  'g/gpm',
+  // A letter case that carries an SI prefix or symbol is never folded (H3-07);
+  // a lone M is the molar, mM the millimolar.
+  'Mg',
+  'MG',
+  'ML',
+  'Mm',
+  'MM',
+  'S',
+  'G',
+  'M',
+  'mM',
+  // Greek small mu reads as the micro sign (H3-16).
+  '\u03bcg/mL',
+  '\u03bcL',
+  '\u03bcM',
 ];
 
 const normalize = NORMALIZE_INPUTS.map((raw) => ({

@@ -1,8 +1,7 @@
-"""Postdoc as an agent: a bounded loop of tools, answered with a checked plan
-(OF-BLD-014 §5.2).
+"""Postdoc as an agent: a bounded loop of tools, answered with a checked plan.
 
     seen, trace, spent = SeenSet(), [], Usage()
-    coverage = module_stores.coverage(question)   # code, no model (OF-BLD-015 §7.1)
+    coverage = module_stores.coverage(question)   # code, no model
     for round in 1 … MAX_ROUNDS:
         turn = llm.converse(... tool_choice='auto')
         if the turn called tools: run them (cached by canonical input), keep
@@ -22,17 +21,18 @@ THE BUDGET. `MAX_ROUNDS` model turns, `MAX_TOOL_CALLS` tool calls,
 `OPENFERMENT_ASK_BUDGET_USD` (spend.ask_budget) and `MAX_SECONDS` of wall
 time. Whichever is spent first names the plan's `stopped`. Each turn may
 write as much as the budget has left to pay for, between `MIN_TOKENS` and
-`MAX_TOKENS` (`_turn_tokens`), and the loop holds back a `MIN_TOKENS` answer
-before it asks another round.
+the ceiling the plan route's effort sets (`postdoc.plan.ceiling`: `MAX_TOKENS`
+at high and below, more at xhigh and max; `_turn_tokens`), and the loop holds
+back a `MIN_TOKENS` answer before it asks another round.
 
 A REFUSAL OR AN OUTAGE mid-loop restarts the question once on the next model
 in the answer chain, with a fresh conversation; tool results come from the
 per-question cache, so nothing is computed twice, and a `restart` step enters
 the trace. A tool whose result depends on what the run changed since (a draft
 checked against what was seen; a train a model builds step by step, whose run
-must be of the train as it now stands, OF-BLD-020 §5.4) is never served from
+must be of the train as it now stands) is never served from
 the cache (`UNCACHED`). A write that changes rows a later read must see (a
-model's train, its run: `CHANGES_ROWS`, OF-BLD-020 §5.R) makes the reads of
+model's train, its run: `CHANGES_ROWS`) makes the reads of
 the same question read those sources afresh and forgets the module reads
 cached before it. A spent daily budget is not an outage another model can fix,
 and ends the question.
@@ -64,7 +64,7 @@ from typing import Any, Callable
 
 from . import llm, module_stores, spend, tools
 from .models import AnswerPlan, CoverageMap, PriorTurn, RunbookDraft, ToolResult, TraceStep, Usage
-from .postdoc import MAX_TOKENS, MIN_TOKENS, SYSTEM as PLAN_SYSTEM, TOOL as PLAN_TOOL
+from .postdoc import MAX_TOKENS, MIN_TOKENS, SYSTEM as PLAN_SYSTEM, TOOL as PLAN_TOOL, ceiling
 from .validate import SeenSet, decline_reason, find_number, validate_plan
 
 log = logging.getLogger("openferment.postdoc_agent")
@@ -136,9 +136,9 @@ is cited by its evidence id.
 through the study tools (rule 18). For Proforma's own scenarios, selling_price \
 reads a person's newest run, run_flowsheet runs a scenario as the service binds \
 it, and stream_table reads a kept run's streams. A price, a cost or a recovery read from a run is \
-cited by that run's evidence id, which is its artifact id and which those \
-three tools return; a train row pureos_read returned is cited by its ref in \
-moduleRefs. When run_flowsheet \
+cited by the evidence id the tool that read it returned: a scenario's run by its \
+artifact id, a library plant's run by the ids engine_report and selling_price \
+return; a train row pureos_read returned is cited by its ref in moduleRefs. When run_flowsheet \
 or selling_price refuses, say in gaps which inputs wait for a source: \
 Proforma's inputs are a named person's, typed in Proforma.
 9. Conditions, settings and dates are numbers too. A temperature, a time \
@@ -209,7 +209,13 @@ outputs as evidence ids, each holding the run's artifact id; engine_report \
 reads a kept run; study_compare sets kept runs side by side; study_read lists \
 the project's scenarios, comparisons and study runbooks. A run's numbers are \
 cited by those evidence ids. When a run refuses, say in gaps what the plant \
-refused, in its words.
+refused, in its words. A scenario's value may be a reading a person deposited \
+at the bench: runbooks_read lists each reading a run may take (kind reading, \
+by its id), with its value and unit; send that value and unit as the reading \
+gave them, with origin {"kind": "measurement", "ref": "<the reading's id>"} \
+and nothing else in the origin, and the service looks the reading up and marks \
+the value as the person's measurement. Choose a reading of the quantity the \
+parameter is, and say in the note why it stands for it.
 19. A number you state goes in a claim's values, never in its text: each value \
 has a label in words and one source. Read it from a computed value by its \
 evidenceId or from a record by its recordId, and the service writes the \
@@ -348,6 +354,9 @@ class _Run:
     coverage: CoverageMap | None = None
     cancelled: Callable[[], bool] = lambda: False
     history: list[PriorTurn] = field(default_factory=list)
+    # The most a turn may write, its thinking included: the plan route's
+    # effort sets it (postdoc.plan.ceiling), MAX_TOKENS at high and below.
+    ceiling: int = MAX_TOKENS
     # Told of each tool call before it runs and of its result after, cached or not: the
     # conversation store keeps them and the event stream says them (postdoc/conversations.py).
     on_call: Callable[[str, dict[str, Any]], None] | None = None
@@ -415,7 +424,8 @@ def _summary_line(name: str, inp: dict[str, Any], result: ToolResult) -> str:
         return f"Read run {inp.get('run')} · {_count(len(result.evidence), 'value')}"
     if name == "study_scenario":
         made = len(result.summary.get("values") or [])
-        return f"Kept scenario {result.summary.get('scenarioId')} on {inp.get('plant')} · {_count(made, 'value')} of yours"
+        named = f"'{inp['title']}'" if inp.get("title") else str(result.summary.get("scenarioId"))
+        return f"Kept scenario {named} on {inp.get('plant')} · {_count(made, 'value')} of yours"
     if name == "study_compare":
         return f"Compared {_count(len(inp.get('runs') or []), 'run')} · kept comparison {result.summary.get('comparisonId')}"
     if name == "study_read":
@@ -424,10 +434,16 @@ def _summary_line(name: str, inp: dict[str, Any], result: ToolResult) -> str:
         return f"Listed the project's documents · {_count(len(result.summary.get('documents') or []), 'document')}"
     if name == "literature_document":
         section = f", {inp['section']}" if inp.get("section") else ""
-        return f"Read {inp.get('document')}{section} · {_count(len(result.passages), 'passage')}"
+        # A document by its title, as the reader names it; its id only when the result holds no title.
+        named = result.summary.get("title") or inp.get("document")
+        return f"Read {named}{section} · {_count(len(result.passages), 'passage')}"
     if name == "stream_table":
         cut = f", {result.summary.get('leftOut')} left out" if result.summary.get("leftOut") else ""
         return f"Read the stream table of run {inp.get('artifactId')} · {_count(int(result.summary.get('shown', 0)), 'stream')}{cut}"
+    if name == "catalogue_read":
+        kind = str(inp.get("kind") or result.summary.get("kind") or "").strip()
+        found = int(result.summary.get("matched", len(result.summary.get("entries") or [])))
+        return f"Read the project's {kind + ' ' if kind else ''}catalogue · {found} {'entry' if found == 1 else 'entries'}"
     if name.endswith("_read") and name[: -len("_read")] in module_stores.LABEL:
         label = module_stores.LABEL[name[: -len("_read")]]
         what = [f'"{inp["words"]}"'] if inp.get("words") else []
@@ -508,18 +524,20 @@ def _turn_tokens(run: _Run, model: str, messages: list[dict[str, Any]], defs: li
     """A turn's ceiling on what it writes, its thinking included (alpha 2.1):
     as many tokens as the question's budget has left to pay for after the
     conversation so far is read, at least MIN_TOKENS, which the loop holds
-    back for the answer, and at most MAX_TOKENS. A model with no price on
-    file gets MIN_TOKENS; the daily cap refuses it anyway."""
+    back for the answer, and at most the run's ceiling, which the plan
+    route's effort sets (alpha 2.2 F.2g). A model with no price on file gets
+    MIN_TOKENS; the daily cap refuses it anyway."""
     _, model_id = llm.spec(model)
     if model_id not in llm.PRICES:
         return MIN_TOKENS
+    top = run.ceiling
     request = {"system": AGENT_SYSTEM, "messages": messages, "tools": defs}
     read = llm.worst_case_usd(model_id, request, 0)
-    per_token = (llm.worst_case_usd(model_id, request, MAX_TOKENS) - read) / MAX_TOKENS
+    per_token = (llm.worst_case_usd(model_id, request, top) - read) / top
     left = budget_usd - run.spent.costUsd - read
     if per_token <= 0:
-        return MAX_TOKENS
-    return max(MIN_TOKENS, min(MAX_TOKENS, int(left / per_token)))
+        return top
+    return max(MIN_TOKENS, min(top, int(left / per_token)))
 
 
 def _out_of_budget(run: _Run, rounds: int, budget_usd: float, final_usd: float = 0.0) -> str | None:
@@ -593,7 +611,7 @@ def _attempt(run: _Run, model: str, budget_usd: float) -> tuple[llm.Turn, str]:
 def _swept(question: str, history: list[PriorTurn]) -> str:
     """What the coverage pass reads. A follow-up ("which of those are
     fenced?") often names nothing itself, so it is swept with the earlier
-    questions `_opening` sends, each its own clause (OF-BLD-016 §1.R). The
+    questions `_opening` sends, each its own clause. The
     earlier answers are the model's words and are never swept."""
     return " ; ".join([*(t.question.strip()[:MAX_TURN_CHARS] for t in _recent(history)), question])
 
@@ -618,7 +636,7 @@ def _sweep(run: _Run, ctx: tools.ToolContext) -> None:
 def held_to_rule_one(gaps: Any, declined: Any, reasons: list[str]) -> tuple[list[str], str | None]:
     """A plan's gaps and its decline are model prose like a claim's text, and
     held to Rule 1 the same way: one with a number is dropped and named in
-    `reasons`, never repaired (§5.R; the decline, OF-BLD-016 §1.R). Returns
+    `reasons`, never repaired (§5.R; the decline). Returns
     the gaps kept and the model's decline, or None when it held a number, so
     the decline code writes stands in."""
     kept: list[str] = []
@@ -689,6 +707,7 @@ def ask(
     _sweep(run, ctx)
 
     models = llm.chain("plan")
+    run.ceiling = ceiling(llm.routes()["plan"].effort)
     answer: llm.Turn | None = None
     stopped = "done"
     failure: Exception | None = None

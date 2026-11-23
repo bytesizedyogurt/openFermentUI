@@ -13,7 +13,8 @@
 // below Supervised. `useGateHold` is what Deposition asks before completing.
 import { useMemo, useState } from 'react';
 import { ShieldAlert, ShieldCheck, UserCheck } from 'lucide-react';
-import type { Skill, Step } from '@/data/types';
+import type { Skill } from '@/lib/catalogues';
+import type { Step } from '@/lib/protocols';
 import { useStore, guildView, skillById, useSkillById } from '@/store';
 import {
   competenceOf,
@@ -22,6 +23,7 @@ import {
   localToday,
   mayCosign,
   policyOf,
+  rated,
   statusOf,
   type Hold,
   type StatusMap,
@@ -203,6 +205,12 @@ export function GuildGate({ runId, step }: { runId: string; step: Step | undefin
               <strong>Needs a qualified operator.</strong> {operator.name} is below Supervised on {names(gate.blocked, SKILL_BY_ID)}.
             </span>
           </div>
+          {gate.blocked.some((s) => !rated(SKILL_BY_ID[s])) && (
+            <p className="text-body text-ink">
+              Guild rates nobody on {names(gate.blocked.filter((s) => !rated(SKILL_BY_ID[s])), SKILL_BY_ID)}: its entry in the
+              project&rsquo;s skill catalogue holds no policy yet, so nobody holds it until the entry does.
+            </p>
+          )}
           <p className="text-body text-ink">
             Can perform it alone: {canRun.length === 0 ? 'nobody on the team today' : canRun.map((p) => p.name).join(', ')}.
           </p>

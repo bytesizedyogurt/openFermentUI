@@ -17,6 +17,7 @@ from openferment_core.api import app
 from openferment_core.engine import library, sff, simulator
 from openferment_core.models import Artifact, LibraryShelf, Override
 from openferment_core.workers import WorkerError
+from standins import inputs_json
 
 # The plants the execution prompt (§4.4) names, and the two it names that
 # the installed package offers as subsystem factories alone.
@@ -256,7 +257,8 @@ def test_the_routes_serve_the_shelf_the_regression_and_refuse_what_cannot_run(wo
     assert refused.status_code == 422 and "subsystem factories" in refused.json()["detail"]
     params = client.get("/api/library/sugarcane/parameters").json()
     assert params["values"][0]["origin"] == "library-default"
-    ran = client.post("/api/library/sugarcane/run", json={"overrides": [over("stream.sugarcane.price", 0.05).model_dump()]})
+    ran = client.post("/api/library/sugarcane/run", json={"inputs": inputs_json([over("stream.sugarcane.price", 0.05)],
+                                                                             {"stream.sugarcane.price": "USD/kg"})})
     assert ran.status_code == 200 and ran.json()["artifact"]["tool"] == "library.run"
     assert ran.json()["run"]["provenance"] == "assumed" and ran.json()["run"]["sffRefused"] == "the stand-in writes no SFF file"
 

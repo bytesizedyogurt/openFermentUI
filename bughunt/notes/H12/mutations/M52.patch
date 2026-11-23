@@ -1,0 +1,11 @@
+--- a/core/openferment_core/engine/conform.py
++++ b/core/openferment_core/engine/conform.py
+@@ -190,7 +190,7 @@
+     codes = [h.status_code for h in http]
+     detail = [h.json().get("detail") if h.headers.get("content-type", "").startswith("application/json") else None
+               for h in http]
+-    ok = codes == [422, 422] and bool(tool.error) and not calls and not kept
++    ok = codes == [422, 422] and bool(tool.error) and not kept
+     return ok, (f"the route answered {' and '.join(map(str, codes))} (a number for a quantity, a stray number) and the "
+                 f"tool {'refused' if tool.error else 'ran'}; the engine was {'reached' if calls else 'never reached'}; "
+                 f"{len(kept)} run kept"

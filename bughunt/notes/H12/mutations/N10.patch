@@ -1,0 +1,9 @@
+--- a/core/openferment_core/units.py
++++ b/core/openferment_core/units.py
+@@ -252,6 +252,4 @@
+     f = field(field_id)
+     if f is None:
+         raise UnitError(f"Unknown field: {field_id}")
+-    if f["categorical"]:
+-        raise UnitError(f"{field_id} is categorical; it has no unit to convert to")
+     return convert(value, unit, f["canonicalUnit"])

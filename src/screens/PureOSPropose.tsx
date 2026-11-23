@@ -18,14 +18,16 @@
 // The products offered are the ones fermOS and geneOS have words for
 // (lib/geneos.ts's PRODUCT_WORDS) and then the products on file; the hosts are
 // the strains on file; the inlet is none (typed in the Builder) or a kept
-// simulation's harvest. Products and strains arrive with the documents that
-// report them, through Intake. The service refuses what does not fit, in words.
+// simulation's harvest. The products and the strains on file are the project's
+// catalogue entries (lib/catalogues.ts, alpha 2.2 E.9), kept on the Catalogues
+// screen. The service refuses what does not fit, in words.
 import { useEffect, useMemo, useState } from 'react';
-import type { SimulationSummary, TrainProposal } from '@/data/types';
 import { useStore } from '@/store';
-import { PureosDown, PureosRefused, proposeTrain } from '@/lib/pureos';
+import { PureosDown, PureosRefused, proposeTrain, type TrainProposal } from '@/lib/pureos';
 import { PRODUCT_WORDS, productWords } from '@/lib/geneos';
-import { fermosSimulations } from '@/lib/fermos';
+import { strainWords } from '@/lib/catalogues';
+import { href } from '@/router';
+import { fermosSimulations, type SimulationSummary } from '@/lib/fermos';
 import { Button, Callout, Card, SectionTitle } from '@/components/ui';
 import { ProposedTrainView } from '@/components/ProposedTrain';
 
@@ -134,7 +136,7 @@ export function ProposeTrain() {
               >
                 {hosts.map((s) => (
                   <option key={s.id} value={s.id}>
-                    {`${s.binomial} ${s.designation}`.trim()}
+                    {strainWords(s)}
                   </option>
                 ))}
               </select>
@@ -162,8 +164,12 @@ export function ProposeTrain() {
               {busy ? 'Proposing…' : 'Propose'}
             </Button>
             {!hostChosen && (
-              <span className="text-caption text-ink-soft">
-                No host is on file in geneOS yet: strains arrive with the documents that report them, through Intake.
+              <span className="text-caption text-ink-soft" data-testid="propose-no-host">
+                No host is on file yet: a strain the project keeps on the{' '}
+                <a className="text-accent hover:underline" href={href('/catalogues')}>
+                  Catalogues screen
+                </a>{' '}
+                is a host here.
               </span>
             )}
           </div>

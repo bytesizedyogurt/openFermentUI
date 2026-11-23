@@ -19,7 +19,7 @@ export type SubsystemOwner =
   | 'Proforma'
   | 'Guild';
 
-export interface Subsystem {
+interface Subsystem {
   /** `owner.subsystem`, lowercase. */
   id: string;
   owner: SubsystemOwner;
@@ -35,14 +35,9 @@ export interface Subsystem {
 
 const UNBUILT = 'Not built. Nothing here computes, stores or retrieves anything yet.';
 
-export const SUBSYSTEMS: Subsystem[] = [
+const SUBSYSTEMS: Subsystem[] = [
   // ── Intake ───────────────────────────────────────────────────────────
-  { id: 'intake.sources', owner: 'Intake', label: 'Sources', state: UNBUILT },
-  { id: 'intake.parser', owner: 'Intake', label: 'Parser', state: UNBUILT },
   { id: 'intake.instrument', owner: 'Intake', label: 'Instrument ingest', state: UNBUILT },
-
-  // ── BioRepo ──────────────────────────────────────────────────────────
-  { id: 'biorepo.audit', owner: 'BioRepo', label: 'Audit', state: UNBUILT },
 
   // ── geneOS — the organism as an engineered system (§2) ───────────────
   { id: 'geneos.parts', owner: 'geneOS', label: 'Parts', state: UNBUILT },

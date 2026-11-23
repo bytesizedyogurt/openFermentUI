@@ -18,7 +18,9 @@ import pytest
 from fastapi.testclient import TestClient
 
 from openferment_core import artifacts, basis, fermos, intake, proforma
+from standins import assumed_inputs
 import standins  # test-only stand-ins, moved out of demo.py (alpha 2.0 stage 1)
+from test_fermos import forecast_inputs
 from openferment_core.models import (
     ComputedBasis,
     FermosPoint,
@@ -164,7 +166,7 @@ def test_the_list_holds_every_fit_and_forecast_and_nothing_else(store):
     assert sorted(i.artifactId for i in listed) == sorted([fit.kineticArtifactId, fc.artifactId])
     assert {i.tool for i in listed} == {"kinetic_fit", "growth_forecast"}
     assert all(i.provenance == "computed" for i in listed)
-    with pytest.raises(proforma.ScenarioRefused, match="reference biorefinery"):
+    with pytest.raises(proforma.ScenarioRefused, match="there is no flowsheet corn_drygrind on the shelf"):
         proforma.fermos_fits("corn_drygrind")
 
 
@@ -182,7 +184,7 @@ def test_a_chosen_fit_binds_titre_yield_and_productivity_and_the_run_names_it(st
         assert by[k].records == [] and by[k].sampling == "triangular" and by[k].source.note
     assert "productivity" not in info.waiting and by["titre"].flags == ["chosen in place of the 3 records it bound"]
 
-    run = proforma.run(ProformaRunRequest(scenarioId=MADE_HERE, flowsheet=ETHANOL, assumptions=ASSUMED, fits=fits), pool=standin)
+    run = proforma.run(ProformaRunRequest(scenarioId=MADE_HERE, flowsheet=ETHANOL, inputs=assumed_inputs(ASSUMED), fits=fits), pool=standin)
     art = artifacts.get(run.artifactId)
     named = {i.name: i for i in art.inputs}
     for k in proforma.FIT_KEYS:
@@ -203,7 +205,7 @@ def test_a_chosen_fit_binds_titre_yield_and_productivity_and_the_run_names_it(st
     assert run.provenance == "assumed"
     # A forecast a person changed is an assumption, so a run fed by it is assumed by its own inputs.
     changed = fermos.forecast_run(fit_artifact=fit.kineticArtifactId, duration_h=LONG_H,
-                                  start=fermos.StartValues(S0=55.0), changed_by="Sean Creighton")
+                                  inputs=forecast_inputs(fit.kineticArtifactId, s0=55.0))
     assert proforma.fit_info(artifacts.get(changed.artifactId), ETHANOL).provenance == "assumed"
 
 
@@ -226,7 +228,7 @@ def test_a_fits_productivity_feeds_the_fermenter_only_beside_its_own_titre(stand
         assert f"productivity from growth_forecast {fc.artifactId}" in words and said in words, words
         assert f"choose {fc.artifactId} for titre as well, or stop using it for productivity" in words, words
         with pytest.raises(proforma.ScenarioRefused, match="only beside titre from"):
-            proforma.run(ProformaRunRequest(scenarioId=MADE_HERE, flowsheet=ETHANOL, assumptions=ASSUMED, fits=fits), pool=standin)
+            proforma.run(ProformaRunRequest(scenarioId=MADE_HERE, flowsheet=ETHANOL, inputs=assumed_inputs(ASSUMED), fits=fits), pool=standin)
     # No stand-in record is of S288C, so there titre takes a person's assumption.
     with pytest.raises(proforma.ScenarioRefused, match="titre is a named person's assumption"):
         proforma.bind_flowsheet(ETHANOL, pool=standin, host="s-cerevisiae-s288c", fits={"productivity": fc.artifactId},
@@ -259,7 +261,7 @@ def test_an_unidentified_mu_refuses_naming_mu(standin):
     with pytest.raises(proforma.ScenarioRefused, match=r"cannot feed titre: μ \(mu\) is not identified"):
         proforma.bind_flowsheet(ETHANOL, pool=standin, fits={"titre": fit.kineticArtifactId})
     with pytest.raises(proforma.ScenarioRefused, match=r"μ \(mu\) is not identified"):
-        proforma.run(ProformaRunRequest(scenarioId=MADE_HERE, flowsheet=ETHANOL, assumptions=ASSUMED,
+        proforma.run(ProformaRunRequest(scenarioId=MADE_HERE, flowsheet=ETHANOL, inputs=assumed_inputs(ASSUMED),
                                         fits={"yield": fit.kineticArtifactId}), pool=standin)
 
 
@@ -327,7 +329,7 @@ def test_a_fit_of_another_products_series_is_refused_whole(standin, monkeypatch)
 
 def test_a_damaged_fit_file_refuses_what_rests_on_it_and_the_rest_still_lists(client):
     """OF-BLD-019 §5.R, finding 2: a forecast whose kinetic fit's file is
-    damaged on disk is refused in words naming the damage; every other fit
+    damaged in its row is refused in words naming the damage; every other fit
     still lists, and the endpoint answers."""
     fit = kept_fit()
     fc = fermos.forecast_run(fit_artifact=fit.kineticArtifactId, duration_h=LONG_H)
@@ -337,13 +339,13 @@ def test_a_damaged_fit_file_refuses_what_rests_on_it_and_the_rest_still_lists(cl
     plant_damaged(fit.kineticArtifactId)  # a row that no longer reads as an artifact
     listed = {i.artifactId: i for i in proforma.fermos_fits(ETHANOL)}
     assert set(listed) == {fc.artifactId, other.kineticArtifactId}
-    assert listed[fc.artifactId].refused and "is damaged on disk" in listed[fc.artifactId].refused
+    assert listed[fc.artifactId].refused and "is damaged in its row" in listed[fc.artifactId].refused
     assert listed[fc.artifactId].depositionId is None and listed[fc.artifactId].fitArtifactId == fit.kineticArtifactId
     assert listed[other.kineticArtifactId].refused is None
     r = client.get("/api/fermos/fits", params={"flowsheet": ETHANOL})
     assert r.status_code == 200 and len(r.json()) == 2
     b = client.get("/api/proforma/bind", params={"flowsheet": ETHANOL, "fits": json.dumps({"titre": fc.artifactId})})
-    assert b.status_code == 422 and "damaged on disk" in b.json()["detail"]
+    assert b.status_code == 422 and "damaged in its row" in b.json()["detail"]
 
 
 def test_the_rest_is_refused_in_words(standin):
@@ -379,5 +381,5 @@ def test_the_fits_endpoint_and_the_bind_endpoint_with_fits(client):
     assert refused.status_code == 422 and "does not run out" in refused.json()["detail"]
 
     ran = client.post("/api/proforma/run", json={"scenarioId": MADE_HERE, "flowsheet": ETHANOL, "fits": fits,
-                                                  "assumptions": [a.model_dump() for a in ASSUMED]})
+                                                  "inputs": [i.model_dump(mode="json", exclude_none=True) for i in assumed_inputs(ASSUMED)]})
     assert ran.status_code == 200 and {i["key"]: i["binding"] for i in ran.json()["inputs"]}["yield"] == "artifact"

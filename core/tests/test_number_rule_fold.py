@@ -11,7 +11,7 @@ import pytest
 from openferment_core.validate import find_number
 
 WORDS = [
-    "PHB formed on a scaffold of fibres.",
+    "The product formed on a scaffold of fibres.",
     "The scaffolds were seeded.",
     "A manifold fed the fermenters.",
     "Proteins unfold above the melting point.",

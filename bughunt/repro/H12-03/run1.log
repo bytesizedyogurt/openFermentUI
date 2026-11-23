@@ -1,0 +1,21 @@
+worktree /tmp/claude-0/-home-user-openFermentUI/cfbc5c9f-640a-5002-a705-5ceaf850fdc6/scratchpad/bh/work/H12-03/wt-13561 at 2047f5a
+the lock at the head (core/openferment_core/spend.py, _reserve and _settle):
+   spend.py:156:        await db.lock(s, "spend", day.isoformat())
+   spend.py:184:        await db.lock(s, "spend", day.isoformat())
+the test binding (core/openferment_core/db/session.py): every session takes the one connection in turn:
+   session.py:99:    async with binding.turn:
+1. head, probe over a fresh bh_r_h12_03_db:
+   spend from /tmp/claude-0/-home-user-openFermentUI/cfbc5c9f-640a-5002-a705-5ceaf850fdc6/scratchpad/bh/work/H12-03/wt-13561/core/openferment_core/spend.py; _reserve takes the day's lock: True
+   PROBE: 20 rounds of two $0.60 reservations against a $1.00 cap: both held (the cap overrun) in 0; the most held at once $0.60
+   test_spend, test_phase3_review, test_llm, test_ready: exit 0, 175 passed in 14.83s
+   tests/test_phase3_review.py::test_concurrent_reservations_cannot_together_pass_the_cap: PASSED
+2. mutation applied:  1 file changed, 1 deletion(-)
+   -        await db.lock(s, "spend", day.isoformat())
+   probe over bh_r_h12_03_db made fresh again:
+   spend from /tmp/claude-0/-home-user-openFermentUI/cfbc5c9f-640a-5002-a705-5ceaf850fdc6/scratchpad/bh/work/H12-03/wt-13561/core/openferment_core/spend.py; _reserve takes the day's lock: False
+   PROBE: 20 rounds of two $0.60 reservations against a $1.00 cap: both held (the cap overrun) in 20; the most held at once $1.20
+   test_spend, test_phase3_review, test_llm, test_ready: exit 0, 175 passed in 10.29s
+   tests/test_phase3_review.py::test_concurrent_reservations_cannot_together_pass_the_cap: PASSED
+EXPECTED: with the day's lock gone from spend._reserve, two reservations at once each see room only one has (spend.py:175-177 'Check and hold are one step under the day's lock, so two calls at once cannot each see room that only one of them has (§3.R)'; CLAUDE.md:140 stop condition 'Spend above the daily cap'), and a test fails, test_phase3_review.py:96-97 'R5c — check and charge are one step: concurrent calls cannot each pass' first
+OBSERVED: head: the probe overran the $1.00 cap in 0 of 20 rounds and the four test files exit 0 (175 passed in 14.83s); with the lock deleted: the probe overran it in 20 of 20 rounds (two $0.60 reservations held at once), and the four test files exit 0 (175 passed in 10.29s), the R5c race test PASSED
+RESULT: DEFECT

@@ -7,6 +7,7 @@ import { MessageSquarePlus, Plus } from 'lucide-react';
 import { useStore } from '@/store';
 import { href, navigate } from '@/router';
 import { TraceCards } from './TraceCards';
+import { stamp } from '@/lib/proforma';
 import { Button, Card, SectionTitle, cx } from './ui';
 
 export function HomeStart() {
@@ -75,11 +76,16 @@ export function HomeStart() {
               <ul className="space-y-1" data-testid="home-conversations">
                 {conversations.slice(0, 5).map((c) => (
                   <li key={c.id} className="text-body flex items-baseline gap-2">
-                    <a className="truncate hover:text-accent" href={href(`/postdoc/${c.id}`)}>
+                    <a
+                      className="truncate hover:text-accent"
+                      href={href(`/postdoc/${c.id}`)}
+                      title={c.title || c.turns[0]?.question || c.id}
+                    >
                       {c.title || c.turns[0]?.question || c.id}
                     </a>
                     <span className="text-caption text-ink-soft shrink-0">
-                      {c.turns.length} turn{c.turns.length === 1 ? '' : 's'}
+                      <span className="font-num">{c.turns.length}</span> question{c.turns.length === 1 ? '' : 's'} ·{' '}
+                      <span className="font-num">{stamp(c.startedAt)}</span>
                     </span>
                   </li>
                 ))}

@@ -1,0 +1,7 @@
+deposit 200
+[every value a reading] report measured | GET /api/runs None | origins []
+[readings and one estimate] report assumed | GET /api/runs None | origins []
+[readings and one person's value] report assumed | GET /api/runs None | origins []
+[every value a person's] report assumed | GET /api/runs None | origins []
+[every value a model's] report assumed | GET /api/runs None | origins []
+runs list: [('58b68da2f718cff0', 'kinetics', 'assumed'), ('4761432844ab40cd', 'kinetics', 'assumed'), ('d740cb2b96bf533e', 'kinetics', 'assumed'), ('3ed7d97a69c777e5', 'kinetics', 'assumed'), ('90e308503f0ddc1c', 'kinetics', 'measured')]

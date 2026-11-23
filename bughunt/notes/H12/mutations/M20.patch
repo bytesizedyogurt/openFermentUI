@@ -1,0 +1,11 @@
+--- a/core/openferment_core/engine/runs.py
++++ b/core/openferment_core/engine/runs.py
+@@ -461,8 +461,6 @@
+     name = _engine_name(engine)
+     project_id = projects.current()
+     held = db.run(_get(project_id, run_id))
+-    if held is not None and (held.status == "refused" or held.sff is not None or held.sffRefused is not None):
+-        return report(run_id)
+     who = (by or "").strip() or "this browser"
+     first, when, asked = (held.by, held.at, held.scenarioId) if held is not None else (who, _now(), scenario_id)
+     base = dict(id=run_id, engine=name, plant=thing, configuration=configuration, tool=tool, toolVersion=version,

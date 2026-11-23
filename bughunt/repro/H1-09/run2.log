@@ -1,0 +1,33 @@
+NOTICE:  database "bh_r_h1_09_svc" does not exist, skipping
+== the service on http://127.0.0.1:10060 over bh_r_h1_09_svc, the stand-in engine h109 on PYTHONPATH
+== GET /api/engines: h109 as listed
+[200]
+h109: things=['extra', 'nounit'] error=''
+== control: POST /api/engines/h109/run {thing: nounit} (the output {name: x, value: 1.0}, no unit)
+503 {"detail":"the h109 worker's run op answered an output that is no name, value and unit, outside the protocol (docs/api/workers.md, Engine ops): {\"name\": \"x\", \"value\": 1.0}"}
+== the case: POST /api/engines/h109/run {thing: extra} (the output {name: x, value: 1.0, unit: u, stray: 42})
+[200]
+status=done
+artifact=c623317b478a7941
+hash=91028a8d56cd4be92f1cac7ff5998beb4698dd71f02a02139a5ce60025f1b620
+artifact_values=[{"name": "x", "value": 1.0, "unit": "u", "stray": 42}]
+run_values=[["x", ["origin", "unit", "value"]]]
+== GET /api/biorepo/artifacts/c623317b478a7941: the artifact as the store keeps it
+[200]
+kept output.values: [{"name": "x", "value": 1.0, "unit": "u", "stray": 42}]
+== the kept hash against the service's own output_hash, over the output as kept and with the stray key taken out
+kept=91028a8d56cd4be9 as_kept=91028a8d56cd4be9 three_fields=09e61125e93b5153
+== POST /api/biorepo/artifacts/c623317b478a7941/replay (the stand-in answers stray 43 on its second run of extra)
+[200]
+identical=False withinTolerance=False differences=[('values[0].stray', 42, 43)]
+runs rows kept for h109 (thing:status): extra:done
+
+EXPECTED: docs/api/workers.md:62-68 says "An answer outside the shapes below (a result key missing, outputs that are no list of names, values and units, ...) breaks the contract: the service raises EngineBroken, keeps no runs row and answers 503 in words", and the run op's shape (workers.md:93-94, engines.md:456) is {"outputs": [{"name", "value", "unit"}, ...]}; so the output {name, value, unit, stray: 42} is refused 503 with no runs row, or kept as its name, value and unit alone, with no stray number in the artifact, its hash or its replay
+OBSERVED: run of extra: 200, status done; the run's typed outputs (name, quantity keys): [["x", ["origin", "unit", "value"]]]
+OBSERVED: the artifact c623317b478a7941 keeps output.values [{"name": "x", "value": 1.0, "unit": "u", "stray": 42}]
+OBSERVED: hashes: kept=91028a8d56cd4be9 as_kept=91028a8d56cd4be9 three_fields=09e61125e93b5153
+OBSERVED: replay: identical=False withinTolerance=False differences=[('values[0].stray', 42, 43)]
+OBSERVED: runs rows: extra:done
+CONTROL:  run of nounit (no unit): 503 {"detail":"the h109 worker's run op answered an output that is no name, value and unit, outside the protocol (docs/api/workers.md, Engine ops): {\"name\": \"x\", \"value\": 1.0}"}
+checks: control_refused=1 stray_run_kept_done=1 stray_in_artifact=1 stray_in_hash=1 stray_in_replay=1
+RESULT: DEFECT

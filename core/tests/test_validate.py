@@ -14,23 +14,7 @@ from __future__ import annotations
 import pytest
 
 from openferment_core.models import weakest_provenance
-from openferment_core.validate import decline_reason, find_number, validate_claims
-
-# A tiny fixed corpus. Small on purpose: these tests are about the validator's
-# rules, not about retrieval, and a fixture you can hold in your head is a
-# fixture whose failures are readable.
-RECORDS = {
-    "r-A1-1": {"id": "r-A1-1", "paperId": "A1", "provenance": "curated"},
-    "r-H4-3": {"id": "r-H4-3", "paperId": "H4", "provenance": "verified"},
-    "r-O8-1": {"id": "r-O8-1", "paperId": "O8", "provenance": "industry-estimate"},
-    "r-G1-1": {"id": "r-G1-1", "paperId": "G1", "provenance": "gold"},
-}
-PAPERS = {"A1": {"id": "A1"}, "H4": {"id": "H4"}, "O8": {"id": "O8"}, "G1": {"id": "G1"}}
-
-
-def check(claims):
-    return validate_claims(claims, RECORDS, PAPERS)
-
+from openferment_core.validate import decline_reason, find_number
 
 # ── the number detector ────────────────────────────────────────────────
 
@@ -63,7 +47,7 @@ def test_numbers_are_found_in_every_disguise(text):
         "Nobody has measured this in this host",
         "Often the tension between yield and purity decides the train",
         "Someone should reconsider this alone",
-        "Phosphorylation state of bovine beta-casein as expressed in E. coli",
+        "Phosphorylation state of a placeholder protein as expressed in a placeholder host",
         "The wavelength used for the absorbance reading",
         # Identifiers carry digits without being quantities. A claim that cannot
         # name its strain is useless, and the first of these is the
@@ -91,182 +75,7 @@ def test_ordinary_prose_is_not_flagged(text):
     assert find_number(text) is None, f"false positive on {text!r}"
 
 
-# ── the four rejection rules ───────────────────────────────────────────
-
-
-def test_a_good_claim_survives_intact():
-    result = check(
-        [
-            {
-                "id": "c1",
-                "text": "Expression level in the cell-wall-deficient strain",
-                "recordIds": ["r-A1-1"],
-                "paperIds": ["A1"],
-                "support": "direct",
-            }
-        ]
-    )
-    assert result.rejected == 0
-    assert len(result.claims) == 1
-    assert result.claims[0].text == "Expression level in the cell-wall-deficient strain"
-
-
-def test_rule_one_a_claim_with_a_number_is_dropped():
-    result = check(
-        [
-            {
-                "id": "c1",
-                "text": "Expression reached 0.2% TSP in the strain",
-                "recordIds": ["r-A1-1"],
-                "support": "direct",
-            }
-        ]
-    )
-    assert result.claims == []
-    assert result.rejected == 1
-    assert "contains a number" in result.reasons[0]
-
-
-def test_the_rejected_claim_is_never_repaired():
-    """The rule that matters most.
-
-    A validator that strips the number and keeps the sentence produces prose
-    the model never wrote, attached to citations chosen to support the prose it
-    did write. Nothing that failed may come back in any form.
-    """
-    result = check(
-        [
-            {
-                "id": "c1",
-                "text": "Expression reached 0.2% TSP",
-                "recordIds": ["r-A1-1"],
-                "support": "direct",
-            }
-        ]
-    )
-    assert result.claims == [], "a rejected claim must not reappear repaired"
-    assert not any("0.2" in c.text for c in result.claims)
-
-
-def test_rule_two_an_unresolvable_record_id_is_dropped():
-    result = check(
-        [
-            {
-                "id": "c1",
-                "text": "Secreted fraction in the host",
-                "recordIds": ["r-DOES-NOT-EXIST"],
-                "support": "direct",
-            }
-        ]
-    )
-    assert result.claims == []
-    assert result.rejected == 1
-    assert "do not exist" in result.reasons[0]
-
-
-def test_a_claim_is_dropped_if_any_citation_is_a_ghost():
-    # One real record does not rescue a hallucinated one. A partially-real
-    # citation list is how a fabricated corroboration gets through.
-    result = check(
-        [
-            {
-                "id": "c1",
-                "text": "Secreted fraction in the host",
-                "recordIds": ["r-A1-1", "r-NOPE-9"],
-                "support": "direct",
-            }
-        ]
-    )
-    assert result.claims == []
-    assert result.rejected == 1
-
-
-def test_rule_three_an_unresolvable_paper_id_is_dropped():
-    result = check(
-        [
-            {
-                "id": "c1",
-                "text": "Secreted fraction in the host",
-                "recordIds": ["r-A1-1"],
-                "paperIds": ["ZZ9"],
-                "support": "direct",
-            }
-        ]
-    )
-    assert result.claims == []
-    assert "papers that do not exist" in result.reasons[0]
-
-
-def test_rule_four_no_citation_and_not_admitting_it():
-    result = check(
-        [{"id": "c1", "text": "Secretion is generally poor in this host", "support": "direct"}]
-    )
-    assert result.claims == []
-    assert "not 'unsupported'" in result.reasons[0]
-
-
-def test_an_uncited_claim_that_admits_it_survives():
-    """Naming an absence is a useful answer, but it has to be declared.
-
-    "Nobody has measured this in this host" is exactly the answer §6 asks for.
-    It is allowed through with no citations because it claims no measurement —
-    what is not allowed is arriving at that state by omission.
-    """
-    result = check(
-        [
-            {
-                "id": "c1",
-                "text": "No study in the corpus measures this in a microalgal host",
-                "recordIds": [],
-                "support": "unsupported",
-            }
-        ]
-    )
-    assert len(result.claims) == 1
-    assert result.claims[0].support == "unsupported"
-    assert result.rejected == 0
-
-
-def test_empty_claim_text_is_dropped():
-    result = check([{"id": "c1", "text": "   ", "recordIds": ["r-A1-1"]}])
-    assert result.claims == []
-    assert result.rejected == 1
-
-
 # ── provenance is computed, never model-chosen ─────────────────────────
-
-
-def test_provenance_is_the_weakest_cited_record():
-    result = check(
-        [
-            {
-                "id": "c1",
-                "text": "Market size for the product category",
-                "recordIds": ["r-G1-1", "r-O8-1"],
-                "support": "direct",
-                "provenance": "gold",  # the model's own claim, to be ignored
-            }
-        ]
-    )
-    assert result.claims[0].provenance == "industry-estimate", (
-        "a claim resting on one gold record and one industry estimate is an "
-        "industry estimate, not gold"
-    )
-
-
-def test_the_models_provenance_field_is_discarded():
-    result = check(
-        [
-            {
-                "id": "c1",
-                "text": "Expression level in the strain",
-                "recordIds": ["r-A1-1"],  # curated
-                "support": "direct",
-                "provenance": "measured",  # a promotion the model is not allowed
-            }
-        ]
-    )
-    assert result.claims[0].provenance == "curated"
 
 
 def test_weakest_provenance_ranks_measured_above_gold():
@@ -278,88 +87,6 @@ def test_weakest_provenance_ranks_measured_above_gold():
 def test_an_unknown_provenance_class_is_treated_as_the_weakest():
     # An unrecognised provenance is not a reason for confidence.
     assert weakest_provenance(["gold", "something-new"]) == "assumed"
-
-
-def test_papers_are_derived_from_the_cited_records():
-    """A claim can never point at a paper its evidence does not come from."""
-    result = check(
-        [
-            {
-                "id": "c1",
-                "text": "Secreted fraction across both hosts",
-                "recordIds": ["r-A1-1", "r-H4-3"],
-                "paperIds": [],  # model named none
-                "support": "direct",
-            }
-        ]
-    )
-    assert result.claims[0].paperIds == ["A1", "H4"]
-
-
-# ── counting, and what happens when everything fails ───────────────────
-
-
-def test_rejections_are_counted_and_reasoned():
-    result = check(
-        [
-            {"id": "c1", "text": "Titre hit 4.2 g/L", "recordIds": ["r-A1-1"]},
-            {"id": "c2", "text": "Fine claim", "recordIds": ["r-GHOST"]},
-            {"id": "c3", "text": "Expression in the strain", "recordIds": ["r-A1-1"]},
-        ]
-    )
-    assert len(result.claims) == 1
-    assert result.rejected == 2
-    assert len(result.reasons) == 2
-    assert result.reasons[0].startswith("c1:")
-    assert result.reasons[1].startswith("c2:")
-
-
-def test_when_every_claim_is_rejected_the_plan_declines():
-    result = check([{"id": "c1", "text": "Titre hit 4.2 g/L", "recordIds": ["r-A1-1"]}])
-    reason = decline_reason(result, None)
-    assert reason is not None
-    assert "validation" in reason
-    assert "fault in the answer, not in the corpus" in reason
-
-
-def test_the_models_own_decline_wins():
-    # It knows what it was missing and can say so specifically.
-    result = check([])
-    assert decline_reason(result, "No study measures this in a microalga.") == (
-        "No study measures this in a microalga."
-    )
-
-
-def test_no_claims_and_no_rejections_declines_on_the_corpus():
-    assert "corpus does not contain evidence" in decline_reason(check([]), None)
-
-
-def test_a_valid_plan_does_not_decline():
-    result = check(
-        [{"id": "c1", "text": "Expression in the strain", "recordIds": ["r-A1-1"]}]
-    )
-    assert decline_reason(result, None) is None
-
-
-# ── malformed model output must not crash the service ──────────────────
-
-
-def test_missing_fields_are_handled_rather_than_raised():
-    result = check([{}, {"text": "Expression in the strain"}, {"recordIds": ["r-A1-1"]}])
-    assert result.rejected == 3
-    assert result.claims == []
-
-
-def test_a_claim_with_no_id_gets_a_positional_one():
-    result = check([{"text": "Expression in the strain", "recordIds": ["r-A1-1"]}])
-    assert result.claims[0].id == "c1"
-
-
-def test_an_invalid_support_value_falls_back_rather_than_crashing():
-    result = check(
-        [{"id": "c1", "text": "Expression in the strain", "recordIds": ["r-A1-1"], "support": "vibes"}]
-    )
-    assert result.claims[0].support == "direct"
 
 
 # ── the paper's wording, resolved (OF-BLD-014 §2.1) ────────────────────
@@ -431,15 +158,20 @@ WORDING_SECTION = [
 
 
 @pytest.fixture(autouse=True)
-def _test_strains(monkeypatch):
-    """A strain alias table of fictional strains: the service ships none, since
-    strains arrive with a project's records (alpha 2.0, ADR-010)."""
-    import openferment_core.validate as module
+def _test_strains():
+    """Two fictional strains kept in the test project's strain catalogue with
+    their other names, which anchoring reads (validate.strain_id): the service
+    ships none, since strains arrive with a project (alpha 2.0, ADR-010)."""
+    from openferment_core import catalogues
 
-    real = module.vocabulary()
-    monkeypatch.setattr(module, "vocabulary", lambda path=None: {
-        **real, "strains": {"ab12": "strain-ab12", "ab12-3": "strain-ab12", "cd34": "strain-cd34"},
-    })
+    for sid, name, aliases in (("strain-ab12", "Test strain AB12", ["AB12", "AB12-3"]),
+                               ("strain-cd34", "Test strain CD34", ["CD34"])):
+        catalogues.keep(catalogues.CatalogueEntry(kind="strain", id=sid, name=name, species="Testus organismus",
+                                                  aliases=aliases), by="A test fixture")
+    yield
+    # The test's rows roll back with its transaction; the aliases held for
+    # the test project go with them.
+    catalogues._ALIASES.changed()
 
 
 def _anchored(organism: str):
@@ -479,6 +211,78 @@ def test_resolving_the_organism_does_not_move_the_content_id():
     # A decision keyed by content stays on its candidate when anchoring
     # learns to resolve the wording it was made about.
     assert _anchored("Testus organismus AB12").id == _anchored("Testus organismus").id
+
+
+def test_a_strain_kept_with_an_alias_resolves_a_record_naming_that_alias():
+    # H14-02: anchoring reads the project's strain catalogue, and reads it
+    # afresh once a strain is kept, so a strain kept after an anchoring run
+    # resolves the next one.
+    from openferment_core import catalogues, validate
+
+    wording = "Testus organismus Ethanol Grey"
+    before = _anchored(wording)
+    assert before.organism == wording and before.organismText is None, "no strain names it yet"
+    catalogues.keep(catalogues.CatalogueEntry(kind="strain", id="ethanol-grey", name="Ethanol Grey",
+                                              species="Testus organismus", aliases=[wording]), by="A test fixture")
+    after = _anchored(wording)
+    assert after.organism == "ethanol-grey", "the strain's id, which the strain page and the Hosts counts match on"
+    assert after.organismText == wording
+    assert validate.vocabulary()["strains"][wording.lower()] == "ethanol-grey"
+    # Its name alone, standing in a longer wording, resolves it too.
+    assert _anchored("an Ethanol Grey culture").organism == "ethanol-grey"
+
+
+def test_a_candidate_written_by_hand_resolves_its_organism_inside_its_transaction(held_documents):
+    # The tool door's hand-written candidate anchors inside its transaction,
+    # on the database loop, where no read of the catalogue can run: the
+    # aliases a strain keep read again are held for it.
+    from openferment_core import catalogues, extract
+
+    held_documents["W2"] = WORDING_SECTION
+    raw = {"sectionId": "s1", "field": "titer_secreted", "value": 15, "unit": "mg L-1",
+           "quote": "secreted the reporter to 15 mg L-1", "organism": "Testus organismus AB12"}
+    made, rule, detail = extract.add_candidate("W2", raw, who="A test fixture")
+    assert made is not None, (rule, detail)
+    assert made.organism == "strain-ab12" and made.organismText == "Testus organismus AB12"
+    # The evidence pool's record, which fermOS's strain filter reads, names the strain.
+    from openferment_core.evidence_pool import candidate_record
+
+    assert candidate_record(made, {})["strainId"] == "strain-ab12"
+    # After the aliases held are let go, the next candidate is kept too.
+    catalogues._ALIASES.changed()
+    again, rule, detail = extract.add_candidate("W2", {**raw, "organism": "AB12"}, who="A test fixture")
+    assert again is not None, (rule, detail)
+
+
+def test_a_candidate_written_by_hand_after_a_restart_resolves_its_organism(held_documents):
+    # A restarted service holds no strain aliases until something reads them
+    # off the database loop. add_candidate reads them before its transaction,
+    # so a hand-written candidate naming a kept strain's alias resolves.
+    from openferment_core import catalogues, db, extract, projects
+
+    held_documents["W3"] = WORDING_SECTION
+    raw = {"sectionId": "s1", "field": "titer_secreted", "value": 15, "unit": "mg L-1",
+           "quote": "secreted the reporter to 15 mg L-1", "organism": "Testus organismus AB12"}
+    catalogues._ALIASES.changed()
+    made, rule, detail = extract.add_candidate("W3", raw, who="A test fixture")
+    assert made is not None, (rule, detail)
+    assert made.organism == "strain-ab12" and made.organismText == "Testus organismus AB12"
+    # On the database loop with nothing held, the candidate is kept with its
+    # wording as the paper wrote it.
+    catalogues._ALIASES.changed()
+    sections = extract.passages("W3")
+    kept, rule, detail = db.run(extract._add_candidate(projects.current(), "W3", raw, sections, "A test fixture"))
+    assert kept is not None, (rule, detail)
+    assert kept.organism == "Testus organismus AB12" and kept.organismText is None
+
+
+def test_with_no_project_open_a_wording_stays_as_the_paper_wrote_it():
+    from openferment_core import projects, validate
+
+    with projects.using(None):
+        assert validate.strain_aliases() == {}
+        assert validate.strain_id("Testus organismus AB12") is None
+        assert _anchored("Testus organismus AB12").organism == "Testus organismus AB12"
 
 
 # ── the carbon source at anchoring ─────────────────────────────────────
@@ -582,7 +386,7 @@ class _Pool:
 
 
 PASSAGE = Passage(id="X4:s1:0", paperId="X4", sectionId="s1", heading="Results", kind="prose",
-                  text="Cells fed xylose hydrolysate accumulated polyhydroxybutyrate.  The content rose over four days.", start=0, end=97)
+                  text="Cells fed the placeholder sugar accumulated the product.  The content rose over four days.", start=0, end=90)
 
 
 def _evidence(prov="computed"):
@@ -605,9 +409,9 @@ def _one(claim, seen=None):
 
 def test_plan_happy_path_keeps_every_kind_of_citation():
     r = _one({
-        "id": "c1", "text": "Xylose-fed cells accumulated the polymer.", "support": "direct",
+        "id": "c1", "text": "Cells on the placeholder sugar accumulated the product.", "support": "direct",
         "recordIds": ["r-X1-1"], "evidenceIds": ["ev-1"],
-        "passages": [{"passageId": PASSAGE.id, "quote": "Cells fed xylose hydrolysate accumulated polyhydroxybutyrate."}],
+        "passages": [{"passageId": PASSAGE.id, "quote": "Cells fed the placeholder sugar accumulated the product."}],
         "paperIds": ["Z9"],
     })
     assert r.rejected == 0
@@ -665,3 +469,74 @@ def test_plan_provenance_across_mixed_citations():
     assert modeled.claims[0].provenance == "assumed"
     curated = _one({"text": "A claim.", "recordIds": ["r-X1-1", "r-X2-1"]})
     assert curated.claims[0].provenance == "curated"
+
+
+# The rules alpha 1.0's one-call path held, held here on the loop's plan.
+
+
+def test_plan_a_rejected_claim_is_never_repaired():
+    """A validator that strips the number and keeps the sentence produces prose
+    the model never wrote, attached to citations chosen for the prose it did
+    write. Nothing that failed comes back in any form."""
+    r = _one({"id": "c1", "text": "The content reached 40 percent.", "recordIds": ["r-X1-1"]})
+    assert r.claims == [], "a rejected claim must not reappear repaired"
+
+
+def test_plan_one_real_record_rescues_no_ghost_beside_it():
+    # A partly real citation list is how a fabricated corroboration gets through.
+    r = _one({"text": "A claim.", "recordIds": ["r-X1-1", "r-nowhere"]}, _seen(records=["r-X1-1", "r-nowhere"]))
+    assert r.claims == [] and r.rejected == 1 and "do not exist" in r.reasons[0]
+
+
+def test_plan_empty_text_is_dropped():
+    r = _one({"id": "c1", "text": "   ", "recordIds": ["r-X1-1"]})
+    assert r.claims == [] and r.rejected == 1 and "empty claim text" in r.reasons[0]
+
+
+def test_plan_the_models_provenance_field_is_discarded():
+    r = _one({"text": "A claim.", "recordIds": ["r-X2-1"], "support": "direct", "provenance": "measured"})
+    assert r.claims[0].provenance == "curated", "a promotion the model is not allowed"
+
+
+def test_plan_rejections_are_counted_and_reasoned_by_claim():
+    r = validate_plan([
+        {"id": "c1", "text": "The content reached 40 percent.", "recordIds": ["r-X1-1"]},
+        {"id": "c2", "text": "A claim.", "recordIds": ["r-nowhere"]},
+        {"id": "c3", "text": "A claim.", "recordIds": ["r-X1-1"]},
+    ], _seen(), _Pool())
+    assert len(r.claims) == 1 and r.rejected == 2 and len(r.reasons) == 2
+    assert r.reasons[0].startswith("c1:") and r.reasons[1].startswith("c2:")
+
+
+def test_plan_malformed_claims_are_counted_and_never_raised():
+    r = validate_plan([{}, {"text": "A claim."}, {"recordIds": ["r-X1-1"]}, "not a claim"], _seen(), _Pool())
+    assert r.rejected == 4 and r.claims == []
+
+
+def test_plan_a_claim_with_no_id_gets_a_positional_one_and_a_bad_support_falls_back():
+    r = _one({"text": "A claim.", "recordIds": ["r-X1-1"], "support": "vibes"})
+    assert r.claims[0].id == "c1" and r.claims[0].support == "direct"
+
+
+# ── what the answer says when nothing stands ───────────────────────────
+
+
+def test_when_every_claim_is_rejected_the_plan_declines():
+    reason = decline_reason(_one({"text": "The content reached 40 percent.", "recordIds": ["r-X1-1"]}), None)
+    assert reason is not None
+    assert "validation" in reason
+    assert "fault in the answer, not in the corpus" in reason
+
+
+def test_the_models_own_decline_wins():
+    # It knows what it was missing and can say so specifically.
+    empty = validate_plan([], _seen(), _Pool())
+    assert decline_reason(empty, "No study measures this in a microalga.") == "No study measures this in a microalga."
+
+
+def test_no_claims_and_no_rejections_declines_on_the_corpus():
+    assert "corpus does not contain evidence" in decline_reason(validate_plan([], _seen(), _Pool()), None)
+
+
+def test_a_valid_plan_does_not_decline():
+    assert decline_reason(_one({"text": "A claim.", "recordIds": ["r-X1-1"]}), None) is None

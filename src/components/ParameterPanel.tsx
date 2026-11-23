@@ -15,11 +15,22 @@
 //                change is an `Override` under the reviewer name, at now,
 //                kept in the open project's rows (`setOverride`;
 //                lib/projectState.ts); Reset to source drops it
-//                (`clearOverride`). With no
+//                (`clearOverride`). On a panel that offers readings (a
+//                Proforma scenario's, `readings`; alpha 2.2 E.17) the person
+//                may also choose a reading deposited at the bench for a row:
+//                it is kept as the override in the reading's own value and
+//                unit (`Override.unit`), its depositor and the time it was
+//                taken, with the person's words on why it stands for the
+//                parameter, and the service sets it in the parameter's unit
+//                each time it is sent. With no
 //                reviewer name every edit control is disabled and the row
 //                says where to set one;
 //   the service  is asked after each change, debounced, to lay the scope's
-//                overrides on (`POST /api/params/{scope}/resolve`), and its
+//                overrides on, each sent as a typed input in its spec's unit
+//                (`POST /api/params/{scope}/resolve`, lib/params.ts; a caller
+//                that shows fewer specs than its scope holds passes the
+//                scope's own as `unitSpecs`, so a value typed elsewhere on
+//                the scope goes in its unit too), and its
 //                answer, its out-of-bounds warnings included, is what each
 //                row shows. A value outside the bounds is kept, never clamped.
 //                The service binds the scope with the overrides as a run of
@@ -31,12 +42,21 @@
 // The panel COMPUTES NOTHING: every value, source and warning it shows came
 // from the service or the person. A model never sets an override.
 import { useEffect, useMemo, useRef, useState, type ReactNode } from 'react';
-import type { Override, ParameterSpec, ParameterValue, ParamResolveResult, ParamScope } from '@/data/types';
 import { overrideEnds, overridesFor, useStore } from '@/store';
-import { ParamsDown, resolveParams, type ParamAsk } from '@/lib/params';
-import { ParameterRow, type ParameterChange } from './ParameterRow';
+import {
+  ParamsDown,
+  resolveParams,
+  type Override,
+  type ParamAsk,
+  type ParameterSpec,
+  type ParameterValue,
+  type ParamResolveResult,
+  type ParamScope,
+} from '@/lib/params';
+import { NOT_RUNNING } from '@/lib/http';
+import { ParameterRow, type ChosenReading, type ParameterChange } from './ParameterRow';
 
-export interface ParameterPanelProps {
+interface ParameterPanelProps {
   /** The scope the specs and overrides belong to: `proforma:<id>`, `fermos:family:<id>`, `fermos:vessel:<id>`, `pureos:unit:<train>:<unit>`. */
   scope: string;
   /** The scope as the caller fetched it (`GET /api/params/{scope}`); null while it is asked or when it could not be. */
@@ -55,20 +75,44 @@ export interface ParameterPanelProps {
   readOnly?: boolean;
   /** What a record-bound value's link opens, by key (Proforma passes the records chooser it had); by default the records as citation chips. */
   recordsOf?: (key: string, value: ParameterValue) => ReactNode;
+  /** The specs that name each override's unit when `data` shows fewer than the scope holds (FermOSForecast's batch fit shows its start values and run length); by default `data`'s own. */
+  unitSpecs?: ParameterSpec[];
+  /** Offer, on each numeric row a person may change, the project's readings deposited at the bench it may take (a Proforma scenario's panel). */
+  readings?: boolean;
 }
 
 /** How long the panel waits after a change before asking the service to resolve it. */
 const RESOLVE_AFTER_MS = 350;
 
-/** A person's override as the row shows it while the service has not answered: their value, its interval as the service reads it (`overrideEnds`), their name. */
-function asTyped(o: Override, served: ParameterValue | undefined): ParameterValue {
+/**
+ * A person's override as the row shows it while the service has not answered: their value, its interval as the service
+ * reads it (`overrideEnds`), their name; a reading they chose as the reading it is, its value shown where its unit is
+ * the parameter's and none where the service has its conversion to make.
+ */
+function asTyped(o: Override, served: ParameterValue | undefined, spec: ParameterSpec): ParameterValue {
+  if (o.origin === 'measurement') {
+    return {
+      key: o.key,
+      value: o.unit == null || o.unit === spec.unit ? o.value : null,
+      low: null,
+      high: null,
+      source: { kind: 'deposition', id: o.ref ?? null, by: o.by, note: `measured on ${o.at}` },
+      origin: 'measurement',
+      identified: null,
+      overriddenBy: o.by,
+      libraryDefault: served?.libraryDefault ?? null,
+      recordIds: [],
+      detail: null,
+      outOfBounds: null,
+    };
+  }
   const ends = overrideEnds(o);
   return {
     key: o.key,
     value: o.value,
     low: ends.low,
     high: ends.high,
-    source: { kind: 'assumption', id: null, by: o.by, note: o.note },
+    source: { kind: 'assumption', id: null, by: o.by, note: o.note ?? null },
     origin: 'assumption',
     identified: null,
     overriddenBy: o.by,
@@ -80,7 +124,7 @@ function asTyped(o: Override, served: ParameterValue | undefined): ParameterValu
 }
 
 /** The groups in the caller's order, then any the caller did not name, in the specs' order. */
-export function groupOrder(specs: ParameterSpec[], groups: string[] = []): string[] {
+function groupOrder(specs: ParameterSpec[], groups: string[] = []): string[] {
   const present = [...new Set(specs.map((s) => s.group))];
   return [...groups.filter((g) => present.includes(g)), ...present.filter((g) => !groups.includes(g))];
 }
@@ -88,13 +132,13 @@ export function groupOrder(specs: ParameterSpec[], groups: string[] = []): strin
 /** The time an override is kept at: now, to the second, in UTC. */
 const nowStamp = () => `${new Date().toISOString().slice(0, 19)}Z`;
 
-export function ParameterPanel({ scope, data, request, onChange, onResolved, onRefused, groups, readOnly, recordsOf }: ParameterPanelProps) {
+export function ParameterPanel({ scope, data, request, onChange, onResolved, onRefused, groups, readOnly, recordsOf, unitSpecs, readings = false }: ParameterPanelProps) {
   const overrides = useStore(overridesFor(scope));
   const reviewer = useStore((s) => s.reviewer).trim();
   const setOverride = useStore((s) => s.setOverride);
   const clearOverride = useStore((s) => s.clearOverride);
   const [resolved, setResolved] = useState<{ asked: string; result: ParamResolveResult } | null>(null);
-  const [problem, setProblem] = useState<{ down: boolean; words: string } | null>(null);
+  const [problem, setProblem] = useState<{ down: boolean; away: boolean; words: string } | null>(null);
   const resolvedRef = useRef(onResolved);
   resolvedRef.current = onResolved;
   const refusedRef = useRef(onRefused);
@@ -115,7 +159,7 @@ export function ParameterPanel({ scope, data, request, onChange, onResolved, onR
     }
     const ctrl = new AbortController();
     const timer = window.setTimeout(() => {
-      resolveParams(scope, overrides, JSON.parse(askKey) as ParamAsk, ctrl.signal)
+      resolveParams(scope, overrides, unitSpecs ?? data.specs, JSON.parse(askKey) as ParamAsk, ctrl.signal)
         .then((result) => {
           setResolved({ asked, result });
           resolvedRef.current?.(result);
@@ -126,7 +170,7 @@ export function ParameterPanel({ scope, data, request, onChange, onResolved, onR
           resolvedRef.current?.(null);
           const down = e instanceof ParamsDown;
           const words = down ? `${e.message} ${e.remedy ?? ''}`.trim() : e instanceof Error ? e.message : String(e);
-          setProblem({ down, words });
+          setProblem({ down, away: down && e.message === NOT_RUNNING, words });
           if (!down) refusedRef.current?.(words);
         });
     }, RESOLVE_AFTER_MS);
@@ -147,11 +191,32 @@ export function ParameterPanel({ scope, data, request, onChange, onResolved, onR
 
   const change = (spec: ParameterSpec, c: ParameterChange) => {
     if (!reviewer) return;
-    setOverride({ scope, key: spec.key, value: c.value, low: c.low, high: c.high, by: reviewer, at: nowStamp(), note: c.note });
+    setOverride({ scope, key: spec.key, value: c.value, low: c.low, high: c.high, by: reviewer, at: nowStamp(), note: c.note, origin: 'person-assumption' });
     onChange?.(useStore.getState().parameterOverrides[scope] ?? []);
   };
   const reset = (spec: ParameterSpec) => {
     clearOverride(scope, spec.key);
+    onChange?.(useStore.getState().parameterOverrides[scope] ?? []);
+  };
+  // A reading chosen for a row: its own value and unit, its depositor and the time it was taken, as the service listed
+  // it, kept in the reviewer's name with the project's rows (`chosenBy`, the row's maker on the service, and its
+  // audit row); the service looks it up again and sets it in the parameter's unit each time it is sent.
+  const read = (spec: ParameterSpec, r: ChosenReading, note: string | null) => {
+    if (!reviewer) return;
+    setOverride({
+      scope,
+      key: spec.key,
+      value: r.value,
+      unit: r.unit,
+      low: null,
+      high: null,
+      by: r.by,
+      at: r.at,
+      note,
+      origin: 'measurement',
+      ref: r.ref,
+      chosenBy: reviewer,
+    });
     onChange?.(useStore.getState().parameterOverrides[scope] ?? []);
   };
 
@@ -159,9 +224,11 @@ export function ParameterPanel({ scope, data, request, onChange, onResolved, onR
     <div data-testid="parameter-panel" data-scope={scope} data-resolved={fresh ? 'true' : 'false'}>
       {problem && (
         <p className="text-caption text-signal-warn mb-2" role="status" data-testid="param-problem" data-down={problem.down ? 'true' : 'false'}>
-          {problem.down
-            ? `The service could not check these values: ${problem.words} Your changes are kept in the project and go with the run.`
-            : `The service refused these values: ${problem.words}`}
+          {problem.away
+            ? `The service could not check these values: ${problem.words} Your changes wait in this browser until the service answers, and go to the project then, with the run.`
+            : problem.down
+              ? `The service could not check these values: ${problem.words} Your changes are kept in the project and go with the run.`
+              : `The service refused these values: ${problem.words}`}
         </p>
       )}
       {groupOrder(data.specs, groups).map((g) => (
@@ -171,7 +238,7 @@ export function ParameterPanel({ scope, data, request, onChange, onResolved, onR
             .filter((s) => s.group === g)
             .map((spec) => {
               const o = byKey.get(spec.key) ?? null;
-              const value = answered.get(spec.key) ?? (o ? asTyped(o, served.get(spec.key)) : served.get(spec.key) ?? null);
+              const value = answered.get(spec.key) ?? (o ? asTyped(o, served.get(spec.key), spec) : served.get(spec.key) ?? null);
               return (
                 <ParameterRow
                   key={spec.key}
@@ -184,6 +251,9 @@ export function ParameterPanel({ scope, data, request, onChange, onResolved, onR
                   records={value && value.origin === 'record' && recordsOf ? recordsOf(spec.key, value) : undefined}
                   onSet={(c) => change(spec, c)}
                   onReset={() => reset(spec)}
+                  offersReadings={readings}
+                  scope={scope}
+                  onRead={(r, note) => read(spec, r, note)}
                 />
               );
             })}

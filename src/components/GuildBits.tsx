@@ -4,7 +4,10 @@
 // src/screens/Guild.tsx shares only the tab strip.
 import { useEffect, useMemo, useState, type ReactNode } from 'react';
 import { Check, Download, UserPlus, X } from 'lucide-react';
-import type { Check as GuildCheck, DecisionCheck, Guild, GuildEvidence, GuildPerson, GuildRole, Protocol, Skill } from '@/data/types';
+import type { Skill } from '@/lib/catalogues';
+import type { Check as GuildCheck } from '@/lib/checks';
+import type { EvidenceCheck, Guild, GuildEvidence, GuildPerson, GuildRole } from '@/lib/guild';
+import type { Protocol } from '@/lib/protocols';
 import { useStore, guildView, actingIdOf, useSkillById } from '@/store';
 import { GUILD_TABS } from '@/data/tabs';
 import { OwnerTabs } from '@/components/OwnerTabs';
@@ -16,6 +19,7 @@ import {
   competenceOf,
   isAssessor,
   localToday,
+  rated,
   readyForCheck,
   statusOf,
   type StatusMap,
@@ -119,7 +123,7 @@ export function GuildHeader({ title, subtitle }: { title: string; subtitle: Reac
   return (
     <>
       <PageHeader
-        eyebrow="Guild of Applied Life"
+        eyebrow="Guild"
         title={title}
         subtitle={subtitle}
         actions={
@@ -145,7 +149,7 @@ export function GuildHeader({ title, subtitle }: { title: string; subtitle: Reac
 
 // ── one ledger entry ───────────────────────────────────────────────────
 
-export const KIND_LABEL: Record<GuildEvidence['kind'], string> = {
+const KIND_LABEL: Record<GuildEvidence['kind'], string> = {
   knowledge: 'Training sign-off',
   supervised: 'Supervised run',
   witnessed: 'Witnessed check',
@@ -156,7 +160,7 @@ export const KIND_LABEL: Record<GuildEvidence['kind'], string> = {
 };
 
 /** What an entry is called: a lesson passed is knowledge nobody signed. */
-export function kindLabel(e: Pick<GuildEvidence, 'kind' | 'source'>): string {
+function kindLabel(e: Pick<GuildEvidence, 'kind' | 'source'>): string {
   return e.kind === 'knowledge' && e.source.kind === 'lesson' ? 'Lesson passed' : KIND_LABEL[e.kind];
 }
 
@@ -282,9 +286,9 @@ export function EvidenceRow({
 // ── asking the service ─────────────────────────────────────────────────
 
 /** The service's answer about an entry, asked shortly after it stops changing. Null while unknown. */
-function useServiceCheck(entry: GuildEvidence | null): DecisionCheck | null {
+function useServiceCheck(entry: GuildEvidence | null): EvidenceCheck | null {
   const serviceUp = useStore((s) => s.serviceUp);
-  const [answer, setAnswer] = useState<DecisionCheck | null>(null);
+  const [answer, setAnswer] = useState<EvidenceCheck | null>(null);
   const key = entry ? JSON.stringify({ ...entry, id: '' }) : '';
   useEffect(() => {
     setAnswer(null);
@@ -324,7 +328,7 @@ function stepsNeeding(skillId: string, protocols: readonly Protocol[]): { ref: s
   const out: { ref: string; stepId: string; text: string }[] = [];
   for (const p of protocols) {
     const v = p.versions.find((x) => x.version === p.currentVersion) ?? p.versions[0];
-    for (const st of v.steps) if (st.skills?.includes(skillId)) out.push({ ref: p.id, stepId: st.id, text: st.text });
+    for (const st of (v.steps ?? [])) if (st.skills?.includes(skillId)) out.push({ ref: p.id, stepId: st.id, text: st.text });
   }
   return out;
 }
@@ -438,7 +442,7 @@ function SheetBody({ personId, skillId, onClose }: { personId: string; skillId: 
           </Fact>
           <Fact label="Supervised runs">
             <span className="font-num">
-              {st.supervisedCount} of {skill.supervisedRuns}
+              {rated(skill) ? `${st.supervisedCount} of ${skill.supervisedRuns}` : `${st.supervisedCount}, and the skill holds no policy yet`}
             </span>
           </Fact>
           <Fact label="Training">{st.knowledgeComplete ? 'Signed off' : 'Not yet'}</Fact>
@@ -487,7 +491,7 @@ function SheetBody({ personId, skillId, onClose }: { personId: string; skillId: 
 
             {kind === 'witnessed' && (
               <ol className="space-y-1.5">
-                {skill.mastery.map((m, i) => (
+                {(skill.mastery ?? []).map((m, i) => (
                   <li key={m} className="flex flex-wrap items-center gap-2">
                     <span className="flex-1 min-w-[180px] text-body">{m}</span>
                     <span className="flex gap-1">
@@ -557,7 +561,7 @@ function SheetBody({ personId, skillId, onClose }: { personId: string; skillId: 
             {kind === 'witnessed' && allMarked && (
               <p className={cx('text-body', passed ? 'text-accent' : 'text-signal-error')}>
                 {passed
-                  ? `Every criterion met. Signing records a passed check${st.knowledgeComplete && st.supervisedCount >= skill.supervisedRuns ? ', which makes this Qualified' : ''}.`
+                  ? `Every criterion met. Signing records a passed check${rated(skill) && st.knowledgeComplete && st.supervisedCount >= skill.supervisedRuns ? ', which makes this Qualified' : ''}.`
                   : `Not every criterion met. Signing records a check that did not pass${st.level >= 3 ? ', which suspends this skill until one does' : ''}.`}
               </p>
             )}
@@ -712,7 +716,7 @@ export function AddPersonForm({ onDone }: { onDone?: () => void }) {
 // ── export ─────────────────────────────────────────────────────────────
 
 /** One person's ledger as CSV, with a header that says what the file is. */
-export function exportLedger(ctx: GuildContext, personId: string) {
+function exportLedger(ctx: GuildContext, personId: string) {
   const person = ctx.personById.get(personId);
   if (!person) return;
   const esc = (v: unknown) => {

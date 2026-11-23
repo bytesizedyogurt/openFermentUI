@@ -197,7 +197,10 @@ runs = _scoped(
     Column("flowsheet_id", Text),
     Column("scenario_id", Text),
     Column("status", Text, nullable=False),
+    # The engine that ran it (migration 0008; docs/api/engines.md).
+    Column("engine", Text, nullable=False, server_default="biosteam"),
     Index(None, "project_id", "scenario_id"),
+    Index(None, "project_id", "engine"),
 )
 
 artifacts = _scoped(
@@ -295,6 +298,11 @@ eval_runs = _scoped("eval_runs", Column("question_id", Text, nullable=False),
 catalogue = _scoped("catalogue", Column("kind", Text, nullable=False), Index(None, "project_id", "kind"),
                     updated=True)
 
+# A project's protocols (alpha 2.2 E.12a, ADR-017; protocols.py): one row a
+# protocol, kept whole by its id, its versions appended and each kept as it
+# was kept.
+protocols = _scoped("protocols", updated=True)
+
 jobs = _scoped("jobs", Column("kind", Text, nullable=False), Column("state", Text, nullable=False), updated=True)
 
 # ── Guild and Primer ──────────────────────────────────────────────────────
@@ -352,4 +360,18 @@ spend = Table(
     Column("project_id", Text),
     _when(),
     Column("expires_at", TIMESTAMP(timezone=True)),
+)
+
+# Each engine's last conformance verdict (engine/conform.py; docs/api/engines.md,
+# Conformance): the machine's, as the engines installed here are, so it belongs
+# to no project. One row per engine, replaced by its next check.
+engine_checks = Table(
+    "engine_checks",
+    metadata,
+    Column("engine", Text, primary_key=True),
+    Column("version", Text, nullable=False),
+    Column("ok", Boolean, nullable=False),
+    Column("body", JSON, nullable=False),
+    Column("created_by", Text, nullable=False),
+    _when(),
 )

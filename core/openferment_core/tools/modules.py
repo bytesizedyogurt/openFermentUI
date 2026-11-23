@@ -1,4 +1,4 @@
-"""One read tool per module (OF-BLD-015 §7.2).
+"""One read tool per module.
 
 `runbooks_read`, `geneos_read`, `fermos_read`, `pureos_read`, `proforma_read`,
 `biorepo_read`, `guild_read`, `primer_read`, `intake_read` and `home_read`,
@@ -15,7 +15,9 @@ where a row stands, the one `state` computed from it in `module_stores.py`,
 and the row's provenance mark. The rows go back on `ToolResult.rows`, which
 is what lets a claim cite them (`SeenSet`).
 
-A read that leaves part of a module out says so in `partial`. Nothing here
+A read that leaves part of a module out says so in `partial`, a sentence.
+The summary is a `ModuleRead` (models.py), and each kind's `detail` holds the
+fields `module_stores.DETAIL` names; docs/TOOLS.md lists both. Nothing here
 writes.
 """
 from __future__ import annotations
@@ -28,7 +30,7 @@ from typing import Literal
 from pydantic import BaseModel, ConfigDict, Field, field_validator
 
 from .. import module_stores
-from ..models import ToolResult
+from ..models import ModuleRead, ToolResult
 from . import MAX_SUMMARY_CHARS, Tool, ToolContext, register
 
 MAX_ROWS = 20
@@ -36,13 +38,22 @@ MAX_ROWS = 20
 ROW_BUDGET = MAX_SUMMARY_CHARS - 1_500
 
 WHAT = {
-    "runbooks": "the runbooks (their status, lock and what they predict) and the protocols (their versions)",
-    "geneos": "the hosts, the pathways, the genome-scale models on the shelf and the ceilings computed on them",
+    "runbooks": "the runbooks (their status, lock and what they predict), the protocols (their versions), the "
+                "depositions made at the bench (kind deposition: its runbook, state, how many readings it holds and "
+                "how many a person confirmed, and the ids of the readings a run may take), each reading a run may "
+                "take as a measurement (kind reading, read by its id <deposition id>/<entry id>: the measure it is "
+                "of, its value and unit as the bench kept them, who deposited it and when it was taken; a "
+                "scenario's value names it as {\"value\": <value>, \"unit\": \"<unit>\", \"origin\": "
+                "{\"kind\": \"measurement\", \"ref\": \"<its id>\"}}), and the measured evidence a "
+                "reconciliation released (kind measured-evidence: the prediction it tests, its value, unit and "
+                "conditions)",
+    "geneos": "the hosts, the genome-scale models on the shelf and the ceilings computed on them",
     "fermos": "the growth fits and forecasts computed from deposited runs (kind artifact), the kept simulations "
               "of a model family (kind simulation: its family, strain, product and sugar, and what bound each "
               "parameter, in words; its numbers stay in the artifact, cited by the row's ref or the evidence id "
-              "fermos_simulate returns), and the vessels BioSTEAM designed for kept simulations (kind vessel, read "
-              "by the design's artifact id or the simulation's)",
+              "fermos_simulate returns), the vessels BioSTEAM designed for kept simulations (kind vessel, read "
+              "by the design's artifact id or the simulation's), and the depositions kept with the runbooks, whose "
+              "series fermOS fits (kind deposition: its runbook, its readings and series, and the fits made from it)",
     "pureos": "the downstream unit operations, by stage (each with the BioSTEAM classes it is), and the trains Proforma's "
               "runs simulated (kind train, one a scenario: read by the scenario id or the run's artifact id); kind "
               "train-unit is one unit of a train, in run order, with the product in and out and the recovery read "
@@ -51,9 +62,12 @@ WHAT = {
               "train-run is one kept run of such a train (pureos/train-run/<artifact id>, read by its id or its "
               "train's: its train, product, units and product stream in words; its numbers stay in the artifact, "
               "cited by the row's ref or the evidence id pureos_build returns)",
-    "proforma": "the cost scenarios and the runs kept as artifacts: each scenario's runs and the reference "
-                "biorefineries' runs (stream_table reads a run's streams)",
-    "biorepo": "the records, the extractor's candidates, the computed artifacts and the Witness runs that score the extractor",
+    "proforma": "the cost scenarios and the runs kept as artifacts: each scenario's runs, the library plants' runs, "
+                "the corn stover and dry-grind corn reference plants among them, and the runs kept from the retired "
+                "reference entries (a reference run, the benchmark), listed as kept (stream_table reads a run's "
+                "streams; engine_report reads a library run's numbers as evidence ids)",
+    "biorepo": f"the records and the extractor's candidates, by one rule ({module_stores.RECORD}; search_records names "
+               "each hit's kind by it), the computed artifacts and the Witness runs that score the extractor",
     "guild": "the people on the ledger (name, role, whether active) and the competence checks on skills; no level is stored "
              "and none is read",
     "primer": "the lessons, by module, and the skills each counts toward",
@@ -75,7 +89,7 @@ class ModuleReadInput(BaseModel):
     kind: str = Field(description="One of the module's kinds, named in the tool's description, or an empty string for every kind.")
     state: Literal["", "open", "fenced", "approved", "locked", "proposed", "retired"] = Field(
         description="One of open, fenced, approved, locked, proposed, retired; or an empty string for every state.")
-    limit: int = Field(description=f"How many rows to return, at most {MAX_ROWS}.")
+    limit: int = Field(description=f"How many rows to return, at most {MAX_ROWS}; a larger limit is read as {MAX_ROWS}.")
 
     @field_validator("kind", "state", mode="before")
     @classmethod
@@ -87,22 +101,14 @@ class ModuleReadInput(BaseModel):
 
 
 def _summary(module: str, inp: ModuleReadInput, matched: list[Any], rows: list[dict[str, Any]], cut: bool) -> dict[str, Any]:
+    """The read's summary, a ModuleRead, its null fields left out."""
     states: dict[str, int] = {}
     for r in matched:
         states[r.state] = states.get(r.state, 0) + 1
-    out: dict[str, Any] = {
-        "module": module_stores.LABEL[module],
-        "count": len(matched),
-        "returned": len(rows),
-        "states": states,
-        "rows": rows,
-    }
-    if cut:
-        out["note"] = "fewer rows than asked, so that the result stays readable; ask by id or with words for the rest"
-    partial = module_stores.PARTIAL.get(module)
-    if partial:
-        out["partial"] = partial
-    return out
+    note = "fewer rows than asked, so that the result stays readable; ask by id or with words for the rest"
+    return ModuleRead(module=module_stores.LABEL[module], count=len(matched), returned=len(rows), states=states,
+                      rows=rows, note=note if cut else None, partial=module_stores.PARTIAL.get(module),
+                      ).model_dump(mode="json", exclude_none=True)
 
 
 def _runner(module: str):
@@ -137,9 +143,13 @@ def _description(module: str) -> str:
     partial = module_stores.PARTIAL.get(module)
     return (
         f"Read {label}: {WHAT[module]}. Kinds: {kinds}. Pass ids or refs, words, a kind and a state to narrow; pass an "
-        f"empty list and empty strings to list the module. Returns at most {MAX_ROWS} rows, each with its "
+        f"empty list and empty strings to list the module. Returns at most {MAX_ROWS} rows (a larger limit is read "
+        f"as {MAX_ROWS}), in the summary's rows and the result's rows, each with its "
         "ref (cite it in moduleRefs), label, state (open, fenced, approved, locked, proposed, retired; computed by the "
-        "service), the module's own status word and its provenance; and the count of every match by state."
+        "service), the module's own status word and its provenance. The summary holds module, rows, count (every "
+        "match), returned (the rows shown) and states (the count of every match by state), a note when rows were "
+        "left out so that the result stays readable, and partial, a sentence naming what the read leaves out, when "
+        "the module is read in part; narrow by ids, state or words to read the rest."
         + (f" Read in part: {partial}." if partial else "")
     )
 

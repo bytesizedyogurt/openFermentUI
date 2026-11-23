@@ -1,0 +1,24 @@
+worktree /tmp/claude-0/-home-user-openFermentUI/cfbc5c9f-640a-5002-a705-5ceaf850fdc6/scratchpad/bh/work/H12-08/wt-15405 at 2047f5a; database bh_r_h12_08_db (fresh)
+0. the tree as it stands:
+   funnel GET /api/audit naming a key: 403 detail='a request through Tailscale Funnel comes from the public internet and may not name a key' key_held=False key_override_rows=[]
+   request_key('  '): key_named()=False whose='the key in core/.env'
+   request_key(''): key_named()=False whose='the key in core/.env'
+1. M31, key_refusal's Funnel rule dropped: 1 file changed, 1 insertion(+), 1 deletion(-)
+   -    if FUNNEL in headers:
+   +    if False:
+   funnel GET /api/audit naming a key: 200 detail=None key_held=True key_override_rows=['GET /api/audit']
+   request_key('  '): key_named()=False whose='the key in core/.env'
+   request_key(''): key_named()=False whose='the key in core/.env'
+   pytest tests/test_key_override.py tests/test_request_guard.py tests/test_llm.py: 130 passed in 5.10s
+2. M28, request_key's strip-and-empty rule dropped: 1 file changed, 1 insertion(+), 1 deletion(-)
+   -    token = _REQUEST_KEY.set((key or "").strip() or None)
+   +    token = _REQUEST_KEY.set(key)
+   funnel GET /api/audit naming a key: 403 detail='a request through Tailscale Funnel comes from the public internet and may not name a key' key_held=False key_override_rows=[]
+   request_key('  '): key_named()=True whose='the key this request named'
+   request_key(''): key_named()=True whose='the key this request named'
+   pytest tests/test_key_override.py tests/test_request_guard.py tests/test_llm.py: 130 passed in 5.43s
+3. control, guard.refusal's Funnel rule dropped: 1 file changed, 1 insertion(+), 1 deletion(-)
+   pytest tests/test_key_override.py tests/test_request_guard.py tests/test_llm.py: 1 failed, 129 passed in 5.33s
+EXPECTED: guard.py:95-99 refuses a key named through Tailscale Funnel on a read or a change alike, and llm.py:693-698 takes an empty key as none; so with either rule dropped a test of the override fails: a GET naming a key through Funnel answered 403, and request_key('  ') leaving key_named() False
+OBSERVED: on the tree, the Funnel GET is 403 and request_key('  ') gives key_named()=False; with the Funnel rule dropped (M31) the Funnel GET is answered 200, the key held for the request and an override row kept (['GET /api/audit']), and the tests give 130 passed in 5.10s; with the blank-key rule dropped (M28) request_key('  ') gives key_named()=True and whose='the key this request named', and the tests give 130 passed in 5.43s; the control (guard.refusal's Funnel rule dropped) gives 1 failed, 129 passed in 5.33s
+RESULT: DEFECT

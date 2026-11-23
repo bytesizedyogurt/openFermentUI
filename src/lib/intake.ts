@@ -1,23 +1,29 @@
 // The browser's side of Intake (OF-BLD-012 §5.4).
 //
 // Calls with no key: extract one of the project's documents, post a review
-// decision, and ask for the overlay the store applies at load. Collecting a
-// document into the project is lib/literature.ts's.
+// decision, ask whether the service would keep one, and ask for the overlay
+// the store applies at load. Collecting a document into the project is
+// lib/literature.ts's.
 //
 // SAME DISCIPLINE AS lib/postdoc.ts. When the service is unreachable this says
-// so and says how to start it, and it never quietly substitutes the timer
-// simulation for a real fetch — the ingest board keeps that path, labelled as
-// the offline one, and the choice between them is made in the store where the
-// reader can see which one ran.
-import type {
-  DecisionCheck,
-  ExtractResponse,
-  FetchSource,
-  Overlay,
-  ReviewDecision,
-} from '@/data/types';
+// so and names the command that starts it (`IntakeDown`).
+//
+// The answers read here are the service's own shapes, generated from its
+// models into src/api/types.gen.ts (ADR-007): the extraction's answer and the
+// source that served a text are named here, and the review family this posts
+// and reads is named in lib/review.ts.
+import type { components } from '@/api/types.gen';
+import type { DecisionCheck, Overlay, OverlayPaper, ReviewDecision } from './review';
 import { START_COMMAND, postdocHealth } from './postdoc';
 import { apiFetch } from './project';
+import { detailWords } from './http';
+
+type S = components['schemas'];
+
+/** POST /api/intake/{paper_id}/extract: the candidates anchoring kept, the refusals counted by rule, and what the model calls took. */
+export type ExtractResponse = S['ExtractResponse'];
+/** Who served a document's text, as the overlay names it: Europe PMC, OSTI, the Saccharomyces Genome Database, an uploaded file or pasted text. */
+export type FetchSource = OverlayPaper['source'];
 
 /** Who served a fetched text, in the words the reader is shown. */
 const SOURCE_NAMES: Record<FetchSource, string> = {
@@ -40,16 +46,16 @@ export function licenceWords(licenceClass: string): string {
   return LICENCE_WORDS[licenceClass] ?? licenceClass.replace(/_/g, ' ');
 }
 
-/** The name of a fetched text's source; absent is Europe PMC, the one source an older service knew. */
-export function fetchSourceName(source: FetchSource | undefined): string {
-  return SOURCE_NAMES[source ?? 'europepmc'];
+/** The name of the source that served a text, in the words the reader is shown. */
+export function fetchSourceName(source: FetchSource): string {
+  return SOURCE_NAMES[source];
 }
 
 export class IntakeDown extends Error {
   constructor(
     message: string,
     /** How to fix it, when there is a fix the reader can carry out. */
-    readonly remedy: string = `Start it with \`${START_COMMAND}\` from \`core/\`.`,
+    readonly remedy: string = `Start it with ${START_COMMAND} from the repository root.`,
   ) {
     super(message);
     this.name = 'IntakeDown';
@@ -74,7 +80,7 @@ export async function explain(response: Response, signal?: AbortSignal): Promise
   }
   let detail = '';
   try {
-    detail = String(((await response.json()) as { detail?: string }).detail ?? '');
+    detail = detailWords(((await response.json()) as { detail?: unknown }).detail);
   } catch {
     /* not JSON — the status is the message */
   }
@@ -122,7 +128,7 @@ export async function postDecision(decision: ReviewDecision, signal?: AbortSigna
   if (response.status === 422) {
     let detail = '';
     try {
-      detail = String(((await response.json()) as { detail?: string }).detail ?? '');
+      detail = detailWords(((await response.json()) as { detail?: unknown }).detail);
     } catch {
       /* the status is the message */
     }
@@ -183,7 +189,7 @@ export async function extractPaper(
 }
 
 /** What loading the overlay found: the overlay, no service to ask, or a running service's refusal in its words. */
-export type OverlayLoad = { overlay: Overlay } | { down: true } | { refused: string };
+type OverlayLoad = { overlay: Overlay } | { down: true } | { refused: string };
 
 /**
  * The overlay, or why there is none.
@@ -207,7 +213,7 @@ export async function loadOverlay(signal?: AbortSignal): Promise<OverlayLoad> {
     if (!response.ok) {
       let detail = '';
       try {
-        detail = String(((await response.json()) as { detail?: string }).detail ?? '');
+        detail = detailWords(((await response.json()) as { detail?: unknown }).detail);
       } catch {
         /* not JSON — the status is the message */
       }

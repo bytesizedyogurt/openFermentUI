@@ -6,7 +6,7 @@ from pathlib import Path
 import pytest
 
 from openferment_core import artifacts, intake, nightly_checks
-from openferment_core.models import BasisInput, BasisSource
+from openferment_core.models import BasisInput, BasisSource, ReplayDifference, ReplayResult, ReplayTolerance
 
 REPO = Path(__file__).resolve().parents[2]
 
@@ -31,6 +31,23 @@ def test_an_identical_replay_passes_and_a_different_one_is_a_problem(store):
     state["value"] = 2.0
     problems = nightly_checks.replay_newest()
     assert len(problems) == 1 and art.id in problems[0] and "replays differently" in problems[0]
+
+
+def test_a_replay_within_the_precision_its_basis_states_holds_and_the_log_says_which(store, monkeypatch, capsys):
+    """A stand-in replay whose last digits moved inside the stated precision, as a
+    BioSTEAM run's may: no problem, and the log says it held within its precision."""
+    art, _ = _keep("nightly_probe_near", "1", 1.0)
+    near = ReplayResult(artifactId=art.id, identical=False, storedHash=art.outputHash, replayedHash="a-placeholder-hash",
+                        differences=[ReplayDifference(path="v", stored=1.0, replayed=1.0000000001)], durationMs=1,
+                        tolerance=ReplayTolerance(rtol=1e-9, atol=1e-8, why="a placeholder precision"),
+                        withinTolerance=True)
+    monkeypatch.setattr(artifacts, "replay", lambda aid: near)
+    assert nightly_checks.replay_newest() == []
+    assert (f"artifact {art.id} (nightly_probe_near): replays within its precision (rtol 1e-09, atol 1e-08), "
+            "1 difference inside it") in capsys.readouterr().out
+    monkeypatch.setattr(artifacts, "replay", lambda aid: near.model_copy(update={"withinTolerance": False}))
+    problems = nightly_checks.replay_newest()
+    assert len(problems) == 1 and art.id in problems[0] and "replays differently: 1 differences, first at v" in problems[0]
 
 
 def test_an_artifact_an_earlier_version_made_is_stale_and_no_problem(store, capsys):

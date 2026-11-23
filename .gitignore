@@ -12,12 +12,19 @@ dist/
 core/.env
 core/.env.*
 !core/.env.example
+# The engines this machine keeps installed beside core/uv.lock, one package
+# directory a line (scripts/engines-local.sh); `*.local` above holds it too.
+core/engines.local
 .venv/
 core/.venv/
 __pycache__/
 *.py[cod]
 .pytest_cache/
 .ruff_cache/
+# The record an editable install with setuptools writes beside a package's
+# code (an engine package under examples/engines/ installed into core's
+# environment); every install writes it again.
+*.egg-info/
 
 # Written by `pnpm test:core` from the client's TypeScript before the suite
 # runs (scripts/export-*.ts); a committed copy would be a second source that
@@ -26,7 +33,13 @@ core/tests/fixtures/units.json
 core/tests/fixtures/resolvers.json
 core/tests/fixtures/fields.json
 core/tests/fixtures/competence.json
+core/tests/fixtures/competence-unrated.json
 core/tests/fixtures/lock-digests.json
+
+# A model's response for a real paper is a paper's extracted values, and the
+# repository holds software alone (CLAUDE.md, acceptance A4): fixture-mode
+# extraction replays a response from here, and none is kept in git.
+core/tests/fixtures/extract/
 
 # What this machine fetches for itself, fetched again when gone: the genome-
 # scale models geneOS computes on (THIRD_PARTY.md gives each its source and
@@ -47,6 +60,7 @@ core/data/artifacts/
 core/data/index/
 core/data/rageval/
 core/data/live/
+core/data/literature/
 core/data/demo/
 core/data/identifiers-proposed.tsv
 core/data/guild.json
@@ -67,3 +81,6 @@ core/data/pureos-trains.json.lock
 # A build spec or a session's prompt copied to the root.
 /OF-BLD-*.md
 /PROMPT*.md
+# The worktrees a session's workflows and the handoff's builders work in,
+# each a checkout of its own.
+.claude/worktrees/

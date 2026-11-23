@@ -1,0 +1,118 @@
+"""The `biosteam` engine behind the contract (docs/api/engines.md; ADR-015),
+on the real Proforma worker: registered by core/pyproject.toml's own entry
+point, its run the adapter's own row, a value set as a quantity the adapter's
+override on the day its origin names, a value typed in another unit refused
+before the plant is run, its SFF file answered as the flowsheet record, a
+plant that takes a configuration run in its default at both library doors,
+and the eight conformance checks holding on a library plant and on one of
+the shelf's scenario flowsheets (alpha 2.2 D6).
+"""
+from __future__ import annotations
+
+import pytest
+from fastapi.testclient import TestClient
+
+from openferment_core import api, proforma
+from openferment_core.engine import EngineRefused, conform, registry, runs
+from openferment_core.models import EngineInput, InputAssumption, Origin, Quantity, SFFFlowsheet
+from standins import assumed_inputs
+from test_proforma import ETHANOL_STANDIN
+
+pytestmark = pytest.mark.sim
+
+BY = "Ada Moreno"
+ENTRY = "openferment_core.engine.biosteam:ENGINE"
+# The day a person set a value, as the request says it: a placeholder day.
+DAY = "2026-10-30"
+
+
+@pytest.fixture(scope="module")
+def biosteam():
+    proforma.start(background=False)
+    assert proforma.status()["status"] == "ready", proforma.status()
+    registry.reset()
+    yield registry.get("biosteam")
+    registry.reset()
+
+
+def test_the_cores_own_entry_point_registers_it_and_it_keeps_the_contract(biosteam):
+    assert registry.found()["biosteam"].entry == ENTRY
+    found = conform.checks(biosteam, by="conformance test", things=["cornstover"], entry=ENTRY)
+    assert [c.number for c in found] == list(range(1, 9))
+    assert all(c.ok for c in found), [(c.number, c.said) for c in found if not c.ok]
+
+
+def test_a_run_through_the_engine_is_the_adapters_own_row_and_its_file_the_record(biosteam):
+    run = biosteam.run("cornstover", None, [], BY)
+    assert (run.engine, run.status, run.by) == ("biosteam", "done", BY)
+    assert runs.run("cornstover", None, [], by=BY).run.id == run.id
+    record = biosteam.export_sff(run)
+    assert isinstance(record, SFFFlowsheet) and record.id == run.sff.recordId and record.validation.valid
+    assert record.runArtifactId == run.artifactId
+
+
+def test_a_value_set_as_a_quantity_is_the_adapters_override_and_makes_the_run_assumed(biosteam):
+    p = {x.key: x for x in biosteam.parameters("cornstover", None)}["stream.cornstover.price"]
+    assert p.origin.kind == "library-default" and p.origin.ref and p.boundsReason.strip()
+    q = Quantity(value=p.value * 1.5, unit=p.unit,
+                 origin=Origin(kind="person-assumption", by=BY, at=DAY, note="half again the package's own"))
+    held = len(runs.listed("biosteam"))
+    other_unit = q.model_copy(update={"unit": "placeholder-unit"})
+    with pytest.raises(EngineRefused, match=f"the parameter's unit is '{p.unit}'"):
+        biosteam.run("cornstover", None, [EngineInput(name=p.key, quantity=other_unit)], BY)
+    assert len(runs.listed("biosteam")) == held, "a value typed in another unit keeps nothing"
+    run = biosteam.run("cornstover", None, [EngineInput(name=p.key, quantity=q)], BY)
+    assert run.provenance == "assumed"
+    (given,) = [i for i in run.inputs if i.name == p.key]
+    assert given.quantity.value == pytest.approx(p.value * 1.5) and given.quantity.origin.kind == "person-assumption"
+    assert (given.quantity.origin.by, given.quantity.origin.at) == (BY, DAY)
+    at_default = biosteam.run("cornstover", None, [], BY)
+    assert run.outputs["price"]["solvedPrice"] > at_default.outputs["price"]["solvedPrice"]
+
+
+def test_a_plant_that_takes_a_configuration_runs_in_its_default_when_asked_with_none(biosteam):
+    (cane,) = [t for t in biosteam.things() if t.id == "cane"]
+    assert cane.configurations and cane.defaultConfiguration in cane.configurations
+    run = biosteam.run("cane", None, [], BY)
+    assert run.status == "done" and run.configuration == cane.defaultConfiguration
+    # The library's own door takes the one path: asked with none, the plant runs in the same default, as that row.
+    routed = TestClient(api.app).post("/api/library/cane/run", json={"by": BY})
+    assert routed.status_code == 200 and routed.json()["run"]["id"] == run.id
+
+
+# ── a scenario's flowsheet as a thing (alpha 2.2 D6) ─────────────────────
+# Every value is test_proforma's STAND-IN, set here as a fixture's assumption: none is a measurement, and no
+# price the run solves is a result.
+
+SCENARIO = "ethanol_glucose_v0"
+CHECKER = "conformance test"
+
+
+def standin_inputs():
+    """The ethanol flowsheet's six inputs at test_proforma's stand-in values, each a person's assumption
+    held fixed, as a run request sends them: the test project holds no record to bind any of them."""
+    return assumed_inputs([InputAssumption(key=k, value=v, low=v, high=v, by=BY, at=DAY, note="a STAND-IN for a test")
+                           for k, v in ETHANOL_STANDIN.items()], SCENARIO)
+
+
+def test_conformance_holds_on_a_scenario_flowsheet_and_its_run_is_one_row_with_its_file(biosteam):
+    (thing,) = [t for t in biosteam.things() if t.id == SCENARIO]
+    assert thing.kind == proforma.THING_KIND and (thing.precision.rtol, thing.precision.atol) == (0.0, 0.0)
+    inputs = standin_inputs()
+    found = conform.checks(biosteam, by=CHECKER, things=[SCENARIO], entry=ENTRY, inputs=inputs)
+    assert [c.number for c in found] == list(range(1, 9))
+    assert all(c.ok for c in found), [(c.number, c.said) for c in found if not c.ok]
+    (run,) = [r for r in runs.listed("biosteam") if r.by == CHECKER]
+    assert (run.tool, run.plant, run.configuration, run.scenarioId, run.status) == (
+        proforma.RUN, SCENARIO, None, SCENARIO, "done")
+    assert run.provenance == "assumed" and {v["name"] for v in run.outputs["values"]} >= {"price.solvedPrice"}
+    record = biosteam.export_sff(run)
+    assert isinstance(record, SFFFlowsheet) and record.id == run.sff.recordId and record.validation.valid
+    assert record.runArtifactId == run.artifactId
+    # The same request again, at the engine or at Proforma's own door as an unsaved scenario named by the
+    # flowsheet's id, is that one row.
+    assert biosteam.run(SCENARIO, None, inputs, CHECKER).id == run.id
+    sent = [i.model_dump(mode="json", exclude_none=True) for i in inputs]
+    routed = TestClient(api.app).post("/api/proforma/run", json={"scenarioId": SCENARIO, "flowsheet": SCENARIO,
+                                                                 "inputs": sent, "by": CHECKER})
+    assert routed.status_code == 200 and routed.json()["artifactId"] == run.id

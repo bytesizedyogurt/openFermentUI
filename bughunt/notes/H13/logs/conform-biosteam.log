@@ -1,0 +1,19 @@
+biosteam (engine run 1 · biosteam · biorefineries 2.35.1 · biosteam 2.54.0 · thermosteam 0.54.2): every check holds
+
+✓ 1  a JSON number outside a quantity is refused in words before the worker is reached
+     the route answered 422 and 422 (a number for a quantity, a stray number) and the tool refused; the engine was never reached; 0 run kept
+✓ 2  every default carries an origin naming what it rests on (a library-default, a record or an artifact its ref, a convention its note, a person's assumption its by), and a parameter with none takes a run's value
+     1840 parameters of 10 things (cane, cellulosic, corn, cornstover, lipidcane, milk, oilcane, sugarcane, cellulosic_ethanol_v0, ethanol_glucose_v0), each in its default configuration or its first: 1834 defaults, each with its origin, and 6 with none, each taking a run's value
+✓ 3  a run writes one runs row keyed by its basis, and the same request twice is that one row, with its diagnostics in their shape when it reports some
+     run 8a8f63c8892c27ef of cane, asked twice, is 1 row; engine biosteam, status done; its id the artifact id of its basis
+✓ 4  a replay holds every output within the precision the thing states
+     identical (rtol 1e-09, atol 1e-08); 0 differences
+✓ 5  the run's SFF file validates and scores, or sffRefused holds words
+     record run-8a8f63c8892c27ef: valid, score 0.8029035964014402
+✓ 6  importing the module the entry point names imports neither the worker module nor what the engine computes with
+     importing openferment_core.engine.biosteam imported none of the worker openferment_core.workers.proforma_worker, biorefineries, biosteam, cobra, pisces_sff, thermosteam
+✓ 7  a request the engine refuses is kept as a receipt in its words, with no traceback
+     the engine computes in code of its own, with no compute the check can offer a thing to, so it holds the refusal it reaches: 'conform-no-such-thing', a thing the engine lacks, refused in words before any run, 0 run kept (the biosteam engine runs no thing 'conform-no-such-thing'; it runs cane, cellulosic, corn, cornstover, lipidcane, milk, oilcane, sugarcane, cellulosic_ethanol_v0, ethanol_glucose_v0); a refusal inside its own computation is the receipt its own run keeps, held by the engine's own tests
+✓ 8  created_by on every run is the person or the model that asked for it
+     the checks' run: created_by 'conformance check of biosteam', its by 'conformance check of biosteam', asked by 'conformance check of biosteam'; a model's run of cellulosic through the engine_run tool (cd52e54e68eba7f0): created_by 'conformance-model', asked by 'conformance-model'
+exit 0 in 37 s

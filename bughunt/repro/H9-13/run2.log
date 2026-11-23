@@ -1,0 +1,26 @@
+EXPECTED: each call below answers a ToolResult with its refusal in error, or a 4xx whose detail says in words
+EXPECTED: why (tools/__init__.py:501-503 'Every refusal is a result with `error` set; nothing here raises';
+EXPECTED: api.py:208 'A refusal is a status with its reason in `detail`, in words'), whether a string field
+EXPECTED: holds 'ab' or the JSON escape 'a\ud800b' (a lone surrogate UTF-8 cannot carry).
+NOTICE:  database "bh_r_h9_13_svc" does not exist, skipping
+CASE search_records query='ab'        -> 200	{"summary":{"query":"ab","field":"x","organism":"x","count":0,"records":[]},"evidence":[],"recordIds":[],"passages":[],"error":null,"usage":{"inputTokens":0,"ou
+CASE search_records query='a\ud800b'  -> 500	Internal Server Error
+CASE search_records field='ab'        -> 200	{"summary":{"query":"x","field":"ab","organism":"x","count":0,"records":[]},"evidence":[],"recordIds":[],"passages":[],"error":null,"usage":{"inputTokens":0,"ou
+CASE search_records field='a\ud800b'  -> 500	Internal Server Error
+CASE search_records organism='ab'        -> 200	{"summary":{"query":"x","field":"x","organism":"ab","count":0,"records":[]},"evidence":[],"recordIds":[],"passages":[],"error":null,"usage":{"inputTokens":0,"ou
+CASE search_records organism='a\ud800b'  -> 500	Internal Server Error
+CASE search_passages query='ab'        -> 200	{"summary":{"query":"ab","engine":"sci-rag-kit","count":0,"passages":[]},"evidence":[],"recordIds":[],"passages":[],"error":null,"usage":{"inputTokens":0,"outpu
+CASE search_passages query='a\ud800b'  -> 500	Internal Server Error
+CASE yield_ceiling product='ab'        -> 200	{"summary":{},"evidence":[],"recordIds":[],"passages":[],"error":"yield_ceiling refused: there is no product ab; the shelf knows ethanol","usage":{"inputTokens"
+CASE yield_ceiling product='a\ud800b'  -> 500	Internal Server Error
+CASE selling_price scenarioId='ab'        -> 200	{"summary":{},"evidence":[],"recordIds":[],"passages":[],"error":"selling_price refused: ab is no BioSTEAM scenario this project keeps and no plant of the libra
+CASE selling_price scenarioId='a\ud800b'  -> 500	Internal Server Error
+CASE run_flowsheet scenarioId='ab'        -> 200	{"summary":{},"evidence":[],"recordIds":[],"passages":[],"error":"run_flowsheet refused: ab is not a BioSTEAM scenario this project keeps; its BioSTEAM scenario
+CASE run_flowsheet scenarioId='a\ud800b'  -> 500	Internal Server Error
+service log, the failure behind the 500s:
+      | pydantic_core._pydantic_core.PydanticSerializationError: Error serializing to JSON: UnicodeEncodeError: 'utf-8' codec can't encode character '\ud800' in position 1: surrogates not allowed
+  pydantic_core._pydantic_core.PydanticSerializationError: Error serializing to JSON: UnicodeEncodeError: 'utf-8' codec can't encode character '\ud800' in position 1: surrogates not allowed
+OBSERVED: 7 of 7 calls with 'ab' answered 200 with a ToolResult; 7 of 7 calls with 'a\ud800b' answered
+OBSERVED: a 5xx with no detail and no error in words ('Internal Server Error'); the service log names
+OBSERVED: UnicodeEncodeError 15 time(s) (the answer could not be encoded as UTF-8 after tools.run returned).
+RESULT: DEFECT

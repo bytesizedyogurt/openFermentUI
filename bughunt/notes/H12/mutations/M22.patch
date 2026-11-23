@@ -1,0 +1,11 @@
+--- a/core/openferment_core/engine/runs.py
++++ b/core/openferment_core/engine/runs.py
+@@ -476,7 +476,7 @@
+         return _report(receipt, None, None)
+     reported = (held.diagnostics if held is not None and held.diagnostics else
+                 [RunDiagnostic.model_validate(d) for d in diagnostics or []])
+-    kept = EngineRun(**base, status="done", provenance=art.provenance, artifactId=art.id, outputs=_outputs(art),
++    kept = EngineRun(**base, status="done", provenance="computed", artifactId=art.id, outputs=_outputs(art),
+                      durationMs=art.durationMs, sffRefused=sff_refused, diagnostics=reported,
+                      sff=RunSFF(recordId=flowsheet.id, valid=flowsheet.validation.valid,
+                                 score=flowsheet.completeness.score,

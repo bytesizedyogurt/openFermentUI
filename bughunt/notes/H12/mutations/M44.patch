@@ -1,0 +1,11 @@
+--- a/core/openferment_core/spend.py
++++ b/core/openferment_core/spend.py
+@@ -121,7 +121,7 @@
+         if r.state in SPENT:
+             out["byRole"][r.role] = round(out["byRole"].get(r.role, 0.0) + float(r.usd), 6)
+             out["calls"] += 1
+-        elif r.state == "reserved" and r.expires_at is not None and r.expires_at > now:
++        elif r.state == "reserved" and r.expires_at is not None and r.expires_at < now:
+             out["reservations"][r.reservation] = {"usd": float(r.usd), "t": r.created_at.timestamp()}
+     return out
+ 

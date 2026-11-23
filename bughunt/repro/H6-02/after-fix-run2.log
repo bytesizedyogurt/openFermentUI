@@ -1,0 +1,10 @@
+== 1. an alpha 1.0 biorepo.json, written by alpha 1.0's models, the gold value given an origin model-estimate
+  {"status": "verified", "provenance": "curated", "gold": {"value": 3.0, "unit": "mg L-1", "origin": {"kind": "model-estimate", "by": "claude-x", "at": "2026-10-20T00:00:00Z"}}, "corrected": null, "rejectReason": null, "reviewer": "Ada Moreno", "recordId": "cl1-P1-0001", "at": "2026-10-20T00:00:00Z", "quote": null, "sectionId": null}
+  {"alpha1_reads_gold_as": {"value": 3.0, "unit": "mg L-1"}}
+== 2. the importer (package.json's db:import-alpha1 module, the tree's own venv) into a fresh bh_r_h6_02_import
+NOTICE:  database "bh_r_h6_02_import" does not exist, skipping
+  refused: /tmp/claude-0/-home-user-openFermentUI/cfbc5c9f-640a-5002-a705-5ceaf850fdc6/scratchpad/bh/work/H6-02/alpha1-data/biorepo.json holds decision cl1-P1-0001, which a project cannot keep: BioRepo keeps records, and gold.origin is a model's estimate or rests on an assumption: an estimate may reach a scenario or a run, never a record (ADR-006); nothing was imported
+  exit 2
+EXPECTED: the importer refuses the decision (rule estimate), naming biorepo.json and cl1-P1-0001, nothing written
+OBSERVED: the importer did not carry the directory (exit 2): refused: /tmp/claude-0/-home-user-openFermentUI/cfbc5c9f-640a-5002-a705-5ceaf850fdc6/scratchpad/bh/work/H6-02/alpha1-data/biorepo.json holds decision cl1-P1-0001, which a project cannot keep: BioRepo keeps records, and gold.origin is a model's estimate or rests on an assumption: an estimate may reach a scenario or a run, never a record (ADR-006); nothing was imported
+RESULT: NO-DEFECT

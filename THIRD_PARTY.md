@@ -4,7 +4,7 @@ Every package openFerment's service and browser app run on: each Python distribu
 `core/uv.lock` installs, its extras included, and every JavaScript production
 dependency, with its version, the licence its own metadata states, and the part of
 openFerment that uses it. The JavaScript build and test tools (`devDependencies`) are
-left out. `pnpm check:licences` (`scripts/check-licences.py`, OF-BLD-014 §1.2) writes
+left out. `pnpm check:licences` (`scripts/check-licences.py`) writes
 this file from what is installed and fails while the committed copy is stale. The
 accepted licence strings, and every package a person accepted, are in
 `core/licences.toml`.
@@ -217,7 +217,7 @@ accepted licence strings, and every package a person accepted, are in
 ## Model files read as data
 
 Downloaded into `core/data/models/`, which git ignores, or shipped inside a package; read by the
-geneOS worker alone (OF-BLD-014 E.9).
+geneOS worker alone.
 
 | File | Licence | Source | Revision | sha256 | Accepted by | Date | Why |
 |---|---|---|---|---|---|---|---|

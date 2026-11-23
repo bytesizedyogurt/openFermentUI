@@ -1,0 +1,72 @@
+NOTICE:  database "bh_r_h13_02_demo" does not exist, skipping
+worktree: /tmp/claude-0/-home-user-openFermentUI/cfbc5c9f-640a-5002-a705-5ceaf850fdc6/scratchpad/bh/work/H13-02/wt at 2047f5a
+   openferment_core: /tmp/claude-0/-home-user-openFermentUI/cfbc5c9f-640a-5002-a705-5ceaf850fdc6/scratchpad/bh/work/H13-02/wt/core/openferment_core/__init__.py
+   report.OUT: /tmp/claude-0/-home-user-openFermentUI/cfbc5c9f-640a-5002-a705-5ceaf850fdc6/scratchpad/bh/work/H13-02/wt/docs/reports/literature-retrieval
+
+== 1. the contract and the generator, as 2047f5a holds them
+   docs/reports/literature-retrieval.md:1: <!-- Written by `pnpm lit:report` (core/openferment_core/literature/report.py); regenerate, do not edit. -->
+   docs/reports/literature-retrieval.md:91: <!-- Added by hand at alpha 2.2 F.5 (docs/PROGRESS.md, stage F's log): the next `pnpm lit:report --project ethanol ... --render` writes this project's part whole from its own run, these two sections with it. -->
+   CLAUDE.md:106: - C: The local embedder serves a project's corpus at this scale; `pnpm lit:report` measures retrieval against the kit's 
+   the committed file: 126 lines; its '### What this run measured' at line 93, '### What waits on the account' at line 109
+   the sections report.render() writes (core/openferment_core/literature/report.py:732-822):
+      report.py:746 ### The corpus
+      report.py:752 ### The ground truth
+      report.py:759 ### Retrieval
+      report.py:785 ### The judge's relevance
+      report.py:795 ### Answers
+      report.py:809 ### Routes
+      report.py:813 ### Cost
+   lines of report.py naming 'What this run measured': 0; naming 'What waits on the account': 0
+
+== 2. a project render (report.write of the committed JSON's own part), no database
+   rendered parts: ethanol
+   the rendered file: 89 lines; against the committed file 37 lines gone, 0 added; the JSON unchanged: yes
+   diff hunks: 90,126d89 
+   '### What this run measured' in it: 0; '### What waits on the account' in it: 0
+
+== 3. `pnpm lit:report` (the kit's demo, offline, keyless), its database a fresh bh_r_h13_02_demo
+NOTICE:  database "bh_r_h13_02_demo" does not exist, skipping
+   exit 0 in 6 s; its last line: written to docs/reports/literature-retrieval.md and .json
+   the report: 126 lines before, 89 after
+    docs/reports/literature-retrieval.json |  6 +++---
+    docs/reports/literature-retrieval.md   | 39 +---------------------------------
+    2 files changed, 4 insertions(+), 41 deletions(-)
+   lines removed from the Markdown, beside the date line:
+      -<!-- Added by hand at alpha 2.2 F.5 (docs/PROGRESS.md, stage F's log): the next `pnpm lit:report --project et
+      -### What this run measured
+      -The run above asked no model: 0 calls and 0 USD in its tally, 8.5 s for the command whole, each configuration
+      -seconds in the table. The command:
+      -    pnpm lit:report --project ethanol --by "Claude Code (build session)" --configs interactive,vector_only,ke
+      -Its run whole stays in the service's data folder, outside git. Its ground truth is built by code from the can
+      -project keeps (`report.truth`): 130 questions from the 457 candidates its 22 documents hold, 20 of them with 
+      -question a group by document, passage and field. Each question was asked of the retriever inside the project'
+      -the three configurations that ask no model: `interactive` (vectors and keywords together, as BioRepo → Sear
+      -`vector_only` and `keyword_only`. Each configuration's top ten was scored under both relevance rules: the kit
+      -passage of the question's document, or one holding a quote of its candidates) and the passage rule (the candi
+      -passage). `keyword_only` returned no passage for 102 of the 130 questions, one for 22, four for one and ten f
+      -same under both rules; `interactive` and `vector_only` returned ten for every question.
+      -### What waits on the account
+      -The Anthropic account refuses every model call until 2026-12-01 00:00 UTC (`docs/PROGRESS.md`, Blockers). Eac
+      -below asks a model and runs once the account answers, in this order, `<name>` the person each run is audited 
+      -1. The concept graph, on the `index` route: `pnpm lit:graph --project ethanol --by <name>`. Its dry run (`pnp
+      -   --project ethanol --dry-run`, which calls no model) measured 814 passages in 92 batches and 1,758,899 prom
+      -   characters (439,725 kit tokens): their input comes to 0.2199 USD on `claude-haiku-5-5`, and the most the b
+      -   cost, each batch's whole answer counted, to 2.3239 USD.
+      -2. The configurations that ask a model, `full_deep`, `no_graph` and `no_hyde`, which measure the graph and Hy
+      -   each by its removal; the judge's grading of the top ten of `interactive` and `full_deep`, on the `judge` r
+      -   the answer lane, the kit's answer through `interactive` and `full_deep` on the `explain` route, graded bli
+      -   grounding on the `judge` route. One run gives them all and renders this part again: `pnpm lit:report --pro
+      -   ethanol --by <name> --judge --render`.
+      -3. The answer lane is the measure `explain`'s default rests on: the routing table holds `explain` at the `ext
+      -   route's models and effort until that lane's live run sets the family's default (ADR-008, Implementations 1
+      -   The same run's count of the kit's judgements that stopped at their ceiling measures the kit's room at max
+      -   (`llm.KIT_ROOM`, Implementation 18).
+   lines added to the Markdown: +Sci RAG Kit's retrieval evaluation over its demo corpus, as openFerment runs the kit (2026-11-10):
+   fields that moved in the JSON: generated_at git_commit latest_ingested_at 
+   '### What this run measured' after: 0; '### What waits on the account' after: 0; the hand's comment after: 0
+
+the main checkout's report pair: cb9f98c8e7f08c6b before, cb9f98c8e7f08c6b after
+
+EXPECTED: by docs/reports/literature-retrieval.md:1 ("Written by `pnpm lit:report` ...; regenerate, do not edit") the committed file is its generator's output, so regenerating it moves only what the generator owns (the date and the commit) and keeps every section; by line 91 a project render ("--render writes this project's part whole ..., these two sections with it") writes '### What this run measured' and '### What waits on the account'
+OBSERVED: the committed file holds 126 lines, 37 of them past what the generator writes from the committed JSON (a project render of its own part: 37 gone, 0 added, '### What this run measured' 0, '### What waits on the account' 0; report.py names neither section: 0, 0); `pnpm lit:report` exits 0 and leaves 89 lines, '### What this run measured' 0, '### What waits on the account' 0, the hand's comment 0
+RESULT: DEFECT

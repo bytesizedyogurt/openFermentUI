@@ -1,4 +1,4 @@
-"""The gates (OF-BLD-015 §7.4): one table, one row a gate.
+"""The gates: one table, one row a gate.
 
 A write tool whose (module, action) a row names writes nothing: the call
 becomes a proposal (`proposals.propose`) with `state: proposed`, and Home

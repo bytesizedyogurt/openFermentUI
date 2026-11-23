@@ -34,7 +34,8 @@ neither exists (this build container).
 
 Store modules keep their function names (`artifacts.compute`, `biorepo.write`,
 `guild.write_evidence`, …) and swap their bodies to sessions; row locks and transactions replace
-`_WRITE_LOCK`, file locks and atomic writes. `atomic.py` stays for export files. Artifact ids keep
+`_WRITE_LOCK`, file locks and atomic writes. `atomic.py` stays for a fetched model file (alpha 2.2
+H.0: its file lock `held` left with the JSON stores it served). Artifact ids keep
 the sha256-of-canonical-inputs scheme so replay works unchanged.
 
 Schema separation (provisional, confirmed at stage 2): our tables declare `schema="openferment"`

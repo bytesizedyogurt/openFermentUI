@@ -1,0 +1,14 @@
+diff --git a/core/openferment_core/models.py b/core/openferment_core/models.py
+index 4a83d2f..a957d78 100644
+--- a/core/openferment_core/models.py
++++ b/core/openferment_core/models.py
+@@ -50,8 +50,8 @@ PROVENANCE_ORDER: list[str] = [
+     "curated",
+     "computed",
+     "unverified",
+-    "user",
+     "industry-estimate",
++    "user",
+     "assumed",
+ ]
+ 

@@ -1,5 +1,5 @@
 """`yield_ceiling`: the most product a published reaction network can make
-from a feed (OF-BLD-014 §6.3).
+from a feed.
 
 Ids and words in: a model on geneOS's shelf, the product (ethanol from the
 two yeast models), the sugar. One `Evidence` out, figure hint `ceiling`, whose basis names the model

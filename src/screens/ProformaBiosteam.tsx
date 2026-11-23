@@ -11,19 +11,20 @@
 // (CostWaterfall, Tornado, Distribution), never by recharts.
 //
 // The scenario page (ProformaScenario.tsx) composes these sections under its
-// inputs and its Run; a reference biorefinery's page (ProformaReference.tsx,
-// OF-BLD-019 §3.3) reads the same sections over its own `proforma.reference`
-// artifact through `runViewOfReference`, one case and no samples.
+// inputs and its Run; a run's page (ProformaRun.tsx) and a reference plant's
+// page (ProformaReference.tsx, OF-BLD-019 §3.3; alpha 2.2 D8) read the same
+// sections over a library plant's `library.run` artifact through
+// `runViewOfRun`, one case and no samples.
 import { useMemo, useState, type ReactNode } from 'react';
 import { Download } from 'lucide-react';
-import type { CostLine, FlowsheetInfo, ResultGrid, ScenarioInput } from '@/data/types';
+import type { CostLine, FlowsheetInfo, ResultGrid, ScenarioInput } from '@/lib/proforma';
 import { href } from '@/router';
 import { clampPoint, interpolate, type Grid } from '@/engine/interp';
 import { fmt } from '@/engine/units';
 import { exportCSV } from '@/lib/csv';
-import { Card } from '@/components/ui';
+import { Card, cx } from '@/components/ui';
 import { Tick } from '@/components/Provenance';
-import { CostWaterfall, Distribution, Tornado } from '@/components/figures';
+import { CostWaterfall, Distribution, Tornado, priceNote, waterfallTotal } from '@/components/figures';
 import {
   infeasibleWords,
   NO_DIAGRAM,
@@ -38,10 +39,11 @@ import {
 } from '@/lib/proforma';
 
 /** Where a sampled input came from, beside its tornado bar. */
-export const SOURCE_WORDS: Record<string, string> = {
+const SOURCE_WORDS: Record<string, string> = {
   record: 'records',
   assumption: 'assumption',
   'model-estimate': 'a model’s estimate',
+  deposition: 'a deposition’s reading',
   model: 'reference model',
   artifact: 'artifact',
   convention: 'convention',
@@ -87,14 +89,24 @@ function Section({
   );
 }
 
-function Table({ headers, rows, rowTestid }: { headers: string[]; rows: (string | number)[][]; rowTestid: string }) {
+/**
+ * A run's table: the first column its row's name, the rest numbers set right. `wide`, when given, names the one column
+ * that takes the free width and reads left (a stream's flows by component), and the name column keeps to its words.
+ */
+function Table({ headers, rows, rowTestid, wide }: { headers: string[]; rows: (string | number)[][]; rowTestid: string; wide?: number }) {
+  const at = (j: number, head: boolean) =>
+    j === 0
+      ? cx('text-left py-1 pr-2', head ? 'font-medium' : 'font-num', wide !== undefined && 'w-[1%] whitespace-nowrap')
+      : j === wide
+        ? cx('text-left py-1 px-1.5 min-w-[18rem]', head ? 'font-medium' : 'font-num')
+        : cx('text-right py-1 px-1.5', head ? 'font-medium' : 'font-num', wide !== undefined && 'whitespace-nowrap');
   return (
     <div className="overflow-x-auto">
       <table className="w-full text-caption">
         <thead>
           <tr className="border-b border-line text-ink-soft">
             {headers.map((h, i) => (
-              <th key={h} className={i === 0 ? 'text-left py-1 pr-2 font-medium' : 'text-right py-1 px-1.5 font-medium'}>
+              <th key={h} className={at(i, true)}>
                 {h}
               </th>
             ))}
@@ -104,7 +116,7 @@ function Table({ headers, rows, rowTestid }: { headers: string[]; rows: (string 
           {rows.map((r, i) => (
             <tr key={i} className="border-b border-line/50 align-top" data-testid={rowTestid}>
               {r.map((c, j) => (
-                <td key={j} className={j === 0 ? 'py-1 pr-2 font-num' : 'py-1 px-1.5 text-right font-num'}>
+                <td key={j} className={at(j, false)}>
                   {c}
                 </td>
               ))}
@@ -160,9 +172,18 @@ export function RunResult({ view, priceBasis, scenarioId }: { view: RunView; pri
       </p>
       <p className="text-caption text-ink-soft mt-2">
         Run{' '}
-        <a className="font-num hover:text-accent underline underline-offset-2" href={href(`/biorepo/artifacts/${view.artifactId}`)}>
+        <a
+          className="font-num hover:text-accent underline underline-offset-2"
+          href={href(`/proforma/runs/${view.artifactId}`)}
+          data-testid="scenario-run-page"
+        >
           {view.artifactId}
+        </a>{' '}
+        (its page, with its SFF file;{' '}
+        <a className="hover:text-accent underline underline-offset-2" href={href(`/biorepo/artifacts/${view.artifactId}`)}>
+          its artifact
         </a>
+        )
         {view.createdAt && (
           <>
             , computed <span className="font-num">{stamp(view.createdAt)}</span>
@@ -183,7 +204,7 @@ export function RunResult({ view, priceBasis, scenarioId }: { view: RunView; pri
 
 // ── Cost breakdown ──────────────────────────────────────────────────────
 
-export function CostBreakdown({
+function CostBreakdown({
   view,
   priceBasis,
   csvName,
@@ -196,18 +217,19 @@ export function CostBreakdown({
   totalLabel?: string;
 }) {
   const tea = view.tables.tea;
-  const note = costBreakdownNote(view);
+  const unit = tea?.basis ? `USD per ${tea.basis}` : priceBasis;
+  const notes = [priceNote(tea?.productPrice, view.basePrice, unit), costBreakdownNote(view)].filter((n): n is string => Boolean(n));
   return (
     <div data-testid="cost-breakdown">
       <CostWaterfall
         title="What is the price made of?"
         lines={tea?.lines ?? []}
-        total={view.basePrice != null ? { label: totalLabel, value: view.basePrice } : null}
-        unit={tea?.basis ? `USD per ${tea.basis}` : priceBasis}
+        total={waterfallTotal(tea?.productPrice, view.basePrice, totalLabel)}
+        unit={unit}
         annualUnit={u(view, 'annual', 'USD/yr')}
         provenance={view.provenance}
         basis={[view.basis]}
-        notes={note ? [note] : undefined}
+        notes={notes.length ? notes : undefined}
         empty={costBreakdownEmpty(view)}
         csvName={`${csvName}-cost-breakdown`}
       />
@@ -219,7 +241,7 @@ export function CostBreakdown({
  * The line under the cost breakdown (§3.R, finding 10): sales are a year's,
  * in the run's annual unit; the capital sums are one-off, in its cost unit.
  */
-export function costBreakdownNote(view: RunView): string | null {
+function costBreakdownNote(view: RunView): string | null {
   const tea = view.tables.tea;
   if (!tea) return null;
   return `Read from BioSTEAM's ${tea.teaClass} object for the base case: sales ${cell(tea.sales)} ${u(view, 'annual', 'USD/yr')}; installed equipment ${cell(tea.installedEquipmentCost)}, fixed capital ${cell(tea.FCI)} and total capital ${cell(tea.TCI)} ${u(view, 'cost', 'USD')}, once; over ${cell(tea.operatingHours)} operating hours a year.`;
@@ -230,7 +252,7 @@ export function costBreakdownNote(view: RunView): string | null {
  * run keeps no TEA, and running again gives the same case; only a run
  * stored before the tables is helped by running again.
  */
-export function costBreakdownEmpty(view: RunView): { what: string; where: string } {
+function costBreakdownEmpty(view: RunView): { what: string; where: string } {
   if (view.baseInfeasible)
     return {
       what: `the base case could not run: ${baseCaseRefusal(view.baseInfeasible)}.`,
@@ -257,7 +279,7 @@ export function Sensitivity({ view, labels, csvName }: { view: RunView; labels: 
   );
 }
 
-export function PriceDistribution({ view, priceBasis, csvName }: { view: RunView; priceBasis: string; csvName: string }) {
+function PriceDistribution({ view, priceBasis, csvName }: { view: RunView; priceBasis: string; csvName: string }) {
   return (
     <Distribution
       title="What would this plant's product cost, across the inputs' ranges?"
@@ -281,7 +303,7 @@ export function PriceDistribution({ view, priceBasis, csvName }: { view: RunView
  * which is not how the TEA breakdown above splits the same plant, so no line
  * here takes a word the waterfall uses for another quantity.
  */
-export const SLIDER_LINE_LABEL: Record<CostLine, string> = {
+const SLIDER_LINE_LABEL: Record<CostLine, string> = {
   capex: 'Capital: what the price leaves after the operating lines',
   media: 'Feed and other materials bought',
   utilities: 'Fermentation section\u2019s utilities',
@@ -306,7 +328,7 @@ function atPoint(grid: ResultGrid, point: Record<string, number>): { msp: number
 }
 
 /** Three inputs moved over the run's grid, interpolated between its cases (engine/interp). */
-export function Sliders({ view, labels, priceBasis, scenarioId }: { view: RunView; labels: Record<string, string>; priceBasis: string; scenarioId: string }) {
+function Sliders({ view, labels, priceBasis, scenarioId }: { view: RunView; labels: Record<string, string>; priceBasis: string; scenarioId: string }) {
   const g = view.grid;
   const grid = useMemo(() => (g ? asResultGrid(scenarioId, g) : null), [g, scenarioId]);
   const [point, setPoint] = useState<Record<string, number>>(() =>
@@ -320,7 +342,7 @@ export function Sliders({ view, labels, priceBasis, scenarioId }: { view: RunVie
       <p className="text-caption text-ink-soft mb-3">
         Interpolated between the {g.msp.length} grid cases the service simulated; the other inputs stay at their base value. The cost lines
         are split as the flowsheet splits its grid, the fermentation section apart from the downstream units, not as the breakdown above.
-        {g.infeasible > 0 && ` ${g.infeasible} cases could not run, and a point near one shows no price.`}
+        {g.infeasible > 0 && ` ${g.infeasible} case${g.infeasible === 1 ? '' : 's'} could not run, and a point near one shows no price.`}
       </p>
       <div className="space-y-3">
         {g.dims
@@ -364,7 +386,7 @@ export function Sliders({ view, labels, priceBasis, scenarioId }: { view: RunVie
 
 // ── Streams, equipment, utilities ───────────────────────────────────────
 
-export function streamsTable(view: RunView) {
+function streamsTable(view: RunView) {
   const headers = [
     'Stream',
     'From',
@@ -406,7 +428,7 @@ export function streamsTable(view: RunView) {
   return { headers, rows, csv };
 }
 
-export function StreamsTable({ view, csvName }: { view: RunView; csvName: string }) {
+function StreamsTable({ view, csvName }: { view: RunView; csvName: string }) {
   const t = streamsTable(view);
   return (
     <Section
@@ -415,12 +437,12 @@ export function StreamsTable({ view, csvName }: { view: RunView; csvName: string
       reads="Every stream of the base case as BioSTEAM holds it after the run: the unit it leaves (feed, for one that enters the plant) and the one it enters (out, for one that leaves it), its phase, temperature, pressure and mass flow, by component."
       csv={{ name: `${csvName}-streams`, ...t }}
     >
-      {t.rows.length ? <Table {...t} rowTestid="stream-row" /> : <p className="text-body text-ink-soft">This run kept no stream table.</p>}
+      {t.rows.length ? <Table {...t} rowTestid="stream-row" wide={7} /> : <p className="text-body text-ink-soft">This run kept no stream table.</p>}
     </Section>
   );
 }
 
-export function equipmentTable(view: RunView) {
+function equipmentTable(view: RunView) {
   const headers = [
     'Unit',
     'Class',
@@ -440,7 +462,7 @@ export function equipmentTable(view: RunView) {
   return { headers, rows, csv };
 }
 
-export function EquipmentTable({ view, csvName }: { view: RunView; csvName: string }) {
+function EquipmentTable({ view, csvName }: { view: RunView; csvName: string }) {
   const t = equipmentTable(view);
   return (
     <Section
@@ -454,7 +476,7 @@ export function EquipmentTable({ view, csvName }: { view: RunView; csvName: stri
   );
 }
 
-export function utilitiesTable(view: RunView) {
+function utilitiesTable(view: RunView) {
   const d = view.tables.utilities;
   const headers = ['Duty', 'Total', 'Unit'];
   const rows = d
@@ -476,7 +498,7 @@ export function utilitiesTable(view: RunView) {
   return { headers, rows, csv };
 }
 
-export function UtilitiesCard({ view, csvName }: { view: RunView; csvName: string }) {
+function UtilitiesCard({ view, csvName }: { view: RunView; csvName: string }) {
   const t = utilitiesTable(view);
   const d = view.tables.utilities;
   return (
@@ -493,9 +515,16 @@ export function UtilitiesCard({ view, csvName }: { view: RunView; csvName: strin
 
 // ── Diagram ─────────────────────────────────────────────────────────────
 
-export function DiagramCard({ view, csvName }: { view: RunView; csvName: string }) {
+/**
+ * The run's diagram, or the units in run order with the words why it has none. A library plant's run draws no
+ * diagram on any host (workers/library_plants.py: `draw` False): its SFF file's graph is its drawing, so its note says
+ * that and links the record (`sffRecord`) when the page knows it; the note a library run's artifact keeps names
+ * Graphviz, and that cause holds for a scenario's run alone.
+ */
+function DiagramCard({ view, csvName, sffRecord = null }: { view: RunView; csvName: string; sffRecord?: string | null }) {
   const order = view.tables.unitOrder.length ? view.tables.unitOrder : [...view.tables.units].sort((a, b) => a.order - b.order).map((x) => x.id);
   const classOf = new Map(view.tables.units.map((x) => [x.id, x.unitClass]));
+  const library = view.basis.tool === 'library.run';
   return (
     <Section
       title="Diagram"
@@ -507,9 +536,26 @@ export function DiagramCard({ view, csvName }: { view: RunView; csvName: string 
         <img src={diagramSrc(view.tables.diagram)} alt={`Flowsheet diagram of ${view.flowsheet ?? 'the run'}: ${order.join(', ')}`} className="max-w-full h-auto" data-testid="diagram-svg" />
       ) : (
         <>
-          <p className="text-caption text-signal-warn mb-2" data-testid="diagram-note">
-            {view.tables.diagramNote ?? NO_DIAGRAM}
-          </p>
+          {library ? (
+            <p className="text-caption text-ink-soft mb-2" data-testid="diagram-note">
+              A library plant&rsquo;s run draws no diagram on any host: its SFF file&rsquo;s graph is its drawing
+              {sffRecord ? (
+                <>
+                  , on the record{' '}
+                  <a className="font-num underline underline-offset-2 hover:text-accent" href={href(`/flowsheets/${encodeURIComponent(sffRecord)}`)} data-testid="diagram-sff">
+                    {sffRecord}
+                  </a>
+                </>
+              ) : (
+                ', on the run’s SFF record when it wrote one'
+              )}
+              . The units are listed in run order.
+            </p>
+          ) : (
+            <p className="text-caption text-signal-warn mb-2" data-testid="diagram-note">
+              {view.tables.diagramNote ?? NO_DIAGRAM}
+            </p>
+          )}
           {order.length > 0 ? (
             <ol className="list-decimal pl-5 text-body" data-testid="diagram-units">
               {order.map((id) => (
@@ -531,39 +577,36 @@ export function DiagramCard({ view, csvName }: { view: RunView; csvName: string 
 // ── What the run read back, credited to whoever set it ──────────────────
 
 /** Each group's heading and line, by who set its values (§3.R, findings 6 and 20). */
-const READ_BACK_GROUPS: { origin: ReadBackRow['origin']; title: (reference: boolean) => string; reads: (reference: boolean) => string }[] = [
+const READ_BACK_GROUPS: { origin: ReadBackRow['origin']; title: string; reads: string }[] = [
   {
     origin: 'setting',
-    title: (reference) => (reference ? 'What the package set' : 'What the package, BioSTEAM and the run\u2019s conventions set'),
-    reads: (reference) =>
-      reference
-        ? 'Each the package\u2019s own default, read back from its objects after the run; nobody typed these.'
-        : 'The settings the inputs leave to the package\u2019s finance model, to BioSTEAM\u2019s units or to a convention the basis names, read back after the base case ran; nobody typed these.',
+    title: 'What the package, BioSTEAM and the run\u2019s conventions set',
+    reads:
+      'The settings the inputs leave to the package\u2019s finance model, to BioSTEAM\u2019s units or to a convention the basis names, read back after the base case ran; nobody typed these.',
   },
   {
     // OF-BLD-020 §6.R (main-11/23): a value a named person set, as the run's basis names them.
     origin: 'person',
-    title: () => 'What a named person set',
-    reads: () =>
-      'Each a named person\u2019s assumption, as the run\u2019s basis names it (a Finance value typed in this scenario\u2019s panel, or a vessel setting typed in fermOS \u2192 Vessel), read back after the base case ran.',
+    title: 'What a named person set',
+    reads:
+      'Each a named person\u2019s assumption, or a reading deposited at the bench that a person chose, as the run\u2019s basis names it (a Finance value typed or chosen in this scenario\u2019s panel, or a vessel setting typed in fermOS \u2192 Vessel), read back after the base case ran; a reading is named by its depositor.',
   },
   {
     origin: 'case',
-    title: () => 'What this case gave',
-    reads: () =>
-      'Set by this case\u2019s bound records and named assumptions, through BioSTEAM\u2019s units, and read back after the base case ran; the reference model supplied none of these.',
+    title: 'What this case gave',
+    reads:
+      'Set by this case\u2019s bound records, named assumptions and chosen readings, through BioSTEAM\u2019s units, and read back after the base case ran; the reference model supplied none of these.',
   },
   {
     origin: 'read',
-    title: () => 'Also read back from the run',
-    reads: () => 'Read from the run\u2019s objects after the base case ran; this page does not know which setting each one is, so it credits nobody.',
+    title: 'Also read back from the run',
+    reads: 'Read from the run\u2019s objects after the base case ran; this page does not know which setting each one is, so it credits nobody.',
   },
 ];
 
-export function ReadBack({ view, flowsheet }: { view: RunView; flowsheet: FlowsheetInfo | null }) {
+function ReadBack({ view, flowsheet }: { view: RunView; flowsheet: FlowsheetInfo | null }) {
   const rows = readBackRows(view.readBack, flowsheet, view.basis?.inputs ?? []);
   if (!rows.length) return null;
-  const reference = !!flowsheet?.reference;
   return (
     <Card className="p-4" data-testid="proforma-readback">
       {READ_BACK_GROUPS.map((g) => {
@@ -571,8 +614,8 @@ export function ReadBack({ view, flowsheet }: { view: RunView; flowsheet: Flowsh
         if (!these.length) return null;
         return (
           <div key={g.origin} className="mb-3 last:mb-0" data-testid="readback-group" data-origin={g.origin}>
-            <h2 className="font-serif text-section-title font-semibold mb-1">{g.title(reference)}</h2>
-            <p className="text-caption text-ink-soft mb-2">{g.reads(reference)}</p>
+            <h2 className="font-serif text-section-title font-semibold mb-1">{g.title}</h2>
+            <p className="text-caption text-ink-soft mb-2">{g.reads}</p>
             <table className="w-full text-caption">
               <tbody>
                 {these.map((r) => (
@@ -580,7 +623,7 @@ export function ReadBack({ view, flowsheet }: { view: RunView; flowsheet: Flowsh
                     <td className="py-0.5 pr-2">
                       {r.label}
                       {r.label !== r.key && <span className="font-num text-ink-soft"> ({r.key})</span>}
-                      {r.by && <span className="text-ink-soft"> · by {r.by}</span>}
+                      {r.by && <span className="text-ink-soft"> · {r.reading ? 'a reading deposited by' : 'by'} {r.by}</span>}
                     </td>
                     <td className="py-0.5 px-1.5 text-right font-num">{typeof r.value === 'number' ? fmt(r.value, 4) : r.value}</td>
                     <td className="py-0.5 pl-1.5 font-num text-ink-soft">{r.unit}</td>
@@ -624,6 +667,7 @@ export function RunReport({
   csvName,
   flowsheet = null,
   oneCase = false,
+  sffRecord = null,
 }: {
   view: RunView;
   priceBasis: string;
@@ -636,6 +680,8 @@ export function RunReport({
   flowsheet?: FlowsheetInfo | null;
   /** The run is one case, sampled nowhere. */
   oneCase?: boolean;
+  /** The run's SFF record, when the page knows it: a library run's drawing. */
+  sffRecord?: string | null;
 }) {
   return (
     <div className="space-y-4" data-testid="run-report">
@@ -651,7 +697,7 @@ export function RunReport({
       <StreamsTable view={view} csvName={csvName} />
       <EquipmentTable view={view} csvName={csvName} />
       <UtilitiesCard view={view} csvName={csvName} />
-      <DiagramCard view={view} csvName={csvName} />
+      <DiagramCard view={view} csvName={csvName} sffRecord={sffRecord} />
       <ReadBack view={view} flowsheet={flowsheet} />
     </div>
   );

@@ -1,0 +1,17 @@
+NOTICE:  database "bh_r_h1_04_svc" does not exist, skipping
+service http://127.0.0.1:9000 over fresh database bh_r_h1_04_svc
+stated precision of biosteam/ethanol_glucose_v0 (GET /api/engines): {'rtol': 0.0, 'atol': 0.0}
+POST /api/engines/biosteam/run -> HTTP 200 in 25 s
+POST /api/biorepo/artifacts/4f2ccc41f73b2f66/replay -> HTTP 200 in 7 s
+after a restart, POST /api/biorepo/artifacts/4f2ccc41f73b2f66/replay -> HTTP 200 in 22 s
+run 4f2ccc41f73b2f66 done | artifact 4f2ccc41f73b2f66 | samples 500 feasible 500
+specs: every input fixed: [('feed_glucose_conc', 100.0), ('glucose_price', 0.5), ('plant_scale', 1000.0), ('productivity', 1.0), ('titre', 50.0), ('yield', 0.4)]
+price.solvedPrice (basePrice): 6.36040554632803 USD/kg
+quantiles of the 500 samples of the same inputs: {'p5': 7.371976772110385, 'p25': 7.371976772110385, 'p50': 7.371976772110385, 'p75': 7.371976772110385, 'p95': 7.371976772110385}
+replay: identical False | withinTolerance False | tolerance None | differences 51
+replay basePrice stored -> replayed: (6.36040554632803, 7.371976772110385)
+first differences: [('baseCostLines.capex', 1.1303753027262005, 1.2980509548267865), ('baseCostLines.downstream', 0.06559327885388727, 0.07378575345708832), ('baseCostLines.labor', 2.355264491025208, 2.737073400461741), ('baseCostLines.media', 1.2800350494702217, 1.487539891555294)]
+replay in a freshly started worker: identical True | withinTolerance True | differences 0 | basePrice the same | []
+EXPECTED: every sample of the same six fixed inputs prices as the base case does (each quantile equal to basePrice), and the replay is identical (precision rtol 0, atol 0)
+OBSERVED: basePrice 6.36040554632803; 5 of 5 quantiles differ from it (7.371976772110385); replay identical False, withinTolerance False, 51 differences, basePrice 6.36040554632803 -> 7.371976772110385
+RESULT: DEFECT

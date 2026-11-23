@@ -1,0 +1,78 @@
+diff --git a/docs/reports/literature-retrieval.json b/docs/reports/literature-retrieval.json
+index d80bfbc..99778c3 100644
+--- a/docs/reports/literature-retrieval.json
++++ b/docs/reports/literature-retrieval.json
+@@ -2,8 +2,8 @@
+   "kind": "retrieval-report",
+   "demo": {
+     "kind": "retrieval",
+-    "generated_at": "2026-10-30T08:55:58.096625+00:00",
+-    "git_commit": "55ca3b3",
++    "generated_at": "2026-11-10T22:51:55.802797+00:00",
++    "git_commit": "2047f5a",
+     "snapshot": null,
+     "provenance": {
+       "embedding": "fastembed:BAAI/bge-small-en-v1.5@384",
+@@ -16,7 +16,7 @@
+       "entities": 0,
+       "relationships": 0,
+       "communities": 0,
+-      "latest_ingested_at": "2026-10-30T08:55:57.406485+00:00",
++      "latest_ingested_at": "2026-11-10T22:51:55.019294+00:00",
+       "embedding_versions": [
+         "fastembed:BAAI/bge-small-en-v1.5@384"
+       ]
+diff --git a/docs/reports/literature-retrieval.md b/docs/reports/literature-retrieval.md
+index d917dae..5c1cca9 100644
+--- a/docs/reports/literature-retrieval.md
++++ b/docs/reports/literature-retrieval.md
+@@ -2,7 +2,7 @@
+ 
+ # Literature retrieval report
+ 
+-Sci RAG Kit's retrieval evaluation over its demo corpus, as openFerment runs the kit (2026-10-30):
++Sci RAG Kit's retrieval evaluation over its demo corpus, as openFerment runs the kit (2026-11-10):
+ FastEmbed `BAAI/bge-small-en-v1.5` (384 dimensions), the project's scope, and the
+ configurations that ask no model. `interactive` is what BioRepo → Search runs. The kit's
+ note below compares rows with `full_deep`, which asks a model and is not run here: read
+@@ -87,40 +87,3 @@ A layer earns its place when removing it moves a measure outside the overlap of
+ ### Cost
+ 
+ Retrieval 0.0000 USD, the judge's relevance 0.0000 USD, answers and their grading 0.0000 USD: 0.0000 USD in all.
+-
+-<!-- Added by hand at alpha 2.2 F.5 (docs/PROGRESS.md, stage F's log): the next `pnpm lit:report --project ethanol ... --render` writes this project's part whole from its own run, these two sections with it. -->
+-
+-### What this run measured
+-
+-The run above asked no model: 0 calls and 0 USD in its tally, 8.5 s for the command whole, each configuration's own
+-seconds in the table. The command:
+-
+-    pnpm lit:report --project ethanol --by "Claude Code (build session)" --configs interactive,vector_only,keyword_only --render
+-
+-Its run whole stays in the service's data folder, outside git. Its ground truth is built by code from the candidates the
+-project keeps (`report.truth`): 130 questions from the 457 candidates its 22 documents hold, 20 of them with candidates, extracted on 5 November, one
+-question a group by document, passage and field. Each question was asked of the retriever inside the project's scope in
+-the three configurations that ask no model: `interactive` (vectors and keywords together, as BioRepo → Search runs),
+-`vector_only` and `keyword_only`. Each configuration's top ten was scored under both relevance rules: the kit's rule (a
+-passage of the question's document, or one holding a quote of its candidates) and the passage rule (the candidates' own
+-passage). `keyword_only` returned no passage for 102 of the 130 questions, one for 22, four for one and ten for five, the
+-same under both rules; `interactive` and `vector_only` returned ten for every question.
+-
+-### What waits on the account
+-
+-The Anthropic account refuses every model call until 2026-12-01 00:00 UTC (`docs/PROGRESS.md`, Blockers). Each lane
+-below asks a model and runs once the account answers, in this order, `<name>` the person each run is audited under.
+-
+-1. The concept graph, on the `index` route: `pnpm lit:graph --project ethanol --by <name>`. Its dry run (`pnpm lit:graph
+-   --project ethanol --dry-run`, which calls no model) measured 814 passages in 92 batches and 1,758,899 prompt
+-   characters (439,725 kit tokens): their input comes to 0.2199 USD on `claude-haiku-5-5`, and the most the build could
+-   cost, each batch's whole answer counted, to 2.3239 USD.
+-2. The configurations that ask a model, `full_deep`, `no_graph` and `no_hyde`, which measure the graph and HyDE layers
+-   each by its removal; the judge's grading of the top ten of `interactive` and `full_deep`, on the `judge` route; and
+-   the answer lane, the kit's answer through `interactive` and `full_deep` on the `explain` route, graded blind for
+-   grounding on the `judge` route. One run gives them all and renders this part again: `pnpm lit:report --project
+-   ethanol --by <name> --judge --render`.
+-3. The answer lane is the measure `explain`'s default rests on: the routing table holds `explain` at the `extract`
+-   route's models and effort until that lane's live run sets the family's default (ADR-008, Implementations 17 and 18).
+-   The same run's count of the kit's judgements that stopped at their ceiling measures the kit's room at max
+-   (`llm.KIT_ROOM`, Implementation 18).

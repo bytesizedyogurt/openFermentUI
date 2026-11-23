@@ -1,0 +1,16 @@
+== H6-02: estimate
+  exit 0; 0 refused: lines; 0 tracebacks; last line: The files under $BH_WORK/H6/a1data-repro/estimate are left as they were; m
+  BioRepo reads cl1-P1-0001: verified gold gold {"value": 3.0, "unit": "mg L-1", "origin": {"kind": "model-estimate", "ref": null, "by": "claude-x", "at": "2026-10-20T00:00:00Z", "note": null}}
+  the record store asked the same decision: ok False rule estimate
+== H6-03: two extraction files of one paper
+  exit 1; 0 refused: lines; 3 tracebacks; last line: (Background on this error at: https://sqlalche.me/e/21/gkpj)
+== H6-03: a database the server does not hold
+  exit 1; 0 refused: lines; 3 tracebacks; last line: (Background on this error at: https://sqlalche.me/e/21/dbapi)
+== H6-03: a server that does not answer
+  exit 1; 0 refused: lines; 1 tracebacks; last line: ConnectionRefusedError: [Errno 111] Connect call failed ('127.0.0.1', 8869)
+   (pnpm db:migrate on the same two: refused: the server at 127.0.0.1:5432 holds no database bh_h6_nothere (database "bh_h6_not | refused: the database bh_h6_x on 127.0.0.1:8869 could not be reached: ConnectionRefusedErr)
+== H6-04: one person named twice
+  exit 0; 0 refused: lines; 0 tracebacks; last line: The files under $BH_WORK/H6/a1data-repro/dup-person are left as they were;
+  printed:       3  people
+  kept: 2 people (p-ada Ada Moreno, p-ben Ben Ortiz (again))
+  audited: 3 people

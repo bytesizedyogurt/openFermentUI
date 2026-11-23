@@ -9,10 +9,13 @@
 import { START_COMMAND, postdocHealth } from './postdoc';
 import { apiFetch } from './project';
 
+/** What a ServiceDown says when nothing answered: the service is not running, and a write waits in this browser's outbox. */
+export const NOT_RUNNING = 'The service is not running.';
+
 export class ServiceDown extends Error {
   constructor(
     message: string,
-    readonly remedy: string = `Start it with \`${START_COMMAND}\` from \`core/\`.`,
+    readonly remedy: string = `Start it with ${START_COMMAND} from the repository root.`,
   ) {
     super(message);
     this.name = 'ServiceDown';
@@ -30,21 +33,49 @@ export class ServiceRefused extends Error {
   }
 }
 
+/**
+ * A refusal's detail in words. The service's own words stand as they are. A
+ * request whose fields the service refused answers a list of field errors
+ * (FastAPI's 422, each with the field's place and why), said here field by
+ * field, each in a model's own words (Pydantic writes a model's refusal after
+ * the words "Value error, ", which are left off); a field the service does not
+ * hold means this page was loaded before the service changed, and the words
+ * say to reload it.
+ */
+export function detailWords(detail: unknown): string {
+  if (typeof detail === 'string') return detail;
+  if (Array.isArray(detail)) {
+    const fields = detail.map((d) => {
+      const e = (d ?? {}) as { loc?: unknown; msg?: unknown };
+      const where = Array.isArray(e.loc) ? e.loc.filter((x) => x !== 'body').join('.') : '';
+      return `${where ? `${where}: ` : ''}${typeof e.msg === 'string' && e.msg ? e.msg.replace(/^Value error, /, '') : 'refused'}`;
+    });
+    const older = detail.some((d) => (d as { type?: unknown } | null)?.type === 'extra_forbidden');
+    return (
+      `The service refused the request's fields: ${fields.join('; ')}.` +
+      (older ? ' This page was loaded before the service changed what it takes: reload the page.' : '')
+    );
+  }
+  if (detail == null) return '';
+  return typeof detail === 'object' ? JSON.stringify(detail) : String(detail);
+}
+
 export async function call<T>(path: string, init?: RequestInit): Promise<T> {
   let response: Response;
   try {
     response = await apiFetch(path, init);
   } catch {
-    throw new ServiceDown('The service is not running.');
+    throw new ServiceDown(NOT_RUNNING);
   }
   if (response.ok) return (await response.json()) as T;
   // 413 is an upload past the size an import takes, 502 a source the service
-  // could not fetch (an SFF reference file); like 404, a 502 is the service's
-  // only when it says why, since a proxy in front of it answers 502 too.
+  // could not fetch (an SFF reference file, or a file named by its address);
+  // like 404, a 502 is the service's only when it says why, since a proxy in
+  // front of it answers 502 too.
   if ([404, 409, 413, 422, 502, 503].includes(response.status)) {
     let detail = '';
     try {
-      detail = String(((await response.json()) as { detail?: unknown }).detail ?? '');
+      detail = detailWords(((await response.json()) as { detail?: unknown }).detail);
     } catch {
       /* the status is the message */
     }
@@ -54,7 +85,7 @@ export async function call<T>(path: string, init?: RequestInit): Promise<T> {
   try {
     await postdocHealth(init?.signal ?? undefined);
   } catch {
-    throw new ServiceDown('The service is not running.');
+    throw new ServiceDown(NOT_RUNNING);
   }
   throw new ServiceDown(`The service answered ${response.status}.`, 'The service is running, so check its log — it will name what went wrong.');
 }

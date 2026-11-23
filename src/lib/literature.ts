@@ -5,10 +5,23 @@
 // Not collected is an answer, not an error: the service returns the outcome
 // with `status: 'failed'` and the reason, and the Intake card shows it as it
 // stands. Only a service that cannot be reached throws (IntakeDown).
-import type { CollectOutcome, CollectRequest, LiteratureDocument, PasteRequest, SearchResponse } from '@/data/types';
+import type { components } from '@/api/types.gen';
 import { IntakeDown, explain } from './intake';
 import { parseEvents } from './postdoc';
 import { apiFetch } from './project';
+
+type S = components['schemas'];
+
+/** What Intake did with one document: ingested, linked, held already, or failed with its reason (ADR-002). */
+export type CollectOutcome = S['CollectOutcome'];
+/** POST /api/intake/collect: an identifier, in a person's name, with the reason it belongs here. */
+export type CollectRequest = S['CollectRequest'];
+/** POST /api/intake/paste: text under its title, in a person's name, with its licence class and licence. */
+export type PasteRequest = S['PasteRequest'];
+/** One document a project holds (GET /api/literature/documents). */
+export type LiteratureDocument = S['LiteratureDocument'];
+/** GET /api/literature/search: the passages that best answer a question, best first. */
+export type SearchResponse = S['SearchResponse'];
 
 async function asked<T>(input: string, init: RequestInit = {}, signal?: AbortSignal): Promise<T> {
   let response: Response;

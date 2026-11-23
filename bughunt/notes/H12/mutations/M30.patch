@@ -1,0 +1,11 @@
+--- a/core/openferment_core/guard.py
++++ b/core/openferment_core/guard.py
+@@ -130,7 +130,7 @@
+     # preflight, and this service approves none.
+     forwarded = headers.get("x-forwarded-host")
+     if same_site(origin, headers.get("host")) or (
+-        forwarded and answers_to(hostname(forwarded)) and same_site(origin, forwarded)
++        forwarded and same_site(origin, forwarded)
+     ):
+         return None
+     return f"a page on {origin or 'an unnamed origin'!r} may not change anything here"

@@ -1,5 +1,5 @@
 {
-  "_fixture": "TEST FIXTURE: the toy flowsheet (a mixer and a splitter) through the real BioSTEAM worker; made by `python -m openferment_core.demo --sim`.",
+  "_fixture": "TEST FIXTURE: the toy flowsheet (a mixer and a splitter) through the real BioSTEAM worker; made by `standins.sim_fixtures()` under `pnpm test:sim`.",
   "evaluate": {
     "topEthanol": 30.0,
     "topWater": 60.0,

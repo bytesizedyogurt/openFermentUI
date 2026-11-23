@@ -15,7 +15,8 @@ stay visible.
 
 Every number a model, a person or a library supplies enters as
 `Quantity {value, unit, basis?, low?, high?, origin}` with
-`Origin {kind: record | artifact | person-assumption | model-estimate | library-default | convention, ref, by, at, note}`.
+`Origin {kind: record | artifact | person-assumption | model-estimate | measurement | library-default | convention, ref, by, at, note}`
+(`measurement`, a deposition's reading, joined the list on 2026-11-03: the implementation note of that day).
 
 - Provenance is computed from origins by code (`basis_provenance`, `weakest_provenance`, the
   client's display of the server's answer), never set by a model or a person.
@@ -143,3 +144,164 @@ task (development plan §8).
   and Home as `verified`. Before 8.5 it reached them as the extractor wrote it, `unverified`.
 - The browser's `provenanceOf` reads a decided record by the same rule; `test_evidence_pool.py`
   holds the service's.
+
+### Alpha 2.2 C.4 (2026-11-03): a Proforma run bases a model's estimate as an estimate
+
+- A Proforma run's value whose origin is `model-estimate` binds as the model's estimate: its
+  basis source is `model-estimate`, the model's id its `by` and the day it was estimated in its
+  note (`basis.estimate_source`), and the run's sensitivity reads the input's source kind as
+  `model-estimate`. Until C.4 the binding based it as a person's assumption naming the model
+  (`basis.assumption_source`). Either way the run is `assumed`. A run a model set a value of is
+  therefore kept afresh under a new id when asked again, its output moving where the sensitivity
+  reads the kind; the earlier artifact stands and replays as it was (`docs/PROGRESS.md`,
+  Departures). A model's id on two lines is refused in words at Proforma's door, a blank one by
+  the request's own origin (`core/tests/test_proforma_overrides.py`).
+
+### Alpha 2.2 C.5 (2026-11-03): the measurement origin
+
+- `OriginKind` gains `measurement` (the alpha 2.2 prompt's §6.3): a reading a person deposited at
+  the bench, its `ref` the reading's id (`<deposition id>/<entry id>`), its `at` the time the
+  reading was taken and its `by` the person who deposited it. `Origin`'s validator requires the
+  ref in that form and the time; a request form (`EngineInput`, `ScenarioValue`, a tool's
+  quantity) may leave the time and the depositor to the service, which fills both from the
+  deposition. `OverrideOrigin` and `ParamOrigin` gain it and `Override` gains `ref`, so a reading
+  travels through every resolver as a person's value does, and every door that takes values
+  admits it: a study scenario (`study_scenario`'s quantity among them), fermOS, pureOS, Proforma,
+  the library and the contract engines.
+- The lookup (`measurements.py`, reached through `basis.resolved`: `basis.override_of` calls it for
+  each value it converts, a contract engine's run and a study scenario for theirs) reads the
+  project's depositions rows before anything runs and holds a reading to its rules. The
+  deposition and its entry are the project's own. A person confirmed the entry's number. The entry
+  is the reading that stands for its measure: a later entry on the same measure with no time of
+  its own corrects an earlier one with none, and a reading in a series is its own, corrected by a
+  later entry at its time alone; a later entry still waiting to be read back corrects it too, and
+  the refusal says the newer number waits. The deposition names the person who deposited it: a
+  browser with no name set in Settings keeps its rows as `this browser`, and a reading kept so, or
+  under a placeholder name (`biorepo.reviewer_refusal`), is no measurement. The entry holds a
+  number in a unit and the time it was taken. The value and unit sent are the entry's own, with no
+  low, high or basis. The depositor and the time are the row's maker and the entry's, filled where
+  the value leaves them out and refused where it names others; at the tool door a caller names the
+  reading alone, and a depositor or a time written in its origin is refused in words. The entry's
+  unit is the parameter's, or converts into it through `units.convert` to a finite number, the
+  conversion stated in the value's note. Each refusal is in words, a 422 at a route and an error
+  from a tool, and nothing runs.
+- A reading's basis source is a `deposition` naming it (`basis.measurement_source`): its id the
+  ref, its `by` the depositor and its note `measured on <at>` with any conversion.
+  `basis.origin_of` reads it back as a `measurement`. A deposition source naming a whole series
+  (the readings a kinetic fit is made on) reads back as the bench's record, as it did, and the
+  fit's provenance stays what it was.
+- Provenance (`basis.basis_provenance`): `assumed` when any input is a person's assumption or a
+  model's estimate, or rests on one; else `measured` when any input is a measurement; else the
+  weakest of its sources' classes, as before. The package's own run carries neither label: it is
+  `computed`. This follows the plan's D7 and the prompt's §6.3 (no input a person's assumption or
+  a model's estimate), and it has a consequence the owner should see: a reading beside a record of
+  a weaker class (`unverified`, `user`, `industry-estimate`) or beside an artifact computed with no
+  assumption leaves the run `measured`, the first class of `PROVENANCE_ORDER`, so a claim citing
+  such a run ranks above gold while an unverified record stands in its basis; the basis keeps each
+  record with its class for a reader to weigh (`core/tests/test_basis.py` holds the rule). The prompt's §3 words a measured
+  run as one resting on "measurements and records alone"; the owner may settle that wording
+  against §6.3's, and the rule moves with a new note (`docs/PROGRESS.md`, Departures).
+- `basis.is_set` says whether a basis source is a value a run sets: a person's assumption, a model's
+  estimate or a deposition's reading (a deposition naming a whole series is the record a kinetic fit
+  rests on); every reader asks it, and it holds a deposition to being a reading (`is_measurement`). `SET_ORIGINS` and `SET_PARAM_ORIGINS` name the
+  same three as an origin and a parameter's value name them. Every reader of "a value this run set"
+  reads them: the values a library run hands its worker, its regression gate and its SFF file, a
+  run's parameters, the comparisons, Proforma's sampling, fermOS's, pureOS's and the vessel's
+  read-back, the composite and the tools' words. `engine_report`'s parameter evidence reads each
+  parameter's own origin word, so a person's value there is `assumed` and a reading `measured`.
+- The service holds a reading's unit to the parameter's, and nothing in the run checks that the
+  reading measured the quantity the parameter is: which measure stands for which parameter is the
+  scenario maker's choice, kept as the scenario's `by` (the proof's walk pairs a placeholder
+  reading with a placeholder parameter by unit alone). A later pass may tie a runbook's measure to
+  the parameters it may set.
+- No artifact id moves: a basis that names no reading is written as it was
+  (`core/tests/test_engine_pins.py`).
+- What a person chooses from: `GET /api/depositions/readings?unit=` lists the readings the
+  lookup's rules let a run take in that unit, each with the runbook and the measure it was
+  recorded against, its value and unit, the time it was taken and its depositor, its value in the
+  asked unit beside its own (`measurements.readings`). NewScenarioDialog, opened from a run's page,
+  offers them beside a typed value for each parameter a person sets and sends a chosen one as
+  `{kind: measurement, ref}`; a run's page reads a measurement in words, linked to the deposition
+  its reading was recorded in, and the parameter's chip says measured. No store holds a protocol
+  in this build, so the bench also records readings against a locked runbook's measures alone,
+  with no protocol's steps (`DepositionBench`, `/runbooks/depositions/<id>/bench`), once the person
+  has set their name in Settings. The proof's walk deposits a reading there on step 5's locked
+  runbook, makes a scenario on it alone and reads its run `measured`.
+- A reading's ref keeps naming one entry. A deposition's, an entry's, an observation's and a
+  measured evidence's id is unique across page loads (`timeId`). The service keeps a deposition
+  the bench's way (`project_state.deposition_refusal`): readings and observations are appended,
+  each kept with the value, unit, time and words it was taken with (a correction is a new entry,
+  keeping the time its reading was taken and saying when it was typed, `correctedAt`); a read-back
+  moves `confirmed` from false to true; the state moves from staged to running to closed; a
+  reconciliation stays as made; and closing stops new readings, observations and sample times.
+  Every other write is refused in words, and every write a closed deposition accepts is audited.
+  A run looks its readings up again each time it runs, and refuses in words one corrected since.
+- The module reads list what a run may take: the runbooks read holds each deposition (its
+  `standing` refs, the lookup's own rules deciding, `measurements.held_readings`), each reading
+  that stands as a row of its own (kind `reading`, read by its id, with its measure, value, unit,
+  time and depositor, marked `measured`), and the measured evidence a reconciliation released
+  (kind `measured-evidence`, marked `unverified` where nobody read its number back), so
+  `module_stores.PARTIAL` holds no runbooks line. Postdoc's rule 18 says how a scenario's value
+  names a reading it read there.
+
+### Alpha 2.2 D.0 (2026-11-04): an assistant's estimate at the HTTP door
+
+- `POST /api/tools/{name}` with `X-OpenFerment-Assistant: <name>/<version>` runs the call in the
+  model's lane under that name, so a number it types into a quantity is `model-estimate` by that
+  name, as an MCP client's is in the server's own process (ADR-008, Implementation 12). The MCP
+  server's `--service` mode sends its client's declared name there, and the estimate keeps the
+  same origin whichever way the server reaches the project.
+
+### Alpha 2.2 E.15 (2026-11-05): the browser's quantity types are generated
+
+- The browser's `Quantity`, `Origin`, `OriginKind` and `OverrideOrigin` are the service's own,
+  generated into `src/api/types.gen.ts`, and `check:plan`'s pairs, `Origin` among them, retired with
+  `src/data/types.ts` (ADR-007's note of E.15). The 4.4b note above stands as written then.
+
+### Alpha 2.2 E.17 (2026-11-05): a reading on Proforma's parameter panel
+
+- A Proforma scenario's parameter panel offers, on each numeric row whose rule takes a person's
+  value, the project's readings deposited at the bench that the parameter may take (`GET
+  /api/depositions/readings?unit=` in the parameter's unit, the lookup's own rules deciding),
+  beside a typed value. A chosen reading is kept as the scope's override in the reading's own value
+  and unit: `Override.unit` names that unit, its origin `measurement`, `ref` the reading, `by` its
+  depositor and `at` the time it was taken. An override keeps a unit of its own for a deposition's
+  reading alone, and a person's assumption or a model's estimate naming one is refused in words.
+  A typed value or the row's slider replaces the reading with the person's own.
+- The two senders send what the row holds: the browser's `inputsOf` (the panel's resolve, the run,
+  the ceiling check and geneOS's above-ceiling list) and the service's `proforma.inputs_of`
+  (`project_state.run_request`, which `selling_price`, `run_flowsheet` and `proforma_write` read)
+  send a reading in its own value and unit, and every other row in its parameter's unit. The lookup
+  holds the reading to its rules at each door and sets it in the parameter's unit, the conversion
+  stated in the value's note ("<value> <unit> as deposited, <value> <unit> in the parameter's
+  unit"), so the run's basis names both. The resolvers keep taking an Override in the
+  parameter's unit: `basis.override_of` returns one whose `unit` is empty.
+- A run's basis names the input, its low and its high each as a `deposition` source naming the
+  reading, the value held fixed; the run is `measured` resting on readings, records and the
+  package's defaults, and `assumed` beside a person's value (`basis.basis_provenance`, as the C.5
+  note states). The override row's maker and its audit row name the person who chose the reading;
+  the basis names its depositor.
+- No artifact id moves: a basis that names no reading is written as it was
+  (`core/tests/test_engine_pins.py`), and a row with no unit reads as it did.
+- The chooser stands on a Proforma scenario's panel alone. fermOS's panels and pureOS's Builder
+  render their rows with it off, and a saved train's `TrainParam` holds no reading (Known debts).
+
+### Alpha 2.2 E.debts (2026-11-08): who chose a reading, and where a reading's own unit stands
+
+- The person who chose a reading is kept on its row: `Override.chosenBy`, a reading's alone (a
+  person's value or a model's estimate naming one is refused in words), which the panel fills with
+  the reviewer's name and `project_state` writes as the row's maker, `by` staying the depositor.
+  This pays the review's finding on E.17's note above: E.17 kept the depositor as the row's maker
+  and audited a scope's first keep alone. Each keep that sets a parameter to a reading its scope
+  did not hold, or the same reading chosen by another person, writes a `choose_reading` audit row
+  naming the key, the reading and the chooser, and the row's Readings on the panel say who chose
+  it. `chosenBy` enters no run's basis: the basis names the depositor, as before, and no artifact
+  id moves with it.
+- The state door keeps a reading in its own unit on a Proforma scenario's scope alone
+  (`project_state.OWN_UNIT_SCOPE`) and refuses one on every other scope in words, so a saved train
+  never reads a reading's own number in its parameter's unit.
+- A reading's value note says the conversion in words alone: "<value> <unit> as deposited, <value>
+  <unit> in the parameter's unit", the converter's name left out. The note stands in the run's
+  basis, so a run on a reading deposited in another unit than its parameter's takes a new id; a
+  reading in its parameter's own unit states no conversion, and every pin holds
+  (`core/tests/test_engine_pins.py`).

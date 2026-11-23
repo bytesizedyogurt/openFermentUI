@@ -40,9 +40,10 @@
 // consumed) and what the cross-check rests on, in the service's words.
 import { useEffect, useMemo, useRef, useState } from 'react';
 import { Gauge } from 'lucide-react';
-import type { FermosFitInfo, ParamScope, SimulationSummary, VesselDesign } from '@/data/types';
+import type { FermosFitInfo } from '@/lib/proforma';
 import { overridesFor, useStore } from '@/store';
 import { href, navigate, useRoute } from '@/router';
+import { EngineRunLink } from '@/components/EngineRunLink';
 import { Button, Callout, EmptyState, SectionTitle } from '@/components/ui';
 import { NewScenarioDialog } from '@/components/NewScenarioDialog';
 import { ParameterPanel } from '@/components/ParameterPanel';
@@ -50,8 +51,8 @@ import { ProvenanceBadge } from '@/components/Provenance';
 import { OxygenBalance } from '@/components/figures';
 import { fmt } from '@/engine/units';
 import { exportCSV } from '@/lib/csv';
-import { paramScope } from '@/lib/params';
-import { COMPOSITE_FLOWSHEET, fermosFits, proformaStatus, stamp } from '@/lib/proforma';
+import { paramScope, type ParamScope } from '@/lib/params';
+import { COMPOSITE_FLOWSHEET, fermosFits, plainNote, proformaStatus, stamp } from '@/lib/proforma';
 import {
   FermosDown,
   FermosRefused,
@@ -62,10 +63,12 @@ import {
   vesselRequest,
   vesselScope,
   vesselTypeOf,
+  type SimulationSummary,
+  type VesselDesign,
 } from '@/lib/fermos';
 
 /** The panel's groups, in Appendix 2 §C's order. */
-export const VESSEL_GROUPS = ['Scale', 'Vessel', 'Schedule', 'Aeration', 'Agitation', 'Heat'];
+const VESSEL_GROUPS = ['Scale', 'Vessel', 'Schedule', 'Aeration', 'Agitation', 'Heat'];
 
 /** What Price this in Proforma does, said beside it (OF-BLD-020 §6.1). */
 export const PRICE_WORDS =
@@ -190,7 +193,8 @@ function Result({ design }: { design: VesselDesign }) {
           <a className="font-num hover:text-accent" href={href(`/biorepo/artifacts/${design.artifactId}`)}>
             {design.artifactId}
           </a>{' '}
-          on {stamp(design.createdAt)}, designed for {design.sourceTool} <span className="font-num">{design.source}</span>
+          on {stamp(design.createdAt)}, designed for {design.sourceTool} <span className="font-num">{design.source}</span>;{' '}
+          <EngineRunLink artifactId={design.artifactId} engine="kinetics" />
         </span>
       </p>
 
@@ -273,7 +277,7 @@ function Result({ design }: { design: VesselDesign }) {
               {i.name}: <span className="font-num text-ink">{String(i.value)}</span> {i.unit} — {i.source.kind}
               {i.source.by ? ` by ${i.source.by}` : ''}
               {i.source.id ? ` ${i.source.id}` : ''}
-              {i.source.note ? ` (${i.source.note})` : ''}
+              {i.source.note ? ` (${plainNote(i.source.note)})` : ''}
             </li>
           ))}
         </ul>
@@ -334,6 +338,7 @@ export default function FermOSVessel() {
 
   const scope = chosen ? vesselScope(chosen.id) : '';
   const overrides = useStore(overridesFor(scope));
+  const reviewer = useStore((s) => s.reviewer).trim();
   const vesselType = vesselTypeOf(overrides);
   const ask = useMemo(() => ({ vesselType }), [vesselType]);
   const [panel, setPanel] = useState<ParamScope | null>(null);
@@ -387,7 +392,9 @@ export default function FermOSVessel() {
     const mine = asked;
     setBusy(true);
     setRefused(null);
-    designVessel(vesselRequest(chosen.kind === 'simulation' ? { simulation: chosen.id } : { fit: chosen.id }, overrides), ctrl.signal)
+    // The panel's specs name the unit each override is sent in (lib/params.ts, `inputsOf`).
+    const source = chosen.kind === 'simulation' ? { simulation: chosen.id } : { fit: chosen.id };
+    designVessel(vesselRequest(source, overrides, panel?.specs ?? [], reviewer), ctrl.signal)
       .then((d) => {
         if (ctrl.signal.aborted) return;
         setDesign({ asked: mine, design: d });

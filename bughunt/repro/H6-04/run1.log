@@ -1,0 +1,22 @@
+EXPECTED: the import prints the new project's id and what it carried, one count a kind
+EXPECTED: (docs/runbooks/live-host-install.md:217); for each kind the printed count, the audit row's
+EXPECTED: detail.counts and the rows the project keeps are one number, or a duplicate id is refused in words.
+module: <worktree of 2047f5a>/core/openferment_core/import_alpha1.py
+alpha 1.0 data one: guild.json people [('p-ada', 'Ada Moreno'), ('p-ben', 'Ben Ortiz')]; artifacts/ ['00000000000000aa.json']
+alpha 1.0 data dup: guild.json people [('p-ada', 'Ada Moreno'), ('p-ben', 'Ben Ortiz'), ('p-ben', 'Ben Ortiz (again)')]; artifacts/ ['00000000000000aa copy.json', '00000000000000aa.json']
+database bh_r_h6_04_imp (fresh): openferment at 0010
+
+== import one: exit 0; project repro-h6-04-one; 0 refused: lines
+  people:    printed 2; audited 2; kept 2 (p-ada Ada Moreno, p-ben Ben Ortiz)
+  artifacts: printed 1; audited 1; kept 1 (00000000000000aa)
+  printed, audited and kept counts: agree
+
+== import dup: exit 0; project repro-h6-04-dup; 0 refused: lines
+  people:    printed 3; audited 3; kept 2 (p-ada Ada Moreno, p-ben Ben Ortiz (again))
+  artifacts: printed 2; audited 2; kept 1 (00000000000000aa)
+  printed, audited and kept counts: disagree
+
+OBSERVED: control (no duplicate id): printed 2 people, audited 2, kept 2; printed 1 artifacts, audited 1, kept 1 (agree)
+OBSERVED: duplicate ids, exit 0 with no refused: line: printed 3 people, audited 3, kept 2; printed 2 artifacts, audited 2, kept 1 (disagree)
+OBSERVED: the import counts the entries of each file (import_alpha1.py:79-93) and rows.put upserts by (project_id, id).
+RESULT: DEFECT

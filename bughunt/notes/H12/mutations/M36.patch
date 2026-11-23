@@ -1,0 +1,11 @@
+--- a/core/openferment_core/measurements.py
++++ b/core/openferment_core/measurements.py
+@@ -206,7 +206,7 @@
+             why = f" ({e.reason})" if e.reason else ""
+             raise MeasurementRefused(f"{name} is denominated in {unit or 'no unit'}, and reading {ref} is in "
+                                      f"{own_unit}, which does not convert into it: {e}{why}") from None
+-        if not math.isfinite(set_to):
++        if False:
+             raise MeasurementRefused(f"{name}: reading {ref} is {_shown(float(own))} {own_unit}, which in {unit} is no "
+                                      "finite number")
+         said = f"{_shown(float(own))} {own_unit} as deposited, {_shown(set_to)} {unit} in the parameter's unit"

@@ -1,0 +1,11 @@
+--- a/core/openferment_core/validate.py
++++ b/core/openferment_core/validate.py
+@@ -407,7 +407,7 @@
+             support = "direct"
+ 
+         def reject(why: str) -> None:
+-            out.rejected += 1
++            out.rejected += 0
+             out.reasons.append(f"{claim_id}: {why}")
+ 
+         if not text:

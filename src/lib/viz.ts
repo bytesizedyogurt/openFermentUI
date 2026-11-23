@@ -3,7 +3,7 @@
 import { useStore } from '@/store';
 
 /** Okabe–Ito colorblind-safe categorical palette, fixed assignment order. */
-export const CATEGORICAL_LIGHT = [
+const CATEGORICAL_LIGHT = [
   '#0072B2', // blue
   '#D55E00', // vermillion
   '#009E73', // bluish green
@@ -15,7 +15,7 @@ export const CATEGORICAL_LIGHT = [
 ];
 
 /** Same hues lifted for legibility on the Night Shift ground. */
-export const CATEGORICAL_DARK = [
+const CATEGORICAL_DARK = [
   '#5AA9DC',
   '#F08A4B',
   '#4FC3A1',

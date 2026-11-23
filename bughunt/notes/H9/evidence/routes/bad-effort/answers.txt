@@ -1,0 +1,39 @@
+## table: {"plan": {"effort": "extreme"}}
+## GET /api/health
+{"ok":true,"service":"openferment-core","model":"claude-opus-5-5","fallbackModel":"claude-sonnet-5-5","hasKey":true} [200]
+## POST /api/ask
+Internal Server Error [500]
+
+## POST /api/ask/stream
+event: turn
+data: {"conversationId": "lc-87698af30865", "turnId": "turn-e9d1b1eb102c", "seq": 1}
+
+event: step
+data: {"n": 1, "kind": "coverage", "tool": null, "input": {"modules": ["Runbooks · 0", "geneOS · 0", "fermOS · 0", "pureOS · 0", "Proforma · 0", "BioRepo · 0 · read in part", "Guild · 0", "Primer · 0", "Intake · 0", "Home · 0"]}, "summary": "Swept the modules for what the question names · searched ten, found in none", "ms": 56, "ok": true}
+
+event: error
+data: {"message": "Postdoc failed while answering: RoutesInvalid. The service log names what went wrong."}
+
+ [200]
+## POST /api/intake/08eab93bb6d640d490aa4ec04515e8a5/extract
+Internal Server Error [500]
+
+## POST /api/literature/answer
+nk", "status": "disabled", "duration_ms": 0, "candidates": 0}]}
+
+event: compression_done
+data: {"enabled": false, "source_count_before": 1, "source_count_after": 1, "failure_count": 0, "dropped_count": 0, "prompt_tokens_before": 194, "prompt_tokens_after": 194}
+
+event: error
+data: {"code": "RoutesInvalid", "message": "OPENFERMENT_ROUTES.plan.effort is one of low, medium, high, xhigh, max"}
+
+ [200]
+## GET /api/literature/search deep
+{"query":"xylose","profile":"deep","hits":[{"documentId":"08eab93bb6d640d490aa4ec04515e8a5","passageId":"p0","title":"Notes","text":"Yeast ferments glucose to ethanol. Xylose is not consumed.","sectionPath":null,"citation":"Notes.","licenceClass":"unknown","year":null,"score":0.04098360655737705,"la
+
+## POST /api/tools/intake_write extract (assistant)
+{"summary":{},"evidence":[],"recordIds":[],"passages":[],"error":"intake_write failed: RoutesInvalid: OPENFERMENT_ROUTES.plan.effort is one of low, medium, high, xhigh, max","usage":{"inputTokens":0,"outputTokens":0,"cacheReadTokens":0,"cacheWriteTokens":0,"costUsd":0.0,"models":[]},"draft":null,"rows":[],"data":null,"auditIds":[]} [200]
+
+## POST /api/tools/home_write note (assistant)
+{"summary":{"state":"proposed","proposalId":"pr-3f839d37da29","gate":"notebook","gateCovers":"write a note under a person's name","how":"accept the note; it is kept under your name","meaning":"nothing was written: this action waits for a person, who sees it as a card on Home with one button. Say so in gaps."},"evidence":[],"recordIds":[],"passages":[],"error":null,"usage":{"inputTokens":0,"outputT
+

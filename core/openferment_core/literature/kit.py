@@ -12,17 +12,26 @@ THE PROJECT IS THE SCOPE. A document a project collects is stored with source
 `project:<id>:<collector>` (`source`), and `documents_link` holds a row for
 each project that holds it, with the selection that brought it in. A document
 the kit already holds (the same text, whoever collected it) is linked, not
-stored again, so `documents_link` is the authority on who holds what. Every
+stored again, so `documents_link` is the authority on who holds what. The
+kit finds a held document by a key that folds letter case and white space, so
+the held passages are read before a link is made (`_differs`): a text that
+differs from them in letter case alone ("2000 mg" beside a held "2000 Mg") is
+answered `failed` with the first word that differs, and the project links
+nothing for it. Every
 read a project makes is narrowed to its linked documents: their sources go to
 the kit as its `sources` allowlist, and every other document from those
 sources as `exclude_document_ids` (`visible`). A project that holds nothing
-sees nothing; the kit denies an empty allowlist outright.
+sees nothing; the kit denies an empty allowlist outright. The retriever reads
+the project's holdings again once a retrieval is done, so a document another
+project commits under a shared source during the search stays out of it
+(`ProjectRetriever`).
 
 `ProjectService` is the kit's own `RagService` with that narrowing applied to
-every read, so the calls below, the kit's REST app at /rag (`rest_app`) and
-its MCP server (`mcp.py`) answer alike for one project. A request to /rag
-names its project as every /api request does (api.py); the MCP server acts in
-OPENFERMENT_PROJECT.
+every read, the concept graph's among them (`graph.py`), so the calls below,
+the kit's REST app at /rag (`rest_app`) and its MCP server
+(`openferment_core/literature_mcp.py`) answer alike for one project. A request
+to /rag names its project as every /api request does (api.py); the MCP server
+acts in the project its `--project` names, else OPENFERMENT_PROJECT.
 
 TWO KINDS OF ENGINE. asyncpg ties a connection to the event loop that opened
 it. The calls openFerment makes run on the database loop (`db.run`) through a
@@ -34,13 +43,14 @@ test's transaction binds.
 """
 from __future__ import annotations
 
+import contextvars
 import dataclasses
 import json
 import os
 import queue
 import secrets
 import threading
-from collections.abc import AsyncIterator, Callable, Coroutine, Iterator
+from collections.abc import AsyncIterator, Callable, Coroutine, Iterable, Iterator
 from dataclasses import dataclass
 from typing import Any, TypeVar
 
@@ -51,8 +61,10 @@ from sci_rag.db import models as kit_models
 from sci_rag.db.models import Chunk, Document, DocumentCitation
 from sci_rag.domain import load_domain
 from sci_rag.embed.provider import EmbeddingProvider
+from sci_rag.ingest.chunker import chunk_document
 from sci_rag.ingest.ingester import IngestOutcome, ingest_entries
 from sci_rag.ingest.manifest import CorpusEntry
+from sci_rag.ingest.parsers import parse_file
 from sci_rag.llm.client import LLMClient
 from sci_rag.retrieve import Retriever
 from sci_rag.retrieve.types import RetrievalResult, RetrievalScope
@@ -65,7 +77,7 @@ from sqlalchemy.ext.asyncio import AsyncEngine, async_sessionmaker
 
 from .. import db, projects
 from ..db import models as t
-from . import DOMAIN_DIR, EMBEDDING_CACHE, EMBEDDING_DIM, EMBEDDING_MODEL, HERE
+from . import DOMAIN_DIR, EMBEDDING_CACHE, EMBEDDING_DIM, EMBEDDING_MODEL, HERE, graph
 from .fastembed import FastEmbedProvider
 
 T = TypeVar("T")
@@ -142,10 +154,19 @@ def model(role: str = "answer") -> LLMClient:
     return _MODEL(role)
 
 
+#: The failures of the answers the model streams in this context, kept for
+#: `answer` to say. The kit catches a failed answer, logs its words and sends
+#: its class name; the installed client's words say why it failed, in the
+#: service's own words for a missing key or the Anthropic account's usage
+#: limit (llm.py), which never hold a key's value.
+_FAILURES: contextvars.ContextVar[list[Exception] | None] = contextvars.ContextVar("kit_answer_failures", default=None)
+
+
 class _ModelOnDemand(LLMClient):
     """The installed model client, looked up each time the kit generates: a
     search that generates nothing needs none, and a client installed after
-    the service was built is the one used."""
+    the service was built is the one used. A streamed answer that fails is
+    kept in `_FAILURES`, when its caller set one (`answer`)."""
 
     def __init__(self, role: str) -> None:
         self.role = role
@@ -159,9 +180,17 @@ class _ModelOnDemand(LLMClient):
             prompt, system=system, temperature=temperature, max_tokens=max_tokens, json_mode=json_mode
         )
 
-    def stream(self, prompt: str, *, system: str | None = None, temperature: float = 0.2,
-               max_tokens: int = 2048) -> AsyncIterator[str]:
-        return model(self.role).stream(prompt, system=system, temperature=temperature, max_tokens=max_tokens)
+    async def stream(self, prompt: str, *, system: str | None = None, temperature: float = 0.2,  # type: ignore[override]
+                     max_tokens: int = 2048) -> AsyncIterator[str]:
+        try:
+            async for piece in model(self.role).stream(prompt, system=system, temperature=temperature,
+                                                       max_tokens=max_tokens):
+                yield piece
+        except Exception as e:  # the kit catches it next and sends its class name
+            failures = _FAILURES.get()
+            if failures is not None:
+                failures.append(e)
+            raise
 
     async def generate_json(self, prompt: str, *, system: str | None = None, max_tokens: int = 4096) -> Any:
         return await model(self.role).generate_json(prompt, system=system, max_tokens=max_tokens)
@@ -301,7 +330,7 @@ def service(kind: str = "loop") -> ProjectService:
         if held is None:
             _answer_for_the_kit()
             s = settings()
-            retriever = Retriever(
+            retriever = ProjectRetriever(
                 settings=s,
                 domain=load_domain(DOMAIN_DIR),
                 embedder=embedder(),
@@ -369,6 +398,19 @@ async def visible(project_id: str) -> Visible:
     return Visible(tuple(held), tuple(sources), tuple(others))
 
 
+async def holding(project_id: str, document_ids: Iterable[str]) -> set[str]:
+    """Which of `document_ids` the project holds when this is read."""
+    ids = sorted(set(document_ids))
+    if not ids:
+        return set()
+    link = t.documents_link
+    async with db.session() as s:
+        rows = (await s.execute(
+            select(link.c.document_id).where(link.c.project_id == project_id, link.c.document_id.in_(ids))
+        )).all()
+    return {r[0] for r in rows}
+
+
 async def linked(project_id: str, document_id: str) -> dict[str, Any] | None:
     """The link row of a document the project holds, or None."""
     link = t.documents_link
@@ -413,6 +455,54 @@ async def _narrowed(base: RetrievalScope | None) -> RetrievalScope:
 async def _held(document_id: str) -> None:
     if await _on_db(linked(_project(), document_id)) is None:
         raise ApiError(404, "document_not_found", "No such document", document_id)
+
+
+class ProjectRetriever(Retriever):
+    """The kit's retriever, with every result held to the current project.
+
+    `_narrowed` reads the project's scope in a statement of its own, before
+    the retrieval runs. A document another project commits in between, under
+    a source the two projects share, passes both the scope's `sources`
+    allowlist and its `exclude_document_ids`, which were read before it
+    existed. So once the retrieval is done, the documents its items name are
+    read against the project's holdings again (`holding`). When an item names
+    a document the project does not hold, the retrieval runs again, up to
+    `RERUNS` times, each time excluding the strays seen so far and every other
+    document of the project's sources as `visible` reads them then, so the
+    scope still precedes the ranking and a second document committed in the
+    same window is excluded with the first. Any item the last run returns
+    from a document the project does not hold is dropped. Every caller of the
+    service's retriever reaches it: the search, the answer engine and the
+    retrieval report."""
+
+    #: How many times a retrieval runs again when its items name a document
+    #: the project does not hold.
+    RERUNS = 2
+
+    async def retrieve(self, query: str, **kw: Any) -> RetrievalResult:
+        project = _project()
+        result = await super().retrieve(query, **kw)
+        strays = await self._strays(project, result)
+        for _ in range(self.RERUNS):
+            if not strays - {None}:
+                break
+            scope = kw.get("scope") or RetrievalScope()
+            now = await _on_db(visible(project))
+            kw["scope"] = dataclasses.replace(scope, exclude_document_ids=tuple(sorted(
+                {*scope.exclude_document_ids, *now.excluded, *(d for d in strays if d is not None)})))
+            result = await super().retrieve(query, **kw)
+            strays = await self._strays(project, result)
+        if strays:
+            result = dataclasses.replace(result, items=[i for i in result.items if i.document_id not in strays])
+        return result
+
+    @staticmethod
+    async def _strays(project: str, result: RetrievalResult) -> set[str | None]:
+        """The documents the result's items name that the project does not
+        hold, None standing for an item that names no document."""
+        named = {i.document_id for i in result.items}
+        held = await _on_db(holding(project, (d for d in named if d is not None)))
+        return {d for d in named if d not in held}
 
 
 class ProjectService(RagService):
@@ -493,17 +583,40 @@ class ProjectService(RagService):
         found["cited_by"] = [c for c in found["cited_by"] if c["document_id"] in mine]
         return found
 
+    async def search_entities(self, name_contains: str, entity_type: str | None = None,
+                              limit: int = 20) -> dict[str, Any]:
+        """The kit's `search_entities` over the project's concept graph: the
+        entities the project's passages name whose name holds `name_contains`
+        (`graph.entities`, under graph.py's rule)."""
+        project = _project()
+        seen = await _on_db(visible(project))
+        return await graph.entities(self.session_factory, seen.documents, project=project,
+                                    name_contains=name_contains, entity_type=entity_type, limit=limit)
+
+    async def entity_relationships(self, entity_name: str) -> dict[str, Any]:
+        """The kit's `get_entity_relationships` over the project's concept
+        graph: each relationship of the entity named `entity_name` whose
+        evidence the project holds, with the passage it stands in
+        (`graph.relationships`, under graph.py's rule)."""
+        project = _project()
+        seen = await _on_db(visible(project))
+        return await graph.relationships(self.session_factory, seen.documents, entity_name, project=project)
+
     async def stats(self) -> dict[str, Any]:
-        """The project's documents and chunks. The concept graph (entities,
-        relationships, communities) is the instance's, counted whole."""
-        counts = await super().stats()
+        """The project's documents, their chunks and their citations, counted
+        by licence class, source and embedding version, and its concept graph:
+        the entities its passages name and the relationships they hold
+        (graph.py's rule). Communities stay unbuilt, since the kit reads none
+        under a scope, so they count 0."""
         ids = (await _on_db(visible(_project()))).documents
+        shape = await graph.counts(self.session_factory, ids)
+        counts: dict[str, Any] = {"documents": len(ids)}
         async with self.session_factory() as session:
-            counts["documents"] = len(ids)
             counts["chunks"] = int(await session.scalar(
                 select(func.count(Chunk.id)).where(Chunk.document_id.in_(ids))) or 0)
             counts["citations"] = int(await session.scalar(
                 select(func.count(DocumentCitation.id)).where(DocumentCitation.citing_document_id.in_(ids))) or 0)
+            counts.update(entities=shape["entities"], relationships=shape["relationships"], communities=0)
             counts["license_classes"] = dict((await session.execute(
                 select(Document.license_class, func.count(Document.id)).where(Document.id.in_(ids))
                 .group_by(Document.license_class))).all())
@@ -516,6 +629,31 @@ class ProjectService(RagService):
                     .group_by(Chunk.embedding_version))).all()
             }
         return counts
+
+    async def fingerprint(self) -> dict[str, Any]:
+        """The project's corpus as a report states it: the kit's fingerprint
+        (`sci_rag.evals.report.corpus_fingerprint`: documents, chunks, the
+        graph's entities, relationships and communities, the latest ingestion,
+        the embedding versions) counted over the documents the project holds,
+        with the kit's token count of their chunks (`tokens`, its estimate of
+        four characters a token where tiktoken is absent) and the concept
+        graph's counts (`graph`, `graph.counts`)."""
+        project = _project()
+        ids = (await _on_db(visible(project))).documents
+        async with self.session_factory() as session:
+            chunks, tokens = (await session.execute(
+                select(func.count(Chunk.id), func.coalesce(func.sum(Chunk.token_count), 0))
+                .where(Chunk.document_id.in_(ids)))).one()
+            latest = await session.scalar(select(func.max(Document.ingested_at)).where(Document.id.in_(ids)))
+            versions = sorted(v for v in (await session.execute(
+                select(Chunk.embedding_version).where(Chunk.document_id.in_(ids)).distinct())).scalars() if v)
+        shape = await graph.counts(self.session_factory, ids)
+        return {
+            "project": project, "documents": len(ids), "chunks": int(chunks), "tokens": int(tokens),
+            "entities": shape["entities"], "relationships": shape["relationships"], "communities": 0,
+            "latest_ingested_at": latest.isoformat() if latest else None, "embedding_versions": versions,
+            "graph": shape,
+        }
 
 
 # ── what openFerment calls ─────────────────────────────────────────────────
@@ -532,6 +670,38 @@ class Stored:
     chunks: int = 0
 
 
+async def _differs(entry: CorpusEntry, document_id: str) -> str:
+    """Words for an entry the kit answered with a held document of other text,
+    or "" when the held document holds this entry's text. The kit keys a
+    document on its passages' words with white space collapsed and letter case
+    folded (`content_hash_for` in `sci_rag.ingest.ingester`), so a paste of
+    "2000 mg" finds a held "2000 Mg" and comes back `skipped_duplicate` with
+    that document's id, and its unique `content_hash` keeps one document for
+    the two. The entry is parsed and chunked again as the ingester does, with
+    its defaults, and its words are set beside the held passages' words with
+    white space collapsed and letter case kept."""
+    given = " ".join(d.body for d in chunk_document(parse_file(entry.path))).split()
+    async with kit_engine.session_scope() as session:
+        chunks = (await session.execute(
+            select(Chunk).where(Chunk.document_id == document_id).order_by(Chunk.chunk_index)
+        )).scalars().all()
+    held = " ".join(body_of(c) for c in chunks).split()
+    if given == held:
+        return ""
+    at = next((i for i, (a, b) in enumerate(zip(held, given, strict=False)) if a != b), min(len(held), len(given)))
+
+    def word(words: list[str]) -> str:
+        return repr(words[at]) if at < len(words) else "the text's end"
+
+    how = " in letter case alone" if " ".join(held).lower() == " ".join(given).lower() else ""
+    return (
+        f"document {document_id} holds a text that differs from this one{how}, first at word {at + 1} "
+        f"(held {word(held)}, given {word(given)}); the kit keys the two alike, since it folds letter case "
+        f"and white space when it keys a text, and keeps one document for both, so a link would show this "
+        f"project the held words"
+    )
+
+
 async def _store(entries: list[CorpusEntry], *, project_id: str, selections: list[dict[str, Any]],
                  by: str) -> list[Stored]:
     stored: list[Stored] = []
@@ -544,6 +714,11 @@ async def _store(entries: list[CorpusEntry], *, project_id: str, selections: lis
         if outcome.document_id is None:
             stored.append(Stored("failed", None, outcome.detail))
             continue
+        if outcome.status == "skipped_duplicate":
+            differs = await _differs(entry, outcome.document_id)
+            if differs:
+                stored.append(Stored("failed", None, differs))
+                continue
         if outcome.status == "ingested" and selection.get("sourceRef"):
             # A file written for the ingester has no address worth keeping;
             # the document points back to how it came instead.
@@ -683,6 +858,14 @@ def stats(project_id: str) -> dict[str, Any]:
     return db.run(go())
 
 
+async def fingerprint(project_id: str) -> dict[str, Any]:
+    """`ProjectService.fingerprint` for `project_id`, awaited on the database
+    loop: a report's coroutine, handed to `db.run`, awaits it beside the
+    kit's own evaluation."""
+    with projects.using(project_id):
+        return await service().fingerprint()
+
+
 @dataclass(frozen=True)
 class Hit:
     """One passage a search found, with where it stands and how it was found."""
@@ -751,11 +934,16 @@ def answer(query: str, *, project_id: str, top_k: int = 8, profile: str = "inter
     for a synchronous caller (a streaming route): `retrieval_done`, `delta`
     (text), `citations` (every source, its passage id, and whether the answer
     cited it), `done`, or `error`. The model is the installed client, through
-    llm.py; what the kit passes between its own steps is left out."""
+    llm.py; what the kit passes between its own steps is left out. An answer
+    the model failed to write ends in an `error` whose message is the
+    failure's own words, llm.py's for a missing key or the account's usage
+    limit, as Postdoc and Extract say them."""
     events: queue.Queue[Any] = queue.Queue()
     end = object()
+    failures: list[Exception] = []
 
     async def pump() -> None:
+        _FAILURES.set(failures)
         try:
             with projects.using(project_id):
                 async for event in service().answer_stream(query, profile=profile, top_k=top_k, max_tokens=max_tokens):
@@ -774,6 +962,9 @@ def answer(query: str, *, project_id: str, top_k: int = 8, profile: str = "inter
             yield {"type": "error", "code": type(item).__name__, "message": str(item)}
             continue
         data = {k: v for k, v in item.data.items() if not k.startswith("_")}
+        if item.type == "error" and data.get("code") == "generation_failed" and failures:
+            # The kit's message names the failure's class; the failure's words say why.
+            data["message"] = str(failures[-1]) or data.get("message")
         if item.type == "citations":
             where = db.run(_where([c["chunk_id"] for c in data.get("citations", []) if c.get("chunk_id")]))
             for c in data.get("citations", []):
@@ -784,7 +975,7 @@ def answer(query: str, *, project_id: str, top_k: int = 8, profile: str = "inter
 def rest_app() -> Any:
     """The kit's REST app, for /rag: its routes, its key check and its error
     shape over `service('free')`. Its MCP endpoint is left out; the MCP
-    server runs on its own (`python -m openferment_core.literature.mcp`)."""
+    server runs on its own (`python -m openferment_core.literature_mcp`)."""
     from sci_rag.server.app import create_app
     from starlette.routing import Mount
 

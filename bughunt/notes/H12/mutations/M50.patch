@@ -1,0 +1,11 @@
+--- a/core/openferment_core/engine/conform.py
++++ b/core/openferment_core/engine/conform.py
+@@ -483,7 +483,7 @@
+                      "outside the precision") + f" (rtol {r.tolerance.rtol:g}, atol {r.tolerance.atol:g})"
+         else:
+             state = "identical" if r.identical else "different, where the thing's precision asks for identical outputs"
+-        four = (bool(r.withinTolerance or r.identical),
++        four = (True,
+                 f"{state}; {len(r.differences)} difference{'s' if len(r.differences) != 1 else ''}")
+     except Exception as e:
+         four = (False, f"the replay failed: {type(e).__name__}: {_words(e)}")

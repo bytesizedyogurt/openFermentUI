@@ -1,0 +1,10 @@
+document: c2f1e088158947d9ae083b334037c6eb; model requests before the two asks: 0
+## POST /api/literature/answer: {"route": "POST /api/literature/answer", "status": 200, "events": ["retrieval_started", "retrieval_done", "compression_done", "generation_started", "error"], "modelRequests": 1, "keysUsed": ["ENVKEY"], "sentinelInResponse": false}
+## POST /rag/v1/answer (control: the kit's answer through its REST door): {"route": "POST /rag/v1/answer (control: the kit's answer through its REST door)", "status": 200, "events": ["retrieval_started", "retrieval_done", "compression_done", "generation_started", "error"], "modelRequests": 3, "keysUsed": ["SENTINEL", "SENTINEL", "SENTINEL"], "sentinelInResponse": false}
+## GET /api/audit?action=key_override: [{"target": "POST /api/literature/answer", "detail": {"override": true}}, {"target": "POST /rag/v1/answer", "detail": {"override": true}}]
+## the request's key in the service log: 0 lines
+## the cause, in the repository's Python:
+  inside llm.request_key: key_named() in a threading.Thread = False; in asyncio.to_thread = True
+EXPECTED: every model request POST /api/literature/answer makes carries the request's key (x-api-key = SENTINEL), as POST /rag/v1/answer's do; the audit row's override:true then holds
+OBSERVED: /api/literature/answer sent 1 model request(s) carrying ['ENVKEY']; /rag/v1/answer sent 3 carrying ['SENTINEL', 'SENTINEL', 'SENTINEL']; key_override audit row for POST /api/literature/answer with override true: True
+RESULT: DEFECT

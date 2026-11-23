@@ -40,7 +40,8 @@ export type ComponentName =
   | 'Common Seal'
   | 'Guild'
   | 'Runbook'
-  | 'Deposition';
+  | 'Deposition'
+  | 'Catalogues';
 
 /**
  * One line per component, shown on hover and to screen readers. A name with no
@@ -62,6 +63,7 @@ export const COMPONENT_ROLE: Record<ComponentName, string> = {
   Guild: 'People and permissions — review, roles and who decided what',
   Runbook: 'Assay — the outbound falsifiable claim',
   Deposition: 'Assay — the inbound account of what actually happened',
+  Catalogues: 'Evidence in — the strains, products, skills and lessons a project keeps',
 };
 
 /**
@@ -98,7 +100,7 @@ export function ComponentTag({
     <span
       className={cx(
         // No border and no background — that absence is the family marker.
-        'inline-flex items-baseline gap-1 font-num text-[11px] leading-tight text-ink-soft',
+        'relative inline-flex items-baseline gap-1 font-num text-[11px] leading-tight text-ink-soft',
         className,
       )}
       title={title ?? (component ? `${component} — ${COMPONENT_ROLE[component]}` : who)}

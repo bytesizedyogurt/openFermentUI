@@ -1,0 +1,11 @@
+--- a/core/openferment_core/engine/conform.py
++++ b/core/openferment_core/engine/conform.py
+@@ -449,7 +449,7 @@
+             art = artifacts.get(a.artifactId)
+             keyed = artifacts.artifact_id(art.tool, art.toolVersion, art.inputs, art.seed) == a.id
+         diagnosed, reported = _diagnosed(a, b, art)
+-        ok = a.id == b.id and rows == 1 and a.status == "done" and a.engine == engine.name and keyed and diagnosed
++        ok = a.id == b.id and a.status == "done" and a.engine == engine.name and keyed and diagnosed
+         said = (f"run {a.id} of {thing.id}" + (f" with {len(inputs)} value{'s' if len(inputs) != 1 else ''} set"
+                                                 if inputs else "")
+                 + f", asked twice, is {rows} row{'s' if rows != 1 else ''}; engine {a.engine}, status {a.status}; "

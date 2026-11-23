@@ -1,0 +1,27 @@
+worktree /tmp/claude-0/-home-user-openFermentUI/cfbc5c9f-640a-5002-a705-5ceaf850fdc6/scratchpad/bh/work/H12-04/wt-474 at 2047f5a
+the check at the head (core/openferment_core/guard.py, refusal):
+   guard.py:133:        forwarded and answers_to(hostname(forwarded)) and same_site(origin, forwarded)
+the tests' only cases with X-Forwarded-Host (core/tests/test_request_guard.py):
+   test_request_guard.py:75:        **{"x-forwarded-host": "127.0.0.1"},
+   test_request_guard.py:87:        {"host": "localhost:8000", "origin": "http://127.0.0.1:5173", "x-forwarded-host": "127.0.0.1:5173"},  # pnpm dev
+   test_request_guard.py:91:            "x-forwarded-host": "100.101.102.103:5173",
+   test_request_guard.py:97:            "x-forwarded-host": "mini.tail1234.ts.net",
+   test_request_guard.py:102:            "x-forwarded-host": "mini.tail1234.ts.net",
+1. head, probe over a fresh bh_r_h12_04_db:
+   PROBE guard.py loaded from /tmp/claude-0/-home-user-openFermentUI/cfbc5c9f-640a-5002-a705-5ceaf850fdc6/scratchpad/bh/work/H12-04/wt-474/core/openferment_core/guard.py
+   PROBE guard.refusal('POST', headers) = "a page on 'http://rebind.evil.example.com' may not change anything here"
+   PROBE status=403 detail="a page on 'http://rebind.evil.example.com' may not change anything here"
+   PROBE made=no projects=[]
+   test_request_guard, test_key_override, test_projects: exit 0, 58 passed in 4.19s
+2. mutation applied:  1 file changed, 1 insertion(+), 1 deletion(-)
+   -        forwarded and answers_to(hostname(forwarded)) and same_site(origin, forwarded)
+   +        forwarded and same_site(origin, forwarded)
+   probe over bh_r_h12_04_db made fresh again:
+   PROBE guard.py loaded from /tmp/claude-0/-home-user-openFermentUI/cfbc5c9f-640a-5002-a705-5ceaf850fdc6/scratchpad/bh/work/H12-04/wt-474/core/openferment_core/guard.py
+   PROBE guard.refusal('POST', headers) = None
+   PROBE status=201 detail=None
+   PROBE made=yes projects=['rebound-write']
+   test_request_guard, test_key_override, test_projects: exit 0, 58 passed in 4.24s
+EXPECTED: with answers_to(hostname(forwarded)) gone from guard.refusal, a test fails: the guard is the access control (CLAUDE.md:52 'the loopback bind and core/openferment_core/guard.py are the access control until accounts exist'), it exists for DNS rebinding (guard.py:10-12 'A hostile name is made to resolve to the Mini ... The request then names that hostile domain in Host'), and a proxy that rewrites Host carries that name in X-Forwarded-Host (guard.py:124-125), so a POST with Host 127.0.0.1:8000, Origin http://rebind.evil.example.com and X-Forwarded-Host rebind.evil.example.com is answered 403 and a test holds it there
+OBSERVED: head: the probe's POST /api/projects answered 403 (project made: no) and the three test files exit 0 (58 passed in 4.19s); with the check deleted: the same POST answered 201 (project made: yes), and the three test files exit 0 (58 passed in 4.24s)
+RESULT: DEFECT

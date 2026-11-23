@@ -289,16 +289,16 @@ def test_a_reference_flowsheet_kept_in_the_project_is_fetched_checked_once_and_d
 
 
 def test_a_runs_export_carries_openferments_block_and_is_kept_as_the_runs(toolkit):
-    record = sff.export({"flowsheet": "cornstover_benchmark"}, project_id=PROJECT, run_artifact_id="0123456789abcdef",
-                        by="A. Reader", title="Corn stover ethanol")
+    record = sff.export({"flowsheet": "ethanol_glucose_v0"}, project_id=PROJECT, run_artifact_id="0123456789abcdef",
+                        by="A. Reader", title="Glucose to ethanol")
     [(op, args)] = toolkit.calls
-    assert op == "sff_export" and args["flowsheet"] == "cornstover_benchmark" and args["title"] == "Corn stover ethanol"
+    assert op == "sff_export" and args["flowsheet"] == "ethanol_glucose_v0" and args["title"] == "Glucose to ethanol"
     assert (record.id, record.origin, record.runArtifactId) == ("run-0123456789abcdef", "run", "0123456789abcdef")
-    assert record.title == "Corn stover ethanol" and record.source == "exported from run 0123456789abcdef of cornstover_benchmark"
+    assert record.title == "Glucose to ethanol" and record.source == "exported from run 0123456789abcdef of ethanol_glucose_v0"
     held = json.loads(sff.document(record.id, project_id=PROJECT))
     assert held["metadata"]["openferment"] == {"project_id": PROJECT, "run_artifact_id": "0123456789abcdef",
-                                               "origin": "run", "flowsheet": "cornstover_benchmark"}
-    again = sff.export({"flowsheet": "cornstover_benchmark"}, project_id=PROJECT, run_artifact_id="0123456789abcdef",
+                                               "origin": "run", "flowsheet": "ethanol_glucose_v0"}
+    again = sff.export({"flowsheet": "ethanol_glucose_v0"}, project_id=PROJECT, run_artifact_id="0123456789abcdef",
                        by="A. Reader")
     assert again.id == record.id and len(sff.listed(project_id=PROJECT)) == 1, "a run exported twice is one record"
 
@@ -369,8 +369,12 @@ def test_a_run_exports_from_its_basis_alone():
                         provenance="computed", createdAt="2026-10-30T00:00:00Z", durationMs=0)
 
     model = BasisSource(kind="model", id="biorefineries@2.35.1")
+    # A run kept from a retired reference entry writes no file of its own (alpha 2.2 D8): the library plant's run
+    # of the same package's plant does, and the refusal says which.
     ref = art(proforma.REFERENCE, [BasisInput(name="flowsheet", value="corn_drygrind", unit="", source=model)])
-    assert proforma.plant_of(ref) == {"flowsheet": "corn_drygrind"}
-    assert proforma.plant_of(art(proforma.BENCHMARK, [])) == {"flowsheet": "cornstover_benchmark"}
+    with pytest.raises(proforma.ScenarioRefused, match="POST /api/library/corn/run"):
+        proforma.plant_of(ref)
+    with pytest.raises(proforma.ScenarioRefused, match="the library plant cornstover's to write"):
+        proforma.plant_of(art(proforma.BENCHMARK, []))
     with pytest.raises(proforma.ScenarioRefused, match="not a run of a flowsheet"):
         proforma.plant_of(art("thermo.props", []))

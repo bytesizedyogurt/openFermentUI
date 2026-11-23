@@ -1,0 +1,16 @@
+--- a/core/openferment_core/llm.py
++++ b/core/openferment_core/llm.py
+@@ -1147,10 +1147,9 @@
+         async def generate(self, prompt: str, *, system: str | None = None, temperature: float = 0.2,
+                            max_tokens: int = 2048, json_mode: bool = False) -> str:
+             room = KIT_ROOM[routes()[family].effort]
+-            result = await asyncio.to_thread(
+-                call, system=system or "", user=prompt, schema=None, max_tokens=max(max_tokens, room),
+-                family=family, label="sci-rag-kit: ",
+-            )
++            result = await asyncio.get_running_loop().run_in_executor(None, lambda: call(
++                system=system or "", user=prompt, schema=None, max_tokens=max(max_tokens, room),
++                family=family, label="sci-rag-kit: "))
+             return result.text
+ 
+         async def stream(self, prompt: str, *, system: str | None = None, temperature: float = 0.2,

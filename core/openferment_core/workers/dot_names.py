@@ -1,4 +1,4 @@
-"""Stable node names for a BioSTEAM digraph (OF-BLD-019 §7.R, finding 5).
+"""Stable node names for a BioSTEAM digraph.
 
 BioSTEAM names every node of the digraph it hands Graphviz `str(hash(obj))`,
 the unit's or the stream's address in that process, and Graphviz writes each

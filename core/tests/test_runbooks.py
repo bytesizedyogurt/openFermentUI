@@ -10,6 +10,9 @@ holds the digest the browser's own code writes, a runbook the page made
 included, and from then on the store refuses a row whose predictions or
 measures differ. A second lock, a runbook with no prediction, a refused
 run, an output that is no number and an unknown run are refused in words.
+A run of any engine is predicted by its outputs.values (`values.<name>`):
+the contract's sample engine's, and a library run's, whose `price.<key>`
+and `outputs.<key>` keep their runbook ids and predictions.
 """
 from __future__ import annotations
 
@@ -19,16 +22,19 @@ from fastapi.testclient import TestClient
 from openferment_core import audit, project_state
 from openferment_core.api import app
 from openferment_core.engine import library, runs, simulator
+from openferment_core.engine.sample import SAMPLE
 from openferment_core.models import PredictedOutput, RunbookCreate
 from openferment_core.runbook_lock import lock_hash
 from openferment_core.studies import runbooks, scenarios
 from openferment_core.workers import WorkerError
 
 from test_comparisons import PricedStandIn
+from test_engines import given
+from test_project_state import kept_before_its_model
 from test_runbook_lock import cases
 from test_studies import asked
 
-# A runbook as the page keeps one (src/data/types.ts `Runbook`).
+# A runbook as the page keeps one (`Runbook`, models.py and src/lib/studies.ts).
 PAGE_ROW = {"id": "rb-1", "kind": "research", "title": "A person's runbook", "status": "draft", "stages": [], "note": "",
             "eta": None, "outputs": [], "productId": None, "progressPct": 0, "estCostUsd": None, "strainId": None,
             "predictions": [], "measurementSchema": [], "lockedAt": None, "lockHash": None}
@@ -146,11 +152,15 @@ def test_what_cannot_be_a_runbook_or_locked_is_refused_in_words(worker, monkeypa
         runbooks.lock("rb-1")
     with pytest.raises(runbooks.RunbookNotFound):
         runbooks.lock("rb-none")
-    project_state.put("runbooks", "rb-2", {**PAGE_ROW, "id": "rb-2", "status": "shelved"}, "Ada Moreno")
+    shelved = {**PAGE_ROW, "id": "rb-2", "status": "shelved"}
+    with pytest.raises(project_state.StateRefused, match="this runbooks row does not read as a runbook: status"):
+        project_state.put("runbooks", "rb-2", shelved, "Ada Moreno")
+    # A row an earlier page kept, before a runbook's row was read as its model (alpha 2.2 E.0b), is refused where
+    # a study reads it.
+    kept_before_its_model("runbooks", "rb-2", shelved)
     with pytest.raises(runbooks.RunbookRefused, match="status"):
         runbooks.get("rb-2")
-    project_state.put("runbooks", "rb-study-000000000000", {**PAGE_ROW, "id": "rb-study-000000000000",
-                                                            "status": "shelved"}, "Ada Moreno")
+    kept_before_its_model("runbooks", "rb-study-000000000000", {**shelved, "id": "rb-study-000000000000"})
     with pytest.raises(runbooks.RunbookRefused, match="rb-study-000000000000 is not kept in the runbook page's shape"):
         runbooks.listed()
 
@@ -175,3 +185,27 @@ def test_the_routes_make_read_list_and_lock_a_runbook_as_it_is_kept(worker):
     assert client.post("/api/studies/runbooks/rb-none/lock", json={}).status_code == 404
     assert client.post("/api/studies/runbooks", json={**body, "predict": []}).status_code == 422
     assert client.post("/api/studies/runbooks", json={**body, "runId": "0000000000000000"}).status_code == 422
+
+
+# ── a run of any engine (alpha 2.2 stage C, D3) ────────────────────────
+
+
+def test_a_runbook_predicts_any_engines_run_by_its_outputs_values(worker):
+    cane = runs.run("sugarcane", by="Ada Moreno").run
+    by_price = made(cane.id)
+    assert by_price.id == runbooks.runbook_id(cane.id, ["price.solvedPrice", "outputs.ethanolKgPerH"]), "its id holds"
+    by_values = made(cane.id, predict=[PredictedOutput(output="values.price.solvedPrice", label="Minimum selling price"),
+                                       PredictedOutput(output="values.outputs.ethanolKgPerH", label="Ethanol made")])
+    assert by_values.id != by_price.id
+    assert [(p.value, p.unit) for p in by_values.predictions] == [(p.value, p.unit) for p in by_price.predictions]
+    sample = SAMPLE.run("placeholder", None, [given("a-parameter", 2.5, note="a placeholder")], "Ada Moreno")
+    book = made(sample.id, predict=[PredictedOutput(output="values.given a-parameter", label="The value given back"),
+                                    PredictedOutput(output="values.count", label="How many values were given")],
+                title="A placeholder at the bench")
+    given_back, count = book.predictions
+    assert (given_back.value, given_back.unit, given_back.artifactId) == (2.5, "placeholder-unit", sample.artifactId)
+    assert (count.value, count.unit) == (1.0, "1") and f"engine run {sample.id} of placeholder" in count.basis
+    assert [(m.unit, m.timepoint) for m in book.measurementSchema] == [("placeholder-unit", "harvest"), ("1", "harvest")]
+    for output in ("values.nothing", "price.solvedPrice"):
+        with pytest.raises(runbooks.RunbookRefused, match="a run answers values.<name> of its outputs.values"):
+            made(sample.id, predict=[PredictedOutput(output=output, label="Nothing it answers")])

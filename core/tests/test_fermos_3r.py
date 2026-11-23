@@ -22,6 +22,7 @@ from fastapi.testclient import TestClient
 
 from openferment_core import artifacts, fermos, intake, kinetics, params, proforma, tools
 from openferment_core.models import Override, ParamResolveRequest, SimulationRequest
+from standins import as_inputs, family_units, scope_units
 
 BY = "openFerment test fixture"
 OTHER = "Another test fixture"
@@ -35,6 +36,20 @@ BATCH_TYPED = dict(mu_max=0.4, ks=0.2, yxs=0.12, alpha=2.0, yps=0.45, p_max=90.0
 def typed(family=BATCH, by=BY, **values):
     return [Override(scope=fermos.family_scope(family), key=k, value=v, by=by, at="2026-10-21",
                      note="a STAND-IN for a test") for k, v in values.items()]
+
+
+def typed_in(family=BATCH, by=BY, **values):
+    """`typed`'s values as the typed inputs a request takes, each in its parameter's unit (alpha 2.2 D2)."""
+    return as_inputs(typed(family, by, **values), family_units(family))
+
+
+def forecast_typed(fit_id, by=BY, origin="person-assumption", **values):
+    """A forecast's start values or length, typed as `typed` types a family's,
+    as the inputs a forecast request takes, each in its scope's unit."""
+    scope = fermos.forecast_scope(fit_id)
+    typed_here = [Override(scope=scope, key=k, value=v, by=by, at="2026-10-21", note="a STAND-IN for a test",
+                           origin=origin) for k, v in values.items()]
+    return as_inputs(typed_here, scope_units(scope))
 
 
 @pytest.fixture()
@@ -54,7 +69,7 @@ def _api():
 
 def _batch(**over) -> str:
     return fermos.simulate(SimulationRequest(family=BATCH, product="ethanol", sugar="glucose",
-                                             overrides=typed(**{**BATCH_TYPED, **over})), by_pool=EMPTY).artifactId
+                                             inputs=typed_in(**{**BATCH_TYPED, **over})), by_pool=EMPTY).artifactId
 
 
 def _ctx(pool=EMPTY):
@@ -104,21 +119,32 @@ def _logistic_fit():
 def test_a_forecast_length_a_person_typed_is_their_assumption_and_makes_the_forecast_assumed(store):
     fit_id = _logistic_fit()
     scope = fermos.forecast_scope(fit_id)
-    o = Override(scope=scope, key="t_end", value=12.0, by=BY, at="2026-10-21", note="a STAND-IN for a test")
-    res = params.resolve_scope(scope, ParamResolveRequest(overrides=[o]))
+    length = forecast_typed(fit_id, t_end=12.0)
+    res = params.resolve_scope(scope, ParamResolveRequest(inputs=length))
     t_end = next(v for v in res.values if v.key == "t_end")
     assert t_end.origin == "assumption" and t_end.overriddenBy == BY
-    # As FermOSForecast sends it: the length and who set it, no start changed.
-    fc = fermos.forecast_run(fit_artifact=fit_id, duration_h=12.0, duration_by=BY)
+    # As FermOSForecast sends it: the length, typed with who set it and the day, no start changed.
+    fc = fermos.forecast_run(fit_artifact=fit_id, inputs=length)
     named = {i.name: i for i in artifacts.get(fc.artifactId).inputs}
     assert named["duration"].source.kind == "assumption" and named["duration"].source.by == BY
+    assert named["duration"].source.note == "typed on 2026-10-21: a STAND-IN for a test"
     assert fc.evidence.provenance == "assumed"
-    # The reviewer's call: the one who changed a start names the length when nobody else is named.
-    fc = fermos.forecast_run(fit_artifact=fit_id, duration_h=12.0, changed_by=BY)
+    # A model's estimate of the length is named as the model's, and the forecast is assumed alike.
+    fc = fermos.forecast_run(fit_artifact=fit_id, inputs=forecast_typed(fit_id, by="a-placeholder-model",
+                                                                        origin="model-estimate", t_end=12.0))
+    named = {i.name: i for i in artifacts.get(fc.artifactId).inputs}
+    assert named["duration"].source.kind == "model-estimate" and named["duration"].source.by == "a-placeholder-model"
     assert artifacts.get(fc.artifactId).provenance == "assumed"
     # Through the API, and on to Proforma: what the forecast feeds is assumed too.
-    r = _api().post("/api/fermos/forecast", json={"fitArtifactId": fit_id, "durationH": 12.0, "durationBy": BY})
+    body = [i.model_dump(mode="json", exclude_none=True) for i in length]
+    r = _api().post("/api/fermos/forecast", json={"fitArtifactId": fit_id, "inputs": body, "by": BY})
     assert r.status_code == 200 and r.json()["evidence"]["provenance"] == "assumed"
+    # The length and the start values a forecast took before alpha 2.2 are refused in words.
+    stale = _api().post("/api/fermos/forecast", json={"fitArtifactId": fit_id, "durationH": 12.0, "durationBy": BY})
+    assert stale.status_code == 422 and "durationH" in str(stale.json()["detail"])
+    # A length set twice, typed and as the calling code's own, is refused in words.
+    with pytest.raises(fermos.FitRefused, match="a forecast's length is set in one place"):
+        fermos.forecast_run(fit_artifact=fit_id, inputs=length, duration_h=12.0)
     info = proforma.fit_info(artifacts.get(r.json()["artifactId"]), ETHANOL)
     assert info.provenance == "assumed"
     # A length nobody is named for stays the caller's convention, as asked.
@@ -132,8 +158,7 @@ def test_a_forecast_length_a_person_typed_is_their_assumption_and_makes_the_fore
 
 def test_a_forecast_chosen_as_the_fit_binds_its_own_start_values_and_length_with_the_person_named(store):
     fit_id = _logistic_fit()
-    fc = fermos.forecast_run(fit_artifact=fit_id, start=fermos.StartValues(X0=0.5, S0=90.0), changed_by=BY,
-                             duration_h=40.0)
+    fc = fermos.forecast_run(fit_artifact=fit_id, inputs=forecast_typed(fit_id, x0=0.5, s0=90.0, t_end=40.0))
     values, _ = fermos.bind_parameters(BATCH, None, "ethanol", "glucose", EMPTY, [], fc.artifactId, None,
                                        duration_preset=fermos.FIT_LENGTH)
     v = {x.key: x for x in values}
@@ -192,13 +217,13 @@ def test_a_batch_simulation_of_ethanol_feeds_the_flowsheets_titre(store):
 @pytest.mark.parametrize("profile, unread, read", [("constant", "mu_set", "feed_rate"), ("exponential", "feed_rate", "mu_set")])
 def test_a_fed_batch_parameter_its_profile_does_not_read_is_not_waiting_in_the_panel(store, profile, unread, read):
     scope = fermos.family_scope("fedbatch_v1")
-    res = params.resolve_scope(scope, ParamResolveRequest(overrides=typed("fedbatch_v1", feed_profile=profile)))
+    res = params.resolve_scope(scope, ParamResolveRequest(inputs=typed_in("fedbatch_v1", feed_profile=profile)))
     assert unread not in res.waiting and read in res.waiting
     v = next(x for x in res.values if x.key == unread)
     assert v.origin == "not-read" and v.value is None and "waits for nothing" in v.detail
     # What Simulate binds says the same.
     b = fermos.bind(SimulationRequest(family="fedbatch_v1", product="ethanol", sugar="glucose",
-                                      overrides=typed("fedbatch_v1", feed_profile=profile)))
+                                      inputs=typed_in("fedbatch_v1", feed_profile=profile)))
     assert unread not in b.waiting and read in b.waiting
 
 
@@ -212,7 +237,7 @@ def test_fermos_simulates_flags_say_a_value_out_of_bounds_by_its_key_and_end_at_
     # makes at most a gram of cells.
     pool = pool_of(*STANDIN, rec("yxs-hi", "biomass_yield_substrate", 3.75, "g g-1"))
     start = fermos.simulate(SimulationRequest(family=BATCH, product="ethanol", sugar="glucose",
-                                              overrides=typed(x0=0.2, p0=0.0, alpha=2.0, p_max=90.0)),
+                                              inputs=typed_in(x0=0.2, p0=0.0, alpha=2.0, p_max=90.0)),
                             by_pool=pool).artifactId
     r = tools.run("fermos_simulate", {"family": BATCH, "product": "ethanol", "sugar": "glucose",
                                       "recordsByParam": {"yxs": ["yxs-hi"]}, "startFrom": f"simulation:{start}"},

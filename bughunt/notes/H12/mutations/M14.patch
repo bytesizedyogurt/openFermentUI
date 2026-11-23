@@ -1,0 +1,11 @@
+--- a/core/openferment_core/units.py
++++ b/core/openferment_core/units.py
+@@ -201,7 +201,7 @@
+             reason=explain_refusal(from_unit, to_unit),
+         )
+     base = value * uf["factor"] + uf.get("offset", 0)
+-    return (base - ut.get("offset", 0)) / ut["factor"]
++    return base / ut["factor"]
+ 
+ 
+ def to_si(value: float, unit: str) -> tuple[float, str]:

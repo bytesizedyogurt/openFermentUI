@@ -1,11 +1,11 @@
 // The navigation vocabulary (OF-BLD-006 §2.2 as reversed, OF-BLD-008 §1).
 //
 // ═══════════════════════════════════════════════════════════════════════
-// THE RAIL. Home plus ten destinations:
+// THE RAIL. Home plus eleven destinations:
 //
 //     Home
 //     Intake · BioRepo · Postdoc · geneOS · fermOS · pureOS · Proforma
-//     Runbooks · Primer · Guild
+//     Runbooks · Primer · Guild · Catalogues
 //
 // alpha 2.0 retired the closed-map rule and Dominion with its seeded
 // catalogue (ADR-000, ADR-010). Projects become the organizing object at
@@ -24,6 +24,7 @@
 //   - an alias, so typing the old word in the palette still finds the thing;
 //   - a redirect, so an old link lands on the new screen instead of a 404.
 import {
+  BookMarked,
   Dna,
   FlaskConical,
   Filter,
@@ -39,7 +40,7 @@ import {
 } from 'lucide-react';
 import type { ComponentName } from '@/components/ComponentTag';
 
-export interface NavSurface {
+interface NavSurface {
   /** The word a user reads. Also the component name, where it is one. */
   label: string;
   to: string;
@@ -62,18 +63,24 @@ export interface NavSurface {
 }
 
 /**
- * THE RAIL. Home, then the ten destinations, in order.
+ * THE RAIL. Home, then the eleven destinations, in order.
  *
  * Four things that used to be here are views inside their owner: the strain
  * catalogue is geneOS's default view (as Hosts), Protocols and Depositions are
- * Runbooks tabs, and Witness is a BioRepo tab. A catalogue of strains is not a
- * destination — it is what one of them happens to hold.
+ * Runbooks tabs, and Witness is a BioRepo tab. Hosts is where a person chooses
+ * a strain as a chassis.
  *
- * OF-BLD-011 §1 corrected which one. The catalogue sat under fermOS until the
+ * OF-BLD-011 §1 settled which destination holds Hosts. It sat under fermOS until the
  * three OS components were re-cut along the three stages of making something —
  * geneOS the organism, fermOS the reactor, pureOS downstream. Choosing a
  * chassis is a genetic design decision, so Hosts moved to geneOS and
  * `/fermos/organisms` redirects.
+ *
+ * alpha 2.2 E.8 put the catalogues on the rail: the strains, the products,
+ * Guild's skills and Primer's lessons a person keeps, one screen for four
+ * kinds that several destinations read. Catalogues is where a person adds and
+ * edits them; geneOS's Hosts, Guild and Primer read the store's own lists,
+ * which read the catalogues from alpha 2.2 E.9 and E.12.
  */
 export const RAIL: (NavSurface & { key: string })[] = [
   {
@@ -232,9 +239,18 @@ export const RAIL: (NavSurface & { key: string })[] = [
     component: 'Guild',
     key: 'g',
   },
+  {
+    // alpha 2.2 E.8. Its chord key is 'a', since Proforma holds 'c'.
+    label: 'Catalogues',
+    to: '/catalogues',
+    descriptor: 'strains, products, skills, lessons',
+    aliases: ['catalogue', 'catalogues', 'strains', 'strain catalogue', 'aliases', 'other names'],
+    icon: BookMarked,
+    key: 'a',
+  },
 ];
 
-/** The ten destinations: the rail, less Home. */
+/** The eleven destinations: the rail, less Home. */
 export const DESTINATIONS = RAIL.filter((r) => r.to !== '/');
 
 /**
@@ -249,7 +265,7 @@ export const SUB_VIEWS: (NavSurface & { owner: string })[] = [
     label: 'Hosts',
     to: '/geneos/hosts',
     descriptor: 'the strain catalogue — chassis and lineage',
-    aliases: ['organisms', 'strains', 'hosts', 'chassis', 'cw15'],
+    aliases: ['organisms', 'strains', 'hosts', 'chassis'],
     icon: Dna,
     owner: 'geneOS',
   },
@@ -257,7 +273,7 @@ export const SUB_VIEWS: (NavSurface & { owner: string })[] = [
     label: 'Pathway',
     to: '/geneos/pathway',
     descriptor: 'biosynthetic routes and their branch points',
-    aliases: ['pathway', 'pathways', 'route', 'precursor', 'mva', 'shikimate'],
+    aliases: ['pathway', 'pathways', 'route', 'precursor'],
     icon: Dna,
     owner: 'geneOS',
   },
@@ -306,28 +322,29 @@ export const SUB_VIEWS: (NavSurface & { owner: string })[] = [
     owner: 'pureOS',
   },
   {
-    // OF-BLD-019 §4.1 — 'train' is reserved under /pureos: /pureos/train/:scenarioId.
+    // 'train' is reserved under /pureos: /pureos/train/:id opens one train; the Trains page lists them.
     label: 'Train',
-    to: '/pureos/train',
-    descriptor: 'the units of the run Proforma priced, and what each passes on',
+    to: '/pureos',
+    descriptor: 'the trains read from runs, each with what every unit passes on',
     aliases: ['train', 'step recovery', 'recovery by unit', 'stream table', 'mass balance by unit'],
     icon: Filter,
     owner: 'pureOS',
   },
   {
     // OF-BLD-019 §3.3 — 'reference' is reserved under /proforma: a reference
-    // biorefinery's page, /proforma/reference/:id, one a shelf entry.
+    // plant's page, /proforma/reference/:plant, one a plant of the library
+    // shelf (alpha 2.2 D8).
     label: 'Corn ethanol reference',
-    to: '/proforma/reference/corn_drygrind',
-    descriptor: 'the dry-grind corn plant run whole, beside its package\u2019s own test',
-    aliases: ['reference', 'reference biorefinery', 'dry grind', 'corn ethanol', 'package test', 'regression values'],
+    to: '/proforma/reference/corn',
+    descriptor: 'the dry-grind corn plant of the library shelf run whole, beside its package\u2019s own test',
+    aliases: ['reference', 'reference plant', 'dry grind', 'corn ethanol', 'package test', 'regression values'],
     icon: LineChart,
     owner: 'Proforma',
   },
   {
     label: 'Corn stover benchmark',
-    to: '/proforma/reference/cornstover_benchmark',
-    descriptor: 'the NREL 2011 corn stover design run whole, beside its package\u2019s own test',
+    to: '/proforma/reference/cornstover',
+    descriptor: 'the NREL 2011 corn stover design of the library shelf run whole, beside its package\u2019s own test',
     aliases: ['benchmark', 'corn stover', 'nrel 2011', 'reference run'],
     icon: LineChart,
     owner: 'Proforma',
@@ -447,9 +464,34 @@ export const SUB_VIEWS: (NavSurface & { owner: string })[] = [
     icon: Table2,
     owner: 'Intake',
   },
+  // alpha 2.2 E.8 — the catalogues' other three tabs; the strains are the destination's own path.
+  {
+    label: 'Products',
+    to: '/catalogues/products',
+    descriptor: 'the products a train recovers: each one’s class, where the cells leave it, its sequence',
+    aliases: ['products', 'product catalogue', 'product class', 'secreted', 'intracellular', 'sequence'],
+    icon: BookMarked,
+    owner: 'Catalogues',
+  },
+  {
+    label: 'Skill policies',
+    to: '/catalogues/skills',
+    descriptor: 'each skill’s policy: how critical it is, how long a qualification stands, what it needs first',
+    aliases: ['skill policy', 'skills catalogue', 'criticality', 'recency', 'supervised runs', 'prerequisites'],
+    icon: BookMarked,
+    owner: 'Catalogues',
+  },
+  {
+    label: 'Lessons',
+    to: '/catalogues/lessons',
+    descriptor: 'Primer’s lessons, and the skills each counts toward',
+    aliases: ['lessons', 'lesson catalogue'],
+    icon: BookMarked,
+    owner: 'Catalogues',
+  },
 ];
 
-export const ALL_SURFACES: NavSurface[] = [...RAIL, ...SUB_VIEWS];
+const ALL_SURFACES: NavSurface[] = [...RAIL, ...SUB_VIEWS];
 
 /** Descriptor by label, for screens that want to print their own gloss. */
 export const DESCRIPTOR: Record<string, string> = Object.fromEntries(
@@ -470,7 +512,7 @@ export const DESCRIPTOR: Record<string, string> = Object.fromEntries(
  * later changed. Nothing checks this at build time (ADR-011): keep each
  * entry pointing at a screen.
  */
-export const REDIRECTS: Record<string, string> = {
+const REDIRECTS: Record<string, string> = {
   // ── OF-BLD-011: the strain catalogue moved from fermOS to geneOS ────
   // Re-aimed rather than chained: '/organisms' used to land on
   // '/fermos/organisms', which is itself retired now, and a redirect whose
@@ -493,9 +535,13 @@ export const REDIRECTS: Record<string, string> = {
   '/biorepo/ingest': '/intake/ingest',
   '/proforma/compare': '/biorepo/compare',
   // OF-BLD-019 §3.3 — the benchmark's card and the old BioSTEAM page became
-  // the reference page of the corn stover benchmark.
-  '/proforma/benchmark': '/proforma/reference/cornstover_benchmark',
-  '/proforma/biosteam': '/proforma/reference/cornstover_benchmark',
+  // the reference page of the corn stover plant; alpha 2.2 D8 — the shelf's
+  // two hand-written reference entries retired, and their pages are the
+  // library shelf's plants' own.
+  '/proforma/benchmark': '/proforma/reference/cornstover',
+  '/proforma/biosteam': '/proforma/reference/cornstover',
+  '/proforma/reference/cornstover_benchmark': '/proforma/reference/cornstover',
+  '/proforma/reference/corn_drygrind': '/proforma/reference/corn',
 
   // ── OF-BLD-006 legacy, re-pointed at the CURRENT destination ────────
   // These were already redirects; their targets moved underneath them, so
@@ -546,8 +592,8 @@ const PATTERN_REDIRECTS: [RegExp, string][] = [
  * itself retired. Trying progressively shorter prefixes makes the specific
  * rule beat the general one without anybody having to order the map by hand.
  *
- * The tail is preserved, so a deep link keeps its target: `/organisms/cw15`
- * reaches `/geneos/hosts/cw15` rather than dumping the reader at the top
+ * The tail is preserved, so a deep link keeps its target: `/organisms/<id>`
+ * reaches `/geneos/hosts/<id>` rather than dumping the reader at the top
  * of the catalogue to find their strain again.
  */
 export function redirectFor(path: string): string | null {

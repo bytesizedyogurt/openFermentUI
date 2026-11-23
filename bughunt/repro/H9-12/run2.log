@@ -1,0 +1,24 @@
+database: bh_r_h9_12_door (fresh, migrated to head); service: http://127.0.0.1:10350
+project: {"id":"h9-12","name":"h9-12","description":"","createdBy":"bughunt","createdAt":"2026-11-10T23:45:53.679834+00:00"}
+
+## 1. tools.run in this process (its docstring: "nothing here raises")
+DIRECT 1e309 value (control) | returned a ToolResult | error='study_scenario refused: values[0].quantity.value holds a number that is NaN or infinite, and a number a tool takes is finite; nothing ran'
+DIRECT 400-digit integer value | raised OverflowError: int too large to convert to float | at tools/__init__.py:415 numbers_in <- tools/__init__.py:418 numbers_in <- tools/__init__.py:421 numbers_in <- tools/__init__.py:418 numbers_in <- tools/__init__.py:516 run <- /home/user/openFermentUI/bughunt/repro/H9-12/direct_call.py:19 <module>
+
+## 2. POST /api/tools/study_scenario?by=Edge%20Tester
+1e309 value (control): {"summary":{},"evidence":[],"recordIds":[],"passages":[],"error":"study_scenario refused: values[0].quantity.value holds a number that is NaN or infinite, and a number a tool takes is finite; nothing ran","usage":{"inputTokens":0,"outputTokens":0,"cacheReadTokens":0,"cacheWriteTokens":0,"costUsd":0.0,"models":[]},"draft":null,"rows":[],"data":null,"auditIds":[]} [200]
+400-digit integer value: Internal Server Error [500]
+service log lines naming OverflowError: 2
+239:  File "/home/user/openFermentUI/core/openferment_core/tools/__init__.py", line 421, in numbers_in
+242:  File "/home/user/openFermentUI/core/openferment_core/tools/__init__.py", line 418, in numbers_in
+245:  File "/home/user/openFermentUI/core/openferment_core/tools/__init__.py", line 415, in numbers_in
+248:OverflowError: int too large to convert to float
+
+## 3. the MCP server in its own process, raw JSON-RPC tools/call
+CASE 1e309 value (control) | isError=False | text={"summary":{},"evidence":[],"recordIds":[],"passages":[],"error":"study_scenario refused: values[0].quantity.value holds a number that is NaN or infinite, and a number a tool takes is finite; nothing ran","usage":{"inputTokens":0,"outputTokens":0,"cacheReadTokens":0,"cacheWriteTokens":0,"costUsd":0.
+CASE 400-digit integer value | isError=True | text=Error executing tool study_scenario
+MCP server stderr lines naming OverflowError: 1 (first:                              OverflowError: int too large to)
+
+EXPECTED: study_scenario with a 400-digit integer as a quantity's value is refused as the 1e309 control is: tools.run returns a ToolResult whose error says the value is no finite number, POST /api/tools/study_scenario answers 200 with that ToolResult, and MCP answers that ToolResult as JSON with isError false (tools/__init__.py:503 "nothing here raises"; docs/TOOLS.md:896).
+OBSERVED: control refused in words at each door (direct=1 rest=1 mcp=1); the 400-digit integer: tools.run raised OverflowError (1), REST answered [500] 'Internal Server Error' with 2 OverflowError lines in the service log, MCP answered isError=True | text=Error executing tool study_scenario.
+RESULT: DEFECT

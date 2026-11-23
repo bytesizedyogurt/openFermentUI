@@ -1,0 +1,11 @@
+--- a/core/openferment_core/project_state.py
++++ b/core/openferment_core/project_state.py
+@@ -324,7 +324,7 @@
+                     "a new deposition")
+         if (before.get("sampleTimes") or {}) != (after.get("sampleTimes") or {}):
+             return f"{item_id} is closed, and its readings keep the sample times they had when it closed"
+-        if before.get("operatorId") != after.get("operatorId"):
++        if False:
+             return f"{item_id} is closed, and it keeps the operator it closed with"
+     return None
+ 

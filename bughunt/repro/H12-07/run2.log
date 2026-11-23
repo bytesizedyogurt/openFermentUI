@@ -1,0 +1,47 @@
+0. what CI runs, at 2047f5a:
+   verify.yml:53:      - uses: actions/checkout@v4
+   verify.yml:55:      - uses: pnpm/action-setup@v4
+   verify.yml:58:      - uses: actions/setup-node@v4
+   verify.yml:63:      - uses: astral-sh/setup-uv@v5
+   verify.yml:68:      - run: pnpm install --frozen-lockfile
+   verify.yml:70:      - name: FastEmbed's model file
+   verify.yml:76:      - name: Playwright Chromium
+   verify.yml:77:        run: pnpm exec playwright install --with-deps chromium
+   verify.yml:79:      - run: pnpm verify
+   verify.yml:84:      - name: The proof
+   verify.yml:85:        run: pnpm prove
+   lines in verify.yml that hold the Python lock (uv sync, uv lock, --locked, --frozen, UV_FROZEN, UV_LOCKED): 0
+   verify.yml:68:      - run: pnpm install --frozen-lockfile
+   verify stage gen:api: uv run --all-extras python (neither --frozen nor --locked)
+   verify stage gen:components: uv run --all-extras python (neither --frozen nor --locked)
+   verify stage test:core: uv run --all-extras pytest (neither --frozen nor --locked)
+   verify stage test:sim: uv run --all-extras pytest (neither --frozen nor --locked)
+   verify stage test:lit: uv run --all-extras pytest (neither --frozen nor --locked)
+   verify stage check:licences: uv run --all-extras python (neither --frozen nor --locked)
+   verify stage check:tools: uv run --all-extras python (neither --frozen nor --locked)
+   prove (CI's last step): cd core && uv run --frozen --all-extras python ../scripts/prove.py
+   deploy.sh:  # The gate's own `uv run` calls read core/uv.lock as committed, as the sync
+   deploy.sh:  # above does, so a newer uv leaves the tracked lock as it stands.
+   deploy.sh:  UV_FROZEN=1 pnpm verify
+1. worktree /tmp/claude-0/-home-user-openFermentUI/cfbc5c9f-640a-5002-a705-5ceaf850fdc6/scratchpad/bh/work/H12-07/wt-3607 at 2047f5a; database bh_r_h12_07_db (fresh)
+   uv sync --frozen --offline --all-extras (CLAUDE.md:20): exit 0, Installed 169 packages in 615ms
+   alembic: core/uv.lock pins 1.20.1, the worktree's venv holds 1.20.1
+2. the stale lock: 1 file changed, 1 insertion(+), 1 deletion(-); pyproject.toml:30: "alembic>=1.13,<1.20",
+   core/uv.lock unchanged, still pinning alembic 1.20.1
+a. uv lock --check: exit 1, error: The lockfile at `uv.lock` needs to be updated, but `--check` was provided.
+   uv sync --locked --all-extras: exit 1, error: The lockfile at `uv.lock` needs to be updated, but `--locked` was provided.; the venv's alembic 1.20.1
+b. uv run --all-extras pytest tests/test_db.py -m "not live and not sim and not slow and not lit": exit 0, 24 passed in 17.07s
+   Uninstalled 2 packages in 97ms
+   Installed 2 packages in 3ms
+   core/uv.lock after: 1 file changed, 4 insertions(+), 4 deletions(-); it pins alembic 1.19.1, the venv holds 1.19.1
+   uv.lock diff: -version = "1.20.1"
+   uv.lock diff: +version = "1.19.1"
+   uv.lock diff: -    { name = "alembic", specifier = ">=1.13" },
+   uv.lock diff: +    { name = "alembic", specifier = ">=1.13,<1.20" },
+c. uv run --frozen --all-extras (prove's form) after b: exit 0, alembic 1.19.1
+d. the committed lock restored; uv sync --frozen --all-extras: exit 0,  - alembic==1.19.1  + alembic==1.20.1 
+   alembic: core/pyproject.toml asks >=1.13,<1.20, core/uv.lock pins 1.20.1, the install holds 1.20.1
+   the repository's own core/.venv (read only): alembic 1.20.1 before, 1.20.1 after
+EXPECTED: CI fails a commit whose core/uv.lock no longer matches core/pyproject.toml, the way it fails a stale pnpm-lock.yaml (verify.yml:68 --frozen-lockfile), through a step such as uv lock --check or uv sync --locked --all-extras (here each exits 1); and verify's stages run on the versions the committed lock pins (CLAUDE.md:40), the ones CLAUDE.md:20's frozen install installs, as deploy.sh:80-82 runs the same gate with UV_FROZEN=1 to read core/uv.lock as committed
+OBSERVED: verify.yml holds the Python lock on 0 lines; 7 of verify's uv run stages carry neither --frozen nor --locked; with pyproject asking alembic >=1.13,<1.20 and core/uv.lock pinning 1.20.1, uv lock --check exits 1 and uv sync --locked exits 1, while test:core's form exits 0 (24 passed in 17.07s) after rewriting core/uv.lock (1 file changed, 4 insertions(+), 4 deletions(-)) to alembic 1.19.1 and installing 1.19.1; prove's frozen form then runs on alembic 1.19.1; the committed lock's frozen install (CLAUDE.md:20) holds alembic 1.20.1, a version pyproject excludes and CI never ran
+RESULT: DEFECT

@@ -8,22 +8,23 @@
 // uses sit between the figures. With the service down the band says the
 // artifacts need it.
 import { useEffect, useState } from 'react';
-import type { Artifact, Band, ComputedBasis, HistogramBin, Runbook } from '@/data/types';
 import { useStore } from '@/store';
 import { ArtifactsDown, getArtifact } from '@/lib/artifacts';
 import { productOfBasis, productWords, yieldsOnSugar } from '@/lib/geneos';
-import { INFEASIBLE_WORDS, LIBRARY_RUN_TOOL, RUN_TOOL, runViewOfRun } from '@/lib/proforma';
-import { CeilingGap, CostWaterfall, Distribution, TrajectoryBand } from '@/components/figures';
+import { INFEASIBLE_WORDS, LIBRARY_RUN_TOOL, RUN_TOOL, runViewOfRun, type HistogramBin } from '@/lib/proforma';
+import type { Band } from '@/lib/fermos';
+import type { Artifact, ComputedBasis, Runbook } from '@/lib/studies';
+import { CeilingGap, CostWaterfall, Distribution, TrajectoryBand, priceNote, waterfallTotal } from '@/components/figures';
 import { Card } from './ui';
 
 /** The order of the chain, by the tool that kept each artifact. */
-export const DOSSIER_ORDER = ['geneos.ceiling', 'growth_forecast', RUN_TOOL, LIBRARY_RUN_TOOL] as const;
+const DOSSIER_ORDER = ['geneos.ceiling', 'growth_forecast', RUN_TOOL, LIBRARY_RUN_TOOL] as const;
 
 /** The tools whose artifact prices the plant's product: a scenario's sampled run, an engine run. */
 const PRICE_TOOLS: readonly string[] = [RUN_TOOL, LIBRARY_RUN_TOOL];
 
 /** The seams, in the words fermOS's page already uses. */
-export const SEAMS = {
+const SEAMS = {
   afterCeiling:
     'Upstream, geneOS is stoichiometry: a genome-scale model gives a yield ceiling with no time axis. fermOS is dynamics: the curve in a specific vessel.',
   afterForecast:
@@ -59,10 +60,10 @@ export interface Gathered {
  * said once.
  */
 export async function gatherLinks(
-  pointed: { label: string; artifactId?: string }[],
+  pointed: { label: string; artifactId: string }[],
   fetch: (id: string) => Promise<Artifact>,
 ): Promise<Gathered> {
-  const settled = await Promise.allSettled(pointed.map((p) => fetch(p.artifactId!)));
+  const settled = await Promise.allSettled(pointed.map((p) => fetch(p.artifactId)));
   const links: Link[] = [];
   const failed: Gathered['failed'] = [];
   let down: string | null = null;
@@ -114,12 +115,15 @@ function Figure({ link }: { link: Link }) {
     // draws it, from the TEA breakdown the run kept.
     const view = runViewOfRun(a);
     const tea = view?.tables.tea;
+    const unit = tea?.basis ? `USD per ${tea.basis}` : 'USD kg-1';
+    const said = priceNote(tea?.productPrice, view?.basePrice, unit);
     return (
       <CostWaterfall
         title="What is the price made of?"
         lines={tea?.lines ?? []}
-        total={view?.basePrice != null ? { label: 'Base-case price', value: view.basePrice } : null}
-        unit={tea?.basis ? `USD per ${tea.basis}` : 'USD kg-1'}
+        total={waterfallTotal(tea?.productPrice, view?.basePrice)}
+        unit={unit}
+        notes={said ? [said] : undefined}
         annualUnit={view?.tables.tableUnits.annual ?? 'USD/yr'}
         provenance={a.provenance}
         basis={[basisOf(a)]}
@@ -147,7 +151,8 @@ function Figure({ link }: { link: Link }) {
 }
 
 export function Dossier({ runbook }: { runbook: Runbook }) {
-  const pointed = runbook.predictions.filter((p) => p.artifactId);
+  // Each prediction that names the artifact it was read from, with that id.
+  const pointed = (runbook.predictions ?? []).flatMap((p) => (p.artifactId ? [{ label: p.label, artifactId: p.artifactId }] : []));
   const [got, setGot] = useState<Gathered | null>(null);
   const key = pointed.map((p) => p.artifactId).join(',');
 

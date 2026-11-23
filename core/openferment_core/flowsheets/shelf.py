@@ -1,28 +1,31 @@
-"""Proforma's shelf of flowsheets (OF-BLD-019 §2.1, D2).
+"""Proforma's shelf of flowsheets.
 
 Pure data: what each flowsheet is, where it comes from, which program it
 belongs to, the inputs it takes and the outputs it reports. The service
 serves it at `GET /api/proforma/shelf` and must never import BioSTEAM to do
 so, so this module imports nothing heavier than the models (test_proforma
-holds it to that). src/data/types.ts mirrors `FlowsheetInfo` through PAIRS.
+holds it to that). The browser reads `FlowsheetInfo` as its generated twin
+(src/lib/proforma.ts).
 
 A scenario names a flowsheet by id and nothing else about its structure.
-No input here carries a value: records bind the process inputs, a named
-person's assumption sets the rest, and a reference biorefinery runs whole
-on its package's own defaults (Rule 1; E.1).
+No input here carries a value: records bind the process inputs and a named
+person's assumption sets the rest (Rule 1; E.1). Every flowsheet here is one
+a scenario runs. The published plants of the `biorefineries` package, run
+whole on their package's own defaults, are the library shelf's
+(engine/library.py), where the shelf's two hand-written reference entries
+went at alpha 2.2 (D8).
 
     SHELF      the flowsheets a person can choose, by id
     TEST_ONLY  the toy, a STAND-IN for tests: never on the shelf, never
                served, and refused wherever the shelf is asked unless the
                caller says `allow_toy` (as geneOS's toy network is)
-    brothStream   (OF-BLD-020 §6.2) the stream a scenario flowsheet names as
+    brothStream the stream a scenario flowsheet names as
                its fermenter's broth, by the id its own file gives the
                fermenter's outlet (test_seam holds each to its file); a
                train's inlet from a scenario takes it from the newest run.
-               A reference names none: its package names its streams.
-    package_regression(id)
-               a reference biorefinery's own test values (OF-BLD-019 §2.2),
-               parsed from the installed package's test file (`ast`, no
+    regression_of(file, test)
+               the values one test of the installed `biorefineries` asserts
+               (ADR-013), parsed from the package's test file (`ast`, no
                import), with the package, the file and the test named
 """
 from __future__ import annotations
@@ -50,90 +53,6 @@ def _pkg(dist: str) -> str:
 TABLE_UNITS = {"T": "K", "P": "Pa", "massFlow": "kg/hr", "price": "USD/kg", "cost": "USD", "duty": "kJ/hr",
                "power": "kW", "annual": "USD/yr", "perUnit": "USD per unit of the price's basis"}
 
-_CORNSTOVER = FlowsheetInfo(
-    id="cornstover_benchmark",
-    title="Corn stover to ethanol, the NREL 2011 design",
-    description=(
-        "The corn stover ethanol biorefinery the BioSTEAM authors built to the NREL design report "
-        "(Humbird et al. 2011, NREL/TP-5100-47764): pretreatment, enzymatic hydrolysis, co-fermentation, "
-        "distillation, wastewater treatment and a boiler, run whole on the package's own defaults. "
-        "The benchmark: it shows this installation simulates and prices a published biorefinery as its authors do."
-    ),
-    source=f"{_pkg('biorefineries')}, cornstover",
-    program=None,
-    reference=True,
-    inputs=[],
-    outputs=["mespUsdPerGal", "mespUsdPerKg", "ethanolDensityKgPerGal", "settings", "references"],
-    priceOutput="mespUsdPerGal",
-    priceBasis="USD per gallon of ethanol, at the package's own ethanol density",
-    packageTest="biorefineries/tests/test_biorefineries.py::test_cornstover",
-)
-
-# The dry-grind corn plant's inputs (OF-BLD-019 §2.2): every one is the
-# package's own default, listed so a person sees what the plant rests on.
-# None holds a value here; the worker reads each back from the package's
-# objects after the run (flowsheets/corn_drygrind.py, `read_back`).
-_PKG_DEFAULT = "the package's own default, read back after the run"
-
-
-def _default(key: str, name: str, dimension: str, unit: str, where: str) -> FlowsheetInput:
-    return FlowsheetInput(key=key, name=name, dimension=dimension, unit=unit, kind="convention",
-                          note=f"{_PKG_DEFAULT}: {where}")
-
-
-_CORN = FlowsheetInfo(
-    id="corn_drygrind",
-    title="Dry-grind corn to ethanol, the conventional plant",
-    description=(
-        "The conventional dry-grind corn ethanol plant the BioSTEAM authors built after Kwiatkowski et al. 2006 "
-        "(Industrial Crops and Products): milling and slurry, jet cooking and liquefaction, "
-        "saccharification, simultaneous saccharification and fermentation by yeast, the ethanol purification train "
-        "of biorefineries.ethanol (beer column, rectifier, molecular sieves), and DDGS and crude corn oil recovered "
-        "from the stillage. Run whole on the package's own defaults: the yeast program's reference biorefinery, "
-        "with the package's own regression values beside what this installation computes."
-    ),
-    source=f"{_pkg('biorefineries')}, corn",
-    program="yeast",
-    reference=True,
-    inputs=[
-        _default("cornFeed", "corn fed", "massFlow", "kg h-1", "BiorefinerySettings.feedstock_hourly_mass_flow"),
-        _default("cornPrice", "price of corn", "costUSD", "USD kg-1", "default_stream_prices['Corn']"),
-        _default("ethanolPrice", "price of ethanol", "costUSD", "USD kg-1",
-                 "default_stream_prices['Ethanol'], the price at which the package's TEA solves the internal rate of return"),
-        _default("ddgsPrice", "price of DDGS (distillers' dried grains with solubles)", "costUSD", "USD kg-1",
-                 "default_stream_prices['DDGS']"),
-        _default("crudeOilPrice", "price of crude corn oil", "costUSD", "USD kg-1", "default_stream_prices['Crude oil']"),
-        _default("enzymePrice", "price of the amylase enzymes", "costUSD", "USD kg-1", "default_stream_prices['Enzyme']"),
-        _default("yeastPrice", "price of yeast", "costUSD", "USD kg-1", "default_stream_prices['Yeast']"),
-        _default("electricityPrice", "price of electricity", "costUSD", "USD kWh-1",
-                 "default_load_utility_settings(power_price=…)"),
-        _default("ssfYield", "glucose to ethanol in the fermenter, as a share of the theoretical", "fraction", "",
-                 "SimultaneousSaccharificationFermentation(yield_=…)"),
-        _default("ssfTime", "fermentation batch time", "time", "h", "SimultaneousSaccharificationFermentation(tau=…)"),
-        _default("ssfTemperature", "fermenter temperature", "temp", "K", "SimultaneousSaccharificationFermentation(T=…)"),
-        _default("ssfWorkingVolume", "fermenter working volume, as a share of the vessel", "fraction", "",
-                 "SimultaneousSaccharificationFermentation(V_wf=…)"),
-        _default("solidsContent", "corn in the slurry", "fraction", "g g-1",
-                 "default_process_parameters['slurry_solids_content']"),
-        _default("yeastLoading", "yeast loaded on the mash", "fraction", "g g-1",
-                 "default_process_parameters['yeast_loading']"),
-        _default("operatingDays", "operating days a year", "time", "d", "default_tea_parameters['operating_days']"),
-        _default("incomeTax", "income tax", "fraction", "", "default_tea_parameters['income_tax']"),
-        _default("langFactor", "Lang factor, installed over purchased equipment cost", "factor", "",
-                 "default_tea_parameters['lang_factor']"),
-        _default("laborCost", "labour cost", "costUSD", "USD yr-1", "default_tea_parameters['labor_cost']"),
-        _default("startYear", "first year of the plant's life", "year", "", "default_tea_parameters['duration']"),
-        _default("endYear", "last year of the plant's life", "year", "", "default_tea_parameters['duration']"),
-        _default("depreciation", "depreciation schedule", "schedule", "", "default_tea_parameters['depreciation']"),
-        _default("cepci", "plant cost index (CEPCI)", "index", "", "BiorefinerySettings(CEPCI=…)"),
-    ],
-    outputs=["ethanolPriceUsdPerKg", "IRR", "ethanolKgPerH", "cornKgPerH", "measured", "checks", "readBack", "references"],
-    priceOutput="ethanolPriceUsdPerKg",
-    priceBasis=("USD per kg of the ethanol product stream as the package makes it (ethanol with its denaturant): "
-                "the package's own price, at which its TEA solves the internal rate of return"),
-    packageTest="biorefineries/tests/test_biorefineries.py::test_corn",
-)
-
 # OF-BLD-019 §2.3: glucose to ethanol, ours. What it leaves out is
 # flowsheets/ethanol_glucose_v0.LEAVES_OUT, repeated here as data so the
 # service reads it without BioSTEAM (test_proforma_ethanol holds the two equal).
@@ -158,7 +77,6 @@ _ETHANOL = FlowsheetInfo(
     ),
     source="this repository",
     program="yeast",
-    reference=False,
     inputs=[
         FlowsheetInput(key="feed_glucose_conc", name="glucose in the fermenter's feed", dimension="massConc",
                        unit="g L-1", fields=["medium_component_conc"], kind="process",
@@ -177,9 +95,10 @@ _ETHANOL = FlowsheetInfo(
                        note="the batch time is the titre divided by it"),
         FlowsheetInput(key="plant_scale", name="ethanol fermented in a year", dimension="massFlow", unit="t yr-1",
                        kind="economic",
-                       note="a named person's assumption; with the yield it sets the glucose fed, so the plant's size"),
+                       note="with the yield it sets the glucose fed, so the plant's size"),
         FlowsheetInput(key="glucose_price", name="price of glucose", dimension="costUSD", unit="USD kg-1",
-                       kind="economic", note="a named person's assumption; the glucose alone is priced, not its water"),
+                       kind="economic",
+                       note="the price of the glucose alone; the water that dilutes it carries none"),
         FlowsheetInput(key="ethanol_purity", name="ethanol purity", dimension="fraction", unit="",
                        kind="convention",
                        note="fuel grade: the ethanol the package's molecular sieves give, with no denaturant "
@@ -195,11 +114,12 @@ _ETHANOL = FlowsheetInfo(
 
 # OF-BLD-020 §6.1 (D11): a vessel and a train, priced. A scenario on it is made
 # with New scenario, naming the kept vessel design and train run it is built
-# from (`builtFrom`). Its program is
-# its train's; a train runs only on a program with a chemical set
-# (pureos/train_spec.PROGRAM_CHEMICALS, the yeast program's alone tonight), so
-# the entry is the yeast program's and a train of another program is refused
-# in words (test_custom_train holds the two equal).
+# from (`builtFrom`). Its chemical set is its train's; a train runs only on a
+# chemical set pureOS holds (pureos/train_spec.PROGRAM_CHEMICALS, the yeast set
+# alone tonight), so the entry carries the yeast set's key and a train on
+# another set is refused in words (test_custom_train holds the two equal). The
+# description and the price basis below keep the word "program": a composite
+# run's basis hashes both (docs/PROGRESS.md, Known debts, the `program` key).
 COMPOSITE = "custom_train_v1"
 COMPOSITE_BUILT_FROM = ["fermos.vessel", "pureos.train_run"]
 COMPOSITE_PRICE_BASIS = ("USD per kg of the product the train traces (ethanol, for the yeast program), contained in "
@@ -227,7 +147,6 @@ _CUSTOM_TRAIN = FlowsheetInfo(
     ),
     source="this repository",
     program="yeast",
-    reference=False,
     builtFrom=COMPOSITE_BUILT_FROM,
     inputs=[
         FlowsheetInput(key="feed_glucose_conc", name="glucose in the fermenter's feed", dimension="massConc",
@@ -248,10 +167,11 @@ _CUSTOM_TRAIN = FlowsheetInfo(
         FlowsheetInput(key="plant_scale", name="ethanol fermented in a year", dimension="massFlow", unit="t yr-1",
                        kind="economic",
                        note="the vessel's scale: the plant scale its design names (the vessel design is its source); "
-                            "a design of one vessel's batch volume names none, and then it is a named person's "
-                            "assumption. With the yield it sets the glucose fed, so the plant's size"),
+                            "a design of one vessel's batch volume names none, and then a person sets it. With the "
+                            "yield it sets the glucose fed, so the plant's size"),
         FlowsheetInput(key="glucose_price", name="price of glucose", dimension="costUSD", unit="USD kg-1",
-                       kind="economic", note="a named person's assumption; the glucose alone is priced, not its water"),
+                       kind="economic",
+                       note="the price of the glucose alone; the water that dilutes it carries none"),
     ],
     outputs=["pricePerKgProduct", "productKgPerH", "costLines", "readBack"],
     priceOutput="pricePerKgProduct",
@@ -261,24 +181,7 @@ _CUSTOM_TRAIN = FlowsheetInfo(
     brothStream="beer",
 )
 
-SHELF: dict[str, FlowsheetInfo] = {f.id: f for f in (_CORNSTOVER, _CORN, _ETHANOL, _CUSTOM_TRAIN)}
-
-# The package module each reference biorefinery runs (OF-BLD-019 §2.2).
-REFERENCE_MODULES = {"cornstover_benchmark": "biorefineries.cornstover", "corn_drygrind": "biorefineries.corn"}
-
-# What a reference run changes about its package for this installation to
-# run it, as (what, why); the basis of every run carries each as a
-# `convention` input. No value of the package's is changed.
-REFERENCE_COMPAT = {
-    "corn_drygrind": [(
-        "SimultaneousSaccharificationFermentation._ins_size_is_fixed = False",
-        "biorefineries.corn's SimultaneousSaccharificationFermentation passes its two inlets (the mash and the "
-        "yeast) to bst.BatchBioreactor, which declares one fixed inlet in biosteam 2.54.0, so corn.load() stops with "
-        "'at most 1 streams expected; 2 given'. The flowsheet lets the unit take them, as biosteam's own "
-        "NRELEthanolFermentation declares; the unit's _run already mixes every inlet. No number of the package's "
-        "is changed, and the package's own test values hold within its tolerance.",
-    )],
-}
+SHELF: dict[str, FlowsheetInfo] = {f.id: f for f in (_ETHANOL, _CUSTOM_TRAIN)}
 
 # The quantities the package's test template asserts
 # (biorefineries/tests/test_biorefineries.py, generate_code), by the
@@ -311,27 +214,14 @@ def _installed_file(relative: str) -> Path | None:
     return path if path.is_file() else None
 
 
-@lru_cache(maxsize=None)
-def package_regression(flowsheet_id: str) -> PackageRegression | None:
-    """The values a reference biorefinery's own package test asserts, read
-    from the installed test file: each `assert np.allclose(<expression>,
-    <value>, rtol=<tolerance>)` of the named test, in the order the test
-    writes them. None for a flowsheet with no package test, or when the
-    package or the test is not found here. Nothing is retyped: the file is
-    the authority, and the regression names it."""
-    entry = SHELF.get(flowsheet_id)
-    if entry is None or not entry.packageTest:
-        return None
-    file, _, test = entry.packageTest.partition("::")
-    return regression_of(file, test)
-
-
 def regression_of(file: str, test: str) -> PackageRegression | None:
     """The values one test of the installed biorefineries asserts (`file`
-    relative to the distribution, `test` a function in it), read as
-    `package_regression` reads them; None when the file or the test is not
-    found here. The library plant runner (engine/library.py) names a plant's
-    test this way."""
+    relative to the distribution, `test` a function in it), read from the
+    installed test file: each `assert np.allclose(<expression>, <value>,
+    rtol=<tolerance>)` of the named test, in the order the test writes them;
+    None when the file or the test is not found here. Nothing is retyped:
+    the file is the authority, and the regression names it. The library
+    plant runner (engine/library.py) names a plant's test this way."""
     path = _installed_file(file)
     if path is None:
         return None
@@ -355,7 +245,7 @@ def regression_of(file: str, test: str) -> PackageRegression | None:
 
 # The dry-grind corn plant's TEA parameters (OF-BLD-020 §6.1, Appendix 2 §D),
 # read from the installed package's own file without importing it, as the
-# package test is (`package_regression`): `custom_train_v1` prices with
+# package test is (`regression_of`): `custom_train_v1` prices with
 # `biorefineries.corn.create_tea`, and the parameter panel serves each of
 # these as the library's default until a person sets one. The worker builds
 # that TEA from the package's dict itself, and a sim test holds the two
@@ -418,7 +308,7 @@ def depreciation_lengths() -> dict[str, int]:
     MACRS schedule's table runs a year past its name, by the half-year
     convention). BioSTEAM refuses a schedule longer than the plant's life
     (its `_fill_depreciation_array`), so the panel says so before a run
-    (OF-BLD-020 §6.R, main-29). Empty when not found here; a table this
+    (main-29). Empty when not found here; a table this
     reader cannot count is left out."""
     return {name: n for name, n in (_depreciation_table() or []) if n is not None}
 
@@ -455,7 +345,6 @@ TEST_ONLY: dict[str, FlowsheetInfo] = {
         description="A mixer feeding a splitter, whose mass balance is worked by hand in flowsheets/toy.py. Not a process.",
         source="this repository",
         program=None,
-        reference=False,
         inputs=[
             FlowsheetInput(key="water", name="water fed", dimension="massFlow", unit="kg h-1", kind="process",
                            note="a STAND-IN input for tests"),

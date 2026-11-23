@@ -1,0 +1,67 @@
+{"kind": "file", "item": "docs/PROGRESS.md", "method": "executed", "findings": ["R1-01", "R1-02", "R1-03", "R1-04"], "note": "Resume, Current stage, both Spend tables, Decisions, every Departures row (alpha 2.2 rows read whole, older rows read), Blockers, Owner questions, Environment facts, Live owed, the alpha 2.2 Log (sampled in full by scripts, H.0 and H read whole); Known debts and Last green runs left to P and the baseline"}
+{"kind": "file", "item": "docs/reports/literature-retrieval.md", "method": "executed", "findings": ["R1-03"], "note": "recomputed from the kept run (litrun.py); dry run's figures reproduced through the code (dryrun_price.py)"}
+{"kind": "file", "item": "docs/reports/literature-retrieval.json", "method": "executed", "findings": [], "note": "project part equals the kept run's public part; demo part equals 112eb8b's payload"}
+{"kind": "file", "item": "docs/reports/model-routing-2026-11.md", "method": "executed", "findings": [], "note": "alpha 2.2 part recomputed from its per-question rows (routing_tables.py); To finish it held to Resume and Blockers"}
+{"kind": "file", "item": "docs/reports/live-questions-2026-11.md", "method": "executed", "findings": [], "note": "warm-up run ids reproduced on a fresh service; extraction table summed"}
+{"kind": "file", "item": "docs/reports/handoff-2026-11.md", "method": "executed", "findings": ["R1-05"], "note": "git diff over CORE, file counts, test collection, TOOLS.md at CORE"}
+{"kind": "file", "item": "core/openferment_core/literature_live.py", "method": "executed", "findings": ["R1-03"], "note": "dry-run branch driven with stubbed database read"}
+{"kind": "file", "item": "core/openferment_core/llm.py", "method": "executed", "findings": ["R1-03"], "note": "ROUTES, routes(), PRICES, LONG_PROMPT_PRICES, cost_usd"}
+{"kind": "file", "item": "core/openferment_core/spend.py", "method": "read", "findings": [], "note": "reservations, expiry, state()"}
+{"kind": "file", "item": "core/openferment_core/engine/sff.py", "method": "read", "findings": [], "note": "main's fetch, library_root"}
+{"kind": "file", "item": "core/openferment_core/postdoc/evaluate.py", "method": "read", "findings": [], "note": "ETHANOL_QUESTIONS follows, engines_here, JUDGE_TOKENS"}
+{"kind": "file", "item": "core/openferment_core/evaluation.py", "method": "read", "findings": [], "note": "the eval CLI's flags"}
+{"kind": "file", "item": "core/openferment_core/literature/graph.py", "method": "read", "findings": ["R1-03"], "note": "ANSWER_TOKENS, prompts, batch size"}
+{"kind": "file", "item": "core/openferment_core/postdoc/plan.py", "method": "read", "findings": [], "note": "MAX_TOKENS and ROOM"}
+{"kind": "file", "item": "core/openferment_core/basis.py", "method": "read", "findings": [], "note": "basis_provenance (owner question 11)"}
+{"kind": "file", "item": "core/openferment_core/workers/proforma_worker.py", "method": "read", "findings": [], "note": "the train's SFF refusal, replay ops"}
+{"kind": "file", "item": "core/openferment_core/pureos/train_spec.py", "method": "read", "findings": [], "note": "replay_precision, set twice"}
+{"kind": "file", "item": "core/openferment_core/studies/comparisons.py", "method": "read", "findings": [], "note": "versions 1 and 2, _row_of"}
+{"kind": "file", "item": "core/openferment_core/module_stores.py", "method": "read", "findings": [], "note": "PARTIAL"}
+{"kind": "file", "item": "core/openferment_core/project_state.py", "method": "read", "findings": [], "note": "deposition_refusal, amend_depositions"}
+{"kind": "file", "item": "core/openferment_core/engine/contract.py", "method": "read", "findings": [], "note": "CONTRACT_RUN"}
+{"kind": "file", "item": "core/openferment_core/engine/registry.py", "method": "read", "findings": [], "note": "ENGINE_NAME_MAX"}
+{"kind": "file", "item": "core/openferment_core/models.py", "method": "read", "findings": [], "note": "ENGINE_NAME_MAX, CONFIGURATION_MAX"}
+{"kind": "file", "item": "core/openferment_core/api.py", "method": "read", "findings": [], "note": "load_dotenv override=False, routes"}
+{"kind": "file", "item": "core/tests/test_engine_pins.py", "method": "read", "findings": [], "note": "fixed dispatch and pins"}
+{"kind": "file", "item": "core/tests/test_literature_live.py", "method": "read", "findings": ["R1-03"], "note": "the dry run's test holds 0 < inputUsd < mostUsd alone"}
+{"kind": "file", "item": "core/tests/test_phase3_review.py", "method": "read", "findings": [], "note": "H.0's removed spend-lock test and would_pass"}
+{"kind": "file", "item": "core/tests/test_spend.py", "method": "read", "findings": [], "note": "H.0's rewrite"}
+{"kind": "file", "item": "core/tests/test_validate.py", "method": "read", "findings": [], "note": "20 tests out, 11 in at 3cd2919"}
+{"kind": "file", "item": "core/tests/test_host.py", "method": "executed", "findings": [], "note": "52 passed with test_guidance's 6"}
+{"kind": "file", "item": "core/tests/test_guidance.py", "method": "executed", "findings": [], "note": "6 passed"}
+{"kind": "file", "item": "src/lib/durable.ts", "method": "read", "findings": ["R1-04"], "note": "DurableSnapshot fields"}
+{"kind": "file", "item": "src/screens/ProformaReference.tsx", "method": "read", "findings": ["R1-01"], "note": "the routes it reads"}
+{"kind": "file", "item": "scripts/check-state.ts", "method": "executed", "findings": [], "note": "95 checks"}
+{"kind": "file", "item": "scripts/check-guild.ts", "method": "executed", "findings": [], "note": "146 checks"}
+{"kind": "file", "item": "scripts/check-plan.mjs", "method": "executed", "findings": [], "note": "9 classes"}
+{"kind": "file", "item": "scripts/host/lib.sh", "method": "read", "findings": [], "note": "backup_database, has_key"}
+{"kind": "file", "item": "scripts/host/nightly.sh", "method": "read", "findings": [], "note": "backup first"}
+{"kind": "file", "item": "scripts/host/install.sh", "method": "read", "findings": [], "note": "against alpha 2.1's"}
+{"kind": "file", "item": "scripts/walk.ts", "method": "read", "findings": [], "note": "the engine step from the Runs screen"}
+{"kind": "file", "item": "scripts/prove.py", "method": "read", "findings": [], "note": "spend read, CONFORM_TIMEOUT_S"}
+{"kind": "file", "item": "examples/agents/record-reader/record_reader.py", "method": "read", "findings": [], "note": "handoff claims"}
+{"kind": "file", "item": "examples/agents/record-reader/README.md", "method": "read", "findings": [], "note": "six lines"}
+{"kind": "file", "item": "examples/engines/openferment-engine-mirror/pyproject.toml", "method": "read", "findings": [], "note": "entry point, no licence or dependency"}
+{"kind": "file", "item": "examples/engines/openferment-engine-mirror/README.md", "method": "read", "findings": [], "note": "ten lines"}
+{"kind": "file", "item": "examples/engines/openferment-engine-mirror/tests/test_worker.py", "method": "executed", "findings": [], "note": "collected, 30 with test_engine"}
+{"kind": "file", "item": "examples/engines/openferment-engine-mirror/tests/test_engine.py", "method": "executed", "findings": [], "note": "collected"}
+{"kind": "file", "item": "docs/decisions/ADR-016-bench-readings-alone.md", "method": "read", "findings": ["R1-02"], "note": "E.12a note"}
+{"kind": "file", "item": "docs/runbooks/live-host-install.md", "method": "read", "findings": [], "note": "step names and step 7"}
+{"kind": "file", "item": "docs/TOOLS.md", "method": "read", "findings": [], "note": "client recipe, tool counts across commits"}
+{"kind": "file", "item": "README.md", "method": "read", "findings": [], "note": "H.4's five lines"}
+{"kind": "file", "item": "core/.env.example", "method": "read", "findings": [], "note": "routing lines"}
+{"kind": "file", "item": "CLAUDE.md", "method": "read", "findings": [], "note": "149 lines (H.6)"}
+{"kind": "operation", "item": "POST /api/projects", "method": "executed", "findings": []}
+{"kind": "operation", "item": "GET /api/engines", "method": "executed", "findings": [], "note": "kinetics worker none, train thingsAre"}
+{"kind": "operation", "item": "GET /api/engines/{name}/parameters", "method": "executed", "findings": [], "note": "a parameter with no default"}
+{"kind": "operation", "item": "POST /api/engines/{name}/run", "method": "executed", "findings": [], "note": "three warm-up runs, ids as the report"}
+{"kind": "operation", "item": "POST /api/tools/{name}", "method": "executed", "findings": [], "note": "growth_forecast with no by; catalogue_write with by"}
+{"kind": "operation", "item": "POST /api/flowsheets/import-url", "method": "executed", "findings": [], "note": "user and password refused"}
+{"kind": "operation", "item": "GET /api/state", "method": "executed", "findings": [], "note": "depositedBy"}
+{"kind": "operation", "item": "GET /api/depositions/readings", "method": "executed", "findings": []}
+{"kind": "operation", "item": "GET /api/audit", "method": "executed", "findings": [], "note": "action and target filters, null fields left out"}
+{"kind": "tool", "item": "growth_forecast", "method": "executed", "findings": [], "note": "422 in words with no caller"}
+{"kind": "tool", "item": "catalogue_write", "method": "executed", "findings": [], "note": "auditIds names the row"}
+{"kind": "engine", "item": "biosteam", "method": "executed", "findings": [], "note": "cornstover and cellulosic_ethanol_v0 ids reproduced"}
+{"kind": "engine", "item": "kinetics", "method": "executed", "findings": [], "note": "listing and parameters"}
+{"kind": "engine", "item": "train", "method": "executed", "findings": [], "note": "listing"}

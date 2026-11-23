@@ -1,0 +1,50 @@
+## commit under test: fa75a62; core/ against 2047f5a: CHANGED
+NOTICE:  database "bh_r_h9_04_loop" does not exist, skipping
+{"pasted": "21e3a13c599a4a24a1151cc599a510f8"}
+agent: validator dropped 10/12 claims: d1: claim text contains a number ('doubled') — values come from the record; d2: claim text contains a number ('halved') — values come from the record; d3: claim text contains a number ('quadrupled') — values come from the record; d4: claim text contains a number ('IV') — values come from the record; d5: claim text contains a number ('x10') — values come from the record; d6: claim text contains a number ('pH7') — values come from the record; d7: claim text contains a number ('pH-4') — values come from the record; k1: claim text contains a number ('twofold') — values come from the record; k2: claim text contains a number ('tenfold') — values come from the record; k3: claim text contains a number ('pH 7') — values come from the record
+{"passageCited": "21e3a13c599a4a24a1151cc599a510f8:p0:0", "declined": null, "kept": 2, "rejected": 10}
+{"claim": "d1", "text": "Ethanol titre roughly doubled under anaerobic conditions", "kept": false, "reason": "d1: claim text contains a number ('doubled') \u2014 values come from the record"}
+{"claim": "d2", "text": "The yield halved on xylose", "kept": false, "reason": "d2: claim text contains a number ('halved') \u2014 values come from the record"}
+{"claim": "d3", "text": "The titre quadrupled in the evolved strain", "kept": false, "reason": "d3: claim text contains a number ('quadrupled') \u2014 values come from the record"}
+{"claim": "d4", "text": "Table IV lists the yields of the strains", "kept": false, "reason": "d4: claim text contains a number ('IV') \u2014 values come from the record"}
+{"claim": "d5", "text": "A x10 rise in productivity followed the change", "kept": false, "reason": "d5: claim text contains a number ('x10') \u2014 values come from the record"}
+{"claim": "d6", "text": "The strain grew best at pH7 in the cited batch", "kept": false, "reason": "d6: claim text contains a number ('pH7') \u2014 values come from the record"}
+{"claim": "d7", "text": "The titre fell at pH-4 in the cited batch", "kept": false, "reason": "d7: claim text contains a number ('pH-4') \u2014 values come from the record"}
+{"claim": "k1", "text": "Ethanol titre rose twofold under anaerobic conditions", "kept": false, "reason": "k1: claim text contains a number ('twofold') \u2014 values come from the record"}
+{"claim": "k2", "text": "A tenfold rise in productivity followed the change", "kept": false, "reason": "k2: claim text contains a number ('tenfold') \u2014 values come from the record"}
+{"claim": "k3", "text": "The strain grew best at pH 7 in the cited batch", "kept": false, "reason": "k3: claim text contains a number ('pH 7') \u2014 values come from the record"}
+{"claim": "s1", "text": "The phase 3 fermentation reached its titre", "kept": true, "reason": null}
+{"claim": "s2", "text": "The phase III fermentation reached its titre", "kept": true, "reason": null}
+{"gap": "Whether the titre doubled at pH7 is measured nowhere in the project", "kept": false}
+{"gap": "Whether the titre rose twofold is measured nowhere in the project", "kept": false}
+{"practice": "d1", "refused": true}
+{"practice": "d2", "refused": true}
+{"practice": "d3", "refused": true}
+{"practice": "d4", "refused": true}
+{"practice": "d5", "refused": true}
+{"practice": "d6", "refused": true}
+{"practice": "d7", "refused": true}
+{"planPromptListsDoubledAsBad": true, "agentRule9NamesPhAndTableNumber": true}
+SUMMARY {"defectKept": 0, "defectTotal": 7, "byDesignKept": 2, "controlDropped": 3, "controlTotal": 3, "gapDoubledKept": false, "gapTwofoldDropped": true, "passageCited": true}
+## the contract
+55:- R: A number in a Postdoc claim or a tool input stands only in a typed quantity with its origin; a claim with a number in its words is dropped and counted (ADR-006).
+51:NEVER WRITE A NUMBER IN CLAIM TEXT. Not in digits, not in words, not as \
+54:record beside your sentence. A claim containing a number is discarded whole — \
+59:  bad:   "Ethanol titre roughly doubled under anaerobic conditions"
+145:window, a year, a percentage, a pH, a rate of return, a table or figure \
+146:number or a concentration in claim text or in a gap discards it, even when \
+## the validator: validate_plan's number rule, the word list, the identifier carve-out
+447:        if found := find_number(text):
+72:    "once twice thrice"
+132:_IDENTIFIER = re.compile(r"(?<![0-9.])[A-Za-z][A-Za-z]*(?:[-\u2013][A-Za-z]*)*\d[A-Za-z0-9-]*")
+166:STEP_WORDS = ("stage", "step", "day", "phase", "round", "pass")
+  doubled    in validate.py: 1
+  halved     in validate.py: 1
+  quadrupled in validate.py: 0
+## the practice drafts' extra check, which says find_number lets these through
+73:# What validate.find_number lets through and a bench conversation reaches for:
+78:    r"(?<![A-Za-z])(?:pH\s*-?\s*\d|[x×]\s?\d|double[sd]?|triple[sd]?|quadruple[sd]?|halve[sd]?|single)(?![a-z])",
+169:def test_bench_quantities_the_shared_validator_lets_through_are_refused_here(said):
+EXPECTED: each of the 7 claims whose words state a quantity (doubled, halved, quadrupled, Table IV, x10, pH7, pH-4) dropped and counted, rejected 7, its reason naming the word, as the 3 controls (twofold, tenfold, pH 7) are; the gap saying "doubled at pH7" dropped as the gap saying "twofold" is
+OBSERVED: 0 of 7 such claims kept, each citing the project's passage with no typed value; 3 of 3 controls dropped; the "doubled at pH7" gap kept=false; passage cited=true; for reference, 2 of 2 phase-label claims (phase 3, phase III) kept, as the step-label rule means
+RESULT: NO-DEFECT

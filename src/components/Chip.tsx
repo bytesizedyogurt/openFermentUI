@@ -6,12 +6,9 @@ import { useStore, provenanceOf } from '@/store';
 import { navigate } from '@/router';
 import { fmt } from '@/engine/units';
 import { fieldName } from '@/data/ontology';
+import { authorsLine, shortCite, shortTitle } from '@/lib/cite';
 import { Popover, cx } from './ui';
 import { ProvenanceBadge, type ProvKind } from './Provenance';
-
-function shortTitle(t: string, max = 64) {
-  return t.length > max ? t.slice(0, max - 1) + '…' : t;
-}
 
 export function CitationChip({
   paperId,
@@ -51,8 +48,9 @@ export function CitationChip({
 
   const copyCitation = () => {
     const doi = paper.doi ? ` https://doi.org/${paper.doi}` : paper.pmcid ? ` PMC${paper.pmcid.replace(/^PMC/, '')}` : '';
-    const authors = paper.authors.length ? paper.authors.join(', ') : '(authors pending verification)';
-    const text = `${authors} (${paper.year}). ${paper.title}. ${paper.venue}.${doi}`;
+    const authors = paper.authors.length ? paper.authors.join('; ') : '(authors pending verification)';
+    const year = paper.year !== null ? ` (${paper.year})` : '';
+    const text = `${authors}${year}. ${paper.title}. ${paper.journal ?? ''}.${doi}`;
     navigator.clipboard?.writeText(text);
     useStore.getState().toast({ text: 'Citation copied', kind: 'info' });
   };
@@ -73,7 +71,7 @@ export function CitationChip({
           )}
           title={`${paper.id} — ${shortTitle(paper.title, 80)}`}
         >
-          [{label ?? paper.id}]
+          [{label ?? shortCite(paper)}]
         </button>
       )}
     >
@@ -81,8 +79,9 @@ export function CitationChip({
         <div>
           <div className="font-serif font-semibold leading-snug">{shortTitle(paper.title, 110)}</div>
           <div className="text-caption text-ink-soft mt-0.5">
-            {paper.authors.slice(0, 3).join(', ')}
-            {paper.authors.length > 3 ? ' et al.' : ''} · {paper.year} · {paper.venue}
+            {[authorsLine(paper.authors), paper.year != null ? String(paper.year) : '', paper.journal ?? '']
+              .filter(Boolean)
+              .join(' · ')}
           </div>
         </div>
 

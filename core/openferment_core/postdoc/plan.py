@@ -1,4 +1,4 @@
-"""The plan Postdoc answers in (OF-BLD-007 §6): its system prompt, its schema
+"""The plan Postdoc answers in: its system prompt, its schema
 and the shape evidence takes in a tool's result.
 
 The bounded loop in `postdoc_agent.py` builds on this prompt and adds its
@@ -26,6 +26,20 @@ from typing import Any
 # (docs/reports/live-questions-2026-11.md). A turn pays for what it writes.
 MIN_TOKENS = 8000
 MAX_TOKENS = 32000
+# The ceiling by the plan route's effort, where the effort thinks past
+# MAX_TOKENS. Alpha 2.2 F.2g: asked on Opus at effort max, each of four
+# questions spent its 24 tool calls and the answer then ran out of room at
+# 32,000 tokens, its thinking spending the turn (ADR-008, Implementation 16).
+# At max a turn may write 128,000 tokens, the output ceiling of every model
+# the routes name (Opus 5.5, Sonnet 5.5 and Haiku 5.5, a streamed call);
+# the question's budget still bounds each turn (postdoc_agent._turn_tokens).
+ROOM = {"xhigh": 64_000, "max": 128_000}
+
+
+def ceiling(effort: str) -> int:
+    """The most a plan turn may write at `effort`, its thinking included:
+    MAX_TOKENS at high and below, ROOM's tokens above."""
+    return ROOM.get(effort, MAX_TOKENS)
 
 SYSTEM = """You are Postdoc, a research assistant for fermentation and \
 bioprocess research in the openFerment platform.

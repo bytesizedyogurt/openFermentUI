@@ -13,14 +13,14 @@ import { RUNBOOK_TABS } from '@/data/tabs';
 import { IntervalLedger } from '@/components/figures';
 import { HIT_RATE_MIN_TESTED, ledgerCounts, ledgerRows, type LedgerCounts } from '@/engine/ledger';
 
-export function LedgerCountsLine({ c }: { c: LedgerCounts }) {
+function LedgerCountsLine({ c }: { c: LedgerCounts }) {
   return (
     <div className="flex flex-wrap gap-x-5 gap-y-1 text-body" data-testid="ledger-counts">
-      <span><span className="font-num">{c.locked}</span> predictions locked</span>
+      <span><span className="font-num">{c.locked}</span> prediction{c.locked === 1 ? '' : 's'} locked</span>
       <span><span className="font-num">{c.tested}</span> tested</span>
       <span><span className="font-num">{c.held}</span> held</span>
       <span><span className="font-num">{c.missed}</span> missed</span>
-      <span><span className="font-num">{c.inconclusiveRuns}</span> runs recorded as inconclusive</span>
+      <span><span className="font-num">{c.inconclusiveRuns}</span> run{c.inconclusiveRuns === 1 ? '' : 's'} recorded as inconclusive</span>
       <span data-testid="hit-rate">
         {c.hitRate === null
           ? `Hit rate: too few tested to state (shown from ${HIT_RATE_MIN_TESTED})`
@@ -88,10 +88,14 @@ export default function RunbookLedger() {
         {rows.length === 0 && (
           <p className="text-body text-ink-soft" data-testid="ledger-empty">
             No runbook has locked predictions yet. Next step: ask{' '}
-            <a className="text-accent underline underline-offset-2" href={href('/postdoc')}>
+            <a className="text-accent underline underline-offset-2" href={href('/postdoc/new')}>
               Postdoc
             </a>{' '}
-            to draft a runbook, turn it into one, and lock its predictions; the ledger counts it from then.
+            to draft a runbook and turn it into one, or make one from a run&rsquo;s numbers on its page (
+            <a className="text-accent underline underline-offset-2" href={href('/proforma/studies')}>
+              Studies
+            </a>{' '}
+            lists the runs); lock its predictions, and the ledger counts it from then.
           </p>
         )}
       </div>

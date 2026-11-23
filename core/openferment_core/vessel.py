@@ -1,5 +1,4 @@
-"""fermOS sizes the vessel a simulation needs, on BioSTEAM (OF-BLD-020 §4.1,
-D7, E.2‴, E.3‴, Appendix 2 §C).
+"""fermOS sizes the vessel a simulation needs, on BioSTEAM (E.2‴, E.3‴, Appendix 2 §C).
 
 From a kept `fermos.simulation` (or, anaerobic only, a `kinetic_fit` or
 `growth_forecast`, read through `proforma.fit_info` for titre, yield and
@@ -39,7 +38,8 @@ convention) or its batch average; the oxygen balance is then computed
 against the simulated uptake over time, and names the hours it is short.
 
 THE ARTIFACT (E.2‴). `design(req)` keeps one `fermos.vessel` artifact
-through `artifacts.compute`. Its basis: the simulation or fit (an `artifact`
+through `artifacts.compute`, and one runs row of the kinetics engine beside
+it (alpha 2.2 D3, fermos_engine.keep_design). Its basis: the simulation or fit (an `artifact`
 input, so its provenance flows in), the vessel class and the chemicals and
 the utility prices and cost index (`model`), the vessel type and the unit id
 (`convention`), every design parameter with its source (`params.basis_inputs`:
@@ -88,10 +88,12 @@ import threading
 from typing import Any, Iterable
 
 from . import params
+from .basis import SET_PARAM_ORIGINS, is_measurement
 from .models import (
     Artifact,
     BasisInput,
     BasisSource,
+    EngineInput,
     Evidence,
     Override,
     ParameterSpec,
@@ -314,7 +316,7 @@ def _past_harvest(end_t: Any, harvest: float) -> bool:
 
 def fit_inputs(art: Artifact) -> dict[str, Any]:
     """What a vessel design reads from a kept kinetic fit or forecast, through
-    `proforma.fit_info` (OF-BLD-019 §5.1): the titre, the yield and the batch
+    `proforma.fit_info`: the titre, the yield and the batch
     time, as the ethanol flowsheet takes them. A fit gives no cells and no
     oxygen uptake, so its vessel is the anaerobic one; the glucose fed is
     what the titre over the yield used (all of it), and none is carried in."""
@@ -534,6 +536,48 @@ DESIGN_KEYS = tuple(d.key for d in DECLARED if d.key not in (
 
 def _decls(kind: str) -> list[Decl]:
     return [d for d in DECLARED if kind in d.kinds]
+
+
+# The unit each design parameter is set in, by its key: a key is declared in
+# one unit, whatever the kind of vessel.
+UNITS = {d.key: d.unit for d in DECLARED}
+
+
+def _kind_of(aid: str) -> str | None:
+    """The kind of vessel the artifact `aid` designs, read from it alone: an
+    aerobic simulation's is aerobic, and every other one's anaerobic (a fit
+    gives no oxygen uptake). None for an artifact not on file, which the
+    design's own read refuses in words (`_source_of`)."""
+    from . import artifacts
+
+    try:
+        art = artifacts.get(aid)
+    except artifacts.ArtifactNotFound:
+        return None
+    return AEROBIC if art.tool == SIMULATION and bool((art.output or {}).get("aerobic")) else ANAEROBIC
+
+
+def overrides_of(aid: str, inputs: Iterable[EngineInput]) -> list[Override]:
+    """The values a design request sets, each a typed quantity with its
+    origin, as the Overrides of the scope `fermos:vessel:<aid>` the design
+    resolves (params.overrides_of, basis.override_of), each in its
+    parameter's declared unit: the vessel's door, where every value set is
+    converted once. A key no design declares is refused naming the keys of
+    the design's own kind (`_decls`, the keys its scope lists); a key another
+    kind declares reaches the design's own checks, which say in its words
+    why this kind takes none (an anaerobic vessel's type) or name the
+    scope's keys (`params.checked`). A unit its parameter is not in and a
+    value no person or model is named for are refused in words
+    (params.ParamRefused)."""
+    inputs = list(inputs)
+    if not inputs:
+        return []
+    unknown = next((i.name for i in inputs if i.name not in UNITS), None)
+    if unknown is not None:
+        kind = _kind_of(aid)
+        keys = list(dict.fromkeys(d.key for d in (_decls(kind) if kind is not None else DECLARED)))
+        raise params.ParamRefused(f"there is no parameter {unknown} here; the parameters are {', '.join(keys)}")
+    return params.overrides_of(params.scope_name("fermos-vessel", aid), inputs, UNITS)
 
 
 def _spec(d: Decl, choices: list[str] | None = None, *, rule: list[str] | None = None, convention: Any = None,
@@ -801,7 +845,7 @@ def provided(aid: str, vessel_type: str | None, overrides: Iterable[Override] = 
 def _provider(ids: tuple[str, ...], req: ParamResolveRequest) -> params.Provided:
     (aid,) = ids
     try:
-        got, _ = provided(aid, req.vesselType, overrides=req.overrides)
+        got, _ = provided(aid, req.vesselType, overrides=overrides_of(aid, req.inputs))
     except VesselNotFound as e:
         raise params.ScopeUnknown(str(e)) from None
     except VesselRefused as e:
@@ -834,7 +878,11 @@ def basis_inputs(req: VesselRequest) -> tuple[list[BasisInput], list[ParameterSp
     if len(named) != 1:
         raise VesselRefused("a vessel is designed for one simulation or one fit: name exactly one")
     aid = named[0]
-    got, read = provided(aid, req.vesselType, overrides=req.overrides,
+    try:
+        overrides = overrides_of(aid, req.inputs)
+    except params.ParamRefused as e:
+        raise VesselRefused(str(e)) from None
+    got, read = provided(aid, req.vesselType, overrides=overrides,
                          kla_method=req.klaMethod)
     art, kind = read["artifact"], read["kind"]
     if req.fit and art.tool == SIMULATION:
@@ -843,19 +891,19 @@ def basis_inputs(req: VesselRequest) -> tuple[list[BasisInput], list[ParameterSp
         raise VesselRefused(f"artifact {aid} is a {art.tool} artifact; name it as the fit, not the simulation")
     if req.fit and kind != ANAEROBIC:  # fit_inputs reads every fit as anaerobic; held here in words all the same
         raise VesselRefused("a fit gives no oxygen uptake, so it designs the anaerobic vessel only")
-    scope_id = params.scope_name("fermos-vessel", aid)
-    stray = sorted({o.scope for o in req.overrides if o.scope != scope_id})
-    if stray:
-        raise VesselRefused(f"an override names the scope it changes, and these were sent to {scope_id}: {', '.join(stray)}")
     try:
-        values = params.resolve(got.specs, got.sources, req.overrides)
+        values = params.resolve(got.specs, got.sources, overrides)
     except params.ParamRefused as e:
         raise VesselRefused(str(e)) from None
     by = {v.key: v for v in values}
     has = {k for k, v in by.items() if v.value is not None}
     if not ({"plant_scale", "batch_volume"} & has):
-        raise VesselRefused("a vessel design needs plant_scale (tonnes of product a year) or batch_volume (one vessel's "
-                            "working volume, m³), a named person's assumption; neither was given")
+        # The scales the design's own scope offers: an anaerobic design takes a plant scale alone.
+        if any(s.key == "batch_volume" for s in got.specs):
+            raise VesselRefused("a vessel design needs plant_scale (tonnes of product a year) or batch_volume (one "
+                                "vessel's working volume, m³), a named person's assumption; neither was given")
+        raise VesselRefused("a vessel design needs plant_scale (tonnes of product a year), a named person's "
+                            "assumption; none was given")
     # Both scales, and N beside V_max, are refused by `_held`, which
     # `provided` ran above for the design and runs for the panel alike.
     waiting = [v.key for v in values if v.origin == "waiting" and v.key not in ("plant_scale", "batch_volume")]
@@ -1088,12 +1136,12 @@ def _parameters(inputs: list[BasisInput], kind: str, source_id: str, source_tool
                                       origin="library-default", libraryDefault=lib,
                                       detail=f"{ws['unitClass']}'s default is None: the class decides at run time"))
             continue
-        o = origin.get(i.source.kind) or ("simulation" if i.source.id == source_id and source_tool == SIMULATION
-                                          else "artifact")
+        o = "measurement" if is_measurement(i.source) else origin.get(i.source.kind) or (
+            "simulation" if i.source.id == source_id and source_tool == SIMULATION else "artifact")
         low, high = given.get(f"{d.key} low"), given.get(f"{d.key} high")
         v = ParameterValue(key=d.key, value=i.value, low=float(low.value) if low else None,
                            high=float(high.value) if high else None, source=i.source, origin=o,
-                           overriddenBy=i.source.by if o in ("assumption", "model-estimate") else None,
+                           overriddenBy=i.source.by if o in SET_PARAM_ORIGINS else None,
                            libraryDefault=lib, detail=i.source.note)
         v.outOfBounds = params.bounds_check(_spec(d, [] if d.choice else None, bounds=_class_bounds(d, ws)), v.value,
                                             v.low, v.high)
@@ -1126,11 +1174,16 @@ def output_of(art: Artifact) -> VesselDesign:
 
 
 def design(req: VesselRequest) -> VesselDesign:
-    """Design the vessel, or return the design kept for the same basis."""
-    from . import artifacts
+    """Design the vessel, or return the design kept for the same basis; the
+    design is kept as a run of the kinetics engine (fermos_engine.keep_design:
+    one runs row, its configuration the simulation or fit, its created_by the
+    request's `by`). A design refused before the worker designs it keeps
+    nothing; the worker's refusal of the values is kept as the run's receipt
+    and raised again."""
+    from .fermos_engine import keep_design
 
-    inputs, _, _, _ = basis_inputs(req)
-    art = artifacts.compute(TOOL, inputs, records_by_id={})
+    inputs, _, _, read = basis_inputs(req)
+    art = keep_design(read["artifact"].id, inputs, by=req.by)
     return output_of(art)
 
 

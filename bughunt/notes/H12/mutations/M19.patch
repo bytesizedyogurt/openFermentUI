@@ -1,0 +1,11 @@
+--- a/core/openferment_core/api.py
++++ b/core/openferment_core/api.py
+@@ -390,7 +390,7 @@
+         with projects.using(None):
+             return await call_next(request)
+     named = named.strip()
+-    if not projects.valid_id(named):
++    if False:
+         return JSONResponse(status_code=422, content={"detail": f"{named!r} is not a project id"})
+     try:
+         known = await db.arun(projects.held(named))

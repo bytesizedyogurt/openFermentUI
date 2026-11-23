@@ -1,0 +1,6 @@
+## study_scenario, a 400-digit integer as a quantity's value
+Internal Server Error [500]
+## search_records, a lone surrogate escape in the query
+Internal Server Error [500]
+## engine_report, a NUL in the run id
+{"summary":{},"evidence":[],"recordIds":[],"passages":[],"error":"engine_report failed: DBAPIError: (sqlalchemy.dialects.postgresql.asyncpg.Error) invalid byte sequence for encoding \"UTF8\": 0x00\n[SQL: SELECT openferment.runs.body \nFROM openferment.runs \nWHERE openferment.runs.project_id = $1::VARCHAR AND openferment.runs.id = $2::VARCHAR]\n[parameters: ('pa', 'a\\x00b')]\n(Background on this error at: https://sqlalche.me/e/21/dbapi)","usage":{"inputTokens":0,"outputTokens":0,"cacheReadToken

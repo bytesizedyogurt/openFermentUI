@@ -1,0 +1,124 @@
+
+[plain public file] https://public.test/f.json
+   -> FETCHED 28 bytes served=https://public.test/f.json kind='application/json'
+   connects: ['93.184.216.34:443 Host=public.test sni=public.test path=/f.json']
+
+[302 to https://127.0.0.1/x] https://public.test/start
+   -> AddressRefused: https://public.test/start redirected to https://127.0.0.1/x: 127.0.0.1 is a loopback address; a file is fetched from a public address alone
+   connects: ['93.184.216.34:443 Host=public.test sni=public.test path=/start']
+
+[302 to https://localhost/x] https://public.test/start
+   -> HostFailed: the host name localhost could not be found
+   connects: ['93.184.216.34:443 Host=public.test sni=public.test path=/start']
+
+[302 to https://private.test/x] https://public.test/start
+   -> AddressRefused: https://public.test/start redirected to https://private.test/x: private.test resolves to 10.0.0.7; 10.0.0.7 is a private address; a file is fetched from a public address alone
+   connects: ['93.184.216.34:443 Host=public.test sni=public.test path=/start']
+
+[302 to https://meta.test/latest] https://public.test/start
+   -> AddressRefused: https://public.test/start redirected to https://meta.test/latest: meta.test resolves to 169.254.169.254; 169.254.169.254 is a link-local address; a file is fetched from a public address alone
+   connects: ['93.184.216.34:443 Host=public.test sni=public.test path=/start']
+
+[302 to https://mixed.test/x] https://public.test/start
+   -> AddressRefused: https://public.test/start redirected to https://mixed.test/x: mixed.test resolves to 93.184.216.34, 127.0.0.1; 127.0.0.1 is a loopback address; a file is fetched from a public address alone
+   connects: ['93.184.216.34:443 Host=public.test sni=public.test path=/start']
+
+[302 to http://public.test/x] https://public.test/start
+   -> AddressRefused: https://public.test/start redirected to http://public.test/x, which is not an https address; a redirect is followed to another https address alone
+   connects: ['93.184.216.34:443 Host=public.test sni=public.test path=/start']
+
+[302 to file:///etc/passwd] https://public.test/start
+   -> AddressRefused: https://public.test/start redirected to file://public.test/etc/passwd, which is not an https address; a redirect is followed to another https address alone
+   connects: ['93.184.216.34:443 Host=public.test sni=public.test path=/start']
+
+[302 to ftp://public.test/x] https://public.test/start
+   -> AddressRefused: https://public.test/start redirected to ftp://public.test/x, which is not an https address; a redirect is followed to another https address alone
+   connects: ['93.184.216.34:443 Host=public.test sni=public.test path=/start']
+
+[302 to https://user:pw@other.test/x] https://public.test/start
+   -> AddressRefused: https://public.test/start redirected to an address that names a user or a password (other.test); a redirect is followed to an address that names neither, since the record keeps it as its source
+   connects: ['93.184.216.34:443 Host=public.test sni=public.test path=/start']
+
+[302 to //127.0.0.1:8882/x] https://public.test/start
+   -> AddressRefused: https://public.test/start redirected to https://127.0.0.1:8882/x: 127.0.0.1 is a loopback address; a file is fetched from a public address alone
+   connects: ['93.184.216.34:443 Host=public.test sni=public.test path=/start']
+
+[302 to /relative/ok] https://public.test/start
+   -> FETCHED 28 bytes served=https://public.test/relative/ok kind='application/json'
+   connects: ['93.184.216.34:443 Host=public.test sni=public.test path=/start', '93.184.216.34:443 Host=public.test sni=public.test path=/relative/ok']
+
+[302 to https://other.test:8882/ok] https://public.test/start
+   -> FETCHED 28 bytes served=https://other.test:8882/ok kind='application/json'
+   connects: ['93.184.216.34:443 Host=public.test sni=public.test path=/start', '151.101.1.1:8882 Host=other.test:8882 sni=other.test path=/ok']
+
+[302 to https://[::ffff:127.0.0.1]/x] https://public.test/start
+   -> AddressRefused: https://public.test/start redirected to https://[::ffff:127.0.0.1]/x: ::ffff:127.0.0.1 is a loopback address; a file is fetched from a public address alone
+   connects: ['93.184.216.34:443 Host=public.test sni=public.test path=/start']
+
+[302 to https://2130706433/x] https://public.test/start
+   -> AddressRefused: https://public.test/start redirected to https://2130706433/x: 2130706433 reads as 127.0.0.1, a loopback address; a file is fetched from a public address alone
+   connects: ['93.184.216.34:443 Host=public.test sni=public.test path=/start']
+
+[302 to https://0x7f.1/x] https://public.test/start
+   -> AddressRefused: https://public.test/start redirected to https://0x7f.1/x: 0x7f.1 reads as 127.0.0.1, a loopback address; a file is fetched from a public address alone
+   connects: ['93.184.216.34:443 Host=public.test sni=public.test path=/start']
+
+[302 to gopher://public.test/] https://public.test/start
+   -> AddressRefused: https://public.test/start redirected to gopher://public.test/, which is not an https address; a redirect is followed to another https address alone
+   connects: ['93.184.216.34:443 Host=public.test sni=public.test path=/start']
+
+[302 to https://other.test/ok] https://public.test/start
+   -> FETCHED 28 bytes served=https://other.test/ok kind='application/json'
+   connects: ['93.184.216.34:443 Host=public.test sni=public.test path=/start', '151.101.1.1:443 Host=other.test sni=other.test path=/ok']
+
+[302 to javascript:alert(1)] https://public.test/start
+   -> InvalidURL: For absolute URLs, path must be empty or begin with '/'
+   connects: ['93.184.216.34:443 Host=public.test sni=public.test path=/start']
+
+[302 to https:/127.0.0.1/x] https://public.test/start
+   -> FETCHED 28 bytes served=https://public.test/127.0.0.1/x kind='application/json'
+   connects: ['93.184.216.34:443 Host=public.test sni=public.test path=/start', '93.184.216.34:443 Host=public.test sni=public.test path=/127.0.0.1/x']
+
+[302 to https:127.0.0.1/x] https://public.test/start
+   -> InvalidURL: For absolute URLs, path must be empty or begin with '/'
+   connects: ['93.184.216.34:443 Host=public.test sni=public.test path=/start']
+
+[302 to https://other.test\@127.0.0.1/x] https://public.test/start
+   -> AddressRefused: https://public.test/start redirected to an address that names a user or a password (127.0.0.1); a redirect is followed to an address that names neither, since the record keeps it as its source
+   connects: ['93.184.216.34:443 Host=public.test sni=public.test path=/start']
+
+[307 to loopback] https://public.test/start
+   -> AddressRefused: https://public.test/start redirected to https://127.0.0.1/x: 127.0.0.1 is a loopback address; a file is fetched from a public address alone
+   connects: ['93.184.216.34:443 Host=public.test sni=public.test path=/start']
+
+[redirect loop] https://public.test/loop?n=0
+   -> HostFailed: https://public.test/loop?n=0 redirected more than 5 times
+   connects: ['93.184.216.34:443 Host=public.test sni=public.test path=/loop?n=0', '93.184.216.34:443 Host=public.test sni=public.test path=/loop?n=1', '93.184.216.34:443 Host=public.test sni=public.test path=/loop?n=2', '93.184.216.34:443 Host=public.test sni=public.test path=/loop?n=3', '93.184.216.34:443 Host=public.test sni=public.test path=/loop?n=4', '93.184.216.34:443 Host=public.test sni=public.test path=/loop?n=5']
+
+[declares 20 MB] https://public.test/big
+   -> TooLarge: the file at https://public.test/big is 20971520 bytes, larger than the 16 MB an import takes
+   connects: ['93.184.216.34:443 Host=public.test sni=public.test path=/big']
+
+[streams 20 MB, no length] https://public.test/big
+   -> TooLarge: the file at https://public.test/big is larger than the 16 MB an import takes
+   connects: ['93.184.216.34:443 Host=public.test sni=public.test path=/big']
+
+[gzip of 40 MB in a small body] https://public.test/bomb
+   -> TooLarge: the file at https://public.test/bomb is larger than the 16 MB an import takes
+   connects: ['93.184.216.34:443 Host=public.test sni=public.test path=/bomb']
+
+[says 10 bytes, sends 20 MB] https://public.test/lie
+   -> TooLarge: the file at https://public.test/lie is larger than the 16 MB an import takes
+   connects: ['93.184.216.34:443 Host=public.test sni=public.test path=/lie']
+
+[503 twice] https://public.test/err
+   -> HostFailed: https://public.test/err answered 503 Service Unavailable
+   connects: ['93.184.216.34:443 Host=public.test sni=public.test path=/err', '93.184.216.34:443 Host=public.test sni=public.test path=/err']
+
+[html page] https://public.test/page
+   -> FETCHED 18 bytes served=https://public.test/page kind='text/html'
+   connects: ['93.184.216.34:443 Host=public.test sni=public.test path=/page']
+
+[drips past a 2 s deadline (FILE_TIMEOUT_S set to 2 here)] https://public.test/slow
+   -> HostFailed: https://public.test/slow did not serve the whole file within 2 s
+   connects: ['93.184.216.34:443 Host=public.test sni=public.test path=/slow']

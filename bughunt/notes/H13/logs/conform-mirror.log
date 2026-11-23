@@ -1,0 +1,18 @@
+mirror (engine run 1 · mirror · openferment-engine-mirror 0.1.0): every check holds
+
+✓ 1  a JSON number outside a quantity is refused in words before the worker is reached
+     the route answered 422 and 422 (a number for a quantity, a stray number) and the tool refused; the engine was never reached; 0 run kept
+✓ 2  every default carries an origin naming what it rests on (a library-default, a record or an artifact its ref, a convention its note, a person's assumption its by), and a parameter with none takes a run's value
+     2 parameters of 1 thing (reflect), each in its default configuration or its first: 2 defaults, each with its origin, and 0 with none, each taking a run's value
+✓ 3  a run writes one runs row keyed by its basis, and the same request twice is that one row, with its diagnostics in their shape when it reports some
+     run 3c401f682fe3c6f5 of reflect, asked twice, is 1 row; engine mirror, status done; its id the artifact id of its basis; it reports 1 diagnostic beside its outputs (time taken), each a name, a value and a unit, kept on its row and nowhere in its artifact; asked again, the first computation's
+✓ 4  a replay holds every output within the precision the thing states
+     identical (rtol 0, atol 0); 0 differences
+✓ 5  the run's SFF file validates and scores, or sffRefused holds words
+     no file, in words: the mirror engine has no plant, so it writes no SFF file
+✓ 6  importing the module the entry point names imports neither the worker module nor what the engine computes with
+     importing openferment_engine_mirror.engine imported none of the worker openferment_engine_mirror.worker, biorefineries, biosteam, cobra, pisces_sff, thermosteam
+✓ 7  a request the engine refuses is kept as a receipt in its words, with no traceback
+     its worker refused 'conform-no-such-thing', kept as receipt 3cef66b9a37ed606 in its words: the mirror engine runs no thing 'conform-no-such-thing'; it runs 'reflect'; asked again, answered from the receipt with the worker's run op never asked
+✓ 8  created_by on every run is the person or the model that asked for it
+     the checks' run: created_by 'conformance check of mirror', its by 'conformance check of mirror', asked by 'conformance check of mirror'; a model's run (2ca4e9a49688dcea, 1 value its estimate): created_by 'conformance-model', asked by 'conformance-model'

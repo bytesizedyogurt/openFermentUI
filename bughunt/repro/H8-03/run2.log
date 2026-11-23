@@ -1,0 +1,19 @@
+EXPECTED: POST /api/intake/upload of report%00.md answers HTTP 200 with a CollectOutcome (status failed and the
+EXPECTED: reason in words, or the name kept and the document stored), and leaves no kit document that no project
+EXPECTED: holds (docs/api/intake.md:55-56: the route raises no 5xx for a document it could not collect).
+NOTICE:  database "bh_r_h8_03_svc" does not exist, skipping
+service on port 9430 over database bh_r_h8_03_svc
+step 1: h803a uploads report%00.md -> HTTP 500: Internal Server Error
+step 1: documents h803a holds: 0 | kit documents: 1 | project links: 0 | kit documents no project links: 1
+step 1: unlinked kit document da6703153e3d43309c659c0fa861754c | source project:h803a:upload | source_ref /tmp/openferment-collected-atg4k6fa/report-.md.md
+step 1: service log: invalid byte sequence for encoding "UTF8": 0x00
+step 1: service log: [SQL: UPDATE documents SET source_ref=$1::VARCHAR WHERE documents.id = $2::VARCHAR]
+step 1: service log: [parameters: ('upload:report\x00.md', 'da6703153e3d43309c659c0fa861754c')]
+step 1: traceback frame: intake.py", line 117, in upload
+step 1: traceback frame: intake.py", line 88, in store
+step 1: traceback frame: literature/kit.py", line 600, in _store
+step 1: traceback frame: literature/kit.py", line 616, in ingest
+step 2: h803b uploads report.md -> status linked | its document: source project:h803a:upload | sourceRef /tmp/openferment-collected-atg4k6fa/report-.md.md (file exists: no)
+OBSERVED: h803a's upload answered HTTP 500 and h803a holds 0 documents, while the kit keeps 1 document(s) no project links;
+OBSERVED: h803b's upload of the same bytes answered linked, its document's source is project:h803a:upload and its sourceRef is /tmp/openferment-collected-atg4k6fa/report-.md.md.
+RESULT: DEFECT

@@ -1,0 +1,74 @@
+worktree: /tmp/claude-0/-home-user-openFermentUI/cfbc5c9f-640a-5002-a705-5ceaf850fdc6/scratchpad/bh/work/H11-04/wt at 2047f5a
+
+== 1. the contract and the code, as 2047f5a holds them
+   scripts/host/nightly.sh:21: # The database and the project the night's extraction writes into (ADR-001,
+   scripts/host/nightly.sh:22: # ADR-005), from core/.env when the environment lacks them; nothing else is
+   scripts/host/nightly.sh:24: for name in OPENFERMENT_DATABASE_URL OPENFERMENT_PROJECT; do
+   scripts/host/nightly.sh:25: value="$(env_setting "$name")"
+   scripts/host/nightly.sh:26: [ -n "$value" ] && export "$name=$value"
+   scripts/host/nightly.sh:30: # The database as the night finds it, before the night's work writes to it
+   scripts/host/nightly.sh:31: # (lib.sh's backup_database: the keg's pg_dump, seven daily files kept).
+   scripts/host/lib.sh:151: ?*)
+   scripts/host/lib.sh:152: echo "OPENFERMENT_DATABASE_URL names the database."
+   scripts/host/lib.sh:187: file="$dir/openferment-$(date +%F).dump"
+   scripts/host/lib.sh:188: if ! (umask 077 && "$tool" -h 127.0.0.1 --format=custom --file="$file.part" openferment); then
+   docs/runbooks/live-host-install.md:240: The night's dump holds the whole database.
+   docs/runbooks/live-host-install.md:260: dumps the database `openferment`
+   lines of backup_database (lib.sh:177-205) reading OPENFERMENT_DATABASE_URL or env_setting: 0
+
+== 2. two test databases on one server, each with a project of its own made through the API
+NOTICE:  database "bh_r_h11_04_live" does not exist, skipping
+NOTICE:  database "bh_r_h11_04_openferment" does not exist, skipping
+NOTICE:  database "bh_r_h11_04_absent" does not exist, skipping
+   bh_r_h11_04_live holds projects: night-live
+   bh_r_h11_04_openferment holds projects: leftover-only
+
+== 3. ensure_database (install.sh's step) over night A's core/.env
+   OPENFERMENT_DATABASE_URL names the database.
+   exit 0
+
+== 4. night 0 (control): core/.env names the database openferment, as install.sh writes it
+   core/.env: OPENFERMENT_DATABASE_URL=postgresql://openferment@127.0.0.1:5432/openferment
+   nightly.sh exit 0
+   call: pg_dump -h 127.0.0.1 --format=custom --file=$OUT/home-0/openferment-backups/openferment-2026-11-10.dump.part openferment
+   call: pg_dump reads the test database bh_r_h11_04_openferment
+   call: python -m openferment_core.extract --all DB=postgresql://openferment@127.0.0.1:5432/openferment PROJECT=night-live
+   call: python -m openferment_core.nightly_checks DB=postgresql://openferment@127.0.0.1:5432/openferment PROJECT=night-live
+   call: python -m openferment_core.checks propose DB=postgresql://openferment@127.0.0.1:5432/openferment PROJECT=night-live
+   call: python -m openferment_core.checks brief --missing DB=postgresql://openferment@127.0.0.1:5432/openferment PROJECT=night-live
+   log: openferment dumped into $OUT/home-0/openferment-backups/openferment-2026-11-10.dump
+   the kept dump openferment-2026-11-10.dump: lines naming night-live 0, naming leftover-only 2
+
+== 5. night A: core/.env names bh_r_h11_04_live, and a database named openferment is on the server
+   core/.env: OPENFERMENT_DATABASE_URL=postgresql://openferment@127.0.0.1:5432/bh_r_h11_04_live
+   nightly.sh exit 0
+   call: pg_dump -h 127.0.0.1 --format=custom --file=$OUT/home-A/openferment-backups/openferment-2026-11-10.dump.part openferment
+   call: pg_dump reads the test database bh_r_h11_04_openferment
+   call: python -m openferment_core.extract --all DB=postgresql://openferment@127.0.0.1:5432/bh_r_h11_04_live PROJECT=night-live
+   call: python -m openferment_core.nightly_checks DB=postgresql://openferment@127.0.0.1:5432/bh_r_h11_04_live PROJECT=night-live
+   call: python -m openferment_core.checks propose DB=postgresql://openferment@127.0.0.1:5432/bh_r_h11_04_live PROJECT=night-live
+   call: python -m openferment_core.checks brief --missing DB=postgresql://openferment@127.0.0.1:5432/bh_r_h11_04_live PROJECT=night-live
+   log: openferment dumped into $OUT/home-A/openferment-backups/openferment-2026-11-10.dump
+   the kept dump openferment-2026-11-10.dump: lines naming night-live 0, naming leftover-only 2
+
+== 6. night C: core/.env names bh_r_h11_04_live, and no database named openferment is on the server
+   core/.env: OPENFERMENT_DATABASE_URL=postgresql://openferment@127.0.0.1:5432/bh_r_h11_04_live
+   nightly.sh exit 1
+   call: pg_dump -h 127.0.0.1 --format=custom --file=$OUT/home-C/openferment-backups/openferment-2026-11-10.dump.part openferment
+   call: pg_dump reads the test database bh_r_h11_04_absent
+   call: python -m openferment_core.extract --all DB=postgresql://openferment@127.0.0.1:5432/bh_r_h11_04_live PROJECT=night-live
+   call: python -m openferment_core.nightly_checks DB=postgresql://openferment@127.0.0.1:5432/bh_r_h11_04_live PROJECT=night-live
+   call: python -m openferment_core.checks propose DB=postgresql://openferment@127.0.0.1:5432/bh_r_h11_04_live PROJECT=night-live
+   call: python -m openferment_core.checks brief --missing DB=postgresql://openferment@127.0.0.1:5432/bh_r_h11_04_live PROJECT=night-live
+   log: pg_dump: error: connection to server at "127.0.0.1", port 5432 failed: FATAL:  database "bh_r_h11_04_absent" does not exist
+   log: pg_dump openferment failed, and the kept dumps stay as they were; the message above says why
+   no dump kept in $OUT/home-C/openferment-backups/
+
+== 7. the stand-in pg_dump, given the address core/.env names in nights A and C
+   call: pg_dump -h 127.0.0.1 --format=custom --file=$OUT/by-url.dump --dbname=postgresql://openferment@127.0.0.1:5432/bh_r_h11_04_live
+   call: pg_dump reads the test database bh_r_h11_04_live
+   that dump's lines naming night-live: 2
+
+EXPECTED: each night pg_dump reads the database the night's four python steps are given, the one core/.env's OPENFERMENT_DATABASE_URL names: night A's and night C's dump hold bh_r_h11_04_live's project night-live (nightly.sh:30 "The database as the night finds it, before the night's work writes to it").
+OBSERVED: night 0: the work given 'openferment', pg_dump asked for 'openferment', exit 0. Night A: the work given 'bh_r_h11_04_live', pg_dump asked for 'openferment', exit 0, the dump's lines naming night-live 0 and naming leftover-only 2. Night C: the work given 'bh_r_h11_04_live', pg_dump asked for 'openferment', exit 1, dump kept: none. The same stand-in given core/.env's address dumps night-live (2 lines).
+RESULT: DEFECT

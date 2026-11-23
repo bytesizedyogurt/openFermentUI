@@ -1,0 +1,11 @@
+{"promptListsAsBad": true}
+{"claim": "Ethanol titre roughly doubled under anaerobic conditions", "kept": 1, "dropped": 0, "reasons": []}
+{"claim": "The ethanol titre tripled once xylose was added", "kept": 0, "dropped": 1, "reasons": ["c1: claim text contains a number ('once') \u2014 values come from the record"]}
+{"claim": "The yield halved on xylose", "kept": 1, "dropped": 0, "reasons": []}
+{"claim": "The titre quadrupled in the evolved strain", "kept": 1, "dropped": 0, "reasons": []}
+{"claim": "Hundreds of strains were screened before this one", "kept": 0, "dropped": 1, "reasons": ["c1: claim text contains a number ('one') \u2014 values come from the record"]}
+{"claim": "Table IV lists the yields of the strains", "kept": 1, "dropped": 0, "reasons": []}
+{"claim": "The phase III fermentation reached its titre", "kept": 1, "dropped": 0, "reasons": []}
+{"claim": "A x10 rise in productivity followed the change", "kept": 1, "dropped": 0, "reasons": []}
+{"claim": "The strain grew best at pH7 in the cited batch", "kept": 1, "dropped": 0, "reasons": []}
+{"claim": "The titre fell at pH-4 in the cited batch", "kept": 1, "dropped": 0, "reasons": []}

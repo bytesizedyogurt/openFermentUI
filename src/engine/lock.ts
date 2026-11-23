@@ -16,7 +16,7 @@
 // Real attestation — a timestamp somebody else can vouch for — belongs to
 // Common Seal, which is not built (Settings → Architecture). Naming that gap is more
 // useful than dressing FNV-1a up as tamper-proofing.
-import type { Measure, Prediction } from '@/data/types';
+import type { Measure, Prediction, Runbook } from '@/lib/studies';
 
 /**
  * Canonical serialization. Field order is fixed here rather than left to
@@ -66,12 +66,8 @@ export function runbookLockHash(predictions: Prediction[], schema: Measure[]): s
  * after freezing, which is the exact failure locking exists to catch, so the
  * caller should surface it rather than swallow it.
  */
-export function lockIntact(runbook: {
-  predictions: Prediction[];
-  measurementSchema: Measure[];
-  lockedAt: string | null;
-  lockHash: string | null;
-}): boolean {
+export function lockIntact(runbook: Pick<Runbook, 'predictions' | 'measurementSchema' | 'lockedAt' | 'lockHash'>): boolean {
   if (!runbook.lockedAt || !runbook.lockHash) return true;
-  return runbookLockHash(runbook.predictions, runbook.measurementSchema) === runbook.lockHash;
+  // A row that set no predictions or no measures froze empty lists of them, as runbook_lock.py reads it.
+  return runbookLockHash(runbook.predictions ?? [], runbook.measurementSchema ?? []) === runbook.lockHash;
 }

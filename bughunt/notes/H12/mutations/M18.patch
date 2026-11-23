@@ -1,0 +1,11 @@
+--- a/core/openferment_core/api.py
++++ b/core/openferment_core/api.py
+@@ -385,7 +385,7 @@
+     on in no project, and a store call it makes is refused with a 422."""
+     if not request.url.path.startswith(("/api/", "/rag/")):
+         return await call_next(request)
+-    named = request.headers.get(projects.HEADER) or request.query_params.get(projects.QUERY)
++    named = request.query_params.get(projects.QUERY) or request.headers.get(projects.HEADER)
+     if named is None or request.url.path.startswith(UNSCOPED):
+         with projects.using(None):
+             return await call_next(request)

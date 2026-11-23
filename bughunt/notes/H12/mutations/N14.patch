@@ -1,0 +1,11 @@
+--- a/core/openferment_core/project_state.py
++++ b/core/openferment_core/project_state.py
+@@ -151,7 +151,7 @@
+ }
+ # A deposition and a measurement are records of the bench: no model's
+ # estimate enters them (ADR-006).
+-RECORD_KINDS = ("depositions", "measuredEvidence")
++RECORD_KINDS = ("depositions",)
+ # Three kinds keep their own tables' shapes: a lock is (runbook, hash, when),
+ # the overrides of one scope are one row per key, and a Live conversation is
+ # Postdoc's own, kept as a conversation and its turns (postdoc/conversations.py):

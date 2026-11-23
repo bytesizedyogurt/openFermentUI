@@ -6,10 +6,10 @@
 // provenance: a new class with no mark fails the type check, and
 // `pnpm check:figures` fails when two classes share a mark or a class that
 // is never evidence is drawn solid.
-import type { Provenance } from '@/data/types';
+import type { Provenance } from '@/lib/studies';
 
-export type PointShape = 'diamond' | 'circle' | 'square' | 'triangle';
-export type Dash = 'solid' | 'dotted' | 'long' | 'short';
+type PointShape = 'diamond' | 'circle' | 'square' | 'triangle';
+type Dash = 'solid' | 'dotted' | 'long' | 'short';
 
 export interface MarkStyle {
   /** The point a record of this provenance draws as. */

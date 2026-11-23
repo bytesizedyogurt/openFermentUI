@@ -1,0 +1,11 @@
+--- a/core/openferment_core/units.py
++++ b/core/openferment_core/units.py
+@@ -231,7 +231,7 @@
+         return False
+     if bv == 0:
+         return abs(av) < 1e-12
+-    return abs(av - bv) / abs(bv) <= tolerance_pct / 100
++    return abs(av - bv) / abs(bv) <= tolerance_pct
+ 
+ 
+ # ── the ontology, for anchoring (§2.4 rules 4 and 5) ───────────────────

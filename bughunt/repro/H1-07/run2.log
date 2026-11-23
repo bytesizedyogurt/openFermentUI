@@ -1,0 +1,22 @@
+NOTICE:  database "bh_r_h1_07_svc" does not exist, skipping
+== the service on http://127.0.0.1:9461 over bh_r_h1_07_svc, the stand-in engine on PYTHONPATH
+== GET /api/engines: h107 as listed
+[200]
+thing id=dup title='the first of two things of one id' precision=(0.0, 0.0)
+thing id=dup title='the second of two things of one id' precision=(1.0, 1.0)
+thing id=single title='a thing of its own id (the control)' precision=(0.0, 0.0)
+error=''
+== the case: POST /api/engines/h107/run {thing: dup}
+200 thing=dup precision.rtol=1.0 precision.atol=1.0 run=1f2555fb673f9b79 status=done
+== control: POST /api/engines/h107/run {thing: single}
+200 thing=single precision.rtol=0.0 precision.atol=0.0 run=6a6f3bc6b5e0f0ff status=done
+runs rows kept for dup: 1
+== the two readers of one listing, in the tree: the service keys the things by id, the run card finds by id
+core/openferment_core/engine/runs.py:792:    things = {x.id: x for x in engine.things()}
+src/screens/ProformaStudies.tsx:275:  const thing = things.find((t) => t.id === thingId) ?? null;
+
+EXPECTED: a things answer listing two things of the id dup (docs/api/engines.md:229-230: "`id`: ... A run names it as its `plant`") is refused as outside the protocol (EngineBroken, listed with words in error, a run answered 503 with no runs row; docs/api/workers.md:62-68), or one thing of that id is listed and run
+OBSERVED: listing: 2 things of id dup, 'the first of two things of one id' precision=(0.0, 0.0);'the second of two things of one id' precision=(1.0, 1.0); error=''
+OBSERVED: run of dup: 200 thing=dup precision.rtol=1.0 precision.atol=1.0 run=1f2555fb673f9b79 status=done; 1 runs row(s) kept
+CONTROL:  run of single (precision listed 0, 0): 200 thing=single precision.rtol=0.0 precision.atol=0.0 run=6a6f3bc6b5e0f0ff status=done
+RESULT: DEFECT

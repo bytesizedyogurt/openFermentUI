@@ -3,7 +3,7 @@
 A quote is held to the passage it cites: one whole sentence or table row of
 the passage, or a run of them, word for word after `normalize_text`. A
 fragment can lift a number out of its negation, so a fragment is refused
-(OF-BLD-014 §4.R, kept by alpha 2.0 ADR-006). The splitter and the check moved
+(kept by alpha 2.0 ADR-006). The splitter and the check moved
 here from the retired retrieval stack (`passages.py`, `rerank.py`) when Sci RAG
 Kit became the literature layer (ADR-002); the kit's chunks are the passages.
 """

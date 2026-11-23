@@ -1,0 +1,69 @@
+422 | 'https://127.0.0.1:8882/a.json' | 127.0.0.1 is a loopback address; a file is fetched from a public address alone
+422 | 'https://localhost:8882/a.json' | localhost resolves to 127.0.0.1; 127.0.0.1 is a loopback address; a file is fetched from a public address alone
+502 | 'https://LOCALHOST.:8882/a.json' | the host name localhost. could not be found
+502 | 'https://localhost.localdomain:8882/a.json' | the host name localhost.localdomain could not be found
+422 | 'https://[::1]:8882/a.json' | ::1 is a loopback address; a file is fetched from a public address alone
+422 | 'https://0.0.0.0:8882/a.json' | 0.0.0.0 is the unspecified address; a file is fetched from a public address alone
+422 | 'https://0:8882/a.json' | 0 reads as 0.0.0.0, the unspecified address; a file is fetched from a public address alone
+422 | 'https://127.1:8882/a.json' | 127.1 reads as 127.0.0.1, a loopback address; a file is fetched from a public address alone
+422 | 'https://127.0.1:8882/a.json' | 127.0.1 reads as 127.0.0.1, a loopback address; a file is fetched from a public address alone
+422 | 'https://2130706433:8882/a.json' | 2130706433 reads as 127.0.0.1, a loopback address; a file is fetched from a public address alone
+422 | 'https://017700000001:8882/a.json' | 017700000001 reads as 127.0.0.1, a loopback address; a file is fetched from a public address alone
+422 | 'https://0x7f000001:8882/a.json' | 0x7f000001 reads as 127.0.0.1, a loopback address; a file is fetched from a public address alone
+422 | 'https://0x7f.0.0.1:8882/a.json' | 0x7f.0.0.1 reads as 127.0.0.1, a loopback address; a file is fetched from a public address alone
+422 | 'https://0177.0.0.1:8882/a.json' | 'https://0177.0.0.1:8882/a.json' is not an address: Invalid IPv4 address: '0177.0.0.1'
+502 | 'https://127.0.0.1.:8882/a.json' | the host name 127.0.0.1. could not be found
+422 | 'https://127.000.000.001:8882/a.json' | 'https://127.000.000.001:8882/a.json' is not an address: Invalid IPv4 address: '127.000.000.001'
+502 | 'https://%31%32%37.0.0.1:8882/a.json' | the host name %31%32%37.0.0.1 could not be found
+422 | 'https://１２７.０.０.１:8882/a.json' | 'https://１２７.０.０.１:8882/a.json' is not an address: Invalid IDNA hostname: '１２７.０.０.１'
+422 | 'https://[::ffff:127.0.0.1]:8882/a.json' | ::ffff:127.0.0.1 is a loopback address; a file is fetched from a public address alone
+422 | 'https://[::ffff:7f00:1]:8882/a.json' | ::ffff:7f00:1 reads as ::ffff:127.0.0.1, a loopback address; a file is fetched from a public address alone
+422 | 'https://[0:0:0:0:0:ffff:127.0.0.1]:8882/a.json' | 0:0:0:0:0:ffff:127.0.0.1 reads as ::ffff:127.0.0.1, a loopback address; a file is fetched from a public address alone
+422 | 'https://[::127.0.0.1]:8882/a.json' | ::127.0.0.1 reads as ::7f00:1, a reserved address; a file is fetched from a public address alone
+422 | 'https://[64:ff9b::7f00:1]:8882/a.json' | 64:ff9b::7f00:1 is a reserved address; a file is fetched from a public address alone
+422 | 'https://[2002:7f00:1::]:8882/a.json' | 2002:7f00:1:: is a private address; a file is fetched from a public address alone
+422 | 'https://[fe80::1%25lo]:8882/a.json' | fe80::1%25lo is a link-local address; a file is fetched from a public address alone
+422 | 'https://[::]:8882/a.json' | :: is the unspecified address; a file is fetched from a public address alone
+422 | 'https://10.0.0.1/a.json' | 10.0.0.1 is a private address; a file is fetched from a public address alone
+422 | 'https://10.255.255.255/a.json' | 10.255.255.255 is a private address; a file is fetched from a public address alone
+422 | 'https://172.16.0.1/a.json' | 172.16.0.1 is a private address; a file is fetched from a public address alone
+422 | 'https://172.31.255.255/a.json' | 172.31.255.255 is a private address; a file is fetched from a public address alone
+422 | 'https://192.168.1.1/a.json' | 192.168.1.1 is a private address; a file is fetched from a public address alone
+422 | 'https://169.254.169.254/latest/meta-data/' | 169.254.169.254 is a link-local address; a file is fetched from a public address alone
+422 | 'https://100.64.0.1/a.json' | 100.64.0.1 is an address outside the public internet; a file is fetched from a public address alone
+422 | 'https://198.18.0.1/a.json' | 198.18.0.1 is a private address; a file is fetched from a public address alone
+422 | 'https://192.0.0.1/a.json' | 192.0.0.1 is a private address; a file is fetched from a public address alone
+422 | 'https://192.0.2.1/a.json' | 192.0.2.1 is a private address; a file is fetched from a public address alone
+422 | 'https://240.0.0.1/a.json' | 240.0.0.1 is a reserved address; a file is fetched from a public address alone
+422 | 'https://255.255.255.255/a.json' | 255.255.255.255 is a reserved address; a file is fetched from a public address alone
+422 | 'https://224.0.0.1/a.json' | 224.0.0.1 is a multicast address; a file is fetched from a public address alone
+422 | 'https://[fc00::1]/a.json' | fc00::1 is a private address; a file is fetched from a public address alone
+422 | 'https://[fd12:3456::1]/a.json' | fd12:3456::1 is a private address; a file is fetched from a public address alone
+422 | 'https://[::ffff:169.254.169.254]/a.json' | ::ffff:169.254.169.254 is a link-local address; a file is fetched from a public address alone
+422 | 'https://[::ffff:a9fe:a9fe]/a.json' | ::ffff:a9fe:a9fe reads as ::ffff:169.254.169.254, a link-local address; a file is fetched from a public address alone
+422 | 'https://[::ffff:10.0.0.1]/a.json' | ::ffff:10.0.0.1 is a private address; a file is fetched from a public address alone
+422 | 'https://[ff02::1]/a.json' | ff02::1 is a multicast address; a file is fetched from a public address alone
+422 | 'https://[2001:db8::1]/a.json' | 2001:db8::1 is a private address; a file is fetched from a public address alone
+422 | 'https://[100::1]/a.json' | 100::1 is a reserved address; a file is fetched from a public address alone
+422 | 'https://10.0.0.1.nip.io/a.json' | 10.0.0.1.nip.io resolves to 10.0.0.1; 10.0.0.1 is a private address; a file is fetched from a public address alone
+422 | 'http://127.0.0.1:8882/a.json' | http://127.0.0.1:8882/a.json is not an https address; a file is fetched from an https address alone
+422 | 'http://example.com/a.json' | http://example.com/a.json is not an https address; a file is fetched from an https address alone
+422 | 'file:///etc/passwd' | file:///etc/passwd is not an https address; a file is fetched from an https address alone
+422 | 'ftp://127.0.0.1:8882/a.json' | ftp://127.0.0.1:8882/a.json is not an https address; a file is fetched from an https address alone
+422 | 'gopher://127.0.0.1:8882/' | gopher://127.0.0.1:8882/ is not an https address; a file is fetched from an https address alone
+422 | 'data:application/json,{}' | data:application/json,{} is not an https address; a file is fetched from an https address alone
+422 | 'javascript:alert(1)' | javascript:alert(1) is not an https address; a file is fetched from an https address alone
+422 | '//example.com/a.json' | //example.com/a.json is not an https address; a file is fetched from an https address alone
+422 | 'example.com/a.json' | example.com/a.json is not an https address; a file is fetched from an https address alone
+422 | 'https:///a.json' | https:///a.json is not an https address; a file is fetched from an https address alone
+422 | 'https://' | https:// is not an https address; a file is fetched from an https address alone
+422 | '' | ['body', 'url']: String should have at least 1 character
+422 | '   ' | an empty address is not an https address; a file is fetched from an https address alone
+422 | 'https://user:pass@example.com/a.json' | the address names a user or a password; a file is fetched from an address that names neither, since the record keeps the address as its source (example.com)
+422 | 'https://user@127.0.0.1:8882/a.json' | the address names a user or a password; a file is fetched from an address that names neither, since the record keeps the address as its source (127.0.0.1)
+422 | 'https://:pw@example.com/a.json' | the address names a user or a password; a file is fetched from an address that names neither, since the record keeps the address as its source (example.com)
+422 | 'https://127.0.0.1:8882/a.json\r\nX-Injected: 1' | 'https://127.0.0.1:8882/a.json\r\nX-Injected: 1' is not an address: Invalid non-printable ASCII character in URL, '\r' at position 29.
+422 | 'https://127.0.0.1:8882/a b.json' | 127.0.0.1 is a loopback address; a file is fetched from a public address alone
+422 | 'https://example.com/aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa' | ['body', 'url']: String should have at most 2048 characters
+422 | 'https://10.0.0.1/aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa' | 10.0.0.1 is a private address; a file is fetched from a public address alone
+records kept in the project: 0 []

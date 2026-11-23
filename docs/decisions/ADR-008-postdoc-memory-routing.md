@@ -193,6 +193,309 @@ answer. Postdoc's loop needs a model that calls tools, so `converse` passes a lo
 words. With no endpoint named, a local model in a route is passed over and `pnpm ready` names the
 setting; another provider's model still waits for the owner.
 
+## Implementation 12 (alpha 2.2 D.0: an assistant named at the tool door)
+
+- `POST /api/tools/{name}` reads `X-OpenFerment-Assistant` (`tools.ASSISTANT_HEADER`): with it the
+  call runs in the model's lane under that name, `ToolContext(model=<name>, via="http")` in the
+  request's project, the name read as UTF-8 text, whitespace-collapsed, its control, format and
+  surrogate characters dropped and cut to `tools.MAX_CALLER` characters (`tools.caller_name`,
+  which an MCP client's declared name and a person's `?by=` pass through too). A number it types
+  is that name's estimate, a write is marked with that name (`by`), its audit row names it as
+  `who` with agent `model`, and a catalogue entry's source reads `<name>, at the HTTP endpoint`. A
+  call naming both `?by=` and the header is a 422 in words, and so is a writing tool's call naming
+  neither.
+- Every write of the model's lane names the door it came in by: `detail.via` on its audit row and
+  `via` on a catalogue entry it keeps, `postdoc` for Postdoc's loop, `mcp` for the MCP server in
+  its own process, `http` for the header. Only Postdoc's row carries an `effort`, the one its
+  model ran at, since no model of the service runs for an outside assistant's write.
+- The header gives an HTTP caller the model's lane under the name it declares. A number it types
+  is that name's estimate, which every record store refuses (ADR-006); its `catalogue_write`
+  replaces only an entry that name kept in the model's lane through an assistant's door, so it
+  replaces neither a person's entry nor Postdoc's; and it writes the stores that hold a model's
+  work alone, pureOS's kept trains among them, where a `?by=` call is refused. A gated action
+  becomes a proposal in either lane, since `writes._runner` checks the gate before the lane, and
+  what a write at the tool door makes lands in the open lane whoever calls (THE MARK,
+  `tools/writes.py`). A caller on loopback reaches the model's lane already through
+  `POST /api/ask`, and an MCP client in the server's own process reaches it with the database's
+  address; the header is one more door to it, `guard.py` holds it as it holds every POST, and no
+  listener, host or CORS rule is added. The MCP server's `--service` mode sends its client's name
+  here (ADR-005).
+- `docs/TOOLS.md` says how the server starts, both ways it reaches a project, and what a client
+  reads: the SDK's names, the shape of an answer over MCP, and where the audit row is read.
+
+## Implementation 13 (alpha 2.2 E.16: the agent builder's interface points)
+
+The agent builder of stage D (`docs/reports/handoff-2026-11.md`, round 1) finished with no core
+edit and named five points the interface left a client to guess. Each is paid in the code the page
+is written from:
+
+- **What a BioRepo record is.** One rule, `module_stores.RECORD`, which both readers' descriptions
+  quote: a record is an extraction a reviewer verified against its document's own words
+  (provenance verified, or gold), and a candidate is one no reviewer has verified yet
+  (unverified); one a reviewer rejected leaves every read. `biorepo_read` lists the two as its
+  kinds `record` and `candidate` (`module_stores.record_kind`, from the row's state), and
+  `search_records` names each hit's kind by the same rule. A candidate a reviewer accepted, which
+  `biorepo_read` listed as kind `candidate` in the approved state, is now kind `record`; a
+  fixture's curated row was a record already and stays one. The row `biorepo_write`'s candidate
+  action answers with is the row the read lists (`module_stores.record_row`).
+- **A write's answer names its audit row.** An audit row's id is its place in the table (`seq`),
+  served as a string of digits. `tools.run` opens `audit.written()` around the tool, and
+  `audit.add` adds each new row's id to it, so the result's `auditIds` names every row the call
+  wrote, oldest first: a kept entry's, a run's, a refused run's receipt, and a gated write's
+  proposal, whose row its own transaction writes on the database's thread (a coroutine sent there
+  runs in a copy of its sender's context, so the list reaches it). Over MCP the answer carries the
+  field as every other.
+- **The audit read by what a write was.** `GET /api/audit` takes `action`, `target` and `who`
+  beside `limit`, each matched exactly as a row names it, and serves the newest `limit` of the
+  matching rows, so a write older than the newest 500 rows is found by what it was. Each row is an
+  `AuditRow`, the entry under its `id`.
+- **The HTTP audit leaves null fields out**, as the MCP server writes every model it answers
+  (`response_model_exclude_none`): a row with no target, ask or effort holds no such key.
+  `AuditRow` joins `api.AS_KEPT`, so the document lists the fields a row may leave out as
+  optional, and `test_route_models.py` serves the route as kept.
+- **What a row holds.** `AuditEntry.detail` says what it holds, and every write whose call takes a
+  note keeps it there (`catalogue_write` and `study_scenario` join the writes that did). A module
+  read's summary is a `ModuleRead`, its `partial` a sentence, and `module_stores.DETAIL` names
+  each kind's `detail` field by field; `docs/TOOLS.md` renders both under Module reads, and
+  `test_agent_interface.py` builds a row of every kind and holds its fields to its kind's words.
+- **The client recipe** hands the server its client's environment with `VIRTUAL_ENV` taken out,
+  which a client run by `uv run <script>` holds and the server's `uv run --project core` warns of
+  at every start, and the page's top points at the recipe, at the MCP server's section and at what
+  a module read answers.
+
+## Implementation 14 (alpha 2.2 F.2a: the evaluation the model comparison reads)
+
+Stage F compares four route tables for `plan` and `explain` on the fourteen, each answer judged by
+two judge models; F.2a lands the evaluation code that comparison reads before the ethanol suite is
+seeded (`postdoc/evaluate.py`, `openferment_core/evaluation.py`, `docs/api/postdoc.md`):
+
+- **The judge pass reads core/.env as a run does.** `pnpm eval judge` copied the database address
+  and the project from `core/.env` and imported nothing more, so it read no key, no routes and the
+  default cap of 25 USD, and each judgement it kept was a decline naming a missing key. Its branch
+  now imports the service module first, as the run branch does, whose import loads `core/.env`
+  through the same loader with `override=False` (`api.py`): the same file, the same names, read
+  the same way, and no new place a key is read from. A judge none of whose route's models answers
+  (no key, the account's usage limit, the day's cap) now stops `run --judge` and `judge` in words
+  with exit 1 and keeps no judgement for the run it was judging (`evaluate.JudgeUnavailable`); a
+  judge that declines is kept as a judgement with no score.
+- **A model's write carries the plan route's effort.** A write's audit row named the single effort
+  setting (`llm.effort()`), so a write asked on a route table at `high` was labelled with
+  `core/.env`'s `max`. It now names the effort of the route Postdoc's loop answers on,
+  `llm.routes()["plan"].effort` (`tools/writes._plan_effort`), so a table's writes carry the
+  table's effort; the single setting stands where the table names no effort for the route, as
+  `routes()` builds it, and where the table cannot be read.
+- **What a run and a judgement keep.** A run keeps the seconds to the loop's first step (the code's
+  module sweep), to its first step of another kind (the model's first) and to the answer, timed
+  through the answer path's `on_step`, with the loop's stop, its restart steps and the validator's
+  reasons. A judgement keeps the models its route tried and the route itself, so one Sonnet gave
+  after Opus declined says so. The summary counts each run once for each judge model, by that
+  model's newest judgement of it, and says how far the two judges' scores of the same answers lie
+  apart, per tag and pooled; `rows` gives each tag's newest run of each question; `run --only`
+  asks some questions alone under a tag, a follow-up in the conversation of its question's newest
+  run there, so a table stopped part way is finished where it stopped. Question 4 follows question
+  3, as the owner's screen asked it in alpha 2.1.
+- `JUDGE_TOKENS` and the loop's bounds stay as they are: the comparison measures them first.
+- **The review (F.2a review).** The account's limit most often lands on one of an answer's plan
+  calls before its judge call, so a stop's answer is itself unanswered: a plan with no claim whose
+  final step reads `No answer: …`, its decline no refusal (`evaluate.unanswered`). The stop's words
+  then say to ask that question again with the rest, beside the questions a full asking asks in
+  its conversation before it when it is a follow-up, and name no judge command for it. `--only`
+  asks a follow-up in its question's conversation when that conversation holds what a full asking
+  has it read before it; a follow-up that would find its own earlier asking there, miss a question
+  asked ahead of it, or follow a question no model answered is refused in words that name the
+  questions to ask with it. `llm.Result.refused` names the models the safety classifier declined
+  before one answered, by the ids they were asked by, and a judgement keeps them, so each judge's
+  refusals (`judges.<model>.refused`) stand apart from its route's pass-overs for a status such as
+  529, which `declined` counts beside them. A stop names what the judge route spent on the call it
+  stopped at (`spentAtStopUsd`); the restarts are counted by kind (`restartCount`); and each row
+  gives each judge's verdict cut to 200 characters.
+
+## Implementation 15 (alpha 2.2 F.2c: the judge's room set by measurement)
+
+The prompt's §4 lets a ceiling move with a measurement and a line here; the spend caps stay where
+they stand. The haiku table's fourteen answers were judged on the table's judge route,
+`claude-opus-5-5` then `claude-sonnet-5-5` at effort max, with `JUDGE_TOKENS` at 16,000, where F.2a
+held it for the comparison to measure first. Three of the fourteen judgements ran out of room
+(eq-eth-01, eq-eth-02 and eq-eth-03, each kept with no score, its `declined` reading "The judge's
+answer did not arrive whole (it ran out of room)", 0.345 to 0.385 USD each), and five of the eleven
+that arrived whole wrote about 14,000 to 16,000 tokens by their cost (eq-eth-06, 07, 10, 12 and 14).
+At effort max the model's thinking counts against the ceiling with its answer.
+
+`JUDGE_TOKENS` is now 32,000, the plan's turn ceiling at effort high (`postdoc/plan.py`, `MAX_TOKENS`), and the
+haiku table was judged again at it on the same route (`pnpm eval judge --suite ethanol --tag haiku`,
+11:45 to 12:20 UTC on 5 November 2026), so the four tables are judged at one setting; the summary
+reads each run's newest judgement. At 32,000 all fourteen arrived whole, each given by
+`claude-opus-5-5` with no fallback and no refusal. The largest wrote about 23,900 tokens
+(eq-eth-01), three quarters of the room, and five of the fourteen wrote past 16,000 (eq-eth-01, 02,
+03, 05 and 07). A judgement cost 0.3346 USD on the mean and 0.5183 at the most, against 0.2928 and
+0.3853 at 16,000 (4.6846 USD for the fourteen, against 4.0988). The hold a judge call places on the
+daily cap until it settles carries its whole room, now 0.64 USD of output at Opus 5.5's price.
+
+A judgement keeps its cost, and a spend row its USD; neither keeps tokens. Each count above comes
+from a judgement's cost at Opus 5.5's prices (4 USD a million tokens in and 20 out; a judge call
+caches nothing). A judgement cut short at 16,000 wrote 16,000 tokens, which gives its question's
+input exactly, and the input of each other question is estimated from the length of its request by
+a line through those three, within a few hundred tokens; the same request went out at both ceilings.
+
+## Implementation 16 (alpha 2.2 F.2g: the plan's room set by the route's effort)
+
+The opus-max table (`claude-opus-5-5` then `claude-sonnet-5-5` at effort max on the plan route) was
+asked on 8 November 2026 from 03:53 UTC. Each of its first four questions (eq-eth-01 to eq-eth-04)
+spent its 24 tool calls, and the answer after the stop ran out of room at the plan's ceiling of
+32,000 tokens: each run keeps "Postdoc's answer did not arrive whole (it ran out of room)", 24 tool
+calls, 360 to 438 seconds and 1.25 to 1.46 USD. The other three tables answered whole after their
+one stop each at the bound (haiku eq-eth-02, sonnet eq-eth-05, opus-high eq-eth-02). At effort max
+the model's thinking counts against the ceiling with its answer, as the judge's did (Implementation
+15). The judge's room holds: none of the 32 judgements made at 32,000 on 8 November ran out.
+
+A plan turn's ceiling now follows the plan route's effort (`postdoc/plan.py`, `ceiling`):
+`MAX_TOKENS`, 32,000, at high and below; 64,000 at xhigh; 128,000 at max, the output ceiling of
+every model the routes name (Opus 5.5, Sonnet 5.5 and Haiku 5.5 on a streamed call, which every
+call here is). The question's budget still bounds each turn (`postdoc_agent._turn_tokens`), and the
+loop still holds back a `MIN_TOKENS` answer before it asks another round. A turn pays for what it
+writes; the hold a call places on the daily cap until it settles carries the turn's whole room.
+
+The table's other ten questions and a measure of the larger room on eq-eth-01 to eq-eth-04 wait on
+the Anthropic account's own usage limit, reached at 04:28 UTC on 8 November ("You will regain
+access on 2026-12-01 at 00:00 UTC"; `pnpm ready --probe` says it in words). Revisit: when the account
+answers again, ask eq-eth-01 to eq-eth-04 on the opus-max table under a tag of their own and see each
+answer arrive whole; a larger room that still runs out returns here with its measure.
+
+## Implementation 17 (alpha 2.2 F.2e and F.2f: the defaults set by the comparison)
+
+`docs/reports/model-routing-2026-11.md`, the section of 8 November 2026, holds the numbers. Four
+route tables varied the `plan` family alone over the fourteen of the suite `ethanol` in the
+rebuilt project: `haiku` (Haiku alone at high), `sonnet` (Sonnet alone at high), `opus-high` (Opus
+then Sonnet at high) and `opus-max` (Opus then Sonnet at max), each with `explain` and `extract` at
+Opus then Sonnet at high, `index` at Haiku at low and `judge` at Opus then Sonnet at max. haiku,
+sonnet and opus-high were asked whole; opus-max's first four answers ran out of room at the plan's
+32,000 tokens (Implementation 16), and the account's own usage limit refused every call from 04:28
+UTC, partway through eq-eth-05's second asking.
+
+**The judge.** One judge: the judge route's first model, `claude-opus-5-5` at effort max with
+`JUDGE_TOKENS` 32,000 (Implementation 15), gave all 46 judgements whole, with no fallback, decline
+or refusal. The second judge, Sonnet alone at max over every tag's newest runs, waits on the
+account, so the disagreement between two judges the prompt's §6.7 rule reads is unmeasured.
+
+**The floor.** The measure in hand is the judge's disagreement with itself: Opus judged eleven haiku
+answers twice, each time whole (eq-eth-04 to eq-eth-14, the same request at 16,000 and at 32,000,
+so the measure holds the room's change with the judge's own noise; eq-eth-01 to 03 ran out of room
+the first time and have no pair), with a mean absolute difference of 0.023 on answers, 0.041 on
+grounded, 0.032 on labelled and 0.045 on coverage. Two judges are taken to disagree at least that
+much, an assumption the second judge's reading will test, so it stands as a floor under the
+disagreement the rule asks for.
+
+**The rule, worked** on `plan` in cost order, Opus's mean of the dearer table less the cheaper's,
+beside the floor:
+
+| Pair | Answers | Grounded | Labelled | Coverage |
+|---|---|---|---|---|
+| sonnet − haiku | +0.054 (past) | −0.106 (past, lower) | −0.056 (past, lower) | +0.036 (within) |
+| opus-high − haiku | +0.186 (past; higher on 11 of 14) | +0.016 (within) | +0.004 (within) | +0.171 (past; higher on 9 of 14) |
+| opus-high − sonnet | +0.131 (past) | +0.122 (past) | +0.060 (past) | +0.135 (past) |
+
+Haiku scores below opus-high past the floor on answering and coverage, by eight and four times it,
+so the rule keeps Opus at high; sonnet crosses haiku (above on answering, below on grounding and
+labelling) and stands below opus-high on all four. The code's scores, computed from each run's tools
+and claims, point the same way: opus-high's tools 0.923 and citations 0.843 against haiku's 0.839
+and 0.748 and sonnet's 0.851 and 0.718, bare numbers level at 0.643. Each whole table stopped once
+at the tool-call bound; no answering model restarted, and Postdoc declined one question, sonnet's
+question 14, the refusal in words that question allows. Opus at high costs 0.4669 USD a question at
+the mean against Haiku's 0.0199 and Sonnet's 0.1784, and answers in a median 65 s against 40 and 25.
+
+**The choice for each family** (`llm.ROUTES`):
+
+- `plan`: `claude-opus-5-5` then `claude-sonnet-5-5` at high, the opus-high table. Sonnet stands
+  behind Opus for a refusal (stage B's lesson); Opus declined none of the fourteen plans here.
+  Effort max stays unmeasured: four answers, each out of room at the old ceiling. Effort medium,
+  the old default, was asked in no table, so the cost order holds no Opus setting below high.
+- `explain`: Opus then Sonnet at high, held at extract's route. None of the fourteen reaches it
+  (Postdoc's loop answers on `plan`); it waits on the retrieval report's answer lane
+  (Implementation 18).
+- `extract`: Opus then Sonnet at high, F.1's measure: Opus declined nine of the 22 documents in
+  `bio`, and Sonnet answered each.
+- `index`: Haiku alone at low. Its one measure is F.0's probe, one call; every table held `index`
+  there, and none of the fourteen's calls reached it. A graph build's batch costs Haiku's price,
+  and a decline on it ends that call in words, its batch read again by the next build
+  (Implementation 18). Before this, `index` tried the answer chain after Haiku (E.7), which put a
+  declined batch on Opus.
+- `judge`: Opus then Sonnet at max, the comparison's method, its room `JUDGE_TOKENS`.
+
+**What one judge leaves open.** The judge is the same model as the opus tables' plan model, so a
+judge's preference for its own model's answers is unmeasured until the Sonnet pass reads the same
+answers. The floor marks a difference below it as within the judge's own noise. The rule drops
+haiku while any score stands past the two judges' disagreement, so opus-high's lead over haiku
+holds while that disagreement proves smaller than 0.186 on answering or than 0.171 on coverage.
+
+**`routes()`.** It builds every family from `ROUTES`, each with a default of its own, and lays a
+plain setting over the families it covers when the environment sets it, an unset one leaving the
+defaults as they stand: `OPENFERMENT_MODEL` with `OPENFERMENT_FALLBACK_MODEL` over the models of
+`plan`, `explain` and `extract` (`llm.ANSWERING`, the efforts kept), `OPENFERMENT_EFFORT` over
+their effort, `OPENFERMENT_INDEX_MODEL` over index's first model; then `OPENFERMENT_ROUTES`. A
+setting written empty is a setting left unset. `judge` and index's effort keep their defaults
+under every plain setting, so a model or effort chosen for answers leaves the evaluation's grader
+as the comparison's method set it; `OPENFERMENT_ROUTES` moves them. The live-host runbook's four
+settings (Opus, Sonnet, Haiku, high) therefore leave every family at its default. Before this,
+every family read the plain settings with their defaults, so `ROUTES` was read nowhere, the judge
+moved with a plain model setting, and with `core/.env` silent every family ran at medium. `DEFAULT_EFFORT`, the single setting's default, is
+the plan route's, high. `GET /api/health` names the plan route's models (`model`, and
+`fallbackModel` the rest in order joined with a comma and a space, empty for a route of one, the
+plain settings' chain where the table cannot route), and `pnpm ready`'s model row names the plan
+route's models and effort; its roles row says when the index route holds no other model the key
+lists. A host whose `core/.env` carries `OPENFERMENT_ROUTES` keeps its own table over these
+defaults. This container's laid the prompt's §4 table (`plan` at max) with
+`OPENFERMENT_EFFORT=max`, and F.3 asks on the defaults with its five routing lines commented out.
+
+Revisit: when the account answers, the Sonnet pass and the opus-max table's fourteen at the larger
+room under the tag `opus-max-room` (eq-eth-01 to eq-eth-04 first, Implementation 16's measure), in
+the order the report's "To finish it" lists; a default the second judge reverses returns here with
+its numbers.
+
+## Implementation 18 (alpha 2.2 F.5: a run's own count, and the kit's room)
+
+- **A run counts its own calls.** `llm.tally()` opens a count: within it every `llm.call` adds one
+  `llm.Spent`, an answer, a refusal and an outage alike, with its family and effort, the ceiling it
+  asked, the model that answered, the models asked and those the safety classifier declined, its
+  tokens and USD, how it stopped, and a failure in the words its caller was given. Tallies nest
+  and reach a copy of their context (a thread `asyncio.to_thread` starts, a coroutine `db.run`
+  hands to the database loop); outside every tally nothing is kept, and the day's spend is charged
+  to `spend.py` either way. The literature lanes read it (`literature_live.py`): each answer and
+  each judgement is counted under its own tally, and the command's stop is the first call in its
+  tally that no model answered.
+- **A kit call has room for its thinking.** The kit sizes each call for a model that writes its
+  answer at once (a judgement in 1,024 tokens, HyDE's passage in 512), and output tokens include
+  thinking. `llm.KIT_ROOM` sets the room by the route's effort (low 0, medium 4,096, high 8,192,
+  xhigh 12,000, max 32,000), and a kit call asks the larger of the kit's ceiling and that room; the
+  live Search answer's call is one of them. The room at max is openFerment's own judge's,
+  `evaluate.JUDGE_TOKENS`, a test holding the two equal: Implementation 15 measured 16,000 too
+  small for a judgement at max (three of fourteen ran out of room and five wrote past it), and
+  Implementation 17 set the `judge` route at max, so every kit judgement asks 32,000, the report's
+  ten passages graded in one call among them. F.5.1 wrote 16,000 on its base, where 16,000 was
+  openFerment's judge ceiling and every route defaulted to medium; the landing review of 8
+  November raised it with the judge's. The kit's own judgements at max are measured by the F.5
+  live run: its truncated count (`literature/report.py`, a call that stopped at its ceiling) is the
+  measure, and a truncated kit judgement brings the room back here with its numbers. The kit's
+  roles stay three (`answer` on `explain`, `extraction` on `index`, `judge` on `judge`): the
+  report builds its questions by code, so the kit's question drafter has no role here.
+- **The answer lane measures `explain`.** `pnpm lit:report --project <id> --by <name> --judge`
+  gives the kit's answers on the `explain` route, graded blind for grounding on the `judge` route
+  (ADR-002, Implementation F): that lane is the measure Implementation 17 holds `explain` at
+  extract's route for, and its live run (Blockers) sets the family's default or returns here with
+  its numbers.
+- **A batch the index route declines.** On the default `index` route, Haiku alone at low
+  (Implementation 17), a graph batch Haiku declines is a batch that fails: it stays unstamped and
+  is read again, on Haiku, by every later build of the default route, counted in the build's
+  `chunks_left` each time (`literature/graph.py`). `OPENFERMENT_ROUTES` naming a second index
+  model reads it; Sonnet answered each of F.1's declines.
+
+## Implementation 19 (alpha 2.2 H.0: the one-call path's record)
+
+- 6.1's `postdoc/single.py`, the one-call path, left at 8.5 (`484b5b2`), and the claim filter it
+  validated by, `validate.validate_claims`, left at alpha 2.2 H.0. `postdoc/` holds
+  `conversations.py`, `evaluate.py` and `plan.py`; every answer comes from the loop, its claims held
+  by `validate.validate_plan`. `explain` is a route family of `llm.ROUTES`, the role a call names,
+  with no module of its own.
+
 ## Evidence
 
 - `postdoc_agent.py`, `llm.py`, `spend.py`, `tools/__init__.py` at `alpha-1.0`.

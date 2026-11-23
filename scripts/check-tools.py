@@ -21,8 +21,11 @@ Fails when:
    through `writes.run_scenario`, `writes.run_simulation` and writes.py's
    train functions, so rule 2 reads their calls to `proforma.run`,
    `fermos.simulate`, `pureos.kept.keep_train` and
-   `pureos.train_spec.run_train`. What keeps a run is found, not listed:
-   every function of the service that calls `artifacts.compute` for a
+   `pureos.train_spec.run_train`; `growth_forecast`, whose kept forecast is a
+   run of the kinetics engine (alpha 2.2 D3), forecasts through
+   `writes.run_forecast` and its call to `fermos.forecast_run`. What keeps a
+   run is found by reading the service's code: every function of the service
+   that calls `artifacts.compute` for a
    `proforma.run`, `proforma.reference`, `proforma_benchmark`,
    `fermos.simulation`, `fermos.vessel` or `pureos.train_run` artifact (or for
    a tool it cannot name) or `audit.append`, or that writes a row (`db.rows`'
@@ -158,9 +161,13 @@ ALLOWED_WRITES = (
     "proposals.propose",
     "audit.append",
     # engine_run, study_scenario and study_compare (alpha 2.0 stage 6), each
-    # through its one function in writes.py: an engine run of a plant or of a
-    # scenario, a scenario kept, a comparison kept.
-    "engine.runs.run",
+    # through its one function in writes.py: an engine run of a thing or of a
+    # scenario, a scenario kept, a comparison kept. engine_run on any
+    # registered engine goes through run_with (alpha 2.2 stage B;
+    # docs/api/engines.md): BioSTEAM's things through the biosteam engine's
+    # own run, the library's one path (alpha 2.2 stage C), and an engine built
+    # on WorkerEngine through run_with's run_engine.
+    "engine.runs.run_with",
     "studies.scenarios.run",
     "studies.scenarios.make",
     "studies.comparisons.make",
@@ -350,14 +357,22 @@ from openferment_core.studies import comparisons as _comparisons_mod  # noqa: E4
 PACKAGE_DIR = Path(writes.__file__).resolve().parent.parent
 TOOLS_DIR = Path(writes.__file__).resolve().parent
 WORKER_SIDE = ("workers", "flowsheets")
-# What a kept run is (OF-BLD-020 §3.4): a Proforma run, a simulation, a vessel
-# design, and pureOS's train run (night two names it; `pureos.train_run`).
+# What a kept run is (OF-BLD-020 §3.4; alpha 2.2 D3, every run a `runs` row):
+# a Proforma run, a simulation, a kept growth forecast and a vessel design (the
+# kinetics engine's), and pureOS's train run (the train engine's;
+# `pureos.train_run`).
 TRAIN_RUN = "pureos.train_run"
 # Alpha 2.0 stage 6: an engine run of a library plant or a flowsheet, and a
 # study's comparison of runs, which a model keeps through engine_run and
 # study_compare.
+# The two kinds kept from the retired reference entries (alpha 2.2 D8) stay
+# listed, so a function that computes one is read as one that keeps a run.
+# A contract engine's run (`engine.<name>`, one tool for each engine
+# registered) is computed by `engine/runs.compute_kept` and `run_engine` on a
+# tool they take as a value, which the rule reads as a tool it cannot name.
 RUN_KINDS = frozenset({_proforma_mod.RUN, _proforma_mod.REFERENCE, _proforma_mod.BENCHMARK, _fermos_mod.SIMULATION,
-                       _vessel_mod.TOOL, TRAIN_RUN, _library_mod.LIBRARY_RUN, _comparisons_mod.COMPARISON})
+                       _fermos_mod.FORECAST, _vessel_mod.TOOL, TRAIN_RUN, _library_mod.LIBRARY_RUN,
+                       _comparisons_mod.COMPARISON})
 COMPUTE = "openferment_core.artifacts.compute"
 APPEND = "openferment_core.audit.append"
 # The same row inside a store's own transaction (ADR-001): a write and its
@@ -835,7 +850,7 @@ if errors:
         print(f"  - {e}")
     sys.exit(1)
 print(f"✓ check:tools  {len(module_stores.MODULES)} modules with a read and a write tool; writes.py calls only "
-      f"{len(ALLOWED_WRITES)} module write functions, and no other tool file reaches any of the {len(WRITERS)} functions that keep a run (Proforma's, a simulation, a vessel, a train, an engine run or a comparison), a train or a scenario a model made, or write an audit line; {sum(len(g.actions) for g in gates.GATES)} gated actions need a person; "
+      f"{len(ALLOWED_WRITES)} module write functions, and no other tool file reaches any of the {len(WRITERS)} functions that keep a run (Proforma's, a simulation, a forecast, a vessel, a train, an engine run or a comparison), a train or a scenario a model made, or write an audit line; {sum(len(g.actions) for g in gates.GATES)} gated actions need a person; "
       f"{len(coded)} gates in gates.py and docs/TOOLS.md alike; {len(tools.WHITELIST)} tools, each registered, each "
       f"acting in one project, and docs/TOOLS.md as the registry writes it; a number stands only in a quantity or a "
       f"count, and no fermOS or pureOS tool takes one")

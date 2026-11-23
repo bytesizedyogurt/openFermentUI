@@ -46,10 +46,16 @@
  *    one it picks); it says what would fill it when the run kept no stream;
  *    it stands on the grammar, is exported from the index, and pureOS →
  *    Builder draws with it.
+ * 11. A basis's link opens where its id is kept (bug hunt 2026-11, links):
+ *    an SFF flowsheet record (`sff-<hash>`, `run-<artifact id>`) on its
+ *    flowsheet's page, any other id on BioRepo's artifact page; rendered,
+ *    an evidence card and a figure's basis link each so, and BioRepo's
+ *    source chip and the comparison's artifact input build theirs the same way.
  */
 import { readFileSync, readdirSync, statSync } from 'node:fs';
 import { join, relative } from 'node:path';
-import type { ExtractionRecord, Provenance } from '../src/data/types';
+import type { ExtractionRecord } from '../src/lib/review';
+import type { Provenance } from '../src/lib/studies';
 import { ENCODING, NEVER_EVIDENCE, pointKey } from '../src/components/figures/encoding';
 import { stripPoints, toTable as stripTable } from '../src/components/figures/EvidenceStrip';
 import { toTable as ceilingTable } from '../src/components/figures/CeilingGap';
@@ -58,7 +64,7 @@ import { toTable as distributionTable } from '../src/components/figures/Distribu
 import { toTable as tornadoTable } from '../src/components/figures/Tornado';
 import { toTable as ledgerTable } from '../src/components/figures/IntervalLedger';
 import { emptyOf as recoveryEmpty, noBar, toTable as recoveryTable } from '../src/components/figures/RecoveryByUnit';
-import { bars as waterfallBars, toTable as waterfallTable } from '../src/components/figures/CostWaterfall';
+import { bars as waterfallBars, toTable as waterfallTable, priceNote, waterfallTotal } from '../src/components/figures/CostWaterfall';
 import { OxygenBalance as OxygenBalanceFigure, emptyOf as oxygenEmpty, toTable as oxygenTable } from '../src/components/figures/OxygenBalance';
 import {
   PurityByStream as PurityByStreamFigure,
@@ -71,9 +77,12 @@ import { createElement } from 'react';
 import { renderToStaticMarkup } from 'react-dom/server';
 import { fmt } from '../src/engine/units';
 import { toTable as timeCourseTable, type TimeCourseProps } from '../src/components/figures/TimeCourse';
-import type { TrainUnit } from '../src/data/types';
+import type { TrainUnit } from '../src/lib/pureos';
 import { gatherLinks } from '../src/components/Dossier';
-import { ArtifactsDown, ArtifactRefused } from '../src/lib/artifacts';
+import { ArtifactsDown, ArtifactRefused, artifactPath } from '../src/lib/artifacts';
+import { EvidenceCard } from '../src/components/EvidenceCard';
+import { FigureFrame } from '../src/components/figures/FigureFrame';
+import type { Evidence } from '../src/lib/postdoc';
 import { YIELD_FIELD, yieldFieldKnown, yieldsOnSugar } from '../src/lib/geneos';
 
 const problems: string[] = [];
@@ -278,7 +287,7 @@ ok.push('an assumed mark is held out of the median, a ceiling keeps its provenan
   // §4.R: a run with no tables names no product too; the figure says the
   // tables are missing and why, in the train's words, never that the run's
   // flowsheet prices nothing.
-  const why = 'this run was kept before runs carried their tables (OF-BLD-019 §2.1); run the scenario again';
+  const why = 'this run was kept before runs carried their tables; run the scenario again';
   const old = recoveryEmpty({ title: 't', product: null, units: [], provenance: 'assumed', massUnit: 'kg/hr', why });
   if (!old || !/kept no unit table/.test(old.what) || /names no product/.test(old.what) || old.where !== why)
     problems.push(`a run that kept no unit table is drawn as one naming no product: ${JSON.stringify(old)}`);
@@ -308,6 +317,13 @@ ok.push('an assumed mark is held out of the median, a ceiling keeps its provenan
   if (!credit || !(credit.to < credit.from)) problems.push('a co-product credit does not run back');
   const util = drawn.find((b) => b.key === 'utilities');
   if (!util || util.from !== 1.0) problems.push('a CostWaterfall bar does not start where the line before it ended');
+  // A library run reads its breakdown at the product's set price, and its TEA
+  // may solve another: the last row is the price the lines sum to, and the
+  // solved price is said beside the figure.
+  const apart = waterfallTotal(0.72, 0.85);
+  if (apart?.value !== 0.72 || apart.label === 'Base-case price') problems.push("CostWaterfall's last row leaves the price its lines sum to for a solved price they do not sum to");
+  if (!priceNote(0.72, 0.85, 'USD per kg')?.includes('0.85')) problems.push('a run whose TEA solved another price than its breakdown reads says nothing of it');
+  if (priceNote(0.72, 0.72, 'USD per kg') !== null || waterfallTotal(0.72, 0.72)?.label !== 'Base-case price') problems.push('a run whose breakdown is read at its solved price is given a note or a label of a price apart');
   const index = readFileSync('src/components/figures/index.ts', 'utf8');
   for (const name of ['CostWaterfall', 'Tornado']) {
     const src = readFileSync(`src/components/figures/${name}.tsx`, 'utf8');
@@ -444,6 +460,49 @@ ok.push('an assumed mark is held out of the median, a ceiling keeps its provenan
   if (!/export \{ PurityByStream,/.test(readFileSync('src/components/figures/index.ts', 'utf8'))) problems.push('the figures index does not export PurityByStream');
   if (!/<PurityByStream\b/.test(readFileSync('src/screens/PureOSBuilder.tsx', 'utf8'))) problems.push('pureOS → Builder does not draw purity by stream through the grammar');
   ok.push(`tables: purity by stream ${rows.length}, one row per stream; ${bars} bars for the streams with a share, the product stream the service's alone; PurityByStream stands on toTable, ENCODING and FigureFrame`);
+}
+
+// 11 — a basis's link opens where its id is kept: an SFF flowsheet record on
+// its flowsheet's page (GET /api/flowsheets/{id} answers it), and a kept
+// artifact on BioRepo's (GET /api/biorepo/artifacts/{id} answers it).
+{
+  const SFF = 'sff-be74817c298f211b';
+  const RUN_FILE = 'run-e953f85cb5dc338a';
+  const KEPT = '0ad61c3c719cdc5e';
+  const paths: [string, string][] = [
+    [SFF, `/flowsheets/${SFF}`],
+    [RUN_FILE, `/flowsheets/${RUN_FILE}`],
+    [KEPT, `/biorepo/artifacts/${KEPT}`],
+  ];
+  for (const [id, want] of paths) {
+    const got = artifactPath(id);
+    if (got !== want) problems.push(`artifactPath(${id}) is ${got}; ${id} opens at ${want}`);
+  }
+  const basis = (artifactId: string) => ({ tool: 'engine.sff', toolVersion: 'e236e32', inputs: [], artifactId, at: '2026-11-23T00:00:00Z', seed: null });
+  const card = (artifactId: string): Evidence => ({
+    id: `sff:${artifactId}:units`, label: 'the units the file lists', value: 4, unit: '', provenance: 'computed',
+    basis: basis(artifactId), interval: null, figure: null,
+  });
+  const hrefs = (html: string) => [...html.matchAll(/href="([^"]*)"/g)].map((m) => m[1]);
+  for (const [id, want] of paths) {
+    const links = hrefs(renderToStaticMarkup(createElement(EvidenceCard, { evidence: card(id) })));
+    if (!links.includes(`#${want}`)) problems.push(`an evidence card whose basis is ${id} links to ${links.join(', ') || 'nothing'}; it opens at #${want}`);
+  }
+  const frame = hrefs(renderToStaticMarkup(createElement(FigureFrame, {
+    title: 't', drawn: 'd', table: { headers: [], rows: [] }, csvName: 'c', basis: paths.map(([id]) => basis(id)), children: null,
+  })));
+  for (const [id, want] of paths) {
+    if (!frame.includes(`#${want}`)) problems.push(`a figure whose basis is ${id} links to ${frame.join(', ') || 'nothing'}; it opens at #${want}`);
+  }
+  const built = [
+    ['src/screens/BioRepoArtifacts.tsx', /href=\{href\(artifactPath\(source\.id\)\)\}/, "BioRepo's source chip"],
+    ['src/screens/Compare.tsx', /href=\{href\(artifactPath\(i\.by\)\)\}/, "the comparison's artifact input"],
+    ['src/screens/RunbookDetail.tsx', /: artifactPath\(p\.artifactId\)\)\}/, "a drafted runbook prediction's artifact"],
+  ] as const;
+  for (const [file, pattern, what] of built) {
+    if (!pattern.test(readFileSync(file, 'utf8'))) problems.push(`${what} (${file}) builds its link without artifactPath`);
+  }
+  ok.push(`links: ${paths.length} ids, an SFF record on its flowsheet's page and a kept artifact on BioRepo's, from the evidence card, the figure's basis, the source chip, the comparison and a drafted runbook's prediction`);
 }
 
 if (problems.length) {

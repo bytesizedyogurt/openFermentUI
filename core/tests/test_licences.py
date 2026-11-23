@@ -309,3 +309,103 @@ def test_a_package_with_no_licence_metadata_passes_only_on_its_named_acceptance(
     assert not lic.decide("other_package", [], policy).ok, "no metadata and no acceptance fails"
     later = lic.decide("py_rust_stemmers", ["GPL-3.0-only"], policy)
     assert not later.ok, "once it states a licence, the acceptance of none no longer covers it"
+
+
+# ── an engine installed beside the lock (alpha 2.2 D0.10) ───────────────
+
+
+class _Installed:
+    """A distribution as importlib.metadata gives one: its metadata, its
+    version, its entry points, the requirements it names and, for an
+    editable install, the directory it was installed from (PEP 610)."""
+
+    def __init__(self, name, *, engine=False, source=None, requires=(), **licence):
+        from types import SimpleNamespace
+
+        self.metadata = _metadata(Name=name, **licence)
+        self.version = "0.1.0"
+        self.entry_points = [SimpleNamespace(group=lic.ENGINE_GROUP, name="a-placeholder")] if engine else []
+        self.requires = list(requires)
+        self._source = source
+
+    def read_text(self, filename):
+        import json
+
+        if filename != "direct_url.json" or self._source is None:
+            return None
+        return json.dumps({"url": self._source.as_uri(), "dir_info": {"editable": True}})
+
+
+LOCK_TEXT = '[[package]]\nname = "openferment-core"\nversion = "0.1.0"\n\n[[package]]\nname = "numpy"\nversion = "1.0"\n'
+
+
+@pytest.fixture
+def beside(tmp_path):
+    """A lock naming the core and numpy, and the repository's examples/ in a directory of the test's own."""
+    lock = tmp_path / "uv.lock"
+    lock.write_text(LOCK_TEXT, encoding="utf-8")
+    examples = tmp_path / "examples"
+    (examples / "engines" / "openferment-engine-example").mkdir(parents=True)
+    (tmp_path / "elsewhere" / "an-outside-engine").mkdir(parents=True)
+    return lock, examples
+
+
+def _side(policy, beside, *installed):
+    lock, examples = beside
+    return {p.name: p for p in lic.engine_side(policy, lock, distributions=list(installed), examples=examples)}
+
+
+def test_an_engine_under_examples_is_the_projects_own_and_declares_no_licence(policy, beside):
+    lock, examples = beside
+    own = examples / "engines" / "openferment-engine-example"
+    held = _side(policy, beside, _Installed("openferment-engine-example", engine=True, source=own),
+                 _Installed("numpy", License="MIT"), _Installed("openferment-core", engine=True))
+    assert list(held) == ["openferment-engine-example"], "the lock's own packages, the core among them, stay its own"
+    p = held["openferment-engine-example"]
+    assert p.verdict.ok and p.verdict.how == "the project's own, under examples/, declaring no licence (ADR-012)"
+    assert p.part == f"an engine installed from {own.resolve()}"
+    declared = _side(policy, beside, _Installed("openferment-engine-example", engine=True, source=own,
+                                                License_Expression="MIT"))["openferment-engine-example"]
+    assert not declared.verdict.ok and declared.verdict.how == (
+        "a package under examples/ is the project's own, and this one declares MIT: a licence for the project is the "
+        "owner's choice (ADR-012), so the package declares none")
+
+
+def test_an_engine_from_outside_and_each_dependency_it_brings_are_held_to_the_ledger(policy, beside):
+    lock, examples = beside
+    outside = examples.parent / "elsewhere" / "an-outside-engine"
+    held = _side(policy, beside,
+                 _Installed("an-outside-engine", engine=True, source=outside, License_Expression="MIT",
+                            requires=["a-solver>=1", "numpy", "a-plotter; extra == 'plots'"]),
+                 _Installed("an-indexed-engine", engine=True, License_Expression="GPL-3.0-only"),
+                 _Installed("a-solver", License="Apache2.0", requires=["a-solver-core"]),
+                 _Installed("a-solver-core"), _Installed("a-plotter", License="MIT"), _Installed("numpy", License="MIT"),
+                 _Installed("a-library-no-engine-names", License_Expression="GPL-3.0-only"))
+    assert sorted(held) == ["a-solver", "a-solver-core", "an-indexed-engine", "an-outside-engine"], \
+        "an engine's own requirements beside the lock, its extras' and the lock's left out; a package no engine names"
+    assert held["an-outside-engine"].verdict.ok and held["an-outside-engine"].verdict.how == "allowed"
+    assert not held["an-indexed-engine"].verdict.ok and "GPL-3.0-only" in held["an-indexed-engine"].verdict.how
+    assert held["an-indexed-engine"].part == "an engine installed beside the lock"
+    assert held["a-solver"].verdict.ok and held["a-solver"].part == "a dependency of the engine an-outside-engine, " \
+                                                                    "beside the lock"
+    assert not held["a-solver-core"].verdict.ok and "no licence metadata" in held["a-solver-core"].verdict.how
+
+
+def test_an_engine_beside_the_lock_is_reported_fails_the_stage_by_name_and_stays_off_the_listing(policy, beside,
+                                                                                                  tmp_path):
+    lock, examples = beside
+    own = examples / "engines" / "openferment-engine-example"
+    python = [package("anthropic", ["MIT"], policy)]
+    listing = tmp_path / "THIRD_PARTY.md"
+    listing.write_text(lic.render(python, [], policy), encoding="utf-8")
+    passing = lic.engine_side(policy, lock, examples=examples,
+                              distributions=[_Installed("openferment-engine-example", engine=True, source=own)])
+    code, report = lic.check(python, [], policy, listing, engines=passing)
+    assert code == 0, report
+    assert any(line.startswith("  beside lock  openferment-engine-example 0.1.0 (none stated), an engine installed "
+                               "from ") for line in report), report
+    assert "openferment-engine-example" not in listing.read_text(encoding="utf-8")
+    failing = lic.engine_side(policy, lock, examples=examples,
+                              distributions=[_Installed("an-indexed-engine", engine=True, License="GPL-3.0-only")])
+    code, report = lic.check(python, [], policy, listing, engines=failing)
+    assert code == 1 and any("python an-indexed-engine 0.1.0: GPL-3.0-only" in line for line in report), report

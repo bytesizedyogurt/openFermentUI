@@ -1,0 +1,17 @@
+EXPECTED: with a 1.00 USD cap, two calls whose worst case is 0.90 each never both spend on one UTC day:
+EXPECTED: a call held at 23:59:30 and settled at 00:00:40 either counts against the new day while in flight
+EXPECTED: (so a 0.90 call asked at 00:00:10 is refused) or is charged to the day that held it
+EXPECTED: (llm.py:37-39: a call whose worst case could take the UTC day past OPENFERMENT_DAILY_BUDGET_USD is refused before it is sent).
+NOTICE:  database "bh_r_h9_09_spend" does not exist, skipping
+{"step": "control, one day (2026-11-08)", "first": "be48603c1a42", "second": "refused (today $0.00 spent and $0.90 reserved of the $1.00 cap)", "daySpentUsd": 0.9, "cap": 1.0}
+{"step": "23:59:30 A reserves 0.90", "a": "024fa027d3d6", "state": {"day": "2026-11-10", "byRole": {"answer": 0.0, "index": 0.0}, "calls": 0, "reservations": {"024fa027d3d6": {"usd": 0.9, "t": 1794354480.148738}}, "totalUsd": 0.0, "reservedUsd": 0.9}}
+{"step": "00:00:10 the new day's state as B's check reads it", "reservedUsd": 0, "totalUsd": 0.0}
+{"step": "00:00:10 B reserves 0.90 while A is in flight", "b": "cb7ae262f59e"}
+{"step": "00:00:40 A settles 0.90", "newDayTotalUsd": 0.9}
+{"step": "00:01:10 B settles 0.90", "day0SpentUsd": 0, "day1SpentUsd": 1.8, "day1Calls": 2, "cap": 1.0}
+OBSERVED: control: within one day the second 0.90 reservation was refused
+OBSERVED: at 00:00:10 the new day's check read reservedUsd=0 while A's 0.90 was in flight
+OBSERVED: B's 0.90 reservation on 2026-11-11 was held
+OBSERVED: 2026-11-10 spent 0.00 USD; 2026-11-11 spent 1.80 USD in 2 calls against the 1.00 USD cap
+OBSERVED: spend rows (day|state|usd): 2026-11-08|settled|0.900000 2026-11-11|settled|0.900000 2026-11-11|settled|0.900000 
+RESULT: DEFECT

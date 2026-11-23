@@ -1,0 +1,48 @@
+EXPECTED: four identical kinetics run requests asked at once, each naming its own asker, keep one runs row
+EXPECTED: whose created_by column and body by name the same asker, and every asker is answered with that name
+EXPECTED: (docs/api/engines.md:541-544: its by and created_by are the first asker's, whoever asks again).
+NOTICE:  database "bh_r_h1_01_svc" does not exist, skipping
+warm: CASE mu_max=0.39: 1 row id(s), askers answered by ['asker-0']: OK
+value mu_max=0.41, 4 asks at once:
+  asker-0 answered: status 200, run d8ffe9b543efc332, by 'asker-1'
+  asker-1 answered: status 200, run d8ffe9b543efc332, by 'asker-1'
+  asker-2 answered: status 200, run d8ffe9b543efc332, by 'asker-1'
+  asker-3 answered: status 200, run d8ffe9b543efc332, by 'asker-1'
+  row d8ffe9b543efc332: created_by 'asker-0', body by 'asker-1'; GET /api/runs/d8ffe9b543efc332 serves by 'asker-1'
+  job.running events for d8ffe9b543efc332: 4 (one an ask that computed)
+CASE mu_max=0.41: 1 row id(s), askers answered by ['asker-1']: DEFECT
+value mu_max=0.42, 4 asks at once:
+  asker-0 answered: status 200, run c4efafb9ec0199cc, by 'asker-1'
+  asker-1 answered: status 200, run c4efafb9ec0199cc, by 'asker-1'
+  asker-2 answered: status 200, run c4efafb9ec0199cc, by 'asker-1'
+  asker-3 answered: status 200, run c4efafb9ec0199cc, by 'asker-1'
+  row c4efafb9ec0199cc: created_by 'asker-2', body by 'asker-1'; GET /api/runs/c4efafb9ec0199cc serves by 'asker-1'
+  job.running events for c4efafb9ec0199cc: 4 (one an ask that computed)
+CASE mu_max=0.42: 1 row id(s), askers answered by ['asker-1']: DEFECT
+value mu_max=0.43, 4 asks at once:
+  asker-0 answered: status 200, run a6b532af461e088a, by 'asker-1'
+  asker-1 answered: status 200, run a6b532af461e088a, by 'asker-1'
+  asker-2 answered: status 200, run a6b532af461e088a, by 'asker-1'
+  asker-3 answered: status 200, run a6b532af461e088a, by 'asker-1'
+  row a6b532af461e088a: created_by 'asker-3', body by 'asker-1'; GET /api/runs/a6b532af461e088a serves by 'asker-1'
+  job.running events for a6b532af461e088a: 4 (one an ask that computed)
+CASE mu_max=0.43: 1 row id(s), askers answered by ['asker-1']: DEFECT
+value mu_max=0.44, 4 asks at once:
+  asker-0 answered: status 200, run 62c0c2367f8239e0, by 'asker-3'
+  asker-1 answered: status 200, run 62c0c2367f8239e0, by 'asker-3'
+  asker-2 answered: status 200, run 62c0c2367f8239e0, by 'asker-3'
+  asker-3 answered: status 200, run 62c0c2367f8239e0, by 'asker-3'
+  row 62c0c2367f8239e0: created_by 'asker-3', body by 'asker-3'; GET /api/runs/62c0c2367f8239e0 serves by 'asker-3'
+  job.running events for 62c0c2367f8239e0: 1 (one an ask that computed)
+CASE mu_max=0.44: 1 row id(s), askers answered by ['asker-3']: OK
+value mu_max=0.45, 4 asks at once:
+  asker-0 answered: status 200, run ec7b617f387da5ea, by 'asker-0'
+  asker-1 answered: status 200, run ec7b617f387da5ea, by 'asker-0'
+  asker-2 answered: status 200, run ec7b617f387da5ea, by 'asker-0'
+  asker-3 answered: status 200, run ec7b617f387da5ea, by 'asker-0'
+  row ec7b617f387da5ea: created_by 'asker-3', body by 'asker-0'; GET /api/runs/ec7b617f387da5ea serves by 'asker-0'
+  job.running events for ec7b617f387da5ea: 4 (one an ask that computed)
+CASE mu_max=0.45: 1 row id(s), askers answered by ['asker-0']: DEFECT
+SUMMARY: 4 of 5 values gave a row whose names disagree
+OBSERVED: 4 of 5 values gave a defect line; the database holds 4 runs row(s) whose created_by differs from body by
+RESULT: DEFECT

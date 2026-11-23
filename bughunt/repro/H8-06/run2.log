@@ -1,0 +1,9 @@
+EXPECTED: a deep search whose graph and HyDE stages fail on their model call names them in degradedStages (SearchResponse, docs/api/openapi.json:13180: "the retrieval layers that timed out or failed, so a narrow result says why").
+OBSERVED: the service's health says hasKey: False
+OBSERVED: the route answers profile deep | degradedStages [] | hits 1
+OBSERVED: the service logged, during the route call: 2026-11-10 23:46:10 [warning ] query_entity_extraction_failed error=ModelUnavailable
+OBSERVED: the service logged, during the route call: 2026-11-10 23:46:10 [warning ] hyde_generation_failed error=ModelUnavailable
+OBSERVED: in process, the kit logged: 2026-11-10 23:46:12 [warning ] query_entity_extraction_failed error=ModelUnavailable
+OBSERVED: in process, the kit logged: 2026-11-10 23:46:12 [warning ] hyde_generation_failed error=ModelUnavailable
+OBSERVED: in process, the kit's traces: {"profile": "deep", "stages": {"vector": "success", "keyword": "success", "graph": "empty", "community": "skipped", "hyde": "empty", "rerank": "disabled"}, "degraded_stages": [], "hits": 1}
+RESULT: DEFECT

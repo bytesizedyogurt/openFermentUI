@@ -1,0 +1,35 @@
+== every origin kind at the Proforma resolve ==
+[resolve person-assumption] 200 {"scope": "proforma:sc-h3", "values": [{"key": "feed_glucose_conc", "value": null, "low": null, "high": null, "source": null, "origin": "waiting", "identified": null, "overriddenBy": null, "libraryDefault": null, "recordIds": [], "detail": "waits for a source: a record of medium_component_conc throu
+    titre -> 42.0 origin assumption source {'kind': 'assumption', 'id': None, 'note': 'typed on 2026-11-09T10:00:00Z', 'by': 'Ada Lovelace'}
+    basisInputs: [('titre', 42.0, 'assumption'), ('titre low', 42.0, 'assumption'), ('titre high', 42.0, 'assumption')]
+[resolve model-estimate] 200 {"scope": "proforma:sc-h3", "values": [{"key": "feed_glucose_conc", "value": null, "low": null, "high": null, "source": null, "origin": "waiting", "identified": null, "overriddenBy": null, "libraryDefault": null, "recordIds": [], "detail": "waits for a source: a record of medium_component_conc throu
+    titre -> 42.0 origin model-estimate source {'kind': 'model-estimate', 'id': None, 'note': 'estimated on 2026-11-09T10:00:00Z', 'by': 'claude-x'}
+    basisInputs: [('titre', 42.0, 'model-estimate'), ('titre low', 42.0, 'model-estimate'), ('titre high', 42.0, 'model-estimate')]
+[resolve measurement] 200 {"scope": "proforma:sc-h3", "values": [{"key": "feed_glucose_conc", "value": null, "low": null, "high": null, "source": null, "origin": "waiting", "identified": null, "overriddenBy": null, "libraryDefault": null, "recordIds": [], "detail": "waits for a source: a record of medium_component_conc throu
+    titre -> 42.0 origin measurement source {'kind': 'deposition', 'id': 'dep1/e6', 'note': "measured on 2026-11-09T10:00:00Z: 42 g/L as deposited, 42 g L-1 in the parameter's unit", 'by': 'Ada Lovelace'}
+    basisInputs: [('titre', 42.0, 'deposition'), ('titre low', 42.0, 'deposition'), ('titre high', 42.0, 'deposition')]
+[resolve record] 422 {"detail": [{"type": "value_error", "loc": ["body", "inputs", 0], "msg": "Value error, titre: a value a run sets is a person's assumption or a model's estimate, its origin naming who set it (person-assumption or model-estimate, with by), or a deposition's reading, its origin naming the reading (meas
+[resolve artifact] 422 {"detail": [{"type": "value_error", "loc": ["body", "inputs", 0], "msg": "Value error, titre: a value a run sets is a person's assumption or a model's estimate, its origin naming who set it (person-assumption or model-estimate, with by), or a deposition's reading, its origin naming the reading (meas
+[resolve library-default] 422 {"detail": [{"type": "value_error", "loc": ["body", "inputs", 0], "msg": "Value error, titre: a value a run sets is a person's assumption or a model's estimate, its origin naming who set it (person-assumption or model-estimate, with by), or a deposition's reading, its origin naming the reading (meas
+[resolve convention] 422 {"detail": [{"type": "value_error", "loc": ["body", "inputs", 0], "msg": "Value error, titre: a value a run sets is a person's assumption or a model's estimate, its origin naming who set it (person-assumption or model-estimate, with by), or a deposition's reading, its origin naming the reading (meas
+
+== a measurement sent with a different value or unit, a low/high, a depositor named ==
+[value differs] 422 {"detail": "titre: reading dep1/e6 is 42 g/L, and the value sent is 40.0 g/L: a measurement carries its reading's own value and unit"}
+[unit differs] 422 {"detail": "titre: reading dep1/e6 is 42 g/L, and the value sent is 42.0 g L-1: a measurement carries its reading's own value and unit"}
+[with a high] 422 {"detail": "titre: a measurement is its reading's one value, and this quantity also carries high"}
+[another depositor] 422 {"detail": "titre: reading dep1/e6 was deposited by Ada Lovelace, and the value sent names Someone Else"}
+[unconfirmed reading e2] 422 {"detail": "titre: reading dep1/e2 waits for a person to confirm its number at the bench, and an unconfirmed number is no measurement"}
+[corrected reading e1] 422 {"detail": "titre: reading dep1/e1 was corrected by dep1/e5, the reading that stands for its measure now"}
+[a reading in K for a titre] 422 {"detail": "titre is denominated in g L-1, and reading dep1/e3 is in K, which does not convert into it: Incompatible units: K (temp) vs g L-1 (massConc)"}
+
+== another project's reading (p2 names p1's dep1/e6) ==
+[p2 resolve] 422 {"detail": "titre: the project holds no deposition dep1, so it holds no reading dep1/e6"}
+
+== a series correction undone by moving a sample time ==
+[deposit s1 at 5 h (a mis-read 4 g/L)] 200 {"kind": "depositions", "id": "dep9", "value": {"id": "dep9", "runbookId": "rb1", "protocolId": null, "operatorId": null
+[correct s1 by s2 at the same 5 h] 200 {"kind": "depositions", "id": "dep9", "value": {"id": "dep9", "runbookId": "rb1", "protocolId": null, "operatorId": null
+[resolve on s1 (corrected)] 422 {"detail": "titre: reading dep9/s1 was corrected by dep9/s2, the reading that stands for its measure now"}
+[move s2 to 6 h] 200 {"kind": "depositions", "id": "dep9", "value": {"id": "dep9", "runbookId": "rb1", "protocolId": null, "operatorId": null
+[resolve on s1 again] 200 {"scope": "proforma:sc-h3", "values": [{"key": "feed_glucose_conc", "value": null, "low": null, "high": null, "source": null, "origin": "waiting", "identified": null, "overriddenBy": null, "libraryDefault": null, "recordIds": [], "detail": "waits for a source: a record of medium_component_conc throu
+readings offered for a titre now: [('dep1/e6', 42.0, 7.5), ('dep9/s1', 4.0, 5.0), ('dep9/s2', 40.0, 6.0)]
+[take s1's sample time away] 200 {"kind": "depositions", "id": "dep9", "value": {"id": "dep9", "runbookId": "rb1", "protocolId": null, "operatorId": null

@@ -45,7 +45,6 @@ def test_a_database_that_does_not_answer_closes_the_gate():
     try:
         with pytest.raises(spend.SpendUnknown, match="no model call is made"):
             spend.total_today()
-        assert spend.would_pass(0.01)[0] is True
         with pytest.raises(spend.SpendUnknown):
             spend.reserve("answer", 0.01)
     finally:
@@ -110,11 +109,13 @@ def test_a_budget_that_is_not_a_number_of_dollars_is_refused(monkeypatch, raw):
     assert "OPENFERMENT_DAILY_BUDGET_USD" in str(e.value)
 
 
-def test_would_pass_compares_the_projection_with_what_is_left(monkeypatch):
+def test_a_reservation_holds_what_is_left_and_is_refused_past_it(monkeypatch):
     monkeypatch.setenv("OPENFERMENT_DAILY_BUDGET_USD", "1")
     spend.charge("answer", 0.9)
-    assert spend.would_pass(0.1) == (False, 0.9, 1.0)
-    assert spend.would_pass(0.11)[0] is True
+    spend.settle(spend.reserve("answer", 0.1), "answer", 0)
+    with pytest.raises(spend.CapReached):
+        spend.reserve("answer", 0.11)
+    assert spend.total_today() == 0.9
 
 
 def test_a_negative_charge_is_refused():

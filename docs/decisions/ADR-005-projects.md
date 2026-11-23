@@ -42,6 +42,30 @@ control.
 - **Tests** run in one project, `test-project`, written in each test's rolled-back transaction;
   every `TestClient` a test makes names it, as the browser does.
 
+## Implementation (alpha 2.2 D.0: the MCP server through a running service)
+
+- **`--service <origin>`.** The MCP server acts through a running service when started with
+  `python -m openferment_core.mcp_server --project <id> --service <origin>`: every registry call is
+  `POST <origin>/api/tools/<name>` with the arguments as the client sent them, the project in
+  `X-OpenFerment-Project` and the client's declared name in `X-OpenFerment-Assistant`;
+  `ask_postdoc` is `POST <origin>/api/ask` and `get_artifact` `GET
+  <origin>/api/biorepo/artifacts/<id>`. A builder handed a project id and a service's address, in
+  a worktree with no `core/.env`, reaches the project that service holds, whatever database it runs
+  on. The server then opens no database and reads `core/.env` for `OPENFERMENT_PROJECT` alone,
+  when `--project` names none.
+- **Loopback alone.** The origin is `http://` or `https://`, the host `127.0.0.1`, `[::1]` or
+  `localhost`, an explicit port, and nothing after it (`mcp_server.service_origin`); anything else
+  is refused in words when the server starts, a value holding a user or a password in words that
+  never repeat it, and every call answers with those words. `localhost` is sent to `127.0.0.1`,
+  the address the service binds, so no resolver is asked where it is. The server sends through
+  `httpx.Client(trust_env=False, follow_redirects=False)`, so no proxy carries a loopback call and
+  a redirect the service answers is its words, followed nowhere; `get_artifact` sends an id of an
+  artifact's shape alone (sixteen hex digits), so a dot segment steers the read nowhere. No
+  listener and no host is added, and `guard.py` is unchanged: it holds these POSTs as it holds any.
+- **A project the store does not hold.** In its own process the server checks the project against
+  its database at the first call and answers every call with words naming the project while the
+  database lacks it; through a service, the service's own 404 words come back as the call's error.
+
 ## Consequences
 
 - Home opens on the person's projects; module screens become views inside a project (ADR-009).

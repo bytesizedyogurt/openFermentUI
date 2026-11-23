@@ -1,0 +1,1007 @@
+[
+ {
+  "id": "M01",
+  "target": "basis.basis_provenance",
+  "file": "openferment_core/basis.py",
+  "old": "    if found != \"assumed\" and any(is_measurement(i.source) for i in basis.inputs):\n        return \"measured\"\n",
+  "new": "",
+  "tests": [
+   "tests/test_basis.py",
+   "tests/test_estimates.py",
+   "tests/test_measurements.py",
+   "tests/test_finite_inputs.py",
+   "tests/test_params.py"
+  ],
+  "why": "a run on a reading never reads measured"
+ },
+ {
+  "id": "M02",
+  "target": "basis.basis_provenance",
+  "file": "openferment_core/basis.py",
+  "old": "    if any(i.source.kind in ASSUMED_KINDS for i in basis.inputs):\n        return \"assumed\"",
+  "new": "    if any(i.source.kind == \"assumption\" for i in basis.inputs):\n        return \"assumed\"",
+  "tests": [
+   "tests/test_basis.py",
+   "tests/test_estimates.py",
+   "tests/test_measurements.py",
+   "tests/test_finite_inputs.py",
+   "tests/test_params.py"
+  ],
+  "why": "a model's estimate no longer makes a value assumed (only a person's assumption does)"
+ },
+ {
+  "id": "M03",
+  "target": "basis.basis_provenance",
+  "file": "openferment_core/basis.py",
+  "old": "    if found != \"assumed\" and any(is_measurement(i.source) for i in basis.inputs):",
+  "new": "    if found == \"computed\" and any(is_measurement(i.source) for i in basis.inputs):",
+  "tests": [
+   "tests/test_basis.py",
+   "tests/test_estimates.py",
+   "tests/test_measurements.py",
+   "tests/test_finite_inputs.py",
+   "tests/test_params.py"
+  ],
+  "why": "a reading beside a weaker record leaves the weaker class (ADR-006 says measured)"
+ },
+ {
+  "id": "M04",
+  "target": "basis._provenance_of",
+  "file": "openferment_core/basis.py",
+  "old": "    if item is None:\n        return _UNKNOWN",
+  "new": "    if item is None:\n        return \"computed\"",
+  "tests": [
+   "tests/test_basis.py",
+   "tests/test_estimates.py",
+   "tests/test_measurements.py",
+   "tests/test_finite_inputs.py",
+   "tests/test_params.py"
+  ],
+  "why": "a record or artifact the caller cannot find reads as computed"
+ },
+ {
+  "id": "M05",
+  "target": "basis.is_measurement",
+  "file": "openferment_core/basis.py",
+  "old": "    return (source.kind == \"deposition\" and bool(READING_REF.fullmatch(source.id or \"\"))\n            and bool(_MEASURED.match(source.note or \"\")))",
+  "new": "    return (source.kind == \"deposition\" and bool(READING_REF.fullmatch(source.id or \"\")))",
+  "tests": [
+   "tests/test_basis.py",
+   "tests/test_estimates.py",
+   "tests/test_measurements.py",
+   "tests/test_finite_inputs.py",
+   "tests/test_params.py",
+   "tests/test_fermos.py",
+   "tests/test_exports.py",
+   "tests/test_comparisons.py"
+  ],
+  "why": "a deposition source naming a dep/entry id reads as a measurement whatever its note says"
+ },
+ {
+  "id": "M06",
+  "target": "basis.origin_of",
+  "file": "openferment_core/basis.py",
+  "old": "    return Origin(kind=kind, ref=source.id, by=source.by, at=stamped.group(1) if stamped else None,",
+  "new": "    return Origin(kind=kind, ref=source.id, by=source.by, at=None,",
+  "tests": [
+   "tests/test_basis.py",
+   "tests/test_estimates.py",
+   "tests/test_measurements.py",
+   "tests/test_finite_inputs.py",
+   "tests/test_params.py",
+   "tests/test_runs.py"
+  ],
+  "why": "an origin read back from a basis source loses the day stamped in its note"
+ },
+ {
+  "id": "M07",
+  "target": "basis.override_of",
+  "file": "openferment_core/basis.py",
+  "old": "    if q.unit != unit:\n        raise InputRefused(",
+  "new": "    if False:\n        raise InputRefused(",
+  "tests": [
+   "tests/test_basis.py",
+   "tests/test_estimates.py",
+   "tests/test_measurements.py",
+   "tests/test_finite_inputs.py",
+   "tests/test_params.py"
+  ],
+  "why": "a value in another unit than its parameter's is taken as if it were in the parameter's"
+ },
+ {
+  "id": "M08",
+  "target": "basis.override_of",
+  "file": "openferment_core/basis.py",
+  "old": "    if not (origin.at or \"\").strip():\n        raise InputRefused(",
+  "new": "    if False:\n        raise InputRefused(",
+  "tests": [
+   "tests/test_basis.py",
+   "tests/test_estimates.py",
+   "tests/test_measurements.py",
+   "tests/test_finite_inputs.py",
+   "tests/test_params.py"
+  ],
+  "why": "a value that does not say when it was set is taken"
+ },
+ {
+  "id": "M09",
+  "target": "basis.estimate_in",
+  "file": "openferment_core/basis.py",
+  "old": "        if value.get(\"provenance\") == \"assumed\":\n            return f\"{path}.provenance\" if path else \"provenance\"\n",
+  "new": "",
+  "tests": [
+   "tests/test_estimates.py",
+   "tests/test_biorepo.py",
+   "tests/test_project_state.py",
+   "tests/test_extract.py",
+   "tests/test_writes.py"
+  ],
+  "why": "a value calling itself assumed enters a record store"
+ },
+ {
+  "id": "M10",
+  "target": "basis.estimate_in",
+  "file": "openferment_core/basis.py",
+  "old": "    if isinstance(value, (list, tuple)):\n        for n, v in enumerate(value):",
+  "new": "    if False:\n        for n, v in enumerate(value):",
+  "tests": [
+   "tests/test_estimates.py",
+   "tests/test_biorepo.py",
+   "tests/test_project_state.py",
+   "tests/test_extract.py",
+   "tests/test_writes.py"
+  ],
+  "why": "an estimate inside a list (a candidate list, a deposition's entries) is not found"
+ },
+ {
+  "id": "M11",
+  "target": "extract._put refusal",
+  "file": "openferment_core/extract.py",
+  "old": "    refuse_estimates(result, \"the candidates store\")\n",
+  "new": "",
+  "tests": [
+   "tests/test_estimates.py",
+   "tests/test_biorepo.py",
+   "tests/test_project_state.py",
+   "tests/test_extract.py",
+   "tests/test_writes.py"
+  ],
+  "why": "the candidates store keeps an estimate"
+ },
+ {
+  "id": "M12",
+  "target": "project_state.put refusal",
+  "file": "openferment_core/project_state.py",
+  "old": "            refuse_estimates(value, f\"a project's {kind}\")",
+  "new": "            pass",
+  "tests": [
+   "tests/test_estimates.py",
+   "tests/test_biorepo.py",
+   "tests/test_project_state.py",
+   "tests/test_extract.py",
+   "tests/test_writes.py"
+  ],
+  "why": "a project's depositions and measured evidence keep an estimate"
+ },
+ {
+  "id": "M13",
+  "target": "biorepo.write refusal",
+  "file": "openferment_core/biorepo.py",
+  "old": "        refuse_estimates(decision, \"BioRepo\")",
+  "new": "        pass",
+  "tests": [
+   "tests/test_estimates.py",
+   "tests/test_biorepo.py",
+   "tests/test_project_state.py",
+   "tests/test_extract.py",
+   "tests/test_writes.py"
+  ],
+  "why": "BioRepo keeps a decision carrying an estimate"
+ },
+ {
+  "id": "M14",
+  "target": "units.convert",
+  "file": "openferment_core/units.py",
+  "old": "    return (base - ut.get(\"offset\", 0)) / ut[\"factor\"]",
+  "new": "    return base / ut[\"factor\"]",
+  "tests": [
+   "tests/test_units.py",
+   "tests/test_units_minus.py",
+   "tests/test_measurements.py",
+   "tests/test_biorepo.py"
+  ],
+  "why": "an affine unit's offset is dropped on the way out (\u00b0C, \u00b0F)"
+ },
+ {
+  "id": "M15",
+  "target": "units.convert",
+  "file": "openferment_core/units.py",
+  "old": "    if uf[\"family\"] != ut[\"family\"]:\n        raise UnitError(",
+  "new": "    if False:\n        raise UnitError(",
+  "tests": [
+   "tests/test_units.py",
+   "tests/test_units_minus.py",
+   "tests/test_measurements.py",
+   "tests/test_biorepo.py"
+  ],
+  "why": "a conversion across families goes through"
+ },
+ {
+  "id": "M16",
+  "target": "units.quantity_equals",
+  "file": "openferment_core/units.py",
+  "old": "    return abs(av - bv) / abs(bv) <= tolerance_pct / 100",
+  "new": "    return abs(av - bv) / abs(bv) <= tolerance_pct",
+  "tests": [
+   "tests/test_units.py",
+   "tests/test_units_minus.py",
+   "tests/test_measurements.py",
+   "tests/test_biorepo.py",
+   "tests/test_anchor.py",
+   "tests/test_witness.py"
+  ],
+  "why": "the tolerance is read as a fraction a hundred times wider"
+ },
+ {
+  "id": "M17",
+  "target": "api.act_in_the_named_project",
+  "file": "openferment_core/api.py",
+  "old": "    if not known:\n        return JSONResponse(status_code=404,",
+  "new": "    if False:\n        return JSONResponse(status_code=404,",
+  "tests": [
+   "tests/test_projects.py",
+   "tests/test_openapi.py",
+   "tests/test_events.py",
+   "tests/test_route_models.py"
+  ],
+  "why": "a request naming a project the database does not hold goes on in it"
+ },
+ {
+  "id": "M18",
+  "target": "api.act_in_the_named_project",
+  "file": "openferment_core/api.py",
+  "old": "    named = request.headers.get(projects.HEADER) or request.query_params.get(projects.QUERY)",
+  "new": "    named = request.query_params.get(projects.QUERY) or request.headers.get(projects.HEADER)",
+  "tests": [
+   "tests/test_projects.py",
+   "tests/test_openapi.py",
+   "tests/test_events.py",
+   "tests/test_route_models.py"
+  ],
+  "why": "?project= wins over the header when both name a project"
+ },
+ {
+  "id": "M19",
+  "target": "api.act_in_the_named_project",
+  "file": "openferment_core/api.py",
+  "old": "    if not projects.valid_id(named):\n        return JSONResponse(status_code=422,",
+  "new": "    if False:\n        return JSONResponse(status_code=422,",
+  "tests": [
+   "tests/test_projects.py",
+   "tests/test_openapi.py",
+   "tests/test_events.py",
+   "tests/test_route_models.py"
+  ],
+  "why": "a malformed project id goes to the database"
+ },
+ {
+  "id": "M20",
+  "target": "runs.keep_run",
+  "file": "openferment_core/engine/runs.py",
+  "old": "    if held is not None and (held.status == \"refused\" or held.sff is not None or held.sffRefused is not None):\n        return report(run_id)\n",
+  "new": "",
+  "tests": [
+   "tests/test_runs.py",
+   "tests/test_engines.py",
+   "tests/test_engine_diagnostics.py",
+   "tests/test_proforma_runs.py",
+   "tests/test_events.py"
+  ],
+  "why": "the same run kept twice is written and said again"
+ },
+ {
+  "id": "M21",
+  "target": "runs.keep_run",
+  "file": "openferment_core/engine/runs.py",
+  "old": "    first, when, asked = (held.by, held.at, held.scenarioId) if held is not None else (who, _now(), scenario_id)",
+  "new": "    first, when, asked = (who, _now(), scenario_id)",
+  "tests": [
+   "tests/test_runs.py",
+   "tests/test_engines.py",
+   "tests/test_engine_diagnostics.py",
+   "tests/test_proforma_runs.py",
+   "tests/test_events.py"
+  ],
+  "why": "a held row with neither file nor words is rewritten under the second asker's name, time and scenario"
+ },
+ {
+  "id": "M22",
+  "target": "runs.keep_run",
+  "file": "openferment_core/engine/runs.py",
+  "old": "    kept = EngineRun(**base, status=\"done\", provenance=art.provenance,",
+  "new": "    kept = EngineRun(**base, status=\"done\", provenance=\"computed\",",
+  "tests": [
+   "tests/test_runs.py",
+   "tests/test_engines.py",
+   "tests/test_engine_diagnostics.py",
+   "tests/test_proforma_runs.py",
+   "tests/test_events.py"
+  ],
+  "why": "a run row says computed whatever its artifact's provenance"
+ },
+ {
+  "id": "M23",
+  "target": "runs.keep_run",
+  "file": "openferment_core/engine/runs.py",
+  "old": "    if art is not None and (art.id, art.tool, art.toolVersion) != (run_id, tool, version):",
+  "new": "    if False:",
+  "tests": [
+   "tests/test_runs.py",
+   "tests/test_engines.py",
+   "tests/test_engine_diagnostics.py",
+   "tests/test_proforma_runs.py",
+   "tests/test_events.py"
+  ],
+  "why": "an artifact of another basis is kept as this run's"
+ },
+ {
+  "id": "M24",
+  "target": "runs.keep_run",
+  "file": "openferment_core/engine/runs.py",
+  "old": "    reported = (held.diagnostics if held is not None and held.diagnostics else",
+  "new": "    reported = (None if False else",
+  "tests": [
+   "tests/test_runs.py",
+   "tests/test_engines.py",
+   "tests/test_engine_diagnostics.py",
+   "tests/test_proforma_runs.py",
+   "tests/test_events.py"
+  ],
+  "why": "a held row's own diagnostics give way to the second computation's"
+ },
+ {
+  "id": "M25",
+  "target": "llm._default_client",
+  "file": "openferment_core/llm.py",
+  "old": "    key = _REQUEST_KEY.get() or os.environ.get(\"ANTHROPIC_API_KEY\")",
+  "new": "    key = os.environ.get(\"ANTHROPIC_API_KEY\") or _REQUEST_KEY.get()",
+  "tests": [
+   "tests/test_key_override.py",
+   "tests/test_llm.py",
+   "tests/test_request_guard.py"
+  ],
+  "why": "core/.env's key wins over the key a request names"
+ },
+ {
+  "id": "M26",
+  "target": "api.use_the_key_a_request_names",
+  "file": "openferment_core/api.py",
+  "old": "    if project is not None:\n        await db.arun(audit.add(project,",
+  "new": "    if False:\n        await db.arun(audit.add(project,",
+  "tests": [
+   "tests/test_key_override.py",
+   "tests/test_llm.py",
+   "tests/test_request_guard.py"
+  ],
+  "why": "no audit row says an override was used"
+ },
+ {
+  "id": "M27",
+  "target": "api.use_the_key_a_request_names",
+  "file": "openferment_core/api.py",
+  "old": "                                detail={\"override\": True}))",
+  "new": "                                detail={\"override\": True, \"key\": named[-4:]}))",
+  "tests": [
+   "tests/test_key_override.py",
+   "tests/test_llm.py",
+   "tests/test_request_guard.py"
+  ],
+  "why": "the audit row keeps the key's last four characters"
+ },
+ {
+  "id": "M28",
+  "target": "llm.request_key",
+  "file": "openferment_core/llm.py",
+  "old": "    token = _REQUEST_KEY.set((key or \"\").strip() or None)",
+  "new": "    token = _REQUEST_KEY.set(key)",
+  "tests": [
+   "tests/test_key_override.py",
+   "tests/test_llm.py",
+   "tests/test_request_guard.py"
+  ],
+  "why": "a whitespace key is held as a key (the middleware refuses it first)"
+ },
+ {
+  "id": "M29",
+  "target": "guard.same_site",
+  "file": "openferment_core/guard.py",
+  "old": "    return origin_port == h[1] if h[1] is not None else origin_port in DEFAULT_PORTS.values()",
+  "new": "    return True",
+  "tests": [
+   "tests/test_request_guard.py",
+   "tests/test_key_override.py",
+   "tests/test_projects.py"
+  ],
+  "why": "another port on the same host is the same site"
+ },
+ {
+  "id": "M30",
+  "target": "guard.refusal",
+  "file": "openferment_core/guard.py",
+  "old": "        forwarded and answers_to(hostname(forwarded)) and same_site(origin, forwarded)",
+  "new": "        forwarded and same_site(origin, forwarded)",
+  "tests": [
+   "tests/test_request_guard.py",
+   "tests/test_key_override.py",
+   "tests/test_projects.py"
+  ],
+  "why": "X-Forwarded-Host may name any host"
+ },
+ {
+  "id": "M31",
+  "target": "guard.key_refusal",
+  "file": "openferment_core/guard.py",
+  "old": "    if FUNNEL in headers:\n        return \"a request through Tailscale Funnel comes from the public internet and may not name a key\"",
+  "new": "    if False:\n        return \"a request through Tailscale Funnel comes from the public internet and may not name a key\"",
+  "tests": [
+   "tests/test_request_guard.py",
+   "tests/test_key_override.py",
+   "tests/test_projects.py"
+  ],
+  "why": "a key may be named through Funnel"
+ },
+ {
+  "id": "M32",
+  "target": "guard.answers_to",
+  "file": "openferment_core/guard.py",
+  "old": "    return \".\" not in host or host.endswith(OWN_SUFFIXES)",
+  "new": "    return \".\" not in host or host.endswith((*OWN_SUFFIXES, \".net\"))",
+  "tests": [
+   "tests/test_request_guard.py",
+   "tests/test_key_override.py",
+   "tests/test_projects.py"
+  ],
+  "why": "any .net name is the owner's"
+ },
+ {
+  "id": "M33",
+  "target": "measurements._held_to_rules",
+  "file": "openferment_core/measurements.py",
+  "old": "    if entry.get(\"confirmed\") is not True:\n        raise MeasurementRefused(",
+  "new": "    if entry.get(\"confirmed\") is False:\n        raise MeasurementRefused(",
+  "tests": [
+   "tests/test_measurements.py",
+   "tests/test_basis.py",
+   "tests/test_finite_inputs.py"
+  ],
+  "why": "a reading with no confirmed field at all is taken"
+ },
+ {
+  "id": "M34",
+  "target": "measurements._held_to_rules",
+  "file": "openferment_core/measurements.py",
+  "old": "    if (origin.at or \"\").strip() and _time(origin.at) != when:",
+  "new": "    if False:",
+  "tests": [
+   "tests/test_measurements.py",
+   "tests/test_basis.py",
+   "tests/test_finite_inputs.py"
+  ],
+  "why": "a value naming another time than its reading's is taken"
+ },
+ {
+  "id": "M35",
+  "target": "measurements._held_to_rules",
+  "file": "openferment_core/measurements.py",
+  "old": "    if not _number(q.value) or float(q.value) != float(own) or q.unit != own_unit:",
+  "new": "    if not _number(q.value) or q.unit != own_unit:",
+  "tests": [
+   "tests/test_measurements.py",
+   "tests/test_basis.py",
+   "tests/test_finite_inputs.py"
+  ],
+  "why": "a value sent beside a reading need not be the reading's"
+ },
+ {
+  "id": "M36",
+  "target": "measurements._held_to_rules",
+  "file": "openferment_core/measurements.py",
+  "old": "        if not math.isfinite(set_to):\n            raise MeasurementRefused(",
+  "new": "        if False:\n            raise MeasurementRefused(",
+  "tests": [
+   "tests/test_measurements.py",
+   "tests/test_basis.py",
+   "tests/test_finite_inputs.py"
+  ],
+  "why": "a conversion to an infinite number is taken"
+ },
+ {
+  "id": "M37",
+  "target": "measurements.corrected_by",
+  "file": "openferment_core/measurements.py",
+  "old": "    return str(later[-1].get(\"id\")) if later else None",
+  "new": "    return str(later[0].get(\"id\")) if later else None",
+  "tests": [
+   "tests/test_measurements.py",
+   "tests/test_basis.py",
+   "tests/test_finite_inputs.py"
+  ],
+  "why": "the first correction is named in place of the latest"
+ },
+ {
+  "id": "M38",
+  "target": "validate.find_number",
+  "file": "openferment_core/validate.py",
+  "old": "    if m := _MAGNITUDE.search(masked):\n        return m.group(0)\n",
+  "new": "",
+  "tests": [
+   "tests/test_validate.py",
+   "tests/test_number_rule_fold.py",
+   "tests/test_number_rule_chemistry.py",
+   "tests/test_number_rule_kinetics.py",
+   "tests/test_number_rule_steps.py",
+   "tests/test_postdoc_agent.py",
+   "tests/test_phase5_review.py"
+  ],
+  "why": "magnitude words pass the number rule"
+ },
+ {
+  "id": "M39",
+  "target": "validate.find_number",
+  "file": "openferment_core/validate.py",
+  "old": "    if m := _WORD_NUMBER.search(masked):\n        return m.group(0)\n",
+  "new": "",
+  "tests": [
+   "tests/test_validate.py",
+   "tests/test_number_rule_fold.py",
+   "tests/test_number_rule_chemistry.py",
+   "tests/test_number_rule_kinetics.py",
+   "tests/test_number_rule_steps.py",
+   "tests/test_postdoc_agent.py",
+   "tests/test_phase5_review.py"
+  ],
+  "why": "word numbers pass the number rule"
+ },
+ {
+  "id": "M40",
+  "target": "validate.validate_plan",
+  "file": "openferment_core/validate.py",
+  "old": "        def reject(why: str) -> None:\n            out.rejected += 1\n",
+  "new": "        def reject(why: str) -> None:\n            out.rejected += 0\n",
+  "tests": [
+   "tests/test_validate.py",
+   "tests/test_number_rule_fold.py",
+   "tests/test_number_rule_chemistry.py",
+   "tests/test_number_rule_kinetics.py",
+   "tests/test_number_rule_steps.py",
+   "tests/test_postdoc_agent.py",
+   "tests/test_phase5_review.py"
+  ],
+  "why": "a dropped claim is not counted"
+ },
+ {
+  "id": "M41",
+  "target": "tools.numbers_in",
+  "file": "openferment_core/tools/__init__.py",
+  "old": "    elif isinstance(value, list):\n        for n, v in enumerate(value):\n            found += numbers_in(v, f\"{path}[{n}]\", quantities)",
+  "new": "    elif isinstance(value, list):\n        pass",
+  "tests": [
+   "tests/test_tools.py",
+   "tests/test_module_tools.py",
+   "tests/test_finite_inputs.py",
+   "tests/test_mcp.py"
+  ],
+  "why": "a number inside a list in a tool input passes"
+ },
+ {
+  "id": "M42",
+  "target": "spend._reserve",
+  "file": "openferment_core/spend.py",
+  "old": "        if spent + reserved + projected_usd > cap:",
+  "new": "        if spent + projected_usd > cap:",
+  "tests": [
+   "tests/test_spend.py",
+   "tests/test_llm.py",
+   "tests/test_ready.py",
+   "tests/test_phase3_review.py"
+  ],
+  "why": "what is reserved and unsettled is left out of the cap"
+ },
+ {
+  "id": "M43",
+  "target": "spend._setting",
+  "file": "openferment_core/spend.py",
+  "old": "    if value < 0:\n        raise BudgetSettingInvalid(",
+  "new": "    if False:\n        raise BudgetSettingInvalid(",
+  "tests": [
+   "tests/test_spend.py",
+   "tests/test_llm.py",
+   "tests/test_ready.py",
+   "tests/test_phase3_review.py"
+  ],
+  "why": "a negative budget is taken"
+ },
+ {
+  "id": "M44",
+  "target": "spend._day_state",
+  "file": "openferment_core/spend.py",
+  "old": "        elif r.state == \"reserved\" and r.expires_at is not None and r.expires_at > now:",
+  "new": "        elif r.state == \"reserved\" and r.expires_at is not None and r.expires_at < now:",
+  "tests": [
+   "tests/test_spend.py",
+   "tests/test_llm.py",
+   "tests/test_ready.py",
+   "tests/test_phase3_review.py"
+  ],
+  "why": "a live reservation holds nothing and an expired one holds"
+ },
+ {
+  "id": "M45",
+  "target": "spend._reserve",
+  "file": "openferment_core/spend.py",
+  "old": "        await db.lock(s, \"spend\", day.isoformat())\n        now = datetime.now(timezone.utc)\n        # An abandoned",
+  "new": "        now = datetime.now(timezone.utc)\n        # An abandoned",
+  "tests": [
+   "tests/test_spend.py",
+   "tests/test_llm.py",
+   "tests/test_ready.py",
+   "tests/test_phase3_review.py"
+  ],
+  "why": "check and hold are no longer one step"
+ },
+ {
+  "id": "M46",
+  "target": "registry._why_not",
+  "file": "openferment_core/engine/registry.py",
+  "old": "    if own != name:\n        return f\"the object at {entry} names itself",
+  "new": "    if False:\n        return f\"the object at {entry} names itself",
+  "tests": [
+   "tests/test_engines.py",
+   "tests/test_boundaries.py"
+  ],
+  "why": "an object whose own name differs from its entry point's is used"
+ },
+ {
+  "id": "M47",
+  "target": "registry._load",
+  "file": "openferment_core/engine/registry.py",
+  "old": "            wrong = _imported_in_service(obj, set(sys.modules) - before)",
+  "new": "            wrong = []",
+  "tests": [
+   "tests/test_engines.py",
+   "tests/test_boundaries.py"
+  ],
+  "why": "an engine whose import brings its heavy modules into the service is used"
+ },
+ {
+  "id": "M48",
+  "target": "registry._discover",
+  "file": "openferment_core/engine/registry.py",
+  "old": "            if len(core) != 1:",
+  "new": "            if len(core) > 1:",
+  "tests": [
+   "tests/test_engines.py",
+   "tests/test_boundaries.py"
+  ],
+  "why": "two outside packages registering one name: the first is used"
+ },
+ {
+  "id": "M49",
+  "target": "registry._why_not",
+  "file": "openferment_core/engine/registry.py",
+  "old": "    if worker is None and heavy:\n        return (",
+  "new": "    if False:\n        return (",
+  "tests": [
+   "tests/test_engines.py",
+   "tests/test_boundaries.py"
+  ],
+  "why": "an engine declaring heavy modules and no worker is used"
+ },
+ {
+  "id": "M50",
+  "target": "conform._replayed (check 4)",
+  "file": "openferment_core/engine/conform.py",
+  "old": "        four = (bool(r.withinTolerance or r.identical),",
+  "new": "        four = (True,",
+  "tests": [
+   "tests/test_engines.py",
+   "tests/test_engine_diagnostics.py",
+   "tests/test_measurements.py",
+   "tests/test_train.py",
+   "tests/test_pureos_build_tool.py",
+   "-k",
+   "not sigterm_ends_the_command"
+  ],
+  "why": "check 4 holds whatever the replay says"
+ },
+ {
+  "id": "M51",
+  "target": "conform._run_twice (check 3)",
+  "file": "openferment_core/engine/conform.py",
+  "old": "        ok = a.id == b.id and rows == 1 and a.status == \"done\" and a.engine == engine.name and keyed and diagnosed",
+  "new": "        ok = a.id == b.id and a.status == \"done\" and a.engine == engine.name and keyed and diagnosed",
+  "tests": [
+   "tests/test_engines.py",
+   "tests/test_engine_diagnostics.py",
+   "tests/test_measurements.py",
+   "tests/test_train.py",
+   "tests/test_pureos_build_tool.py",
+   "-k",
+   "not sigterm_ends_the_command"
+  ],
+  "why": "check 3 holds when a run asked twice is two rows"
+ },
+ {
+  "id": "M52",
+  "target": "conform._bare_number (check 1)",
+  "file": "openferment_core/engine/conform.py",
+  "old": "    ok = codes == [422, 422] and bool(tool.error) and not calls and not kept",
+  "new": "    ok = codes == [422, 422] and bool(tool.error) and not kept",
+  "tests": [
+   "tests/test_engines.py",
+   "tests/test_engine_diagnostics.py",
+   "tests/test_measurements.py",
+   "tests/test_train.py",
+   "tests/test_pureos_build_tool.py",
+   "-k",
+   "not sigterm_ends_the_command"
+  ],
+  "why": "check 1 holds when the engine was reached"
+ },
+ {
+  "id": "M53",
+  "target": "conform._replayed (check 5)",
+  "file": "openferment_core/engine/conform.py",
+  "old": "        return four, (bool(run.sff.valid and run.sff.score is not None),",
+  "new": "        return four, (run.sff.score is not None,",
+  "tests": [
+   "tests/test_engines.py",
+   "tests/test_engine_diagnostics.py",
+   "tests/test_measurements.py",
+   "tests/test_train.py",
+   "tests/test_pureos_build_tool.py",
+   "-k",
+   "not sigterm_ends_the_command"
+  ],
+  "why": "check 5 holds on an SFF file that is not valid"
+ },
+ {
+  "id": "M54",
+  "target": "conform._asked_by (check 8)",
+  "file": "openferment_core/engine/conform.py",
+  "old": "    ok = who == by and run.by == by",
+  "new": "    ok = run.by == by",
+  "tests": [
+   "tests/test_engines.py",
+   "tests/test_engine_diagnostics.py",
+   "tests/test_measurements.py",
+   "tests/test_train.py",
+   "tests/test_pureos_build_tool.py",
+   "-k",
+   "not sigterm_ends_the_command"
+  ],
+  "why": "check 8 holds whoever the row's created_by is"
+ },
+ {
+  "id": "M55",
+  "target": "collectors.refused_class",
+  "file": "openferment_core/literature/collectors.py",
+  "old": "    (\"is_private\", \"a private address\"),\n",
+  "new": "",
+  "tests": [
+   "tests/test_sff_url.py",
+   "tests/test_collectors.py",
+   "tests/test_intake_sources.py",
+   "tests/test_intake.py"
+  ],
+  "why": "a private address is fetched"
+ },
+ {
+  "id": "M56",
+  "target": "collectors.public_addresses",
+  "file": "openferment_core/literature/collectors.py",
+  "old": "    for address in found:\n        why = refused_class(address)",
+  "new": "    for address in found[:1]:\n        why = refused_class(address)",
+  "tests": [
+   "tests/test_sff_url.py",
+   "tests/test_collectors.py",
+   "tests/test_intake_sources.py",
+   "tests/test_intake.py"
+  ],
+  "why": "a name resolving to a public and a private address passes on the first"
+ },
+ {
+  "id": "M57",
+  "target": "collectors.refused_class",
+  "file": "openferment_core/literature/collectors.py",
+  "old": "    seen = _v4(address)\n",
+  "new": "    seen = address\n",
+  "tests": [
+   "tests/test_sff_url.py",
+   "tests/test_collectors.py",
+   "tests/test_intake_sources.py",
+   "tests/test_intake.py"
+  ],
+  "why": "an IPv4-mapped IPv6 loopback is fetched"
+ },
+ {
+  "id": "M58",
+  "target": "collectors._literal",
+  "file": "openferment_core/literature/collectors.py",
+  "old": "    try:\n        return ipaddress.IPv4Address(socket.inet_aton(host))\n    except (OSError, ValueError):\n        return None",
+  "new": "    return None",
+  "tests": [
+   "tests/test_sff_url.py",
+   "tests/test_collectors.py",
+   "tests/test_intake_sources.py",
+   "tests/test_intake.py"
+  ],
+  "why": "a short numeric host (127.1, 2130706433) is resolved as a name"
+ },
+ {
+  "id": "M59",
+  "target": "project_state.deposition_refusal",
+  "file": "openferment_core/project_state.py",
+  "old": "        if old.get(\"confirmed\") is True and new.get(\"confirmed\") is not True:",
+  "new": "        if False:",
+  "tests": [
+   "tests/test_project_state.py",
+   "tests/test_measurements.py",
+   "tests/test_runbooks.py",
+   "tests/test_route_models.py"
+  ],
+  "why": "a confirmed reading may be unconfirmed"
+ },
+ {
+  "id": "M60",
+  "target": "project_state.deposition_refusal",
+  "file": "openferment_core/project_state.py",
+  "old": "    if before.get(\"reconciliation\") is not None and before.get(\"reconciliation\") != after.get(\"reconciliation\"):",
+  "new": "    if False:",
+  "tests": [
+   "tests/test_project_state.py",
+   "tests/test_measurements.py",
+   "tests/test_runbooks.py",
+   "tests/test_route_models.py"
+  ],
+  "why": "a reconciliation may be rewritten"
+ },
+ {
+  "id": "M61",
+  "target": "project_state.deposition_refusal",
+  "file": "openferment_core/project_state.py",
+  "old": "        if (before.get(\"sampleTimes\") or {}) != (after.get(\"sampleTimes\") or {}):",
+  "new": "        if False:",
+  "tests": [
+   "tests/test_project_state.py",
+   "tests/test_measurements.py",
+   "tests/test_runbooks.py",
+   "tests/test_route_models.py"
+  ],
+  "why": "a closed deposition's sample times may move"
+ },
+ {
+  "id": "M62",
+  "target": "project_state._appended",
+  "file": "openferment_core/project_state.py",
+  "old": "    if sent[: len(held)] != held:\n        return f\"{item_id} keeps its {what}s in the order",
+  "new": "    if False:\n        return f\"{item_id} keeps its {what}s in the order",
+  "tests": [
+   "tests/test_project_state.py",
+   "tests/test_measurements.py",
+   "tests/test_runbooks.py",
+   "tests/test_route_models.py"
+  ],
+  "why": "readings may be reordered"
+ },
+ {
+  "id": "M63",
+  "target": "project_state.deposition_refusal",
+  "file": "openferment_core/project_state.py",
+  "old": "        if before.get(\"operatorId\") != after.get(\"operatorId\"):",
+  "new": "        if False:",
+  "tests": [
+   "tests/test_project_state.py",
+   "tests/test_measurements.py",
+   "tests/test_runbooks.py",
+   "tests/test_route_models.py"
+  ],
+  "why": "a closed deposition's operator may change"
+ },
+ {
+  "id": "M64",
+  "target": "ready.check_data",
+  "file": "openferment_core/ready.py",
+  "old": "    if at != head:\n        return Check(\"data\", \"fail\"",
+  "new": "    if False:\n        return Check(\"data\", \"fail\"",
+  "tests": [
+   "tests/test_db.py",
+   "tests/test_ready.py",
+   "tests/test_import_alpha1.py"
+  ],
+  "why": "a database behind the newest schema reads ok"
+ },
+ {
+  "id": "M65",
+  "target": "ready.check_literature",
+  "file": "openferment_core/ready.py",
+  "old": "    if at != head or width is None:",
+  "new": "    if width is None:",
+  "tests": [
+   "tests/test_db.py",
+   "tests/test_ready.py",
+   "tests/test_import_alpha1.py"
+  ],
+  "why": "the kit's schema behind its newest revision reads ok"
+ },
+ {
+  "id": "M66",
+  "target": "import_alpha1._write",
+  "file": "openferment_core/import_alpha1.py",
+  "old": "        if at != head:\n            raise ImportRefused(",
+  "new": "        if False:\n            raise ImportRefused(",
+  "tests": [
+   "tests/test_db.py",
+   "tests/test_ready.py",
+   "tests/test_import_alpha1.py"
+  ],
+  "why": "an import into a database behind the newest schema goes on"
+ },
+ {
+  "id": "M67",
+  "target": "migrations.upgrade",
+  "file": "openferment_core/migrations.py",
+  "old": "    command.upgrade(_kit_config(target), \"head\")",
+  "new": "    command.upgrade(_kit_config(target), \"-1\") if False else command.upgrade(_kit_config(target), \"0005\")",
+  "tests": [
+   "tests/test_db.py",
+   "tests/test_ready.py",
+   "tests/test_import_alpha1.py"
+  ],
+  "why": "the kit's schema is migrated one revision short of its head"
+ },
+ {
+  "id": "M68",
+  "target": "models.weakest_provenance",
+  "file": "openferment_core/models.py",
+  "old": "    return PROVENANCE_ORDER[worst] if worst < len(PROVENANCE_ORDER) else \"assumed\"",
+  "new": "    return PROVENANCE_ORDER[worst] if worst < len(PROVENANCE_ORDER) else \"unverified\"",
+  "tests": [
+   "tests/test_basis.py",
+   "tests/test_estimates.py",
+   "tests/test_measurements.py",
+   "tests/test_finite_inputs.py",
+   "tests/test_params.py",
+   "tests/test_postdoc_agent.py"
+  ],
+  "why": "an unknown class reads as unverified"
+ },
+ {
+  "id": "M69",
+  "target": "biorepo.provenance_of",
+  "file": "openferment_core/biorepo.py",
+  "old": "        return \"gold\" if _is_gold(d) else \"verified\"",
+  "new": "        return \"verified\" if _is_gold(d) else \"gold\"",
+  "tests": [
+   "tests/test_biorepo.py",
+   "tests/test_writes.py",
+   "tests/test_import_alpha1.py",
+   "tests/test_evidence_pool.py"
+  ],
+  "why": "gold and verified swapped"
+ },
+ {
+  "id": "M70",
+  "target": "biorepo.provenance_of",
+  "file": "openferment_core/biorepo.py",
+  "old": "    if d.status == \"verified\":\n        return \"gold\" if _is_gold(d) else \"verified\"\n    return \"unverified\"",
+  "new": "    if d.status in (\"verified\", \"corrected\"):\n        return \"gold\" if _is_gold(d) else \"verified\"\n    return \"unverified\"",
+  "tests": [
+   "tests/test_biorepo.py",
+   "tests/test_writes.py",
+   "tests/test_import_alpha1.py",
+   "tests/test_evidence_pool.py"
+  ],
+  "why": "a corrected decision a reviewer left unverified reads verified"
+ }
+]

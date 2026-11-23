@@ -6,7 +6,8 @@
 // aggregated is a tick on the axis. Computed limits are rule lines. A record
 // whose unit does not convert to the axis unit is not drawn, and the count of
 // those is stated.
-import type { ComputedBasis, ExtractionRecord, Provenance } from '@/data/types';
+import type { ComputedBasis, Provenance } from '@/lib/studies';
+import type { ExtractionRecord } from '@/lib/review';
 import { aggregateExclusion, provenanceOf } from '@/store';
 import { asNumber, convert, fmt } from '@/engine/units';
 import { FigureFrame, Mark, lineStroke, type FigureTable } from './FigureFrame';
@@ -24,7 +25,7 @@ export interface EvidenceStripProps {
   records: ExtractionRecord[];
   /** The axis unit; every record is converted to it or left out. */
   unit: string;
-  /** What the axis measures, e.g. "PHB yield on substrate". */
+  /** What the axis measures, e.g. "Ethanol yield on substrate". */
   quantity: string;
   groupBy: 'organism' | 'paper';
   rules?: StripRule[];
@@ -36,7 +37,7 @@ export interface EvidenceStripProps {
   empty?: { what: string; where: string };
 }
 
-export interface StripPoint {
+interface StripPoint {
   record: ExtractionRecord;
   group: string;
   value: number;

@@ -16,7 +16,9 @@ import pytest
 from fastapi.testclient import TestClient
 
 from openferment_core import artifacts, proforma, pureos
-from openferment_core.models import Artifact, BasisInput, BasisSource, InputAssumption, Override, TrainSpec
+from openferment_core.models import (Artifact, BasisInput, BasisSource, EngineInput, InputAssumption, Origin,
+                                     Override, Quantity, TrainSpec)
+from standins import train_inputs
 from test_train import (  # noqa: F401 (the fixtures, by name)
     AT,
     BY,
@@ -76,17 +78,19 @@ def test_check_says_everything_a_run_would_refuse_each_by_its_place_and_runs_no_
     assert not [c for c in worker.calls if c[0] == "train_run"]
 
 
-def test_check_puts_the_validations_refusals_and_a_stray_override_in_their_places(store, worker, no_pool):
+def test_check_puts_the_validations_refusals_and_a_stray_input_in_their_places(store, worker, no_pool):
     bad = spec_of(units=[{"id": "C1", "type": "centrifugation", "outlets": {"cake": "recycle:C1"}}])
     got = pureos.check_train(bad)
     assert not got.ok and list(got.places) == ["C1"] and "recycles to C1, itself" in got.places["C1"][0]
-    stray = pureos.check_train(spec_of(), [Override(scope="pureos:unit:t9:C1", key="split.Yeast", value=0.5, by=BY,
-                                                    at=AT)])
-    assert list(stray.places) == ["train"] and "pureos:unit:t9:C1" in stray.refusals[0]
-    # A request's override settles what the train left waiting, as the run's would.
-    settle = pureos.check_train(_waiting_spec(), [
+    stray = pureos.check_train(spec_of(), [EngineInput(name="C9.split.Yeast", quantity=Quantity(
+        value=0.5, unit="", origin=Origin(kind="person-assumption", by=BY, at=AT)))])
+    assert list(stray.places) == ["train"] and stray.refusals[0].startswith(
+        "C9.split.Yeast names 'C9', which is no unit of train t1 and not its inlet; its places are inlet, C1, F1")
+    # A request's input settles what the train left waiting, as the run's would.
+    waiting = _waiting_spec()
+    settle = pureos.check_train(waiting, train_inputs(waiting, [
         Override(scope="pureos:unit:t1:inlet", key="broth_flow", value=1.0, by=BY, at=AT),
-        Override(scope="pureos:unit:t1:C1", key="split.Ethanol", value=0.05, by=BY, at=AT)])
+        Override(scope="pureos:unit:t1:C1", key="split.Ethanol", value=0.05, by=BY, at=AT)]))
     assert settle.ok, settle.refusals
 
 
@@ -223,6 +227,102 @@ def test_a_runs_train_takes_every_unit_the_product_passes_through_by_its_class(s
     assert got.refusals == [] and pureos.validate(spec) == []
     assert any("The inlet is beer" in n for n in got.notes)
     assert any("package's version" in n for n in got.notes)
+
+
+# A run whose first unit taken is a vent's mixer (every number invented for
+# the test, a balance that holds on paper): the fermenter's vent carries a
+# little ethanol into M3, whose first inlet, air, carries none; a scrubber
+# no catalogue type holds sends what it caught to M4, where the beer joins;
+# a pump and a beer column follow. The train starts where the beer enters.
+VENTED_STREAMS = [
+    _stream("glucose", None, "M1", {"Glucose": 100.0}),
+    _stream("water", None, "M1", {"Water": 400.0}),
+    _stream("solution", "M1", "R1", {"Glucose": 100.0, "Water": 400.0}),
+    _stream("vent", "R1", "M3", {"Ethanol": 1.0, "Water": 4.0}),
+    _stream("air", None, "M3", {"Water": 10.0}),
+    _stream("gas", "M3", "D3", {"Ethanol": 1.0, "Water": 14.0}),
+    _stream("exhaust", "D3", None, {"Water": 14.0}),
+    _stream("scrubbed", "D3", "M4", {"Ethanol": 1.0}),
+    _stream("beer", "R1", "M4", {"Ethanol": 49.0, "Water": 396.0}),
+    _stream("s0", "M4", "P1", {"Ethanol": 50.0, "Water": 396.0}),
+    _stream("s1", "P1", "D1", {"Ethanol": 50.0, "Water": 396.0}),
+    _stream("ethanol", "D1", None, {"Ethanol": 48.0, "Water": 46.0}),
+    _stream("stillage", "D1", None, {"Ethanol": 2.0, "Water": 350.0}),
+]
+VENTED_UNITS = [
+    _unit("M1", 0, "Mixer", ["glucose", "water"], ["solution"]),
+    _unit("R1", 1, "Fermenter", ["solution"], ["vent", "beer"]),
+    _unit("M3", 2, "Mixer", ["air", "vent"], ["gas"]),
+    _unit("D3", 3, "VentScrubber", ["gas"], ["exhaust", "scrubbed"]),
+    _unit("M4", 4, "Mixer", ["scrubbed", "beer"], ["s0"]),
+    _unit("P1", 5, "Pump", ["s0"], ["s1"]),
+    _unit("D1", 6, "BinaryDistillation", ["s1"], ["ethanol", "stillage"]),
+]
+
+
+def test_a_runs_train_starts_on_the_stream_carrying_the_most_product_into_it_from_outside(store, monkeypatch):
+    """The first unit taken here is a vent's mixer, whose first inlet carries
+    none of the product: the train starts where the most product enters it
+    from outside it by the run's stream table, the beer into M4; the mixer
+    before it is named with why, and the scrubber's stream into M4, from a
+    unit now outside the train, is named with its product flow."""
+    monkeypatch.setattr(proforma, "call", lambda *a, **k: (_ for _ in ()).throw(AssertionError("a simulator started")))
+    _keep(streams=VENTED_STREAMS, units=VENTED_UNITS)
+    got = pureos.from_run(RUN_ID)
+    spec = got.train
+    assert [(u.id, u.type) for u in spec.units] == [("M4", "mixer"), ("P1", "pump"), ("D1", "distillation")]
+    assert (spec.inlet.kind, spec.inlet.ref, spec.inlet.streamId) == ("run-stream", RUN_ID, "beer")
+    unmapped = {m.unitId: m.why for m in got.unmapped}
+    assert set(unmapped) == {"M1", "R1", "M3", "D3"}
+    assert unmapped["M3"] == ("before M4, where the train starts: beer carries the most Ethanol into the train from "
+                              "outside it (49 kg/hr by the run's stream table) and enters M4, and 1 kg/hr of Ethanol "
+                              "enters M3")
+    assert "VentScrubber is no unit type" in unmapped["D3"]
+    assert ("The inlet is beer, the stream carrying the most Ethanol into the train from outside it by the run's "
+            "stream table (49 kg/hr), entering M4; the train starts there, and the 1 unit taken before it is left out "
+            "(M3).") in got.notes
+    assert ("Also entering the train from outside it in the run, and left out of it: scrubbed into M4 (1 kg/hr of "
+            "Ethanol).") in got.notes
+    assert {u.id: u.outlets for u in spec.units}["D1"] == {"distillate": "onward", "bottoms": "waste"}
+
+
+def test_a_runs_train_fed_through_a_unit_before_it_starts_on_that_units_outlet(store):
+    """The beer reaches the pump through a heat exchanger no catalogue type
+    holds, before the train: its outlet is the stream carrying the most
+    product into the train from outside it, as no unit of the train's own
+    outlets reaches the exchanger going forward."""
+    streams = [*(dict(s, sink="H0") if s["id"] == "beer" else s for s in STREAMS),
+               _stream("hot", "H0", "P1", {"Ethanol": 50.0, "Water": 400.0}), _stream("s9", None, "H0", {"Water": 1.0}),
+               _stream("s9c", "H0", None, {"Water": 1.0})]
+    units = [*UNITS[:2], _unit("H0", 2, "HXprocess", ["beer", "s9"], ["hot", "s9c"]),
+             *(dict(u, order=u["order"] + 1) for u in UNITS[2:])]
+    units[3] = dict(units[3], ins=["hot"])
+    _keep(streams=streams, units=units)
+    got = pureos.from_run(RUN_ID)
+    assert [u.id for u in got.train.units] == ["P1", "D1", "M2", "D2", "U1"] and got.train.inlet.streamId == "hot"
+    assert ("The inlet is hot, the stream carrying the most Ethanol into the train from outside it by the run's stream "
+            "table (50 kg/hr), entering P1.") in got.notes
+    assert not any(n.startswith("Also entering the train") for n in got.notes)
+    assert "HXprocess is no unit type" in {m.unitId: m.why for m in got.unmapped}["H0"]
+
+
+def test_a_runs_train_whose_streams_from_outside_carry_no_product_starts_at_its_first_unit(store):
+    """The product enters the first unit taken only by a recycle from a later
+    one: no stream from outside the train carries it, so the train starts at
+    the first unit taken, on its first inlet, and the notes say so."""
+    # Every number invented for the test; a loop no balance holds, standing for a product that enters by a recycle.
+    streams = [_stream("water", None, "M1", {"Water": 10.0}),
+               _stream("back", "D1", "M1", {"Ethanol": 48.0, "Water": 5.0}),
+               _stream("mixed", "M1", "P1", {"Ethanol": 48.0, "Water": 15.0}),
+               _stream("s1", "P1", "D1", {"Ethanol": 48.0, "Water": 15.0}),
+               _stream("ethanol", "D1", None, {"Ethanol": 48.0})]
+    units = [_unit("M1", 0, "Mixer", ["water", "back"], ["mixed"]), _unit("P1", 1, "Pump", ["mixed"], ["s1"]),
+             _unit("D1", 2, "BinaryDistillation", ["s1"], ["ethanol", "back"])]
+    _keep(streams=streams, units=units)
+    got = pureos.from_run(RUN_ID)
+    assert [u.id for u in got.train.units] == ["M1", "P1", "D1"] and got.train.inlet.streamId == "water"
+    assert ("The inlet is water, the first inlet of M1 in the run, as its stream table holds it: no stream from outside "
+            "the train carries Ethanol into it there.") in got.notes
 
 
 def test_a_unit_whose_class_no_type_holds_is_named_and_the_line_passes_through_it(store):

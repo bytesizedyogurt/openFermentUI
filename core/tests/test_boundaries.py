@@ -56,14 +56,21 @@ EXCEPTIONS: dict[tuple[str, str], str] = {
     ("literature", "projects"): "every read and write of a project's documents is scoped to the current project (ADR-005)",
     ("literature", "migrations"): "the retrieval report (literature/report.py) migrates a disposable database of its own",
     ("engine", "artifacts"): "a run's computation is kept as an artifact, replayable, with the existing semantics (§7.4)",
-    ("engine", "basis"): "provenance and origins are computed by the basis rules alone (ADR-006)",
+    ("engine", "basis"): "provenance and origins are computed by the basis rules alone (ADR-006), and a value that "
+                         "is a deposition's reading is looked up through basis.resolved, the one door (measurements.py)",
     ("engine", "flowsheets"): "the package-test reader in flowsheets/shelf.py, which imports no BioSTEAM (§8.4: "
                               "the regression check reads the package's own test by ast)",
     ("engine", "projects"): "a run and a flowsheet record belong to the current project (ADR-005)",
     ("engine", "events"): "a run is a job the project's event stream says as it happens (§7.3 item 2)",
+    ("engine", "api"): "conformance check 1 (engine/conform.py) sends a bare number to the service's own run route "
+                       "and sees it refused before the engine is reached (docs/api/engines.md)",
+    ("engine", "tools"): "conformance check 1 sends a bare number through the engine_run tool as well, the second "
+                         "door a number enters by (docs/api/engines.md)",
     ("studies", "projects"): "a scenario, a comparison and a runbook belong to the current project (ADR-005)",
     ("studies", "artifacts"): "a comparison is computed as an artifact over the runs' artifacts, replayable (§7.4)",
-    ("studies", "basis"): "a value's origin and a comparison's provenance are the basis rules' (ADR-006)",
+    ("studies", "basis"): "a value's origin and a comparison's provenance are the basis rules' (ADR-006), and a value "
+                          "that is a deposition's reading is looked up through basis.resolved, the one door "
+                          "(measurements.py)",
     ("studies", "project_state"): "a study's runbook is a row of the project's runbooks beside a person's, kept and "
                                   "its lock audited by the store the runbook page writes to",
     ("studies", "runbook_lock"): "a runbook is locked under the digest the browser writes (src/engine/lock.ts)",
@@ -72,9 +79,18 @@ EXCEPTIONS: dict[tuple[str, str], str] = {
 }
 
 
-def _imports(path: Path) -> list[tuple[int, str]]:
-    """Every module a file imports, as an absolute dotted name, with its line."""
-    parts = path.relative_to(PACKAGE.parent).with_suffix("").parts
+def _is_module(root: Path, dotted: str) -> bool:
+    """Whether `dotted` names a module file or a package standing under `root`."""
+    where = root.joinpath(*dotted.split("."))
+    return where.with_suffix(".py").is_file() or (where / "__init__.py").is_file()
+
+
+def _imports(path: Path, root: Path = PACKAGE.parent) -> list[tuple[int, str]]:
+    """Every module a file imports, as an absolute dotted name, with its line;
+    `root` is the directory its top-level package stands in. `from X import y`
+    names X, and X.y as well when y is a module file or a package under X, as
+    Python imports it."""
+    parts = path.relative_to(root).with_suffix("").parts
     here = list(parts[:-1]) if path.name != "__init__.py" else list(parts[:-1])
     out = []
     for node in ast.walk(ast.parse(path.read_text(encoding="utf-8"))):
@@ -84,11 +100,15 @@ def _imports(path: Path) -> list[tuple[int, str]]:
             if node.level:
                 base = here[: len(here) - (node.level - 1)] if node.level > 1 else here
                 if node.module:
-                    out.append((node.lineno, ".".join([*base, node.module])))
+                    module = ".".join([*base, node.module])
+                    out.append((node.lineno, module))
+                    out += [(node.lineno, f"{module}.{a.name}") for a in node.names if _is_module(root, f"{module}.{a.name}")]
                 else:
                     out += [(node.lineno, ".".join([*base, a.name])) for a in node.names]
             elif node.module:
                 out.append((node.lineno, node.module))
+                out += [(node.lineno, f"{node.module}.{a.name}") for a in node.names
+                        if _is_module(root, f"{node.module}.{a.name}")]
     return out
 
 
@@ -101,6 +121,25 @@ def test_the_reader_resolves_relative_imports_as_python_does():
     found = dict((name, line) for line, name in _imports(PACKAGE / "engine" / "runs.py"))
     assert "openferment_core.basis" in found and "openferment_core.engine.library" in found
     assert "openferment_core.workers" in found and "sqlalchemy" not in found
+    # `from ..db import models as t` imports the module db/models.py; `from ..workers import WorkerError` a name.
+    assert "openferment_core.db.models" in found and "openferment_core.workers.WorkerError" not in found
+
+
+def test_the_reader_names_a_worker_module_imported_from_its_package(tmp_path):
+    """`from ..workers import proforma_worker` imports the worker's own module,
+    which the engine's row forbids (WORKER_SIDE), relative or absolute."""
+    engine = tmp_path / "openferment_core" / "engine"
+    workers = tmp_path / "openferment_core" / "workers"
+    for d in (engine, workers):
+        d.mkdir(parents=True)
+        (d / "__init__.py").write_text("")
+    (workers / "proforma_worker.py").write_text("")
+    (engine / "relative.py").write_text("from ..workers import proforma_worker, WorkerError\n")
+    (engine / "absolute.py").write_text("from openferment_core.workers import proforma_worker\n")
+    for name in ("relative", "absolute"):
+        found = [n for _, n in _imports(engine / f"{name}.py", tmp_path)]
+        assert "openferment_core.workers.proforma_worker" in found and "openferment_core.workers.WorkerError" not in found
+        assert any(".".join(n.split(".")[1:3]) in WORKER_SIDE for n in found), name
 
 
 @pytest.mark.parametrize("package", sorted(MAY))
@@ -133,3 +172,75 @@ def test_every_exception_names_a_package_with_a_row_and_is_still_needed():
     for (pkg, first), why in EXCEPTIONS.items():
         assert pkg in MAY and why.strip()
         assert (pkg, first) in used, f"the exception {pkg} → {first} is no longer used: remove it"
+
+
+# ── every registered engine (docs/api/engines.md, check 6, as a grep) ───
+
+
+def heavy_outside_the_worker(root: Path, package: str, worker: str | None, heavy: set[str]) -> list[str]:
+    """Each module of `package` (standing in `root`), beside its worker module
+    and the modules below it, that imports the worker or a heavy module (a
+    heavy name covering the module and every module below it)."""
+    base = root / package
+    files = sorted(base.rglob("*.py")) if base.is_dir() else [root / f"{package}.py"]
+    inside = (lambda m: bool(worker) and (m == worker or m.startswith(worker + ".")))
+    wrong = []
+    for path in files:
+        module = ".".join(path.relative_to(root).with_suffix("").parts).removesuffix(".__init__")
+        if inside(module):
+            continue
+        for line, name in _imports(path, root):
+            if inside(name) or any(name == h or name.startswith(h + ".") for h in heavy):
+                wrong.append(f"{path.relative_to(root)}:{line} imports {name}")
+    return wrong
+
+
+def test_every_registered_engine_imports_what_it_computes_with_in_its_worker_alone():
+    """The core's own engines keep their worker on the worker's side this
+    package map and test_workers' grep hold; any other package registered here
+    is read whole, and no module of it but its worker imports the worker or a
+    heavy module it declares. Read inside the test, so the package map
+    (`pnpm gen:components`) never depends on what is installed."""
+    import importlib.util
+
+    from openferment_core.engine import registry
+    from openferment_core.workers import WORKER_LIBRARIES
+
+    registry.reset()
+    try:
+        held = []
+        for name, f in sorted(registry.found().items()):
+            if f.engine is None:
+                continue
+            top = f.entry.split(":", 1)[0].split(".")[0]
+            worker = f.engine.worker
+            if top == "openferment_core":
+                assert worker is None or worker.removeprefix("openferment_core.") in WORKER_SIDE, (name, worker)
+                assert set(f.engine.heavy) <= set(WORKER_LIBRARIES), (name, f.engine.heavy)
+            else:
+                spec = importlib.util.find_spec(top)
+                where = spec.submodule_search_locations
+                root = Path(list(where)[0]).parent if where else Path(spec.origin).parent
+                kept_out = set(f.engine.heavy) | set(WORKER_LIBRARIES)
+                assert heavy_outside_the_worker(root, top, worker, kept_out) == [], name
+            held.append(name)
+        assert "biosteam" in held
+    finally:
+        registry.reset()
+
+
+def test_the_grep_finds_a_heavy_import_outside_an_engines_worker(tmp_path):
+    pkg = tmp_path / "an_engine"
+    pkg.mkdir()
+    (pkg / "__init__.py").write_text("from .engine import ENGINE\n")
+    (pkg / "engine.py").write_text("import a_heavy_library\nENGINE = None\n")
+    (pkg / "worker.py").write_text("import a_heavy_library\nfrom another_heavy import x\n")
+    assert heavy_outside_the_worker(tmp_path, "an_engine", "an_engine.worker", {"a_heavy_library"}) == [
+        "an_engine/engine.py:1 imports a_heavy_library"]
+    (pkg / "engine.py").write_text("from . import worker\nENGINE = None\n")
+    assert heavy_outside_the_worker(tmp_path, "an_engine", "an_engine.worker", set()) == [
+        "an_engine/engine.py:1 imports an_engine.worker"]
+    # A dotted heavy name covers its module and every module below it.
+    (pkg / "engine.py").write_text("import a_heavy_library.core.solve\nimport a_heavy_library\nENGINE = None\n")
+    assert heavy_outside_the_worker(tmp_path, "an_engine", "an_engine.worker", {"a_heavy_library.core"}) == [
+        "an_engine/engine.py:1 imports a_heavy_library.core.solve"]

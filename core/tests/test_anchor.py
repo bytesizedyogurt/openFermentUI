@@ -668,3 +668,274 @@ def test_a_negation_marker_is_a_word_not_a_substring():
     assert value_basis(0.0, "phosphoserine was not detected in any fraction", "", negative_result=True) == "negation"
     assert value_basis(0.0, "there was no detectable kinase activity", "", negative_result=True) == "negation"
     assert value_basis(0.0, "the sites were absent from the mature protein", "", negative_result=True) == "negation"
+
+
+# ── a quote whose unit does not convert into the candidate's (H3-01) ───
+#
+# Rule 3 reads the number in the unit the sentence wrote and converts it into
+# the candidate's. Where the unit engine refuses the conversion (a price per
+# gallon into one per kilogram, a percentage by volume into a mass
+# concentration), the sentence states no number in the candidate's unit, and
+# the candidate is refused on the value. biorepo.write re-anchors every value
+# a decision places through the same rule, so a candidate kept before rule 3
+# read the unit cannot become a gold or a corrected record either. Test
+# sentences, stated as such.
+
+PER_GALLON = "The minimum ethanol selling price was $2.15/gal in the base case."
+BY_VOLUME = "The final ethanol concentration was 45% (v/v) after fermentation."
+UNCONVERTED = [
+    ("minimum_selling_price", 2.15, "USD/kg", PER_GALLON, "USD gal⁻¹"),
+    ("minimum_selling_price", 2.15, "USD/kg", "The minimum ethanol selling price was 2.15 USD/gal in the base case.",
+     "USD gal⁻¹"),
+    ("ethanol_titre", 45, "g/L", BY_VOLUME, "%"),
+    ("ethanol_titre", 5, "g/L", "Ethanol reached 5 mol/L in the broth.", "mol L⁻¹"),
+    ("ethanol_yield_substrate", 0.45, "g/g", "The specific growth rate was 0.45 h-1 on glucose.", "h⁻¹"),
+    ("specific_oxygen_uptake", 2, "mmol/g/h", "The specific oxygen uptake rate was 2 mg/g/h in the run.",
+     "mg g⁻¹ h⁻¹"),
+    ("minimum_selling_price", 1.2, "USD/kg", "The minimum selling price was 1.2 EUR kg-1 for the product.",
+     "EUR kg⁻¹"),
+]
+
+
+def _on_its_sentence(field, value, unit, sentence):
+    sections = [{"id": "s1", "heading": "Results", "text": f"Results. {sentence} Further text."}]
+    raw = {"sectionId": "s1", "field": field, "value": value, "unit": unit, "quote": sentence,
+           "method": "undetermined"}
+    return anchor_candidate(raw, sections, paper_id="U1")
+
+
+def test_a_currency_written_before_the_number_joins_the_unit_after_it():
+    assert [(q.value, q.unit) for q in parse_quantities(PER_GALLON)] == [(2.15, "USD gal⁻¹")]
+    assert [(q.value, q.unit) for q in parse_quantities("sold at about USD 12 thousand/kg")] == [
+        (12000.0, "USD kg⁻¹")
+    ]
+    # A currency with no unit after it stays a bare number.
+    assert [(q.value, q.unit) for q in parse_quantities("it cost $2.15 in all")] == [(2.15, None)]
+
+
+@pytest.mark.parametrize("field,value,unit,sentence,said", UNCONVERTED)
+def test_a_quote_whose_unit_does_not_convert_into_the_candidates_refuses_on_the_value(
+    field, value, unit, sentence, said
+):
+    candidate, rule, detail = _on_its_sentence(field, value, unit, sentence)
+    assert candidate is None and rule == "value", (rule, detail)
+    assert f"the quote states {value:g} {said}" in detail and "does not convert into" in detail
+
+
+def test_a_quote_whose_unit_converts_still_anchors_and_says_converted():
+    c, rule, detail = _on_its_sentence(
+        "ethanol_titre", 0.045, "g/L", "The final ethanol concentration was 45 mg/L after fermentation."
+    )
+    assert rule is None, detail
+    assert c.valueBasis == "converted"
+    c, rule, detail = _on_its_sentence("minimum_selling_price", 12000, "USD/kg", "sold at about USD 12 thousand/kg")
+    assert rule is None, detail
+    assert c.valueBasis == "exact", "the sentence wrote the candidate's own unit, and nothing was converted"
+
+
+def test_biorepo_write_refuses_to_promote_a_value_whose_quote_unit_does_not_convert(held_documents):
+    from openferment_core import biorepo, db, extract, projects
+    from openferment_core.literature import kit
+    from openferment_core.models import Candidate, ExtractResponse, Quantity, ReviewDecision, Usage
+    from openferment_core.units import to_si
+
+    held_documents["U1"] = [
+        {"id": "s1", "heading": "Results", "text": f"Results. {PER_GALLON} Further text."},
+        {"id": "s2", "heading": "Results", "text": f"Results. {BY_VOLUME} Further text."},
+    ]
+    db.run(kit._link(projects.current(), "U1", {}, "test"))
+    # The two candidates as anchoring kept them while rule 3 compared such a
+    # number bare: a price per kilogram on a price per gallon, and a mass
+    # concentration on a percentage by volume.
+    kept = []
+    for cid, section, field, value, unit, quote in (
+        ("cl1-U1-00000001", "s1", "minimum_selling_price", 2.15, "USD kg⁻¹", PER_GALLON),
+        ("cl1-U1-00000002", "s2", "ethanol_titre", 45.0, "g L⁻¹", BY_VOLUME),
+    ):
+        sv, su = to_si(value, unit)
+        kept.append(Candidate(id=cid, paperId="U1", sectionId=section, field=field, value=value, unit=unit,
+                              quote=quote, si=Quantity(value=sv, unit=su), confidence=0.8, valueBasis="converted",
+                              method="undetermined"))
+    extract._persist(ExtractResponse(paperId="U1", extractedAt="2026-11-10T12:00:00Z", candidates=kept, audit=[],
+                                     usage=Usage(), calls=0))
+
+    def decided(record_id, **kw):
+        return ReviewDecision(status="verified", provenance="curated", reviewer="A test reviewer",
+                              recordId=record_id, at="2026-11-10T12:00:00Z", **kw)
+
+    # A decision that places a number re-anchors it on the record's quote: a
+    # gold value or a correction (an accept with neither places none, §7.3).
+    with pytest.raises(biorepo.WriteRefused) as price:
+        biorepo.write(decided("cl1-U1-00000001", gold=Quantity(value=2.15, unit="USD/kg")))
+    assert price.value.rule == "quote"
+    assert "rule 'value'" in price.value.why and "USD gal⁻¹ does not convert" in price.value.why
+    with pytest.raises(biorepo.WriteRefused) as corrected:
+        biorepo.write(decided("cl1-U1-00000001", corrected=Quantity(value=2.15, unit="USD/kg")))
+    assert corrected.value.rule == "quote" and "rule 'value'" in corrected.value.why
+    with pytest.raises(biorepo.WriteRefused) as gold:
+        biorepo.write(decided("cl1-U1-00000002", gold=Quantity(value=45, unit="g/L")))
+    assert gold.value.rule == "quote"
+    assert "rule 'value'" in gold.value.why and "% does not convert" in gold.value.why
+    assert biorepo.decisions() == {}, "neither decision was kept"
+
+
+# ── a unit the sentence writes past what the unit table reads ──────────
+#
+# The quantity parser reads the longest run of tokens the unit table knows,
+# and for 'g ethanol per litre' that is 'g' alone: the label word and what
+# follows it are the rest of the unit. Such a number compares bare, as rule 3
+# compared every number before F1.2, and anchors as 'exact'; the refusals
+# above, whose units the parser reads whole, stay refused. Test sentences,
+# stated as such.
+
+LABELLED = [
+    ("ethanol_titre", 45, "g/L", "Ethanol reached 45 g ethanol per litre in the broth."),
+    ("final_biomass_density", 12, "g/L", "Biomass reached 12 g DCW/L by the end of the run."),
+    ("ethanol_titre", 45, "g L-1", "The titre reached 45 g EtOH L-1 at 48 h."),
+    ("medium_component_conc", 100, "g/L", "The feed held 100 g glucose/L at the start."),
+    ("ethanol_productivity", 1.2, "g/L/h", "Productivity was 1.2 g ethanol/L/h over the run."),
+    ("titer_secreted", 150, "mg/L", "The supernatant held 150 mg protein/L after 72 h."),
+    ("ethanol_yield_substrate", 0.45, "g/g", "The yield was 0.45 g ethanol per g glucose consumed."),
+    ("expression_pct_tsp", 12, "% TSP", "The reporter made up 12% of total soluble protein."),
+    # A denominator in brackets, a middle dot, a share named in words (round
+    # 2's check of H3-01): each runs on past the 'g' or '%' the table reads.
+    ("ethanol_yield_substrate", 0.45, "g/g", "The ethanol yield was 0.45 g ethanol (g glucose)-1 on the hydrolysate."),
+    ("ethanol_yield_substrate", 0.45, "g/g", "The ethanol yield was 0.45 g ethanol (g glucose)\u22121 on the hydrolysate."),
+    ("biomass_yield_substrate", 0.5, "g/g", "Biomass yield was 0.5 g cells (g glucose)-1 in the batch."),
+    ("final_biomass_density", 5, "g/L", "The culture reached 5 g (DCW)/L by the end of the run."),
+    ("ethanol_titre", 80, "g/L", "Growth stopped near 80 g ethanol\u00b7L-1 in the broth."),
+    ("expression_pct_tsp", 12, "% TSP", "The reporter made up 12% total soluble protein in the leaves."),
+]
+
+
+@pytest.mark.parametrize("field,value,unit,sentence", LABELLED)
+def test_a_quote_whose_unit_carries_a_label_anchors_its_candidate_as_exact(field, value, unit, sentence):
+    c, rule, detail = _on_its_sentence(field, value, unit, sentence)
+    assert rule is None, detail
+    assert c.valueBasis == "exact", "a unit read in part is compared bare, and nothing is converted from it"
+
+
+def test_the_parser_says_when_the_sentences_unit_runs_on_past_what_it_read():
+    for _, value, _, sentence in LABELLED:
+        [q] = [q for q in parse_quantities(sentence) if q.value == value]
+        assert q.unit is not None and q.unitWhole is False, sentence
+    for _, value, _, sentence, _ in UNCONVERTED:
+        [q] = [q for q in parse_quantities(sentence) if q.value == value]
+        assert q.unitWhole, sentence
+    assert [q.unitWhole for q in parse_quantities("The secreted titre reached 4.20 g L-1 after 72 h")] == [True, True]
+
+
+def test_a_share_named_in_words_states_nothing_in_a_unit_that_is_no_percentage():
+    # A percentage read in part compares bare into a percentage alone: the
+    # sentence states 12% of something, and no 12 g/L.
+    for sentence in ("The reporter made up 12% total soluble protein in the leaves.",
+                     "The reporter made up 12% of total soluble protein."):
+        c, rule, detail = _on_its_sentence("ethanol_titre", 12, "g/L", sentence)
+        assert c is None and rule == "value", detail
+    # A bracket closed with nothing after it qualifies the unit and ends it.
+    assert [q.unitWhole for q in parse_quantities("Ethanol was 45% (v/v) in the broth.")] == [True]
+
+
+def test_a_number_whose_unit_runs_on_is_never_converted():
+    # 150 mg protein/L read as 150 mg would convert into no concentration;
+    # compared bare, it states 150 and no 0.15.
+    c, rule, detail = _on_its_sentence("titer_secreted", 0.15, "g/L", "The supernatant held 150 mg protein/L after 72 h.")
+    assert c is None and rule == "value", detail
+
+
+def test_biorepo_write_reanchors_a_plain_accept_on_a_candidate_kept_as_converted(held_documents):
+    # A candidate kept while rule 3 compared a number in another unit bare
+    # carries valueBasis 'converted'. A plain accept places the record's own
+    # number, so its value is anchored on its quote again, and one that no
+    # longer anchors is refused; one that still does is kept as sent.
+    from openferment_core import biorepo, db, extract, projects
+    from openferment_core.literature import kit
+    from openferment_core.models import Candidate, ExtractResponse, Quantity, ReviewDecision, Usage
+    from openferment_core.units import to_si
+
+    labelled = "Ethanol reached 45 g ethanol per litre in the broth."
+    in_mg = "The final ethanol concentration was 45 mg/L after fermentation."
+    held_documents["U2"] = [
+        {"id": f"s{n}", "heading": "Results", "text": f"Results. {sentence} Further text."}
+        for n, sentence in enumerate((PER_GALLON, BY_VOLUME, labelled, in_mg), start=1)
+    ]
+    db.run(kit._link(projects.current(), "U2", {}, "test"))
+    kept = []
+    for cid, section, field, value, unit, quote in (
+        ("cl1-U2-00000001", "s1", "minimum_selling_price", 2.15, "USD kg⁻¹", PER_GALLON),
+        ("cl1-U2-00000002", "s2", "ethanol_titre", 45.0, "g L⁻¹", BY_VOLUME),
+        ("cl1-U2-00000003", "s3", "ethanol_titre", 45.0, "g L⁻¹", labelled),
+        ("cl1-U2-00000004", "s4", "ethanol_titre", 0.045, "g L⁻¹", in_mg),
+    ):
+        sv, su = to_si(value, unit)
+        kept.append(Candidate(id=cid, paperId="U2", sectionId=section, field=field, value=value, unit=unit,
+                              quote=quote, si=Quantity(value=sv, unit=su), confidence=0.8, valueBasis="converted",
+                              method="undetermined"))
+    extract._persist(ExtractResponse(paperId="U2", extractedAt="2026-11-10T12:00:00Z", candidates=kept, audit=[],
+                                     usage=Usage(), calls=0))
+
+    def accepted(record_id):
+        return ReviewDecision(status="verified", provenance="curated", reviewer="A test reviewer",
+                              recordId=record_id, at="2026-11-10T12:00:00Z")
+
+    for record_id, unit in (("cl1-U2-00000001", "USD gal⁻¹"), ("cl1-U2-00000002", "%")):
+        for dry_run in (True, False):
+            with pytest.raises(biorepo.WriteRefused) as refused:
+                biorepo.write(accepted(record_id), dry_run=dry_run)
+            assert refused.value.rule == "quote", dry_run
+            assert "rule 'value'" in refused.value.why and f"{unit} does not convert" in refused.value.why
+    # The labelled unit compares bare and the milligrams convert: both stand.
+    for record_id in ("cl1-U2-00000003", "cl1-U2-00000004"):
+        stored = biorepo.write(accepted(record_id))
+        assert stored.status == "verified" and stored.quote is None, "the decision is kept as sent"
+    assert sorted(biorepo.decisions()) == ["cl1-U2-00000003", "cl1-U2-00000004"]
+
+
+def test_biorepo_write_reanchors_a_plain_accept_on_a_candidate_kept_as_exact(held_documents):
+    # '$2.15/gal' parsed with no unit before round 1, so 2.15 USD kg⁻¹ was
+    # kept as 'exact' on it (bughunt/repro/H3-01/README.md). A plain accept
+    # anchors every record with a quote on it again, whatever its basis, and
+    # this one is refused; a record that still anchors is kept as sent.
+    from openferment_core import biorepo, db, extract, projects
+    from openferment_core.literature import kit
+    from openferment_core.models import Candidate, ExtractResponse, Quantity, ReviewDecision, Usage
+    from openferment_core.units import to_si
+
+    plain = "The final ethanol concentration was 45 g/L after fermentation."
+    held_documents["U3"] = [
+        {"id": f"s{n}", "heading": "Results", "text": f"Results. {sentence} Further text."}
+        for n, sentence in enumerate((PER_GALLON, plain), start=1)
+    ]
+    db.run(kit._link(projects.current(), "U3", {}, "test"))
+    kept = []
+    for cid, section, field, value, unit, quote in (
+        ("cl1-U3-00000001", "s1", "minimum_selling_price", 2.15, "USD kg⁻¹", PER_GALLON),
+        ("cl1-U3-00000002", "s2", "ethanol_titre", 45.0, "g L⁻¹", plain),
+    ):
+        sv, su = to_si(value, unit)
+        kept.append(Candidate(id=cid, paperId="U3", sectionId=section, field=field, value=value, unit=unit,
+                              quote=quote, si=Quantity(value=sv, unit=su), confidence=0.8, valueBasis="exact",
+                              method="undetermined"))
+    extract._persist(ExtractResponse(paperId="U3", extractedAt="2026-11-10T12:00:00Z", candidates=kept, audit=[],
+                                     usage=Usage(), calls=0))
+
+    def accepted(record_id):
+        return ReviewDecision(status="verified", provenance="curated", reviewer="A test reviewer",
+                              recordId=record_id, at="2026-11-10T12:00:00Z")
+
+    for dry_run in (True, False):
+        with pytest.raises(biorepo.WriteRefused) as refused:
+            biorepo.write(accepted("cl1-U3-00000001"), dry_run=dry_run)
+        assert refused.value.rule == "quote", dry_run
+        assert "rule 'value'" in refused.value.why and "USD gal⁻¹ does not convert" in refused.value.why
+    stored = biorepo.write(accepted("cl1-U3-00000002"))
+    assert stored.status == "verified" and stored.quote is None, "the decision is kept as sent"
+    assert sorted(biorepo.decisions()) == ["cl1-U3-00000002"]
+
+
+def test_a_gram_per_gallon_is_refused_on_the_unit():
+    # H3-08: 0.45 g/gal anchored as a verified yield of 0.45 g g⁻¹; it does not
+    # normalise now, and anchoring refuses it on rule 'unit' as it refuses g/furlong.
+    c, rule, detail = _on_its_sentence("ethanol_yield_substrate", 0.45, "g/gal",
+                                       "The broth held 0.45 g/gal of residual ethanol at harvest.")
+    assert c is None and rule == "unit", detail

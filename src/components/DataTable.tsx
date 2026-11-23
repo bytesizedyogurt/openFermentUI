@@ -28,7 +28,12 @@ export interface FacetDef<T> {
   valuesOf: (row: T) => string[];
   /** Optional pretty label for a raw value. */
   labelOf?: (v: string) => string;
+  /** The values' order: by count, most first (the default), or by value, highest first (years, say). */
+  order?: 'count' | 'value-desc';
 }
+
+/** How many of a facet's values show before its list scrolls; a longer list says so under it. */
+const FACET_SHOWN = 9;
 
 const TICK_BG: Record<ProvKind, string> = {
   measured: 'rgb(var(--gold))',
@@ -114,7 +119,11 @@ export function DataTable<T>({
       }
       return {
         ...f,
-        options: [...counts.entries()].sort((a, b) => b[1] - a[1] || a[0].localeCompare(b[0])),
+        options: [...counts.entries()].sort((a, b) =>
+          f.order === 'value-desc'
+            ? b[0].localeCompare(a[0], undefined, { numeric: true })
+            : b[1] - a[1] || a[0].localeCompare(b[0]),
+        ),
       };
     });
   }, [rows, facets, active]);
@@ -245,13 +254,18 @@ export function DataTable<T>({
                         )}
                         aria-pressed={on}
                       >
-                        <span className="truncate">{f.labelOf?.(value) ?? value}</span>
+                        <span className="truncate" title={f.labelOf?.(value) ?? value}>
+                          {f.labelOf?.(value) ?? value}
+                        </span>
                         <span className="font-num text-[11px] shrink-0">{count}</span>
                       </button>
                     );
                   })}
                   {f.options.length === 0 && <div className="text-caption text-ink-soft">—</div>}
                 </div>
+                {f.options.length > FACET_SHOWN && (
+                  <div className="text-[11px] text-ink-soft mt-0.5">{f.options.length} values: the list scrolls for the rest</div>
+                )}
               </div>
             ))}
           </div>

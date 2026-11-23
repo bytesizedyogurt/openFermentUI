@@ -1,5 +1,5 @@
 """`fermos_vessel`, `fermos_write`'s `design_vessel` and `fermos_read`'s
-kind `vessel` (OF-BLD-020 §4.2, D13, E.4‴).
+kind `vessel` (OF-BLD-020 §4.2, D13, E.4‴; alpha 2.2 D3).
 
 Every simulation here is test_vessel's STAND-IN (an artifact in §3.1's shape,
 invented numbers), and the worker is its stand-in too; nothing starts
@@ -14,7 +14,9 @@ import json
 import pytest
 
 from openferment_core import artifacts, audit, module_stores, proposals, tools, vessel
+from openferment_core.engine import runs
 from openferment_core.models import VesselRequest
+from standins import as_input
 from openferment_core.validate import SeenSet, validate_plan
 from test_module_tools import ctx_for, read
 from test_tools import pool  # noqa: F401  (the stand-in pool fixture)
@@ -41,8 +43,8 @@ def a_person_typed_a_scale(monkeypatch):
 
     def with_a_person(req: VesselRequest):
         aid = req.simulation or req.fit
-        return real(req.model_copy(update={"overrides": [*req.overrides,
-                                                         override(aid, "plant_scale", 2000.0, by=STANDIN_PERSON)]}))
+        scale = as_input(override(aid, "plant_scale", 2000.0, by=STANDIN_PERSON), vessel.UNITS["plant_scale"])
+        return real(req.model_copy(update={"inputs": [*req.inputs, scale]}))
 
     monkeypatch.setattr(vessel, "design", with_a_person)
 
@@ -84,7 +86,7 @@ def test_without_a_persons_scale_the_tool_returns_the_refusals_words_and_keeps_n
     r = tools.run("fermos_vessel", ask(simulationArtifact=AEROBIC_ID), ctx())
     assert r.error.startswith("fermos_vessel refused: a vessel design needs plant_scale")
     assert "a model never supplies one" in r.error and "fermOS → Vessel" in r.error
-    assert r.evidence == [] and audit.read() == []
+    assert r.evidence == [] and audit.read() == [] and runs.listed() == []
     assert not [a for a in artifacts.all_artifacts() if a.tool == vessel.TOOL]
     # fermos_write's design_vessel is the same function, refused alike.
     w = tools.run("fermos_write", {"action": "design_vessel", "target": "", "fields": {"simulationArtifact": AEROBIC_ID},
@@ -136,6 +138,10 @@ def test_a_design_is_kept_cited_by_its_artifact_id_and_marked_as_the_models(mark
     assert (line.agent, line.who, line.module, line.action, line.state, line.target, line.askId, line.effort) == (
         "model", "claude-haiku-5-5", "fermos", "design_vessel", "open", AEROBIC_ID, "ask-42", "medium")
     assert line.detail["tool"] == "fermos_vessel" and line.detail["artifactId"] == art.id
+    # Alpha 2.2 D3: the design is one run of the kinetics engine, created by the model that asked.
+    run = runs.get(art.id)
+    assert (run.engine, run.plant, run.configuration, run.tool, run.by) == (
+        "kinetics", "vessel", AEROBIC_ID, vessel.TOOL, "claude-haiku-5-5")
     # At no gate: nothing was proposed.
     assert proposals.read().proposals == []
     # fermos_write's design_vessel is the same design, marked with its own name.
@@ -143,6 +149,7 @@ def test_a_design_is_kept_cited_by_its_artifact_id_and_marked_as_the_models(mark
         "simulationArtifact": AEROBIC_ID, "vesselType": "bubble-column", "klaMethod": "Dewes"}}, ctx())
     assert w.error is None and w.evidence[0].id == ev.id
     assert audit.read()[-1].detail["tool"] == "fermos_write" and audit.read()[-1].detail["note"] == "again"
+    assert runs.listed("kinetics") == [run], "the same design, one row"
 
 
 def test_a_claim_cites_a_design_its_run_returned_and_no_other(marked, a_person_typed_a_scale, pool):  # noqa: F811

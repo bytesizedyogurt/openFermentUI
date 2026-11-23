@@ -1,0 +1,27 @@
+## commit under test: a667bbc; core/ and docs/ against 2047f5a: unchanged
+## the contract
+194:its default route: the models tried in order, each after the one before it declines or is
+195:unavailable, and the effort they think at (ADR-008, Implementation 17;
+207:empty standing unset: `OPENFERMENT_MODEL` with `OPENFERMENT_FALLBACK_MODEL` (several models,
+208:comma-separated, tried in order) over the models of `plan`, `explain` and `extract`
+14:list, tried in order) is the chain of the answering families, plan, explain
+485:        # The models the route moves to, in order, when its first declines or
+474:    The models are the plan route's, the one Postdoc's loop answers on.
+## the loop
+28:A REFUSAL OR AN OUTAGE mid-loop restarts the question once on the next model
+714:    for i, model in enumerate(models[:2]):
+728:            if isinstance(e, llm.BudgetExhausted) or i + 1 >= min(len(models), 2):
+## what ran
+plan route (llm.chain): ['claude-opus-5-5', 'claude-sonnet-5-5', 'claude-haiku-5-5']
+GET /api/health: model 'claude-opus-5-5' fallbackModel 'claude-sonnet-5-5, claude-haiku-5-5'
+control: unavailable ['claude-opus-5-5']; asked ['claude-opus-5-5', 'claude-sonnet-5-5']; declined 'The corpus does not contain evidence that bears on this question, so there is nothing to answer from.'
+   step: Swept the modules for what the question names · searched ten, found in none
+   step: claude-opus-5-5 was unavailable; asked again on claude-sonnet-5-5
+   step: Answered: 0 claims kept, 0 dropped
+case: unavailable ['claude-opus-5-5', 'claude-sonnet-5-5']; asked ['claude-opus-5-5', 'claude-sonnet-5-5']; declined 'claude-sonnet-5-5 answered 529: overloaded'
+   step: Swept the modules for what the question names · searched ten, found in none
+   step: claude-opus-5-5 was unavailable; asked again on claude-sonnet-5-5
+   step: No answer: claude-sonnet-5-5 answered 529: overloaded
+EXPECTED: with the plan route opus, sonnet, haiku (health's fallbacks 'claude-sonnet-5-5, claude-haiku-5-5') and opus and sonnet unavailable, the loop asks opus, then sonnet, then haiku, and haiku's plan is the answer (the last step 'Answered: …', as the control's sonnet plan is)
+OBSERVED: health fallbackModel 'claude-sonnet-5-5, claude-haiku-5-5'; asked ['claude-opus-5-5', 'claude-sonnet-5-5']; declined 'claude-sonnet-5-5 answered 529: overloaded'; last step 'No answer: claude-sonnet-5-5 answered 529: overloaded'
+RESULT: DEFECT

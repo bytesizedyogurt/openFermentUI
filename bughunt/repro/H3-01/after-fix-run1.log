@@ -1,0 +1,35 @@
+database: bh_r_h3_01_anchor (fresh, migrated to head)
+== Part A: validate.anchor_candidate ==
+minimum_selling_price = 2.15 USD/kg  on  'The minimum ethanol selling price was 2.15 USD/gal in the base case.'
+    the quote states 2.15 'USD gal⁻¹'; units.convert(2.15, 'USD gal⁻¹', 'USD kg⁻¹'): UnitError: A price per gallon and a price per kilogram are not interconvertible without the density of the product. Record the density the analysis assumes for it and the conversion becomes possible; guessing it would fabricate a price.
+    refused on rule 'value': the quote states 2.15 USD gal⁻¹, and USD gal⁻¹ does not convert into USD kg⁻¹ (A price per gallon and a price per kilogram are not interconvertible without the density of the product. Record the density the analysis assumes for it and the conversion becomes possible; guessing it would fabricate a price.); a record's value stands in the quote in the candidate's unit
+ethanol_titre = 45 g/L  on  'The final ethanol concentration was 45% (v/v) after fermentation.'
+    the quote states 45.0 '%'; units.convert(45.0, '%', 'g L⁻¹'): UnitError: Incompatible units: % (percent) vs g L⁻¹ (massConc)
+    refused on rule 'value': the quote states 45 %, and % does not convert into g L⁻¹ (Incompatible units: % (percent) vs g L⁻¹ (massConc)); a record's value stands in the quote in the candidate's unit
+ethanol_titre = 5 g/L  on  'Ethanol reached 5 mol/L in the broth.'
+    the quote states 5.0 'mol L⁻¹'; units.convert(5.0, 'mol L⁻¹', 'g L⁻¹'): UnitError: Incompatible units: mol L⁻¹ (molar) vs g L⁻¹ (massConc)
+    refused on rule 'value': the quote states 5 mol L⁻¹, and mol L⁻¹ does not convert into g L⁻¹ (Incompatible units: mol L⁻¹ (molar) vs g L⁻¹ (massConc)); a record's value stands in the quote in the candidate's unit
+ethanol_yield_substrate = 0.45 g/g  on  'The specific growth rate was 0.45 h-1 on glucose.'
+    the quote states 0.45 'h⁻¹'; units.convert(0.45, 'h⁻¹', 'g g⁻¹'): UnitError: Incompatible units: h⁻¹ (rate) vs g g⁻¹ (yield)
+    refused on rule 'value': the quote states 0.45 h⁻¹, and h⁻¹ does not convert into g g⁻¹ (Incompatible units: h⁻¹ (rate) vs g g⁻¹ (yield)); a record's value stands in the quote in the candidate's unit
+specific_oxygen_uptake = 2 mmol/g/h  on  'The specific oxygen uptake rate was 2 mg/g/h in the run.'
+    the quote states 2.0 'mg g⁻¹ h⁻¹'; units.convert(2.0, 'mg g⁻¹ h⁻¹', 'mmol g⁻¹ h⁻¹'): UnitError: A rate in moles per gram per hour and one in grams per gram per hour differ by the molar mass of what is taken up or made. Record which substance it is and convert by its molar mass as a stated step; the engine will not assume it.
+    refused on rule 'value': the quote states 2 mg g⁻¹ h⁻¹, and mg g⁻¹ h⁻¹ does not convert into mmol g⁻¹ h⁻¹ (A rate in moles per gram per hour and one in grams per gram per hour differ by the molar mass of what is taken up or made. Record which substance it is and convert by its molar mass as a stated step; the engine will not assume it.); a record's value stands in the quote in the candidate's unit
+minimum_selling_price = 1.2 USD/kg  on  'The minimum selling price was 1.2 EUR kg-1 for the product.'
+    the quote states 1.2 'EUR kg⁻¹'; units.convert(1.2, 'EUR kg⁻¹', 'USD kg⁻¹'): UnitError: Currency conversion needs an exchange rate with a date attached. The engine will not invent one — record the rate and the date as an explicit assumption.
+    refused on rule 'value': the quote states 1.2 EUR kg⁻¹, and EUR kg⁻¹ does not convert into USD kg⁻¹ (Currency conversion needs an exchange rate with a date attached. The engine will not invent one — record the rate and the date as an explicit assumption.); a record's value stands in the quote in the candidate's unit
+minimum_selling_price = 2.15 USD/kg  on  'The minimum ethanol selling price was $2.15/gal in the base case.'
+    the quote parses as 2.15 'USD gal⁻¹'
+    refused on rule 'value'
+control: ethanol_titre = 45 g/L  on  'The final ethanol concentration was 45 mg/L after fermentation.'
+    refused on rule 'value': no number in the quote equals 45.0 within 0.5%; the value is derived from the quote's numbers; edit it to the paper's spelling or record the derivation
+
+== Part B: biorepo.write in a fresh database ==
+Traceback (most recent call last):
+  File "/home/user/openFermentUI/bughunt/repro/H3-01/repro.py", line 109, in <module>
+    assert price and titre and ctl, "a candidate did not anchor"
+           ^^^^^^^^^^^^^^^^^^^^^^^
+AssertionError: a candidate did not anchor
+the database's records rows (openferment.records) the decisions left:
+
+RESULT: NO-DEFECT (the script did not complete; see the lines above)

@@ -1,4 +1,4 @@
-"""`thermo_props`: what thermosteam says of a mixture on file (OF-BLD-019 §4.2, D9).
+"""`thermo_props`: what thermosteam says of a mixture on file.
 
 Ids and words in, never a number: a Proforma run's artifact id with one of
 its streams, or a preset the service fills — `ethanol-water-azeotrope`, or
@@ -10,7 +10,7 @@ its own `Evidence`, citable by its id like any computed value (`SeenSet`
 keeps it, `validate_plan` takes its provenance); a chemical the library
 lacks, a stream not on file or a record that is no titre is refused in words.
 
-Offered loose, the module tools' way (OF-BLD-015 §7.2): every field is a
+Offered loose, the module tools' way: every field is a
 string and an empty one means "not this".
 """
 from __future__ import annotations
@@ -31,7 +31,7 @@ MAX_COMPONENTS = 12
 class ThermoPropsInput(BaseModel):
     model_config = ConfigDict(extra="forbid")
 
-    artifactId: str = Field(description="A Proforma run's artifact id (tool proforma.run), with streamId; or an empty string.")
+    artifactId: str = Field(description="A Proforma run's artifact id (the artifact tool proforma.run), with streamId; or an empty string.")
     streamId: str = Field(description="One stream of that run's stream table, by its id; or an empty string.")
     preset: str = Field(description=(
         f"{thermo.AZEOTROPE} (the composition thermosteam's own vapour-liquid equilibrium gives), or {thermo.BEER} "

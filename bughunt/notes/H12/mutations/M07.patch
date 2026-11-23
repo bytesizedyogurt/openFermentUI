@@ -1,0 +1,11 @@
+--- a/core/openferment_core/basis.py
++++ b/core/openferment_core/basis.py
+@@ -170,7 +170,7 @@
+         assert origin is not None  # the lookup answers the reading's origin
+     if not (origin.at or "").strip():
+         raise InputRefused(f"{name}: a value a run sets says when it was set (quantity.origin.at)")
+-    if q.unit != unit:
++    if False:
+         raise InputRefused(f"{name} is set in {q.unit!r}, and the parameter's unit is {unit!r}")
+     if q.basis is not None:
+         raise InputRefused(f"{name}: a value a run sets is in its parameter's own unit, which says what it is "

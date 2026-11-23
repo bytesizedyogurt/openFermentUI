@@ -2,7 +2,13 @@
 stage 6; execution prompt §4.6, §9.1 step 6; ADR-004, ADR-006).
 
 `engine_plants` lists what the shelf runs: the `biorefineries` plants with an
-entry point and openFerment's own flowsheets, each with its configurations.
+entry point and openFerment's own flowsheets, each with its configurations,
+then the shelf's flowsheets a Proforma scenario runs (the biosteam engine's
+things of kind `scenario`, alpha 2.2 D6); or, named, another engine's
+things. Beside them it lists every engine registered here (`engines`), each
+with its version, its worker's state, its last conformance verdict and the
+ids of the project's runs it made, newest first, so one read says which
+engines there are and which run came from each.
 `engine_parameters` gives one plant's parameters as the package builds it
 (the Proforma worker reads them): each key with its unit and the library's
 default, the values a scenario sets are set against. `engine_run` runs a plant
@@ -12,13 +18,18 @@ caller's; `engine_report` reads a kept run back.
 
 A RUN'S EVIDENCE. Each number its price block and its flowsheet's own outputs
 hold, in its unit, and each line of its TEA breakdown, per unit of the price's
-basis and per year, is one Evidence whose id is `<artifact id>:<block>.<key>`
-and whose basis is the run's artifact, its provenance the artifact's
+basis and per year, is one Evidence whose id is `<artifact id>:<block>.<key>`;
+each output of a contract engine's run, of a kinetics run, of a train run
+and of a Proforma scenario's run (its outputs.values) is one whose id is
+`<artifact id>:values.<name>`. Each one's
+basis is the run's artifact, its provenance the artifact's
 (`assumed` when a value the run set is a person's assumption or a model's
-estimate). `engine_report` also gives, by words, the parameters the run read
-back from the plant (`<artifact id>:parameters.<key>`), each with its origin:
-computed where the package set it, assumed where a person or a model did. A
-claim cites those ids, and a value a claim states is read from one by its id.
+estimate, `measured` when the values it set are deposited readings beside
+records and defaults). `engine_report` also gives, by words, the parameters
+the run read back from the plant (`<artifact id>:parameters.<key>`), each
+with its origin: computed where the package set it, assumed where a person
+or a model did, measured where a deposition's reading did. A claim cites
+those ids, and a value a claim states is read from one by its id.
 """
 from __future__ import annotations
 
@@ -26,7 +37,8 @@ from typing import Any
 
 from pydantic import BaseModel, Field
 
-from ..models import ComputedBasis, Evidence, RunReport, ToolResult
+from ..basis import SET_ORIGINS
+from ..models import CONFIGURATION_MAX, ComputedBasis, Evidence, RunReport, ToolResult
 from . import Tool, ToolContext, register
 
 MAX_ROWS = 40
@@ -48,6 +60,14 @@ PRICE_WORDS = {
 }
 
 
+# The unit of a price number the run's own block leaves blank: an internal
+# rate of return is a share a year, written as a fraction, so a claim citing
+# it carries a unit beside its USD/kg neighbours. The run's output is kept as
+# it was kept (its blank unit is part of its output hash); its evidence names
+# the unit.
+BLANK_UNITS = {"IRR": "fraction"}
+
+
 def _number(x: Any) -> bool:
     return isinstance(x, (int, float)) and not isinstance(x, bool)
 
@@ -66,12 +86,27 @@ def run_evidence(report: RunReport) -> list[Evidence]:
     for key, unit in (price.get("units") or {}).items():
         if _number(price.get(key)):
             out.append(Evidence(id=f"{art.id}:price.{key}", label=f"{name}: {PRICE_WORDS.get(key, key)}",
-                                value=price[key], unit=unit, provenance=art.provenance, basis=basis))
+                                value=price[key], unit=unit or BLANK_UNITS.get(key, ""), provenance=art.provenance,
+                                basis=basis))
     units = art.output.get("outputUnits") or {}
     for key, value in (art.output.get("outputs") or {}).items():
         if _number(value) or isinstance(value, str):
             out.append(Evidence(id=f"{art.id}:outputs.{key}", label=f"{name}: {key}", value=value,
                                 unit=units.get(key) or "", provenance=art.provenance, basis=basis))
+    # A contract engine's outputs (docs/api/engines.md): each a name, a value and a unit.
+    for v in art.output.get("values") or []:
+        if isinstance(v, dict) and isinstance(v.get("name"), str) and (_number(v.get("value")) or isinstance(v.get("value"), str)):
+            out.append(Evidence(id=f"{art.id}:values.{v['name']}", label=f"{name}: {v['name']}", value=v["value"],
+                                unit=str(v.get("unit") or ""), provenance=art.provenance, basis=basis))
+    # The kinetics engine's (fermos_engine.py), the train engine's (pureos/engine.py) and a Proforma scenario's
+    # (proforma.py): each of the run's outputs.values, read from its artifact (engine/runs.py `values_of`).
+    from ..engine import runs
+
+    if art.tool in (runs.SIMULATION_TOOL, runs.FORECAST_TOOL, runs.VESSEL_TOOL, runs.TRAIN_TOOL, runs.PROFORMA_TOOL):
+        for v in runs.values_of(art):
+            q = v["quantity"]
+            out.append(Evidence(id=f"{art.id}:values.{v['name']}", label=f"{name}: {v['name']}", value=q["value"],
+                                unit=q["unit"], provenance=art.provenance, basis=basis))
     # The TEA's breakdown, line by line as the worker read it from BioSTEAM's TEA object.
     tea = art.output.get("tea") or {}
     per_unit = f"USD per {tea['basis']}" if tea.get("basis") else "USD per unit of the price's basis"
@@ -87,15 +122,23 @@ def run_evidence(report: RunReport) -> list[Evidence]:
     return out[:MAX_ROWS]
 
 
-# What a parameter's origin is, in words, as a claim's label says it.
-ORIGIN_WORDS = {"library-default": "the package's own value", "person-assumption": "a person's assumption",
-                "model-estimate": "a model's estimate", "record": "read from a record", "artifact": "read from an artifact"}
+# What a parameter's origin is, in words, as a claim's label says it: each
+# a ParamOrigin, the word a run's parameters (runs.parameters_of) give a
+# value for where it came from.
+ORIGIN_WORDS = {"library-default": "the package's own value", "assumption": "a person's assumption",
+                "model-estimate": "a model's estimate", "measurement": "a deposition's reading",
+                "record": "read from a record", "artifact": "read from an artifact"}
+# The provenance a parameter's own evidence carries, by its ParamOrigin: a
+# value a person or a model set is assumed, a deposition's reading measured,
+# and the package's own value computed.
+ORIGIN_PROVENANCE = {"assumption": "assumed", "model-estimate": "assumed", "measurement": "measured"}
 
 
 def parameter_evidence(report: RunReport, words: str, limit: int) -> list[Evidence]:
     """The parameters a kept run read back from the plant whose key, label or
     group hold every one of `words`, as evidence on the run's artifact: computed
-    where the package set the value, assumed where a person or a model did."""
+    where the package set the value, assumed where a person or a model did,
+    measured where a deposition's reading did."""
     art, run = report.artifact, report.run
     held = report.parameters
     if hasattr(held, "model_dump"):
@@ -117,29 +160,62 @@ def parameter_evidence(report: RunReport, words: str, limit: int) -> list[Eviden
         source = (v.get("source") or {}).get("id")
         label = f"{name}: {spec.get('label') or v.get('key')}, {ORIGIN_WORDS.get(origin, origin)}" + (f" ({source})" if source else "")
         out.append(Evidence(id=f"{art.id}:parameters.{v.get('key')}", label=label, value=v["value"],
-                            unit=spec.get("unit") or "", provenance="assumed" if origin in ("person-assumption", "model-estimate") else "computed",
+                            unit=spec.get("unit") or "", provenance=ORIGIN_PROVENANCE.get(origin, "computed"),
                             basis=basis))
         if len(out) >= limit:
             break
     return out
 
 
+# How many characters of a run's diagnostics, as JSON, a summary names: the
+# rest are counted, and the run's page and GET /api/runs/{id} hold them all.
+DIAGNOSTICS_BUDGET = 1_500
+DIAGNOSTICS_WORDS = (
+    "what the run's computation reported about itself (the time it took, the iterations it made), kept on the run "
+    "beside its outputs: words to read, since a claim cites evidence ids alone and a replay compares the outputs "
+    "alone")
+
+
+def diagnostics_said(run: Any) -> dict[str, Any] | None:
+    """A run's diagnostics as a summary names them: how many, each name, value
+    and unit within DIAGNOSTICS_BUDGET, and what they are; None for a run
+    whose engine reports none."""
+    import json
+
+    if not run.diagnostics:
+        return None
+    shown: list[dict[str, Any]] = []
+    size = 0
+    for d in run.diagnostics:
+        row = {"name": d.name, "value": d.value, "unit": d.unit}
+        size += len(json.dumps(row, ensure_ascii=False))
+        if size > DIAGNOSTICS_BUDGET:
+            break
+        shown.append(row)
+    return {"count": len(run.diagnostics), "shown": shown, "note": DIAGNOSTICS_WORDS}
+
+
 def run_result(report: RunReport, *, state: str = "open") -> ToolResult:
-    """A kept run in a tool's words: what ran, on what values, and its numbers as evidence ids."""
+    """A kept run in a tool's words: the engine and the artifact tool that
+    made it, what ran, on what values, and its numbers as evidence ids; a
+    run whose engine reports diagnostics names them too (`diagnostics_said`)."""
     run = report.run
     if run.status == "refused":
-        return ToolResult(summary={"runId": run.id, "plant": run.plant, "configuration": run.configuration,
-                                   "status": "refused", "refused": run.refused, "scenarioId": run.scenarioId})
+        return ToolResult(summary={"runId": run.id, "engine": run.engine, "tool": run.tool, "plant": run.plant,
+                                   "configuration": run.configuration, "status": "refused", "refused": run.refused,
+                                   "scenarioId": run.scenarioId})
     evidence = run_evidence(report)
     own = [{"key": i.name, "value": i.quantity.value, "unit": i.quantity.unit, "origin": i.quantity.origin.kind,
-            "by": i.quantity.origin.by}
-           for i in run.inputs if i.quantity.origin is not None
-           and i.quantity.origin.kind in ("person-assumption", "model-estimate")]
+            "by": i.quantity.origin.by, **({"reading": i.quantity.origin.ref} if i.quantity.origin.kind == "measurement"
+                                           else {})}
+           for i in run.inputs if i.quantity.origin is not None and i.quantity.origin.kind in SET_ORIGINS]
     return ToolResult(
         summary={
             "state": state,
             "runId": run.id,
             "artifactId": run.artifactId,
+            "engine": run.engine,
+            "tool": run.tool,
             "plant": run.plant,
             "configuration": run.configuration,
             "scenarioId": run.scenarioId,
@@ -150,6 +226,7 @@ def run_result(report: RunReport, *, state: str = "open") -> ToolResult:
             "sffRefused": run.sffRefused,
             "packageTest": run.outputs.get("regression"),
             "by": run.by,
+            **({"diagnostics": said} if (said := diagnostics_said(run)) else {}),
         },
         evidence=evidence,
     )
@@ -159,45 +236,166 @@ def run_result(report: RunReport, *, state: str = "open") -> ToolResult:
 
 
 class EnginePlantsInput(BaseModel):
+    engine: str = Field(default="biosteam", max_length=40, description=(
+        "The engine whose things to list: biosteam, whose things are the library plants, openFerment's flowsheet "
+        "and the shelf's scenario flowsheets, or any other the summary's `engines` names. Whichever is named, the "
+        "summary lists every engine registered here with the ids of the project's runs each made."))
     words: str = Field(default="", max_length=200,
                        description="Words to narrow the shelf by: a product, a feedstock, a plant's name; empty for all.")
     limit: int = Field(default=20, ge=1, le=MAX_ROWS, description="How many rows at most.")
 
 
+# How many of an engine's runs the listing names by id, newest first; `runs` counts them all.
+RUN_IDS = 20
+
+
+def engines_listed() -> list[dict[str, Any]]:
+    """Every engine registered here, in name order (GET /api/engines lists the
+    same): its version, its worker and the worker's state, its last
+    conformance verdict, and the project's runs it made (`runs`, how many;
+    `runIds`, the newest RUN_IDS, newest first). An engine that cannot be
+    used is listed with its words and its runs."""
+    from ..engine import conform, registry, runs
+
+    made = runs.made_by()
+    out: list[dict[str, Any]] = []
+    for name, found in sorted(registry.found().items()):
+        ids = made.get(name, [])
+        row: dict[str, Any] = {"name": name}
+        if found.engine is None:
+            row["error"] = found.error
+        else:
+            try:
+                row["version"] = found.engine.version()
+            except Exception as e:  # a version that cannot be read is said, and the engine still listed
+                row["error"] = f"its version could not be read: {type(e).__name__}: {e}"
+            row["worker"] = found.engine.worker
+            row["workerStatus"] = registry.status_of(found.engine)
+        verdict = conform.latest(name)
+        row["conformance"] = (None if verdict is None else
+                              {"ok": verdict.ok, "version": verdict.version, "by": verdict.by, "at": verdict.at})
+        row["runs"] = len(ids)
+        row["runIds"] = ids[:RUN_IDS]
+        out.append(row)
+    # The project's runs of an engine registered here no longer, listed under its name with those words.
+    out += [{"name": name, "error": "no engine of this name is registered here now", "runs": len(ids),
+             "runIds": ids[:RUN_IDS]} for name, ids in sorted(made.items()) if name not in registry.found()]
+    return out
+
+
+def registered_names() -> list[str]:
+    """Every engine name the registry holds here, in name order, an engine
+    set aside among them (engine/registry.py): what `engine_plants` lists,
+    for a reader outside the engine package (Postdoc's question 13)."""
+    from ..engine import registry
+
+    return registry.names()
+
+
+def _registered(tool: str, name: str) -> tuple[Any, ToolResult | None]:
+    """The registered engine named, or the tool's refusal in words."""
+    from ..engine import registry
+
+    try:
+        return registry.get(name.strip() or "biosteam"), None
+    except (registry.EngineNotFound, registry.EngineUnavailable) as e:
+        return None, ToolResult(error=f"{tool} refused: {str(e).strip(chr(39))}")
+
+
 def _plants(inp: EnginePlantsInput, ctx: ToolContext) -> ToolResult:
     from ..engine import library
 
-    shelf = library.shelf()
+    engine, refused = _registered("engine_plants", inp.engine)
+    if refused is not None:
+        return refused
     words = [w for w in inp.words.lower().split() if w]
+    if engine.name != "biosteam":
+        from ..engine import EngineBroken
+
+        try:
+            things = engine.things()
+        except EngineBroken as e:
+            return ToolResult(error=f"engine_plants refused: the {engine.name} engine broke its contract: {e}")
+        rows = [{"plant": th.id, "kind": th.kind, "title": th.title, "configurations": th.configurations,
+                 "defaultConfiguration": th.defaultConfiguration} for th in things
+                if not words or all(w in f"{th.id} {th.title} {th.kind or ''}".lower() for w in words)]
+        return ToolResult(summary={"engine": engine.name, "matched": len(rows), "plants": rows[: inp.limit],
+                                   "engines": engines_listed()})
+    shelf = library.shelf()
+    # Each plant as the engine runs it (engine/biosteam.py): the
+    # configurations it built in here, and the one a run takes when none is
+    # named, at every door.
+    things = {th.id: th for th in engine.things()}
     rows = []
     for p in shelf.plants:
-        if p.kind not in ("plant", "flowsheet") or p.error:
+        th = things.get(p.id)
+        if th is None:
             continue
         said = " ".join(x for x in (p.id, p.title or "", p.module, p.composedFrom or "", p.readme or "") if x).lower()
         if words and not all(w in said for w in words):
             continue
-        rows.append({"plant": p.id, "kind": p.kind, "title": p.title, "configurations": p.configurations,
-                     "defaultConfiguration": p.defaultConfiguration, "requiresConfiguration": p.requiresConfiguration,
+        rows.append({"plant": p.id, "kind": p.kind, "title": p.title, "configurations": th.configurations,
+                     "defaultConfiguration": th.defaultConfiguration,
+                     "requiresConfiguration": bool(th.configurations) and th.defaultConfiguration is None,
                      "composedFrom": p.composedFrom})
-    return ToolResult(summary={"simulator": shelf.simulator, "package": shelf.package, "matched": len(rows),
-                               "plants": rows[: inp.limit]})
+    # The things the engine's providers give it (alpha 2.2 D6): the shelf's
+    # flowsheets a Proforma scenario runs, a run of one a scenario's run.
+    held = {p.id for p in shelf.plants}
+    rows += [{"plant": th.id, "kind": th.kind, "title": th.title, "configurations": th.configurations,
+              "defaultConfiguration": th.defaultConfiguration} for th in things.values()
+             if th.id not in held and (not words or all(w in f"{th.id} {th.title}".lower() for w in words))]
+    return ToolResult(summary={"engine": "biosteam", "simulator": shelf.simulator, "package": shelf.package,
+                               "matched": len(rows), "plants": rows[: inp.limit], "engines": engines_listed()})
 
 
 # ── engine_parameters ───────────────────────────────────────────────────
 
 
 class EngineParametersInput(BaseModel):
+    engine: str = Field(default="biosteam", max_length=40, description=(
+        "The engine to read (GET /api/engines names them): biosteam, whose things are the library plants, "
+        "openFerment's flowsheet and the shelf's scenario flowsheets, or any other registered here."))
     plant: str = Field(max_length=80, description="A plant's id, as engine_plants gives it.")
-    configuration: str = Field(default="", max_length=40, description="One of the plant's configurations; empty for its own.")
+    configuration: str = Field(default="", max_length=CONFIGURATION_MAX,
+                               description="One of the plant's configurations; empty for its own.")
     words: str = Field(default="", max_length=200, description="Words to narrow the parameters by; empty for all.")
     limit: int = Field(default=20, ge=1, le=MAX_ROWS, description="How many rows at most.")
 
 
 def _parameters(inp: EngineParametersInput, ctx: ToolContext) -> ToolResult:
-    from ..engine import library
+    from ..engine import biosteam, library, runs
+    from ..engine import EngineBroken, EngineRefused
 
+    engine, refused = _registered("engine_parameters", inp.engine)
+    if refused is not None:
+        return refused
+    if engine.name != "biosteam" or biosteam.provided(inp.plant) is not None:
+        # The thing and its configuration resolved as a run of it resolves
+        # them (runs.thing_of), so the worker is asked in the configuration
+        # a run would use.
+        try:
+            cfg, found_params = runs.parameters_with(engine, inp.plant, inp.configuration)
+        except EngineRefused as e:
+            return ToolResult(error=f"engine_parameters refused: {e}")
+        except EngineBroken as e:
+            return ToolResult(error=f"engine_parameters refused: the {engine.name} engine broke its contract: {e}")
+        words = [w for w in inp.words.lower().split() if w]
+        # A parameter with no default (default and origin null) is one a run sets, or the engine binds.
+        rows = [{"key": p.key, "label": p.label, "unit": p.unit, "default": p.value,
+                 "origin": p.origin.kind if p.origin is not None else None, "min": p.min, "max": p.max}
+                for p in found_params if not words or all(w in f"{p.key} {p.label}".lower() for w in words)]
+        return ToolResult(summary={"engine": engine.name, "plant": inp.plant.strip(), "configuration": cfg,
+                                   "matched": len(rows), "parameters": rows[: inp.limit],
+                                   "note": "A run sets a value in the parameter's own unit, as a typed quantity; "
+                                           "a parameter whose default is null has none, and a run sets it or the "
+                                           "engine binds it from what the project holds."})
+    said = biosteam.unknown(inp.plant)
+    if said:
+        return ToolResult(error=f"engine_parameters refused: {said} (engine_plants lists them)")
     try:
-        found = library.parameters(inp.plant.strip(), inp.configuration.strip() or None)
+        # Read in the configuration a run of the plant runs in: the one
+        # named, else its default (engine/biosteam.py `default_configuration`).
+        found = library.parameters(inp.plant.strip(), biosteam.default_configuration(inp.plant, inp.configuration))
     except (library.LibraryRefused, library.PlantNotFound) as e:
         return ToolResult(error=f"engine_parameters refused: {str(e).strip(chr(39))}")
     defaults = {v.key: v for v in found.values}
@@ -219,9 +417,14 @@ def _parameters(inp: EngineParametersInput, ctx: ToolContext) -> ToolResult:
 
 
 class EngineRunInput(BaseModel):
+    engine: str = Field(default="biosteam", max_length=40, description=(
+        "The engine to run (GET /api/engines names them): biosteam, whose things are the library plants, "
+        "openFerment's flowsheet and the shelf's scenario flowsheets, or any other registered here, whose thing this "
+        "tool runs at its own defaults."))
     plant: str = Field(default="", max_length=80,
                        description="A plant's id, run at the library's defaults; empty when a scenario is named.")
-    configuration: str = Field(default="", max_length=40, description="One of the plant's configurations; empty for its own.")
+    configuration: str = Field(default="", max_length=CONFIGURATION_MAX,
+                               description="One of the plant's configurations; empty for its own.")
     scenario: str = Field(default="", max_length=80,
                           description="A study scenario's id (study_scenario returns it), run on its plant with its values.")
     note: str = Field(default="", max_length=600, description="Why the run is asked for, in words.")
@@ -230,13 +433,19 @@ class EngineRunInput(BaseModel):
 def _run(inp: EngineRunInput, ctx: ToolContext) -> ToolResult:
     from .writes import run_engine
 
-    return run_engine("engine_run", inp.plant, inp.configuration, inp.scenario, inp.note, ctx)
+    engine, refused = _registered("engine_run", inp.engine)
+    if refused is not None:
+        return refused
+    return run_engine("engine_run", inp.plant, inp.configuration, inp.scenario, inp.note, ctx,
+                      engine=None if engine.name == "biosteam" else engine)
 
 
 # ── engine_report ───────────────────────────────────────────────────────
 
 
 class EngineReportInput(BaseModel):
+    engine: str = Field(default="biosteam", max_length=40, description=(
+        "The engine that ran it, when you know it: a run of another engine is then refused. Left out, the run's own."))
     run: str = Field(max_length=80, description="A kept run's id, as engine_run or study_read gives it.")
     parameters: str = Field(default="", max_length=200, description=(
         "Words to read the parameters the run read back from the plant by (its feed, a unit, a price, a finance term): "
@@ -251,13 +460,20 @@ def _report(inp: EngineReportInput, ctx: ToolContext) -> ToolResult:
         report = runs.report(inp.run.strip())
     except runs.RunNotFound as e:
         return ToolResult(error=f"engine_report refused: {str(e).strip(chr(39))}")
+    # The engine is checked only when the caller names one: left out, its
+    # default stands for the run's own (docs/TOOLS.md, engine_report).
+    if "engine" in inp.model_fields_set and inp.engine.strip() and inp.engine.strip() != report.run.engine:
+        return ToolResult(error=f"engine_report refused: run {report.run.id} was made by the {report.run.engine} "
+                                f"engine, and {inp.engine.strip()!r} was named")
     result = run_result(report, state="open")
     if inp.parameters.strip() and result.error is None:
         # The parameters asked for, in the summary's room: the run's own numbers
         # stay citable, and engine_report with no words lists them.
         found = parameter_evidence(report, inp.parameters, inp.limit)
-        keep = ("state", "runId", "artifactId", "plant", "configuration", "scenarioId", "provenance", "valuesSet")
-        result.summary = {**{k: result.summary.get(k) for k in keep}, "matched": len(found),
+        keep = ("state", "runId", "artifactId", "engine", "tool", "plant", "configuration", "scenarioId", "provenance",
+                "valuesSet")
+        reported = {"diagnostics": result.summary["diagnostics"]} if "diagnostics" in result.summary else {}
+        result.summary = {**{k: result.summary.get(k) for k in keep}, **reported, "matched": len(found),
                           "parameters": [{"id": e.id, "label": e.label.split(": ", 1)[-1], "value": e.value,
                                           "unit": e.unit} for e in found],
                           "note": "The run's price, its outputs and its TEA breakdown: engine_report with no parameters."}
@@ -270,7 +486,10 @@ PLANTS_TOOL = register(Tool(
     description=(
         "List what the library shelf runs: the biorefineries plants with an entry point and openFerment's own "
         "flowsheets, each with its configurations, the configuration a run takes when none is named, and the "
-        "package a flowsheet is composed from. Narrow by words. Returns ids and words, nothing to cite."
+        "package a flowsheet is composed from; or, with `engine`, that engine's things. Beside them, `engines` "
+        "lists every engine registered here: its version, its worker and the worker's state, its last "
+        "conformance verdict, and the ids of the project's runs it made, newest first (engine_report reads "
+        "each). Narrow the things by words. Returns ids and words, nothing to cite."
     ),
     input_model=EnginePlantsInput, run=_plants, strict=False,
 ))
@@ -291,7 +510,8 @@ RUN_TOOL = register(Tool(
         "Run a plant from the library shelf at the library's defaults, or a study scenario (by its id) with the "
         "values it sets, as an engine run: kept in the project, marked as yours, with the SFF file it writes. "
         "Returns the run's id, its artifact id, its provenance (assumed when a value it set is an estimate or an "
-        "assumption), the values it set with their origins, and each number its price and its flowsheet's "
+        "assumption; measured when a value it set is a deposition's reading and none is either), the values it "
+        "set with their origins (a reading with its ref), and each number its price and its flowsheet's "
         "outputs hold as an evidence id to cite. The same plant and values asked again answer from the run kept. "
         "A plant that refuses the values is kept as a receipt and refused in the plant's words."
     ),
@@ -305,7 +525,8 @@ REPORT_TOOL = register(Tool(
         "each number its price block, its flowsheet's outputs and its TEA breakdown hold as an evidence id to cite; "
         "with words in `parameters`, the parameters the run read back from the plant (its feed's composition, "
         "moisture and price, the chemicals' prices, the finance terms), each as an evidence id with its origin. "
-        "For a refused run, the plant's own words."
+        "A run whose engine reports what its computation did (the time it took, say) names those diagnostics as "
+        "words beside its outputs. For a refused run, the plant's own words."
     ),
     input_model=EngineReportInput, run=_report, strict=False,
 ))

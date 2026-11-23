@@ -583,3 +583,54 @@ def test_a_5xx_from_the_lookup_raises_transient(monkeypatch):
     with pytest.raises(collectors.Transient):
         resolve_pmcid({"id": "X4", "doi": "10.1/x"})
 
+
+
+# ── a paste one letter's case apart from a held text (H8-01) ──────────────
+
+OTHER_PROJECT = "other-project"
+
+
+def _add_project(project_id: str) -> None:
+    from sqlalchemy import insert
+
+    from openferment_core import db
+    from openferment_core.db import models as t
+
+    async def add() -> None:
+        async with db.session() as s:
+            await s.execute(insert(t.projects).values(id=project_id, name=project_id, created_by="test"))
+
+    db.run(add())
+
+
+def test_a_paste_in_letter_case_apart_from_a_held_text_is_answered_in_words(kit_database):
+    # The kit keys a text with its letter case folded, so "2000 mg" finds a
+    # held "2000 Mg"; a link would show the pasting project a unit 10^9 times
+    # the one it gave. The kit's rows are committed in the session's
+    # database, so the sentence carries a run of this test's own.
+    import uuid
+
+    from openferment_core import db, intake
+    from openferment_core.literature import kit
+
+    _add_project(OTHER_PROJECT)
+    mega = f"The biorefinery processes 2000 Mg of dry corn stover per day in run {uuid.uuid4().hex}."
+    milli = mega.replace("2000 Mg", "2000 mg")
+    first = intake.paste("A note in megagrams", mega, project_id="test-project", by="A. Reader")
+    assert first.status == "ingested" and first.documentId
+
+    other = intake.paste("A note in milligrams", milli, project_id=OTHER_PROJECT, by="B. Reader")
+    assert other.status == "failed" and other.documentId is None, other
+    assert f"document {first.documentId} holds a text that differs from this one in letter case alone" in other.reason
+    assert "first at word 5 (held 'Mg', given 'mg')" in other.reason
+    assert db.run(kit.visible(OTHER_PROJECT)).documents == (), "the project links nothing for it"
+
+    # The project that holds the "2000 Mg" text is answered alike for its "2000 mg" one.
+    again = intake.paste("The note again in milligrams", milli, project_id="test-project", by="A. Reader")
+    assert again.status == "failed" and "letter case alone" in again.reason and "(held 'Mg', given 'mg')" in again.reason
+
+    # The same text, its white space apart, is still linked, and reads as held.
+    same = intake.paste("A copy", mega.replace(" of ", "  of\n"), project_id=OTHER_PROJECT, by="B. Reader")
+    assert same.status == "linked" and same.documentId == first.documentId
+    [passage] = kit.passages(first.documentId, project_id=OTHER_PROJECT).sections
+    assert "2000 Mg of dry corn stover" in passage["text"]

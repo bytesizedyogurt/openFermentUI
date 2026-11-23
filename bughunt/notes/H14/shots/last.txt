@@ -1,0 +1,1691 @@
+== Home (no project)
+OPENFERMENT
+Bioprocess literature you can operate on
+Ask Postdoc about the documents your project holds, verify every extracted number against the span it came from, turn verified parameters into runnable protocols, and model what they cost at scale.
+Your projects
+Ethanol
+ethanol
+NEW PROJECT
+Make it
+Ask Postdoc
+Ask
+What if the organism fermented glucose alone? Propose a scenario, run it, and say what changed and what the change rests
+1 question · 2026-11-08 04:26 UTC
+What if the organism fermented glucose alone? Propose a scenario, run it, and say what changed and what the change rests
+1 question · 2026-11-08 04:22 UTC
+What does the reference cellulosic ethanol plant in the library assume about its feedstock, and where do those numbers c
+2 questions · 2026-11-08 04:06 UTC
+What strains of Saccharomyces cerevisiae appear in the project's documents, and which documents describe each?
+1 question · 2026-11-08 04:00 UTC
+Which of the project's documents report an ethanol titre, and under what conditions does each report it?
+1 question · 2026-11-08 03:53 UTC
+Running now
+AS IT HAPPENS
+
+Runs, tool calls, artifacts and Postdoc's turns show here as they happen.
+
+Project vitals
+?
+User-entered.
+DOCUMENTS HELD
+22
+814 passages, each searchable and quotable
+Extracted · unverified.
+EXTRACTION RECORDS
+457
+verified
+0
+unverified
+457
+rejected
+0
+Gold · a value a reviewer typed.
+GOLD SET
+0
+No gold values yet — promote a record with g in review
+Assumed · rests on an assumption.
+PROTOCOLS PUBLISHED
+0
+0 versions in total
+Measured · first-party
+Gold · a value a reviewer typed
+Verified against source
+Curated · written by hand
+Computed · basis attached
+Extracted · unverified
+Industry estimate · a vendor’s figure
+User-entered
+Assumed · rests on an assumption
+?
+Runbooks
+?
+Assumed · rests on an assumption.
+RUNBOOKS
+0
+0 running · 0 waiting on a person
+Your work
+User-entered.
+LAST CONVERSATION
+What if the organism fermented glucose alone? Propose a scenario, run it, and say what changed and what the change rests
+1 question · 2026-11-08 04:26 UTC
+Extracted · unverified.
+REVIEW QUEUE
+457 unverified records waiting
+Start a queue and triage them one span at a time.
+The destinations
+11/11 with something behind them
+
+Everything this platform does lives inside one of these 11.
+
+Intake
+documents in, anchored to source
+457 extraction records
+BioRepo
+records, artifacts, provenance
+22 papers · gold set not yet annotated
+Postdoc
+ask, plan, answer from records
+live through openferment-core, on the model it is configured with
+geneOS
+host, construct, pathway, design
+0 hosts · no sequence tooling
+fermOS
+reactor, kinetics, scale
+0 deposited runs it can fit · fits, forecasts, simulations and vessel designs kept with the project
+pureOS
+harvest, capture, recovery
+45 unit operations · no process model
+Proforma
+cost, scale, uncertainty
+2 scenarios · 6 runs · 3 comparisons
+Runbooks
+claims to be tested
+0 runbooks · 0 protocols
+Primer
+how the system works
+0 lessons
+Guild
+who may verify
+review queue and roles
+Catalogues
+strains, products, skills, lessons
+kept on the service, each entry in its keeper’s name
+Start something
+Postdoc
+Ask a question
+Get a cited answer with the plan, tool calls and retrieved passages shown.
+Guild
+Review extractions
+Triage machine-extracted parameters against the span they came from.
+Protocols → Deposition
+Run a protocol
+Scale a verified procedure to your batch size and execute it at the bench.
+Proforma
+Model a process
+Run a scenario on BioSTEAM and see where the cost per kilogram goes.
+Runbooks
+Open a runbook
+A synthesised answer to "how would we make this", with the stages it took to get there.
+What is this platform?
+The map behind these names
+Workforce
+Nobody is on Guild’s ledger yet. Start it
+Predictions
+Locked
+0
+Tested
+0
+Held
+0
+Missed
+0
+Inconclusive runs
+0
+
+Too few tested for a hit rate; one is shown from 5. Open the ledger
+
+Recent activity
+Nothing has happened since this page opened
+What a person does here is listed as it happens: a paper fetched, a record reviewed, a run deposited, a runbook adopted. To start, review the next record in Guild or fetch a paper in Intake.
+
+Activity is session-only and resets on refresh.
+
+
+== /p/ethanol/flowsheets/run-e7efa2505b4633de
+Corn stover to ethanol (openFerment cellulosic_ethanol_v0, composed from biorefineries.cellulosic): dilute acid, IB
+SFF flowsheet record run-e7efa2505b4633de
+
+Valid against SFF 0.2.4; completeness 0.75; 68 units and 118 streams; source: exported from run e7efa2505b4633de of library:cellulosic_ethanol_v0. Written by run e7efa2505b4633de.
+
+run-e7efa2505b4633de.sff.json
+
+What the check found: error pass 22; error skip 3; info pass 3; warning fail 1; warning pass 14.
+
+The 4 findings that did not pass
+The flowsheet: 68 units, 77 streams between them, 27 feeds and 14 products at the boundary. A dashed stream closes a recycle.
+Corn stover
+sulfuric_acid
+warm_proc…
+pretreatm…
+warm_proc…
+ammonia
+ammonia_p…
+cellulase
+saccharif…
+CSL
+DAP
+stripping…
+recycled_…
+air_lagoon
+caustic
+denaturant
+plant_air
+cooling_tower_makeu…
+cooling_tower_chemi…
+bioreactor_cleaning…
+boiler_ma…
+natural_g…
+FGD_lime
+boiler_ch…
+air
+makeup_RO…
+makeup_pr…
+vent
+evaporate…
+brine
+Ethanol
+s59
+cooling_t…
+cooling_t…
+bioreacto…
+emissions
+boiler_blowdown_wat…
+ash
+RO_treate…
+recycled_…
+excess_wa…
+U101
+Feed stock handling
+H2SO4_storage
+Sulfuric acid stora…
+T201
+Sulfuric acid tank
+M201
+Sulfuric acid mixer
+M203
+Steam mixer
+R201
+Pretreatment reacto…
+P201
+Blowdown discharge …
+T202
+Oligomer conversion…
+F201
+Pretreatment flash
+Ammonia_storage
+Ammonia storage tank
+M205
+Ammonia mixer
+T203
+Ammonia addition ta…
+P202
+Hydrolyzate pump
+M301
+Enzyme hydrolysate …
+H301
+Hydrolysate heat ex…
+R301
+Continuous presacch…
+CSL_storage
+CSLStorage tank
+S302
+Splitter
+DAP_storage
+DAPStorage tank
+S301
+Splitter
+R303
+Saccharification an…
+R302
+Seed train
+T301
+Seed hold tank
+M304
+Mixer
+D401
+Vent scrubber
+M401
+Mixer
+T302
+Beer tank
+P401
+Pump
+H401
+Heat exchanger
+D402
+Distillation Column
+P402
+Pump
+S401
+Pressure filter
+M204
+Mixer
+H201
+Waste vapor condens…
+M601
+Mixer
+WWTC
+Wastewater system c…
+R601
+Anaerobic digestion
+M602
+Mixer
+R602
+Aerobic digestion
+S601
+Membrane bioreactor
+S602
+Splitter
+M603
+Mixer
+S603
+Sludge centrifuge
+M604
+Mixer
+slurry_mixer
+Mixer
+S604
+Reverse osmosis
+treated_water_m…
+Mixer
+M402
+Mixer
+D403
+Divided Distillatio…
+H402
+Heat exchanger
+U401
+Molecular sieve
+H403
+Heat exchanger
+T701
+Storage tank
+P701
+Pump
+T702
+Storage tank
+P702
+Pump
+M701
+Mixer
+T703
+Storage tank
+gas_mixer
+Mixer
+P403
+Pump
+process_water_m…
+Mixer
+CWP
+Chilled water packa…
+ADP
+Air distribution pa…
+CT
+Cooling tower
+CIP
+CIP Package
+FWT
+Fire water tank
+BT
+Boiler turbogenerat…
+PWC
+Process water center
+[failed] GET http://127.0.0.1:8941/api/events?project=ethanol net::ERR_ABORTED
+
+== /p/ethanol/proforma/reference/cornstover
+cornstover · REFERENCE PLANT
+cornstover: 2nd Generation Ethanol Production from Corn Stover
+A published plant from the BioSTEAM project’s own biorefineries package, on the library shelf, run whole on its package’s own values and held to its package’s own test.
+Proforma
+Source: biorefineries 2.35.1, biorefineries.cornstover
+· on biosteam 2.54.0, thermosteam 0.54.2
+· Held to biorefineries/tests/test_biorefineries.py::test_cornstover
+· Provenance, as the artifact computes it:
+Computed · basis attached
+Rerun
+The simulator has not started on this service yet.
+
+A run is asked for in a person’s name: set yours in Settings first.
+
+Computed · basis attached.
+PRICE
+0.6588
+USD/kg of ethanol; the price its TEA solves at the package’s rate of return. Internal rate of return the TEA holds: 0.1.
+
+Run bfda026530692adc, kept by Claude Code (build session), computed 2026-11-05 09:17 UTC in 22.1 s, with library run 2 · biosteam 2.54.0 · biorefineries 2.35.1 · tables from BioSTEAM 2.54.0, thermosteam 0.54.2 · its SFF file run-bfda026530692adc. The run’s page draws the plant from its SFF file and lists its parameters.
+
+Held to its package’s own test
+CSV
+
+Each value biorefineries/tests/test_biorefineries.py::test_cornstover asserts in biorefineries 2.35.1, read by the service from the test file installed with the package, beside what this run measured for the same expression. The service holds each as numpy’s allclose holds the package’s own test: the relative difference within the test’s tolerance.
+
+9 of 11 within the package’s tolerance on this run.
+
+Quantity	Expression	Unit	Package's value	This run	Relative difference	Tolerance	Within
+internal rate of return	tea.IRR	—	0.1	0.1	0 %	5 %	within
+feedstock price	feedstock.price	USD/kg	0.051588	0.051588	2.45×10⁻⁹ %	5 %	within
+product price	product.price	USD/kg	0.68655	0.65881	4 %	5 %	within
+sales	tea.sales	USD/yr	126,814,635	121,768,094	4 %	5 %	within
+material cost	tea.material_cost	USD/yr	82,270,812	82,272,671	0.0023 %	5 %	within
+installed equipment cost	tea.installed_equipment_cost	USD	209,112,841	192,647,846	7.9 %	5 %	outside
+utility cost	tea.utility_cost	USD/yr	-10,675,099	-11,189,196	4.8 %	5 %	within
+heating duty	units.get_heating_duty()	GJ/hr	351.93	352.17	0.068 %	5 %	within
+cooling duty	units.get_cooling_duty()	GJ/hr	347.55	347.69	0.04 %	5 %	within
+electricity consumption	units.get_electricity_consumption()	MW	22.056	20.915	5.2 %	5 %	outside
+electricity production	units.get_electricity_production()	MW	47.935	47.863	0.15 %	5 %	within
+
+A reference run is one case on the package’s own values: it samples nothing, so it has no price distribution, no sensitivity and no sliders.
+
+Result
+Computed · basis attached.
+MINIMUM SELLING PRICE
+0.6588
+USD/kg of ethanol; the base case. Provenance computed.
+
+Base case, every input at its value: 0.6588 USD/kg of ethanol.
+
+Run bfda026530692adc (its page, with its SFF file; its artifact), computed 2026-11-05 09:17 UTC in 22.1 s · tables from BioSTEAM 2.54.0, thermosteam 0.54.2.
+
+What is the price made of?
+One row per line of the run's TEA breakdown, per unit of the price's basis, each starting where the line before it ended; the last row is the product price the lines are read at. Drawn as computed (hollow square; dotted line).
+USD per kg of the ethanol stream
+Main feedstock
+0.2446
+Other materials
+0.2005
+Utilities
+-0.0605
+Fixed operating, labour included
+0.0493
+Capital recovery
+0.2249
+Base-case price
+0.6588
+
+Read from BioSTEAM's CellulosicEthanolTEA object for the base case: sales 121,768,094 USD/yr; installed equipment 192,647,846, fixed capital 327,521,097 and total capital 343,897,152 USD, once; over 8,410 operating hours a year.
+
+View as table
+CSV
+How the computed lines were made
+Streams
+CSV
+
+Every stream of the base case as BioSTEAM holds it after the run: the unit it leaves (feed, for one that enters the plant) and the one it enters (out, for one that leaves it), its phase, temperature, pressure and mass flow, by component.
+
+Stream	From	To	Phase	T (K)	P (Pa)	Mass flow (kg/hr)	By component (kg/hr)	Price (USD/kg)
+cornstover	feed	U101	l	298.1	101,325	104,229	Water 21,070; Sucrose 649; Extract 12,347; Acetate 1,525; Ash 4,155; Lignin 13,283; Protein 2,613; Glucan 29,499; Xylan 16,456; Arabinan 2,006; Mannan 505.7; Galactan 120.5	0.052
+s1	U101	M203	l	298.1	101,325	104,229	Water 21,070; Sucrose 649; Extract 12,347; Acetate 1,525; Ash 4,155; Lignin 13,283; Protein 2,613; Glucan 29,499; Xylan 16,456; Arabinan 2,006; Mannan 505.7; Galactan 120.5	—
+sulfuric_acid	feed	H2SO4_storage	l	294.1	547,155	1,926	Water 129.7; H2SO4 1,796	0.09
+s2	H2SO4_storage	T201	l	294.1	547,155	1,926	Water 129.7; H2SO4 1,796	—
+s3	T201	M201	l	294.1	547,155	1,926	Water 129.7; H2SO4 1,796	—
+warm_process_water_1	feed	M201	l	368.1	476,228	23,451	Water 23,451	—
+s4	M201	M203	l	366.4	476,228	25,377	Water 23,581; H2SO4 1,796	—
+pretreatment_steam	feed	M203	g	541.1	1,317,225	32,611	Water 32,611	—
+warm_process_water_2	feed	M203	l	368.1	476,228	153,578	Water 153,578	—
+s5	M203	R201	l	431.1	557,288	315,794	Water 230,839; H2SO4 1,796; Sucrose 649; Extract 12,347; Acetate 1,525; Ash 4,155; Lignin 13,283; Protein 2,613; Glucan 29,499; Xylan 16,456; Arabinan 2,006; Mannan 505.7; Galactan 120.5	—
+s6	R201	M204	g	403.1	272,462	0		—
+s7	R201	P201	l	403.1	272,462	315,723	Water 228,494; AceticAcid 1,525; Furfural 605.7; H2SO4 1,796; HMF 309.4; Glucose 3,586; Xylose 16,830; Arabinose 2,051; Extract 12,347; Ash 4,155; Lignin 12,619; SolubleLignin 664.1; GlucoseOligomer 88.5; GalactoseOligomer 2.893; MannoseOligomer 1.517; XyloseOligomer 394.9; ArabinoseOligomer 48.14; Protein 2,613; Glucan 26,401; Xylan 427.9; Arabinan 142.4; Mannan 502.7; Galactan 117.3	—
+s8	P201	T202	l	403.1	272,462	315,723	Water 228,494; AceticAcid 1,525; Furfural 605.7; H2SO4 1,796; HMF 309.4; Glucose 3,586; Xylose 16,830; Arabinose 2,051; Extract 12,347; Ash 4,155; Lignin 12,619; SolubleLignin 664.1; GlucoseOligomer 88.5; GalactoseOligomer 2.893; MannoseOligomer 1.517; XyloseOligomer 394.9; ArabinoseOligomer 48.14; Protein 2,613; Glucan 26,401; Xylan 427.9; Arabinan 142.4; Mannan 502.7; Galactan 117.3	—
+s9	T202	F201	l	403.1	272,462	315,723	Water 228,494; AceticAcid 1,525; Furfural 605.7; H2SO4 1,796; HMF 309.4; Glucose 3,586; Xylose 16,830; Arabinose 2,051; Extract 12,347; Ash 4,155; Lignin 12,619; SolubleLignin 664.1; GlucoseOligomer 88.5; GalactoseOligomer 2.893; MannoseOligomer 1.517; XyloseOligomer 394.9; ArabinoseOligomer 48.14; Protein 2,613; Glucan 26,401; Xylan 427.9; Arabinan 142.4; Mannan 502.7; Galactan 117.3	—
+s10	F201	M204	g	373.2	101,325	15,001	Water 14,657; AceticAcid 159.2; Furfural 184.4	—
+s11	F201	T203	l	373.2	101,325	300,723	Water 213,837; AceticAcid 1,366; Furfural 421.2; H2SO4 1,796; HMF 309.4; Glucose 3,586; Xylose 16,830; Arabinose 2,051; Extract 12,347; Ash 4,155; Lignin 12,619; SolubleLignin 664.1; GlucoseOligomer 88.5; GalactoseOligomer 2.893; MannoseOligomer 1.517; XyloseOligomer 394.9; ArabinoseOligomer 48.14; Protein 2,613; Glucan 26,401; Xylan 427.9; Arabinan 142.4; Mannan 502.7; Galactan 117.3	—
+ammonia	feed	Ammonia_storage	l	298.1	1,215,900	1,301	NH3 17.03; NH4OH 1,284	0.449
+s13	Ammonia_storage	M205	l	298.1	1,215,900	1,301	NH3 17.03; NH4OH 1,284	—
+ammonia_process_water	feed	M205	l	368.1	476,228	89,212	Water 89,212	—
+s14	M205	T203	l	367.6	476,228	90,513	Water 89,212; NH3 17.03; NH4OH 1,284	—
+s15	T203	P202	l	374.4	101,325	391,236	Water 303,709; AceticAcid 1,366; Furfural 421.2; NH3 17.03; AmmoniumSulfate 2,420; HMF 309.4; Glucose 3,586; Xylose 16,830; Arabinose 2,051; Extract 12,347; Ash 4,155; Lignin 12,619; SolubleLignin 664.1; GlucoseOligomer 88.5; GalactoseOligomer 2.893; MannoseOligomer 1.517; XyloseOligomer 394.9; ArabinoseOligomer 48.14; Protein 2,613; Glucan 26,401; Xylan 427.9; Arabinan 142.4; Mannan 502.7; Galactan 117.3	—
+pretreated_biomass	P202	M301	l	374.4	101,325	391,236	Water 303,709; AceticAcid 1,366; Furfural 421.2; NH3 17.03; AmmoniumSulfate 2,420; HMF 309.4; Glucose 3,586; Xylose 16,830; Arabinose 2,051; Extract 12,347; Ash 4,155; Lignin 12,619; SolubleLignin 664.1; GlucoseOligomer 88.5; GalactoseOligomer 2.893; MannoseOligomer 1.517; XyloseOligomer 394.9; ArabinoseOligomer 48.14; Protein 2,613; Glucan 26,401; Xylan 427.9; Arabinan 142.4; Mannan 502.7; Galactan 117.3	—
+cellulase	feed	M301	l	298.1	101,325	12,673	Water 12,039; Cellulase 633.6	0.212
+saccharification_water	feed	M301	l	298.1	101,325	26,324	Water 26,324	—
+s16	M301	H301	l	366.6	101,325	430,233	Water 342,072; AceticAcid 1,366; Furfural 421.2; NH3 17.03; AmmoniumSulfate 2,420; HMF 309.4; Glucose 3,586; Xylose 16,830; Arabinose 2,051; Extract 12,347; Ash 4,155; Lignin 12,619; SolubleLignin 664.1; GlucoseOligomer 88.5; GalactoseOligomer 2.893; MannoseOligomer 1.517; XyloseOligomer 394.9; ArabinoseOligomer 48.14; Protein 2,613; Glucan 26,401; Xylan 427.9; Arabinan 142.4; Mannan 502.7; Galactan 117.3; Cellulase 633.6	—
+s17	H301	R301	l	321.1	101,325	430,233	Water 342,072; AceticAcid 1,366; Furfural 421.2; NH3 17.03; AmmoniumSulfate 2,420; HMF 309.4; Glucose 3,586; Xylose 16,830; Arabinose 2,051; Extract 12,347; Ash 4,155; Lignin 12,619; SolubleLignin 664.1; GlucoseOligomer 88.5; GalactoseOligomer 2.893; MannoseOligomer 1.517; XyloseOligomer 394.9; ArabinoseOligomer 48.14; Protein 2,613; Glucan 26,401; Xylan 427.9; Arabinan 142.4; Mannan 502.7; Galactan 117.3; Cellulase 633.6	—
+slurry	R301	R303	l	321.1	101,325	430,233	Water 342,072; AceticAcid 1,366; Furfural 421.2; NH3 17.03; AmmoniumSulfate 2,420; HMF 309.4; Glucose 3,586; Xylose 16,830; Arabinose 2,051; Extract 12,347; Ash 4,155; Lignin 12,619; SolubleLignin 664.1; GlucoseOligomer 88.5; GalactoseOligomer 2.893; MannoseOligomer 1.517; XyloseOligomer 394.9; ArabinoseOligomer 48.14; Protein 2,613; Glucan 26,401; Xylan 427.9; Arabinan 142.4; Mannan 502.7; Galactan 117.3; Cellulase 633.6	—
+CSL	feed	CSL_storage	l	298.1	101,325	1,291	CSL 1,291	0.057
+s19	CSL_storage	S302	l	298.1	101,325	1,291	CSL 1,291	—
+CSL1	S302	R302	l	298.1	101,325	215.1	CSL 215.1	—
+CSL2	S302	R303	l	298.1	101,325	1,076	CSL 1,076	—
+DAP	feed	DAP_storage	l	298.1	101,325	158.9	DAP 158.9	0.987
+s18	DAP_storage	S301	l	298.1	101,325	158.9	DAP 158.9	—
+DAP1	S301	R302	l	298.1	101,325	25.17	DAP 25.17	—
+DAP2	S301	R303	l	298.1	101,325	133.7	DAP 133.7	—
+s22	T301	R303	l	305.1	101,325	41,293	Water 33,974; Ethanol 2,069; AceticAcid 136.6; Furfural 42.12; Glycerol 17.43; NH3 1.703; SuccinicAcid 43.44; DAP 22.7; AmmoniumSulfate 242; HMF 30.94; Glucose 149.9; Xylose 171.7; Arabinose 205.1; Extract 1,235; Ash 415.5; Lignin 1,262; SolubleLignin 66.41; GlucoseOligomer 114.5; GalactoseOligomer 0.289; MannoseOligomer 0.152; XyloseOligomer 39.49; ArabinoseOligomer 4.814; Z_mobilis 153.6; Protein 261.3; Glucan 126.7; Xylan 42.79; Xylitol 78.46; Cellobiose 33.44; CSL 213.3; Arabinan 14.24; Mannan 50.27; Galactan 11.73; Cellulase 63.36	—
+s23	R303	M304	g	305.1	101,325	18,864	Water 275.9; Ethanol 182.7; AceticAcid 2.146; Furfural 2.1; Glycerol 1.40×10⁻⁵; NH3 3.584; LacticAcid 8.43×10⁻⁴; SuccinicAcid 2.91×10⁻⁶; O2 151.3; CO2 18,247	—
+s24	R303	M401	l	305.1	101,325	410,878	Water 339,894; Ethanol 21,136; AceticAcid 1,364; Furfural 419.1; Glycerol 170.7; NH3 13.45; LacticAcid 1,656; SuccinicAcid 425.8; DAP 145.7; AmmoniumSulfate 2,420; HMF 309.4; Glucose 526.5; Xylose 1,085; Arabinose 1,990; Extract 12,347; Ash 4,155; Lignin 12,619; SolubleLignin 664.1; GlucoseOligomer 1,145; GalactoseOligomer 2.893; MannoseOligomer 1.517; XyloseOligomer 394.9; ArabinoseOligomer 48.14; Z_mobilis 816.9; Protein 2,933; Glucan 1,267; Xylan 427.9; Xylitol 771.2; Cellobiose 334.4; Arabinan 142.4; Mannan 502.7; Galactan 117.3; Cellulase 633.6	—
+recycle	R303	R302	l	305.1	101,325	43,023	Water 33,941; AceticAcid 136.6; Furfural 42.12; NH3 1.703; AmmoniumSulfate 242; HMF 30.94; Glucose 2,999; Xylose 1,683; Arabinose 205.1; Extract 1,235; Ash 415.5; Lignin 1,262; SolubleLignin 66.41; GlucoseOligomer 114.5; GalactoseOligomer 0.289; MannoseOligomer 0.152; XyloseOligomer 39.49; ArabinoseOligomer 4.814; Protein 261.3; Glucan 126.7; Xylan 42.79; Cellobiose 33.44; Arabinan 14.24; Mannan 50.27; Galactan 11.73; Cellulase 63.36	—
+s20	R302	M304	g	298.1	101,325	1,977	O2 17.16; CO2 1,960	—
+s21	R302	T301	l	305.1	101,325	41,293	Water 33,974; Ethanol 2,069; AceticAcid 136.6; Furfural 42.12; Glycerol 17.43; NH3 1.703; SuccinicAcid 43.44; DAP 22.7; AmmoniumSulfate 242; HMF 30.94; Glucose 149.9; Xylose 171.7; Arabinose 205.1; Extract 1,235; Ash 415.5; Lignin 1,262; SolubleLignin 66.41; GlucoseOligomer 114.5; GalactoseOligomer 0.289; MannoseOligomer 0.152; XyloseOligomer 39.49; ArabinoseOligomer 4.814; Z_mobilis 153.6; Protein 261.3; Glucan 126.7; Xylan 42.79; Xylitol 78.46; Cellobiose 33.44; CSL 213.3; Arabinan 14.24; Mannan 50.27; Galactan 11.73; Cellulase 63.36	—
+s26	M304	D401	g	304.5	101,325	20,842	Water 275.9; Ethanol 182.7; AceticAcid 2.146; Furfural 2.1; Glycerol 1.40×10⁻⁵; NH3 3.584; LacticAcid 8.43×10⁻⁴; SuccinicAcid 2.91×10⁻⁶; O2 168.4; CO2 20,207	—
+stripping_water	feed	D401	l	298.1	101,325	26,379	Water 26,379	—
+vent	D401	out	g	304.5	101,325	20,379	NH3 3.584; O2 168.4; CO2 20,207	—
+s27	D401	M401	l	298.1	101,325	26,842	Water 26,655; Ethanol 182.7; AceticAcid 2.146; Furfural 2.1; Glycerol 1.40×10⁻⁵; LacticAcid 8.43×10⁻⁴; SuccinicAcid 2.91×10⁻⁶	—
+s25	M401	T302	l	304.7	101,325	437,720	Water 366,549; Ethanol 21,318; AceticAcid 1,366; Furfural 421.2; Glycerol 170.7; NH3 13.45; LacticAcid 1,656; SuccinicAcid 425.8; DAP 145.7; AmmoniumSulfate 2,420; HMF 309.4; Glucose 526.5; Xylose 1,085; Arabinose 1,990; Extract 12,347; Ash 4,155; Lignin 12,619; SolubleLignin 664.1; GlucoseOligomer 1,145; GalactoseOligomer 2.893; MannoseOligomer 1.517; XyloseOligomer 394.9; ArabinoseOligomer 48.14; Z_mobilis 816.9; Protein 2,933; Glucan 1,267; Xylan 427.9; Xylitol 771.2; Cellobiose 334.4; Arabinan 142.4; Mannan 502.7; Galactan 117.3; Cellulase 633.6	—
+beer	T302	P401	l	304.7	101,325	437,720	Water 366,549; Ethanol 21,318; AceticAcid 1,366; Furfural 421.2; Glycerol 170.7; NH3 13.45; LacticAcid 1,656; SuccinicAcid 425.8; DAP 145.7; AmmoniumSulfate 2,420; HMF 309.4; Glucose 526.5; Xylose 1,085; Arabinose 1,990; Extract 12,347; Ash 4,155; Lignin 12,619; SolubleLignin 664.1; GlucoseOligomer 1,145; GalactoseOligomer 2.893; MannoseOligomer 1.517; XyloseOligomer 394.9; ArabinoseOligomer 48.14; Z_mobilis 816.9; Protein 2,933; Glucan 1,267; Xylan 427.9; Xylitol 771.2; Cellobiose 334.4; Arabinan 142.4; Mannan 502.7; Galactan 117.3; Cellulase 633.6	—
+s28	P401	H401	l	304.7	607,950	437,720	Water 366,549; Ethanol 21,318; AceticAcid 1,366; Furfural 421.2; Glycerol 170.7; NH3 13.45; LacticAcid 1,656; SuccinicAcid 425.8; DAP 145.7; AmmoniumSulfate 2,420; HMF 309.4; Glucose 526.5; Xylose 1,085; Arabinose 1,990; Extract 12,347; Ash 4,155; Lignin 12,619; SolubleLignin 664.1; GlucoseOligomer 1,145; GalactoseOligomer 2.893; MannoseOligomer 1.517; XyloseOligomer 394.9; ArabinoseOligomer 48.14; Z_mobilis 816.9; Protein 2,933; Glucan 1,267; Xylan 427.9; Xylitol 771.2; Cellobiose 334.4; Arabinan 142.4; Mannan 502.7; Galactan 117.3; Cellulase 633.6	—
+s30	P402	H401	l	395.3	607,950	394,958	Water 345,115; Ethanol 3.451; AceticAcid 1,366; Furfural 421.2; Glycerol 170.7; LacticAcid 1,656; SuccinicAcid 425.8; DAP 145.7; AmmoniumSulfate 2,420; HMF 309.4; Glucose 526.5; Xylose 1,085; Arabinose 1,990; Extract 12,347; Ash 4,155; Lignin 12,619; SolubleLignin 664.1; GlucoseOligomer 1,145; GalactoseOligomer 2.893; MannoseOligomer 1.517; XyloseOligomer 394.9; ArabinoseOligomer 48.14; Z_mobilis 816.9; Protein 2,933; Glucan 1,267; Xylan 427.9; Xylitol 771.2; Cellobiose 334.4; Arabinan 142.4; Mannan 502.7; Galactan 117.3; Cellulase 633.6	—
+s31	H401	D402	l	378.3	607,950	437,720	Water 366,549; Ethanol 21,318; AceticAcid 1,366; Furfural 421.2; Glycerol 170.7; NH3 13.45; LacticAcid 1,656; SuccinicAcid 425.8; DAP 145.7; AmmoniumSulfate 2,420; HMF 309.4; Glucose 526.5; Xylose 1,085; Arabinose 1,990; Extract 12,347; Ash 4,155; Lignin 12,619; SolubleLignin 664.1; GlucoseOligomer 1,145; GalactoseOligomer 2.893; MannoseOligomer 1.517; XyloseOligomer 394.9; ArabinoseOligomer 48.14; Z_mobilis 816.9; Protein 2,933; Glucan 1,267; Xylan 427.9; Xylitol 771.2; Cellobiose 334.4; Arabinan 142.4; Mannan 502.7; Galactan 117.3; Cellulase 633.6	—
+stillage	H401	S401	l	314.7	607,950	394,958	Water 345,115; Ethanol 3.451; AceticAcid 1,366; Furfural 421.2; Glycerol 170.7; LacticAcid 1,656; SuccinicAcid 425.8; DAP 145.7; AmmoniumSulfate 2,420; HMF 309.4; Glucose 526.5; Xylose 1,085; Arabinose 1,990; Extract 12,347; Ash 4,155; Lignin 12,619; SolubleLignin 664.1; GlucoseOligomer 1,145; GalactoseOligomer 2.893; MannoseOligomer 1.517; XyloseOligomer 394.9; ArabinoseOligomer 48.14; Z_mobilis 816.9; Protein 2,933; Glucan 1,267; Xylan 427.9; Xylitol 771.2; Cellobiose 334.4; Arabinan 142.4; Mannan 502.7; Galactan 117.3; Cellulase 633.6	—
+distilled_beer	D402	M402	g	386.1	212,783	42,762	Water 21,434; Ethanol 21,315; NH3 13.45	—
+s29	D402	P402	l	395.3	212,783	394,958	Water 345,115; Ethanol 3.451; AceticAcid 1,366; Furfural 421.2; Glycerol 170.7; LacticAcid 1,656; SuccinicAcid 425.8; DAP 145.7; AmmoniumSulfate 2,420; HMF 309.4; Glucose 526.5; Xylose 1,085; Arabinose 1,990; Extract 12,347; Ash 4,155; Lignin 12,619; SolubleLignin 664.1; GlucoseOligomer 1,145; GalactoseOligomer 2.893; MannoseOligomer 1.517; XyloseOligomer 394.9; ArabinoseOligomer 48.14; Z_mobilis 816.9; Protein 2,933; Glucan 1,267; Xylan 427.9; Xylitol 771.2; Cellobiose 334.4; Arabinan 142.4; Mannan 502.7; Galactan 117.3; Cellulase 633.6	—
+recycled_water	feed	S401	l	320.1	395,168	1	Water 1	—
+s44	S401	slurry_mixer	l	314.7	395,168	36,180	Water 12,663; Ethanol 0.128; AceticAcid 50.74; Furfural 15.04; Glycerol 6.338; LacticAcid 61.7; SuccinicAcid 15.81; DAP 5.415; AmmoniumSulfate 89.93; HMF 11.05; Glucose 19.2; Xylose 40.85; Arabinose 71.44; Extract 460.2; Ash 4,072; Lignin 12,366; SolubleLignin 24.75; GlucoseOligomer 42.6; GalactoseOligomer 0.108; MannoseOligomer 0.056; XyloseOligomer 14.7; ArabinoseOligomer 1.792; Z_mobilis 800.5; Protein 2,874; Glucan 1,242; Xylan 419.8; Xylitol 28.64; Cellobiose 12.01; Arabinan 139.5; Mannan 492.2; Galactan 114.8; Cellulase 23.62	—
+s45	S401	M601	l	314.7	395,168	358,779	Water 332,453; Ethanol 3.323; AceticAcid 1,316; Furfural 406.2; Glycerol 164.3; LacticAcid 1,594; SuccinicAcid 410; DAP 140.3; AmmoniumSulfate 2,330; HMF 298.3; Glucose 507.3; Xylose 1,044; Arabinose 1,918; Extract 11,887; Ash 83.52; Lignin 252.4; SolubleLignin 639.4; GlucoseOligomer 1,102; GalactoseOligomer 2.785; MannoseOligomer 1.461; XyloseOligomer 380.2; ArabinoseOligomer 46.35; Z_mobilis 16.42; Protein 58.66; Glucan 25.22; Xylan 8.086; Xylitol 742.5; Cellobiose 322.4; Arabinan 2.962; Mannan 10.46; Galactan 2.439; Cellulase 610	—
+s12	M204	H201	g	373.2	101,325	15,001	Water 14,657; AceticAcid 159.2; Furfural 184.4	—
+pretreatment_wastewater	H201	M601	l	373.1	101,325	15,001	Water 14,657; AceticAcid 159.2; Furfural 184.4	—
+s46	M601	WWTC	l	317.1	101,325	373,780	Water 347,110; Ethanol 3.323; AceticAcid 1,475; Furfural 590.7; Glycerol 164.3; LacticAcid 1,594; SuccinicAcid 410; DAP 140.3; AmmoniumSulfate 2,330; HMF 298.3; Glucose 507.3; Xylose 1,044; Arabinose 1,918; Extract 11,887; Ash 83.52; Lignin 252.4; SolubleLignin 639.4; GlucoseOligomer 1,102; GalactoseOligomer 2.785; MannoseOligomer 1.461; XyloseOligomer 380.2; ArabinoseOligomer 46.35; Z_mobilis 16.42; Protein 58.66; Glucan 25.22; Xylan 8.086; Xylitol 742.5; Cellobiose 322.4; Arabinan 2.962; Mannan 10.46; Galactan 2.439; Cellulase 610	—
+s47	WWTC	R601	l	317.1	101,325	373,780	Water 347,110; Ethanol 3.323; AceticAcid 1,475; Furfural 590.7; Glycerol 164.3; LacticAcid 1,594; SuccinicAcid 410; DAP 140.3; AmmoniumSulfate 2,330; HMF 298.3; Glucose 507.3; Xylose 1,044; Arabinose 1,918; Extract 11,887; Ash 83.52; Lignin 252.4; SolubleLignin 639.4; GlucoseOligomer 1,102; GalactoseOligomer 2.785; MannoseOligomer 1.461; XyloseOligomer 380.2; ArabinoseOligomer 46.35; Z_mobilis 16.42; Protein 58.66; Glucan 25.22; Xylan 8.086; Xylitol 742.5; Cellobiose 322.4; Arabinan 2.962; Mannan 10.46; Galactan 2.439; Cellulase 610	—
+biogas	R601	gas_mixer	g	307.6	101,325	21,149	Water 667.1; Ethanol 0.007; AceticAcid 0.543; Furfural 0.839; Glycerol 4.07×10⁻⁶; LacticAcid 2.35×10⁻⁴; SuccinicAcid 8.18×10⁻⁷; CH4 5,633; CO2 14,847	—
+s48	R601	M602	l	307.6	101,325	326,557	Water 321,870; Ethanol 0.274; AceticAcid 122.8; Furfural 48.81; Glycerol 13.7; LacticAcid 133.3; SuccinicAcid 34.18; DAP 130.8; AmmoniumSulfate 2,172; HMF 25.06; Glucose 42.61; Xylose 86.8; Arabinose 160.7; Extract 994; Ash 21.1; Lignin 64.61; SolubleLignin 53.47; GlucoseOligomer 92.09; GalactoseOligomer 0.233; MannoseOligomer 0.122; XyloseOligomer 31.78; ArabinoseOligomer 3.874; Z_mobilis 0.379; Protein 1.377; Glucan 6.456; Xylan 2.022; Xylitol 61.9; Cellobiose 27.01; WWTsludge 305.1; Cellulase 51.01	—
+s49	R601	M603	l	308.1	101,325	26,074	Water 24,573; Ethanol 0.018; AceticAcid 9.385; Furfural 3.512; Glycerol 1.091; LacticAcid 10.16; SuccinicAcid 2.722; DAP 9.512; AmmoniumSulfate 158; HMF 1.79; Glucose 3.044; Xylose 7.148; Arabinose 11.94; Extract 75.79; Ash 62.41; Lignin 187.8; SolubleLignin 4.076; GlucoseOligomer 7.084; GalactoseOligomer 0.018; MannoseOligomer 0.009; XyloseOligomer 2.444; ArabinoseOligomer 0.298; Z_mobilis 1.099; Protein 3.902; Glucan 18.76; Xylan 6.065; Xylitol 4.93; Cellobiose 2.007; Arabinan 2.962; Mannan 10.46; Galactan 2.439; WWTsludge 885.6; Cellulase 3.889	—
+s50	M604	M602	l	307.7	101,325	1,907,787	Water 1,877,523; Ethanol 0.028; AceticAcid 13.47; Furfural 5.41; Glycerol 1.499; LacticAcid 14.54; SuccinicAcid 3.741; DAP 806.1; AmmoniumSulfate 13,387; HMF 2.764; SO2 6.298; Glucose 4.7; Xylose 10.05; Arabinose 17.3; Extract 108.5; Ash 115.5; NaOH 10,888; Lignin 350.2; SolubleLignin 5.834; GlucoseOligomer 9.857; GalactoseOligomer 0.025; MannoseOligomer 0.013; XyloseOligomer 3.401; ArabinoseOligomer 0.415; Z_mobilis 0.07; Protein 0.268; Glucan 35.05; Xylan 11.03; Xylitol 6.775; Cellobiose 2.907; Arabinan 0.83; Mannan 2.93; Galactan 0.684; WWTsludge 4,444; Cellulase 5.566	—
+s51	M602	R602	l	307.7	101,325	2,231,127	Water 2,196,300; Ethanol 0.301; AceticAcid 136.3; Furfural 54.22; Glycerol 15.2; LacticAcid 147.8; SuccinicAcid 37.92; DAP 935.2; AmmoniumSulfate 15,533; HMF 27.82; SO2 6.287; Glucose 47.31; Xylose 96.85; Arabinose 178; Extract 1,103; Ash 136.5; NaOH 10,799; Lignin 414.5; SolubleLignin 59.3; GlucoseOligomer 101.9; GalactoseOligomer 0.258; MannoseOligomer 0.135; XyloseOligomer 35.18; ArabinoseOligomer 4.288; Z_mobilis 0.449; Protein 1.646; Glucan 41.47; Xylan 13.04; Xylitol 68.67; Cellobiose 29.92; Arabinan 0.829; Mannan 2.928; Galactan 0.683; WWTsludge 4,742; Cellulase 56.58	—
+air_lagoon	feed	R602	g	298.1	101,325	10,053	N2 7,841; O2 2,212	—
+caustic	feed	R602	l	298.1	101,325	3,950	Water 1,975; NaOH 1,975	0.075
+evaporated_water	R602	out	g	298.1	101,325	35,575	Water 24,851; N2 7,847; O2 368.6; CO2 2,508	—
+s52	R602	S601	l	307.7	101,325	2,209,555	Water 2,174,382; Ethanol 0.012; AceticAcid 5.451; Furfural 2.169; Glycerol 0.608; LacticAcid 5.913; SuccinicAcid 1.517; DAP 935.2; AmmoniumSulfate 15,533; HMF 1.113; SO2 7.428; Glucose 1.892; Xylose 3.874; Arabinose 7.121; Extract 44.1; Ash 136.5; NaOH 12,774; Lignin 414.5; SolubleLignin 2.372; GlucoseOligomer 4.078; GalactoseOligomer 0.01; MannoseOligomer 0.005; XyloseOligomer 1.407; ArabinoseOligomer 0.172; Z_mobilis 0.018; Protein 0.066; Glucan 41.47; Xylan 13.04; Xylitol 2.747; Cellobiose 1.197; Arabinan 0.829; Mannan 2.928; Galactan 0.683; WWTsludge 5,227; Cellulase 2.263	—
+s53	S601	S604	l	307.7	101,325	321,162	Water 316,155; Ethanol 0.002; AceticAcid 0.681; Furfural 0.271; Glycerol 0.076; LacticAcid 0.857; SuccinicAcid 0.19; DAP 136; AmmoniumSulfate 2,258; HMF 0.139; SO2 1.114; Glucose 0.237; Xylose 0.969; Arabinose 0.89; Extract 6.395; Ash 19.79; NaOH 1,857; Lignin 60.1; SolubleLignin 0.344; GlucoseOligomer 0.583; GalactoseOligomer 0.001; MannoseOligomer 7.72×10⁻⁴; XyloseOligomer 0.201; ArabinoseOligomer 0.025; Z_mobilis 0.002; Protein 0.008; Glucan 6.014; Xylan 1.891; Xylitol 0.343; Cellobiose 0.15; Arabinan 0.12; Mannan 0.424; Galactan 0.099; WWTsludge 653.3; Cellulase 0.328	—
+s54	S601	S602	l	307.7	101,325	1,888,393	Water 1,858,227; Ethanol 0.011; AceticAcid 4.769; Furfural 1.898; Glycerol 0.532; LacticAcid 5.056; SuccinicAcid 1.327; DAP 799.3; AmmoniumSulfate 13,274; HMF 0.974; SO2 6.314; Glucose 1.656; Xylose 2.906; Arabinose 6.231; Extract 37.71; Ash 116.7; NaOH 10,916; Lignin 354.4; SolubleLignin 2.028; GlucoseOligomer 3.495; GalactoseOligomer 0.009; MannoseOligomer 0.005; XyloseOligomer 1.206; ArabinoseOligomer 0.147; Z_mobilis 0.016; Protein 0.058; Glucan 35.46; Xylan 11.15; Xylitol 2.403; Cellobiose 1.047; Arabinan 0.709; Mannan 2.503; Galactan 0.584; WWTsludge 4,573; Cellulase 1.935	—
+s55	S602	M604	l	307.7	101,325	1,812,857	Water 1,783,898; Ethanol 0.01; AceticAcid 4.579; Furfural 1.822; Glycerol 0.511; LacticAcid 4.853; SuccinicAcid 1.274; DAP 767.3; AmmoniumSulfate 12,743; HMF 0.935; SO2 6.061; Glucose 1.59; Xylose 2.789; Arabinose 5.982; Extract 36.2; Ash 112; NaOH 10,480; Lignin 340.2; SolubleLignin 1.947; GlucoseOligomer 3.355; GalactoseOligomer 0.008; MannoseOligomer 0.004; XyloseOligomer 1.158; ArabinoseOligomer 0.141; Z_mobilis 0.015; Protein 0.055; Glucan 34.04; Xylan 10.7; Xylitol 2.307; Cellobiose 1.005; Arabinan 0.681; Mannan 2.403; Galactan 0.561; WWTsludge 4,390; Cellulase 1.858	—
+s56	S602	M603	l	307.7	101,325	75,536	Water 74,329; Ethanol 4.22×10⁻⁴; AceticAcid 0.191; Furfural 0.076; Glycerol 0.021; LacticAcid 0.202; SuccinicAcid 0.053; DAP 31.97; AmmoniumSulfate 531; HMF 0.039; SO2 0.253; Glucose 0.066; Xylose 0.116; Arabinose 0.249; Extract 1.508; Ash 4.668; NaOH 436.7; Lignin 14.18; SolubleLignin 0.081; GlucoseOligomer 0.14; GalactoseOligomer 3.53×10⁻⁴; MannoseOligomer 1.85×10⁻⁴; XyloseOligomer 0.048; ArabinoseOligomer 0.006; Z_mobilis 6.28×10⁻⁴; Protein 0.002; Glucan 1.418; Xylan 0.446; Xylitol 0.096; Cellobiose 0.042; Arabinan 0.028; Mannan 0.1; Galactan 0.023; WWTsludge 182.9; Cellulase 0.077	—
+s57	M603	S603	l	307.8	101,325	101,609	Water 98,902; Ethanol 0.019; AceticAcid 9.575; Furfural 3.588; Glycerol 1.112; LacticAcid 10.36; SuccinicAcid 2.775; DAP 41.48; AmmoniumSulfate 688.9; HMF 1.829; SO2 0.253; Glucose 3.11; Xylose 7.265; Arabinose 12.19; Extract 77.3; Ash 67.08; NaOH 436.7; Lignin 201.9; SolubleLignin 4.158; GlucoseOligomer 7.224; GalactoseOligomer 0.018; MannoseOligomer 0.01; XyloseOligomer 2.493; ArabinoseOligomer 0.304; Z_mobilis 1.1; Protein 3.904; Glucan 20.18; Xylan 6.511; Xylitol 5.026; Cellobiose 2.048; Arabinan 2.991; Mannan 10.56; Galactan 2.463; WWTsludge 1,069; Cellulase 3.967	—
+s58	S603	M604	l	307.8	101,325	94,930	Water 93,626; Ethanol 0.018; AceticAcid 8.892; Furfural 3.588; Glycerol 0.989; LacticAcid 9.69; SuccinicAcid 2.467; DAP 38.76; AmmoniumSulfate 643.8; HMF 1.829; SO2 0.237; Glucose 3.11; Xylose 7.265; Arabinose 11.32; Extract 72.27; Ash 3.458; NaOH 408; Lignin 9.982; SolubleLignin 3.887; GlucoseOligomer 6.501; GalactoseOligomer 0.016; MannoseOligomer 0.009; XyloseOligomer 2.243; ArabinoseOligomer 0.273; Z_mobilis 0.055; Protein 0.213; Glucan 1.007; Xylan 0.325; Xylitol 4.468; Cellobiose 1.902; Arabinan 0.149; Mannan 0.527; Galactan 0.123; WWTsludge 53.33; Cellulase 3.709	—
+sludge	S603	slurry_mixer	l	307.8	101,325	6,679	Water 5,277; Ethanol 0.001; AceticAcid 0.684; Glycerol 0.124; LacticAcid 0.674; SuccinicAcid 0.308; DAP 2.721; AmmoniumSulfate 45.19; SO2 0.015; Arabinose 0.87; Extract 5.024; Ash 63.62; NaOH 28.64; Lignin 192; SolubleLignin 0.27; GlucoseOligomer 0.722; GalactoseOligomer 0.002; MannoseOligomer 9.58×10⁻⁴; XyloseOligomer 0.249; ArabinoseOligomer 0.03; Z_mobilis 1.045; Protein 3.691; Glucan 19.17; Xylan 6.186; Xylitol 0.558; Cellobiose 0.146; Arabinan 2.841; Mannan 10.03; Galactan 2.34; WWTsludge 1,015; Cellulase 0.258	—
+to_boiler	slurry_mixer	BT	l	313.1	101,325	42,859	Water 17,940; Ethanol 0.13; AceticAcid 51.43; Furfural 15.04; Glycerol 6.462; LacticAcid 62.37; SuccinicAcid 16.12; DAP 8.136; AmmoniumSulfate 135.1; HMF 11.05; SO2 0.015; Glucose 19.2; Xylose 40.85; Arabinose 72.31; Extract 465.2; Ash 4,135; NaOH 28.64; Lignin 12,558; SolubleLignin 25.02; GlucoseOligomer 43.32; GalactoseOligomer 0.109; MannoseOligomer 0.057; XyloseOligomer 14.95; ArabinoseOligomer 1.822; Z_mobilis 801.6; Protein 2,878; Glucan 1,261; Xylan 426; Xylitol 29.2; Cellobiose 12.15; Arabinan 142.3; Mannan 502.2; Galactan 117.2; WWTsludge 1,015; Cellulase 23.87	—
+RO_treated_water_1	S604	treated_water_mixer	l	307.7	101,325	312,045	Water 312,045	—
+brine	S604	out	l	307.7	101,325	9,117	Water 4,110; Ethanol 0.002; AceticAcid 0.681; Furfural 0.271; Glycerol 0.076; LacticAcid 0.857; SuccinicAcid 0.19; DAP 136; AmmoniumSulfate 2,258; HMF 0.139; SO2 1.114; Glucose 0.237; Xylose 0.969; Arabinose 0.89; Extract 6.395; Ash 19.79; NaOH 1,857; Lignin 60.1; SolubleLignin 0.344; GlucoseOligomer 0.583; GalactoseOligomer 0.001; MannoseOligomer 7.72×10⁻⁴; XyloseOligomer 0.201; ArabinoseOligomer 0.025; Z_mobilis 0.002; Protein 0.008; Glucan 6.014; Xylan 1.891; Xylitol 0.343; Cellobiose 0.15; Arabinan 0.12; Mannan 0.424; Galactan 0.099; WWTsludge 653.3; Cellulase 0.328	—
+s61	treated_water_mixer	PWC	l	307.7	101,325	312,045	Water 312,045	—
+s36	U401	M402	g	388.1	162,120	6,310	Water 2,186; Ethanol 4,124	—
+s32	M402	D403	g	386.4	162,120	49,071	Water 23,619; Ethanol 25,439; NH3 13.45	—
+s33	D403	H402	g	363.9	162,120	27,815	Water 2,363; Ethanol 25,438; NH3 13.45	—
+s34	D403	P403	l	386.8	162,120	21,256	Water 21,256; Ethanol 0.213	—
+s35	H402	U401	g	388.1	162,120	27,815	Water 2,363; Ethanol 25,438; NH3 13.45	—
+s37	U401	H403	g	388.1	162,120	21,505	Water 177.2; Ethanol 21,315; NH3 13.45	—
+s38	H403	T701	l	340	162,120	21,505	Water 177.2; Ethanol 21,315; NH3 13.45	—
+s39	T701	P701	l	340	162,120	21,505	Water 177.2; Ethanol 21,315; NH3 13.45	—
+s40	P701	M701	l	340	162,120	21,505	Water 177.2; Ethanol 21,315; NH3 13.45	—
+denaturant	feed	T702	l	298.1	101,325	473.1	Denaturant 473.1	0.756
+s41	T702	P702	l	298.1	101,325	473.1	Denaturant 473.1	—
+s42	P702	M701	l	298.1	101,325	473.1	Denaturant 473.1	—
+s43	M701	T703	l	339.3	101,325	21,978	Water 177.2; Ethanol 21,315; NH3 13.45; Denaturant 473.1	—
+ethanol	T703	out	l	339.3	101,325	21,978	Water 177.2; Ethanol 21,315; NH3 13.45; Denaturant 473.1	0.659
+gas_to_boiler	gas_mixer	BT	g	307.6	101,325	21,149	Water 667.1; Ethanol 0.007; AceticAcid 0.543; Furfural 0.839; Glycerol 4.07×10⁻⁶; LacticAcid 2.35×10⁻⁴; SuccinicAcid 8.18×10⁻⁷; CH4 5,633; CO2 14,847	—
+recycle_process_water	P403	process_water_mixer	l	386.8	162,120	21,256	Water 21,256; Ethanol 0.213	—
+s60	process_water_mixer	PWC	l	386.8	162,120	21,256	Water 21,256; Ethanol 0.213	—
+plant_air	feed	ADP	l	298.1	101,325	83,383	N2 83,383	—
+s59	ADP	out	l	298.1	101,325	83,383	N2 83,383	—
+bioreactor_cleaning_chemicals	feed	CIP	l	298.1	101,325	126.1	Water 126.1	—
+bioreactor_cleaning_wastewater	CIP	out	l	298.1	101,325	126.1	Water 126.1	—
+cooling_tower_makeup_water	feed	CT	l	301.1	101,325	79,743	Water 79,743	—
+cooling_tower_chemicals	feed	CT	l	301.1	101,325	1.829	Water 1.829	3
+cooling_tower_blowdown	CT	out	l	310.1	101,325	7,249	Water 7,249	—
+cooling_tower_evaporation	CT	out	g	310.1	101,325	72,494	Water 72,494	—
+boiler_makeup_water	feed	BT	l	298.1	101,325	7,690	Water 7,690	—
+natural_gas	feed	BT	g	288.7	101,560	0		—
+FGD_lime	feed	BT	l	298.1	101,325	362.7	Water 178.8; Lime 183.8	0.199
+boiler_chemicals	feed	BT	l	298.1	101,325	0.496	Ash 0.496	4.996
+air	feed	BT	g	298.1	101,325	1,275,420	N2 1,007,582; O2 267,838	—
+emissions	BT	out	g	397.8	101,325	1,333,835	Water 40,850; P4O10 4.373; N2 1,008,359; O2 210,942; SO2 10.6; CO2 73,669	—
+boiler_blowdown_water	BT	out	l	298.1	101,325	7,690	Water 7,690	—
+ash	BT	out	l	298.1	101,325	5,734	Water 1,323; CaSO4 259; Ash 4,152	—
+makeup_RO_water	feed	PWC	l	298.1	101,325	0		—
+makeup_process_water	feed	PWC	l	298.1	101,325	105,813	Water 105,813	—
+RO_treated_water_2	PWC	out	l	298.1	101,325	87,433	Water 87,433	—
+recycled_process_water	PWC	out	l	298.1	101,325	351,681	Water 351,681	—
+excess_water	PWC	out	l	298.1	101,325	0		—
+Equipment
+CSV
+
+Every unit operation in run order, with BioSTEAM's installed and purchase cost and its heat duties and power; a dash where the unit has none.
+
+Unit	Class	Line	Installed cost (USD)	Purchase cost (USD)	Heating duty (kJ/hr)	Cooling duty (kJ/hr)	Power (kW)
+U101	FeedStockHandling	Feed stock handling	0	0	—	—	861.8
+H2SO4_storage	SulfuricAcidStorageTank	Sulfuric acid storage tank	159,067	102,112	—	—	0.486
+T201	SulfuricAcidTank	Sulfuric acid tank	22,549	10,561	—	—	0.518
+M201	SulfuricAcidMixer	Sulfuric acid mixer	2,606	2,606	—	—	—
+M203	SteamMixer	Steam mixer	0	0	154,937,281	0	—
+R201	PretreatmentReactorSystem	Pretreatment reactor system	30,271,320	20,146,766	—	—	4,667
+P201	BlowdownDischargePump	Blowdown discharge pump	59,150	25,717	—	—	100.6
+T202	OligomerConversionTank	Oligomer conversion tank	644,271	349,780	—	—	270
+F201	PretreatmentFlash	Pretreatment flash	1,414,650	738,038	—	—	282
+Ammonia_storage	AmmoniaStorageTank	Ammonia storage tank	424,659	212,330	—	—	—
+M205	AmmoniaMixer	Ammonia mixer	3,815	3,815	—	—	—
+T203	AmmoniaAdditionTank	Ammonia addition tank	721,472	480,981	—	—	7.109
+P202	HydrolyzatePump	Hydrolyzate pump	50,949	22,152	—	—	72.54
+M301	EnzymeHydrolysateMixer	Enzyme hydrolysate mixer	198,452	116,736	—	—	84.43
+H301	HydrolysateHeatExchanger	Hydrolysate heat exchanger	320,292	145,587	0	71,534,937	—
+R301	ContinuousPresaccharification	Continuous presaccharification	10,025,390	5,005,492	—	—	293.9
+CSL_storage	CSLStorageTank	CSLStorage tank	213,277	90,173	—	—	7.255
+S302	MockSplitter	Splitter	0	0	—	—	—
+DAP_storage	DAPStorageTank	DAPStorage tank	255,818	143,259	—	—	4.365
+S301	MockSplitter	Splitter	0	0	—	—	—
+R303	SaccharificationAndCoFermentation	Saccharification and co fermentation	1,684,979	823,078	0	42,646,391	154.1
+R302	SeedTrain	Seed train	633,105	340,730	0	1,941,390	82.43
+T301	SeedHoldTank	Seed hold tank	874,276	488,888	—	—	18.7
+M304	Mixer	Mixer	0	0	—	—	—
+D401	VentScrubber	Vent scrubber	494,619	206,091	—	—	—
+M401	Mixer	Mixer	0	0	—	—	—
+T302	BeerTank	Beer tank	1,342,551	749,818	—	—	111.1
+P401	Pump	Pump	62,137	23,042	—	—	80.7
+H401	HXprocess	Heat exchanger	660,535	207,811	—	—	—
+D402	BinaryDistillation	Distillation Column	1,614,207	565,784	132,227,997	26,648,954	17.06
+P402	Pump	Pump	52,595	19,732	—	—	59.31
+S401	PressureFilter	Pressure filter	7,833,731	4,539,184	—	—	1,641
+M204	Mixer	Mixer	0	0	—	—	—
+H201	WasteVaporCondenser	Waste vapor condenser	197,680	89,854	0	33,230,524	—
+M601	Mixer	Mixer	0	0	—	—	—
+WWTC	WastewaterSystemCost	Wastewater system cost	46,515,962	46,515,962	—	—	6,465
+R601	AnaerobicDigestion	Anaerobic digestion	0	0	—	—	—
+M602	Mixer	Mixer	0	0	—	—	—
+R602	AerobicDigestion	Aerobic digestion	0	0	—	—	—
+S601	MembraneBioreactor	Membrane bioreactor	0	0	—	—	—
+S602	Splitter	Splitter	0	0	—	—	—
+M603	Mixer	Mixer	0	0	—	—	—
+S603	SludgeCentrifuge	Sludge centrifuge	0	0	—	—	—
+M604	Mixer	Mixer	0	0	—	—	—
+slurry_mixer	Mixer	Mixer	0	0	—	—	—
+S604	ReverseOsmosis	Reverse osmosis	0	0	—	—	—
+treated_water_mixer	Mixer	Mixer	0	0	—	—	—
+M402	Mixer	Mixer	0	0	—	—	—
+D403	BinaryDistillation	Divided Distillation Column	1,507,167	538,622	29,568,806	74,939,264	2.128
+H402	HXutility	Heat exchanger	7,032	5,038	1,273,007	0	—
+U401	MolecularSieve	Molecular sieve	4,564,323	2,535,735	34,161,127	1,193,758	143.1
+H403	HXutility	Heat exchanger	124,827	38,923	0	20,557,567	—
+T701	StorageTank	Storage tank	330,846	143,846	—	—	—
+P701	Pump	Pump	14,681	4,449	—	—	1.743
+T702	StorageTank	Storage tank	188,629	82,013	—	—	—
+P702	Pump	Pump	13,277	4,023	—	—	0.054
+M701	Mixer	Mixer	0	0	—	—	—
+T703	StorageTank	Storage tank	1,729,816	752,094	—	—	—
+gas_mixer	Mixer	Mixer	0	0	—	—	—
+P403	Pump	Pump	14,408	4,366	—	—	1.451
+process_water_mixer	Mixer	Mixer	0	0	—	—	—
+CWP	ChilledWaterPackage	Chilled water package	1,624,724	1,083,150	0	0	1,930
+ADP	AirDistributionPackage	Air distribution package	119,861	57,922	—	—	111.9
+CIP	CIPpackage	CIP Package	1,156,737	642,632	—	—	—
+CT	CoolingTower	Cooling tower	2,167,461	1,238,026	0	-272,692,784	1,828
+FWT	FireWaterTank	Fire water tank	1,479,899	823,005	—	—	94.28
+BT	BoilerTurbogenerator	Boiler turbogenerator	70,442,930	39,190,792	-352,168,219	30,407,323	-46,391
+PWC	ProcessWaterCenter	Process water center	407,115	226,723	—	—	48.05
+Utilities
+CSV
+
+The plant's heating, cooling and electricity, as BioSTEAM's UnitGroup totals them over the units the TEA costs, each in the unit the UnitGroup states.
+
+Duty	Total	Unit
+Heating	352.2	GJ/hr
+Cooling	347.7	GJ/hr
+Electricity consumed	20.91	MW
+Electricity produced	47.86	MW
+Diagram
+CSV
+
+The units in the order the run simulated them.
+
+A library plant’s run draws no diagram on any host: its SFF file’s graph is its drawing, on the record run-bfda026530692adc. The units are listed in run order.
+
+U101 · FeedStockHandling
+H2SO4_storage · SulfuricAcidStorageTank
+T201 · SulfuricAcidTank
+M201 · SulfuricAcidMixer
+M203 · SteamMixer
+R201 · PretreatmentReactorSystem
+P201 · BlowdownDischargePump
+T202 · OligomerConversionTank
+F201 · PretreatmentFlash
+Ammonia_storage · AmmoniaStorageTank
+M205 · AmmoniaMixer
+T203 · AmmoniaAdditionTank
+P202 · HydrolyzatePump
+M301 · EnzymeHydrolysateMixer
+H301 · HydrolysateHeatExchanger
+R301 · ContinuousPresaccharification
+CSL_storage · CSLStorageTank
+S302 · MockSplitter
+DAP_storage · DAPStorageTank
+S301 · MockSplitter
+R303 · SaccharificationAndCoFermentation
+R302 · SeedTrain
+T301 · SeedHoldTank
+M304 · Mixer
+D401 · VentScrubber
+M401 · Mixer
+T302 · BeerTank
+P401 · Pump
+H401 · HXprocess
+D402 · BinaryDistillation
+P402 · Pump
+S401 · PressureFilter
+M204 · Mixer
+H201 · WasteVaporCondenser
+M601 · Mixer
+WWTC · WastewaterSystemCost
+R601 · AnaerobicDigestion
+M602 · Mixer
+R602 · AerobicDigestion
+S601 · MembraneBioreactor
+S602 · Splitter
+M603 · Mixer
+S603 · SludgeCentrifuge
+M604 · Mixer
+slurry_mixer · Mixer
+S604 · ReverseOsmosis
+treated_water_mixer · Mixer
+M402 · Mixer
+D403 · BinaryDistillation
+H402 · HXutility
+U401 · MolecularSieve
+H403 · HXutility
+T701 · StorageTank
+P701 · Pump
+T702 · StorageTank
+P702 · Pump
+M701 · Mixer
+T703 · StorageTank
+gas_mixer · Mixer
+P403 · Pump
+process_water_mixer · Mixer
+CWP · ChilledWaterPackage
+ADP · AirDistributionPackage
+CIP · CIPpackage
+CT · CoolingTower
+FWT · FireWaterTank
+BT · BoilerTurbogenerator
+PWC · ProcessWaterCenter
+
+
+== /p/ethanol/pureos/train/e7efa2505b4633de
+pureOS
+PUREOS · TRAIN
+e7efa2505b4633de
+The units of a run, in the order it ran them (a run Proforma priced, or a train built in pureOS): what enters and leaves each, how much of the product it passes on toward the product stream, and how much is still on the path after it.
+Trains
+Builder
+Train
+PRODUCT
+Ethanol
+in ethanol
+OVERALL RECOVERY
+100.0%
+of what the path delivers or loses
+UNITS
+68
+41 on the product's path
+PRODUCT OUT
+2.13×10⁴kg/hr
+3.664 kg/hr lost on the way
+Computed · basis attached
+Run e7efa2505b4633de · a library plant · 2026-11-05 09:17 UTC
+Build a train from this run
+
+Read from the run Proforma priced: one artifact holds its stream and unit tables, and every number here is arithmetic over that stream table, done by the service. Nothing is typed and nothing is simulated again.
+
+The product traced: Ethanol, the largest component of ethanol, the stream the run prices.
+
+Tables made by: BioSTEAM 2.54.0, thermosteam 0.54.2
+
+How much of the Ethanol does each unit pass on?
+One row per unit in run order: the bar is the share of the Ethanol entering the unit that leaves it on the way to the product stream; the tick is the share still on the path after it.
+recovery (share of the product entering the unit)
+all of it
+U101 · FeedStockHandling
+no Ethanol enters or leaves U101
+on path 100.0%
+H2SO4_storage · SulfuricAcidStorageTank
+no Ethanol enters or leaves H2SO4_storage
+on path 100.0%
+T201 · SulfuricAcidTank
+no Ethanol enters or leaves T201
+on path 100.0%
+M201 · SulfuricAcidMixer
+no Ethanol enters or leaves M201
+on path 100.0%
+M203 · SteamMixer
+no Ethanol enters or leaves M203
+on path 100.0%
+R201 · PretreatmentReactorSystem
+no Ethanol enters or leaves R201
+on path 100.0%
+P201 · BlowdownDischargePump
+no Ethanol enters or leaves P201
+on path 100.0%
+T202 · OligomerConversionTank
+no Ethanol enters or leaves T202
+on path 100.0%
+F201 · PretreatmentFlash
+no Ethanol enters or leaves F201
+on path 100.0%
+Ammonia_storage · AmmoniaStorageTank
+no Ethanol enters or leaves Ammonia_storage
+on path 100.0%
+M205 · AmmoniaMixer
+no Ethanol enters or leaves M205
+on path 100.0%
+T203 · AmmoniaAdditionTank
+no Ethanol enters or leaves T203
+on path 100.0%
+P202 · HydrolyzatePump
+no Ethanol enters or leaves P202
+on path 100.0%
+M301 · EnzymeHydrolysateMixer
+no Ethanol enters or leaves M301
+on path 100.0%
+H301 · HydrolysateHeatExchanger
+no Ethanol enters or leaves H301
+on path 100.0%
+R301 · ContinuousPresaccharification
+no Ethanol enters or leaves R301
+on path 100.0%
+CSL_storage · CSLStorageTank
+no Ethanol enters or leaves CSL_storage
+on path 100.0%
+S302 · MockSplitter
+no Ethanol enters or leaves S302
+on path 100.0%
+DAP_storage · DAPStorageTank
+no Ethanol enters or leaves DAP_storage
+on path 100.0%
+S301 · MockSplitter
+no Ethanol enters or leaves S301
+on path 100.0%
+R303 · SaccharificationAndCoFermentation
+1030.4% · on path 100.0%
+R302 · SeedTrain
+no Ethanol enters R302: the product is formed here
+on path 100.0%
+T301 · SeedHoldTank
+100.0% · on path 100.0%
+M304 · Mixer
+100.0% · on path 100.0%
+D401 · VentScrubber
+100.0% · on path 100.0%
+M401 · Mixer
+100.0% · on path 100.0%
+T302 · BeerTank
+100.0% · on path 100.0%
+P401 · Pump
+100.0% · on path 100.0%
+H401 · HXprocess
+100.0% · on path 100.0%
+D402 · BinaryDistillation
+100.0% · on path 100.0%
+P402 · Pump
+off the product's path: no outlet of P402 leads to ethanol
+S401 · PressureFilter
+off the product's path: no outlet of S401 leads to ethanol
+M204 · Mixer
+off the product's path: no outlet of M204 leads to ethanol
+H201 · WasteVaporCondenser
+off the product's path: no outlet of H201 leads to ethanol
+M601 · Mixer
+off the product's path: no outlet of M601 leads to ethanol
+WWTC · WastewaterSystemCost
+off the product's path: no outlet of WWTC leads to ethanol
+R601 · AnaerobicDigestion
+off the product's path: no outlet of R601 leads to ethanol
+M602 · Mixer
+off the product's path: no outlet of M602 leads to ethanol
+R602 · AerobicDigestion
+off the product's path: no outlet of R602 leads to ethanol
+S601 · MembraneBioreactor
+off the product's path: no outlet of S601 leads to ethanol
+S602 · Splitter
+off the product's path: no outlet of S602 leads to ethanol
+M603 · Mixer
+off the product's path: no outlet of M603 leads to ethanol
+S603 · SludgeCentrifuge
+off the product's path: no outlet of S603 leads to ethanol
+M604 · Mixer
+off the product's path: no outlet of M604 leads to ethanol
+slurry_mixer · Mixer
+off the product's path: no outlet of slurry_mixer leads to ethanol
+S604 · ReverseOsmosis
+off the product's path: no outlet of S604 leads to ethanol
+treated_water_mixer · Mixer
+off the product's path: no outlet of treated_water_mixer leads to eth…
+M402 · Mixer
+100.0% · on path 100.0%
+D403 · BinaryDistillation
+100.0% · on path 100.0%
+H402 · HXutility
+100.0% · on path 100.0%
+U401 · MolecularSieve
+100.0% · on path 100.0%
+H403 · HXutility
+100.0% · on path 100.0%
+T701 · StorageTank
+100.0% · on path 100.0%
+P701 · Pump
+100.0% · on path 100.0%
+T702 · StorageTank
+no Ethanol enters or leaves T702
+on path 100.0%
+P702 · Pump
+no Ethanol enters or leaves P702
+on path 100.0%
+M701 · Mixer
+100.0% · on path 100.0%
+T703 · StorageTank
+100.0% · on path 100.0%
+gas_mixer · Mixer
+off the product's path: no outlet of gas_mixer leads to ethanol
+P403 · Pump
+off the product's path: no outlet of P403 leads to ethanol
+process_water_mixer · Mixer
+off the product's path: no outlet of process_water_mixer leads to eth…
+CWP · ChilledWaterPackage
+off the product's path: no outlet of CWP leads to ethanol
+ADP · AirDistributionPackage
+off the product's path: no outlet of ADP leads to ethanol
+CIP · CIPpackage
+off the product's path: no outlet of CIP leads to ethanol
+CT · CoolingTower
+off the product's path: no outlet of CT leads to ethanol
+FWT · FireWaterTank
+off the product's path: no outlet of FWT leads to ethanol
+BT · BoilerTurbogenerator
+off the product's path: no outlet of BT leads to ethanol
+PWC · ProcessWaterCenter
+off the product's path: no outlet of PWC leads to ethanol
+
+A unit's recovery counts the outlets that lead on to the product stream, directly, through later units or round a recycle. Outlets over inlets would read one for every unit that reacts nothing, so it is not used.
+
+A unit whose passes stay apart, such as a process heat exchanger, is counted only on the pass that carries the product on; product that enters a unit on the path and leaves by no outlet is lost there.
+
+Click a unit to cut the stream table below to its streams.
+
+View as table
+CSV
+Units, in run order
+68 units
+Unit	Class	In	Out	Ethanol in	Ethanol out	Recovery	On the path after
+U101
+Feed stock handling
+	FeedStockHandling	cornstover	s1	0	0	—	100.0%
+no Ethanol enters or leaves U101
+H2SO4_storage
+Sulfuric acid storage tank
+	SulfuricAcidStorageTank	sulfuric_acid	s2	0	0	—	100.0%
+no Ethanol enters or leaves H2SO4_storage
+T201
+Sulfuric acid tank
+	SulfuricAcidTank	s2	s3	0	0	—	100.0%
+no Ethanol enters or leaves T201
+M201
+Sulfuric acid mixer
+	SulfuricAcidMixer	s3, warm_process_water_1	s4	0	0	—	100.0%
+no Ethanol enters or leaves M201
+M203
+Steam mixer
+	SteamMixer	s1, pretreatment_steam, warm_process_water_2, s4	s5	0	0	—	100.0%
+no Ethanol enters or leaves M203
+R201
+Pretreatment reactor system
+	PretreatmentReactorSystem	s5	s6, s7	0	0	—	100.0%
+no Ethanol enters or leaves R201
+P201
+Blowdown discharge pump
+	BlowdownDischargePump	s7	s8	0	0	—	100.0%
+no Ethanol enters or leaves P201
+T202
+Oligomer conversion tank
+	OligomerConversionTank	s8	s9	0	0	—	100.0%
+no Ethanol enters or leaves T202
+F201
+Pretreatment flash
+	PretreatmentFlash	s9	s10, s11	0	0	—	100.0%
+no Ethanol enters or leaves F201
+Ammonia_storage
+Ammonia storage tank
+	AmmoniaStorageTank	ammonia	s13	0	0	—	100.0%
+no Ethanol enters or leaves Ammonia_storage
+M205
+Ammonia mixer
+	AmmoniaMixer	ammonia_process_water, s13	s14	0	0	—	100.0%
+no Ethanol enters or leaves M205
+T203
+Ammonia addition tank
+	AmmoniaAdditionTank	s11, s14	s15	0	0	—	100.0%
+no Ethanol enters or leaves T203
+P202
+Hydrolyzate pump
+	HydrolyzatePump	s15	pretreated_biomass	0	0	—	100.0%
+no Ethanol enters or leaves P202
+M301
+Enzyme hydrolysate mixer
+	EnzymeHydrolysateMixer	cellulase, pretreated_biomass, saccharification_water	s16	0	0	—	100.0%
+no Ethanol enters or leaves M301
+H301
+Hydrolysate heat exchanger
+	HydrolysateHeatExchanger	s16	s17	0	0	—	100.0%
+no Ethanol enters or leaves H301
+R301
+Continuous presaccharification
+	ContinuousPresaccharification	s17	slurry	0	0	—	100.0%
+no Ethanol enters or leaves R301
+CSL_storage
+CSLStorage tank
+	CSLStorageTank	CSL	s19	0	0	—	100.0%
+no Ethanol enters or leaves CSL_storage
+S302
+Splitter
+	MockSplitter	s19	CSL1, CSL2	0	0	—	100.0%
+no Ethanol enters or leaves S302
+DAP_storage
+DAPStorage tank
+	DAPStorageTank	DAP	s18	0	0	—	100.0%
+no Ethanol enters or leaves DAP_storage
+S301
+Splitter
+	MockSplitter	s18	DAP1, DAP2	0	0	—	100.0%
+no Ethanol enters or leaves S301
+R303
+Saccharification and co fermentation
+	SaccharificationAndCoFermentation	slurry, s22, CSL2, DAP2	s23, s24, recycle	2068.9	2.13×10⁴	1030.4%	100.0%
+more Ethanol leaves R303 on its way than enters it: the unit forms product
+R302
+Seed train
+	SeedTrain	recycle, CSL1, DAP1	s20, s21	0	2068.9	—	100.0%
+no Ethanol enters R302: the product is formed here
+T301
+Seed hold tank
+	SeedHoldTank	s21	s22	2068.9	2068.9	100.0%	100.0%
+M304
+Mixer
+	Mixer
+Mixer
+	s20, s23	s26	182.7	182.7	100.0%	100.0%
+D401
+Vent scrubber
+	VentScrubber	stripping_water, s26	vent, s27	182.7	182.7	100.0%	100.0%
+M401
+Mixer
+	Mixer
+Mixer
+	s24, s27	s25	2.13×10⁴	2.13×10⁴	100.0%	100.0%
+T302
+Beer tank
+	BeerTank	s25	beer	2.13×10⁴	2.13×10⁴	100.0%	100.0%
+P401
+Pump
+	Pump
+Pump
+	beer	s28	2.13×10⁴	2.13×10⁴	100.0%	100.0%
+H401
+Heat exchanger
+	HXprocess	s28, s30	s31, stillage	2.13×10⁴	2.13×10⁴	100.0%	100.0%
+only the pass s28 → s31 is on the product's path; the pass s30 → stillage is kept apart by HXprocess and is not counted here
+D402
+Distillation Column
+	BinaryDistillation
+Distillation / rectification
+	s31	distilled_beer, s29	2.13×10⁴	2.13×10⁴	100.0%	100.0%
+lost to s29: 3.451
+P402
+Pump
+	Pump
+Pump
+	s29	s30	3.451	3.451	—	—
+off the product's path: no outlet of P402 leads to ethanol
+S401
+Pressure filter
+	PressureFilter
+Pressure filtration
+	stillage, recycled_water	s44, s45	3.451	3.451	—	—
+off the product's path: no outlet of S401 leads to ethanol
+M204
+Mixer
+	Mixer
+Mixer
+	s10, s6	s12	0	0	—	—
+off the product's path: no outlet of M204 leads to ethanol
+H201
+Waste vapor condenser
+	WasteVaporCondenser	s12	pretreatment_wastewater	0	0	—	—
+off the product's path: no outlet of H201 leads to ethanol
+M601
+Mixer
+	Mixer
+Mixer
+	pretreatment_wastewater, s45	s46	3.323	3.323	—	—
+off the product's path: no outlet of M601 leads to ethanol
+WWTC
+Wastewater system cost
+	WastewaterSystemCost	s46	s47	3.323	3.323	—	—
+off the product's path: no outlet of WWTC leads to ethanol
+R601
+Anaerobic digestion
+	AnaerobicDigestion	s47	biogas, s48, s49	3.323	0.299	—	—
+off the product's path: no outlet of R601 leads to ethanol
+M602
+Mixer
+	Mixer
+Mixer
+	s48, s50	s51	0.301	0.301	—	—
+off the product's path: no outlet of M602 leads to ethanol
+R602
+Aerobic digestion
+	AerobicDigestion	s51, air_lagoon, caustic	evaporated_water, s52	0.301	0.012	—	—
+off the product's path: no outlet of R602 leads to ethanol
+S601
+Membrane bioreactor
+	MembraneBioreactor	s52	s53, s54	0.012	0.012	—	—
+off the product's path: no outlet of S601 leads to ethanol
+S602
+Splitter
+	Splitter
+Splitter
+	s54	s55, s56	0.011	0.011	—	—
+off the product's path: no outlet of S602 leads to ethanol
+M603
+Mixer
+	Mixer
+Mixer
+	s49, s56	s57	0.019	0.019	—	—
+off the product's path: no outlet of M603 leads to ethanol
+S603
+Sludge centrifuge
+	SludgeCentrifuge	s57	s58, sludge	0.019	0.019	—	—
+off the product's path: no outlet of S603 leads to ethanol
+M604
+Mixer
+	Mixer
+Mixer
+	s55, s58	s50	0.028	0.028	—	—
+off the product's path: no outlet of M604 leads to ethanol
+slurry_mixer
+Mixer
+	Mixer
+Mixer
+	s44, sludge	to_boiler	0.13	0.13	—	—
+off the product's path: no outlet of slurry_mixer leads to ethanol
+S604
+Reverse osmosis
+	ReverseOsmosis	s53	RO_treated_water_1, brine	0.002	0.002	—	—
+off the product's path: no outlet of S604 leads to ethanol
+treated_water_mixer
+Mixer
+	Mixer
+Mixer
+	RO_treated_water_1	s61	0	0	—	—
+off the product's path: no outlet of treated_water_mixer leads to ethanol
+M402
+Mixer
+	Mixer
+Mixer
+	distilled_beer, s36	s32	2.54×10⁴	2.54×10⁴	100.0%	100.0%
+D403
+Divided Distillation Column
+	BinaryDistillation
+Distillation / rectification
+	s32	s33, s34	2.54×10⁴	2.54×10⁴	100.0%	100.0%
+lost to s34: 0.213
+H402
+Heat exchanger
+	HXutility
+Heat exchange
+	s33	s35	2.54×10⁴	2.54×10⁴	100.0%	100.0%
+U401
+Molecular sieve
+	MolecularSieve
+Molecular sieve dehydration
+	s35	s36, s37	2.54×10⁴	2.54×10⁴	100.0%	100.0%
+H403
+Heat exchanger
+	HXutility
+Heat exchange
+	s37	s38	2.13×10⁴	2.13×10⁴	100.0%	100.0%
+T701
+Storage tank
+	StorageTank
+Storage tank
+	s38	s39	2.13×10⁴	2.13×10⁴	100.0%	100.0%
+P701
+Pump
+	Pump
+Pump
+	s39	s40	2.13×10⁴	2.13×10⁴	100.0%	100.0%
+T702
+Storage tank
+	StorageTank
+Storage tank
+	denaturant	s41	0	0	—	100.0%
+no Ethanol enters or leaves T702
+P702
+Pump
+	Pump
+Pump
+	s41	s42	0	0	—	100.0%
+no Ethanol enters or leaves P702
+M701
+Mixer
+	Mixer
+Mixer
+	s40, s42	s43	2.13×10⁴	2.13×10⁴	100.0%	100.0%
+T703
+Storage tank
+	StorageTank
+Storage tank
+	s43	ethanol	2.13×10⁴	2.13×10⁴	100.0%	100.0%
+gas_mixer
+Mixer
+	Mixer
+Mixer
+	biogas	gas_to_boiler	0.007	0.007	—	—
+off the product's path: no outlet of gas_mixer leads to ethanol
+P403
+Pump
+	Pump
+Pump
+	s34	recycle_process_water	0.213	0.213	—	—
+off the product's path: no outlet of P403 leads to ethanol
+process_water_mixer
+Mixer
+	Mixer
+Mixer
+	recycle_process_water	s60	0.213	0.213	—	—
+off the product's path: no outlet of process_water_mixer leads to ethanol
+CWP
+Chilled water package
+	ChilledWaterPackage	—	—	0	0	—	—
+off the product's path: no outlet of CWP leads to ethanol
+ADP
+Air distribution package
+	AirDistributionPackage	plant_air	s59	0	0	—	—
+off the product's path: no outlet of ADP leads to ethanol
+CIP
+CIP Package
+	CIPpackage	bioreactor_cleaning_chemicals	bioreactor_cleaning_wastewater	0	0	—	—
+off the product's path: no outlet of CIP leads to ethanol
+CT
+Cooling tower
+	CoolingTower	cooling_tower_makeup_water, cooling_tower_chemicals	cooling_tower_blowdown, cooling_tower_evaporation	0	0	—	—
+off the product's path: no outlet of CT leads to ethanol
+FWT
+Fire water tank
+	FireWaterTank	—	—	0	0	—	—
+off the product's path: no outlet of FWT leads to ethanol
+BT
+Boiler turbogenerator
+	BoilerTurbogenerator	to_boiler, gas_to_boiler, boiler_makeup_water, natural_gas, FGD_lime, boiler_chemicals, air	emissions, boiler_blowdown_water, ash	0.137	0	—	—
+off the product's path: no outlet of BT leads to ethanol
+PWC
+Process water center
+	ProcessWaterCenter	s61, makeup_RO_water, s60, makeup_process_water	RO_treated_water_2, recycled_process_water, excess_water	0.213	0	—	—
+off the product's path: no outlet of PWC leads to ethanol
+
+Masses are kg/hr of the product, in the run's base case.
+
+Every stream
+CSV
+Stream	From	To	Phase	T (K)	P (Pa)	Mass flow (kg/hr)	Ethanol (kg/hr)
+cornstover	feed	U101	l	298.1	1.01×10⁵	1.04×10⁵	0
+s1	U101	M203	l	298.1	1.01×10⁵	1.04×10⁵	0
+sulfuric_acid	feed	H2SO4_storage	l	294.1	5.47×10⁵	1926	0
+s2	H2SO4_storage	T201	l	294.1	5.47×10⁵	1926	0
+s3	T201	M201	l	294.1	5.47×10⁵	1926	0
+warm_process_water_1	feed	M201	l	368.1	4.76×10⁵	2.35×10⁴	0
+s4	M201	M203	l	366.4	4.76×10⁵	2.54×10⁴	0
+pretreatment_steam	feed	M203	g	541.1	1.32×10⁶	3.26×10⁴	0
+warm_process_water_2	feed	M203	l	368.1	4.76×10⁵	1.54×10⁵	0
+s5	M203	R201	l	431.1	5.57×10⁵	3.16×10⁵	0
+s6	R201	M204	g	403.1	2.72×10⁵	0	0
+s7	R201	P201	l	403.1	2.72×10⁵	3.16×10⁵	0
+s8	P201	T202	l	403.1	2.72×10⁵	3.16×10⁵	0
+s9	T202	F201	l	403.1	2.72×10⁵	3.16×10⁵	0
+s10	F201	M204	g	373.2	1.01×10⁵	1.50×10⁴	0
+s11	F201	T203	l	373.2	1.01×10⁵	3.01×10⁵	0
+ammonia	feed	Ammonia_storage	l	298.1	1.22×10⁶	1300.7	0
+s13	Ammonia_storage	M205	l	298.1	1.22×10⁶	1300.7	0
+ammonia_process_water	feed	M205	l	368.1	4.76×10⁵	8.92×10⁴	0
+s14	M205	T203	l	367.6	4.76×10⁵	9.05×10⁴	0
+s15	T203	P202	l	374.4	1.01×10⁵	3.91×10⁵	0
+pretreated_biomass	P202	M301	l	374.4	1.01×10⁵	3.91×10⁵	0
+cellulase	feed	M301	l	298.1	1.01×10⁵	1.27×10⁴	0
+saccharification_water	feed	M301	l	298.1	1.01×10⁵	2.63×10⁴	0
+s16	M301	H301	l	366.6	1.01×10⁵	4.30×10⁵	0
+s17	H301	R301	l	321.1	1.01×10⁵	4.30×10⁵	0
+slurry	R301	R303	l	321.1	1.01×10⁵	4.30×10⁵	0
+CSL	feed	CSL_storage	l	298.1	1.01×10⁵	1290.7	0
+s19	CSL_storage	S302	l	298.1	1.01×10⁵	1290.7	0
+CSL1	S302	R302	l	298.1	1.01×10⁵	215.1	0
+CSL2	S302	R303	l	298.1	1.01×10⁵	1075.6	0
+DAP	feed	DAP_storage	l	298.1	1.01×10⁵	158.9	0
+s18	DAP_storage	S301	l	298.1	1.01×10⁵	158.9	0
+DAP1	S301	R302	l	298.1	1.01×10⁵	25.17	0
+DAP2	S301	R303	l	298.1	1.01×10⁵	133.7	0
+s22	T301	R303	l	305.1	1.01×10⁵	4.13×10⁴	2068.9
+s23	R303	M304	g	305.1	1.01×10⁵	1.89×10⁴	182.7
+s24	R303	M401	l	305.1	1.01×10⁵	4.11×10⁵	2.11×10⁴
+recycle	R303	R302	l	305.1	1.01×10⁵	4.30×10⁴	0
+s20	R302	M304	g	298.1	1.01×10⁵	1977.4	0
+s21	R302	T301	l	305.1	1.01×10⁵	4.13×10⁴	2068.9
+s26	M304	D401	g	304.5	1.01×10⁵	2.08×10⁴	182.7
+stripping_water	feed	D401	l	298.1	1.01×10⁵	2.64×10⁴	0
+vent	D401	leaves the plant	g	304.5	1.01×10⁵	2.04×10⁴	0
+s27	D401	M401	l	298.1	1.01×10⁵	2.68×10⁴	182.7
+s25	M401	T302	l	304.7	1.01×10⁵	4.38×10⁵	2.13×10⁴
+beer	T302	P401	l	304.7	1.01×10⁵	4.38×10⁵	2.13×10⁴
+s28	P401	H401	l	304.7	6.08×10⁵	4.38×10⁵	2.13×10⁴
+s30	P402	H401	l	395.3	6.08×10⁵	3.95×10⁵	3.451
+s31	H401	D402	l	378.3	6.08×10⁵	4.38×10⁵	2.13×10⁴
+stillage	H401	S401	l	314.7	6.08×10⁵	3.95×10⁵	3.451
+distilled_beer	D402	M402	g	386.1	2.13×10⁵	4.28×10⁴	2.13×10⁴
+s29	D402	P402	l	395.3	2.13×10⁵	3.95×10⁵	3.451
+recycled_water	feed	S401	l	320.1	3.95×10⁵	1	0
+s44	S401	slurry_mixer	l	314.7	3.95×10⁵	3.62×10⁴	0.128
+s45	S401	M601	l	314.7	3.95×10⁵	3.59×10⁵	3.323
+s12	M204	H201	g	373.2	1.01×10⁵	1.50×10⁴	0
+pretreatment_wastewater	H201	M601	l	373.1	1.01×10⁵	1.50×10⁴	0
+s46	M601	WWTC	l	317.1	1.01×10⁵	3.74×10⁵	3.323
+s47	WWTC	R601	l	317.1	1.01×10⁵	3.74×10⁵	3.323
+biogas	R601	gas_mixer	g	307.6	1.01×10⁵	2.11×10⁴	0.007
+s48	R601	M602	l	307.6	1.01×10⁵	3.27×10⁵	0.274
+s49	R601	M603	l	308.1	1.01×10⁵	2.61×10⁴	0.018
+s50	M604	M602	l	307.7	1.01×10⁵	1.91×10⁶	0.028
+s51	M602	R602	l	307.7	1.01×10⁵	2.23×10⁶	0.301
+air_lagoon	feed	R602	g	298.1	1.01×10⁵	1.01×10⁴	0
+caustic	feed	R602	l	298.1	1.01×10⁵	3949.6	0
+evaporated_water	R602	leaves the plant	g	298.1	1.01×10⁵	3.56×10⁴	0
+s52	R602	S601	l	307.7	1.01×10⁵	2.21×10⁶	0.012
+s53	S601	S604	l	307.7	1.01×10⁵	3.21×10⁵	0.002
+s54	S601	S602	l	307.7	1.01×10⁵	1.89×10⁶	0.011
+s55	S602	M604	l	307.7	1.01×10⁵	1.81×10⁶	0.01
+s56	S602	M603	l	307.7	1.01×10⁵	7.55×10⁴	4.22×10⁻⁴
+s57	M603	S603	l	307.8	1.01×10⁵	1.02×10⁵	0.019
+s58	S603	M604	l	307.8	1.01×10⁵	9.49×10⁴	0.018
+sludge	S603	slurry_mixer	l	307.8	1.01×10⁵	6679.2	0.001
+to_boiler	slurry_mixer	BT	l	313.1	1.01×10⁵	4.29×10⁴	0.13
+RO_treated_water_1	S604	treated_water_mixer	l	307.7	1.01×10⁵	3.12×10⁵	0
+brine	S604	leaves the plant	l	307.7	1.01×10⁵	9117.3	0.002
+s61	treated_water_mixer	PWC	l	307.7	1.01×10⁵	3.12×10⁵	0
+s36	U401	M402	g	388.1	1.62×10⁵	6309.6	4123.8
+s32	M402	D403	g	386.4	1.62×10⁵	4.91×10⁴	2.54×10⁴
+s33	D403	H402	g	363.9	1.62×10⁵	2.78×10⁴	2.54×10⁴
+s34	D403	P403	l	386.8	1.62×10⁵	2.13×10⁴	0.213
+s35	H402	U401	g	388.1	1.62×10⁵	2.78×10⁴	2.54×10⁴
+s37	U401	H403	g	388.1	1.62×10⁵	2.15×10⁴	2.13×10⁴
+s38	H403	T701	l	340	1.62×10⁵	2.15×10⁴	2.13×10⁴
+s39	T701	P701	l	340	1.62×10⁵	2.15×10⁴	2.13×10⁴
+s40	P701	M701	l	340	1.62×10⁵	2.15×10⁴	2.13×10⁴
+denaturant	feed	T702	l	298.1	1.01×10⁵	473.1	0
+s41	T702	P702	l	298.1	1.01×10⁵	473.1	0
+s42	P702	M701	l	298.1	1.01×10⁵	473.1	0
+s43	M701	T703	l	339.3	1.01×10⁵	2.20×10⁴	2.13×10⁴
+ethanol	T703	leaves the plant	l	339.3	1.01×10⁵	2.20×10⁴	2.13×10⁴
+gas_to_boiler	gas_mixer	BT	g	307.6	1.01×10⁵	2.11×10⁴	0.007
+recycle_process_water	P403	process_water_mixer	l	386.8	1.62×10⁵	2.13×10⁴	0.213
+s60	process_water_mixer	PWC	l	386.8	1.62×10⁵	2.13×10⁴	0.213
+plant_air	feed	ADP	l	298.1	1.01×10⁵	8.34×10⁴	0
+s59	ADP	leaves the plant	l	298.1	1.01×10⁵	8.34×10⁴	0
+bioreactor_cleaning_chemicals	feed	CIP	l	298.1	1.01×10⁵	126.1	0
+bioreactor_cleaning_wastewater	CIP	leaves the plant	l	298.1	1.01×10⁵	126.1	0
+cooling_tower_makeup_water	feed	CT	l	301.1	1.01×10⁵	7.97×10⁴	0
+cooling_tower_chemicals	feed	CT	l	301.1	1.01×10⁵	1.829	0
+cooling_tower_blowdown	CT	leaves the plant	l	310.1	1.01×10⁵	7249.4	0
+cooling_tower_evaporation	CT	leaves the plant	g	310.1	1.01×10⁵	7.25×10⁴	0
+boiler_makeup_water	feed	BT	l	298.1	1.01×10⁵	7689.5	0
+natural_gas	feed	BT	g	288.7	1.02×10⁵	0	0
+FGD_lime	feed	BT	l	298.1	1.01×10⁵	362.7	0
+boiler_chemicals	feed	BT	l	298.1	1.01×10⁵	0.496	0
+air	feed	BT	g	298.1	1.01×10⁵	1.28×10⁶	0
+emissions	BT	leaves the plant	g	397.8	1.01×10⁵	1.33×10⁶	0
+boiler_blowdown_water	BT	leaves the plant	l	298.1	1.01×10⁵	7689.5	0
+ash	BT	leaves the plant	l	298.1	1.01×10⁵	5734.5	0
+makeup_RO_water	feed	PWC	l	298.1	1.01×10⁵	0	0
+makeup_process_water	feed	PWC	l	298.1	1.01×10⁵	1.06×10⁵	0
+RO_treated_water_2	PWC	leaves the plant	l	298.1	1.01×10⁵	8.74×10⁴	0
+recycled_process_water	PWC	leaves the plant	l	298.1	1.01×10⁵	3.52×10⁵	0
+excess_water	PWC	leaves the plant	l	298.1	1.01×10⁵	0	0
+Properties
+Another stream
+none
+cornstover
+s1
+sulfuric_acid
+s2
+s3
+warm_process_water_1
+s4
+pretreatment_steam
+warm_process_water_2
+s5
+s6
+s7
+s8
+s9
+s10
+s11
+ammonia
+s13
+ammonia_process_water
+s14
+s15
+pretreated_biomass
+cellulase
+saccharification_water
+s16
+s17
+slurry
+CSL
+s19
+CSL1
+CSL2
+DAP
+s18
+DAP1
+DAP2
+s22
+s23
+s24
+recycle
+s20
+s21
+s26
+stripping_water
+vent
+s27
+s25
+beer
+s28
+s30
+s31
+stillage
+distilled_beer
+s29
+recycled_water
+s44
+s45
+s12
+pretreatment_wastewater
+s46
+s47
+biogas
+s48
+s49
+s50
+s51
+air_lagoon
+caustic
+evaporated_water
+s52
+s53
+s54
+s55
+s56
+s57
+s58
+sludge
+to_boiler
+RO_treated_water_1
+brine
+s61
+s36
+s32
+s33
+s34
+s35
+s37
+s38
+s39
+s40
+denaturant
+s41
+s42
+s43
+ethanol
+gas_to_boiler
+recycle_process_water
+s60
+plant_air
+s59
+bioreactor_cleaning_chemicals
+bioreactor_cleaning_wastewater
+cooling_tower_makeup_water
+cooling_tower_chemicals
+cooling_tower_blowdown
+cooling_tower_evaporation
+boiler_makeup_water
+natural_gas
+FGD_lime
+boiler_chemicals
+air
+emissions
+boiler_blowdown_water
+ash
+makeup_RO_water
+makeup_process_water
+RO_treated_water_2
+recycled_process_water
+excess_water
+
+Density, heat capacity, viscosity, and bubble and dew points, as thermosteam (BioSTEAM’s property engine) computes them for a stream of this run at the stream’s own temperature, pressure and phase. The page names the run and the stream; the service reads the stream from the run, and nothing is typed. A chemical thermosteam’s library lacks is refused in words.
+
+Broth: s21
+Ask thermosteam
+
+Not asked here yet. thermosteam computes it in the Proforma simulator, which takes a minute to start the first time.
+
+Product: ethanol
+Ask thermosteam
+
+Not asked here yet. thermosteam computes it in the Proforma simulator, which takes a minute to start the first time.
+
+Produced by
+pureOS
+·
+train of 68 units, read from a run
+
+
+== /p/ethanol/geneos/model
+HOST, CONSTRUCT, PATHWAY, DESIGN
+geneOS
+The organism as an engineered system. Host choice, genetic parts, pathway assembly, the genome-scale model and strain design — everything that decides what a cell can do, before any vessel is involved.
+Hosts
+0
+Pathway
+Model
+Stoichiometry: the cell's ceiling
+Nothing on this screen predicts what a vessel will produce: a ceiling has no time axis and no vessel.
+
+Opening this tab asks the service for each model’s ceiling and the chosen model’s envelope and sugar mix, and the service keeps each as an artifact of the project, once for each model, product and sugar; opening it again reads the same artifacts back.
+
+Product
+Ethanol
+Sugar fed
+glucose
+xylose
+fructose
+Model, for the envelope and the mix
+Saccharomyces cerevisiae S288C (iMM904)
+Saccharomyces cerevisiae S288C (Yeast9)
+Computing in the geneOS worker…
+How far is each reported ethanol yield from the most a network allows on glucose?
+28 records by organism.
+Ethanol yield on substrate (g g⁻¹)
+Saccharomyces cerevisiae AFY …
+CEN.PK113-7D (WT) · glucose
+TEFmut7 · glucose
+TEFmut2 · glucose
+S. cerevisiae CEN.PK113-7D ev…
+S. cerevisiae CEN.PK113-7D pa…
+ST9681 · glucose
+ST9676 · glucose
+ST9675 · glucose
+S. cerevisiae CEN.PK 113-7D w…
+organism not stated · glucose
+S. cerevisiae IME324, IMX773,…
+S. cerevisiae IME324 and IMX7…
+S. cerevisiae IME369, IMX1489…
+S. cerevisiae IMX774 · glucose
+IMX585 · glucose
+IMX1438 · glucose
+IMK870 · glucose
+S. cerevisiae IMX585 · glucose
+S. cerevisiae IMX756 · glucose
+0
+0.14
+0.28
+0.42
+0.56
+median
+
+A ceiling from flux balance analysis: the most product this reaction network can make from this feed, under the constraints listed. It has no time axis and no vessel.
+
+A genome-scale ceiling uses every reaction in the full reconstruction, including routes a living cell may never run at pace. A reported yield above the line is marked for a reviewer to check its basis.
+
+View as table
+CSV
+Sources:
+3a223464176a4627a226cd5419862f17
+593a39ea85cc4db9afedf3a28f2f8ccf
+c23cb18fd86f45db80c5408c0abb3b68
+d74165d0abfd4f269976ff8573d2d072
+e2049cf74d754d67bc3eb0aa0f574c1c
+f8ab68ffacb644fdbbeca636db59271e
+fe264b26784d48cdbf015927f8ed1ea0
+
+The ceilings are for ethanol; the records are ethanol yields the papers reported on glucose, as written. 4 ethanol yield records on another feed, or with no feed stated, are not drawn here.
+
+What the models lack
+iMM904: Mo, Palsson and Herrgård, BMC Systems Biology 2009 (PMID 19321003), as BiGG Models serves it.
+iMM904: The file publishes oxygen uptake at 2 mmol gDW-1 h-1 (EX_o2_e) and ATP maintenance fixed at 1 mmol gDW-1 h-1 (ATPM); both stand as published, so its envelope is a cell's short of oxygen.
+The shelf
+iMM904 — Saccharomyces cerevisiae S288C (iMM904), genome scale. native: pyruvate decarboxylase (PYRDC) and alcohol dehydrogenase (ALCD2ir); ethanol leaves through EX_etoh_e. Source: https://bigg.ucsd.edu/static/models/iMM904.xml (ETag "017c86841952cc365f20a8b466292b31", Last-Modified 2019-11-01); BiGG Models terms: educational, research and non-profit use; commercial use by agreement with UC San Diego.
+Yeast9 — Saccharomyces cerevisiae S288C (Yeast9), genome scale. native: pyruvate decarboxylase (r_0959) and alcohol dehydrogenase (r_2115); ethanol leaves through r_1761, the file's ethanol exchange. Source: https://github.com/SysBioChalmers/yeast-GEM at v9.1.1 (2d594ae1c4a2d550ccef120d96a58c7bbf586255); CC-BY-4.0.
+Where geneOS stops and fermOS starts
+
+geneOS is stoichiometry: what the engineered cell can do, at steady state, with no time axis and no vessel. A genome-scale model gives a yield ceiling. What a real fermenter achieves over ninety hours is a claim of another discipline, and it belongs to fermOS.
+
+Titre is fermOS’s output. The gap between the ceiling here and the titre achieved there is what reconciliation measures against a deposition, so every number on this screen reads as a ceiling of the cell, and a vessel’s output is fermOS’s to predict.
+
+geneOS subsystems
+5 named, 0 built
+
+Named parts of geneOS that have no implementation. Each one states what is true of the code.
+
+Parts
+not built
+geneos.parts
+Parts has no implementation
+Not built. Nothing here computes, stores or retrieves anything yet.
+Sequence search
+not built
+geneos.search
+Sequence search has no implementation
+Not built. Nothing here computes, stores or retrieves anything yet.
+Structure
+not built
+geneos.structure
+Structure has no implementation
+Not built. Nothing here computes, stores or retrieves anything yet.
+Function
+not built
+geneos.function
+Function has no implementation
+Not built. Nothing here computes, stores or retrieves anything yet.
+Strain design
+not built
+geneos.design
+Strain design has no implementation
+Not built. Nothing here computes, stores or retrieves anything yet.
+Produced by
+geneOS
+·
+0 hosts, no chassis recommendation
+
+
+== /p/ethanol/settings/figures
+SETTINGS
+Figure grammar
+How every chart draws results and predictions: the mark for each kind of thing, the stroke for each provenance, and a table behind every figure. Drawn over the newest computed results the service keeps, or by its legend alone.
+Appearance
+Units & display
+Architecture
+Reviewer & ontology
+OWNER
+Guild policy
+OWNER
+Figure grammar
+Export center
+About & fidelity
+The marks
+
+The kind of thing decides the mark: a measurement or a record is a point, a computed limit a rule line, a computed curve a line. Provenance decides shape, fill and dash, so a figure reads the same in greyscale. A filled point always stands for an observed value.
+
+measured
+filled diamond; heavy solid line
+gold
+filled circle inside a ring; solid line
+verified
+filled circle; solid line
+curated
+filled square; solid line
+unverified
+hollow circle; thin solid line
+computed
+hollow square; dotted line
+user
+hollow triangle; thin solid line
+industry-estimate
+hollow diamond, dashed outline; long dashes
+assumed
+hollow circle, dashed outline, amber; short dashes, amber
+
+Drawn over the newest results this service keeps, listed in BioRepo → Artifacts.
+
+How far is each reported ethanol yield from the most a network allows on xylose?
+0 records by organism, 1 computed limit.
+Ethanol yield on substrate (g g⁻¹)
+iMM904 ceiling
+No record yet: no reported yield on xylose; 32 records of this field name another sugar or none.Reported yields arrive through Intake and its extraction; ceilings are computed in geneOS → Model.
+0
+0.14
+0.28
+0.41
+0.55
+
+A ceiling from flux balance analysis: the most product this reaction network can make from this feed, under the constraints listed. It has no time axis and no vessel.
+
+A genome-scale ceiling uses every reaction in the full reconstruction, including routes a living cell may never run at pace. A reported yield above the line is marked for a reviewer to check its basis.
+
+View as table
+CSV
+[failed] POST http://127.0.0.1:8941/api/geneos/ceiling net::ERR_ABORTED
+[failed] POST http://127.0.0.1:8941/api/geneos/ceiling net::ERR_ABORTED
+[failed] POST http://127.0.0.1:8941/api/geneos/frontier net::ERR_ABORTED
+[failed] POST http://127.0.0.1:8941/api/geneos/mix net::ERR_ABORTED
+
+== /p/ethanol/runbooks/protocols/new/edit
+Protocol not found
+The project keeps no protocol new.
+Back to protocols
+[http 404] GET http://127.0.0.1:8941/api/protocols/new
+[console.error] Failed to load resource: the server responded with a status of 404 (Not Found)
+
+== /p/ethanol/guild/checks/x/run
+(no #of-main)
+
+
+== /p/ethanol/primer/no-such-lesson
+Lesson not found
+The project's lesson catalogue holds no lesson no-such-lesson.
+Back to Primer
+
+
+== /p/ethanol/runbooks/depositions/no-such
+ASSAY
+Deposition not found
+This project holds no deposition with this id.
+No deposition with the id “no-such”
+A deposition is started from a runbook, which is what supplies the predictions it will be judged against.
+Open the runbook board
+

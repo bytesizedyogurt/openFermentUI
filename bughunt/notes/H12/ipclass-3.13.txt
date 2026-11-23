@@ -1,0 +1,37 @@
+3.13.17
+192.0.0.8              a private address
+192.0.0.9              None
+192.0.0.10             None
+192.0.0.170            a private address
+100.64.0.1             an address outside the public internet
+2002::1                a private address
+2002:7f00:1::          a private address
+64:ff9b:1::7f00:1      a reserved address
+64:ff9b::7f00:1        a reserved address
+2001::1                a private address
+2001:1::1              None
+2001:2::1              a private address
+2001:3::1              None
+2001:4:112::1          None
+2001:20::1             None
+2001:db8::1            a private address
+::ffff:127.0.0.1       a loopback address
+::ffff:10.0.0.1        a private address
+fec0::1                a private address
+fc00::1                a private address
+198.18.0.1             a private address
+240.0.0.1              a reserved address
+255.255.255.255        a reserved address
+0.0.0.0                the unspecified address
+100::1                 a reserved address
+::                     the unspecified address
+::1                    a loopback address
+8.8.8.8                None
+2606:4700::1111        None
+192.88.99.1            None
+198.51.100.1           a private address
+203.0.113.1            a private address
+192.0.2.1              a private address
+169.254.1.1            a link-local address
+224.0.0.1              a multicast address
+2001:10::1             a private address

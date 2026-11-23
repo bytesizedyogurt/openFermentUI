@@ -15,88 +15,11 @@ def store(monkeypatch, tmp_path):
     return tmp_path
 
 
-def test_the_benchmark_reproduces_the_published_price(store):
-    # B.3: 1.968 USD per gallon with the package's defaults, within 0.5 %.
-    art = proforma.run_benchmark()
-    assert art.output["mespUsdPerGal"] == pytest.approx(1.968, rel=0.005)
-    assert art.output["package"] == "biorefineries.cornstover@2.35.1"
-    assert art.provenance == "computed" and {i.source.kind for i in art.inputs} == {"model"}
-    assert proforma.stored_benchmark().id == art.id
-    # The plant is built afresh for every run (OF-BLD-019 §2.R), so a replay
-    # in the same worker builds a second plant, and BioSTEAM's sums over a
-    # set of units move the last digit, as they do for a reference run:
-    # measured, 0.6588136420152626 against …628 USD/kg. The replay is held to
-    # the last digits, as the ethanol runs' are.
-    from test_proforma import replays_to_the_last_digits
-
-    replays_to_the_last_digits(art.id)
-
-
-# ── the dry-grind corn plant (OF-BLD-019 §2.2) ─────────────────────────
-# The authority is the installed package's own test file: each value below
-# is read from biorefineries/tests/test_biorefineries.py, test_corn, by
-# flowsheets/shelf.py's `package_regression` (test_proforma holds that
-# parser to the eleven values the file writes). This installation must
-# reproduce every one of them within the test's own rtol (5 %).
-
-CORN_TEST = (
-    "tea.IRR", "feedstock.price", "product.price", "tea.sales", "tea.material_cost", "tea.installed_equipment_cost",
-    "tea.utility_cost", "units.get_heating_duty()", "units.get_cooling_duty()",
-    "units.get_electricity_consumption()", "units.get_electricity_production()",
-)
-
-
-def test_the_corn_plant_reproduces_its_package_test(store):
-    import numpy as np
-
-    from openferment_core.flowsheets import shelf
-
-    regression = shelf.package_regression("corn_drygrind")
-    assert regression is not None and regression.test == "test_corn"
-    assert tuple(v.expression for v in regression.values) == CORN_TEST
-    art = proforma.run_reference("corn_drygrind")
-    measured = art.output["measured"]
-    for v in regression.values:
-        # as the package's test asserts it: numpy.allclose(measured, value, rtol=5e-2)
-        assert np.allclose(measured[v.expression], v.package, rtol=v.rtol), (v.expression, measured[v.expression], v.package)
-    assert all(c["within"] for c in art.output["checks"])
-    assert art.output["ethanolPriceUsdPerKg"] == pytest.approx(regression.values[2].package, rel=1e-9)
-    assert art.output["IRR"] == pytest.approx(measured["tea.IRR"])
-    assert art.provenance == "computed" and {i.source.kind for i in art.inputs} == {"model", "convention"}
-    # A fresh build of the plant replays to the same output, digit for digit.
-    assert artifacts.replay(art.id).identical
-    assert proforma.stored_reference("corn_drygrind").id == art.id
-
-
-def test_the_corn_stover_plant_answers_through_the_reference_endpoint_too(store):
-    # The benchmark's own endpoints answer as before; the same plant's
-    # reference run gives the benchmark's price and every table.
-    from fastapi.testclient import TestClient
-
-    from openferment_core import api
-
-    c = TestClient(api.app, base_url="http://127.0.0.1")
-    bench = c.post("/api/proforma/benchmark").json()["artifact"]
-    assert bench["tool"] == proforma.BENCHMARK and bench["output"]["mespUsdPerGal"] == pytest.approx(1.968, rel=0.005)
-    ref = c.post("/api/proforma/reference/cornstover_benchmark").json()
-    art = ref["artifact"]
-    assert art["tool"] == proforma.REFERENCE and ref["regression"]["test"] == "test_cornstover"
-    assert art["output"]["mespUsdPerGal"] == pytest.approx(bench["output"]["mespUsdPerGal"], rel=1e-9)
-    assert art["output"]["tea"]["product"] == "ethanol" and art["output"]["units"]
-    assert c.get("/api/proforma/benchmark").json()["artifact"]["id"] == bench["id"]
-    assert proforma.run_benchmark().output == bench["output"]
-    # MEASURED 2026-10-20 (biosteam 2.54.0, biorefineries 2.35.1): the
-    # package's own test_cornstover does not hold on these versions for two
-    # of its eleven values, installed equipment cost and electricity
-    # consumption; the run says so in its checks, and this pins the finding.
-    outside = {k["expression"] for k in art["output"]["checks"] if not k["within"]}
-    assert outside == {"tea.installed_equipment_cost", "units.get_electricity_consumption()"}
-    # The corn stover plant's facilities are built from a set, so their order
-    # and the names BioSTEAM gives unnamed streams change from one build to
-    # the next; its numbers do not.
-    replay = artifacts.replay(art["id"])
-    moved = {d.path.split("[")[0].split(".")[0] for d in replay.differences}
-    assert moved <= {"streams", "units", "unitOrder", "…"}, moved
+# The two published plants the shelf's retired reference entries ran (the
+# NREL 2011 corn stover design and the dry-grind corn plant) are the library
+# shelf's cornstover and corn (alpha 2.2 D8): test_library_sim holds each to
+# its package's own test, and test_proforma replays a run kept from either
+# entry through the code that computed it.
 
 
 # ── glucose to ethanol (OF-BLD-019 §2.3) ───────────────────────────────
@@ -163,7 +86,8 @@ def test_a_whole_yeast_run_through_the_worker(store, monkeypatch):
     pool = SimpleNamespace(records=rs, records_by_id={r["id"]: r for r in rs})
     a = [InputAssumption(key=k, value=v, low=lo, high=hi, by="openFerment test fixture", at="2026-10-20")
          for k, v, lo, hi in standins.YEAST_STANDIN_ASSUMED]
-    out = proforma.run(ProformaRunRequest(scenarioId="sc-held-ethanol", assumptions=a, seed=3), pool=pool)
+    out = proforma.run(ProformaRunRequest(scenarioId="sc-held-ethanol", inputs=standins.assumed_inputs(a), seed=3),
+                       pool=pool)
     assert out.samples == 500 and out.feasible + sum(out.infeasible.values()) == 500 and out.baseInfeasible is None
     assert set(out.infeasible) <= {"yield", "concentration", "convergence"}
     assert out.provenance == "assumed" and out.flowsheet == "ethanol_glucose_v0" and out.tea.teaClass == "ConventionalEthanolTEA"
@@ -186,11 +110,11 @@ def test_an_ethanol_case_prices_on_biosteams_own_utility_prices_whatever_ran_bef
     # basis names, and reads each back.
     import biosteam as bst
 
-    from openferment_core.flowsheets import cornstover_benchmark
+    from openferment_core.workers import library_plants
 
     f, b = eth
     first = f.evaluate(b, ETHANOL_CASE)
-    cornstover_benchmark.run()
+    library_plants.build("cornstover")  # the library's corn stover plant, built here outside the worker's defaults
     left = (bst.CE, bst.PowerUtility.price)
     out = f.evaluate(b, ETHANOL_CASE)
     rb = out["readBack"]

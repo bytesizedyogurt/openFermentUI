@@ -1,0 +1,169 @@
+{
+ "candidates": [
+  {
+   "id": "H4-01",
+   "title": "A library run's cost card closes on the package's set price, so its capital recovery line takes the whole NPV gap",
+   "severity": "S2",
+   "kind": "Wrong number",
+   "area": "cost card: proforma_worker.tea_breakdown for library.run, CostWaterfall",
+   "statement": "For a library plant's run the TEA breakdown is read at the product's set price (the worker hands no solved price to the table reader) and Capital recovery is sales less AOC at that price, so whenever the TEA solves another price the line takes the NPV gap: cornstover with a person's feed price of 0.08 USD/kg shows Capital recovery 0.0902 USD/kg where the plant's capital and IRR give about 0.226, and the composed cellulosic_ethanol_v0, every stream and unit equal to cornstover's, shows 0.286 against cornstover's 0.2249.",
+   "contract": "core/openferment_core/workers/proforma_worker.py:427 \"capitalRecovery\": (\"Capital recovery\", \"TEA.sales less TEA.AOC: the return on and of the capital, and its tax\"); src/components/figures/CostWaterfall.tsx:1 \"What the price is made of\"; workers/proforma_worker.py:510-514 (tables) \"Where the flowsheet solved a price, the product carries it while every table is read\" (a Proforma run reads its card at its solved price, a library run at the list price)",
+   "reproCommand": "bash /home/user/openFermentUI/bughunt/notes/H4/scripts/repro.sh H4-01 (scripts cornstover_feedprice.py and compare_plant.py; the screen: node scripts/costcard.mjs <origin> h4p <run id>)",
+   "expected": "Lines that close on the run's base-case price, 0.7945 USD/kg, with Capital recovery the return at the TEA's IRR: sales at 0.7945 USD/kg less AOC, about 41.75 M USD/yr, 0.226 USD/kg; the same plant at the same price giving the same card whether it is cornstover or cellulosic_ethanol_v0.",
+   "observed": "Run 4fb3f640b39e3955 rendered in Chromium: 'Base case, every input at its value: 0.7945 USD per kg of ethanol'; rows Main feedstock 0.3794, Other materials 0.2005, Utilities -0.0605, Fixed operating 0.0493, Capital recovery 0.0902, closing row 'Price the lines are read at 0.6588'. cellulosic_ethanol_v0 at its default (run e7efa2505b4633de, solvedPrice 0.658813642, packagePrice 0.7198608115): Capital recovery 0.286; cornstover (bfda026530692adc): 0.2249, every other line equal.",
+   "cause": "core/openferment_core/workers/library_plants.py:818 (_Module.parts passes \"price\": None, so tea_breakdown reads the product at its set price) with core/openferment_core/workers/proforma_worker.py:459 (\"capitalRecovery\": sales - aoc)",
+   "confidence": "high",
+   "fixSize": "small",
+   "evidence": "Direct biorefineries route (direct_plant.py) and the service agree on every TEA number to ten digits (cmp-cornstover.txt, cmp-cev0-vs-cornstover.txt: 118 streams, 68 units equal); the cards differ only in the price the breakdown is read at. Reproduced twice, once on a fresh database by repro.sh."
+  },
+  {
+   "id": "H4-02",
+   "title": "custom_train_v1's cost card closes on a price per kg of stream while its lines sum to the price per kg of product contained",
+   "severity": "S2",
+   "kind": "Wrong number",
+   "area": "cost card: proforma_worker.tea_breakdown, flowsheets/custom_train_v1.parts, CostWaterfall.priceNote",
+   "statement": "custom_train_v1 states its basis flow as the product contained while the TEA breakdown sets productPrice to the stream's own price per kg of stream, so the card's closing row (9.0791) is on another basis than its lines, which sum to 9.1546, the run's base price; the note under it says the lines sum to 9.0791 and that the TEA solved another price, and both are false.",
+   "contract": "core/openferment_core/flowsheets/__init__.py:20-21 \"the solved `price` (USD per kg of the product stream), `basis_flow` (kg/hr the price is per)\"; src/components/figures/CostWaterfall.tsx:7-9 \"The last row is the product price the breakdown was read at ... the lines sum to it by construction in the service\"",
+   "reproCommand": "bash /home/user/openFermentUI/bughunt/notes/H4/scripts/repro.sh H4-02 (scripts composite_run.py, costcard.mjs)",
+   "expected": "A closing row of 9.1546 USD per kg of Ethanol contained (the sum of the lines and the base price), labelled the base-case price, with no note of a second price.",
+   "observed": "Run 7efef1fcad7a6fd1 rendered in Chromium: rows 2.8848 + 0 + 1.0575 + 3.9195 + 1.2928 (= 9.1546); closing row 'Price the lines are read at 9.0791'; note 'The breakdown is read at the product's set price, 9.0791 USD per kg of Ethanol contained in the train's product stream, and its lines sum to that price. The TEA solves the price at its internal rate of return to 9.1546 ...'. Product stream T304_outlet 123.448 kg/h holding 122.430 kg/h Ethanol: 9.0791 x 123.448 / 122.430 = 9.1546.",
+   "cause": "core/openferment_core/workers/proforma_worker.py:452 (\"productPrice\": _num(product.price) beside basisFlow taken from parts['basis_flow']) with core/openferment_core/flowsheets/custom_train_v1.py:385 (basis_flow = the product contained)",
+   "confidence": "high",
+   "fixSize": "small",
+   "evidence": "composite_run.py: sum of lines 9.154581883417677, tea.productPrice 9.079088510023388, basePrice 9.154581883417677 (artifact 7efef1fcad7a6fd1; again 0f8e079f4b2028d0 on a fresh database). The gap grows with the train's impurity; test_proforma.py:381 holds the sum only for ethanol_glucose_v0, whose basis flow is the stream."
+  },
+  {
+   "id": "H4-03",
+   "title": "A library run that sets any value re-simulates unsettled, so a value equal to the default moves the price in the fifth digit",
+   "severity": "S3",
+   "kind": "Inconsistency",
+   "area": "workers/library_plants.run, engine/library.py",
+   "statement": "When a library run sets any value the worker simulates the built plant a second time, and simulate() settles only a composed flowsheet, so cornstover with its feedstock price set to the library's own default prices ethanol at 0.6588285541 USD/kg with an NPV of -20,477 USD where the run that sets nothing prices 0.658813642, a difference of 2.3e-5 on a run whose basis states ten significant digits.",
+   "contract": "docs/api/engines.md:615 \"A library thing's precision is ten significant digits (`rtol` 1e-9)\"; docs/decisions/ADR-004-biosteam-adapter.md:120-125 measures the unsettled second simulation (0.6588285541) and settles the composed flowsheet for it alone",
+   "reproCommand": "bash /home/user/openFermentUI/bughunt/notes/H4/scripts/repro.sh H4-03 (script cornstover_feeddefault.py)",
+   "expected": "The same plant at the same values prices one price to the precision its basis states: 0.658813642 USD/kg.",
+   "observed": "solvedPrice 0.6588285541 and NPV -20477.5 USD (run 73dd9fcbad97f341) against 0.658813642 and 0 (run bfda026530692adc); capital recovery 41,573,039.7 against 41,575,770.25 USD/yr.",
+   "cause": "core/openferment_core/workers/library_plants.py:782-784 (apply, then simulate) with :711-712 (simulate settles only when p.flowsheet is set)",
+   "confidence": "high",
+   "fixSize": "small",
+   "evidence": "Measured twice (main service and a fresh database). A study that moves a library input by a small step reads this re-simulation's 2.3e-5 as the input's effect."
+  },
+  {
+   "id": "H4-04",
+   "title": "fermOS's mass balance flags a fed-batch whose cells take up nothing as not closing",
+   "severity": "S3",
+   "kind": "Wrong number",
+   "area": "kinetics.mass_balance, fermos simulation flags",
+   "statement": "The closure is the gap divided by the sugar consumed, so a fed-batch with no uptake (closed form: V = V0 + F t and every concentration diluted, which the run meets within 1.2e-6) reports closure 1.0 from 8.5e-5 g of integrator error (1.5 with a feed of water), flags 'The mass balance does not close: 1 against 1%.' and says the rate laws do not hold together.",
+   "contract": "core/openferment_core/kinetics.py:88-96 \"9. The mass balance is checked ... Both are invariants of the equations ... the check catches a wrong right-hand side ..., never integrator error\"; fermos.py note \"The check catches a wrong rate law, not the integrator's error\"",
+   "reproCommand": "bash /home/user/openFermentUI/bughunt/notes/H4/scripts/repro.sh H4-04 (scripts kinetics_cases.py case 7, kinetics_more.py case C)",
+   "expected": "massBalance ok true and no flag: the equations hold exactly (X, S, P and V match the closed form within 1.2e-6 relative).",
+   "observed": "{closure: 1.0, ok: false, note: 'Sugar consumed, 8.45561e-05 g ... outside the 1% closure, so the rate laws or their parameters do not hold together'}; flags ['The mass balance does not close: 1 against 1%.']; feed of water: closure 1.5, consumed -1.5429e-05 g.",
+   "cause": "core/openferment_core/kinetics.py:1346 (scale = max(abs(consumed), ATOL))",
+   "confidence": "high",
+   "fixSize": "small",
+   "evidence": "Seven other hand cases close to 1e-15..4e-7; a fed-batch with growth closes to 2e-7."
+  },
+  {
+   "id": "H4-05",
+   "title": "A batch with μmax zero is refused as one whose sugar never runs out, though β or maintenance use it up",
+   "severity": "S3",
+   "kind": "Contract break",
+   "area": "kinetics._integrate",
+   "statement": "Asked to run until the sugar runs out, a batch with μmax 0 is refused because 'the sugar never runs out', yet with β 0.1 g g-1 h-1, X0 2 g/L, Yp/s 0.5 and S0 20 g/L the sugar falls at 0.4 g/L/h and runs out at 49.95 h, which the same family reports when a run length is named.",
+   "contract": "core/openferment_core/kinetics.py:58-61 \"'Until the sugar runs out' integrates over horizons doubling from 1/μmax ... and a run whose sugar stops falling (growth stopped at Pmax, or by the second nutrient) is refused in words\"",
+   "reproCommand": "bash /home/user/openFermentUI/bughunt/notes/H4/scripts/repro.sh H4-05 (script zero_growth_runout.py)",
+   "expected": "A run that ends at the run-out hour, 49.95 h, or a refusal only for a sugar that stops falling.",
+   "observed": "422 'μmax is zero, so the cells never grow and the sugar never runs out: name a run length'; with t_end 60 h: sugarRunsOutH 49.95000000025453, end S 0, P 10.",
+   "cause": "core/openferment_core/kinetics.py:1209-1210",
+   "confidence": "high",
+   "fixSize": "small",
+   "evidence": "Workaround: name a run length."
+  },
+  {
+   "id": "H4-06",
+   "title": "cellulosic_ethanol_v0 reports its denatured product stream's mass as the ethanol made and the ethanol per kg of dry feed",
+   "severity": "S3",
+   "kind": "Wrong number",
+   "area": "flowsheets/cellulosic_ethanol_v0.outputs, ProformaComparison labels",
+   "statement": "ethanolKgPerH and ethanolKgPerKgDryFeed read the product stream's whole mass, Ethanol 21,314.6 + Denaturant 473.1 + Water 177.2 + NH3 13.4 = 21,978.4 kg/h, which the Comparison screen labels 'Ethanol made per hour' and 'Ethanol per kg of dry feed': 0.2643 kg/kg against the 0.2563 kg of ethanol the plant makes from a kilogram of dry feed (3.1 % high), while ethanol_glucose_v0's output of the same name reads the ethanol alone.",
+   "contract": "src/screens/ProformaComparison.tsx:83-85 'Ethanol made per hour', 'Ethanol per kg of dry feed'; core/openferment_core/flowsheets/cellulosic_ethanol_v0.py:325 \"what the plant makes of its feed\"; core/openferment_core/flowsheets/ethanol_glucose_v0.py:287 (\"ethanolKgPerH\": product.imass[\"Ethanol\"])",
+   "reproCommand": "bash /home/user/openFermentUI/bughunt/notes/H4/scripts/repro.sh H4-06",
+   "expected": "ethanolKgPerH 21,314.6 kg/h and ethanolKgPerKgDryFeed 0.2563 kg/kg, or the outputs named for the denatured fuel they measure.",
+   "observed": "outputs.ethanolKgPerH 21978.37533 kg/hr, outputs.ethanolKgPerKgDryFeed 0.2642940342 kg/kg; the ethanol stream's massFlows {Water 177.23, Ethanol 21314.59, NH3 13.45, Denaturant 473.10}.",
+   "cause": "core/openferment_core/flowsheets/cellulosic_ethanol_v0.py:334-336 (float(ethanol.F_mass))",
+   "confidence": "medium",
+   "fixSize": "small",
+   "evidence": "The MESP per gallon uses the package's own density of the denatured product, which stays right; the two flow outputs are the ones mislabelled."
+  },
+  {
+   "id": "H4-07",
+   "title": "ethanol_glucose_v0 takes a titre at harvest that its beer never reaches",
+   "severity": "S3",
+   "kind": "Inconsistency",
+   "area": "flowsheets/ethanol_glucose_v0.simulate",
+   "statement": "The titre input sets only the batch time (titre over productivity), and the beer's ethanol follows from the feed's glucose and the yield, so a run with titre 70 g/L, feed 150 g/L and yield 0.45 makes beer at 61.83 g/L and is priced on a 35 h batch; nothing holds the titre to what the feed can make, so a titre above feed x yield is priced too.",
+   "contract": "core/openferment_core/flowsheets/ethanol_glucose_v0.py:54 \"titre\": (\"ethanol titre at harvest\", \"g L-1\", None)",
+   "reproCommand": "bash /home/user/openFermentUI/bughunt/notes/H4/scripts/repro.sh H4-07 (script scenario_run.py)",
+   "expected": "Beer at the titre at harvest the run names (70 g/L), or a refusal in words when the feed and the yield cannot make it.",
+   "observed": "readBack beerEthanolGPerL 61.830259604809335, batchTimeH 35.0 (run eb4ad3a1fce70fa2), base price 1.0536688973 USD/kg.",
+   "cause": "core/openferment_core/flowsheets/ethanol_glucose_v0.py:219 (b.R1.tau = titre / productivity) with no check of titre against feed_glucose_conc x yield",
+   "confidence": "medium",
+   "fixSize": "medium",
+   "evidence": "The same holds for custom_train_v1, which takes the same inputs."
+  }
+ ],
+ "suspected": [
+  {
+   "title": "A train whose inlet is a vessel design carries about 1 % more product than the plant scale the vessel was designed at",
+   "tried": "Vessel 9d857dedd0c2cb93 (plant scale 1000 t/yr, titre 2.854 g/L): plant scale over hours over titre is 44.24 m3/h; train_spec._vessel_flow reads working volume x vessels / cycle time = 360.213 x 2 / 16.127 = 44.67 m3/h (BioSTEAM sizes on the effluent's volume). I did not build a train on a vessel inlet to read its product flow."
+  },
+  {
+   "title": "A simulation's productivity counts the product the batch started with",
+   "tried": "productivity = finalTitre / harvestH (fermos.py:2298): decay alone with p0 1 g/L and no product made reports 0.0333 g/L/h; fed-batch dilution with nothing made reports 0.075. Proforma uses titre over productivity only as a batch time, so its price stands; the fermOS screen's figure is the one in doubt."
+  },
+  {
+   "title": "Thermo properties refuse every stream of the cornstover plant",
+   "tried": "POST /api/thermo/props on run bfda026530692adc streams ethanol and s24: refused (no chemical named Denaturant; DAP, Extract, Galactan, Z_mobilis; Lignin, Mannan cannot be built). thermo.STREAM_RUNS lists library.run; the corn plant's ethanol stream answers. The refusal is the documented one, so I left it as a doubt about use."
+  },
+  {
+   "title": "A train read from a cornstover run cannot run",
+   "tried": "POST /api/pureos/train/from-run on bfda026530692adc answers refusals [] and 12 units; /train/check and /train/run refuse it (the inlet carries 28 chemicals the yeast set lacks). from_run.py's docstring names the one chemical set; the Builder is shown a train with no refusal that cannot run."
+  }
+ ],
+ "needsLiveModel": [],
+ "held": [
+  "cornstover, corn and the cellulosic plant through POST /api/library/{plant}/run against biorefineries imported directly in a separate process: every price-block number, IRR, sales, material, utility, installed, TCI, FCI, FOC, VOC, solved and package price, feedstock flow, the four UnitGroup duties, every stream's flow, T, P and component flows (118, 104 and 118 streams) and every unit's installed and purchase cost (68, 71, 68 units) agree to ten significant digits; NPV kept to the TCI's last digit",
+  "cellulosic_ethanol_v0 at dilute acid, IB equals cornstover in every stream, unit and the solved price 0.658813642 USD/kg (ADR-004's figure); MESP 1.967671122 USD/gal",
+  "ADR-013 and the regression report: installed equipment cost 1.926478463e8 and electricity 20.91491945 MW, the two values outside the package test, measured the same by the direct route",
+  "the TEA breakdown's lines sum to the price they are read at for cornstover, corn and ethanol_glucose_v0, and per-unit values equal usdPerYear over basis flow times operating hours",
+  "fermOS hand cases: zero growth with beta, exponential growth with Ks 0, decay alone, maintenance alone, Monod constant yield, chemostat steady state (S*, X*, P*, washout 0.381 h-1), fed-batch dilution, exponential feed at mu_set (XV within 2e-4 of X0V0 exp(mu_set t)), aerobic OUR peak (mu/Yxo + mo) X: all match their closed forms to the solver's tolerance; units g L-1, h, L, g O2 L-1 h-1 as stated",
+  "the kinetics engine's run of each case is the route's artifact (same id) with outputs end.<state> in the state's unit, end.t, harvestH and sugarRunsOutH in hours, versions numpy and scipy, sffRefused in words",
+  "a logistic and Luedeking-Piret fit of exact data recovers X0, mu, Xmax, P0, alpha, beta exactly; its forecast's median final biomass equals X(24 h) of the logistic",
+  "a train run from the ethanol_glucose_v0 run: every unit's inlets equal its outlets component by component, every stream's total equals its components, recovery, productOut, productLost, overallRecovery and purity agree with the stream table, its outputs.values in kg/hr and shares",
+  "the ethanol-water azeotrope (x 0.8939, 0.9556 by mass, 351.40 K at 101325 Pa) and the volatility answer agree with each other",
+  "the anaerobic vessel design's plant-scale reading: 1000 t/yr over 7920 h is 126.26 kg/h, over the titre 2.854 kg/m3"
+ ],
+ "unexamined": [
+  {
+   "item": "aerobic vessel designs (AeratedBioreactor, kLa, compressor power)",
+   "reason": "time: one anaerobic design was checked by hand"
+  },
+  {
+   "item": "the batch_v1 family fit (kinetics.Family.fit) and forecasts drawn from it",
+   "reason": "time: the logistic fit and its forecast were checked"
+  },
+  {
+   "item": "pureOS's in-house unit classes (Ultrafiltration, CellDisruption, Chromatography) and the proposer's rules",
+   "reason": "time; no product catalogue entry was kept to propose for"
+  },
+  {
+   "item": "the oilcane, sugarcane, lipidcane and milk library plants",
+   "reason": "brief named cornstover, corn and the composed flowsheet; the regression report covers the rest"
+  },
+  {
+   "item": "workers/kept_references.py replays of the retired reference entries",
+   "reason": "outside the brief's files"
+  }
+ ]
+}

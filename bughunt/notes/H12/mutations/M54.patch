@@ -1,0 +1,11 @@
+--- a/core/openferment_core/engine/conform.py
++++ b/core/openferment_core/engine/conform.py
+@@ -501,7 +501,7 @@
+     if run is None:
+         return False, "no run to read created_by from (check 3)"
+     who = _created_by(run.id)
+-    ok = who == by and run.by == by
++    ok = run.by == by
+     words = f"the checks' run: created_by {who!r}, its by {run.by!r}, asked by {by!r}"
+     try:
+         held, said = _model_path(engine, chosen, thing, inputs, run, door=door)

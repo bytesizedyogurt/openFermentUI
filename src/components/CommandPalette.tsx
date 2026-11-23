@@ -7,6 +7,7 @@
 import { useEffect, useMemo, useRef, useState } from 'react';
 import { createPortal } from 'react-dom';
 import {
+  BookOpen,
   Library,
   FlaskConical,
   Boxes,
@@ -22,6 +23,7 @@ import {
 import { useStore } from '@/store';
 import { navigate } from '@/router';
 import { RUNBOOK_STATUS_LABEL } from '@/data/labels';
+import { strainWords } from '@/lib/catalogues';
 import { RAIL, SUB_VIEWS } from '@/data/nav';
 import { cx } from './ui';
 
@@ -73,6 +75,7 @@ export function CommandPalette() {
   const strains = useStore((s) => s.strains);
   const runbooks = useStore((s) => s.runbooks);
   const protocols = useStore((s) => s.protocols);
+  const lessons = useStore((s) => s.lessons);
   const scenarios = useStore((s) => s.scenarios);
   const records = useStore((s) => s.records);
   const [query, setQuery] = useState('');
@@ -111,7 +114,7 @@ export function CommandPalette() {
       { id: 'n-ing', group: 'Navigate', label: 'Intake — ingest board', hint: 'what is queued, fetched, failed', aliases: ['ingest', 'library ingest', 'fetch'], icon: Library, run: () => navigate('/intake/ingest') },
       { id: 'n-cmp', group: 'Navigate', label: 'Proforma — compare scenarios', aliases: ['compare', 'simulate compare'], icon: LineChart, run: () => navigate('/biorepo/compare') },
       { id: 'n-set', group: 'Navigate', label: 'Settings', icon: SettingsIcon, run: () => navigate('/settings/appearance') },
-      { id: 'n-arch', group: 'Navigate', label: 'Architecture — the eighteen components', hint: 'what every name means', aliases: ['components', 'names', 'glossary', 'vocabulary', 'map'], icon: Boxes, run: () => navigate('/settings/architecture') },
+      { id: 'n-arch', group: 'Navigate', label: 'Architecture — the named components', hint: 'what every name means', aliases: ['components', 'names', 'glossary', 'vocabulary', 'map'], icon: Boxes, run: () => navigate('/settings/architecture') },
       { id: 'n-abt', group: 'Navigate', label: 'About & colophon', icon: SettingsIcon, run: () => navigate('/settings/about') },
     ];
     for (const p of papers) {
@@ -119,7 +122,7 @@ export function CommandPalette() {
         id: `p-${p.id}`,
         group: 'Navigate',
         label: `${p.id} — ${p.title}`,
-        hint: `${p.year} · paper`,
+        hint: p.year !== null ? `${p.year} · paper` : 'paper',
         icon: Library,
         run: () => navigate(`/biorepo/paper/${p.id}`),
       });
@@ -128,8 +131,10 @@ export function CommandPalette() {
       nav.push({
         id: `s-${s.id}`,
         group: 'Navigate',
-        label: `${s.binomial} ${s.designation}`,
+        label: strainWords(s),
         hint: 'strain',
+        // A strain is found by the other names papers give it too.
+        aliases: s.aliases,
         icon: FlaskConical,
         run: () => navigate(`/geneos/hosts/${s.id}`),
       });
@@ -152,6 +157,17 @@ export function CommandPalette() {
         hint: `${p.id} · protocol`,
         icon: ClipboardList,
         run: () => navigate(`/runbooks/protocols/${p.id}`),
+      });
+    }
+    // A lesson is an entry of the project's lesson catalogue, addressed by its id alone (alpha 2.2 E.12).
+    for (const l of lessons) {
+      nav.push({
+        id: `ls-${l.id}`,
+        group: 'Navigate',
+        label: l.name,
+        hint: `${l.id} · lesson`,
+        icon: BookOpen,
+        run: () => navigate(`/primer/${l.id}`),
       });
     }
     for (const s of scenarios) {
@@ -216,7 +232,7 @@ export function CommandPalette() {
     ];
 
     return { items: [...nav, ...actions] };
-  }, [papers, strains, runbooks, protocols, scenarios, records]);
+  }, [papers, strains, runbooks, protocols, lessons, scenarios, records]);
 
   const results = useMemo(() => {
     const scored = items

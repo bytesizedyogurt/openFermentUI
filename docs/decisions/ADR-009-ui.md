@@ -45,6 +45,12 @@ inspectable card; the SFF graph renders in the run report and the flowsheet page
   report and its SFF graph drawn, the conversation of the proof's step 6 with its estimate marked,
   a runbook. It is the proof's step 9 and runs in CI after verify.
 
+### Alpha 2.2, E.15 (2026-11-05)
+
+- The hand-kept `src/data/types.ts` and `check:plan`'s pairs are retired: every screen, component and
+  `src/lib` module reads the generated `src/api/types.gen.ts`, and `check:plan` holds the provenance
+  ranking alone (ADR-007's note of E.15). The 7.1 note above stands as written then.
+
 ## Revisit condition
 
 A design pass after alpha 2.0.

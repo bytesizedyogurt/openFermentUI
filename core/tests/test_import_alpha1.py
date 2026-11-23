@@ -106,6 +106,19 @@ def test_a_file_that_cannot_be_read_refuses_the_whole_directory_and_writes_nothi
     assert [p.id for p in projects.listed()] == ["test-project"]
 
 
+def test_a_decision_holding_a_models_estimate_refuses_the_whole_import_and_writes_nothing(alpha1):
+    """Bug hunt H6-02: BioRepo keeps records, and an estimate never enters
+    one; the import refuses it in words naming the file and the record, as
+    biorepo.write refuses it, before anything is written."""
+    estimated = LABELLED.model_copy(update={"gold": Quantity(value=3.0, unit="mg L-1",
+                                                             origin={"kind": "model-estimate", "by": "a-placeholder-model"})})
+    (alpha1 / "biorepo.json").write_text(BioRepo(decisions={CANDIDATE.id: DECISION, PROMOTED.id: estimated},
+                                                 records=[CANDIDATE, PROMOTED]).model_dump_json())
+    with pytest.raises(import_alpha1.ImportRefused, match=f"biorepo.json holds decision {PROMOTED.id}.*model's estimate"):
+        import_alpha1.carry(alpha1, "Alpha 1.0 records", "Ada Moreno")
+    assert [p.id for p in projects.listed()] == ["test-project"]
+
+
 def test_a_write_that_fails_part_way_leaves_no_project_behind(alpha1, monkeypatch):
     real = db.rows.put
     calls = {"n": 0}
@@ -130,3 +143,28 @@ def test_the_command_reports_what_it_carried_and_refuses_in_words(alpha1, capsys
     assert import_alpha1.main(["--name", "Again", "--by", "Ada Moreno", "--data", str(alpha1 / "nowhere")]) == 2
     assert "is not a directory" in capsys.readouterr().err
     assert json.loads((alpha1 / "proposals.json").read_text())["proposals"][0]["id"] == "pr-1"
+
+
+def test_a_database_behind_the_newest_schema_is_refused_in_words_and_written_nothing(alpha1, capsys, monkeypatch,
+                                                                                       test_database):
+    from openferment_core.db import migrate
+    from openferment_core.db.engine import make_engine
+
+    monkeypatch.setattr(import_alpha1, "load_dotenv", lambda *a, **k: None)
+    test_database.open()
+    name = f"{test_database.name}_unmigrated"
+    bare = migrate.create(name, test_database.server)
+    engine = make_engine(bare)
+    binding = db.Binding(engine)
+    previous = db.bind(binding)
+    try:
+        assert import_alpha1.main(["--name", "Carried", "--by", "Ada Moreno", "--data", str(alpha1)]) == 2
+        err = capsys.readouterr().err
+        assert f"refused: the database is at revision none of {migrate.head()}. Run: pnpm db:migrate" in err
+        assert "Traceback" not in err
+        assert migrate.revision(bare) is None, "the refusal migrated nothing and wrote nothing"
+    finally:
+        db.bind(previous)
+        db.run(binding.close())
+        db.run(engine.dispose())
+        migrate.drop(name, test_database.server)

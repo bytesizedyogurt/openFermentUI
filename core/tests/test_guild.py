@@ -14,7 +14,7 @@ from __future__ import annotations
 import asyncio
 import json
 import threading
-from datetime import date, timedelta
+from datetime import date, datetime, timedelta, timezone
 from pathlib import Path
 
 import pytest
@@ -66,7 +66,7 @@ def refused(rule: str, fn, *args, **kwargs) -> str:
 # ── the projection ─────────────────────────────────────────────────────
 
 
-def test_projection_holds_the_seed_skills_and_tags():
+def test_the_projection_holds_the_fixture_skills_and_tags():
     skills = guild.skills()
     assert "SK-OD" in skills and "SK-CIP" in skills
     assert guild.step_skills("PR-OD-01", "o4") == ["SK-OD"]
@@ -109,6 +109,70 @@ def test_a_change_is_made_by_a_lead_and_keeps_what_was_first_written():
     stored = guild.write_person(change.model_copy(update={"updatedBy": "p-sean", "addedBy": "p-eric", "joinedAt": "2020-01-01"}))
     assert stored.title == "Operator" and stored.addedBy == "p-sean" and stored.joinedAt == "2026-06-01"
     assert stored.updatedBy == "p-sean" and stored.updatedAt
+
+
+def test_a_change_keeps_the_time_it_was_made():
+    """A page that held a change offline sends it later; the service keeps the
+    change's own time, so a page comparing its owed copy against the service's
+    reads the two changes in the order they were made (H7-01)."""
+    team()
+    made = "2026-06-02T10:00:00.123Z"
+    change = person("p-patrick", "Patrick Mugisha", title="Operator", updatedBy="p-sean", updatedAt=made)
+    assert guild.write_person(change).updatedAt == made
+
+
+def test_an_add_that_carries_a_change_keeps_the_change_and_its_time():
+    """A person added and then changed while the service was away arrives as one
+    add: the change keeps its maker and time, so an earlier change another page
+    sends later is kept back, and a change made after it is written (H7-01)."""
+    team()
+    added_and_changed = person("p-ann", "Ann Uwase", title="Principal", updatedBy="p-sean", updatedAt="2026-06-02T09:10:00.000Z")
+    stored = guild.write_person(added_and_changed)
+    assert stored.updatedBy == "p-sean" and stored.updatedAt == "2026-06-02T09:10:00.000Z" and stored.title == "Principal"
+    earlier = added_and_changed.model_copy(update={"title": "Senior", "updatedAt": "2026-06-02T09:05:00.000Z"})
+    assert guild.write_person(earlier).title == "Principal"
+    later = added_and_changed.model_copy(update={"title": "Head", "updatedAt": "2026-06-02T09:20:00.000Z"})
+    assert guild.write_person(later).title == "Head"
+    # An add that names no change, or a change by someone who is not a lead, keeps no change.
+    plain = guild.write_person(person("p-bea", "Bea Mukamana"))
+    assert plain.updatedBy is None and plain.updatedAt is None
+    by_member = guild.write_person(person("p-cal", "Cal Nkusi", updatedBy="p-patrick", updatedAt="2026-06-02T09:00:00.000Z"))
+    assert by_member.updatedBy is None and by_member.updatedAt is None
+
+
+def test_the_first_lead_added_with_an_offline_change_to_inactive_stays_active():
+    """A first lead who left themself inactive while the service was away would
+    leave the ledger with no lead who can add anyone: the add stands, active."""
+    stored = guild.write_person(person("p-sean", "Sean Creighton", role="lead", added_by=None, active=False,
+                                       updatedBy="p-sean", updatedAt="2026-06-02T09:00:00.000Z"))
+    assert stored.active is True and stored.updatedBy is None
+    guild.write_person(person("p-eric", "Eric Habimana"))
+
+
+def test_a_change_made_before_the_one_the_ledger_holds_leaves_it_as_it_is():
+    """Two pages sync at once, each owing a change of one person: the change
+    made later stands whichever arrives last (H7-01)."""
+    team()
+    later = person("p-patrick", "Patrick Mugisha", title="Principal", updatedBy="p-sean", updatedAt="2026-06-02T10:05:00.000Z")
+    earlier = later.model_copy(update={"title": "Senior", "updatedAt": "2026-06-02T10:00:00.000Z"})
+    guild.write_person(later)
+    answered = guild.write_person(earlier)
+    assert answered.title == "Principal" and answered.updatedAt == later.updatedAt
+    held = next(p for p in guild.read().people if p.id == "p-patrick")
+    assert held.title == "Principal" and held.updatedAt == later.updatedAt
+    # A change made after the one held is written as ever.
+    guild.write_person(later.model_copy(update={"title": "Head", "updatedAt": "2026-06-02T10:06:00.000Z"}))
+    assert next(p for p in guild.read().people if p.id == "p-patrick").title == "Head"
+
+
+@pytest.mark.parametrize("asked", ["2999-01-01T00:00:00Z", "yesterday", "2026-06-02T10:00:00", ""])
+def test_a_change_time_ahead_of_the_clock_or_unreadable_is_the_services_own(asked):
+    team()
+    before = datetime.now(timezone.utc).replace(microsecond=0)
+    change = person("p-patrick", "Patrick Mugisha", title="Operator", updatedBy="p-sean", updatedAt=asked or None)
+    stored = guild.write_person(change)
+    kept = datetime.fromisoformat(stored.updatedAt.replace("Z", "+00:00"))
+    assert stored.updatedAt != asked and before <= kept <= datetime.now(timezone.utc)
 
 
 def test_the_ledger_never_loses_its_last_lead():

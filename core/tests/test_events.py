@@ -188,8 +188,8 @@ def test_an_engine_run_says_its_job_and_the_artifact_it_kept(worker):  # noqa: F
         ("job.queued", rep.run.id), ("job.running", rep.run.id), ("artifact.kept", rep.run.artifactId),
         ("job.done", rep.run.id)]
     job = sent[0].data
-    assert (job["kind"], job["plant"], job["configuration"], job["scenarioId"], job["by"]) == (
-        "engine.run", "sugarcane", None, None, "Ada Moreno")
+    assert (job["kind"], job["engine"], job["plant"], job["configuration"], job["scenarioId"], job["by"]) == (
+        "engine.run", "biosteam", "sugarcane", None, None, "Ada Moreno")
     kept, done = sent[2].data, sent[3].data
     assert (kept["tool"], kept["provenance"]) == (library.LIBRARY_RUN, rep.artifact.provenance)
     assert (done["status"], done["provenance"], done["artifactId"], done["sffRecordId"]) == (

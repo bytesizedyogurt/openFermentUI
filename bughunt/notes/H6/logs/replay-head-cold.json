@@ -1,0 +1,44 @@
+[
+ {
+  "id": "2e0c6c06ca0b2812",
+  "tool": "proforma.run",
+  "status": 200,
+  "s": 16.1,
+  "identical": false,
+  "withinTolerance": false,
+  "differences": 8,
+  "first": {
+   "path": "tea.FCI",
+   "stored": 31220166.41394996,
+   "replayed": 31220166.413949955
+  }
+ },
+ {
+  "id": "540dbc47d9be9a2d",
+  "tool": "proforma.run",
+  "status": 200,
+  "s": 3.6,
+  "identical": false,
+  "withinTolerance": false,
+  "differences": 25,
+  "first": {
+   "path": "grid.costLines.capex[22]",
+   "stored": 0.060654573137600254,
+   "replayed": 0.060654573137600365
+  }
+ },
+ {
+  "id": "74b8a29194c7a763",
+  "tool": "proforma.run",
+  "status": 200,
+  "s": 0.5,
+  "identical": false,
+  "withinTolerance": false,
+  "differences": 8,
+  "first": {
+   "path": "tea.FCI",
+   "stored": 31220166.41394996,
+   "replayed": 31220166.413949955
+  }
+ }
+]

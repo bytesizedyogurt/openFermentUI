@@ -34,6 +34,22 @@ def test_health_still_answers(client):
     assert body["ok"] is True and body["service"] == "openferment-core"
 
 
+def test_health_names_the_plan_routes_models(client, monkeypatch):
+    """alpha 2.2 F.2f: the Postdoc screen's "answers on" and "falling back
+    to" name the plan route's models, a route table's own where it names one."""
+    body = client.get("/api/health").json()
+    assert (body["model"], body["fallbackModel"]) == ("claude-opus-5-5", "claude-sonnet-5-5")
+    monkeypatch.setenv("OPENFERMENT_ROUTES", '{"plan": {"models": ["claude-haiku-5-5"]}, '
+                                             '"judge": {"models": ["claude-sonnet-5-5"]}}')
+    body = client.get("/api/health").json()
+    assert (body["model"], body["fallbackModel"]) == ("claude-haiku-5-5", ""), "a route of one model"
+    monkeypatch.setenv("OPENFERMENT_ROUTES", "{not json")
+    monkeypatch.setenv("OPENFERMENT_FALLBACK_MODEL", "claude-sonnet-5-5,claude-haiku-5-5")
+    body = client.get("/api/health").json()
+    assert body["ok"] is True and (body["model"], body["fallbackModel"]) == \
+        ("claude-opus-5-5", "claude-sonnet-5-5, claude-haiku-5-5"), "a table that cannot route: the plain settings"
+
+
 def test_the_overlay_holds_no_paper_before_anything_is_collected(client, kit_database):
     body = client.get("/api/biorepo/overlay").json()
     overlay = Overlay.model_validate(body)

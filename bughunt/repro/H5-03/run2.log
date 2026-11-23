@@ -1,0 +1,24 @@
+NOTICE:  database "bh_r_h5_03_kinds" does not exist, skipping
+service: http://127.0.0.1:9330 over a fresh bh_r_h5_03_kinds (keyless, collectors offline)
+setup
+  POST /api/projects: 201 {"id":"bh-r-h5-03","name":"bh-r-h5-03","description":"","createdBy":"alice","createdAt":"2026-11-10T23:18:29.281351+00:00"}
+  POST /api/studies/scenarios: 200 {"id":"ssc-21b4b9fdadce","kind":"engine","title":"Alice's study scenario","plant":"cornstover","configuration":null,"values":[],"note":null,"runIds":[],"by":"alice","at":"2026-11-10T23:19:09.290488Z"}
+  POST /api/engines/kinetics/run: 200 {"run":{"id":"3c8d443a7fca6d7c","engine":"kinetics","plant":"batch_v1","configuration":null,"status":"done","tool":"fermos.simulation","toolVersion":"kinetics batch_v1 2 · scipy 1.18.1","inputs":[{"name":"family","quanti
+  POST /api/tools/pureos_build new: 200 {"summary":{"state":"open","trainId":"tr-c0c571ba0d79","name":"ethanol train, built by a model","program":"yeast","product":"ethanol","inlet":{"kind":"simulation","ref":"3c8d443a7fca6d7c","streamId":null,"vessel":null},"
+
+1. study scenario ssc-21b4b9fdadce
+  before: GET /api/studies/scenarios/ssc-21b4b9fdadce 200; title "Alice's study scenario", plant 'cornstover'; listed ['ssc-21b4b9fdadce']; row engine, made by alice
+  PUT /api/state/scenarios/ssc-21b4b9fdadce as bob: 200 {"kind":"scenarios","id":"ssc-21b4b9fdadce","value":{"id":"ssc-21b4b9fdadce","modelId":"ethanol_glucose_v0","flowsheetId":"ethanol_glucose_v0","kind":"biosteam"
+  after: GET /api/studies/scenarios/ssc-21b4b9fdadce 404 {"detail":"the project holds no scenario ssc-21b4b9fdadce"}; listed []; row proforma, made by alice
+  DELETE /api/state/scenarios/ssc-21b4b9fdadce as bob: 200; row (no row)
+
+2. kept train tr-c0c571ba0d79
+  before: GET /api/pureos/trains-kept ['tr-c0c571ba0d79']; row kept, made by bh-h5-03-agent/0.1
+  PUT /api/state/trains/tr-c0c571ba0d79 as bob: 200 {"kind":"trains","id":"tr-c0c571ba0d79","value":{"train":{"id":"tr-c0c571ba0d79","name":"Bob's train","program":"placeholder","product":"x","inlet":{"kind":"typ
+  after: GET /api/pureos/trains-kept []; row made, made by bh-h5-03-agent/0.1
+
+  audit rows on the two ids: [('new_train', 'bh-h5-03-agent/0.1', 'tr-c0c571ba0d79'), ('keep_scenarios', 'bob', 'ssc-21b4b9fdadce'), ('remove_scenarios', 'bob', 'ssc-21b4b9fdadce'), ('keep_trains', 'bob', 'tr-c0c571ba0d79')]
+
+EXPECTED: each PUT refused in words (a 422) naming the row another kind keeps under that id; the study scenario and the model's kept train read back as they were made
+OBSERVED: PUT /api/state/scenarios/ssc-21b4b9fdadce answered 200 and the study scenario is gone (GET 404, the list [], the row 'engine, made by alice' now 'proforma, made by alice'); PUT /api/state/trains/tr-c0c571ba0d79 answered 200 and the model's kept train is gone (trains-kept ['tr-c0c571ba0d79'] then [], the row 'kept, made by bh-h5-03-agent/0.1' now 'made, made by bh-h5-03-agent/0.1')
+RESULT: DEFECT

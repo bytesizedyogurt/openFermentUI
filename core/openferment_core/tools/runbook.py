@@ -1,5 +1,5 @@
 """`draft_runbook`: Postdoc drafts a runbook, and the service writes every
-number (OF-BLD-014 §9.2).
+number.
 
 Ids and words in: a title, a product id and a strain id when the runbook
 tests one the project's catalogues hold (empty for a plant's run), items that each point

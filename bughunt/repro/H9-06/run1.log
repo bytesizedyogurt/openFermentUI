@@ -1,0 +1,29 @@
+EXPECTED: core/openferment_core/api.py:554-556 says of POST /api/ask: "Every failure below returns a plan
+EXPECTED: with `declined` set rather than an HTTP error"; ADR-008 6.3 says OPENFERMENT_ROUTES is "refused in
+EXPECTED: words when it cannot route (`RoutesInvalid`...)". So under the table {"plan": {"models": []}}
+EXPECTED: POST /api/ask answers 200 with a plan whose declined holds the RoutesInvalid words, and the
+EXPECTED: extraction route a refusal in words (a 503 with its detail, as for no key), as the control's
+EXPECTED: keyless ask on the plain table answers 200 with declined set.
+## GET /api/health on 10040 (the table laid over): {"ok":true,"service":"openferment-core","model":"claude-opus-5-5","fallbackModel":"claude-sonnet-5-5","hasKey":false} [200]
+## POST /api/ask on 10040: [500] Internal Server Error
+## POST /api/intake/72f32ddc0a2047379666babc9f1010ad/extract on 10040: [500] Internal Server Error
+## control POST /api/ask on 10041 (no table): [200] declined: ANTHROPIC_API_KEY is not set. Put it in core/.env (gitignored) and restart the service.
+## the service log on 10040: 2 unhandled exception(s), 4 naming RoutesInvalid; the last frames:
+   File "core/openferment_core/api.py", line 465, in refuse_changes_from_elsewhere
+   File "core/openferment_core/api.py", line 402, in act_in_the_named_project
+   File "core/openferment_core/api.py", line 359, in use_the_key_a_request_names
+   File "core/openferment_core/api.py", line 562, in ask
+   File "core/openferment_core/api.py", line 538, in _answer
+   File "core/openferment_core/api.py", line 498, in _ask_agent
+   File "core/openferment_core/postdoc_agent.py", line 709, in ask
+   File "core/openferment_core/llm.py", line 488, in chain
+   File "core/openferment_core/llm.py", line 285, in routes
+   openferment_core.llm.RoutesInvalid: OPENFERMENT_ROUTES.plan.models is a list of model specs
+   File "core/openferment_core/api.py", line 2027, in intake_extract
+   File "core/openferment_core/extract.py", line 588, in extract_paper
+   File "core/openferment_core/extract.py", line 532, in _extract_sections
+   File "core/openferment_core/extract.py", line 328, in call_model
+   File "core/openferment_core/llm.py", line 804, in call
+OBSERVED: POST /api/ask answered [500] 'Internal Server Error'; POST /api/intake/<doc>/extract answered [500] 'Internal Server Error';
+OBSERVED: the RoutesInvalid words reach the service log alone (4 line(s)); the control ask answered [200] with declined set.
+RESULT: DEFECT

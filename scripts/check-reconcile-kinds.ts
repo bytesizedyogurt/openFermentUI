@@ -6,7 +6,7 @@
  */
 import { computeDeltas, suggestOutcome } from '../src/engine/reconcile';
 import { HIT_RATE_MIN_TESTED, ledgerCounts } from '../src/engine/ledger';
-import type { Deposition, Prediction, Runbook } from '../src/data/types';
+import type { Deposition, Prediction, Runbook } from '../src/lib/studies';
 
 let fails = 0;
 const check = (l: string, ok: boolean, x = '') => {

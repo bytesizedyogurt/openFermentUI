@@ -40,9 +40,10 @@ among them (acceptance A2).
 Beyond the decision's list, five stages stay, each guarding a rule this build keeps:
 
 - `gen:components --check`: `COMPONENTS.md` is what the package map writes (stage 8.3).
-- `check:plan`: the hand-kept `src/data/types.ts` and the service's models name the same fields,
-  and `PROVENANCE_RANK` holds the service's order; it goes when the screens read
-  `src/api/types.gen.ts` alone (a debt in `docs/PROGRESS.md`).
+- `check:plan`: the provenance ranking. models.py's `Provenance` union and `PROVENANCE_ORDER`
+  name the same classes, and `PROVENANCE_RANK` in `src/store.ts` holds that order member for
+  member (since alpha 2.2 E.15, the note below; until then it also held the hand-kept
+  `src/data/types.ts` to the service's models, field for field).
 - `check:state`: the browser's outbox of writes the service has not acknowledged (ADR-014).
 - `check:figures`: every provenance draws its own mark, `assumed` among them (execution prompt §7.5).
 - `test:reconcile`: the prediction kinds a deposition reconciles, the code the bench page draws from.
@@ -50,3 +51,22 @@ Beyond the decision's list, five stages stay, each guarding a rule this build ke
 `check:tools` holds `docs/TOOLS.md` to the registry (rule 5), which covers what `gen:tools --check`
 would. `pnpm record:fixtures` waits: no component test replays recorded responses yet, and the walk
 and the smoke run against the real service (a debt in `docs/PROGRESS.md`).
+
+## Implementation notes
+
+### Alpha 2.2, E.15 (2026-11-05): check:plan keeps the provenance ranking
+
+- Every screen, component and `src/lib` module reads `src/api/types.gen.ts`, so
+  `src/data/types.ts` is deleted and `check:plan`'s pairs retire with it, 218 types and 1629
+  fields at their last run (ADR-007's note of E.15), as the alpha 2.2 prompt's §3 authorizes.
+  The stage stays in verify, the sixteen stages in the order above, for what it still guards:
+  the ranking `weakest_provenance` walks and the browser's copy of it. It reads models.py and
+  `src/store.ts` as text, with no Python and no service, and holds the union and the order to
+  the same classes, the order to start at `measured`, to rank `measured` above `gold` and an
+  unverified extraction at least as high as an industry estimate, and `PROVENANCE_RANK` to
+  give each class a rank of its own in the order's order. Each check was made to fail on a
+  scratch copy of the two files before the commit.
+- What the pairs held stands in two stages verify already runs: `gen:api --check` holds the
+  OpenAPI document and the generated types to models.py, and `typecheck` holds every reader to
+  the generated types, the rank's keys to the generated union among them (`PROVENANCE_RANK` is
+  a `Record<Provenance, number>`).

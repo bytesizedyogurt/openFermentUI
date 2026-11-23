@@ -1,17 +1,16 @@
-"""Whole-file writes that land whole or not at all (OF-BLD-012 §B.8).
+"""Whole-file writes that land whole or not at all.
 
-Every file the service still keeps (a genome-scale model in models/, an
-export) would be written with `Path.write_text`, which
-truncates first and fills second. A crash, a power cut or a full disk between
-the two leaves a half-written file. A reader in another process (the nightly
-job writes while the server reads) could also catch a file mid-write. The
-records themselves are kept in the database (ADR-001).
+The one file the service keeps on disk is a genome-scale model it fetched
+into models/ (geneos.py); the records themselves are kept in the database
+(ADR-001). `Path.write_bytes` truncates first and fills second, so a crash,
+a power cut or a full disk between the two would leave half a model file,
+whose hash is its pin.
 
-`write_text` here (and `write_bytes`, for a file kept byte for byte as it was
-fetched) writes beside the target, flushes to disk, then renames over it. A
-rename within one directory is atomic, so the target holds either the old
-contents or the new ones, never a mixture, and a failed write leaves the old
-file exactly as it was and nothing beside it.
+`write_bytes` here writes beside the target, flushes to disk, then renames
+over it, and `write_text` is the same for text. A rename within one
+directory is atomic, so the target holds either the old contents or the new
+ones, never a mixture, and a failed write leaves the old file exactly as it
+was and nothing beside it.
 
 "Flushes to disk" has to mean the disk. On macOS, fsync hands the data to the
 drive, whose own cache can still lose it in a power cut; F_FULLFSYNC asks the
@@ -22,8 +21,6 @@ from __future__ import annotations
 
 import os
 import tempfile
-from collections.abc import Iterator
-from contextlib import contextmanager
 from pathlib import Path
 
 try:
@@ -87,24 +84,3 @@ def write_bytes(path: Path, data: bytes) -> None:
             pass
         raise
 
-
-@contextmanager
-def held(path: Path) -> Iterator[None]:
-    """Hold `path` for a read-modify-write against other processes too.
-
-    A threading lock keeps two requests in the service apart; the nightly job
-    is another process, and a change made in the service while it ran would
-    be lost to whichever wrote second (OF-BLD-013 §5.5). This takes an
-    exclusive advisory lock on a file beside `path` (`<name>.lock`, kept out
-    of git with the file it guards) and waits for it.
-    """
-    path.parent.mkdir(parents=True, exist_ok=True)
-    if fcntl is None:  # pragma: no cover
-        yield
-        return
-    with open(path.with_name(path.name + ".lock"), "a", encoding="utf-8") as f:
-        fcntl.flock(f.fileno(), fcntl.LOCK_EX)
-        try:
-            yield
-        finally:
-            fcntl.flock(f.fileno(), fcntl.LOCK_UN)

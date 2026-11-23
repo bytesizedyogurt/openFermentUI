@@ -32,11 +32,43 @@ def test_a_changed_input_reaches_the_simulation(warm):
     assert out["topEthanol"] == pytest.approx(20.0, rel=1e-9) and out["bottomTotal"] == pytest.approx(135.0, rel=1e-9)
 
 
-def test_an_unknown_input_or_flowsheet_is_refused_in_words(warm):
+def test_an_unknown_input_or_flowsheet_is_refused_in_words(warm, tmp_path):
     with pytest.raises(WorkerError, match="no input sugar"):
         warm.call("evaluate", {"flowsheet": "toy", "values": {"sugar": 1.0}})
-    with pytest.raises(WorkerError):
-        warm.call("evaluate", {"flowsheet": "nowhere", "values": {}})
+    # D11: the words of flowsheets.load's KeyError arrive as it wrote them, unquoted.
+    for op, args in (("evaluate", {"values": {}}), ("grid", {"axes": {"split": [0.2]}}),
+                     ("montecarlo", {"specs": {}, "n": 1}), ("sff_export", {"path": str(tmp_path / "nowhere.sff.json")})):
+        with pytest.raises(WorkerError) as e:
+            warm.call(op, {"flowsheet": "nowhere", **args})
+        assert str(e.value).startswith("Refused: there is no flowsheet nowhere; there are "), (op, str(e.value))
+    # A replay names the runs it replays: those kept from the two retired reference entries (alpha 2.2 D8).
+    with pytest.raises(WorkerError) as e:
+        warm.call("replay_reference", {"flowsheet": "nowhere", "digits": 10})
+    assert str(e.value) == ("Refused: nowhere is no retired reference entry whose kept runs replay here; they are "
+                            "cornstover_benchmark, corn_drygrind")
+
+
+def test_grid_and_montecarlo_pass_the_structure_on_as_evaluate_does(warm):
+    """D11: the toy is built once, whole, and takes no structure; grid and
+    montecarlo hand the request's structure to each case, so the toy refuses
+    one in words there as evaluate does."""
+    structure = {"fermenter": {}, "train": {}, "finance": {}, "financeKeys": []}
+    asks = (("evaluate", {"values": {}}), ("grid", {"axes": {"split": [0.2, 0.5]}}),
+            ("montecarlo", {"specs": {"split": {"kind": "uniform", "low": 0.1, "high": 0.9}}, "n": 2}))
+    for op, args in asks:
+        with pytest.raises(WorkerError, match="Refused: toy is built once, whole, and takes no structure"):
+            warm.call(op, {"flowsheet": "toy", **args, "structure": structure})
+        assert warm.call(op, {"flowsheet": "toy", **args}) is not None, op
+
+
+def test_a_unit_type_the_catalogue_does_not_hold_is_refused_in_its_words(warm):
+    """D11: an unknown catalogue type is the worker's Refused, in the catalogue's words."""
+    for op, args in (("catalogue_specs", {"type": "nonesuch"}),
+                     ("catalogue_unit_check", {"type": "nonesuch", "ins": [], "values": {}, "hold": []})):
+        with pytest.raises(WorkerError) as e:
+            warm.call(op, args)
+        assert str(e.value).startswith("Refused: there is no unit type 'nonesuch' in pureOS's catalogue; it holds "), (
+            op, str(e.value))
 
 
 def test_a_grid_walks_every_point(warm):

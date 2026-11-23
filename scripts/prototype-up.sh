@@ -1,5 +1,5 @@
 #!/bin/bash
-# The running prototype, from a fresh clone, in one command (OF-BLD-014 §1.4).
+# The live app, from a fresh clone, in one command.
 #
 #   bash scripts/prototype-up.sh        pnpm prototype:up
 #

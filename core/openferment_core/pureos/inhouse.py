@@ -1,5 +1,4 @@
-"""The three unit types pureOS's catalogue needs and BioSTEAM lacks
-(OF-BLD-020 §5.1, D8).
+"""The three unit types pureOS's catalogue needs and BioSTEAM lacks.
 
     Ultrafiltration   a membrane concentrates the feed by a factor and washes
                       the retentate with diafiltration buffer; each component

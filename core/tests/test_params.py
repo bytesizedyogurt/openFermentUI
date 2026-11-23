@@ -18,6 +18,7 @@ from pydantic import ValidationError
 from openferment_core import basis, intake, params, proforma
 import standins  # test-only stand-ins, moved out of demo.py (alpha 2.0 stage 1)
 from openferment_core.flowsheets import shelf
+from standins import resolve_json, resolve_request
 from openferment_core.models import (
     BasisSource,
     ComputedBasis,
@@ -200,6 +201,10 @@ def test_a_waiting_parameter_names_the_field_that_would_bind_it():
     assert "a record of ethanol_productivity or volumetric_productivity through the aggregate gate" in v.detail
     assert "a fit a person chooses" in v.detail and "a named person's assumption" in v.detail
     assert v.detail.endswith("14 records name no carbon source")
+    # A panel that offers no reading (fermOS's, pureOS's) keeps its words, held in a kinetics run's outputs.
+    assert "a model's estimate" not in v.detail and "reading" not in v.detail
+    (offered,) = params.resolve([s], {}, [], readings=True)
+    assert "a named person's assumption, a model's estimate or a reading deposited at the bench" in offered.detail
     assert params.basis_inputs([s], [v]) == [], "a waiting value adds nothing to a basis"
 
 
@@ -288,8 +293,6 @@ def test_a_flowsheets_inputs_are_its_specs_with_bounds_and_their_reasons():
     assert scale.boundsReason == "a physical limit: no negative ethanol fermented in a year"
     assert purity.sourceRule == ["convention"] and purity.convention == "fuel grade" and purity.min is None
     assert purity.note == shelf.info(ETHANOL).inputs[-1].note
-    corn = params.flowsheet_specs(shelf.info("corn_drygrind"))
-    assert all(s.sourceRule == ["library-default"] and "package's own default" in s.boundsReason for s in corn)
 
 
 def test_the_provider_binds_what_bind_inputs_binds(standin):
@@ -307,6 +310,9 @@ def test_the_provider_binds_what_bind_inputs_binds(standin):
             else:
                 assert inp.binding == "waiting" and v.origin == "waiting" and v.value is None
         assert got.waiting == [k for k, i in bound.items() if i.binding == "waiting"] == ["plant_scale", "glucose_price"]
+        # A Proforma panel offers a reading on the row, and the words of a value that waits name it (alpha 2.2 E.debts).
+        assert values["glucose_price"].detail == ("waits for a source: a named person's assumption, a model's estimate or "
+                                                   "a reading deposited at the bench")
         assert values["feed_glucose_conc"].detail.startswith("3 records of medium_component_conc, 20 to 100 g L-1, median 60")
     assert params.scope(SCOPE).title.endswith(f"({shelf.info(ETHANOL).title})")
     narrowed = params.scope(SCOPE, ParamResolveRequest(host="nobody"))
@@ -326,22 +332,23 @@ def test_a_fit_a_person_chose_is_the_first_source_of_titre():
 
 def test_an_override_of_a_proforma_input_is_an_assumption_in_the_basis(standin):
     o = override(key="glucose_price", value=0.4, low=0.3, high=0.5, scope=SCOPE)
-    r = params.resolve_scope(SCOPE, ParamResolveRequest(overrides=[o]))
+    r = params.resolve_scope(SCOPE, resolve_request(SCOPE, overrides=[o]))
     values = {v.key: v for v in r.values}
     assert values["glucose_price"].origin == "assumption" and values["glucose_price"].overriddenBy == BY
     assert r.waiting == ["plant_scale"] and r.warnings == []
-    # What a run adds for it (§2.R): the value, its low and high, and the line saying the run read overrides.
+    # What a run adds for it (§2.R): the value, its low and high, and the line saying the run set values.
     assert [i.name for i in r.basisInputs] == ["glucose_price", "glucose_price low", "glucose_price high",
                                                proforma.ASSUMPTIONS_READ]
     assert all(i.unit == "USD kg-1" and i.source.kind == "assumption" and i.source.by == BY for i in r.basisInputs[:3])
     # D4: a person may type outside the bounds; it is kept and said.
-    far = params.resolve_scope(SCOPE, ParamResolveRequest(overrides=[
+    far = params.resolve_scope(SCOPE, resolve_request(SCOPE, overrides=[
         override(key="titre", value=-5.0, scope=SCOPE)]))
     titre = next(v for v in far.values if v.key == "titre")
     assert titre.value == -5.0 and titre.origin == "assumption" and far.warnings == [titre.outOfBounds]
     assert "no negative ethanol titre at harvest" in titre.outOfBounds
-    with pytest.raises(params.ParamRefused, match=f"sent to {SCOPE}: proforma:sc-other-1"):
-        params.resolve_scope(SCOPE, ParamResolveRequest(overrides=[override(scope="proforma:sc-other-1")]))
+    # A value is laid on the scope the route names (alpha 2.2 D2): it carries no scope of its own to stray to.
+    with pytest.raises(ValidationError, match="Extra inputs are not permitted"):
+        ParamResolveRequest.model_validate({"inputs": [{**resolve_json(SCOPE, [o])[0], "scope": "proforma:sc-other-1"}]})
 
 
 # ── the endpoints ──────────────────────────────────────────────────────
@@ -364,7 +371,8 @@ def test_get_serves_a_scope_and_refuses_in_words(client):
         ("/api/params/pureos:unit:t1:u1", 404, "pureOS's train units"),
         ("/api/params/nothing-at-all", 422, "a parameter scope is"),
         (f"/api/params/{SCOPE}/resolve", 422, "a parameter scope is"),
-        (f"/api/params/proforma:{MADE_HERE}?flowsheet=cornstover_benchmark", 422, "reference biorefinery"),
+        (f"/api/params/proforma:{MADE_HERE}?flowsheet=cornstover_benchmark", 422,
+         "there is no flowsheet cornstover_benchmark on the shelf"),
         (f"/api/params/{SCOPE}?flowsheet=custom_train_v1", 422, f"{HELD} runs ethanol_glucose_v0"),
         (f"/api/params/{SCOPE}?fits=[1]", 422, "fits is a JSON object"),
         (f"/api/params/{SCOPE}?fits=" + '{"plant_scale":"0123456789abcdef"}', 422, "a fermOS fit feeds"),
@@ -374,8 +382,8 @@ def test_get_serves_a_scope_and_refuses_in_words(client):
 
 
 def test_post_resolves_overrides_and_runs_nothing(client, store):
-    o = override(key="plant_scale", value=100000.0, scope=SCOPE).model_dump()
-    r = client.post(f"/api/params/{SCOPE}/resolve", json={"overrides": [o]})
+    (o,) = resolve_json(SCOPE, [override(key="plant_scale", value=100000.0, scope=SCOPE)])
+    r = client.post(f"/api/params/{SCOPE}/resolve", json={"inputs": [o]})
     assert r.status_code == 200
     body = r.json()
     assert set(body) == {"scope", "values", "waiting", "basisInputs", "warnings", "notes"}
@@ -386,14 +394,20 @@ def test_post_resolves_overrides_and_runs_nothing(client, store):
         (proforma.ASSUMPTIONS_READ, "overrides")]
     assert body["basisInputs"][0]["source"] == {"kind": "assumption", "id": None, "note": "typed on 2026-10-21: a STAND-IN", "by": BY}
     assert not any(store.rglob("*.json")), "the service keeps no override and no artifact"
+    q = o["quantity"]
     for payload, status, words in (
-        ({"overrides": [{**o, "by": "me"}]}, 422, "placeholder"),
-        ({"overrides": [{**o, "key": "sugarFeed"}]}, 422, "there is no parameter sugarFeed here"),
-        ({"overrides": [{**o, "scope": "proforma:sc-other-1"}]}, 422, "names the scope it changes"),
-        ({"overrides": [{**o, "value": "a lot"}]}, 422, "takes a number, not words"),
+        ({"inputs": [{**o, "quantity": {**q, "origin": {**q["origin"], "by": "me"}}}]}, 422, "placeholder"),
+        ({"inputs": [{**o, "name": "sugarFeed"}]}, 422, "there is no parameter sugarFeed here"),
+        ({"inputs": [{**o, "quantity": {**q, "unit": "a-placeholder-unit"}}]}, 422,
+         "plant_scale is set in 'a-placeholder-unit'"),
+        ({"inputs": [{**o, "quantity": {**q, "value": "a lot"}}]}, 422, "takes a number, not words"),
     ):
         r = client.post(f"/api/params/{SCOPE}/resolve", json=payload)
         assert r.status_code == status and words in r.json()["detail"], (payload, r.json())
+    # A value names no scope of its own, and the overrides the route took before alpha 2.2 are refused in words.
+    for payload in ({"inputs": [{**o, "scope": "proforma:sc-other-1"}]}, {"overrides": []}):
+        r = client.post(f"/api/params/{SCOPE}/resolve", json=payload)
+        assert r.status_code == 422 and "Extra inputs are not permitted" in str(r.json()["detail"]), r.json()
     assert client.post("/api/params/proforma:nowhere/resolve", json={}).status_code == 404
     assert client.post("/api/params/bogus/resolve", json={}).status_code == 422
 
@@ -456,4 +470,4 @@ def test_an_artifact_damaged_on_disk_under_a_vessel_scope_is_a_409_in_words(clie
     plant_damaged(aid)
     scope = f"fermos:vessel:{aid}"
     for r in (client.get(f"/api/params/{scope}"), client.post(f"/api/params/{scope}/resolve", json={})):
-        assert r.status_code == 409 and f"artifact {aid} is damaged on disk" in r.json()["detail"], (r.status_code, r.text)
+        assert r.status_code == 409 and f"artifact {aid} is damaged in its row" in r.json()["detail"], (r.status_code, r.text)

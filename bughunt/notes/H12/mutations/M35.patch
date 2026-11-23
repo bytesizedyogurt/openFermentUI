@@ -1,0 +1,11 @@
+--- a/core/openferment_core/measurements.py
++++ b/core/openferment_core/measurements.py
+@@ -185,7 +185,7 @@
+     if carried:
+         raise MeasurementRefused(f"{name}: a measurement is its reading's one value, and this quantity also carries "
+                                  f"{' and '.join(carried)}")
+-    if not _number(q.value) or float(q.value) != float(own) or q.unit != own_unit:
++    if not _number(q.value) or q.unit != own_unit:
+         raise MeasurementRefused(f"{name}: reading {ref} is {_shown(float(own))} {own_unit}, and the value sent is "
+                                  f"{q.value} {q.unit}: a measurement carries its reading's own value and unit")
+     taken = entry.get("at")

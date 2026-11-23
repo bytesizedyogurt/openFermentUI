@@ -1,0 +1,13 @@
+== migrations migrate
+refused: the server at 127.0.0.1:5432 holds no database bh_r2_missing (database "bh_r2_missing" does not exist): pnpm db:reset <name> makes a database of that name there and migrates it
+exit 2
+== conform biosteam
+! the verdict could not be kept for GET /api/engines: DBAPIError: (sqlalchemy.dialects.postgresql.asyncpg.Error) database "bh_r2_missing" does not exist
+(Background on this error at: https://sqlalche.me/e/21/dbapi)
+biosteam (engine run 1 · biosteam · biorefineries 2.35.1 · biosteam 2.54.0 · thermosteam 0.54.2): every check holds
+
+exit 0
+== conform train --project p
+✗ the PostgreSQL server OPENFERMENT_DATABASE_URL names (postgresql+asyncpg://openferment:***@127.0.0.1:5432/bh_r2_missing) could not read project 'p' from its database: DBAPIError: (sqlalchemy.dialects.postgresql.asyncpg.Error) database "bh_r2_missing" does not exist
+(Background on this error at: https://sqlalche.me/e/21/dbapi). Start it (pnpm db:up), on the live host with sudo brew services start --sudo-service-user="$(id -un)" postgresql@17, or set OPENFERMENT_DATABASE_URL in the environment or in core/.env to a server with pgvector that answers
+exit 2

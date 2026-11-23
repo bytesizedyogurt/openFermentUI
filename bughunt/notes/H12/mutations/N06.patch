@@ -1,0 +1,12 @@
+--- a/core/openferment_core/literature/collectors.py
++++ b/core/openferment_core/literature/collectors.py
+@@ -425,7 +425,8 @@
+             url = httpx.URL(at)
+             try:
+                 pins[(url.raw_host.decode("ascii"), url.port or 443)] = await anyio.to_thread.run_sync(
+-                    public_addresses, url, resolve, abandon_on_cancel=True)
++                    public_addresses, url, resolve, abandon_on_cancel=True) if not came_from else tuple(
++                    a for a in resolve(url.raw_host.decode("ascii"), url.port or 443))
+             except AddressRefused as e:
+                 raise AddressRefused(f"{came_from} redirected to {at}: {e}" if came_from else str(e)) from None
+             ahead: str | None = None

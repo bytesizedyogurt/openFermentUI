@@ -4,77 +4,69 @@
 // (lib/projectState.ts and the service's own stores); what this browser keeps
 // is its preferences and the writes the service has not yet acknowledged
 // (src/lib/durable.ts), and localStorage holds the last-open project alone.
-import { useMemo } from 'react';
+import { useEffect, useMemo, useRef, useState } from 'react';
 import { create } from 'zustand';
-import type {
-  Project,
-  InputAssumption,
-  Override,
-  RunbookDraft,
-  ReviewDecision,
-  ActivityEvent,
-  LiveConversation,
-  LiveTurn,
-  TraceStep,
-  Deposition,
-  Deviation,
-  ExtractionRecord,
-  Job,
-  MeasuredEvidence,
-  LearnModule,
-  OverlayPaper,
-  Paper,
-  Product,
-  Protocol,
-  Provenance,
-  RecordStatus,
-  Runbook,
-  SeriesRole,
-  FermosFitResponse,
-  TrainProposal,
-  TrainFromRun,
-  TrainRun,
-  KeptTrain,
-  RunOutput,
-  RunState,
-  Scenario,
-  Strain,
-  TimerState,
-  Overlay,
-  Guild,
-  GuildEvidence,
-  GuildPerson,
-  GuildPolicy,
-  GuildWithdrawal,
-  Practice,
-  PracticeScenario,
-  PracticeSession,
-  Check,
-  CheckNote,
-  CheckResult,
-  Checks,
-  Skill,
-  TrainSpec,
-} from '@/data/types';
+import {
+  CataloguesDown,
+  listLessons,
+  listProducts,
+  listSkills,
+  listStrains,
+  type Lesson,
+  type Product,
+  type Skill,
+  type Strain,
+} from '@/lib/catalogues';
+import type { CheckNote, CheckResult, Checks } from '@/lib/checks';
+import type { Guild, GuildEvidence, GuildPerson, GuildPolicy, GuildWithdrawal } from '@/lib/guild';
+import type { Practice, PracticeScenario, PracticeSession } from '@/lib/practice';
+import { ProtocolsDown, ProtocolsRefused, keepVersion, listProtocols, makeProtocol as makeProtocolOnService, protocolOf, type Protocol, type ProtocolVersion } from '@/lib/protocols';
+import type { FermosFitResponse } from '@/lib/fermos';
+import type { Override } from '@/lib/params';
+import type { LiveConversation, LiveTurn, RunbookDraft, TraceStep } from '@/lib/postdoc';
+import type { Scenario } from '@/lib/proforma';
+import type { KeptTrain, TrainFromRun, TrainProposal, TrainRun, TrainSpec } from '@/lib/pureos';
+import type { ExtractionRecord, Overlay, OverlayPaper, Paper, RecordStatus, ReviewDecision, RunOutput } from '@/lib/review';
+import {
+  measuresOf,
+  outputsOf,
+  predictionsOf,
+  stagesOf,
+  type Deposition,
+  type MeasuredEvidence,
+  type Provenance,
+  type Runbook,
+  type SeriesRole,
+} from '@/lib/studies';
 import { toSI } from '@/engine/units';
 import { runbookLockHash } from '@/engine/lock';
 import { computeDeltas } from '@/engine/reconcile';
 import { parseReadingsCsv, placeRow } from '@/engine/series';
+import { correctionOf } from '@/engine/readings';
 import {
   type DurableReviewDecision,
   EMPTY_SNAPSHOT,
   clearDurable,
   durableAvailable,
   flushDurable,
+  decisionKey,
+  decisionsIn,
+  holdDecision,
+  lastProject,
   loadDurable,
+  owedGuild,
+  rememberProject,
   saveDurable,
   type DurableSnapshot,
+  type ScenarioAssumption,
   type TrainMade,
 } from '@/lib/durable';
 import { DecisionRefused, IntakeDown, extractPaper, loadOverlay, postDecision } from '@/lib/intake';
-import { blocks, writeRefusal, type ReviewAction } from '@/lib/review';
+import { blocks, recordOf, unsignedRefusal, writeRefusal, type ReviewAction } from '@/lib/review';
+import { isFieldId } from '@/data/ontology';
 import { call } from '@/lib/http';
-import { openProjectId, projectSettled, setOpenProjectId } from '@/lib/project';
+import { watchEvents, type ServiceEvent } from '@/lib/events';
+import { addressedProject, openProjectId, projectAddress, projectSettled, setOpenProjectId, type Project } from '@/lib/project';
 import {
   EMPTY_STATE,
   applyEntries,
@@ -83,7 +75,10 @@ import {
   enqueue,
   flush,
   loadProjectState,
+  rowKey,
+  sameOverrides,
   type OutboxEntry,
+  type ProjectRows,
   type ProjectState,
 } from '@/lib/projectState';
 import {
@@ -105,12 +100,155 @@ export type Theme = 'bench' | 'night';
 export type Density = 'comfortable' | 'dense';
 export type UnitMode = 'published' | 'si';
 
-export interface Toast {
+interface Toast {
   id: string;
   text: string;
   kind: 'info' | 'success' | 'warn' | 'error';
   href?: string;
   hrefLabel?: string;
+}
+
+/**
+ * A line of this page's recent activity, as Home lists it, newest first (`logActivity`): when it happened, the icon
+ * it draws with, its words, the page it links to, and the provenance its tick shows.
+ */
+interface ActivityEvent {
+  at: string;
+  icon: string;
+  text: string;
+  href?: string;
+  provenance: Provenance;
+}
+
+interface JobStage {
+  label: string;
+  ms: number;
+}
+
+export interface Job {
+  id: string;
+  title: string;
+  /**
+   * 'runbook' is a Job that fronts a Runbook: the tray shows the progress bar
+   * while the record it belongs to lives in its own slice (OF-BLD-005 §7).
+   * The two cooperate and stay apart.
+   */
+  kind: 'ingest' | 'extraction' | 'simulation' | 'run' | 'runbook';
+  stages: JobStage[];
+  stageIndex: number;
+  stageProgress: number; // 0-1 within current stage
+  status: 'running' | 'done' | 'failed';
+  failReason?: string;
+  href?: string;
+  /** What the job is on, by its id (the document an extraction reads), so a page finds it; `title` names it in words. */
+  subject?: string;
+  /** The engine a simulation runs on, as the service's event stream names it (`job.*`), so the tray names its component. */
+  engine?: string;
+  startedAt: number;
+}
+
+const wordOf = (v: unknown): string | null => (typeof v === 'string' && v.trim() ? v.trim() : null);
+
+/**
+ * The jobs after one event of the project's stream (lib/events.ts; core/openferment_core/engine/runs.py `_job`).
+ * The service says every engine run queued and running as it starts, whichever door asked for it (Proforma, Studies,
+ * pureOS, Postdoc or the API), and the run enters the jobs as a running simulation, by its run id, named by the
+ * scenario that asked for it where the page holds that scenario; its `job.done` ends it done, with the run's page to
+ * view, and its `job.failed` ends it failed in the service's words. A run asked again after it ended enters again.
+ * Any other event, and the end of a run the page never saw start, leaves the jobs as they are.
+ */
+export function jobsAfterEvent(jobs: Job[], e: ServiceEvent, scenarios: readonly Pick<Scenario, 'id' | 'name'>[] = []): Job[] {
+  const d = e.data;
+  const runId = wordOf(d.id);
+  if (!e.type.startsWith('job.') || !runId) return jobs;
+  const id = `run-${runId}`;
+  const held = jobs.find((j) => j.id === id);
+  if (e.type === 'job.queued' || e.type === 'job.running') {
+    if (held?.status === 'running') return jobs;
+    const thing = wordOf(d.plant) ?? runId;
+    const configuration = wordOf(d.configuration);
+    const scenario = wordOf(scenarios.find((sc) => sc.id === d.scenarioId)?.name);
+    const job: Job = {
+      id,
+      title: `Engine run · ${scenario ?? (configuration ? `${thing} (${configuration})` : thing)}`,
+      kind: 'simulation',
+      engine: wordOf(d.engine) ?? undefined,
+      stages: [{ label: 'Simulate', ms: 0 }],
+      stageIndex: 0,
+      stageProgress: 0,
+      status: 'running',
+      href: `#/proforma/runs/${encodeURIComponent(runId)}`,
+      subject: runId,
+      startedAt: Date.parse(e.at) || Date.now(),
+    };
+    return [...jobs.filter((j) => j.id !== id), job];
+  }
+  if (held?.status !== 'running') return jobs;
+  if (e.type === 'job.done')
+    return jobs.map((j) => (j.id === id ? { ...j, stageIndex: j.stages.length, stageProgress: 1, status: 'done' } : j));
+  const words = wordOf(d.words);
+  const reason =
+    d.status === 'refused'
+      ? `The engine refused the values${words ? `: ${words}` : '.'}`
+      : (words ?? 'The service says the run failed, and names no reason.');
+  return jobs.map((j) => (j.id === id ? { ...j, status: 'failed', failReason: reason } : j));
+}
+
+/** Something that went other than the protocol says, written at the step it happened at. */
+export interface Deviation {
+  at: string;
+  stepId: string;
+  text: string;
+}
+
+/**
+ * A run of a protocol at the bench, this page's own (alpha 2.2 E.12): the
+ * transient half of a deposition, its current step, live timers and checks.
+ */
+export interface RunState {
+  id: string;
+  protocolId: string;
+  version: string;
+  scale: number; // multiplier vs baseBatch
+  startedAt: number; // epoch ms
+  currentStep: number;
+  completed: Record<string, number>; // stepId -> epoch ms completed
+  skipped: Record<string, string>; // stepId -> reason
+  checks: Record<string, boolean[]>; // stepId -> multiCheck states
+  deviations: Deviation[];
+  timers: TimerState[];
+  finishedAt?: number;
+  /**
+   * The durable Deposition this session is writing into, when there is one
+   * (OF-BLD-006 §4.2).
+   *
+   * A RunState is the transient half — current step, live timers, scroll
+   * position — and it legitimately dies with the tab. The Deposition is the
+   * record, and it does not. Keeping the link here keeps the durable object
+   * free of a reference to something that will not survive alongside it.
+   */
+  depositionId?: string;
+  /**
+   * Who is performing the steps, from Guild's ledger (OF-BLD-013 §2). Starts
+   * as whoever is signing in Guild; a handover changes it. Null when the
+   * ledger has nobody on it, and then no step is gated.
+   */
+  operatorId?: string | null;
+  /** Who stood beside the operator, per step, for a step that needed a cosigner. */
+  cosigned?: Record<string, string>;
+  /** Steps whose completion has already written to Guild's ledger, so a redo does not count twice. */
+  guildRecorded?: Record<string, true>;
+}
+
+/** A countdown a step's timer started, as the bench shows it. */
+interface TimerState {
+  id: string;
+  stepId: string;
+  label: string;
+  totalSec: number;
+  remainingSec: number;
+  running: boolean;
+  startedAt?: number;
 }
 
 interface UndoFrame {
@@ -122,14 +260,13 @@ interface UndoFrame {
 }
 
 let seq = 0;
-export const nextId = (prefix: string) => `${prefix}-${++seq}`;
+const nextId = (prefix: string) => `${prefix}-${++seq}`;
 
 /** An id that stays unique across reloads: the time, and a counter for ties. */
 export const timeId = (prefix: string) => `${prefix}-${Date.now().toString(36)}-${++seq}`;
 
-/** Deterministic clock-free timestamp label for audit entries. */
-function stamp(): string {
-  const d = new Date();
+/** Deterministic clock-free timestamp label for audit entries: now, or the moment a decision names. */
+function stamp(d = new Date()): string {
   const p = (n: number) => String(n).padStart(2, '0');
   return `${d.getFullYear()}-${p(d.getMonth() + 1)}-${p(d.getDate())} ${p(d.getHours())}:${p(d.getMinutes())}`;
 }
@@ -144,6 +281,7 @@ function decisionOf(
   r: ExtractionRecord,
   span: { quote: string; sectionId: string } | null,
   at: string,
+  signer?: string,
 ): ReviewDecision {
   return {
     status: r.status,
@@ -151,15 +289,26 @@ function decisionOf(
     gold: r.gold,
     corrected: r.corrected,
     rejectReason: r.rejectReason,
-    // The CURRENT name, not the one the record was stamped with: a decision
-    // made before a name was set is posted under the name once there is one,
-    // and an undo is signed by whoever undid it.
-    reviewer: reviewerName() ?? r.reviewer ?? '',
+    // A decision made now is signed by the current name, an undo by whoever
+    // undid it. One the browser held is signed by the reviewer who made it
+    // (`signer`, from `syncDecisions`), never by whoever set a name since.
+    reviewer: signer ?? reviewerName() ?? r.reviewer ?? '',
     recordId: r.id,
     at,
     ...(span ? { quote: span.quote, sectionId: span.sectionId } : {}),
   };
 }
+
+/**
+ * Whether a held decision decides nothing: 'unverified' with nothing typed
+ * and nothing rejected, which is what an undo keeps (biorepo._is_withdrawal).
+ */
+function withdraws(d: DurableReviewDecision): boolean {
+  return d.status === 'unverified' && !d.gold && !d.corrected && !d.rejectReason && d.provenance !== 'gold';
+}
+
+/** Whether this page has said that it holds unsigned decisions it will not send. */
+let unsignedSaid = false;
 
 /**
  * The span a decision re-anchored the record to (§7.3), when one did: the
@@ -184,7 +333,7 @@ function reanchoredSpan(r: ExtractionRecord): { quote: string; sectionId: string
 function stampOriginal(r: ExtractionRecord): ExtractionRecord {
   return r.original
     ? r
-    : { ...r, original: { value: r.value, unit: r.unit, quote: r.quote, sectionId: r.sectionId } };
+    : { ...r, original: { value: r.value, unit: r.unit, si: r.si, quote: r.quote, sectionId: r.sectionId } };
 }
 
 /**
@@ -227,7 +376,7 @@ function applyDecision(r: ExtractionRecord, d: DurableReviewDecision | ReviewDec
     provenance: d.provenance,
     gold: d.gold,
     corrected: d.corrected,
-    rejectReason: d.rejectReason,
+    rejectReason: d.rejectReason ?? null,
     reviewer: d.reviewer,
   };
   if ('quote' in d && d.quote) next.quote = d.quote;
@@ -252,7 +401,50 @@ function applyDecision(r: ExtractionRecord, d: DurableReviewDecision | ReviewDec
       next.sectionId = r.original.sectionId;
     }
   }
+  // The lines the decision adds to the record's trail (§7.3). A record that already stands as the decision says
+  // gains none, so a decision applied again on every load adds nothing, and a reload rebuilds the trail from it.
+  const lines = auditOf(r, d);
+  if (lines.length) next.audit = [...r.audit, ...lines];
   return next;
+}
+
+type AuditEntry = ExtractionRecord['audit'][number];
+type Measured = { value: number | string; unit: string } | null | undefined;
+
+/** Two quantities of a decision read alike by their value and unit; a field the service adds, and a null, aside. */
+function sameQuantity(a: Measured, b: Measured): boolean {
+  return (a?.value ?? null) === (b?.value ?? null) && (a?.unit ?? null) === (b?.unit ?? null);
+}
+
+/**
+ * The trail a decision from the service or the Durable tier amounts to on a
+ * record, signed by its reviewer at its own time: the correction it makes or
+ * withdraws, from the value the record carried, and the status it gives. What
+ * the record already stands at adds no line.
+ */
+function auditOf(r: ExtractionRecord, d: DurableReviewDecision | ReviewDecision): AuditEntry[] {
+  const when = d.at ? new Date(d.at) : null;
+  const at = when && Number.isFinite(when.getTime()) ? stamp(when) : '—';
+  const who = d.reviewer?.trim() || 'this browser';
+  const lines: AuditEntry[] = [];
+  if (d.corrected && !sameQuantity(d.corrected, r.corrected)) {
+    lines.push({ at, who, action: 'edited value', from: `${r.value} ${r.unit}`, to: `${d.corrected.value} ${d.corrected.unit}` });
+  } else if (!d.corrected && r.corrected && r.original) {
+    lines.push({ at, who, action: 'withdrew the correction', from: `${r.value} ${r.unit}`, to: `${r.original.value} ${r.original.unit}` });
+  }
+  const moved = d.status !== r.status || !sameQuantity(d.gold, r.gold) || (d.rejectReason ?? null) !== (r.rejectReason ?? null);
+  if (moved) {
+    const action =
+      d.status === 'rejected'
+        ? `rejected — ${d.rejectReason ?? 'unspecified'}`
+        : d.gold
+          ? 'flagged for gold set'
+          : d.status === 'verified'
+            ? 'verified'
+            : 'returned to undecided';
+    lines.push({ at, who, action });
+  }
+  return lines;
 }
 
 function sameDecision(a: ExtractionRecord, b: ExtractionRecord): boolean {
@@ -264,13 +456,17 @@ function sameDecision(a: ExtractionRecord, b: ExtractionRecord): boolean {
   );
 }
 
-export interface OFState {
+interface OFState {
   // ── the project's data, from the service (session-mutable) ───────────
   papers: Paper[];
   records: ExtractionRecord[];
   runOutputs: RunOutput[];
+  /**
+   * The open project's strains, as its strain catalogue keeps them (lib/catalogues.ts, alpha 2.2 E.9): geneOS's
+   * hosts, the strains a record, a protocol, a runbook or a simulation names, and pureOS's hosts.
+   */
   strains: Strain[];
-  /** The molecule catalogue (OF-BLD-005). Session-mutable like the rest. */
+  /** The open project's products, as its product catalogue keeps them (alpha 2.2 E.9). */
   products: Product[];
   /**
    * Synthesised runbooks. Kept separate from `jobs` on purpose: a Job is a
@@ -286,15 +482,28 @@ export interface OFState {
    */
   depositions: Deposition[];
   /**
+   * Who deposited each deposition, by id: its row's maker on the service,
+   * the person a measurement resting on one of its readings names
+   * (`GET /api/state`'s `depositedBy`). A deposition the service has not
+   * yet acknowledged has none here.
+   */
+  depositedBy: Record<string, string>;
+  /**
    * First-party measurements released by reconciliation. Durable, and
    * deliberately a separate list from `records`: these are evidence about a
    * run, not extractions from a paper (OF-BLD-006 §5).
    */
   measuredEvidence: MeasuredEvidence[];
+  /**
+   * The open project's protocols, each whole with every version kept of it
+   * (ADR-017; lib/protocols.ts), read from the service as the page opens and
+   * after each version a person keeps.
+   */
   protocols: Protocol[];
   scenarios: Scenario[];
-  modules: LearnModule[];
-  /** A lab's skills (stage 2 serves them); none ship with the app. */
+  /** The project's lessons, as its lesson catalogue keeps them, each with its body (ADR-018); none ship with the app. */
+  lessons: Lesson[];
+  /** The project's skills, as its skill catalogue keeps them; none ship with the app. */
   skills: Skill[];
   activity: ActivityEvent[];
   /**
@@ -313,15 +522,12 @@ export interface OFState {
   reviewIndex: number;
   reviewStats: { accepted: number; rejected: number; edited: number; skipped: number; gold: number; startedAt: number };
   undoStack: UndoFrame[];
-  learnProgress: Record<string, boolean>;
-  /** Runbooks adopted from a Postdoc draft, by id (OF-BLD-014 §9.2). Durable. */
-  adoptedRunbookIds: string[];
   /**
-   * Proforma scenarios a person made from a shelf flowsheet, by id
-   * (OF-BLD-019 §3.1, D6): every scenario the project keeps. They live in
-   * `scenarios` and are saved whole as the project's rows, keyed by id.
+   * The runbooks the project keeps and those this page made, by id: each is one of the project's rows, sent when it
+   * changes (lib/projectState.ts). A runbook adopted from a Postdoc draft (OF-BLD-014 §9.2), promoted from a research
+   * runbook or opened to revise a locked one joins it as it is made.
    */
-  createdScenarioIds: string[];
+  adoptedRunbookIds: string[];
   /** A research runbook, unlocked, from a draft; returns its id. */
   adoptRunbookDraft: (draft: RunbookDraft) => string;
   /**
@@ -333,9 +539,9 @@ export interface OFState {
    * geneOS read the overrides, and the field is kept, derived, for the
    * snapshot an older build reads and the one-time migration.
    */
-  proformaAssumptions: Record<string, InputAssumption[]>;
+  proformaAssumptions: Record<string, ScenarioAssumption[]>;
   /** Writes the override `proforma:<scenarioId>` holds for the input, through `setOverride`. */
-  setProformaAssumption: (scenarioId: string, a: InputAssumption) => void;
+  setProformaAssumption: (scenarioId: string, a: ScenarioAssumption) => void;
   /** Removes it, through `clearOverride`. */
   clearProformaAssumption: (scenarioId: string, key: string) => void;
   /**
@@ -399,7 +605,12 @@ export interface OFState {
     action: 'accept' | 'reject' | 'skip' | 'gold',
     payload?: { reason?: string },
   ) => void;
-  editRecord: (id: string, value: number, unit: string) => void;
+  /**
+   * A reviewer's correction of a record's value, signed by the reviewer name.
+   * With no name set the correction is refused in words and nothing changes,
+   * whether the service answers or not. True when the correction stands.
+   */
+  editRecord: (id: string, value: number, unit: string) => boolean;
   setRecordStatus: (id: string, status: RecordStatus, reason?: string) => void;
   undoReview: () => void;
   advanceReview: (delta: number) => void;
@@ -425,7 +636,17 @@ export interface OFState {
   dismissTimer: (runId: string, timerId: string) => void;
   tickTimers: (dtMs: number) => void;
   finishRun: (runId: string) => void;
-  addProtocolVersion: (protocolId: string, version: Protocol['versions'][number]) => void;
+  /**
+   * Keep a new version of one of the project's protocols in the reviewer's
+   * name and make it the current one (ADR-017). Null when the service kept
+   * it, else why it did not, in words.
+   */
+  keepProtocolVersion: (protocolId: string, version: ProtocolVersion) => Promise<string | null>;
+  /**
+   * Begin a protocol in the open project in the reviewer's name, with its first version (ADR-017): the service keeps it
+   * once under its id and the store holds it as kept. Answers null when it was kept, else the service's words.
+   */
+  beginProtocol: (protocol: Protocol) => Promise<string | null>;
 
   // runbooks (OF-BLD-005 §7) — a slice of its own, never folded into jobs
   /** Research → industrial in one action, carrying the finding across. */
@@ -493,15 +714,19 @@ export interface OFState {
    */
   dropLiveTurn: (conversationId: string, turnId: string) => void;
 
-  // learn
-  completeLesson: (lessonId: string) => void;
-
   // deposition (OF-BLD-006 §4)
   /**
    * Open a Deposition in `staged` and start the run session that writes into
    * it. Staged is the last moment the measurement schema can change (§4.5).
+   * With `protocolId` null the deposition records readings against the
+   * runbook's measures alone, at the bench DepositionBench serves, and no run
+   * session starts (`runId` null).
    */
-  openDeposition: (runbookId: string, protocolId: string, scale: number) => { depositionId: string; runId: string } | null;
+  openDeposition: (
+    runbookId: string,
+    protocolId: string | null,
+    scale: number,
+  ) => { depositionId: string; runId: string | null } | null;
   /** Staged → running. Nothing is recorded before this. */
   beginDeposition: (depositionId: string) => void;
   /**
@@ -533,6 +758,19 @@ export interface OFState {
   attachReadings: (depositionId: string, csv: string) => { attached: number; kept: number };
   /** Running → closed. Append-only throughout; closing stops new entries. */
   closeDeposition: (depositionId: string) => void;
+  /**
+   * Take up a protocol deposition the project keeps, staged or running, at
+   * its protocol's run, and answer the run's id: the run in this page's
+   * memory that writes into it, or, when a reload or a closed tab ended that
+   * run, a fresh one on the protocol's current version at `scale` (the run
+   * that ended held its scale, and the deposition keeps none). The fresh run
+   * keeps the deposition's start and operator and opens at the step its
+   * latest reading or observation was recorded at, with no step marked: the
+   * marks went with the page that made them. Null for a closed deposition,
+   * one of the readings alone, or one whose protocol the project does not
+   * hold.
+   */
+  resumeDeposition: (depositionId: string, scale: number) => string | null;
   /**
    * Record the verdict and release the measured values into BioRepo as
    * evidence. Never writes a parameter override (§5).
@@ -572,7 +810,7 @@ export interface OFState {
    */
   loadProjects: () => Promise<void>;
   /** Open another project. The page reloads, so nothing of the last one is left showing. */
-  openProject: (id: string) => void;
+  openProject: (id: string, opts?: { remember?: boolean }) => void;
   /** Make a project, signed with the reviewer name, and open it. */
   createProject: (asked: { name: string; description?: string }) => Promise<Project>;
   /**
@@ -580,15 +818,40 @@ export interface OFState {
    * base the next change is compared with (lib/projectState.ts). Null until
    * the project's rows have loaded, and nothing is sent before then.
    */
-  stateSeen: ProjectState | null;
+  stateSeen: ProjectRows | null;
   /** Project rows the service has not yet acknowledged, oldest first. */
   stateOutbox: OutboxEntry[];
   /** Rows this browser kept itself before alpha 2.0, until a project is open to carry them to. */
-  stateLegacy: ProjectState | null;
+  stateLegacy: ProjectRows | null;
   /** Why the open project's rows could not be loaded, in words; null when they were. */
   stateProblem: string | null;
   /** Load the open project's rows, lay the unsent ones over them, and send what is owed. */
   hydrateProjectState: () => Promise<void>;
+  /**
+   * Whether the store holds the open project's strains, products, skills and lessons, read from its catalogues this
+   * session; with no project open it holds none, and that is settled too.
+   */
+  cataloguesRead: boolean;
+  /** Why the open project's catalogues could not be read, in words; null when they were. */
+  cataloguesProblem: string | null;
+  /**
+   * Read the open project's strains and products (alpha 2.2 E.9) and its skills and lessons (E.12) from its
+   * catalogues, as the page opens and after the catalogues screen keeps an entry or takes in a file. What was read
+   * last stays when a read fails.
+   */
+  hydrateCatalogues: () => Promise<void>;
+  /** Whether the store holds the open project's protocols, read from the service this session. */
+  protocolsRead: boolean;
+  /** Why the open project's protocols could not be read, in words; null when they were. */
+  protocolsProblem: string | null;
+  /** Read the open project's protocols (ADR-017), as the page opens; what was read last stays when a read fails. */
+  hydrateProtocols: () => Promise<void>;
+  /**
+   * Read one of the open project's protocols from the service and hold it beside the rest: a protocol made after the
+   * page read them (`POST /api/protocols`, in a person's name) reaches a screen that names it. Answers null when the
+   * service held it, 'missing' when the project keeps none of the id, and the service's words when it could not say.
+   */
+  readProtocol: (protocolId: string) => Promise<null | 'missing' | string>;
   /** Put a project's rows in the page. */
   applyProjectState: (state: ProjectState) => void;
   /** Send the outbox; what the service does not answer stays for the next try. */
@@ -642,7 +905,8 @@ export interface OFState {
   /**
    * OF-BLD-014 §7.4 — fermOS's fits made in this session, by deposition id,
    * so Forecast can offer them. Ephemeral: a fit is kept by the service as
-   * an artifact.
+   * an artifact, and Forecast reads the project's kept fits from the service
+   * beside these (lib/fermos.ts `keptFits`), so a reload loses none.
    */
   fermosFits: Record<string, FermosFitResponse>;
   keepFermosFit: (fit: FermosFitResponse) => void;
@@ -755,10 +1019,12 @@ export interface OFState {
 function freezeLocked(runbooks: Runbook[]): Runbook[] {
   for (const r of runbooks) {
     if (!r.lockedAt) continue;
-    r.predictions.forEach((p) => Object.freeze(p));
-    r.measurementSchema.forEach((m) => Object.freeze(m));
-    Object.freeze(r.predictions);
-    Object.freeze(r.measurementSchema);
+    // A row that set no predictions or no measures froze empty lists of them, and holds none to freeze.
+    for (const list of [r.predictions, r.measurementSchema]) {
+      if (!list) continue;
+      list.forEach((x) => Object.freeze(x));
+      Object.freeze(list);
+    }
   }
   return runbooks;
 }
@@ -774,12 +1040,13 @@ const initialState = () => ({
   runbooks: freezeLocked([] as Runbook[]),
   skills: [] as Skill[],
   depositions: [] as Deposition[],
+  depositedBy: {} as Record<string, string>,
   measuredEvidence: [] as MeasuredEvidence[],
   protocols: [] as Protocol[],
   scenarios: [] as Scenario[],
+  lessons: [] as Lesson[],
   // Activity starts empty: what lands in it is what a person did in this
   // browser, never an authored history (OF-BLD-016 §3.1).
-  modules: [] as LearnModule[],
   activity: [] as ActivityEvent[],
   liveConversations: [] as LiveConversation[],
   runs: {} as Record<string, RunState>,
@@ -792,13 +1059,11 @@ const initialState = () => ({
   reviewIndex: 0,
   reviewStats: { accepted: 0, rejected: 0, edited: 0, skipped: 0, gold: 0, startedAt: Date.now() },
   undoStack: [] as UndoFrame[],
-  learnProgress: {} as Record<string, boolean>,
-  proformaAssumptions: {} as Record<string, InputAssumption[]>,
+  proformaAssumptions: {} as Record<string, ScenarioAssumption[]>,
   parameterOverrides: {} as Record<string, Override[]>,
   proformaFits: {} as Record<string, Record<string, string>>,
   trainsMade: {} as Record<string, TrainMade>,
   adoptedRunbookIds: [] as string[],
-  createdScenarioIds: [] as string[],
   exports: [] as { name: string; at: string; rows: number }[],
 });
 
@@ -816,43 +1081,21 @@ function initialTheme(): Theme {
   return window.matchMedia('(prefers-color-scheme: dark)').matches ? 'night' : 'bench';
 }
 
-/** What kind of source a collector serves, for a paper made from the overlay. */
-const SOURCE_TYPES: Partial<Record<NonNullable<OverlayPaper['source']>, Paper['sourceType']>> = {
-  europepmc: 'journal-article',
-  osti: 'industry-report',
-  sgd: 'database-entry',
-};
-
 /**
- * A document the project holds, as a paper (ADR-002): the citation the kit
- * holds, its passages as its sections, its licence. Nothing is filled in
- * that the kit does not hold; a year it does not know stays unset.
+ * A document the project holds, as a paper (ADR-002): the overlay's entry as
+ * the service wrote it, under its id, named by the id when the kit holds no
+ * title. Nothing is filled in that the kit does not hold.
  */
 function paperOf(id: string, o: OverlayPaper): Paper {
-  return {
-    id,
-    title: o.title ?? id,
-    authors: o.authors ?? [],
-    year: o.year ?? undefined,
-    venue: o.journal ?? '',
-    organisms: [],
-    topics: [],
-    abstract: '',
-    sections: o.sections,
-    ingest: o.ingest,
-    textSource: o.textSource,
-    openAccess: o.licenceClass === 'public' || o.licenceClass === 'open_commercial' || o.licenceClass === 'open_noncommercial',
-    doi: o.doi ?? undefined,
-    pmcid: o.pmcid ?? undefined,
-    sourceUrl: o.url ?? undefined,
-    sourceType: o.source ? SOURCE_TYPES[o.source] : undefined,
-    license: o.license ?? undefined,
-    licenceClass: o.licenceClass ?? undefined,
-    extraction: o.extraction ?? undefined,
-    fetchedFrom: o.source,
-    held: true,
-  };
+  return { ...o, id, title: o.title ?? id };
 }
+
+/**
+ * The candidates whose field the ontology does not name that this page has
+ * named in its activity already, so an overlay that brings one again says
+ * nothing new.
+ */
+const unreadCandidates = new Set<string>();
 
 export const useStore = create<OFState>()((set, get) => ({
   ...initialState(),
@@ -887,28 +1130,68 @@ export const useStore = create<OFState>()((set, get) => ({
   stateOutbox: [],
   stateLegacy: null,
   stateProblem: null,
+  cataloguesRead: false,
+  cataloguesProblem: null,
+  protocolsRead: false,
+  protocolsProblem: null,
 
   loadProjects: async () => {
-    let listed: Project[];
-    try {
-      listed = await call<Project[]>('/api/projects');
-    } catch (e) {
-      set({ projectsProblem: e instanceof Error ? e.message : String(e) });
-      projectSettled();
-      return;
+    const read = async (): Promise<Project[] | null> => {
+      try {
+        return await call<Project[]>('/api/projects');
+      } catch (e) {
+        set({ projectsProblem: e instanceof Error ? e.message : String(e) });
+        return null;
+      }
+    };
+    // The first read settles the project the page acts in, and a call made while it is out waits for it, so no
+    // caller goes on (to read what this browser owes, App.tsx) before the project has settled.
+    if (!firstProjects) {
+      firstProjects = (async () => {
+        const listed = await read();
+        if (listed) {
+          const open = get().projectId;
+          const remembered = lastProject();
+          const held = (id: string | null): id is string => !!id && listed.some((p) => p.id === id);
+          // The address's project when the service holds it, else the one this browser remembers, else the only one.
+          const keep = held(open) ? open : held(remembered) ? remembered : listed.length === 1 ? listed[0].id : null;
+          // The project settles here, before the page reads what this browser owes the service, so the owed writes
+          // it takes are the kept project's; the browser remembers it.
+          if (keep !== open || keep !== remembered) setOpenProjectId(keep);
+          set({ projects: listed, projectsProblem: null, projectId: keep });
+        }
+        projectSettled();
+        // The jobs tray lists the project's engine runs as the service starts and ends them, from any screen, from
+        // Postdoc and from the API (`jobsAfterEvent`); the page keeps its project until it reloads, so one stream,
+        // opened once the project settles, serves the page.
+        const project = get().projectId;
+        if (project) watchEvents(project, (e) => set((s) => ({ jobs: jobsAfterEvent(s.jobs, e, s.scenarios) })));
+      })();
+      return firstProjects;
     }
-    const open = get().projectId;
-    const keep = open && listed.some((p) => p.id === open) ? open : listed.length === 1 ? listed[0].id : null;
-    if (keep !== open) setOpenProjectId(keep);
-    set({ projects: listed, projectsProblem: null, projectId: keep });
-    projectSettled();
+    await firstProjects;
+    // Read again later (a project made in another tab since), the list alone changes: the page keeps its project
+    // until it reloads, since what it owes the service is that project's.
+    const listed = await read();
+    if (listed) set({ projects: listed, projectsProblem: null });
   },
 
-  openProject: (id) => {
-    if (id === get().projectId) return;
-    setOpenProjectId(id);
-    set({ projectId: id });
+  openProject: (id, opts) => {
+    // The page keeps the project it has open, and every request names it, until it reloads. The address names the
+    // project a page loads in (lib/project.ts), so the choice is written there, and remembered for an address that
+    // names none; a project no list has confirmed (the service not answering) is opened by its address alone.
+    if (opts?.remember !== false) rememberProject(id);
+    const there = addressedProject() === id ? null : projectAddress(id);
+    if (id === get().projectId) {
+      if (there) window.location.replace(there);
+      return;
+    }
+    const was = window.location.href;
+    if (there) window.history.replaceState(window.history.state, '', there);
     window.location.reload();
+    // A reload the person stays from (a run is going) leaves the page in its project, its address with it; a reload
+    // that goes ahead has its address already.
+    if (there) setTimeout(() => window.history.replaceState(window.history.state, '', was), 0);
   },
 
   createProject: async (asked) => {
@@ -919,8 +1202,10 @@ export const useStore = create<OFState>()((set, get) => ({
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ name: asked.name, description: asked.description ?? '', by }),
     });
-    set((s) => ({ projects: [...(s.projects ?? []), made] }));
     get().openProject(made.id);
+    // A page that stays (a run is going, and the person stayed at the prompt) lists the project made, once its
+    // address is its own again (openProject), so nothing drawn in between names the new project.
+    setTimeout(() => set((s) => ({ projects: [...(s.projects ?? []), made] })), 0);
     return made;
   },
 
@@ -934,9 +1219,25 @@ export const useStore = create<OFState>()((set, get) => ({
       set({ stateProblem: e instanceof Error ? e.message : String(e) });
       return;
     }
+    // A row the service keeps that does not read as its kind stays out of what
+    // the page holds, and the page names it with the service's words.
+    const unread = held.refused;
+    for (const r of unread)
+      get().logActivity({
+        at: stamp(),
+        icon: 'alert',
+        text: `The service keeps ${r.kind} ${r.id}, which does not read as its kind, so this page leaves it out: ${r.why}`,
+        href: '#/',
+        provenance: 'user',
+      });
+    if (unread.length)
+      get().toast({
+        text: `The service keeps ${unread.length} row${unread.length === 1 ? '' : 's'} this page cannot read; the activity feed names ${unread.length === 1 ? 'it' : 'each'}: ${unread[0].why}`,
+        kind: 'error',
+      });
     // Rows this browser kept before alpha 2.0 go to the open project, once.
     const legacy = get().stateLegacy;
-    const outbox = legacy ? enqueue(get().stateOutbox, changes(EMPTY_STATE, legacy, project, decidedBy())) : get().stateOutbox;
+    const outbox = legacy ? queueOwed(get().stateOutbox, changes(EMPTY_STATE, legacy, project, decidedBy())) : get().stateOutbox;
     // What this browser still owes the service stands over what it holds.
     get().applyProjectState(applyEntries(held, outbox.filter((e) => e.project === project)));
     set({ stateSeen: projectStateOf(get()), stateOutbox: outbox, stateLegacy: null, stateProblem: null });
@@ -951,6 +1252,56 @@ export const useStore = create<OFState>()((set, get) => ({
     void get().flushProjectState();
   },
 
+  hydrateCatalogues: async () => {
+    // The catalogues belong to one project: with none open the store holds none.
+    if (!get().projectId) {
+      set({ strains: [], products: [], skills: [], lessons: [], cataloguesRead: true, cataloguesProblem: null });
+      return;
+    }
+    // Reads overlap when the catalogues screen keeps two entries quickly; the newest read's answer is the one kept.
+    const read = ++catalogueReads;
+    try {
+      const [strains, products, skills, lessons] = await Promise.all([listStrains(), listProducts(), listSkills(), listLessons()]);
+      if (read === catalogueReads) set({ strains, products, skills, lessons, cataloguesRead: true, cataloguesProblem: null });
+    } catch (e) {
+      if (read === catalogueReads)
+        set({
+          cataloguesProblem:
+            e instanceof CataloguesDown ? `${e.message} ${e.remedy}` : e instanceof Error ? e.message : String(e),
+        });
+    }
+  },
+
+  hydrateProtocols: async () => {
+    // A project keeps its protocols (ADR-017): with none open the store holds none.
+    if (!get().projectId) {
+      set({ protocols: [], protocolsRead: true, protocolsProblem: null });
+      return;
+    }
+    const read = ++protocolReads;
+    try {
+      const protocols = await listProtocols();
+      if (read === protocolReads) set({ protocols, protocolsRead: true, protocolsProblem: null });
+    } catch (e) {
+      if (read === protocolReads)
+        set({
+          protocolsProblem: e instanceof ProtocolsDown ? `${e.message} ${e.remedy}` : e instanceof Error ? e.message : String(e),
+        });
+    }
+  },
+
+  readProtocol: async (protocolId) => {
+    if (!get().projectId) return 'missing';
+    try {
+      const held = await protocolOf(protocolId);
+      set((s) => ({ protocols: [...s.protocols.filter((p) => p.id !== held.id), held].sort((a, b) => (a.id < b.id ? -1 : a.id > b.id ? 1 : 0)) }));
+      return null;
+    } catch (e) {
+      if (e instanceof ProtocolsRefused && e.status === 404) return 'missing';
+      return e instanceof ProtocolsDown ? `${e.message} ${e.remedy}` : e instanceof Error ? e.message : String(e);
+    }
+  },
+
   applyProjectState: (state) =>
     set((s) => {
       const adopted = new Set(state.runbooks.map((r) => r.id));
@@ -961,17 +1312,17 @@ export const useStore = create<OFState>()((set, get) => ({
           return l && !r.lockedAt ? { ...r, lockedAt: l.lockedAt, lockHash: l.lockHash } : r;
         },
       );
-      const made = new Set(state.scenarios.map((sc) => sc.id));
       return {
         depositions: state.depositions,
+        depositedBy: state.depositedBy,
         measuredEvidence: state.measuredEvidence,
         runbooks: freezeLocked(runbooks),
         adoptedRunbookIds: [...adopted],
         parameterOverrides: state.overrides,
         proformaAssumptions: assumptionsFromOverrides(state.overrides),
         proformaFits: state.fits,
-        scenarios: [...s.scenarios.filter((sc) => !made.has(sc.id) && !s.createdScenarioIds.includes(sc.id)), ...state.scenarios],
-        createdScenarioIds: [...made],
+        // Every scenario is the project's (alpha 2.2 D9): the service's rows, with what this browser still owes laid on.
+        scenarios: state.scenarios,
         trainsMade: state.trains,
         // A turn the service reads as running is being answered there; the screen follows it.
         liveConversations: conversationsHeld(state.conversations, []),
@@ -985,8 +1336,49 @@ export const useStore = create<OFState>()((set, get) => ({
       for (;;) {
         const pending = get().stateOutbox;
         if (!pending.length) return;
-        const { left, sent, refused } = await flush(pending);
-        set((s) => ({ stateOutbox: [...left, ...s.stateOutbox.filter((e) => !pending.includes(e))] }));
+        const epoch = stateEpoch;
+        // A write whose request goes out may reach the service, so a later write of a scope's overrides follows it; a
+        // write the flush never reaches stays one a later write may replace.
+        const { left, sent, refused, kept } = await flush(pending, () => epoch === stateEpoch, (e) => unsent.delete(e));
+        // The browser's data was cleared while the flush ran: the flush sent nothing after the clear, what it had not
+        // sent went with the browser's data, and what was made since is sent from the top.
+        if (epoch !== stateEpoch) continue;
+        for (const { entry } of kept) if (entry.kind === 'overrides') overridesAnswered.set(rowKey(entry), ++overridesAnswers);
+        set((s) => {
+          // A change made while the flush ran replaces its row's last unsent write, the one the page's view stood on;
+          // a scope's overrides changed while their write was out follow that write, on the rows it sent (`queueOwed`).
+          const made = s.stateOutbox.filter((e) => !pending.includes(e));
+          // The scope as the service answered it, another page's keys among them, where the page's view still stands
+          // on the write it sent and no later write of the scope waits: the page shows it, and its next change stands
+          // on it. An answer holding the rows the page sent changes nothing on the page.
+          const waiting = new Set([...made, ...left].map(rowKey));
+          const answered = new Map(kept.map((k) => [rowKey(k.entry), k]));
+          let parameterOverrides = s.parameterOverrides;
+          let seen = s.stateSeen?.overrides ?? {};
+          for (const { entry, value } of answered.values()) {
+            if (entry.kind !== 'overrides' || entry.value === null || entry.project !== s.projectId || !Array.isArray(value)) continue;
+            if (waiting.has(rowKey(entry)) || parameterOverrides[entry.id] !== entry.value || seen[entry.id] !== entry.value) continue;
+            if (sameOverrides(value, entry.value)) continue;
+            parameterOverrides = { ...parameterOverrides, [entry.id]: value as Override[] };
+            seen = { ...seen, [entry.id]: value as Override[] };
+          }
+          const laid = parameterOverrides !== s.parameterOverrides && s.stateSeen !== null;
+          return {
+            stateOutbox: queueOwed(left, made),
+            ...(laid && s.stateSeen
+              ? {
+                  parameterOverrides,
+                  proformaAssumptions: assumptionsFromOverrides(parameterOverrides),
+                  stateSeen: { ...s.stateSeen, overrides: seen },
+                }
+              : {}),
+          };
+        });
+        // A scope's overrides refused (another page changed a key this page changed too): the page reads the
+        // project's overrides again, so it shows each scope as the service keeps it.
+        const project = get().projectId;
+        if (project && refused.some(({ entry }) => entry.kind === 'overrides' && entry.project === project))
+          void rereadOverrides(project);
         for (const { entry, why } of refused)
           get().logActivity({
             at: stamp(),
@@ -1005,7 +1397,9 @@ export const useStore = create<OFState>()((set, get) => ({
           }, STATE_RETRY_MS);
           return;
         }
-        if (!sent) return;
+        // The service answered every write: anything made while it did is sent now. A round that sent and refused
+        // nothing (none was owed by then) ends the loop.
+        if (!sent && !refused.length) return;
       }
     } finally {
       stateFlushing = false;
@@ -1098,7 +1492,7 @@ export const useStore = create<OFState>()((set, get) => ({
           ...rest,
           status: 'rejected' as RecordStatus,
           reviewer: decidedBy(),
-          rejectReason: payload?.reason,
+          rejectReason: payload?.reason ?? null,
           audit,
         };
       }
@@ -1138,6 +1532,15 @@ export const useStore = create<OFState>()((set, get) => ({
 
   editRecord: (id, value, unit) => {
     const s = get();
+    // OF-BLD-012.1 F2 — a correction is a decision, and a decision is signed. With no reviewer name it is
+    // refused in words as an accept and a reject are, in every state of the service: a correction kept unsigned
+    // would be sent later under whichever name was set by then.
+    const who = reviewerName();
+    if (!who) {
+      get().toast({ text: unsignedRefusal(who)!.why, kind: 'error' });
+      return false;
+    }
+    if (!s.records.some((r) => r.id === id)) return false;
     const frame: UndoFrame = {
       records: structuredClone(s.records),
       recordIds: [id],
@@ -1153,11 +1556,12 @@ export const useStore = create<OFState>()((set, get) => ({
         value,
         unit,
         si,
+        reviewer: who,
         audit: [
           ...r.audit,
           {
             at: stamp(),
-            who: decidedBy(),
+            who,
             action: 'edited value',
             from: `${r.value} ${r.unit}`,
             to: `${value} ${unit}`,
@@ -1184,6 +1588,7 @@ export const useStore = create<OFState>()((set, get) => ({
         void get().postReviewDecision(decisionOf(after, reanchoredSpan(after), now));
       }
     }
+    return true;
   },
 
   setRecordStatus: (id, status, reason) =>
@@ -1278,16 +1683,19 @@ export const useStore = create<OFState>()((set, get) => ({
   // (OF-BLD-012 §5.4). When it does not, nothing is fetched, and the toast
   // names the missing service and the command that starts it.
   extractPaperLive: async (paperId, again = false) => {
+    // The document by its title where the project holds one, and by the kit's id where it holds none.
+    const named = get().papers.find((p) => p.id === paperId)?.title.trim() || paperId;
     const id = get().startJob({
-      title: `Extract ${paperId}`,
+      title: `Extract ${named}`,
       kind: 'ingest',
       stages: [{ label: 'Extract', ms: 30000 }],
       href: `#/biorepo/witness`,
+      subject: paperId,
     });
     get().logActivity({
       at: stamp(),
       icon: 'sparkles',
-      text: `Extracting ${paperId} — one structured model response over its full text`,
+      text: `Extracting ${named} — one structured model response over its full text`,
       href: '#/intake/ingest',
       provenance: 'user',
     });
@@ -1299,7 +1707,7 @@ export const useStore = create<OFState>()((set, get) => ({
         .map(([rule, n]) => `${rule} ${n}`)
         .join(', ');
       get().toast({
-        text: `${paperId} extracted — ${result.candidates.length} candidate${result.candidates.length === 1 ? '' : 's'} anchored, ${result.rejected} refused${dropped ? ` (${dropped})` : ''}, $${result.usage.costUsd.toFixed(4)}`,
+        text: `${named} extracted — ${result.candidates.length} candidate${result.candidates.length === 1 ? '' : 's'} anchored, ${result.rejected} refused${dropped ? ` (${dropped})` : ''}, $${result.usage.costUsd.toFixed(4)}`,
         kind: 'success',
         href: '#/biorepo/witness',
         hrefLabel: 'Open Witness',
@@ -1309,7 +1717,7 @@ export const useStore = create<OFState>()((set, get) => ({
         e instanceof IntakeDown ? `${e.message} ${e.remedy}` : e instanceof Error ? e.message : String(e);
       get().failJob(id, message);
       if (e instanceof IntakeDown && /not running/.test(e.message)) set({ serviceUp: false });
-      get().toast({ text: `Extract ${paperId} failed — ${message}`, kind: 'error' });
+      get().toast({ text: `Extract ${named} failed — ${message}`, kind: 'error' });
       return;
     }
     // The run, the candidates and the decisions are recomputed server-side;
@@ -1494,14 +1902,34 @@ export const useStore = create<OFState>()((set, get) => ({
     }
   },
 
-  addProtocolVersion: (protocolId, version) =>
-    set((s) => ({
-      protocols: s.protocols.map((p) =>
-        p.id === protocolId
-          ? { ...p, versions: [...p.versions, version], currentVersion: version.version }
-          : p,
-      ),
-    })),
+  beginProtocol: async (protocol) => {
+    const by = reviewerName();
+    if (!by) return 'Set your reviewer name in Settings first: a protocol is kept in a person\u2019s name.';
+    try {
+      const kept = await makeProtocolOnService({ protocol, by });
+      set((s) => ({ protocols: [...s.protocols.filter((p) => p.id !== kept.id), kept].sort((a, b) => (a.id < b.id ? -1 : a.id > b.id ? 1 : 0)) }));
+      return null;
+    } catch (e) {
+      return e instanceof ProtocolsDown ? `${e.message} ${e.remedy}` : e instanceof Error ? e.message : String(e);
+    }
+  },
+
+  keepProtocolVersion: async (protocolId, version) => {
+    const by = reviewerName();
+    if (!by) return 'Set your reviewer name in Settings first: a version of a protocol is kept in a person\u2019s name.';
+    try {
+      const kept = await keepVersion(protocolId, { version, by });
+      // The service answers the protocol whole, the new version its current one.
+      set((s) => ({
+        protocols: s.protocols.some((p) => p.id === kept.id)
+          ? s.protocols.map((p) => (p.id === kept.id ? kept : p))
+          : [...s.protocols, kept],
+      }));
+      return null;
+    } catch (e) {
+      return e instanceof ProtocolsDown ? `${e.message} ${e.remedy}` : e instanceof Error ? e.message : String(e);
+    }
+  },
 
   // ── runbooks (OF-BLD-005 §7, §8) ─────────────────────────────────────
 
@@ -1513,11 +1941,12 @@ export const useStore = create<OFState>()((set, get) => ({
     const product = source.productId
       ? s.products.find((p) => p.id === source.productId)
       : undefined;
-    const id = nextId('rb');
+    // The promoted runbook is one of the project's rows, so its id holds across reloads.
+    const id = timeId('rb');
 
     // The research runbook's own findings become the industrial one's first
     // stage. Promotion carries the answer across; it does not restart the work.
-    const carried = source.stages
+    const carried = stagesOf(source)
       .filter((st) => st.status === 'done' && (st.value || st.detail))
       .map((st) => st.value ?? st.detail)
       .filter(Boolean)
@@ -1539,7 +1968,8 @@ export const useStore = create<OFState>()((set, get) => ({
         {
           name: 'Host & construct selection',
           status: 'pending',
-          detail: product ? `Starting from ${product.defaultStrainId}` : null,
+          // The host the research runbook names; a product's entry names none.
+          detail: source.strainId ? `Starting from ${source.strainId}` : null,
           value: null,
         },
         { name: 'Process train', status: 'queued', detail: null, value: null },
@@ -1556,19 +1986,19 @@ export const useStore = create<OFState>()((set, get) => ({
       note: `Promoted from ${source.id}. A research runbook that finds something becomes an industrial one in a single action, and the finding travels with it rather than being retyped.`,
       eta: null,
       outputs: [],
-      productId: source.productId,
+      productId: source.productId ?? null,
       progressPct: 0,
       estCostUsd: null,
-      strainId: source.strainId ?? product?.defaultStrainId ?? null,
+      strainId: source.strainId ?? null,
       // Promotion carries the research finding across verbatim. It does NOT
       // invent process predictions: the titre and recovery models have not run,
       // so those are measured with `predictionId: null` rather than predicted
       // against a number somebody made up at promotion time. When the process
       // stages do produce predictions, that is a new version — this one is
       // locked, and locked means superseded, not edited.
-      predictions: source.predictions.map((p) => ({ ...p, id: `${id}-${p.id}` })),
+      predictions: predictionsOf(source).map((p) => ({ ...p, id: `${id}-${p.id}` })),
       measurementSchema: [
-        ...source.measurementSchema.map((m) => ({
+        ...measuresOf(source).map((m) => ({
           ...m,
           id: `${id}-${m.id}`,
           predictionId: m.predictionId ? `${id}-${m.predictionId}` : null,
@@ -1592,7 +2022,7 @@ export const useStore = create<OFState>()((set, get) => ({
       lockHash: null,
     };
 
-    set((st) => ({ runbooks: [runbook, ...st.runbooks] }));
+    set((st) => ({ runbooks: [runbook, ...st.runbooks], adoptedRunbookIds: [...st.adoptedRunbookIds, id] }));
     get().logActivity({
       at: stamp(),
       icon: 'runbook',
@@ -1601,7 +2031,7 @@ export const useStore = create<OFState>()((set, get) => ({
       provenance: 'user',
     });
     get().toast({
-      text: 'Promoted to an industrial runbook — the clearance finding came across with it',
+      text: 'Promoted to an industrial runbook — the research findings came across with it',
       kind: 'success',
       href: `#/runbooks/${id}`,
       hrefLabel: 'Open',
@@ -1614,7 +2044,7 @@ export const useStore = create<OFState>()((set, get) => ({
       runbooks: s.runbooks.map((r) => {
         if (r.id !== runbookId || r.status !== 'blocked_unverified') return r;
         let unblocked = false;
-        const stages = r.stages.map((st) => {
+        const stages = stagesOf(r).map((st) => {
           if (st.status === 'blocked') {
             unblocked = true;
             return {
@@ -1664,8 +2094,8 @@ export const useStore = create<OFState>()((set, get) => ({
           ? {
               ...r,
               status: 'running' as const,
-              stages: r.stages.map((st, i) =>
-                st.status === 'queued' && i === r.stages.findIndex((x) => x.status === 'queued')
+              stages: stagesOf(r).map((st, i, stages) =>
+                st.status === 'queued' && i === stages.findIndex((x) => x.status === 'queued')
                   ? { ...st, status: 'running' as const }
                   : st,
               ),
@@ -1684,7 +2114,7 @@ export const useStore = create<OFState>()((set, get) => ({
       provenance: 'user',
     });
     get().toast({
-      text: `Authorised. Estimated spend ${r.estCostUsd === null ? 'unpriced' : `$${r.estCostUsd}`}.`,
+      text: `Authorised. Estimated spend ${r.estCostUsd == null ? 'unpriced' : `$${r.estCostUsd}`}.`,
       kind: 'info',
     });
   },
@@ -1697,12 +2127,12 @@ export const useStore = create<OFState>()((set, get) => ({
               ...r,
               status: 'complete' as const,
               progressPct: 100,
-              stages: r.stages.map((st) =>
+              stages: stagesOf(r).map((st) =>
                 st.status === 'review'
                   ? { ...st, status: 'done' as const, detail: `Ruled on by a person — ${verdict}` }
                   : st,
               ),
-              outputs: [...r.outputs, 'Boundary map', 'Reviewer decision'],
+              outputs: [...outputsOf(r), 'Boundary map', 'Reviewer decision'],
             }
           : r,
       ),
@@ -1725,7 +2155,8 @@ export const useStore = create<OFState>()((set, get) => ({
       get().toast({ text: 'Already locked — supersede it to change anything.', kind: 'warn' });
       return;
     }
-    if (r.predictions.length === 0) {
+    const predictions = predictionsOf(r);
+    if (predictions.length === 0) {
       get().toast({
         text: 'Nothing to lock. A runbook with no predictions has made no claim.',
         kind: 'warn',
@@ -1733,7 +2164,7 @@ export const useStore = create<OFState>()((set, get) => ({
       return;
     }
     const lockedAt = new Date().toISOString();
-    const lockHash = runbookLockHash(r.predictions, r.measurementSchema);
+    const lockHash = runbookLockHash(predictions, measuresOf(r));
     set((s) => ({
       runbooks: freezeLocked(
         s.runbooks.map((x) => (x.id === runbookId ? { ...x, lockedAt, lockHash } : x)),
@@ -1742,12 +2173,12 @@ export const useStore = create<OFState>()((set, get) => ({
     get().logActivity({
       at: stamp(),
       icon: 'runbook',
-      text: `Predictions frozen on ${r.title} — ${r.predictions.length} claim${r.predictions.length === 1 ? '' : 's'}`,
+      text: `Predictions frozen on ${r.title} — ${predictions.length} claim${predictions.length === 1 ? '' : 's'}`,
       href: `#/runbooks/${runbookId}`,
       provenance: 'user',
     });
     get().toast({
-      text: `Locked. ${r.predictions.length} prediction${r.predictions.length === 1 ? '' : 's'} frozen against hash ${lockHash.slice(0, 8)}.`,
+      text: `Locked. ${predictions.length} prediction${predictions.length === 1 ? '' : 's'} frozen against hash ${lockHash.slice(0, 8)}.`,
       kind: 'success',
     });
   },
@@ -1770,7 +2201,7 @@ export const useStore = create<OFState>()((set, get) => ({
         x.id === runbookId
           ? {
               ...x,
-              predictions: x.predictions.map((p) => (p.id === predictionId ? { ...p, value } : p)),
+              predictions: predictionsOf(x).map((p) => (p.id === predictionId ? { ...p, value } : p)),
             }
           : x,
       ),
@@ -1784,6 +2215,11 @@ export const useStore = create<OFState>()((set, get) => ({
   // runbook outlives this page in the project's rows.
   adoptRunbookDraft: (draft) => {
     const id = `rb-draft-${Date.now().toString(36)}-${nextId('d').slice(2)}`;
+    // The draft's predictions and measures enter the runbook as the service
+    // wrote them, every field present or left out and every null as it
+    // arrived, since lock.ts and runbook_lock.py read a field left out and a
+    // null apart. The draft and the runbook are the service's generated types.
+    const assay = structuredClone({ predictions: draft.predictions, measurementSchema: draft.measures });
     const runbook: Runbook = {
       id,
       kind: 'research',
@@ -1797,8 +2233,7 @@ export const useStore = create<OFState>()((set, get) => ({
       progressPct: 0,
       estCostUsd: null,
       strainId: draft.strainId || null,
-      predictions: structuredClone(draft.predictions),
-      measurementSchema: structuredClone(draft.measures),
+      ...assay,
       lockedAt: null,
       lockHash: null,
     };
@@ -1811,7 +2246,8 @@ export const useStore = create<OFState>()((set, get) => ({
     const s = get();
     const source = s.runbooks.find((x) => x.id === runbookId);
     if (!source) return null;
-    const id = nextId('rb');
+    // The revision is one of the project's rows, so its id holds across reloads.
+    const id = timeId('rb');
     const revision: Runbook = {
       ...structuredClone({ ...source, predictions: source.predictions, measurementSchema: source.measurementSchema }),
       id,
@@ -1824,7 +2260,7 @@ export const useStore = create<OFState>()((set, get) => ({
       lockedAt: null,
       lockHash: null,
     };
-    set((st) => ({ runbooks: [revision, ...st.runbooks] }));
+    set((st) => ({ runbooks: [revision, ...st.runbooks], adoptedRunbookIds: [...st.adoptedRunbookIds, id] }));
     get().logActivity({
       at: stamp(),
       icon: 'runbook',
@@ -1845,13 +2281,19 @@ export const useStore = create<OFState>()((set, get) => ({
 
   openDeposition: (runbookId, protocolId, scale) => {
     const s = get();
-    const protocol = s.protocols.find((p) => p.id === protocolId);
-    if (!protocol) return null;
-    const depositionId = nextId('dep');
+    const protocol = protocolId === null ? null : s.protocols.find((p) => p.id === protocolId);
+    if (protocol === undefined) return null;
+    // The readings alone are measurements a run may rest on, and a
+    // measurement names the person who took it (measurements.py), so they
+    // wait for a person's name in Settings.
+    if (protocol === null && !reviewerName()) return null;
+    // A reading's id names it for good (`<deposition id>/<entry id>`, the ref
+    // a measurement origin carries), so a deposition's id holds across reloads.
+    const depositionId = timeId('dep');
     const deposition: Deposition = {
       id: depositionId,
       runbookId,
-      protocolId,
+      protocolId: protocol?.id ?? null,
       // OF-BLD-013 §2 — Guild's acting person, when the ledger has one who
       // holds skills.
       operatorId: runOperatorDefault(s),
@@ -1862,16 +2304,31 @@ export const useStore = create<OFState>()((set, get) => ({
       observations: [],
       reconciliation: null,
     };
-    const runId = s.startRun(protocolId, protocol.currentVersion, scale);
+    // Its first write names who deposits it (decidedBy), which the service keeps as its maker.
+    const maker = { [depositionId]: decidedBy() };
+    if (protocol === null) {
+      set((st) => ({ depositions: [deposition, ...st.depositions], depositedBy: { ...st.depositedBy, ...maker } }));
+      const runbook = s.runbooks.find((r) => r.id === runbookId);
+      get().logActivity({
+        at: stamp(),
+        icon: 'run',
+        text: `Deposition staged — readings against ${runbook?.title ?? runbookId}`,
+        href: `#/runbooks/depositions/${depositionId}/bench`,
+        provenance: 'user',
+      });
+      return { depositionId, runId: null };
+    }
+    const runId = s.startRun(protocol.id, protocol.currentVersion, scale);
     set((st) => ({
       depositions: [deposition, ...st.depositions],
+      depositedBy: { ...st.depositedBy, ...maker },
       runs: { ...st.runs, [runId]: { ...st.runs[runId], depositionId } },
     }));
     get().logActivity({
       at: stamp(),
       icon: 'run',
       text: `Deposition staged — ${protocol.title}`,
-      href: `#/runbooks/protocols/${protocolId}/run/${runId}`,
+      href: `#/runbooks/protocols/${protocol.id}/run/${runId}`,
       provenance: 'user',
     });
     return { depositionId, runId };
@@ -1895,7 +2352,7 @@ export const useStore = create<OFState>()((set, get) => ({
             entries: [
               ...d.entries,
               {
-                id: nextId('de'),
+                id: timeId('de'),
                 measureId: match.measureId,
                 stepId,
                 at,
@@ -1914,7 +2371,7 @@ export const useStore = create<OFState>()((set, get) => ({
           ...d,
           observations: [
             ...d.observations,
-            { id: nextId('ob'), stepId, at, raw, structured: null },
+            { id: timeId('ob'), stepId, at, raw, structured: null },
           ],
         };
       }),
@@ -1943,23 +2400,15 @@ export const useStore = create<OFState>()((set, get) => ({
         if (d.id !== depositionId || d.state === 'closed') return d;
         const original = d.entries.find((e) => e.id === entryId);
         if (!original) return d;
-        const id = nextId('de');
-        // A correction is the same reading: it keeps the reading's time (§7.1).
+        const id = timeId('de');
+        // A correction is the same reading: it keeps the time the reading was
+        // taken (`at`, the time a measurement names) and its sample time
+        // (§7.1), and says when it was corrected.
         const t = d.sampleTimes?.[entryId];
         return {
           ...d,
           ...(t !== undefined ? { sampleTimes: { ...d.sampleTimes, [id]: t } } : {}),
-          entries: [
-            ...d.entries,
-            {
-              ...original,
-              id,
-              at,
-              value,
-              raw: `${original.raw} → corrected to ${value} ${original.unit}`,
-              confirmed: true,
-            },
-          ],
+          entries: [...d.entries, correctionOf(original, id, value, at)],
         };
       }),
     }));
@@ -1968,7 +2417,9 @@ export const useStore = create<OFState>()((set, get) => ({
   setSampleTime: (depositionId, entryId, hours) =>
     set((s) => ({
       depositions: s.depositions.map((d) => {
-        if (d.id !== depositionId) return d;
+        // A closed deposition keeps the sample times it closed with (the
+        // service refuses a change, project_state.py).
+        if (d.id !== depositionId || d.state === 'closed') return d;
         const times = { ...(d.sampleTimes ?? {}) };
         if (hours === null || !Number.isFinite(hours)) delete times[entryId];
         else times[entryId] = hours;
@@ -1992,7 +2443,8 @@ export const useStore = create<OFState>()((set, get) => ({
     let kept = 0;
     set((s) => ({
       depositions: s.depositions.map((d) => {
-        if (d.id !== depositionId || d.state === 'staged') return d;
+        // Closing stops new readings, as it stops the bench's.
+        if (d.id !== depositionId || d.state !== 'running') return d;
         const rb = s.runbooks.find((r) => r.id === d.runbookId);
         const schema = rb?.measurementSchema ?? [];
         const { rows, unreadable } = parseReadingsCsv(csv);
@@ -2003,17 +2455,17 @@ export const useStore = create<OFState>()((set, get) => ({
         for (const row of rows) {
           const measureId = placeRow(row, schema);
           if (measureId) {
-            const id = nextId('de');
+            const id = timeId('de');
             entries.push({ id, measureId, stepId: 'attached', at, value: row.value, unit: row.unit, raw: row.line, confirmed: false });
             times[id] = row.time;
             attached += 1;
           } else {
-            observations.push({ id: nextId('ob'), stepId: 'attached', at, raw: row.line, structured: null });
+            observations.push({ id: timeId('ob'), stepId: 'attached', at, raw: row.line, structured: null });
             kept += 1;
           }
         }
         for (const line of unreadable) {
-          observations.push({ id: nextId('ob'), stepId: 'attached', at, raw: line, structured: null });
+          observations.push({ id: timeId('ob'), stepId: 'attached', at, raw: line, structured: null });
           kept += 1;
         }
         return { ...d, entries, observations, sampleTimes: times };
@@ -2056,6 +2508,44 @@ export const useStore = create<OFState>()((set, get) => ({
     });
   },
 
+  resumeDeposition: (depositionId, scale) => {
+    const s = get();
+    const d = s.depositions.find((x) => x.id === depositionId);
+    if (!d || d.protocolId === null || d.state === 'closed') return null;
+    const live = liveRunOf(s.runs, depositionId);
+    if (live) {
+      set({ activeRunId: live.id });
+      return live.id;
+    }
+    const protocol = s.protocols.find((p) => p.id === d.protocolId);
+    if (!protocol) return null;
+    const steps = protocol.versions.find((v) => v.version === protocol.currentVersion)?.steps ?? [];
+    const runId = s.startRun(protocol.id, protocol.currentVersion, Number.isFinite(scale) && scale > 0 ? scale : 1);
+    const began = Date.parse(d.startedAt);
+    const at = latestStepOf(d);
+    set((st) => ({
+      runs: {
+        ...st.runs,
+        [runId]: {
+          ...st.runs[runId],
+          depositionId,
+          startedAt: Number.isFinite(began) ? began : st.runs[runId].startedAt,
+          currentStep: Math.max(0, at === null ? 0 : steps.findIndex((x) => x.id === at)),
+        },
+      },
+    }));
+    // The operator the deposition names performs on; one that names nobody takes whoever is signing.
+    get().setRunOperator(runId, d.operatorId ?? get().runs[runId].operatorId ?? null);
+    get().logActivity({
+      at: stamp(),
+      icon: 'run',
+      text: `Deposition taken up — ${protocol.title}`,
+      href: `#/runbooks/depositions/${depositionId}`,
+      provenance: 'user',
+    });
+    return runId;
+  },
+
   // ── scenarios ────────────────────────────────────────────────────────
   togglePin: (id) =>
     set((s) => ({
@@ -2066,29 +2556,22 @@ export const useStore = create<OFState>()((set, get) => ({
     const s = get();
     const src = s.scenarios.find((x) => x.id === id);
     if (!src) return id;
-    // A copy of a scenario on a shelf flowsheet is a scenario a person made:
-    // Durable, time-based id, not run (OF-BLD-019 D6).
-    if (src.kind === 'biosteam' && src.flowsheetId)
-      return get().createScenario(
-        src.flowsheetId,
-        `${src.name} (copy)`,
-        src.vessel && src.trainRun ? { vessel: src.vessel, trainRun: src.trainRun } : null,
-      );
-    const copy: Scenario = {
-      ...structuredClone(src),
-      id: nextId('sc'),
-      name: `${src.name} (copy)`,
-      pinned: false,
-    };
-    set({ scenarios: [...s.scenarios, copy] });
-    return copy.id;
+    // A copy of a scenario is a scenario of the project (alpha 2.2 D9): a
+    // time-based id, its flowsheet and parts the source's, and no run of its
+    // own yet (OF-BLD-019 D6).
+    return get().createScenario(
+      src.flowsheetId ?? src.modelId,
+      `${src.name} (copy)`,
+      src.vessel && src.trainRun ? { vessel: src.vessel, trainRun: src.trainRun } : null,
+    );
   },
 
   // OF-BLD-019 §3.1 (D5, D6) — New scenario makes a `biosteam` scenario and
   // nothing else. Its id is time-based, because nextId restarts on a reload
   // and this outlives one (as adopted runbooks and Live conversations do).
   // It holds no input value: the service binds records, and a named person
-  // types an assumption on its page, kept in proformaAssumptions under its id.
+  // types an assumption on its page, kept as an override of its scope
+  // (`proforma:<id>`).
   createScenario: (flowsheetId, name, parts) => {
     const id = timeId('sc');
     const made: Scenario = {
@@ -2099,16 +2582,13 @@ export const useStore = create<OFState>()((set, get) => ({
       name: name.trim() || flowsheetId,
       description: '',
       product: '',
-      dims: [],
-      point: {},
-      assumptions: [],
       pinned: false,
       // OF-BLD-020 §6.1: what a scenario on custom_train_v1 is built from.
       ...(parts ? { vessel: parts.vessel, trainRun: parts.trainRun } : {}),
       lastRunId: null,
       createdAt: new Date().toISOString(),
     };
-    set((s) => ({ scenarios: [...s.scenarios, made], createdScenarioIds: [...s.createdScenarioIds, id] }));
+    set((s) => ({ scenarios: [...s.scenarios, made] }));
     return id;
   },
 
@@ -2159,14 +2639,6 @@ export const useStore = create<OFState>()((set, get) => ({
         return turns.length ? [{ ...c, turns }] : [];
       }),
     })),
-
-  // ── learn ────────────────────────────────────────────────────────────
-  // Lesson progress is this browser's and Durable (OF-BLD-013 §3.2): the map
-  // remembers which lessons were finished here across a refresh. Whether a
-  // person has passed one is the ledger's question, answered by
-  // `recordLessonForGuild` at the moment the checkpoint is passed.
-  completeLesson: (lessonId) =>
-    set((s) => ({ learnProgress: { ...s.learnProgress, [lessonId]: true } })),
 
   // ── Proforma's assumptions (OF-BLD-014 §8.4) ──────────────────────────
   // A typed value carries the person and the day; the service refuses one
@@ -2236,10 +2708,10 @@ export const useStore = create<OFState>()((set, get) => ({
     const deviations = (run?.deviations ?? []).map((x) => x.text);
 
     const evidence: MeasuredEvidence[] = deltas.map((delta) => ({
-      id: nextId('me'),
+      id: timeId('me'),
       depositionId,
       runbookId: runbook.id,
-      productId: runbook.productId,
+      productId: runbook.productId ?? null,
       predictionId: delta.predictionId,
       label: delta.label,
       value: delta.observed,
@@ -2248,7 +2720,7 @@ export const useStore = create<OFState>()((set, get) => ({
       conditions: {
         protocolId: d.protocolId,
         scale: run?.scale ?? 1,
-        strainId: runbook.strainId,
+        strainId: runbook.strainId ?? null,
       },
       deviations,
       confirmed: delta.confirmed,
@@ -2297,7 +2769,7 @@ export const useStore = create<OFState>()((set, get) => ({
   },
 
   hydrateDurable: async () => {
-    const snap = await loadDurable();
+    const snap = await loadDurable(get().projectId);
     if (!snap) {
       set({ durableReady: durableAvailable(), guildHydrated: true });
       if (get().serviceUp) void get().syncGuild();
@@ -2313,8 +2785,10 @@ export const useStore = create<OFState>()((set, get) => ({
       // replacing them, so a new extraction brings new records without
       // discarding what a reviewer already decided.
       const decisionAt = { ...s.decisionAt };
+      // This project's decisions alone, by record: another project's on a record of the same id is that project's.
+      const ours = decisionsIn(snap, s.projectId);
       const records = s.records.map((r) => {
-        const d = snap.reviewDecisions[r.id];
+        const d = ours[r.id];
         if (!d) return r;
         // §7.3 — the service may already have applied its decision for this
         // record; the later of the two wins. The decision's own `at` when the
@@ -2330,10 +2804,11 @@ export const useStore = create<OFState>()((set, get) => ({
         // The project rows still owed to the service, and the rows this
         // browser kept itself before alpha 2.0, carried to the open project
         // when its rows load (hydrateProjectState).
-        stateOutbox: enqueue(snap.outbox ?? [], s.stateOutbox),
+        stateOutbox: enqueue(snap.outbox ?? [], s.stateOutbox, mayHaveLanded),
         stateLegacy: legacyStateOf(snap),
         durableReady: durableAvailable(),
-        durableReview: { savedAt: snap.savedAt, decisions: snap.reviewDecisions },
+        // This project's decisions alone (a decision saved before decisions named their project is this page's).
+        durableReview: { savedAt: snap.savedAt, decisions: ours },
         decisionAt,
         // Older snapshots predate the field; an unnamed reviewer is the
         // same as one who has not said yet (OF-BLD-012.1 F2).
@@ -2342,14 +2817,15 @@ export const useStore = create<OFState>()((set, get) => ({
         // position (off unless changed since load) stands.
         // OF-BLD-013 §1.3 — what Guild's ledger still owes the service, laid
         // beside the ledger the page holds. Older snapshots predate the field.
-        guild: owedLedger(s.guild, snap.guild?.ledger),
-        guildPending: snap.guild?.pending ?? [],
-        guildPendingWithdrawals: snap.guild?.withdrawals ?? [],
-        guildActingId: snap.guild?.actingId ?? s.guildActingId,
+        // Each project's ledger is its own: the page takes the block of the project it has open (owedGuild).
+        guild: owedLedger(s.guild, owedGuild(snap, s.projectId)?.ledger),
+        guildPending: owedGuild(snap, s.projectId)?.pending ?? [],
+        guildPendingWithdrawals: owedGuild(snap, s.projectId)?.withdrawals ?? [],
+        guildActingId: owedGuild(snap, s.projectId)?.actingId ?? s.guildActingId,
         guildHydrated: true,
-        // §3.2 — lessons finished in this browser. Anything finished since the
-        // page loaded is kept beside what the snapshot remembers.
-        learnProgress: { ...(snap.learnProgress ?? {}), ...s.learnProgress },
+        // A lesson shows finished from the ledger's entries (alpha 2.2 E.12): an
+        // older snapshot's lessons finished here are left where they lie, and the
+        // next save leaves them out.
       };
     });
     if (get().serviceUp) void get().syncGuild();
@@ -2360,7 +2836,7 @@ export const useStore = create<OFState>()((set, get) => ({
 
   // ── service overlay (OF-BLD-012 §2.1) ─────────────────────────────────
 
-  applyOverlay: (overlay) =>
+  applyOverlay: (overlay) => {
     set((s) => {
       const merged: Overlay = {
         papers: { ...(s.overlay?.papers ?? {}), ...overlay.papers },
@@ -2382,25 +2858,7 @@ export const useStore = create<OFState>()((set, get) => ({
       // overlay, all of them every time: the service sends the project's
       // whole set, so a paper the last project held and this one does not
       // leaves with it.
-      const notHeld = s.papers.filter((p) => !p.held);
-      const held = Object.entries(overlay.papers)
-        .filter(([id, o]) => o.title != null && !notHeld.some((p) => p.id === id))
-        .map(([id, o]) => paperOf(id, o));
-      const papers = [...notHeld.map((p) => {
-        const o = overlay.papers[p.id];
-        if (!o) return p;
-        const fetched = o.textSource === 'full-text' && o.sections.length > 0;
-        return {
-          ...p,
-          ingest: o.ingest,
-          textSource: fetched ? 'full-text' : p.textSource,
-          // A fetch that brought no text keeps what the paper held.
-          sections: fetched ? o.sections : p.sections,
-          license: fetched ? (o.license ?? undefined) : p.license,
-          fetchedFrom: fetched ? (o.source ?? 'europepmc') : p.fetchedFrom,
-          ingestReason: o.reason ?? undefined,
-        } as Paper;
-      }), ...held];
+      const papers = Object.entries(overlay.papers).map(([id, o]) => paperOf(id, o));
       // §6.4 — Witness reads runs from the store, and the overlay is where
       // they come from: an overlay run replaces one of the same id, and a run
       // the overlay does not carry stays.
@@ -2431,15 +2889,19 @@ export const useStore = create<OFState>()((set, get) => ({
       const local = s.durableReview;
       const present = new Set(s.records.map((r) => r.id));
       const arrivingIds: string[] = [];
+      // A candidate whose field the ontology does not name stays out of the
+      // records (`recordOf`); `applyOverlay` names it below.
       const arriving: ExtractionRecord[] = currentCandidates
         .filter((c) => !present.has(c.id))
-        .map((c) => {
+        .flatMap((c) => {
+          const entering = recordOf(c);
+          if (!entering) return [];
           arrivingIds.push(c.id);
-          const record: ExtractionRecord = stampOriginal({ ...c, audit: [] });
+          const record = stampOriginal(entering);
           const mine = local?.decisions[c.id];
-          if (!mine) return record;
+          if (!mine) return [record];
           decisionAt[c.id] = mine.at ?? local!.savedAt;
-          return applyDecision(record, mine);
+          return [applyDecision(record, mine)];
         });
       // F3 — what happens to the records earlier candidates became. A
       // candidate nobody decided on is the extractor's current opinion, and
@@ -2480,7 +2942,19 @@ export const useStore = create<OFState>()((set, get) => ({
           ? reviewQueue.indexOf(under)
           : Math.min(s.reviewQueue.slice(0, s.reviewIndex).filter((id) => alive.has(id)).length, reviewQueue.length);
       return { overlay: merged, papers, runOutputs, records, reviewQueue, reviewIndex, decisionAt };
-    }),
+    });
+    // A candidate on a field the ontology does not name stays out of the
+    // records, and the page names it once in its activity, as it names a kept
+    // row it cannot read.
+    const unread = (overlay.candidates ?? []).filter((c) => !isFieldId(c.field) && !unreadCandidates.has(c.id));
+    if (unread.length === 0) return;
+    for (const c of unread) unreadCandidates.add(c.id);
+    const n = unread.length;
+    const fields = [...new Set(unread.map((c) => c.field))];
+    const said = `The service sent ${n} candidate${n === 1 ? '' : 's'} on ${fields.length === 1 ? 'a field' : 'fields'} this page's ontology does not name (${fields.join(', ')}), so this page leaves ${n === 1 ? 'it' : 'them'} out of its records`;
+    get().logActivity({ at: stamp(), icon: 'alert', text: said, href: '#/intake', provenance: 'user' });
+    get().toast({ text: `${said}.`, kind: 'warn' });
+  },
 
   hydrateOverlay: async () => {
     // The overlay acts in one project: with none open there is nothing to load.
@@ -2524,25 +2998,56 @@ export const useStore = create<OFState>()((set, get) => ({
     const s = get();
     const local = s.durableReview;
     if (!local || !s.overlay || !s.serviceUp) return;
+    const epoch = stateEpoch;
     const pending: ReviewDecision[] = [];
     let kept = 0;
+    let unsigned = 0;
     for (const [id, mine] of Object.entries(local.decisions)) {
+      // Another project's decision is sent by a page open on that project.
+      if (mine.project && mine.project !== s.projectId) continue;
       const madeAt = s.decisionAt[id] ?? mine.at ?? local.savedAt;
       const server = s.overlay.records[id];
-      if (server && server.at >= madeAt) continue; // the service has this one, or a newer one
+      if (server && server.at >= madeAt) {
+        // The service has this one, or a newer one: the next save leaves it out of the snapshot.
+        holdDecision(id, mine, local.savedAt);
+        continue;
+      }
       if (s.refusedDecisions[id]) continue; // refused this session; the record has not changed since
       const record = s.records.find((r) => r.id === id);
       if (!record) continue; // a candidate not in this overlay; nothing to post it about
+      // A held decision is signed by the reviewer who made it. One held with
+      // no name on it (a correction made before an edit needed a name) stays
+      // in this browser and is never sent under whoever sets a name next; an
+      // undo decides nothing and is signed by whoever is reviewing now.
+      const signer = mine.reviewer?.trim() || (withdraws(mine) ? reviewerName() : null);
+      if (!signer) {
+        unsigned++;
+        continue;
+      }
       // What the service would refuse is not posted, and not posted again on
       // every load: an accept on an unfetched paper stays this browser's.
       const paper = s.papers.find((p) => p.id === record.paperId);
-      if (writeRefusal(actionOf(record), record, paper, true, reviewerName())) {
+      if (writeRefusal(actionOf(record), record, paper, true, signer)) {
         kept++;
         continue;
       }
-      pending.push(decisionOf(record, reanchoredSpan(record), madeAt));
+      pending.push(decisionOf(record, reanchoredSpan(record), madeAt, signer));
     }
-    for (const d of pending) await get().postReviewDecision(d);
+    if (unsigned && !unsignedSaid) {
+      unsignedSaid = true;
+      get().toast({
+        text:
+          `${unsigned} review decision${unsigned === 1 ? ' was' : 's were'} made in this browser with no reviewer name, ` +
+          `and ${unsigned === 1 ? 'it is' : 'they are'} kept here unsent: the project records who decided what. ` +
+          'Make the decision again under your name to send it.',
+        kind: 'warn',
+      });
+    }
+    for (const d of pending) {
+      // A clear of this browser's data while the sync runs ends it: nothing more is sent.
+      if (epoch !== stateEpoch) return;
+      await get().postReviewDecision(d);
+    }
     if (pending.length || kept) {
       get().logActivity({
         at: stamp(),
@@ -2587,7 +3092,10 @@ export const useStore = create<OFState>()((set, get) => ({
       }
       if (e instanceof IntakeDown) {
         set({ serviceUp: false });
-        get().toast({ text: `${e.message} The decision on ${decision.recordId} is kept in this browser only.`, kind: 'error' });
+        get().toast({
+          text: `${e.message} The decision on ${decision.recordId} waits in this browser and is sent when the project next loads with the service answering.`,
+          kind: 'error',
+        });
         return;
       }
       throw e;
@@ -2643,6 +3151,10 @@ export const useStore = create<OFState>()((set, get) => ({
 
   guildWithdraw: async (evidenceId, reason) => {
     const s = get();
+    if (!s.projectId) {
+      get().toast({ text: 'Open a project first: each project keeps its own Guild ledger.', kind: 'error' });
+      return false;
+    }
     const by = actingIdOf(s);
     if (!by) {
       get().toast({ text: 'Choose who you are with Acting as before withdrawing an entry.', kind: 'error' });
@@ -2812,10 +3324,11 @@ export const useStore = create<OFState>()((set, get) => ({
       return {
         runs: { ...s.runs, [runId]: { ...run, operatorId: personId } },
         // The deposition names whoever is performing now; each step's entry
-        // on the ledger names who performed that step.
+        // on the ledger names who performed that step. A closed deposition
+        // keeps the operator it closed with (project_state.py).
         depositions:
           run.depositionId
-            ? s.depositions.map((d) => (d.id === run.depositionId ? { ...d, operatorId: personId } : d))
+            ? s.depositions.map((d) => (d.id === run.depositionId && d.state !== 'closed' ? { ...d, operatorId: personId } : d))
             : s.depositions,
       };
     }),
@@ -2840,7 +3353,7 @@ export const useStore = create<OFState>()((set, get) => ({
     // The gate shows "Nobody chosen" for anyone else, and nothing is written for them.
     if (!canHold(operatorId)) return 0;
     const protocol = s.protocols.find((p) => p.id === run.protocolId);
-    const step = protocol?.versions.find((v) => v.version === run.version)?.steps.find((x) => x.id === stepId);
+    const step = protocol?.versions.find((v) => v.version === run.version)?.steps?.find((x) => x.id === stepId);
     const tags = step?.skills ?? [];
     if (!protocol || tags.length === 0) return 0;
     set((x) => ({
@@ -2908,7 +3421,7 @@ export const useStore = create<OFState>()((set, get) => ({
     const ledger = guildView(s);
     if (!operatorId || !ledger.people.some((p) => p.id === operatorId && p.active && p.role !== 'auditor')) return 0;
     const protocol = s.protocols.find((p) => p.id === run.protocolId);
-    const tags = protocol?.versions.find((v) => v.version === run.version)?.steps.find((x) => x.id === stepId)?.skills ?? [];
+    const tags = protocol?.versions.find((v) => v.version === run.version)?.steps?.find((x) => x.id === stepId)?.skills ?? [];
     if (!protocol || tags.length === 0) return 0;
     set((x) => ({
       runs: { ...x.runs, [runId]: { ...x.runs[runId], guildRecorded: { ...(x.runs[runId].guildRecorded ?? {}), [stepId]: true } } },
@@ -2930,7 +3443,7 @@ export const useStore = create<OFState>()((set, get) => ({
 
   recordLessonForGuild: async (lessonId) => {
     const s = get();
-    const lesson = s.modules.flatMap((m) => m.lessons).find((l) => l.id === lessonId);
+    const lesson = s.lessons.find((l) => l.id === lessonId);
     const counts = lesson?.skills ?? [];
     const personId = runOperatorDefault(s);
     if (!lesson || counts.length === 0 || !personId) return null;
@@ -2958,7 +3471,7 @@ export const useStore = create<OFState>()((set, get) => ({
         at: localToday(),
         observerId: null,
         source: { kind: 'lesson', ref: lessonId },
-        raw: `Primer lesson ${lessonId}, \u201c${lesson.title}\u201d: every checkpoint question answered correctly`,
+        raw: `Primer lesson ${lessonId}, \u201c${lesson.name}\u201d: every checkpoint question answered correctly`,
       }),
     );
     await Promise.all(writes);
@@ -2968,23 +3481,37 @@ export const useStore = create<OFState>()((set, get) => ({
   syncGuild: async () => {
     if (guildSyncing) return;
     guildSyncing = true;
+    let stoppedByClear = false;
     try {
       if (!get().serviceUp) return;
       const server = await loadGuild();
       if (!server) return;
       const s = get();
+      // A clear of this browser's data while the sync runs ends it: nothing more is sent, and nothing laid in; the
+      // ledger is read again once this sync has let go (below).
+      const epoch = stateEpoch;
       const pending = new Set(s.guildPending);
       // Already on the service: stored, with the answer lost on the way back.
       const stored = new Set([...server.people.map((p) => p.id), ...server.evidence.map((e) => e.id)]);
       const refused: string[] = [];
       let posted = 0;
+      // What the service answered to each post: the person or entry as it keeps them.
+      const answeredPeople = new Map<string, GuildPerson>();
+      const answeredEvidence = new Map<string, GuildEvidence>();
       const attempt = async (
         label: string,
-        post: () => Promise<unknown>,
+        post: () => Promise<GuildPerson | GuildEvidence>,
         onRefused?: (e: GuildRefused) => Promise<void>,
+        kind: 'person' | 'evidence' = 'evidence',
       ): Promise<boolean> => {
+        if (epoch !== stateEpoch) {
+          stoppedByClear = true;
+          return false;
+        }
         try {
-          await post();
+          const answer = await post();
+          if (kind === 'person') answeredPeople.set(answer.id, answer as GuildPerson);
+          else answeredEvidence.set(answer.id, answer as GuildEvidence);
           posted += 1;
           return true;
         } catch (e) {
@@ -3013,17 +3540,50 @@ export const useStore = create<OFState>()((set, get) => ({
           raw: `${e.raw}; refused as ${e.kind === 'independent' ? 'a run alone' : 'a cosigned run'} (${r.why}), so it stands as a deviation`,
           recordedAt: null,
         };
-        await attempt(`deviation on ${e.skillId}`, () => postEvidence(deviation));
+        if (await attempt(`deviation on ${e.skillId}`, () => postEvidence(deviation))) return;
+        // The service went away before it took the deviation: the deviation is owed in the run's place.
+        set((x) => ({
+          guild: { ...x.guild, evidence: [...x.guild.evidence.filter((y) => y.id !== e.id), deviation] },
+          guildPending: [...x.guildPending.filter((id) => id !== e.id), deviation.id],
+        }));
       };
-      // People first, then entries, then withdrawals: each may name the one before.
-      for (const p of s.guild.people)
-        if (pending.has(p.id) && !stored.has(p.id) && !(await attempt(p.name, () => postPerson(p)))) return;
+      // A change to a person the service already holds is sent unless the service carries it already: its copy
+      // says the same, or it holds a change made at or after this one (the service keeps a change's own time,
+      // guild.py `_change_time`, as BioRepo keeps a decision's, and keeps the later of two). A copy the service
+      // holds as an add alone carries no change, and a change follows its person's add, so the change is sent.
+      // An add the service holds is the service's.
+      const onService = new Map(server.people.map((p) => [p.id, p]));
+      const carried = (p: GuildPerson) => {
+        const q = onService.get(p.id);
+        if (!q) return false;
+        if (!p.updatedBy) return true;
+        if (q.name === p.name && q.title === p.title && q.role === p.role && q.active === p.active) return true;
+        if (!q.updatedAt) return false;
+        return Date.parse(q.updatedAt) >= Date.parse(p.updatedAt ?? p.addedAt);
+      };
+      // A withdrawal of an entry the service shows withdrawn is the service's already.
+      const withdrawnThere = new Set(server.evidence.filter((e) => e.withdrawnAt).map((e) => e.id));
+      // People first, then entries, then withdrawals: each may name the one before. A person goes after the people
+      // who added and changed them, so a lead added offline is on the ledger before the change they made.
+      for (const p of byMakers(s.guild.people))
+        if (pending.has(p.id) && !carried(p) && !(await attempt(p.name, () => postPerson(p), undefined, 'person'))) return;
       for (const e of s.guild.evidence)
         if (pending.has(e.id) && !stored.has(e.id) && !(await attempt(`${e.kind} on ${e.skillId}`, () => postEvidence(e), asDeviation(e))))
           return;
       for (const w of s.guildPendingWithdrawals)
-        if (!(await attempt(`withdrawal of ${w.evidenceId}`, () => postWithdrawal(w)))) return;
-      const fresh = (await loadGuild()) ?? server;
+        if (!withdrawnThere.has(w.evidenceId) && !(await attempt(`withdrawal of ${w.evidenceId}`, () => postWithdrawal(w)))) return;
+      // Read again only when this sync sent something: with nothing posted the first read is the ledger. A read
+      // again that fails takes the first read with each post's answer laid in, the ledger as the service keeps it.
+      const reread = posted > 0 ? await loadGuild() : null;
+      if (epoch !== stateEpoch) {
+        stoppedByClear = true;
+        return;
+      }
+      const laid = <T extends { id: string }>(rows: T[], answered: Map<string, T>) => [
+        ...rows.map((r) => answered.get(r.id) ?? r),
+        ...[...answered.values()].filter((a) => !rows.some((r) => r.id === a.id)),
+      ];
+      const fresh = reread ?? { ...server, people: laid(server.people, answeredPeople), evidence: laid(server.evidence, answeredEvidence) };
       // The service's ledger is the truth for everything this sync sent.
       // Anything made while it ran, and anything it did not send, stays.
       const sent = new Set(s.guildPending);
@@ -3058,6 +3618,8 @@ export const useStore = create<OFState>()((set, get) => ({
         get().toast({ text: `The service refused ${refused.length} Guild change${refused.length === 1 ? '' : 's'} made offline: ${refused[0]}`, kind: 'error' });
     } finally {
       guildSyncing = false;
+      // Stopped by a clear: the ledger is read again, so the page shows the service's ledger alone.
+      if (stoppedByClear) void get().syncGuild();
     }
   },
 
@@ -3066,15 +3628,25 @@ export const useStore = create<OFState>()((set, get) => ({
     // snapshot behind would restore itself on the next reload, which is the
     // opposite of what the button says.
     void clearDurable();
+    // A flush to the service still out when the data goes puts back nothing it took (flushProjectState).
+    stateEpoch += 1;
     // The overlay is the service's state, not the session's: it survives a
     // reset the way it survives a reload.
     const overlay = get().overlay;
     const serviceUp = get().serviceUp;
+    // The project's strains, products, skills and lessons are its catalogues' on the service (alpha 2.2 E.9, E.12),
+    // and its protocols are the service's too (ADR-017): each survives a reset the same way.
+    const { strains, products, skills, lessons, protocols } = get();
     // The open project's rows are the service's, and survive a reset the way
     // the overlay does: they are loaded again, and nothing is taken back on
     // the service. What this browser still owed it goes with the browser's data.
     set({
       ...initialState(),
+      strains,
+      products,
+      skills,
+      lessons,
+      protocols,
       toasts: [],
       serviceUp,
       durableReview: null,
@@ -3085,18 +3657,25 @@ export const useStore = create<OFState>()((set, get) => ({
       stateLegacy: null,
     });
     void get().hydrateProjectState();
+    // The activity went with the reset, so a candidate left out is named again.
+    unreadCandidates.clear();
     if (overlay) get().applyOverlay(overlay);
     // Guild's ledger is the service's when there is one, and survives a reset
-    // the way the overlay does; what was only ever in this browser goes.
+    // the way the overlay does; what was only ever in this browser goes: a row
+    // still owed leaves the page's ledger until the sync below reads it again.
+    const owed = new Set(get().guildPending);
+    const known = get().guild;
     set({
-      guild: serviceUp ? get().guild : EMPTY_GUILD,
+      guild: serviceUp
+        ? { ...known, people: known.people.filter((x) => !owed.has(x.id)), evidence: known.evidence.filter((x) => !owed.has(x.id)) }
+        : EMPTY_GUILD,
       guildPending: [],
       guildPendingWithdrawals: [],
       guildActingId: serviceUp ? get().guildActingId : null,
     });
     if (serviceUp) void get().syncGuild();
     get().toast({
-      text: 'This browser’s data is cleared: the lessons finished here and every change it had not yet sent to the service are gone; the project’s rows load again from the service',
+      text: 'This browser’s data is cleared: every change it had not yet sent to the service is gone; the project’s rows load again from the service',
       kind: 'info',
     });
   },
@@ -3107,11 +3686,6 @@ export const useStore = create<OFState>()((set, get) => ({
 /** The ledger every Guild screen reads. */
 export function guildView(s: Pick<OFState, 'guild'>): Guild {
   return s.guild;
-}
-
-/** The checks every Guild screen reads, as the service last answered. */
-export function checksView(s: Pick<OFState, 'checks'>): Check[] {
-  return s.checks?.checks ?? [];
 }
 
 /** One move on one open check: `post` asks the service and the queue is fetched again. */
@@ -3141,6 +3715,40 @@ function runOperatorDefault(s: OFState): string | null {
   return p && p.active && p.role !== 'auditor' ? p.id : null;
 }
 
+/** The run in this page's memory that writes into a deposition and has not finished; a reload or a closed tab ends it. */
+export function liveRunOf(runs: Record<string, RunState>, depositionId: string): RunState | null {
+  return Object.values(runs).find((r) => r.depositionId === depositionId && r.finishedAt === undefined) ?? null;
+}
+
+/** The step a deposition's latest reading or observation was recorded at; null when it holds none. */
+function latestStepOf(d: Deposition): string | null {
+  const recorded = [...d.entries.map((e) => ({ at: e.correctedAt ?? e.at, stepId: e.stepId })), ...d.observations];
+  return recorded.reduce<{ at: string; stepId: string } | null>((was, x) => (was === null || x.at >= was.at ? x : was), null)?.stepId ?? null;
+}
+
+/**
+ * Where a deposition's record takes it to the bench: the readings alone to
+ * their own bench (alpha 2.2 C.5); a protocol's steps to the run in this
+ * page's memory that writes into it, or, once a reload or a closed tab ended
+ * that run, to its protocol, where `resumeDeposition` takes it up. A closed
+ * deposition goes to no bench, and nor does one whose protocol the project
+ * does not hold.
+ */
+export type BenchOffer =
+  | { kind: 'readings'; to: string }
+  | { kind: 'run'; to: string }
+  | { kind: 'take-up'; protocol: Protocol }
+  | { kind: 'none'; why: 'closed' | 'no-protocol' };
+
+export function benchOf(d: Deposition, runs: Record<string, RunState>, protocols: readonly Protocol[]): BenchOffer {
+  if (d.state === 'closed') return { kind: 'none', why: 'closed' };
+  if (d.protocolId === null) return { kind: 'readings', to: `/runbooks/depositions/${encodeURIComponent(d.id)}/bench` };
+  const live = liveRunOf(runs, d.id);
+  if (live) return { kind: 'run', to: `/runbooks/protocols/${live.protocolId}/run/${live.id}` };
+  const protocol = protocols.find((p) => p.id === d.protocolId);
+  return protocol ? { kind: 'take-up', protocol } : { kind: 'none', why: 'no-protocol' };
+}
+
 type StoreSet = (partial: Partial<OFState> | ((s: OFState) => Partial<OFState>)) => void;
 
 /**
@@ -3158,6 +3766,11 @@ async function guildPost<T>(
   local: T,
 ): Promise<T | null> {
   const pend = () => set((x) => ({ guildPending: x.guildPending.includes(id) ? x.guildPending : [...x.guildPending, id] }));
+  if (!get().projectId) {
+    set(onRefused());
+    get().toast({ text: 'Open a project first: each project keeps its own Guild ledger.', kind: 'error' });
+    return null;
+  }
   if (!get().serviceUp) {
     pend();
     return local;
@@ -3219,7 +3832,7 @@ export function overridesFor(scope: string): (s: Pick<OFState, 'parameterOverrid
  * finding 10: kept, they held every later value to the old one, and the
  * service refused it as outside its own low and high).
  */
-export function overrideOfAssumption(scenarioId: string, a: InputAssumption): Override {
+function overrideOfAssumption(scenarioId: string, a: ScenarioAssumption): Override {
   const fixed = a.low === a.value && a.high === a.value;
   return {
     scope: proformaScope(scenarioId),
@@ -3230,6 +3843,7 @@ export function overrideOfAssumption(scenarioId: string, a: InputAssumption): Ov
     by: a.by,
     at: a.at,
     note: a.note ?? null,
+    origin: 'person-assumption',
   };
 }
 
@@ -3246,19 +3860,23 @@ export function overrideEnds(o: Pick<Override, 'value' | 'low' | 'high'>): { low
   return { low: o.low ?? o.value, high: o.high ?? o.value };
 }
 
-/** An override as a Proforma assumption; null for a value in words, which no Proforma input takes. */
-export function assumptionOfOverride(o: Override): InputAssumption | null {
-  if (typeof o.value !== 'number' || !Number.isFinite(o.value)) return null;
+/**
+ * An override as a Proforma assumption; null for a value in words, which no Proforma input takes, and for a reading
+ * deposited at the bench, which is a measurement in its own value and unit (alpha 2.2 E.17), so the derived
+ * `proformaAssumptions` an older build reads holds a person's values alone.
+ */
+export function assumptionOfOverride(o: Override): ScenarioAssumption | null {
+  if (o.origin === 'measurement' || typeof o.value !== 'number' || !Number.isFinite(o.value)) return null;
   const ends = overrideEnds(o);
   return { key: o.key, value: o.value, low: ends.low ?? o.value, high: ends.high ?? o.value, by: o.by, at: o.at, note: o.note ?? null };
 }
 
 /** `proformaAssumptions` as the overrides of every `proforma:` scope give it, by scenario id. */
-export function assumptionsFromOverrides(overrides: Record<string, Override[]>): Record<string, InputAssumption[]> {
-  const out: Record<string, InputAssumption[]> = {};
+export function assumptionsFromOverrides(overrides: Record<string, Override[]>): Record<string, ScenarioAssumption[]> {
+  const out: Record<string, ScenarioAssumption[]> = {};
   for (const [scope, list] of Object.entries(overrides)) {
     if (!scope.startsWith(PROFORMA_SCOPE)) continue;
-    out[scope.slice(PROFORMA_SCOPE.length)] = list.map(assumptionOfOverride).filter((a): a is InputAssumption => a !== null);
+    out[scope.slice(PROFORMA_SCOPE.length)] = list.map(assumptionOfOverride).filter((a): a is ScenarioAssumption => a !== null);
   }
   return out;
 }
@@ -3268,7 +3886,7 @@ export function assumptionsFromOverrides(overrides: Record<string, Override[]>):
  * `proforma:<id>` for every scenario whose scope the snapshot holds no entry
  * for (D3: a snapshot written before the panel carries only the old field).
  */
-export function overridesOfSnapshot(snap: Pick<DurableSnapshot, 'parameterOverrides' | 'proformaAssumptions'>): Record<string, Override[]> {
+function overridesOfSnapshot(snap: Pick<DurableSnapshot, 'parameterOverrides' | 'proformaAssumptions'>): Record<string, Override[]> {
   const out: Record<string, Override[]> = { ...(snap.parameterOverrides ?? {}) };
   for (const [id, typed] of Object.entries(snap.proformaAssumptions ?? {})) {
     const scope = proformaScope(id);
@@ -3277,16 +3895,44 @@ export function overridesOfSnapshot(snap: Pick<DurableSnapshot, 'parameterOverri
   return out;
 }
 
+/**
+ * People in an order that puts each after the people who added and changed them (a lead added offline goes before
+ * the change they made, so the service holds them as a lead by then); the rest keep their order.
+ */
+export function byMakers(people: GuildPerson[]): GuildPerson[] {
+  const byId = new Map(people.map((p) => [p.id, p]));
+  const placed = new Set<string>();
+  const out: GuildPerson[] = [];
+  const visit = (p: GuildPerson, seen: Set<string>) => {
+    if (placed.has(p.id) || seen.has(p.id)) return;
+    seen.add(p.id);
+    for (const maker of [p.addedBy, p.updatedBy]) {
+      const q = maker ? byId.get(maker) : undefined;
+      if (q && q.id !== p.id) visit(q, seen);
+    }
+    placed.add(p.id);
+    out.push(p);
+  };
+  for (const p of people) visit(p, new Set());
+  return out;
+}
+
+/** What this page saves to Durable, as the store holds it now (exported for `check:state`). */
 export function snapshotOf(s: OFState): DurableSnapshot {
   const reviewDecisions: DurableSnapshot['reviewDecisions'] = {};
   for (const r of s.records) {
-    // Only records a reviewer has actually touched.
-    if (r.status === 'unverified' && !r.gold && !r.corrected && !r.reviewer) continue;
+    const server = s.overlay?.records[r.id];
+    const madeAt = s.decisionAt[r.id];
+    // Only records a reviewer has actually touched, and a record taken back to undecided (an undo) after a decision
+    // the service holds: that undo is owed to the service like any decision.
+    const undone = !!server && !!madeAt && server.at < madeAt;
+    if (r.status === 'unverified' && !r.gold && !r.corrected && !r.reviewer && !undone) continue;
     // And only decisions the service does not hold yet: one it holds at this
     // time or later is its own, and loads with the overlay.
-    const server = s.overlay?.records[r.id];
-    if (server && s.decisionAt[r.id] && server.at >= s.decisionAt[r.id]) continue;
-    reviewDecisions[r.id] = {
+    if (server && madeAt && server.at >= madeAt) continue;
+    // Keyed by the project and the record, so another project's decision on a record of the same id stays its own.
+    reviewDecisions[decisionKey(s.projectId, r.id)] = {
+      recordId: r.id,
       status: r.status,
       provenance: r.provenance,
       gold: r.gold,
@@ -3294,25 +3940,34 @@ export function snapshotOf(s: OFState): DurableSnapshot {
       rejectReason: r.rejectReason,
       reviewer: r.reviewer,
       at: s.decisionAt[r.id],
+      // The project it was made in, so a page re-applies and sends only its own project's decisions.
+      ...(s.projectId ? { project: s.projectId } : {}),
       // The sentence a promotion re-anchored to, when it did (§7.3).
       ...(reanchoredSpan(r) ?? {}),
     };
   }
   const owed = new Set(s.guildPending);
   const legacy = s.stateLegacy;
+  const savedAt = new Date().toISOString();
   return {
     ...EMPTY_SNAPSHOT,
-    savedAt: new Date().toISOString(),
+    savedAt,
     reviewDecisions,
     reviewerName: s.reviewer,
-    guild: {
-      // Only what the service has not acknowledged; the ledger loads from it.
-      ledger: { ...s.guild, people: s.guild.people.filter((x) => owed.has(x.id)), evidence: s.guild.evidence.filter((x) => owed.has(x.id)) },
-      pending: s.guildPending,
-      withdrawals: s.guildPendingWithdrawals,
-      actingId: s.guildActingId,
-    },
-    learnProgress: Object.fromEntries(Object.keys(s.learnProgress).filter((k) => s.learnProgress[k]).map((k) => [k, true as const])),
+    // Guild's owed writes in the open project, by its id: another project's block stays as stored (mergeSnapshot).
+    guildOwed: s.projectId
+      ? {
+          [s.projectId]: {
+            // Only what the service has not acknowledged; the ledger loads from it.
+            ledger: { ...s.guild, people: s.guild.people.filter((x) => owed.has(x.id)), evidence: s.guild.evidence.filter((x) => owed.has(x.id)) },
+            pending: s.guildPending,
+            withdrawals: s.guildPendingWithdrawals,
+            actingId: s.guildActingId,
+            // When this project's block was written: what a save takes whole of it is the later block's (foldParting).
+            at: savedAt,
+          },
+        }
+      : {},
     outbox: s.stateOutbox,
     // Rows kept here before alpha 2.0 stay until a project is open to take them.
     ...(legacy
@@ -3332,8 +3987,8 @@ export function snapshotOf(s: OFState): DurableSnapshot {
 }
 
 /** The open project's rows as the page holds them (lib/projectState.ts). */
-export function projectStateOf(s: OFState): ProjectState {
-  const runbookLocks: ProjectState['runbookLocks'] = {};
+export function projectStateOf(s: OFState): ProjectRows {
+  const runbookLocks: ProjectRows['runbookLocks'] = {};
   for (const r of s.runbooks) if (r.lockedAt && r.lockHash) runbookLocks[r.id] = lockOf(r.id, r.lockedAt, r.lockHash);
   return {
     depositions: s.depositions,
@@ -3342,7 +3997,7 @@ export function projectStateOf(s: OFState): ProjectState {
     runbookLocks,
     overrides: s.parameterOverrides,
     fits: s.proformaFits,
-    scenarios: s.scenarios.filter((sc) => s.createdScenarioIds.includes(sc.id)),
+    scenarios: s.scenarios,
     trains: s.trainsMade,
     conversations: s.liveConversations,
   };
@@ -3359,8 +4014,8 @@ function lockOf(id: string, lockedAt: string, lockHash: string): { lockedAt: str
 }
 
 /** The rows a snapshot from before alpha 2.0 kept in this browser, or null when it kept none. */
-function legacyStateOf(snap: DurableSnapshot): ProjectState | null {
-  const state: ProjectState = {
+function legacyStateOf(snap: DurableSnapshot): ProjectRows | null {
+  const state: ProjectRows = {
     depositions: snap.depositions ?? [],
     measuredEvidence: snap.measuredEvidence ?? [],
     runbooks: snap.adoptedRunbooks ?? [],
@@ -3388,7 +4043,78 @@ function owedLedger(ledger: Guild, owed: Guild | undefined): Guild {
 }
 
 let stateFlushing = false;
+
+/**
+ * The writes this page made that no flush has taken yet. Each may give way to a later write of its row; a write a
+ * flush took, or one the page took from the browser's snapshot at load, may have reached the service already.
+ */
+const unsent = new WeakSet<OutboxEntry>();
+const mayHaveLanded = (e: OutboxEntry) => !unsent.has(e);
+
+/**
+ * Queue the page's own `entries` behind `outbox` (lib/projectState.ts `enqueue`): a later write of a row replaces its
+ * last write still unsent, and a scope's overrides follow a write of the scope that may have reached the service, on
+ * the rows they were made from, so the two land in order (bug hunt H7-04).
+ */
+export function queueOwed(outbox: OutboxEntry[], entries: OutboxEntry[]): OutboxEntry[] {
+  const queued = enqueue(outbox, entries, mayHaveLanded);
+  for (const e of queued.slice(queued.length - entries.length)) unsent.add(e);
+  return queued;
+}
+
+/** Each scope's overrides the service answered, by `rowKey`, with the count of answers when it did. */
+const overridesAnswered = new Map<string, number>();
+let overridesAnswers = 0;
+/** The newest read of the project's overrides; an older one that answers later is set aside. */
+let overridesReads = 0;
+
+/**
+ * Read the open project's overrides again once the service refused a write of a scope's overrides (bug hunt H7-04):
+ * the page shows each scope as the service keeps it, what this browser still owes laid over it, and the next change
+ * stands on that. A scope whose write the service answered while the read was out keeps what the page holds, since the
+ * read may predate that write; the newest read alone is laid, while the same project stays open. A read that fails is
+ * said in words.
+ */
+async function rereadOverrides(project: string): Promise<void> {
+  const read = ++overridesReads;
+  const from = overridesAnswers;
+  let held: ProjectState;
+  try {
+    held = await loadProjectState();
+  } catch (e) {
+    if (read !== overridesReads) return;
+    useStore.getState().logActivity({
+      at: stamp(),
+      icon: 'alert',
+      text: `This page could not read the project's overrides again after the service refused a change, so it shows the change until the project loads again: ${e instanceof Error ? e.message : String(e)}`,
+      href: '#/',
+      provenance: 'user',
+    });
+    return;
+  }
+  if (read !== overridesReads) return;
+  useStore.setState((s) => {
+    if (s.projectId !== project || !s.stateSeen) return {};
+    const overrides = applyEntries(held, s.stateOutbox.filter((e) => e.project === project)).overrides;
+    for (const [row, n] of overridesAnswered) {
+      if (n <= from) continue;
+      const scope = row.split('\u0000')[2];
+      if (!row.startsWith(`${project}\u0000overrides\u0000`) || scope === undefined) continue;
+      if (scope in s.parameterOverrides) overrides[scope] = s.parameterOverrides[scope];
+      else delete overrides[scope];
+    }
+    return { parameterOverrides: overrides, proformaAssumptions: assumptionsFromOverrides(overrides), stateSeen: { ...s.stateSeen, overrides } };
+  });
+}
+/** Bumped when the browser's data is cleared, so a flush out at the time puts back nothing it took. */
+let stateEpoch = 0;
+/** The page's first read of the project list, which settles the project it acts in (`loadProjects`). */
+let firstProjects: Promise<void> | null = null;
 let stateRetry: ReturnType<typeof setTimeout> | null = null;
+/** How many reads of the project's catalogues this page has asked for; only the newest one's answer is kept. */
+let catalogueReads = 0;
+/** How many reads of the project's protocols this page has asked for; only the newest one's answer is kept. */
+let protocolReads = 0;
 /** How long a project row the service did not answer waits before it is sent again. */
 const STATE_RETRY_MS = 15_000;
 
@@ -3413,14 +4139,13 @@ if (typeof window !== 'undefined') {
         s.parameterOverrides === prev.parameterOverrides &&
         s.proformaFits === prev.proformaFits &&
         s.scenarios === prev.scenarios &&
-        s.createdScenarioIds === prev.createdScenarioIds &&
         s.trainsMade === prev.trainsMade &&
         s.liveConversations === prev.liveConversations)
     )
       return;
     const now = projectStateOf(s);
     const owed = changes(s.stateSeen, now, s.projectId, decidedBy());
-    useStore.setState(owed.length ? { stateSeen: now, stateOutbox: enqueue(s.stateOutbox, owed) } : { stateSeen: now });
+    useStore.setState(owed.length ? { stateSeen: now, stateOutbox: queueOwed(s.stateOutbox, owed) } : { stateSeen: now });
     if (owed.length) void useStore.getState().flushProjectState();
   });
 }
@@ -3436,14 +4161,14 @@ if (durableAvailable()) {
       s.guildPending === prev.guildPending &&
       s.guildPendingWithdrawals === prev.guildPendingWithdrawals &&
       s.guildActingId === prev.guildActingId &&
-      s.learnProgress === prev.learnProgress &&
       s.stateOutbox === prev.stateOutbox &&
       s.stateLegacy === prev.stateLegacy
     )
       return;
     saveDurable(snapshotOf(s));
   });
-  // A tab closing mid-run must not lose the last few hundred milliseconds.
+  // A tab closing mid-run must not lose the last few hundred milliseconds: it leaves them under its own key
+  // (durable.ts `flushDurable`), and the next page to load lays them in.
   window.addEventListener('pagehide', flushDurable);
 }
 
@@ -3451,7 +4176,7 @@ if (durableAvailable()) {
  * OF-BLD-020 §5.R — what pureOS's Builder showed of one train this session
  * (`builderShown`): each part absent until the page has shown it.
  */
-export interface BuilderShown {
+interface BuilderShown {
   /** The newest run made on the page, as the service returned it. */
   run?: TrainRun | null;
   /** What the service said reading the train from a kept run's units. */
@@ -3470,6 +4195,44 @@ export function skillById(skills: readonly Skill[]): Record<string, Skill> {
 /** The lab's skills, for a component: none ship with the app (ADR-010). */
 export function useSkills(): Skill[] {
   return useStore((s) => s.skills);
+}
+
+/** Where a screen's protocol stands: read and held, still being read, kept by no one under the id, or unreadable. */
+interface HeldProtocol {
+  protocol: Protocol | undefined;
+  /** `reading` until the project's protocols (or this one) are read; `problem` names why they could not be. */
+  state: 'held' | 'reading' | 'missing' | 'problem';
+  problem: string | null;
+}
+
+/**
+ * The open project's protocol `protocolId`, for a screen that names one by its address. The store reads the project's
+ * protocols as the page opens; a protocol it does not hold once they are read is asked of the service by its id
+ * (`readProtocol`), so one made after the page opened is found, and only the service's answer that the project keeps
+ * none of the id reads as missing.
+ */
+export function useProtocol(protocolId: string): HeldProtocol {
+  const protocol = useStore((s) => s.protocols.find((p) => p.id === protocolId));
+  const read = useStore((s) => s.protocolsRead);
+  const problem = useStore((s) => s.protocolsProblem);
+  const readProtocol = useStore((s) => s.readProtocol);
+  // The service's answer for each id this screen asked after a miss, and the id being asked now.
+  const [answers, setAnswers] = useState<Record<string, null | 'missing' | string>>({});
+  const asking = useRef<string | null>(null);
+  useEffect(() => {
+    if (protocol || !read || protocolId in answers || asking.current === protocolId) return;
+    asking.current = protocolId;
+    void readProtocol(protocolId).then((answer) => {
+      asking.current = null;
+      setAnswers((was) => ({ ...was, [protocolId]: answer }));
+    });
+  }, [protocol, read, protocolId, answers, readProtocol]);
+  if (protocol) return { protocol, state: 'held', problem: null };
+  if (!read) return problem ? { protocol, state: 'problem', problem } : { protocol, state: 'reading', problem: null };
+  const answer = answers[protocolId];
+  if (answer === 'missing') return { protocol, state: 'missing', problem: null };
+  if (typeof answer === 'string') return { protocol, state: 'problem', problem: answer };
+  return { protocol, state: 'reading', problem: null };
 }
 
 /** The lab's skills by id, for a component. */
@@ -3505,9 +4268,9 @@ export function provenanceOf(r: ExtractionRecord): Provenance {
  * to the statistic only: the records stay visible in per-record tables and
  * plots, because they are real values, just not independent evidence.
  */
-export type AggregateExclusion = 'rejected' | 'industry-estimate' | 'computed' | 'assumed' | 'not-primary';
+type AggregateExclusion = 'rejected' | 'industry-estimate' | 'computed' | 'assumed' | 'not-primary';
 
-export function aggregateExclusion(r: ExtractionRecord): AggregateExclusion | null {
+export function aggregateExclusion(r: Pick<ExtractionRecord, 'provenance' | 'status' | 'isPrimary'>): AggregateExclusion | null {
   if (r.status === 'rejected') return 'rejected';
   if (r.provenance === 'industry-estimate') return 'industry-estimate';
   // A computed value is derived from inputs already counted on their own

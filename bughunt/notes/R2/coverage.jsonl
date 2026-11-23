@@ -1,0 +1,76 @@
+{"kind": "file", "item": "docs/reports/handoff-2026-11.md", "method": "executed", "findings": ["R2-04"], "note": "every sentence held to the tree: the diff over the core paths, the mirror's files, README lengths, tests (30 pass), the page's install and conform mirror 8 of 8 in my worktree, the record-reader run against my service (exit 0, 50 tools, the entry and audit row as quoted), the audit route at CORE, the six engines.md points, E.16's five payments"}
+{"kind": "file", "item": "docs/decisions/ADR-000-fresh-slate.md", "method": "read", "findings": [], "note": "alpha 2.2 lines: backticked paths and names held by scripts/adr_refs.py"}
+{"kind": "file", "item": "docs/decisions/ADR-001-postgresql.md", "method": "read", "findings": [], "note": "alpha 2.2 lines held by adr_refs.py"}
+{"kind": "file", "item": "docs/decisions/ADR-002-sci-rag-kit.md", "method": "executed", "findings": ["R2-01"], "note": "Implementation F read whole; KIT_ROLES, the batching rule and the dry run checked; the dry run's cost is R2-01"}
+{"kind": "file", "item": "docs/decisions/ADR-003-sff.md", "method": "read", "findings": [], "note": "library_flowsheets named deleted, as in the tree"}
+{"kind": "file", "item": "docs/decisions/ADR-004-biosteam-adapter.md", "method": "read", "findings": [], "note": "alpha 2.2 lines held by adr_refs.py"}
+{"kind": "file", "item": "docs/decisions/ADR-005-projects.md", "method": "read", "findings": [], "note": "the --service loopback rule tried on the MCP server"}
+{"kind": "file", "item": "docs/decisions/ADR-006-quantities-and-estimates.md", "method": "executed", "findings": [], "note": "C.4, C.5, D.0, E.15, E.17, E.debts notes read; the override unit rules and NaN refusals tried on my service"}
+{"kind": "file", "item": "docs/decisions/ADR-007-schema-source.md", "method": "read", "findings": [], "note": "E.0a schema counts (189 to 255, 66 new) checked; paths named are deleted files or generated fixtures"}
+{"kind": "file", "item": "docs/decisions/ADR-008-postdoc-memory-routing.md", "method": "executed", "findings": [], "note": "Implementations 12 to 19 read; routes() defaults and overlays run; arithmetic of 15 to 17 checked"}
+{"kind": "file", "item": "docs/decisions/ADR-009-ui.md", "method": "read", "findings": [], "note": "alpha 2.2 lines held by adr_refs.py"}
+{"kind": "file", "item": "docs/decisions/ADR-010-deletions.md", "method": "read", "findings": [], "note": "E.10 note: enumeration.ts gone from the tree"}
+{"kind": "file", "item": "docs/decisions/ADR-011-guards.md", "method": "read", "findings": [], "note": "E.15 note: check:plan run green in my worktree"}
+{"kind": "file", "item": "docs/decisions/ADR-014-durable-write-queue.md", "method": "read", "findings": [], "note": "alpha 2.2 lines held by adr_refs.py"}
+{"kind": "file", "item": "docs/decisions/ADR-015-engine-contract.md", "method": "executed", "findings": ["R2-02"], "note": "read whole; entry points, 48 tools, withheld names, conform biosteam, kinetics and mirror 8 of 8, the missing-database case is R2-02"}
+{"kind": "file", "item": "docs/decisions/ADR-016-bench-readings-alone.md", "method": "read", "findings": [], "note": "alpha 2.2 decision read"}
+{"kind": "file", "item": "docs/decisions/ADR-017-project-protocols.md", "method": "executed", "findings": [], "note": "read whole; routes, migration 0010, version-held refusal (M15 caught)"}
+{"kind": "file", "item": "docs/decisions/ADR-018-lesson-body.md", "method": "read", "findings": [], "note": "the nine embeds match the service and the page"}
+{"kind": "file", "item": "docs/PROGRESS.md", "method": "read", "findings": ["R2-01"], "note": "the Spend, Known debts and stage-log lines the commit messages cite; sums and row counts checked; lines 609 and 3372 repeat R2-01's numbers"}
+{"kind": "file", "item": "docs/reports/literature-retrieval.md", "method": "executed", "findings": ["R2-01"], "note": "the ethanol part's counts checked against the .json; the dry run's cost lines are R2-01"}
+{"kind": "file", "item": "docs/reports/literature-retrieval.json", "method": "read", "findings": [], "note": "questions, groups, documents, chunks and lane numbers set beside the .md"}
+{"kind": "file", "item": "docs/reports/model-routing-2026-11.md", "method": "read", "findings": [], "note": "the 8 November section's arithmetic checked (differences, means, costs)"}
+{"kind": "file", "item": "docs/api/engines.md", "method": "read", "findings": [], "note": "the six points of the handoff and the conform paragraph"}
+{"kind": "file", "item": "docs/TOOLS.md", "method": "read", "findings": ["R2-04"], "note": "line count at CORE, the VIRTUAL_ENV recipe, catalogue_write's input"}
+{"kind": "file", "item": "docs/runbooks/live-host-install.md", "method": "read", "findings": [], "note": "the backup lines of steps 3, 6 and 7, the routing settings, the pnpm commands"}
+{"kind": "file", "item": "examples/agents/record-reader/record_reader.py", "method": "executed", "findings": [], "note": "run against my service on 8970: exit 0"}
+{"kind": "file", "item": "examples/agents/record-reader/README.md", "method": "read", "findings": [], "note": "six lines"}
+{"kind": "file", "item": "examples/engines/openferment-engine-mirror/README.md", "method": "read", "findings": [], "note": "ten lines"}
+{"kind": "file", "item": "examples/engines/openferment-engine-mirror/pyproject.toml", "method": "executed", "findings": [], "note": "installed into my worktree's venv with the page's command"}
+{"kind": "file", "item": "examples/engines/openferment-engine-mirror/openferment_engine_mirror/worker.py", "method": "executed", "findings": [], "note": "conform mirror 8 of 8"}
+{"kind": "file", "item": "examples/engines/openferment-engine-mirror/openferment_engine_mirror/engine.py", "method": "executed", "findings": [], "note": "listed by the registry beside the core's three"}
+{"kind": "file", "item": "examples/engines/openferment-engine-mirror/openferment_engine_mirror/__init__.py", "method": "read", "findings": []}
+{"kind": "file", "item": "examples/engines/openferment-engine-mirror/tests/test_engine.py", "method": "executed", "findings": [], "note": "6 tests pass"}
+{"kind": "file", "item": "examples/engines/openferment-engine-mirror/tests/test_worker.py", "method": "executed", "findings": [], "note": "24 tests pass"}
+{"kind": "file", "item": "core/openferment_core/literature_live.py", "method": "executed", "findings": ["R2-01"], "note": "graph_command's dry-run branch driven with stand-ins"}
+{"kind": "file", "item": "core/openferment_core/engine/conform.py", "method": "executed", "findings": ["R2-02"], "note": "run against a missing database, an unreachable server, and on bh_r2_conform_cfg"}
+{"kind": "file", "item": "core/openferment_core/mcp_server.py", "method": "fuzzed", "findings": ["R2-03"], "note": "--service refusals tried; trust_env and follow_redirects mutated (M16 survived, M17 caught)"}
+{"kind": "file", "item": "core/openferment_core/llm.py", "method": "fuzzed", "findings": ["R2-01"], "note": "routes() overlays run; KIT_ROOM, effort overlays mutated (M02, M03, M11 caught); price tiers read"}
+{"kind": "file", "item": "core/openferment_core/project_state.py", "method": "fuzzed", "findings": [], "note": "M01, M13 caught; a malformed kept row named in refused on my service"}
+{"kind": "file", "item": "core/openferment_core/catalogues.py", "method": "fuzzed", "findings": [], "note": "M14 caught; twelve categories, nine embeds"}
+{"kind": "file", "item": "core/openferment_core/protocols.py", "method": "fuzzed", "findings": [], "note": "M15 caught"}
+{"kind": "file", "item": "core/openferment_core/models.py", "method": "fuzzed", "findings": [], "note": "M12 caught; configurationTitles rules read"}
+{"kind": "file", "item": "core/openferment_core/postdoc/plan.py", "method": "fuzzed", "findings": [], "note": "M08 caught"}
+{"kind": "file", "item": "core/openferment_core/tools/engine.py", "method": "fuzzed", "findings": [], "note": "M09 caught"}
+{"kind": "file", "item": "core/openferment_core/literature/report.py", "method": "fuzzed", "findings": [], "note": "M10 survived; the command's own guard is tested"}
+{"kind": "file", "item": "core/openferment_core/literature/collectors.py", "method": "fuzzed", "findings": [], "note": "M20 and M21 survive and change nothing: the fetch is always handed its pinned transport"}
+{"kind": "file", "item": "core/openferment_core/api.py", "method": "fuzzed", "findings": [], "note": "M04, M18 caught; the audit route's filters tried"}
+{"kind": "file", "item": "core/openferment_core/ready.py", "method": "executed", "findings": [], "note": "ready --offline against bh_r2_svc"}
+{"kind": "file", "item": "core/openferment_core/workers/__init__.py", "method": "read", "findings": [], "note": "withheld names against ADR-015"}
+{"kind": "file", "item": "scripts/host/lib.sh", "method": "fuzzed", "findings": [], "note": "backup_database mutated four ways (M05, M06, M07, M19), each caught"}
+{"kind": "file", "item": "core/tests/test_host.py", "method": "executed", "findings": [], "note": "58 passed with test_guidance.py"}
+{"kind": "file", "item": "core/tests/test_mcp_service.py", "method": "executed", "findings": ["R2-03"], "note": "run under M16 and M17 with the port-binding test deselected"}
+{"kind": "file", "item": "core/tests/test_engines.py", "method": "read", "findings": [], "note": "the page-example test and the withheld test"}
+{"kind": "file", "item": "core/tests/test_engine_pins.py", "method": "read", "findings": [], "note": "17 pins"}
+{"kind": "file", "item": "core/tests/test_literature_live.py", "method": "executed", "findings": [], "note": "the --limit test, under M10"}
+{"kind": "file", "item": "CLAUDE.md", "method": "read", "findings": [], "note": "line counts 148 and 149 at ae6f74c and 2047f5a"}
+{"kind": "file", "item": "COMPONENTS.md", "method": "read", "findings": [], "note": "src/data/'s nine files"}
+{"kind": "file", "item": "package.json", "method": "read", "findings": [], "note": "which scripts run uv with --frozen"}
+{"kind": "operation", "item": "GET /api/audit", "method": "executed", "findings": [], "note": "filters, limit, null fields"}
+{"kind": "operation", "item": "POST /api/tools/{name}", "method": "executed", "findings": [], "note": "auditIds, the by rule"}
+{"kind": "operation", "item": "POST /api/engines/{name}/run", "method": "fuzzed", "findings": [], "note": "stray fields, booleans, NaN, Infinity, overflow, missing at"}
+{"kind": "operation", "item": "POST /api/fermos/simulate", "method": "fuzzed", "findings": [], "note": "NaN and Infinity"}
+{"kind": "operation", "item": "POST /api/params/{scope}/resolve", "method": "fuzzed", "findings": [], "note": "NaN and Infinity"}
+{"kind": "operation", "item": "POST /api/library/{plant}/run", "method": "fuzzed", "findings": [], "note": "NaN and Infinity"}
+{"kind": "operation", "item": "POST /api/studies/scenarios", "method": "fuzzed", "findings": [], "note": "NaN and Infinity"}
+{"kind": "operation", "item": "GET /api/state", "method": "executed", "findings": [], "note": "a malformed kept row named in refused"}
+{"kind": "operation", "item": "PUT /api/state/{kind}/{item_id}", "method": "executed", "findings": [], "note": "the override unit rules"}
+{"kind": "operation", "item": "GET /api/engines", "method": "executed", "findings": [], "note": "lists biosteam, kinetics, train"}
+{"kind": "operation", "item": "GET /api/engines/{name}/parameters", "method": "executed", "findings": [], "note": "kinetics batch_v1"}
+{"kind": "operation", "item": "GET /api/health", "method": "executed", "findings": [], "note": "names the plan route's models"}
+{"kind": "operation", "item": "POST /api/projects", "method": "executed", "findings": [], "note": "made r2p"}
+{"kind": "tool", "item": "catalogue_write", "method": "executed", "findings": [], "note": "through the HTTP door and the MCP relay"}
+{"kind": "engine", "item": "biosteam", "method": "executed", "findings": ["R2-02"], "note": "conform against a missing database"}
+{"kind": "engine", "item": "kinetics", "method": "executed", "findings": [], "note": "conform --inputs 8 of 8"}
+{"kind": "engine", "item": "mirror", "method": "executed", "findings": [], "note": "installed in my worktree; conform 8 of 8"}
+{"kind": "engine", "item": "train", "method": "executed", "findings": ["R2-02"], "note": "conform --project against a missing database"}

@@ -31,7 +31,10 @@ EMBEDDING_CACHE = Path(os.environ.get("FASTEMBED_CACHE_PATH", "").strip() or Pat
 #: The kit's domain profile and prompts (domain/domain.yaml).
 DOMAIN_DIR = HERE / "domain"
 
-_SETTINGS = {
+#: The kit's settings, written on import. A process that imports
+#: openferment_core holds these four whatever it was started with: an engine's
+#: worker too, whose start environment holds no other SCI_RAG_ name.
+KIT_SETTINGS = {
     # What the kit would build if one of its own paths asked for an embedder;
     # every kit object openFerment builds is handed FastEmbed instead (kit.py),
     # and this keeps any other path offline rather than on Google's service.
@@ -40,4 +43,4 @@ _SETTINGS = {
     "SCI_RAG_EMBEDDING_DIM": str(EMBEDDING_DIM),
     "SCI_RAG_DOMAIN_DIR": str(DOMAIN_DIR),
 }
-os.environ.update(_SETTINGS)
+os.environ.update(KIT_SETTINGS)

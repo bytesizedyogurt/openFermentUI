@@ -21,6 +21,7 @@ from fastapi.testclient import TestClient
 from openferment_core import artifacts, intake, proforma
 from openferment_core.flowsheets import KNOWN, shelf
 from openferment_core.models import Artifact, BasisInput, BasisSource, InputAssumption, ProformaRunRequest
+from standins import assumed_inputs
 
 CORE = Path(__file__).resolve().parent.parent
 FIXTURE_BY = "openFerment test fixture"
@@ -52,14 +53,18 @@ def test_the_shelf_and_the_service_read_it_without_biosteam():
 
 def test_the_shelf_holds_the_flowsheets_that_exist_and_never_the_toy():
     # OF-BLD-020 §6.1: a vessel and a train, priced (test_custom_train holds it).
-    assert set(shelf.SHELF) == {"cornstover_benchmark", "corn_drygrind", "ethanol_glucose_v0", "custom_train_v1"}
-    assert set(KNOWN) == {"cornstover_benchmark", "corn_drygrind", "ethanol_glucose_v0", "custom_train_v1", "toy"}
+    # alpha 2.2 D8: the two hand-written reference entries retired, so every
+    # flowsheet here is one a scenario runs, and its module is the one it loads.
+    assert set(shelf.SHELF) == {"ethanol_glucose_v0", "custom_train_v1"}
+    assert set(KNOWN) == {"ethanol_glucose_v0", "custom_train_v1", "toy"}
     for fid in KNOWN:
         assert (CORE / "openferment_core" / "flowsheets" / f"{fid}.py").is_file(), f"{fid} has no module"
-    cs, eth = shelf.SHELF["cornstover_benchmark"], shelf.SHELF[ETHANOL]
-    assert cs.reference and cs.inputs == [] and cs.source.startswith("biorefineries ")
-    assert cs.source.endswith(", cornstover")
-    assert not eth.reference and eth.source == "this repository"
+    for retired in ("cornstover_benchmark", "corn_drygrind"):
+        assert not (CORE / "openferment_core" / "flowsheets" / f"{retired}.py").exists(), retired
+        with pytest.raises(shelf.NotOnShelf, match=f"there is no flowsheet {retired} on the shelf"):
+            shelf.info(retired)
+    eth = shelf.SHELF[ETHANOL]
+    assert eth.source == "this repository" and eth.program == "yeast"
     with pytest.raises(shelf.NotOnShelf, match="STAND-IN for tests and is not on the shelf"):
         shelf.info("toy")
     with pytest.raises(shelf.NotOnShelf, match="there is no flowsheet nowhere"):
@@ -72,10 +77,11 @@ def test_the_shelf_endpoint_serves_every_flowsheet_on_the_shelf():
 
     c = TestClient(api.app, base_url="http://127.0.0.1")
     served = c.get("/api/proforma/shelf").json()
-    assert [f["id"] for f in served] == ["cornstover_benchmark", "corn_drygrind", "ethanol_glucose_v0", "custom_train_v1"]
+    assert [f["id"] for f in served] == ["ethanol_glucose_v0", "custom_train_v1"]
     assert all("toy" != f["id"] for f in served)
     eth = next(f for f in served if f["id"] == ETHANOL)
-    assert set(eth) >= {"id", "title", "description", "source", "reference", "inputs", "outputs", "packageTest"}
+    assert set(eth) >= {"id", "title", "description", "source", "inputs", "outputs"}
+    assert not {"reference", "packageTest"} & set(eth), "the reference plants are the library shelf's"
     assert set(eth["inputs"][0]) == {"key", "name", "dimension", "unit", "fields", "kind", "note"}
 
 
@@ -87,10 +93,10 @@ def test_a_run_asks_for_a_sample_count_within_its_cap(store):
             proforma.run(ProformaRunRequest(scenarioId=MADE_HERE, flowsheet=ETHANOL, samples=n), pool=pool)
 
 
-def test_run_flowsheet_refuses_the_toy_a_reference_and_what_waits(store):
+def test_run_flowsheet_refuses_the_toy_a_retired_entry_and_what_waits(store):
     with pytest.raises(proforma.ScenarioRefused, match="not on the shelf"):
         proforma.run_flowsheet("toy", [assume("water", 100.0)])
-    with pytest.raises(proforma.ScenarioRefused, match="reference biorefinery"):
+    with pytest.raises(proforma.ScenarioRefused, match="there is no flowsheet cornstover_benchmark on the shelf"):
         proforma.run_flowsheet("cornstover_benchmark", [])
     with pytest.raises(proforma.ScenarioRefused, match="wait for a source.*ethanol, split"):
         proforma.run_flowsheet("toy", [assume("water", 100.0)], allow_toy=True)
@@ -114,7 +120,7 @@ def test_the_stand_in_run_carries_every_table_and_says_it_is_the_stand_in(store,
     rs = standins._standin_yeast_records()
     a = [InputAssumption(key=k, value=v, low=lo, high=hi, by=FIXTURE_BY, at="2026-10-20")
          for k, v, lo, hi in (("plant_scale", 100000.0, 100000.0, 100000.0), ("glucose_price", 0.4, 0.3, 0.5))]
-    run = proforma.run(ProformaRunRequest(scenarioId=MADE_HERE, flowsheet=ETHANOL, assumptions=a, samples=50),
+    run = proforma.run(ProformaRunRequest(scenarioId=MADE_HERE, flowsheet=ETHANOL, inputs=assumed_inputs(a), samples=50),
                        pool=SimpleNamespace(records=rs, records_by_id={r["id"]: r for r in rs}))
     assert run.samples == 50 and run.flowsheet == ETHANOL and run.tablesSource == standins.PROFORMA_STANDIN
     assert [u.id for u in run.units] == run.unitOrder == ["R1", "D302", "U301"] and len(run.streams) == 7
@@ -177,11 +183,13 @@ def test_the_toy_run_artifact_carries_every_table(warm, store):
 
 
 @pytest.mark.sim
-def test_the_worker_refuses_a_reference_case_by_case(warm):
+def test_the_worker_refuses_a_retired_entry_case_by_case_and_replays_none_it_did_not_keep(warm):
     from openferment_core.workers import WorkerError
 
-    with pytest.raises(WorkerError, match="reference biorefinery"):
+    with pytest.raises(WorkerError, match="there is no flowsheet cornstover_benchmark"):
         warm.call("evaluate", {"flowsheet": "cornstover_benchmark", "values": {}})
+    with pytest.raises(WorkerError, match="no retired reference entry whose kept runs replay here"):
+        warm.call("replay_reference", {"flowsheet": ETHANOL, "digits": 10})
 
 
 @pytest.mark.sim

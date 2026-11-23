@@ -8,10 +8,28 @@
 // `thermo_props` artifact (`core/openferment_core/thermo.py`). This file asks
 // and reads; it computes no property. With the service down it says so, and
 // nothing stands in for an answer (E.2). Shares lib/http.ts's call.
-import type { Artifact, ThermoProps, ThermoPropsRequest, Train } from '@/data/types';
+//
+// The question and the answer are the service's own shapes, generated from its
+// models into src/api/types.gen.ts (ADR-007): both doors answer the
+// `thermo_props` artifact beside what it holds, which the service reads as
+// `ThermoProps`, so a page reads each property as typed. A train whose
+// streams a card asks about is pureOS's, named in lib/pureos.ts.
+import type { components } from '@/api/types.gen';
 import { ServiceDown, ServiceRefused, call } from './http';
+import type { Train } from './pureos';
 
 export { ServiceDown as ThermoDown, ServiceRefused as ThermoRefused };
+
+type S = components['schemas'];
+
+/** `POST /api/thermo/props`, and the same question as `GET` query parameters: a run's stream, or a preset, by ids and words. */
+export type ThermoPropsRequest = S['ThermoPropsRequest'];
+/** What a `thermo_props` artifact holds: thermosteam's answer for one mixture, in the library's units. */
+export type ThermoProps = S['ThermoProps'];
+/** `POST /api/thermo/props`: the `thermo_props` artifact beside what it holds. */
+export type ThermoPropsAnswer = S['ThermoPropsAnswer'];
+/** `GET /api/thermo/props`: the same pair as stored, or both null when nobody has asked the question here. */
+export type ThermoPropsStored = S['ThermoPropsStored'];
 
 export const BEER = 'beer-at-titre-of';
 export const TITRE_FIELD = 'ethanol_titre';
@@ -22,24 +40,26 @@ const query = (q: ThermoPropsRequest) =>
     .map(([k, v]) => `${k}=${encodeURIComponent(String(v))}`)
     .join('&');
 
-/** The answer stored for this question, or null when nobody has asked it here; starts no simulator. */
-export const thermoStored = (q: ThermoPropsRequest, signal?: AbortSignal) =>
-  call<{ artifact: Artifact | null }>(`/api/thermo/props?${query(q)}`, { signal }).then((r) => r.artifact);
+/** The answer stored for this question, its artifact beside what it holds, or null when nobody has asked it here; starts no simulator. */
+export const thermoStored = (q: ThermoPropsRequest, signal?: AbortSignal): Promise<ThermoPropsAnswer | null> =>
+  call<ThermoPropsStored>(`/api/thermo/props?${query(q)}`, { signal }).then((r) =>
+    r.artifact && r.props ? { artifact: r.artifact, props: r.props } : null,
+  );
 
-/** Ask thermosteam (or get the stored answer): one `thermo_props` artifact. */
+/** Ask thermosteam (or get the stored answer): one `thermo_props` artifact beside what it holds. */
 export const thermoAsk = (q: ThermoPropsRequest, signal?: AbortSignal) =>
-  call<Artifact>('/api/thermo/props', {
+  call<ThermoPropsAnswer>('/api/thermo/props', {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify(q),
     signal,
   });
 
-/** The answer an artifact holds, as the service wrote it. */
-export const propsOf = (a: Artifact) => a.output as unknown as ThermoProps;
+/** A property a Properties card shows: a number of the answer, or null where the library could not compute it. */
+type PropertyKey = keyof Pick<ThermoProps, 'density' | 'Cp' | 'viscosity' | 'bubblePoint' | 'dewPoint'>;
 
 /** The rows a Properties card shows, in order: the output key and its words. */
-export const PROPERTY_ROWS: { key: 'density' | 'Cp' | 'viscosity' | 'bubblePoint' | 'dewPoint'; label: string }[] = [
+export const PROPERTY_ROWS: { key: PropertyKey; label: string }[] = [
   { key: 'density', label: 'Density' },
   { key: 'Cp', label: 'Heat capacity' },
   { key: 'viscosity', label: 'Viscosity' },

@@ -6,7 +6,7 @@
 // `fermos.vessel` artifact, so both take its provenance, and the figure
 // computes nothing: the hours that fall short are the service's (`short`),
 // never found here.
-import type { ComputedBasis, Provenance } from '@/data/types';
+import type { ComputedBasis, Provenance } from '@/lib/studies';
 import { fmt } from '@/engine/units';
 import { ENCODING } from './encoding';
 import { FigureFrame, lineStroke, type FigureTable } from './FigureFrame';

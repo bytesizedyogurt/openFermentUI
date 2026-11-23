@@ -13,7 +13,7 @@
 //
 // The figure draws what it is given and computes nothing: every number in it
 // and in its table is the artifact's own.
-import type { ComputedBasis, Provenance } from '@/data/types';
+import type { ComputedBasis, Provenance } from '@/lib/studies';
 import { fmt } from '@/engine/units';
 import { DASH_ARRAY, ENCODING, markColor } from './encoding';
 import { FigureFrame, Mark, lineStroke, type FigureTable } from './FigureFrame';

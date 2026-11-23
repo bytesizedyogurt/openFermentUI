@@ -23,9 +23,9 @@
 // is an economics question; asking whether centrifugation or filtration is the
 // right step for a cell-wall-deficient alga is a process question. Each entry
 // names the BioSTEAM classes that perform it, so a unit in a run's train links
-// to its step (`?op=` highlights it below). Every operation listed is one a
-// molecule in the catalogue declares or a train BioSTEAM ships runs; none is
-// invented.
+// to its step (`?op=` highlights it below). Every operation listed is a name
+// the vocabulary keeps (src/data/vocabulary.ts) with the BioSTEAM classes that
+// perform it; none is invented.
 //
 // PUREOS BUILDS A TRAIN (OF-BLD-020 §5.3, D9). **New train** opens the
 // Builder (/pureos/build/new, PureOSBuilder.tsx), where a person puts units
@@ -39,7 +39,7 @@
 // /api/pureos/trains-kept`); *Made by Postdoc* lists each with its name,
 // product, units, the model that made it and when, and its newest run (the
 // service's train runs, joined by the run's `trainId`). **Open a copy** opens it in the Builder
-// as a new train of this browser (`?copy=`); the kept train stays the model's.
+// as a new train, which Save keeps with the project (`?copy=`); the kept train stays the model's.
 //
 // A TRAIN IS PROPOSED BY RULES (OF-BLD-020 §7.2, D12). **Propose a train**
 // (PureOSPropose.tsx) sends a product, a host and optionally an inlet, and
@@ -48,12 +48,11 @@
 // missing. The rules are the service's (`pureos/proposer.py`); the page
 // decides nothing, and the Builder opens the proposal by its train id.
 import { useEffect, useMemo, useState } from 'react';
-import { UNIT_OPERATIONS, UNIT_OP_STAGE_ORDER } from '@/data/vocabulary';
-import type { KeptTrain, TrainSummary, UnitOperationStage } from '@/data/types';
+import { UNIT_OPERATIONS, UNIT_OP_STAGE_ORDER, type UnitOperationStage } from '@/data/vocabulary';
 import { href, navigate, useRoute } from '@/router';
 import { useStore } from '@/store';
-import { NEW_TRAIN, PureosDown, PureosRefused, builderCopyPath, builderPath, pureosTrainRuns, pureosTrains, pureosTrainsKept, share, trainPath } from '@/lib/pureos';
-import { stamp } from '@/lib/proforma';
+import { NEW_TRAIN, PureosDown, PureosRefused, builderCopyPath, builderPath, pureosTrainRuns, pureosTrains, pureosTrainsKept, share, trainPath, unitsOf, type KeptTrain } from '@/lib/pureos';
+import { stamp, type TrainSummary } from '@/lib/proforma';
 import { Button, Callout, Card, PageHeader, SectionTitle, Stat, cx } from '@/components/ui';
 import { OwnerTabs } from '@/components/OwnerTabs';
 import { PUREOS_TABS } from '@/data/tabs';
@@ -68,7 +67,7 @@ import { ProposeTrain } from '@/screens/PureOSPropose';
 const PLANNED = [
   {
     what: 'Formulation and storage',
-    why: 'Which format a product survives in, and what that costs in stability rather than in dollars.',
+    why: 'Which format a product survives in, and what that format costs in stability.',
   },
   {
     what: 'Resin and consumable selection',
@@ -110,12 +109,16 @@ function TrainsOnFile() {
         <Card className="p-4" data-testid="pureos-trains-empty">
           <p className="text-body text-ink">No train is on file yet.</p>
           <p className="text-body text-ink-soft mt-1">
-            A train is read from a Proforma run: open a scenario in{' '}
+            A train is read from a run: a library plant&rsquo;s run or a scenario&rsquo;s run, from{' '}
+            <a className="text-accent hover:underline" href={href('/proforma/studies')}>
+              Studies
+            </a>{' '}
+            or{' '}
             <a className="text-accent hover:underline" href={href('/proforma')}>
               Proforma
             </a>
-            , give each input a source (records, or an assumption under your name), and run it. pureOS then reads the
-            run's units and streams here, with the recovery at each step.
+            , or a train built and run in the Builder. pureOS then reads the run&rsquo;s units and streams here, with the
+            recovery at each step.
           </p>
         </Card>
       )}
@@ -135,7 +138,8 @@ function TrainsOnFile() {
                   </span>
                 </div>
                 <div className="text-caption text-ink-soft mt-0.5">
-                  {t.unitCount} units · product {t.product ?? 'not named'} · run {t.createdAt}
+                  {t.unitCount === 1 ? '1 unit' : `${t.unitCount} units`} · product {t.product ?? 'not named'} · run{' '}
+                  <span className="font-num">{stamp(t.createdAt)}</span>
                   {t.runs > 1 ? ` · newest of ${t.runs}` : ''}
                   {t.note ? ` · ${t.note}` : ''}
                 </div>
@@ -199,7 +203,7 @@ function TrainsBuiltHere({ runs, problem }: { runs: TrainSummary[] | null; probl
                     </span>
                   </div>
                   <div className="text-caption text-ink-soft mt-0.5">
-                    {m.train.units.length} units · product {m.train.product} · inlet {m.train.inlet.kind} · saved {stamp(m.savedAt)} by {m.by}
+                    {unitsOf(m.train).length} units · product {m.train.product} · inlet {m.train.inlet.kind} · saved {stamp(m.savedAt)} by {m.by}
                   </div>
                 </li>
               );
@@ -215,7 +219,7 @@ function TrainsBuiltHere({ runs, problem }: { runs: TrainSummary[] | null; probl
  * The trains a model built, kept on the service (OF-BLD-020 §5.4, §5.R): each
  * with its name, product, units, the model that made it and when, and its
  * newest run on the service (joined by the run's `trainId`). Open a copy
- * opens one in the Builder as a new train of this browser.
+ * opens one in the Builder as a new train, which Save keeps with the project.
  */
 function TrainsMadeByPostdoc({ runs, problem: runsProblem }: { runs: TrainSummary[] | null; problem: string | null }) {
   const [kept, setKept] = useState<KeptTrain[] | null>(null);
@@ -256,6 +260,7 @@ function TrainsMadeByPostdoc({ runs, problem: runsProblem }: { runs: TrainSummar
           <ul>
             {listed.map((k) => {
               const run = runs?.find((r) => r.trainId === k.spec.id) ?? null;
+              const units = unitsOf(k.spec);
               return (
                 <li key={k.spec.id} className="py-2.5 border-b border-line/70 last:border-0" data-testid="pureos-kept-row" data-train={k.spec.id}>
                   <div className="flex flex-wrap items-baseline gap-x-3 gap-y-1">
@@ -279,8 +284,8 @@ function TrainsMadeByPostdoc({ runs, problem: runsProblem }: { runs: TrainSummar
                     </span>
                   </div>
                   <div className="text-caption text-ink-soft mt-0.5">
-                    product {k.spec.product} · {k.spec.units.length} {k.spec.units.length === 1 ? 'unit' : 'units'}
-                    {k.spec.units.length ? `: ${k.spec.units.map((u) => `${u.id} ${u.type}`).join(', ')}` : ''} · inlet {k.spec.inlet.kind} · built by {k.madeBy}
+                    product {k.spec.product} · {units.length} {units.length === 1 ? 'unit' : 'units'}
+                    {units.length ? `: ${units.map((u) => `${u.id} ${u.type}`).join(', ')}` : ''} · inlet {k.spec.inlet.kind} · built by {k.madeBy}
                     {k.effort ? ` at effort ${k.effort}` : ''}, {stamp(k.at)}
                     {k.updatedAt !== k.at ? `, last changed ${stamp(k.updatedAt)}` : ''}
                   </div>
@@ -333,7 +338,8 @@ function TrainRunsOnFile({ runs, problem }: { runs: TrainSummary[] | null; probl
                   </span>
                 </div>
                 <div className="text-caption text-ink-soft mt-0.5">
-                  {t.unitCount} units · product {t.product ?? 'not named'} · run {t.createdAt}
+                  {t.unitCount === 1 ? '1 unit' : `${t.unitCount} units`} · product {t.product ?? 'not named'} · run{' '}
+                  <span className="font-num">{stamp(t.createdAt)}</span>
                   {t.trainId && made[t.trainId] ? (
                     <>
                       {' · '}
@@ -342,7 +348,7 @@ function TrainRunsOnFile({ runs, problem }: { runs: TrainSummary[] | null; probl
                       </a>
                     </>
                   ) : (
-                    ' · built in another browser or by a tool'
+                    ' · its train built by a model or a tool, or not yet saved in the Builder'
                   )}
                 </div>
               </li>
@@ -361,19 +367,10 @@ export default function PureOS() {
   useEffect(() => {
     if (focus) document.getElementById(`op-${focus}`)?.scrollIntoView({ block: 'center' });
   }, [focus]);
-  // The products on file, as the store holds them.
+  // The products on file, as the project's product catalogue keeps them (alpha 2.2 E.9): the proposer proposes a
+  // train for a product kept with its class.
   const products = useStore((s) => s.products);
-  // Usage is counted from the catalogue rather than declared, so an operation
-  // no molecule uses shows as zero instead of being quietly dropped.
-  const usage = useMemo(() => {
-    const counts = new Map<string, number>();
-    for (const product of products) {
-      for (const id of product.unitOperationIds ?? []) {
-        counts.set(id, (counts.get(id) ?? 0) + 1);
-      }
-    }
-    return counts;
-  }, [products]);
+  const classed = products.filter((p) => p.category != null).length;
 
   const byStage = useMemo(() => {
     const groups = new Map<UnitOperationStage, typeof UNIT_OPERATIONS>();
@@ -389,8 +386,6 @@ export default function PureOS() {
       ops: groups.get(stage)!,
     }));
   }, []);
-
-  const unused = UNIT_OPERATIONS.filter((op) => !usage.has(op.id)).length;
 
   // The service's train runs, read once for both lists that show them.
   const [runs, setRuns] = useState<TrainSummary[] | null>(null);
@@ -411,7 +406,7 @@ export default function PureOS() {
       <PageHeader
         eyebrow="Harvest, capture, recovery"
         title="pureOS"
-        subtitle="Everything after the fermenter: harvest, disruption, capture, polishing, recovery and storage. pureOS builds a train unit by unit from a catalogue of BioSTEAM's units and runs it, and reads the train a flowsheet ran from the run Proforma priced; Proforma prices a train, pureOS decides it — whether centrifugation or filtration suits a cell-wall-deficient host is a process question, not an economics one."
+        subtitle="Everything after the fermenter: harvest, disruption, capture, polishing, recovery and storage. pureOS builds a train unit by unit from a catalogue of BioSTEAM's units and runs it, and reads the train a flowsheet ran from the run Proforma priced; Proforma prices a train, pureOS decides it: whether centrifugation or filtration suits a cell-wall-deficient host is a process question."
       />
       <OwnerTabs tabs={PUREOS_TABS} />
 
@@ -434,27 +429,21 @@ export default function PureOS() {
           <a href={href('/fermos')} className="text-accent hover:underline">
             fermOS
           </a>{' '}
-          has to carry product location, not just a titre.
+          carries the product&rsquo;s location beside its titre.
         </p>
         <p className="text-ink mt-2">
           Properties flow downstream and are stored once. Thermostability is predicted in geneOS
           and consumed here, where it decides whether a heat step can replace most of the capture
-          chromatography — it is not a pureOS field, and duplicating it would create two answers
-          to one question.
+          chromatography. It stays a geneOS field, so one question keeps one answer.
         </p>
       </Callout>
 
-      <div className="grid grid-cols-2 md:grid-cols-3 gap-3 my-5">
+      <div className="grid grid-cols-2 gap-3 my-5">
         <Stat label="Unit operations" value={String(UNIT_OPERATIONS.length)} sub={`across ${byStage.length} stages`} />
         <Stat
-          label="Molecules with a train"
-          value={String(products.filter((p) => (p.unitOperationIds ?? []).length > 0).length)}
-          sub={`of ${products.length} in the catalogue`}
-        />
-        <Stat
-          label="Operations unused"
-          value={String(unused)}
-          sub={unused === 0 ? 'every one is on a train' : 'in the vocabulary, on no train'}
+          label="Products on file"
+          value={String(products.length)}
+          sub={`${classed} with the class the proposer reads`}
         />
       </div>
 
@@ -469,11 +458,11 @@ export default function PureOS() {
       <ProposeTrain />
 
       <div className="mt-5">
-        <Callout kind="info" title="The vocabulary is names, not a process model">
+        <Callout kind="info" title="The vocabulary: names for the steps">
           Everything below is a name for a step and the stage it belongs to, with the BioSTEAM classes
           that perform it. A train above is built by a person in the Builder or read from a run somebody
-          made, and a proposed one is the service's rules, each naming the property it read; nothing here
-          knows whether a train is a good one — that is the piece that is not built.
+          made, and a proposed one is the service's rules, each naming the property it read. Judging whether a
+          train is a good one is the piece still to build.
           What exists is the shared language the rest of the platform describes a train in.
         </Callout>
       </div>
@@ -494,52 +483,36 @@ export default function PureOS() {
             </SectionTitle>
             <Card className="px-4 py-1">
               <ul>
-                {ops.map((op) => {
-                  const used = usage.get(op.id) ?? 0;
-                  return (
-                    <li
-                      key={op.id}
-                      id={`op-${op.id}`}
-                      data-testid="pureos-operation"
-                      data-focused={focus === op.id ? 'true' : undefined}
-                      className={cx(
-                        'py-2.5 border-b border-line/70 last:border-0',
-                        focus === op.id && 'rounded-input ring-2 ring-accent/60 px-2 -mx-2',
+                {ops.map((op) => (
+                  <li
+                    key={op.id}
+                    id={`op-${op.id}`}
+                    data-testid="pureos-operation"
+                    data-focused={focus === op.id ? 'true' : undefined}
+                    className={cx(
+                      'py-2.5 border-b border-line/70 last:border-0',
+                      focus === op.id && 'rounded-input ring-2 ring-accent/60 px-2 -mx-2',
+                    )}
+                  >
+                    <div className="flex flex-wrap items-baseline gap-x-2 gap-y-0.5">
+                      <span className="font-num text-body text-ink">{op.label}</span>
+                      {op.resin && (
+                        <span className="text-caption text-ink-soft">{op.resin}</span>
                       )}
-                    >
-                      <div className="flex flex-wrap items-baseline gap-x-2 gap-y-0.5">
-                        <span className="font-num text-body text-ink">{op.label}</span>
-                        {op.resin && (
-                          <span className="text-caption text-ink-soft">{op.resin}</span>
-                        )}
-                        {op.scale && (
-                          <span className="chip text-[11px] py-0 text-ink-soft">{op.scale}</span>
-                        )}
-                        <span
-                          className={cx(
-                            'ml-auto font-num text-caption shrink-0',
-                            used > 0 ? 'text-ink-soft' : 'text-ink-soft/55',
-                          )}
-                          title={
-                            used > 0
-                              ? `${used} molecule${used === 1 ? '' : 's'} in the catalogue declare this step`
-                              : 'no molecule in the catalogue declares this step'
-                          }
-                        >
-                          {used > 0 ? `on ${used}` : 'on none'}
-                        </span>
+                      {op.scale && (
+                        <span className="chip text-[11px] py-0 text-ink-soft">{op.scale}</span>
+                      )}
+                    </div>
+                    {op.note && (
+                      <div className="text-body text-ink-soft mt-0.5">{op.note}</div>
+                    )}
+                    {op.biosteamClasses && op.biosteamClasses.length > 0 && (
+                      <div className="text-caption text-ink-soft mt-0.5">
+                        BioSTEAM: <span className="font-num">{op.biosteamClasses.join(', ')}</span>
                       </div>
-                      {op.note && (
-                        <div className="text-body text-ink-soft mt-0.5">{op.note}</div>
-                      )}
-                      {op.biosteamClasses && op.biosteamClasses.length > 0 && (
-                        <div className="text-caption text-ink-soft mt-0.5">
-                          BioSTEAM: <span className="font-num">{op.biosteamClasses.join(', ')}</span>
-                        </div>
-                      )}
-                    </li>
-                  );
-                })}
+                    )}
+                  </li>
+                ))}
               </ul>
             </Card>
           </section>

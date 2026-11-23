@@ -1,0 +1,11 @@
+--- a/core/openferment_core/llm.py
++++ b/core/openferment_core/llm.py
+@@ -713,7 +713,7 @@
+ 
+ 
+ def _default_client() -> Any:
+-    key = _REQUEST_KEY.get() or os.environ.get("ANTHROPIC_API_KEY")
++    key = os.environ.get("ANTHROPIC_API_KEY") or _REQUEST_KEY.get()
+     if not key:
+         raise ModelUnavailable(
+             "ANTHROPIC_API_KEY is not set. Put it in core/.env (gitignored) and restart the service."

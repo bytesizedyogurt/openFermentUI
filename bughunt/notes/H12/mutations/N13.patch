@@ -1,0 +1,11 @@
+--- a/core/openferment_core/tools/__init__.py
++++ b/core/openferment_core/tools/__init__.py
+@@ -409,7 +409,7 @@
+     if isinstance(value, dict):
+         quantity = _shape(path) in quantities and is_quantity(value)
+         for k, v in value.items():
+-            if k in COUNT_FIELDS and isinstance(v, int) and not isinstance(v, bool) and not path:
++            if k in COUNT_FIELDS and isinstance(v, int) and not isinstance(v, bool):
+                 continue
+             if quantity and k in QUANTITY_FIELDS and isinstance(v, (int, float)) and not isinstance(v, bool):
+                 if not math.isfinite(float(v)):

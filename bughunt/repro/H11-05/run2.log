@@ -1,0 +1,79 @@
+worktree: /tmp/claude-0/-home-user-openFermentUI/cfbc5c9f-640a-5002-a705-5ceaf850fdc6/scratchpad/bh/work/H11-05/wt at 2047f5a
+
+== 1. the contract and the code, as 2047f5a holds them
+   scripts/session-start.sh:6: # Idempotent: run it at the start of every session, on a fresh clone or a
+   scripts/session-start.sh:7: # warm one. In order:
+   scripts/session-start.sh:18: #   4. the database (ADR-001): when PostgreSQL answers on 127.0.0.1 and
+   scripts/session-start.sh:19: #      core/.env names none, the development address (compose.yaml's) joins
+   scripts/session-start.sh:20: #      core/.env; then pnpm db:migrate, whatever it exits with
+   scripts/session-start.sh:44: # A key not scoped to a workspace needs the workspace named on each request
+   scripts/session-start.sh:45: # (llm.make_client). The id is not a secret; it joins core/.env when the file
+   scripts/session-start.sh:46: # lacks it, so a service started from the file sends it too.
+   scripts/session-start.sh:47: if [ -n "${OPENFERMENT_WORKSPACE_ID:-}" ] && [ -e core/.env ] && ! grep -q '^OPENFERMENT_WORKSPACE_ID=' core/.env; then
+   scripts/session-start.sh:48:   printf 'OPENFERMENT_WORKSPACE_ID=%s\n' "${OPENFERMENT_WORKSPACE_ID//[[:space:]]/}" >> core/.env
+   scripts/session-start.sh:62: if [ -e core/.env ] && ! grep -q '^OPENFERMENT_DATABASE_URL=' core/.env && command -v pg_isready >/dev/null && pg_isready -q -h 127.0.0.1; then
+   scripts/session-start.sh:63:   printf 'OPENFERMENT_DATABASE_URL=postgresql://openferment:openferment@127.0.0.1:5432/openferment_dev\n' >> core/.env
+   scripts/host/lib.sh:162:   # On a line of its own, whether or not the file's last line ends in one.
+   scripts/host/lib.sh:163:   printf '\nOPENFERMENT_DATABASE_URL=postgresql://%s@127.0.0.1:5432/openferment\n' "$(id -un)" >> "$REPO/core/.env"
+   core/tests/test_host.py:243: def test_the_database_is_made_from_the_keg_and_named_once_on_a_line_of_its_own(tmp_path):
+   core/tests/test_host.py:247:     env_file.write_text("# a placeholder\nANTHROPIC_API_KEY=sk-ant-...")  # no newline at the end
+   core/tests/test_host.py:256:     lines = env_file.read_text().splitlines()
+   core/tests/test_host.py:257:     assert lines[1] == "ANTHROPIC_API_KEY=sk-ant-..." and lines[-1] == (
+   lines in core/tests naming session-start.sh: 1
+   core/tests/test_host.py:452: (SCRIPTS / "session-start.sh", "(cd core && uv sync --all-extras)", "\nbash scripts/engines-local.sh"),
+   core/.env.example's last byte: \n
+
+== 2. PostgreSQL on 127.0.0.1 (session-start's condition for the database line)
+   pg_isready: 127.0.0.1:5432 - accepting connections
+
+== 3. case A (control): '# hand-written\nANTHROPIC_API_KEY=sk-ant-...\n', the key line ending in a newline
+   session-start exit 0; its lines naming core/.env:
+   > core/.env is present; left as it is
+   > OPENFERMENT_DATABASE_URL added to core/.env (the development address)
+   stand-in calls: pnpm install --frozen-lockfile;uv sync --all-extras;pnpm --silent db:migrate;pnpm --silent ready;
+   core/.env now holds (cat -A: $ marks a line's end):
+   | # hand-written$
+   | ANTHROPIC_API_KEY=sk-ant-...$
+   | OPENFERMENT_DATABASE_URL=postgresql://openferment:openferment@127.0.0.1:5432/openferment_dev$
+   dotenv_values: ANTHROPIC_API_KEY = 'sk-ant-...' | OPENFERMENT_DATABASE_URL = 'postgresql://openferment:openferment@127.0.0.1:5432/openferment_dev' | OPENFERMENT_WORKSPACE_ID = None
+   the service loader (core/openferment_core/db/engine.py): key = 'sk-ant-...' | database_url() -> postgresql+asyncpg://openferment:***@127.0.0.1:5432/openferment_dev
+
+== 4. case B: '# hand-written\nANTHROPIC_API_KEY=sk-ant-...', no newline at the key line's end
+   session-start exit 0; its lines naming core/.env:
+   > core/.env is present; left as it is
+   > OPENFERMENT_DATABASE_URL added to core/.env (the development address)
+   stand-in calls: pnpm install --frozen-lockfile;uv sync --all-extras;pnpm --silent db:migrate;pnpm --silent ready;
+   core/.env now holds (cat -A: $ marks a line's end):
+   | # hand-written$
+   | ANTHROPIC_API_KEY=sk-ant-...OPENFERMENT_DATABASE_URL=postgresql://openferment:openferment@127.0.0.1:5432/openferment_dev$
+   dotenv_values: ANTHROPIC_API_KEY = 'sk-ant-...OPENFERMENT_DATABASE_URL=postgresql://openferment:openferment@127.0.0.1:5432/openferment_dev' | OPENFERMENT_DATABASE_URL = None | OPENFERMENT_WORKSPACE_ID = None
+   the service loader (core/openferment_core/db/engine.py): key = 'sk-ant-...OPENFERMENT_DATABASE_URL=postgresql://openferment:openferment@127.0.0.1:5432/openferment_dev' | database_url() -> DatabaseUnavailable: OPENFERMENT_DATABASE_URL is not set
+
+== 5. case B2: session-start run again over case B's file (the script calls itself idempotent)
+   session-start exit 0; its lines naming core/.env:
+   > core/.env is present; left as it is
+   > OPENFERMENT_DATABASE_URL added to core/.env (the development address)
+   stand-in calls: pnpm install --frozen-lockfile;uv sync --all-extras;pnpm --silent db:migrate;pnpm --silent ready;
+   core/.env now holds (cat -A: $ marks a line's end):
+   | # hand-written$
+   | ANTHROPIC_API_KEY=sk-ant-...OPENFERMENT_DATABASE_URL=postgresql://openferment:openferment@127.0.0.1:5432/openferment_dev$
+   | OPENFERMENT_DATABASE_URL=postgresql://openferment:openferment@127.0.0.1:5432/openferment_dev$
+   dotenv_values: ANTHROPIC_API_KEY = 'sk-ant-...OPENFERMENT_DATABASE_URL=postgresql://openferment:openferment@127.0.0.1:5432/openferment_dev' | OPENFERMENT_DATABASE_URL = 'postgresql://openferment:openferment@127.0.0.1:5432/openferment_dev' | OPENFERMENT_WORKSPACE_ID = None
+   the service loader (core/openferment_core/db/engine.py): key = 'sk-ant-...OPENFERMENT_DATABASE_URL=postgresql://openferment:openferment@127.0.0.1:5432/openferment_dev' | database_url() -> postgresql+asyncpg://openferment:***@127.0.0.1:5432/openferment_dev
+
+== 6. case C: as case B, with OPENFERMENT_WORKSPACE_ID=wrkspc_h11_placeholder in the session
+   session-start exit 0; its lines naming core/.env:
+   > core/.env is present; left as it is
+   > OPENFERMENT_WORKSPACE_ID added to core/.env
+   > OPENFERMENT_DATABASE_URL added to core/.env (the development address)
+   stand-in calls: pnpm install --frozen-lockfile;uv sync --all-extras;pnpm --silent db:migrate;pnpm --silent ready;
+   core/.env now holds (cat -A: $ marks a line's end):
+   | # hand-written$
+   | ANTHROPIC_API_KEY=sk-ant-...OPENFERMENT_WORKSPACE_ID=wrkspc_h11_placeholder$
+   | OPENFERMENT_DATABASE_URL=postgresql://openferment:openferment@127.0.0.1:5432/openferment_dev$
+   dotenv_values: ANTHROPIC_API_KEY = 'sk-ant-...OPENFERMENT_WORKSPACE_ID=wrkspc_h11_placeholder' | OPENFERMENT_DATABASE_URL = 'postgresql://openferment:openferment@127.0.0.1:5432/openferment_dev' | OPENFERMENT_WORKSPACE_ID = None
+   the service loader (core/openferment_core/db/engine.py): key = 'sk-ant-...OPENFERMENT_WORKSPACE_ID=wrkspc_h11_placeholder' | database_url() -> postgresql+asyncpg://openferment:***@127.0.0.1:5432/openferment_dev
+
+EXPECTED: in every case the setting session-start adds lands on a line of its own (lib.sh:162 "On a line of its own, whether or not the file's last line ends in one"): the key reads as 'sk-ant-...', the database as the development address, and in case C the workspace as 'wrkspc_h11_placeholder' (session-start.sh:45-46 "it joins core/.env when the file lacks it, so a service started from the file sends it too").
+OBSERVED: case A (control): key 'sk-ant-...', database 'postgresql://openferment:openferment@127.0.0.1:5432/openferment_dev'. Case B: key 'sk-ant-...OPENFERMENT_DATABASE_URL=postgresql://openferment:openferment@127.0.0.1:5432/openferment_dev', database 'None', the service loader's database 'None'. Case B2 (second run): key 'sk-ant-...OPENFERMENT_DATABASE_URL=postgresql://openferment:openferment@127.0.0.1:5432/openferment_dev', database 'postgresql://openferment:openferment@127.0.0.1:5432/openferment_dev'. Case C: key 'sk-ant-...OPENFERMENT_WORKSPACE_ID=wrkspc_h11_placeholder', workspace 'None', database 'postgresql://openferment:openferment@127.0.0.1:5432/openferment_dev'.
+RESULT: DEFECT

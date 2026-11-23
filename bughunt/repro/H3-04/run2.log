@@ -1,0 +1,10 @@
+service: http://127.0.0.1:9920 over a fresh bh_r_h3_04_svc (keyless), tree at 6a32507, core/ as at 2047f5a: yes
+[1 what p1 holds at the bench] depositions []; runbooks []; readings a run may take []
+[2 PUT measuredEvidence me2, depositionId 'nope', 999 g/L, provenance measured, confirmed true] 200 {"kind": "measuredEvidence", "id": "me2", "value": {"id": "me2", "depositionId": "nope", "runbookId": "nope", "productId": null, "predictionId": "p1", "label": "Ethanol titre", "value": 999.0, "unit": "g/L", "provenance": "measured", "conditions": {"protocolId
+[3 GET /api/state] measuredEvidence me2 (999.0, 'g/L', 'measured', True, 'nope'); depositions []
+[4 POST /api/tools/runbooks_read runbooks/measured-evidence/me2] provenance measured value 999.0 g/L depositionId nope label 'Ethanol titre, measured in deposition nope'
+[5 validate_plan, a claim citing runbooks/measured-evidence/me2] kept 1, rejected 0, claim provenance measured []
+EXPECTED: the write of me2 is refused in words with a 422, since p1 holds no deposition 'nope' (and no runbook 'nope') for it to have been measured in; a measured-evidence row is held to a deposition, entry and reconciliation the project keeps, and its mark is computed from that deposition's confirmed readings by code
+OBSERVED: PUT answered 200; GET /api/state keeps me2 at 999.0 g/L, provenance measured, depositionId nope, while p1 holds depositions []; runbooks_read marks the row measured at 999.0 g/L; a claim citing it is graded measured
+checks: DEFECT (kept=True no_deposition_held=True read_as_measured=True claim_class=measured)
+RESULT: DEFECT

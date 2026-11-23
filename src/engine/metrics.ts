@@ -1,10 +1,11 @@
 // Validation metrics (OF-DES-001 §8.8): P/R/F1 of an extractor run against the
 // values reviewers typed (a gold value or a correction), as witness.py scores
 // it, recomputed live from the service's run.
-import type { ExtractionRecord, FieldId, RunOutput } from '@/data/types';
+import type { ExtractionRecord, RunOutput } from '@/lib/review';
 
 export interface FieldMetrics {
-  field: FieldId;
+  /** A record's field, or the field the service wrote on a run's false positive (named by `fieldName`). */
+  field: string;
   nGold: number;
   tp: number;
   fp: number;
@@ -50,8 +51,8 @@ export function computeRunMetrics(
 ): RunMetrics {
   const goldRecords = records.filter((r) => r.gold || r.corrected);
   const byId = new Map(goldRecords.map((r) => [r.id, r]));
-  const perFieldCounts = new Map<FieldId, { tp: number; fp: number; fn: number; failures: Map<string, number> }>();
-  const ensure = (f: FieldId) => {
+  const perFieldCounts = new Map<string, { tp: number; fp: number; fn: number; failures: Map<string, number> }>();
+  const ensure = (f: string) => {
     if (!perFieldCounts.has(f)) perFieldCounts.set(f, { tp: 0, fp: 0, fn: 0, failures: new Map() });
     return perFieldCounts.get(f)!;
   };
@@ -76,7 +77,7 @@ export function computeRunMetrics(
     c.failures.set('spurious', (c.failures.get('spurious') ?? 0) + 1);
   }
 
-  const goldByField = new Map<FieldId, number>();
+  const goldByField = new Map<string, number>();
   for (const r of goldRecords) goldByField.set(r.field, (goldByField.get(r.field) ?? 0) + 1);
 
   const perField: FieldMetrics[] = [];

@@ -1,6 +1,6 @@
 """The proof (execution prompt §9.1): an end-to-end path with nothing seeded.
 
-    pnpm prove                    every step: 1 to 9
+    pnpm prove                    every step: 1 to 10
     pnpm prove --steps 5,8        the steps named, after the steps they stand on
     pnpm prove --keep             leave the service running at the end, and say where
     pnpm prove --live             with the key in core/.env and the network: step 3 collects the
@@ -18,6 +18,21 @@ where it would call a model, and step 6 asks Postdoc through its evaluation's of
 Its last check reads the proof's own spend table: offline it holds no call. Every check prints ✓
 or ✗ with what it saw; the proof exits 1 when a check fails, 2 when it cannot start.
 
+Before its service starts, the proof installs every package directory under examples/engines/
+(one holding a pyproject.toml) into core's environment with `uv pip install -e`, each said with the
+engines its pyproject.toml registers, and every package core/uv.lock pins held at its locked
+version (the lock's versions are the install's constraints, so a package that would move one is
+refused in uv's words). A package that leads outside examples/engines/, one whose pyproject.toml
+cannot be read and one that fails to install each fail the proof in words; with none there one
+line says so. Step 9 runs the first thing of each of their engines on its own defaults from the
+Runs screen and step 10 checks each, as it checks every engine the service lists, with no value
+set: the proof names no example engine, so a builder's package is picked up with no change under
+scripts/. At its end, however it ends (a failure, Ctrl-C, SIGTERM), the proof leaves core's
+environment as it found it: each package it installed whose distribution was installed nowhere
+before is uninstalled, one installed before from the same directory stays, and one installed
+before from another directory is installed from there again, one line a package. With --keep the
+packages stay installed while the kept service runs, each said with the command that takes it out.
+
     1  a fresh database, migrated to its head; `ready --offline` green
     2  a project made through the API
     3  Sci RAG Kit's demo corpus (five fictional documents, CC0) taken in through Intake's upload:
@@ -26,7 +41,9 @@ or ✗ with what it saw; the proof exits 1 when a check fails, 2 when it cannot 
        candidate extracted through the service and anchored to the stored text, its second,
        quoting words the document does not hold, refused; a decision carrying a model's estimate
        refused at the record store; a person's decision accepting the candidate, and the record in
-       BioRepo with its status, provenance and reviewer
+       BioRepo with its status, provenance and reviewer; the kit's own MCP server over stdio in the
+       project: its tools listed, the two graph tools among them, a graph tool refused in words
+       (no build has read the project's passages), and the corpus counted as the project's
     4  the library's plants listed; the cellulosic ethanol reference plant (the package's
        cornstover) run and held to the package's own test within its tolerance, the two values
        the package's own test fails on this installation each held to what the package's code
@@ -50,13 +67,56 @@ or ✗ with what it saw; the proof exits 1 when a check fails, 2 when it cannot 
     9  the UI walk (scripts/walk.ts, Chromium): Home, the project at its own address with its
        live trace, a document pasted in and searched, the flowsheet run's report and its SFF
        graph, a scenario begun from that run, the plants Studies offers to run, the project's
-       SFF flowsheets, the conversation of step 6 with its estimate marked, the runbook of step 5
+       SFF flowsheets, the catalogues screen keeping a placeholder strain in the proof's person's
+       name (added, edited, taken in again from a file through the screen, and read back as the
+       person's; the service then holds it as the strain catalogue's one entry, the person's keep
+       from that file), a placeholder lesson taken in from a file with its body and renamed on the
+       form, its body read back whole, a skill kept with no policy that its Guild page says so of
+       in words, a protocol kept after the page opened found at its address and its editor opened
+       by its address on a fresh load with the steps kept, geneOS's Hosts showing that strain's card
+       and its page with the other names its entry keeps, the conversation of step 6 with its
+       estimate marked, the runbook of step 5;
+       then a reading deposited at the bench on that locked runbook, the readings alone, by the
+       proof's person, in the unit of the scenario parameter step 5 sets, the placeholder the
+       person types; a scenario made from step 5's flowsheet run through NewScenarioDialog with
+       that reading chosen and nothing typed, and run; its run's page read: provenance measured,
+       the reading's origin linked to its deposition. The service then holds each as the walk
+       left it: the deposition, the reading with its depositor and time, the scenario resting
+       on the reading alone, and its run `measured` with the measurement among its inputs; then
+       a Proforma scenario made on the shelf's glucose-to-ethanol flowsheet through New scenario,
+       and on its parameter panel a parameter set to that same reading, chosen among those its row
+       offers, the row's chip measured and its words naming the reading as deposited; the service
+       then keeps the scenario's override in the reading's own value and unit, by its depositor at
+       the time it was taken, and a tool reading the kept scenario binds the reading from that row
+       with nothing left waiting for it and no refusal of the lookup (alpha 2.2 E.17); then,
+       for each engine a package under examples/engines/ registers, its first thing run on its own
+       defaults from the Runs screen (Studies' run card, the engine chosen), the run's page opened,
+       and its provenance, its outputs and its diagnostics read there as the service keeps them;
+       with no such package, one line says so and the walk checks nothing more
+   10  every engine of the entry-point group `openferment.engines` listed by the service with its
+       version and its worker's state, none with an error, every engine core/pyproject.toml registers
+       among them (biosteam, kinetics and train), and every engine the step sets values or a project
+       for; the eight conformance checks of docs/api/engines.md
+       made on each (`python -m openferment_core.engine.conform <name>`, on a scratch database of
+       its own; the kinetics engine's with `--inputs`, the placeholders its builder writes as the
+       proof's person's assumptions, each dated the proof's day; the train engine's with
+       `--project`, naming the proof's own project, which the checks read and copy into a database
+       of their own and check there, on a train made in the project first as a person makes one in
+       pureOS's Builder: step 4's cornstover run read into a train (`POST
+       /api/pureos/train/from-run`), its first units taken out while a check refuses its inlet as one
+       the chemical set cannot build, then the units whose values wait taken out with every unit
+       before them, the inlet the run's stream entering the first unit kept, checked and saved as the
+       project's row, read back as the proof's person's), each within its time (CONFORM_TIMEOUT_S),
+       the words of checks 3, 5 and 7 printed under each engine's line; the proof's project as it was
+       after every engine's checks (its runs, its trains and its artifacts); and each verdict kept in
+       the proof's database and listed, every core engine's among them
 """
 from __future__ import annotations
 
 import argparse
 import json
 import os
+import re
 import shutil
 import signal
 import socket
@@ -67,7 +127,7 @@ import time
 from dataclasses import dataclass, field
 from pathlib import Path
 from typing import Any, Callable
-from urllib.parse import urlsplit, urlunsplit
+from urllib.parse import quote, urlsplit, urlunsplit
 
 import httpx
 
@@ -86,6 +146,21 @@ FLOWSHEET = "cellulosic_ethanol_v0"
 OTHER_PLANT = "sugarcane"
 # One of the toolkit's reference SFF files (engine/sff_library.json): Sugarcane → Ethanol.
 REFERENCE_FILE = "SF_BST_15"
+# The reading the walk deposits at the bench (step 9) on step 5's locked runbook: a placeholder the proof's person
+# types, in the unit of the scenario parameter step 5 sets, the unit the runbook's measure is in; and the parameter a
+# scenario then sets to that reading alone. The pairing is a placeholder chosen by unit: the service holds a reading's
+# unit to the parameter's, and which measure stands for which parameter is the scenario maker's choice (ADR-006's
+# note of 2026-11-03). The value measures nothing.
+READING_PARAMETER = "stream.cornstover.price"
+READING_UNIT = "USD/kg"
+READING_VALUE = 1.0
+# The Proforma scenario's flowsheet and the parameter of it the walk sets on its parameter panel to that same reading
+# (step 9, alpha 2.2 E.17): a placeholder pairing chosen by unit, as the reading's own is. The parameter is
+# denominated in another spelling of the reading's unit, so the service sets the reading in it as a conversion.
+PANEL_FLOWSHEET = "ethanol_glucose_v0"
+PANEL_PARAMETER = "glucose_price"
+# The placeholder strain the walk keeps on the catalogues screen (step 9): an id whose entry stands for no strain.
+WALK_STRAIN = "walk-placeholder-strain"
 # Sci RAG Kit's demo corpus (five fictional documents, CC0), and the one the extraction reads.
 DEMO = CORE / "tests" / "fixtures" / "kit-demo"
 DEMO_LICENCE = "CC0, as the manifest of Sci RAG Kit's demo corpus states (core/tests/fixtures/kit-demo/manifest.jsonl)"
@@ -106,7 +181,8 @@ DEPARTURES = {
 }
 DIGITS = 10
 # A step, and the steps it stands on.
-STEPS: dict[int, tuple[int, ...]] = {1: (), 2: (1,), 3: (2,), 4: (2,), 5: (2,), 6: (2,), 7: (2,), 8: (2,), 9: (5, 6)}
+STEPS: dict[int, tuple[int, ...]] = {1: (), 2: (1,), 3: (2,), 4: (2,), 5: (2,), 6: (2,), 7: (2,), 8: (2,), 9: (5, 6),
+                                     10: (2, 4)}
 TITLES = {
     1: "a fresh database, migrated; ready green",
     2: "a project made through the API",
@@ -118,9 +194,43 @@ TITLES = {
        "its history",
     7: "a reference SFF file imported; it draws",
     8: "the service restarted: everything reloads; an artifact replays within its tolerance",
-    9: "the UI walk: Home, the project, ingest, search, a run report and its SFF graph, a scenario begun from it, the plants Studies offers, the SFF flowsheets, a conversation, a runbook",
+    9: "the UI walk: Home, the project, ingest, search, a run report and its SFF graph, a scenario begun from it, the plants Studies offers, the SFF flowsheets, a placeholder strain kept on the catalogues screen and shown among geneOS's hosts, a lesson renamed on the form with its body kept, a skill with no policy said in words on Guild, a protocol and its editor opened by their address, a conversation, a runbook; a reading at the bench, a scenario on it, its run measured; that reading chosen on a Proforma scenario's parameter panel, kept in its own value and unit; each example engine's first thing run from the Runs screen",
+    10: "the engines: each registered one listed, the core's three among them, the eight conformance checks made on "
+        "it, its verdict kept, the proof's project as it was; a train made on step 4's run for the train engine's",
 }
+# How long the conformance checks of one engine may take, and how long a run past it is given to end once asked
+# to (SIGTERM), dropping its own database as it ends, before it is killed. BioSTEAM's are the longest: a cold
+# import, then the parameters of every thing it runs (1840 of 10 things at C.7: the library's eight plants,
+# openFerment's flowsheet and the shelf's scenario flowsheet) and its runs. Measured here at C.7: biosteam
+# 51 to 63 s, kinetics 9 to 11 s, train 30 to 36 s.
+CONFORM_TIMEOUT_S = 1800.0
+CONFORM_END_S = 60.0
+# The states a listed engine's worker may be in (engine/registry.py `status_of`): `none` for an engine with no
+# worker, and for one with a worker any state but `failed`.
+WORKER_STATES = ("ready", "cold", "starting")
+# The checks whose words step 10 prints under each engine's line, from conform's own table: check 3 names the
+# thing that ran and where, check 5 the branch it took (a file or sffRefused's words), check 7 the refusal held.
+SAID_CHECKS = (3, 5, 7)
+# The engines whose things wait for values no default gives, each with the module and the function that
+# write the file `conform --inputs` reads (docs/api/engines.md, Conformance): the core's kinetics engine. The
+# function is called with the file's path, the person whose assumptions the placeholders are (PERSON), and the
+# proof's day, which dates each.
+PLACEHOLDERS = {"kinetics": ("openferment_core.fermos_engine", "write_placeholder_inputs")}
+# The engines whose things are a project's own (each declares `things_are`), checked in a copy of the proof's own
+# project (`conform --project`), on what the proof made there for each: the core's train engine, on the train
+# `make_train` makes on step 4's reference run.
+IN_PROJECT = ("train",)
+WRITE_PLACEHOLDERS = ("import importlib, sys; getattr(importlib.import_module(sys.argv[1]), sys.argv[2])"
+                      "(sys.argv[3], by=sys.argv[4], at=sys.argv[5])")
 RUN_TIMEOUT_S = 1800.0
+# How long step 3's call on the sci-rag server over stdio may take: its start, a cold kit import among it, and
+# three calls that read the store.
+SCI_RAG_TIMEOUT_S = 180.0
+
+# The engine packages a builder keeps in the repository (stage D's), each a directory holding a pyproject.toml,
+# installed into core's environment before the service starts; and the group each registers its engines under.
+EXAMPLES = ROOT / "examples" / "engines"
+ENGINE_GROUP = "openferment.engines"
 
 # Opens the export package with the standard library alone (run with -I -S, from a directory of its own).
 READER = '''\
@@ -167,12 +277,17 @@ class Proof:
     project: str = ""
     # Live: the key in core/.env, the network, the routed models (--live).
     live: bool = False
+    # The day the proof began (UTC, YYYY-MM-DD): the day step 10's placeholders are dated. Step 5's person's
+    # assumption and model's estimate carry days of their own, written in the step.
+    day: str = ""
     failed: int = 0
     passed: int = 0
     # What the steps made, for step 8 to reload.
     made: dict[str, Any] = field(default_factory=dict)
     service: subprocess.Popen | None = None
     log: Path = Path()
+    # The packages installed from examples/engines/, each with how core's environment held it before (D0.8a).
+    installed: list[Any] = field(default_factory=list)
 
     def check(self, ok: bool, words: str) -> bool:
         print(f"  {'✓' if ok else '✗'} {words}")
@@ -193,6 +308,33 @@ class Stop(Exception):
 def on_server(address: str, name: str) -> str:
     parts = urlsplit(address)
     return urlunsplit(parts._replace(path=f"/{name}"))
+
+
+def conformed(command: list[str], env: dict[str, str]) -> subprocess.CompletedProcess:
+    """`conform` run to its end, as `subprocess.run` runs it; a run past CONFORM_TIMEOUT_S is asked to end
+    (SIGTERM), which drops the checks' own database as it ends (engine/conform.py `_scratch`), and is killed
+    CONFORM_END_S later if it has not. A run that outlived its time ends with words saying so."""
+    with subprocess.Popen(command, cwd=CORE, text=True, stdout=subprocess.PIPE, stderr=subprocess.PIPE,
+                          env=env) as p:
+        try:
+            out, err = p.communicate(timeout=CONFORM_TIMEOUT_S)
+        except subprocess.TimeoutExpired:
+            p.terminate()
+            try:
+                out, err = p.communicate(timeout=CONFORM_END_S)
+            except subprocess.TimeoutExpired:
+                p.kill()
+                out, err = p.communicate()
+            err = f"{err or ''}\nthe checks ran past {CONFORM_TIMEOUT_S:.0f} s and were asked to end"
+        except BaseException:
+            # The proof itself ends (Ctrl-C, SIGTERM): the checks are asked to end with it, dropping their database.
+            p.terminate()
+            try:
+                p.wait(timeout=CONFORM_END_S)
+            except subprocess.TimeoutExpired:
+                p.kill()
+            raise
+    return subprocess.CompletedProcess(command, p.returncode, out, err)
 
 
 def migrations(*args: str) -> subprocess.CompletedProcess:
@@ -269,6 +411,184 @@ def api(proof: Proof, method: str, path: str, body: Any = None, *, expect: int =
 
 def within_digits(a: float, b: float, digits: int = DIGITS) -> bool:
     return abs(a - b) <= 10.0 ** (1 - digits) * max(abs(a), abs(b))
+
+
+# ── the example engines (alpha 2.2 D0.8, D0.8a) ─────────────────────────
+
+# Where core's environment holds a distribution from, read by its own interpreter: null when it holds none, else its
+# version and its direct_url.json (the directory an install named, and whether it was editable).
+HELD_FROM = """\
+import json, sys
+from importlib import metadata
+try:
+    d = metadata.distribution(sys.argv[1])
+except metadata.PackageNotFoundError:
+    print("null")
+else:
+    print(json.dumps({"version": d.version, "from": json.loads(d.read_text("direct_url.json") or "null")}))
+"""
+
+
+@dataclass
+class Installed:
+    """A package the proof installed from examples/engines/, its distribution, the engines it registers, and how
+    core's environment held that distribution before the proof began: None when it held none."""
+    package: Path
+    distribution: str
+    engines: list[str]
+    before: dict[str, Any] | None
+
+
+def shown(path: Path) -> Path:
+    return path.relative_to(ROOT) if path.is_relative_to(ROOT) else path
+
+
+def example_packages(root: Path = EXAMPLES) -> list[Path]:
+    """Each package directory under examples/engines/, one holding a pyproject.toml, in name order, each as it is
+    named there (install_examples refuses one that leads outside the directory)."""
+    if not root.is_dir():
+        return []
+    return sorted(p for p in root.iterdir() if p.is_dir() and (p / "pyproject.toml").is_file())
+
+
+def example_project(package: Path) -> tuple[str, list[str]]:
+    """A package's distribution and the engines its pyproject.toml registers in the group `openferment.engines`, in
+    name order; ValueError in words for a pyproject.toml that names no distribution, and the parser's own error for
+    one that is no TOML."""
+    import tomllib
+
+    project = tomllib.loads((package / "pyproject.toml").read_text(encoding="utf-8")).get("project") or {}
+    name = str(project.get("name") or "").strip()
+    if not name:
+        raise ValueError("its pyproject.toml names no distribution ([project] name)")
+    return name, sorted((project.get("entry-points") or {}).get(ENGINE_GROUP) or {})
+
+
+def held_from(distribution: str, run: Callable[..., Any] = subprocess.run) -> dict[str, Any] | None:
+    """How core's environment holds `distribution` (HELD_FROM): None when it holds none."""
+    done = run([sys.executable, "-c", HELD_FROM, distribution], cwd=CORE, text=True, capture_output=True, timeout=60)
+    if done.returncode != 0:
+        raise OSError(f"core's interpreter could not say whether it holds {distribution}: "
+                      f"{(done.stderr or done.stdout or '').strip()[-200:] or 'no words'}")
+    return json.loads(done.stdout.strip() or "null")
+
+
+def lock_constraints(path: Path, run: Callable[..., Any] = subprocess.run) -> None:
+    """core/uv.lock's versions written to `path` as an install's constraints (`uv export --frozen`), so an install
+    moves no package the lock pins: one whose dependencies would is refused in uv's words. OSError in words when
+    the lock cannot be read so."""
+    done = run(["uv", "export", "--frozen", "--all-extras", "--no-hashes", "--no-emit-project", "--quiet"], cwd=CORE,
+               text=True, capture_output=True, timeout=120)
+    if done.returncode != 0:
+        said = (done.stderr or done.stdout or "").strip().splitlines()
+        raise OSError(f"core/uv.lock could not be read as the installs' constraints (uv export --frozen exited "
+                      f"{done.returncode}): {said[-1] if said else 'no words'}")
+    path.write_text(done.stdout, encoding="utf-8")
+
+
+def install_examples(proof: Proof, root: Path = EXAMPLES, run: Callable[..., Any] = subprocess.run,
+                     constraints: Path | None = None) -> list[str]:
+    """Each package under examples/engines/ installed into core's environment (`uv pip install -e`, the
+    interpreter the proof runs on, every package core/uv.lock pins held at its locked version), before the service
+    starts: one check a package, naming the engines it registers. A package that leads outside examples/engines/
+    (a symbolic link elsewhere), a pyproject.toml that cannot be read, an install uv refuses and one that outlives
+    its time each fail in words, and the rest are installed; with none, one line saying so. Each package installed
+    is kept in `proof.installed` with how core's environment held its distribution before (leave_as_found). The
+    engines the installed packages register, for the walk (step 9)."""
+    packages = example_packages(root)
+    if not packages:
+        print(f"  no package under {shown(root)}, so none is installed and no example engine is walked")
+        return []
+    held = constraints or proof.data_dir / "constraints.txt"
+    try:
+        lock_constraints(held, run)
+    except (OSError, subprocess.TimeoutExpired) as e:
+        proof.check(False, f"no package under {shown(root)} was installed: {e}")
+        return []
+    names: list[str] = []
+    inside = root.resolve()
+    for package in packages:
+        where = shown(package)
+        if not package.resolve().is_relative_to(inside):
+            proof.check(False, f"{where} leads to {package.resolve()}, outside {shown(root)}; the proof installs "
+                               f"from {shown(root)} alone, so this one was not installed")
+            continue
+        try:
+            distribution, engines = example_project(package)
+            before = held_from(distribution, run)
+        except (OSError, UnicodeDecodeError, ValueError, subprocess.TimeoutExpired) as e:
+            # tomllib's TOMLDecodeError is a ValueError.
+            proof.check(False, f"{where} was not installed: {type(e).__name__}: {e}")
+            continue
+        try:
+            done = run(["uv", "pip", "install", "--python", sys.executable, "-c", str(held), "-e", str(package)],
+                       cwd=CORE, text=True, capture_output=True, timeout=RUN_TIMEOUT_S)
+        except (OSError, subprocess.TimeoutExpired) as e:
+            proof.check(False, f"{where} did not install (uv pip install -e): {type(e).__name__}: {e}")
+            continue
+        said = (done.stderr or done.stdout or "").strip().splitlines()
+        if proof.check(done.returncode == 0,
+                       f"{where} installed into core's environment (uv pip install -e, each package core/uv.lock "
+                       "pins held at its locked version), registering "
+                       + (", ".join(engines) or "no engine in the group openferment.engines")
+                       if done.returncode == 0 else
+                       f"{where} did not install (uv pip install -e exited {done.returncode}, each package "
+                       f"core/uv.lock pins held at its locked version): " + (said[-1] if said else "no words")):
+            proof.installed.append(Installed(package, distribution, engines, before))
+            names += engines
+    return sorted(set(names))
+
+
+def _source_of(before: dict[str, Any]) -> tuple[Path | None, bool]:
+    """The directory an earlier install of a distribution named, and whether it was editable; None for one
+    installed from anywhere else (an index, a URL)."""
+    url = ((before.get("from") or {}).get("url") or "")
+    if not url.startswith("file://"):
+        return None, False
+    from urllib.parse import unquote
+
+    editable = bool(((before.get("from") or {}).get("dir_info") or {}).get("editable"))
+    return Path(unquote(urlsplit(url).path)), editable
+
+
+def leave_as_found(proof: Proof, run: Callable[..., Any] = subprocess.run, *, kept: bool = False) -> None:
+    """Core's environment as the proof found it (D0.8a), one line a package: each package the proof installed
+    whose distribution the environment held none of before is uninstalled; one it held from that same directory
+    stays; one it held from another directory is installed from there again, as it was. With the service kept
+    (--keep), each stays installed while the service runs, with the command that takes it out."""
+    for done in proof.installed:
+        where = shown(done.package)
+        if kept:
+            print(f"  {done.distribution} stays installed from {where} while the kept service runs; "
+                  f"cd core && uv pip uninstall {done.distribution} takes it out")
+            continue
+        if done.before is None:
+            out = run(["uv", "pip", "uninstall", "--python", sys.executable, done.distribution], cwd=CORE, text=True,
+                      capture_output=True, timeout=300)
+            said = (out.stderr or out.stdout or "").strip().splitlines()
+            print(f"  {done.distribution} uninstalled, as the proof found core's environment without it"
+                  if out.returncode == 0 else
+                  f"  ✗ {done.distribution} could not be uninstalled (uv pip uninstall exited {out.returncode}): "
+                  f"{said[-1] if said else 'no words'}; cd core && uv pip uninstall {done.distribution} takes it out")
+            continue
+        source, editable = _source_of(done.before)
+        if source is not None and source.resolve() == done.package.resolve():
+            print(f"  {done.distribution} stays installed from {where}, as it was before the proof")
+            continue
+        if source is None or not source.is_dir():
+            print(f"  {done.distribution} stays installed from {where}; before the proof it was installed from "
+                  f"{source or (done.before.get('from') or {}).get('url') or 'an index'}, which the proof cannot "
+                  "install it from again")
+            continue
+        constraints = proof.data_dir / "constraints.txt"
+        out = run(["uv", "pip", "install", "--python", sys.executable, "-c", str(constraints),
+                   *(["-e"] if editable else []), str(source)], cwd=CORE, text=True, capture_output=True,
+                  timeout=RUN_TIMEOUT_S)
+        said = (out.stderr or out.stdout or "").strip().splitlines()
+        print(f"  {done.distribution} installed again from {source}, as it was before the proof"
+              if out.returncode == 0 else
+              f"  ✗ {done.distribution} could not be installed again from {source}: {said[-1] if said else 'no words'}; "
+              f"it stays installed from {where}")
 
 
 # ── the steps ──────────────────────────────────────────────────────────
@@ -458,6 +778,47 @@ def step_3(proof: Proof) -> None:
                 f"{asked_with['rule']}")
     accept(proof, record_id, words)
     proof.made["documents"] = sorted(d["documentId"] for d in docs.values())
+    sci_rag_server(proof)
+
+
+def sci_rag_server(proof: Proof) -> None:
+    """The kit's own MCP server over stdio, as `.mcp.json` starts it, acting in the proof's project: its tools
+    listed with the two graph tools among them, a graph tool refused in words (no build has read the proof's
+    passages), and the corpus counted as the project's. It reads the store alone and asks no model."""
+    import asyncio
+
+    from mcp import ClientSession, StdioServerParameters
+    from mcp.client.stdio import stdio_client
+    from mcp.types import Implementation
+    from openferment_core.literature import graph
+
+    env = environment(proof, 0)  # the service's: the proof's database, and offline no model key
+    env.pop("VIRTUAL_ENV", None)
+    params = StdioServerParameters(command=sys.executable, cwd=str(CORE), env=env,
+                                   args=["-m", "openferment_core.literature_mcp", "--project", proof.project])
+
+    async def ask() -> tuple[list[str], Any, Any]:
+        async with stdio_client(params) as (read, write):
+            async with ClientSession(read, write, client_info=Implementation(name="openferment-proof",
+                                                                              version="1")) as session:
+                await session.initialize()
+                listed = await session.list_tools()
+                refused = await session.call_tool("search_entities", {"name_contains": ""})
+                counted = await session.call_tool("corpus_stats", {})
+                return [t.name for t in listed.tools], refused, counted
+
+    names, refused, counted = asyncio.run(asyncio.wait_for(ask(), SCI_RAG_TIMEOUT_S))
+    proof.check({"search_entities", "get_entity_relationships", "search_corpus", "corpus_stats"} <= set(names),
+                f"the sci-rag server over stdio lists {len(names)} tools, search_entities and "
+                "get_entity_relationships among them")
+    said = refused.content[0].text if refused.content else ""
+    proof.check(bool(refused.is_error) and graph.no_graph(proof.project) in said,
+                "search_entities in the proof's project, whose passages no build has read, refused in words naming "
+                "the command that builds its graph")
+    stats = json.loads(counted.content[0].text) if counted.content and not counted.is_error else {}
+    proof.check(stats.get("documents") == len(proof.made["documents"]) and stats.get("entities") == 0,
+                f"corpus_stats there: the project's {stats.get('documents')} documents and {stats.get('chunks')} "
+                f"passages, {stats.get('entities')} entities")
 
 
 def step_4(proof: Proof) -> None:
@@ -675,15 +1036,322 @@ def step_9(proof: Proof) -> None:
         raise Stop("dist/ holds no built app: run `pnpm build` before the proof, since the service mounts the app "
                    "it finds when it starts")
     runbook = proof.made.get("runbook")
+    if runbook:
+        # The bench files a reading in its measure's unit, which the scenario parameter must be denominated in.
+        units = {m["unit"] for m in api(proof, "GET", f"/api/studies/runbooks/{runbook[0]}")["measurementSchema"]}
+        if READING_UNIT not in units:
+            raise Stop(f"runbook {runbook[0]} measures in {', '.join(sorted(units))}, and the walk's reading is for "
+                       f"{READING_PARAMETER}, in {READING_UNIT}")
+    # The panel's reading is set on a parameter of a shelf flowsheet: the shelf holds it, the parameter among its inputs.
+    shelf = {f["id"]: f for f in api(proof, "GET", "/api/proforma/shelf")}
+    if PANEL_PARAMETER not in {i["key"] for i in (shelf.get(PANEL_FLOWSHEET) or {}).get("inputs") or []}:
+        raise Stop(f"the service's shelf holds no flowsheet {PANEL_FLOWSHEET} taking {PANEL_PARAMETER}, the parameter the "
+                   "walk sets to its reading on a Proforma scenario's panel")
+    examples = proof.made.get("examples") or []
+    if not examples:
+        print("  no engine installed from examples/engines/, so the walk runs none of theirs")
     env = {**os.environ, "WALK_ORIGIN": proof.origin, "WALK_PROJECT": proof.project, "WALK_RUN": proof.made["flowsheet"],
-           "WALK_CONVERSATION": proof.made["conversation"], "WALK_RUNBOOK": runbook[0] if runbook else ""}
+           "WALK_CONVERSATION": proof.made["conversation"], "WALK_RUNBOOK": runbook[0] if runbook else "",
+           "WALK_PERSON": PERSON, "WALK_READING": f"{READING_VALUE:g}", "WALK_READING_UNIT": READING_UNIT,
+           "WALK_READING_PARAMETER": READING_PARAMETER, "WALK_PANEL_FLOWSHEET": PANEL_FLOWSHEET,
+           "WALK_PANEL_PARAMETER": PANEL_PARAMETER, "WALK_STRAIN": WALK_STRAIN, "WALK_ENGINES": ",".join(examples)}
     walked = subprocess.run(["npx", "tsx", "scripts/walk.ts"], cwd=ROOT, text=True, capture_output=True, env=env,
-                            timeout=900)
+                            timeout=1500)
     lines = [line.strip() for line in walked.stdout.splitlines() if line.strip().startswith(("✓", "✗"))]
     for line in lines:
         proof.check(line.startswith("✓"), line[1:].strip())
     proof.check(walked.returncode == 0 and bool(lines), "the walk ended clean" if walked.returncode == 0 else
                 f"the walk exited {walked.returncode}: {(walked.stderr or '').strip()[-300:]}")
+    catalogued_by_the_walk(proof)
+    if runbook:
+        measured_by_the_walk(proof, runbook[0])
+        made = re.search(r"^\s*panel scenario (\S+)\s*$", walked.stdout, re.M)
+        read_on_the_panel(proof, runbook[0], made.group(1) if made else "")
+
+
+def catalogued_by_the_walk(proof: Proof) -> None:
+    """The strain the walk kept on the catalogues screen, read back through the API (alpha 2.2 E.8): the strain
+    catalogue's one entry, under WALK_STRAIN, a person's keep in the proof's person's name (no model's door), with
+    its other names and a file as its source, as the screen's file intake kept it last."""
+    held = api(proof, "GET", "/api/catalogues/strain")
+    e = held[0] if len(held) == 1 else {}
+    proof.check(e.get("id") == WALK_STRAIN and e.get("by") == PERSON and e.get("agent") == "person" and e.get("via") is None
+                and bool(e.get("aliases")) and str(e.get("source") or "").startswith("the file ") and bool(e.get("at")),
+                f"the walk's strain {e.get('id')}: kept by {e.get('by')} as a {e.get('agent')}'s keep at {e.get('at')}, its "
+                f"other names {', '.join(e.get('aliases') or [])}, from {e.get('source')}, the strain catalogue's one entry"
+                if e else f"the strain catalogue holds {len(held)} entries, and the walk kept one")
+
+
+def measured_by_the_walk(proof: Proof, runbook: str) -> None:
+    """What the walk left on the service, read back through the API (alpha 2.2 C.5): the deposition it made at
+    the bench on `runbook` with no protocol's steps, closed, holding the one reading the proof's person typed and
+    read back; that reading listed as one a run takes in the parameter's unit, deposited by the person; the
+    scenario on step 5's flowsheet setting the parameter to that reading alone; and its run, `measured`, the
+    reading among its inputs as a measurement and every other input the library's default or a convention."""
+    deposited = [d for d in api(proof, "GET", "/api/state")["depositions"] if d.get("runbookId") == runbook]
+    readings = [r for r in api(proof, "GET", f"/api/depositions/readings?unit={quote(READING_UNIT)}")
+                if r["runbookId"] == runbook]
+    d = deposited[0] if len(deposited) == 1 else {}
+    r = readings[0] if len(readings) == 1 else {}
+    entries = d.get("entries") or []
+    if not proof.check(bool(d) and d.get("protocolId") is None and d.get("state") == "closed" and len(entries) == 1
+                       and entries[0].get("confirmed") is True and bool(r) and r["ref"] == f"{d['id']}/{entries[0]['id']}"
+                       and (r["value"], r["unit"], r["by"]) == (READING_VALUE, READING_UNIT, PERSON),
+                       f"the walk's deposition on runbook {runbook}: "
+                       + (f"{d['id']}, the readings alone, {d['state']}, holding reading {r['ref']}, {r['value']:g} "
+                          f"{r['unit']} confirmed at the bench, deposited by {r['by']} and taken {r['at']}"
+                          if d and r else f"{len(deposited)} depositions and {len(readings)} readings")):
+        return
+    made = [s for s in api(proof, "GET", "/api/studies/scenarios")
+            if any((v["quantity"].get("origin") or {}).get("kind") == "measurement" for v in s["values"])]
+    scenario = made[0] if len(made) == 1 else {}
+    values = scenario.get("values") or []
+    origin = (values[0]["quantity"].get("origin") or {}) if len(values) == 1 else {}
+    if not proof.check(bool(scenario) and len(values) == 1 and values[0]["key"] == READING_PARAMETER
+                       and scenario.get("plant") == FLOWSHEET and scenario.get("by") == PERSON
+                       and (origin.get("ref"), origin.get("by"), origin.get("at")) == (r["ref"], PERSON, r["at"])
+                       and len(scenario.get("runIds") or []) == 1,
+                       f"the walk's scenario {scenario.get('id')} on {scenario.get('plant')}, made by {scenario.get('by')}: "
+                       + (f"{READING_PARAMETER} set to reading {origin.get('ref')} alone (a placeholder pairing chosen by "
+                          "unit), kept with its depositor and time, nothing assumed, run once" if scenario
+                          else f"{len(made)} scenarios rest on a reading")):
+        return
+    run = api(proof, "GET", f"/api/runs/{scenario['runIds'][0]}")["run"]
+    inputs = {i["name"]: i["quantity"] for i in run["inputs"]}
+    kinds = {q["origin"]["kind"] for q in inputs.values()}
+    set_to = inputs.get(READING_PARAMETER) or {}
+    came = set_to.get("origin") or {}
+    proof.check(run["status"] == "done" and run["provenance"] == "measured" and run["scenarioId"] == scenario["id"]
+                and kinds <= {"library-default", "convention", "measurement"}
+                and (set_to.get("value"), set_to.get("unit")) == (READING_VALUE, READING_UNIT)
+                and (came.get("kind"), came.get("ref"), came.get("by"), came.get("at")) == ("measurement", r["ref"], PERSON,
+                                                                                           r["at"]),
+                f"its run {run['id']}: {run['provenance']}, {READING_PARAMETER} {set_to.get('value')} {set_to.get('unit')} "
+                f"a {came.get('kind')} (reading {came.get('ref')}, deposited by {came.get('by')}, taken {came.get('at')}); "
+                f"its inputs {', '.join(sorted(kinds))}")
+    proof.made["measuredRun"] = run["id"]
+    proof.made["deposition"] = d["id"]
+
+
+def read_on_the_panel(proof: Proof, runbook: str, made: str) -> None:
+    """What the walk kept on a Proforma scenario's parameter panel, read back through the API (alpha 2.2 E.17): the
+    scenario it made and named, on PANEL_FLOWSHEET, whose scope's one override sets PANEL_PARAMETER to the walk's
+    reading in that reading's own value and unit (`Override.unit`), by its depositor at the time it was taken; and a
+    tool reading the kept scenario (`selling_price`, a read: no run is kept) binds the reading from that row, through
+    `project_state.run_request`, `proforma.inputs_of` and the lookup, with nothing left waiting for it and no refusal
+    of the lookup's."""
+    state = api(proof, "GET", "/api/state")
+    scenario = next((s for s in state["scenarios"] if s["id"] == made), {}) if made else {}
+    rows = state["overrides"].get(f"proforma:{made}") or [] if made else []
+    readings = [r for r in api(proof, "GET", f"/api/depositions/readings?unit={quote(READING_UNIT)}")
+                if r["runbookId"] == runbook]
+    r = readings[0] if len(readings) == 1 else {}
+    o = rows[0] if len(rows) == 1 else {}
+    if not proof.check(bool(scenario) and scenario.get("modelId") == PANEL_FLOWSHEET and bool(r)
+                       and o.get("key") == PANEL_PARAMETER
+                       and (o.get("origin"), o.get("ref"), o.get("value"), o.get("unit"), o.get("by"), o.get("at"))
+                       == ("measurement", r.get("ref"), READING_VALUE, READING_UNIT, PERSON, r.get("at"))
+                       and o.get("low") is None and o.get("high") is None,
+                       f"the walk's Proforma scenario {made or 'unnamed'} on {scenario.get('modelId')}: "
+                       + (f"{PANEL_PARAMETER} kept as reading {o.get('ref')} in its own {o.get('value')} {o.get('unit')}, "
+                          f"deposited by {o.get('by')} and taken {o.get('at')}, one value" if o
+                          else f"{len(rows)} overrides kept for its scope")):
+        return
+    said = api(proof, "POST", "/api/tools/selling_price", {"scenarioId": made}).get("error") or ""
+    proof.check(f"no run of {made} is on file here" in said and "could not be bound" not in said
+                and PANEL_PARAMETER not in said and "a measurement carries" not in said,
+                f"selling_price on {made}: the kept row binds {PANEL_PARAMETER} to the reading as the lookup sets it, "
+                f"nothing waits for it and no lookup refusal stands (\"{said[:200].rsplit(' ', 1)[0]}…\")")
+
+
+def make_train(proof: Proof) -> str:
+    """A train on step 4's cornstover run in the proof's project, made through the routes a person uses in
+    pureOS's Builder: the run's units read into a train (`POST /api/pureos/train/from-run`, every unit the
+    product passes through whose class is a catalogue type, at its class's own defaults, from the unit the
+    stream carrying the most product into it enters); its first units taken out while a check of it (`POST
+    /api/pureos/train/check`) refuses its inlet as one whose chemicals the set cannot build
+    (`train_spec.CANNOT_BUILD`), the inlet each time the run's own stream entering the new first unit, read from
+    the run's unit table, as the Builder offers it once the first units go (`builder-inlet-away`); then the units
+    whose values wait (the check's places, every refusal of each a value that waits,
+    `openferment_core.pureos.engine.WAITING`) taken out with every unit before them, as a person with no value
+    for them removes them, and the inlet the run's stream entering the first unit kept; any other refusal stops
+    the proof; checked again, nothing refused; and saved as the project's row, as Save keeps it (`PUT
+    /api/state/trains/<id>`). Its id."""
+    from openferment_core.pureos.engine import WAITING
+    from openferment_core.pureos.train_spec import CANNOT_BUILD
+
+    reference = proof.made["reference"]
+    read = api(proof, "POST", "/api/pureos/train/from-run", {"artifactId": reference}, timeout=RUN_TIMEOUT_S)
+    train = read["train"]
+    ins = {u["id"]: u["ins"] for u in api(proof, "GET", f"/api/biorepo/artifacts/{reference}")["output"]["units"]}
+
+    def from_unit(n: int) -> dict[str, Any]:
+        """The train from its unit n on, its inlet the run's stream entering that unit."""
+        if n == 0:
+            return train
+        first = train["units"][n]
+        return {**train, "name": f"{train['name']}, from {first['id']} on", "units": train["units"][n:],
+                "inlet": {**train["inlet"], "streamId": ins[first["id"]][0]}}
+
+    def check(tail: dict[str, Any]) -> dict[str, Any]:
+        return api(proof, "POST", "/api/pureos/train/check", {"train": tail, "by": PERSON}, timeout=RUN_TIMEOUT_S)
+
+    head = 0
+    checked = check(train)
+    while (not checked["ok"] and any(CANNOT_BUILD in w for w in checked["places"].get("inlet") or [])
+           and head + 1 < len(train["units"])):
+        head += 1
+        checked = check(from_unit(head))
+    tail = from_unit(head)
+    waiting = [n for n, u in enumerate(tail["units"]) if checked["places"].get(u["id"])]
+    other = [w for place, said in checked["places"].items() for w in said
+             if not (place != "inlet" and WAITING.search(w))]
+    if other:
+        proof.check(False, f"{REFERENCE_PLANT} run {reference} read into train {train['id']}: from "
+                           f"{tail['units'][0]['id']} on stream {tail['inlet']['streamId']}, refused for more than a "
+                           "value that waits: " + "; ".join(other)[:600])
+        raise Stop("the train is refused for more than an inlet it cannot build or a value that waits")
+    kept = tail["units"][max(waiting) + 1:] if waiting else tail["units"]
+    if not proof.check(bool(kept), f"{REFERENCE_PLANT} run {reference} read into train {train['id']}: "
+                                   f"{len(train['units'])} units ({', '.join(u['id'] for u in train['units'])}) from "
+                                   f"stream {train['inlet']['streamId']}; {head} taken out from the head ("
+                                   f"{', '.join(u['id'] for u in train['units'][:head]) or 'none'}), each check refusing "
+                                   "an inlet the chemical set cannot build; then "
+                                   f"{len(waiting)} of the rest ({', '.join(tail['units'][n]['id'] for n in waiting) or 'none'}) "
+                                   "waiting for values its class requires, every refusal of each a value that waits; "
+                                   + (f"kept from {kept[0]['id']} on" if kept else "no unit runs on its own values")):
+        raise Stop("no train to check the train engine on")
+    made = from_unit(len(train["units"]) - len(kept))
+    again = check(made)
+    if not proof.check(again["ok"], f"train {made['id']} ({', '.join(u['id'] for u in kept)}) on stream "
+                                    f"{made['inlet']['streamId']} of run {reference}: "
+                                    + ("nothing a run would refuse" if again["ok"] else "; ".join(again["refusals"])[:300])):
+        raise Stop("the train would be refused")
+    at = time.strftime("%Y-%m-%dT%H:%M:%SZ", time.gmtime())
+    api(proof, "PUT", f"/api/state/trains/{made['id']}", {"by": PERSON, "value": {"train": made, "savedAt": at,
+                                                                                   "by": PERSON}})
+    proof.made["train"] = made["id"]
+    return made["id"]
+
+
+def registered_engines() -> list[str]:
+    """The engines core/pyproject.toml registers in the group `openferment.engines`: the core's own, each of
+    which step 10 requires listed with no error, conformed and held. An engine another package registers (stage
+    D's) is checked beside them once the service lists it."""
+    import tomllib
+
+    project = tomllib.loads((CORE / "pyproject.toml").read_text(encoding="utf-8"))
+    return sorted(project["project"]["entry-points"]["openferment.engines"])
+
+
+def said_lines(stdout: str) -> dict[int, str]:
+    """Each check's words from `conform`'s table (engine/conform.py `table`): the indented line under its
+    `✓ <n>` or `✗ <n>` line, by its number."""
+    lines = stdout.splitlines()
+    out: dict[int, str] = {}
+    for i, line in enumerate(lines):
+        head = line[1:].split() if line.startswith(("✓", "✗")) else []
+        if head and head[0].isdigit() and i + 1 < len(lines) and lines[i + 1].startswith("     "):
+            out[int(head[0])] = lines[i + 1].strip()
+    return out
+
+
+def project_rows(proof: Proof) -> dict[str, Any]:
+    """What a conformance run could write into the proof's project: its runs and its artifacts by id, and its
+    trains as GET /api/state holds them."""
+    return {"runs": sorted(r["id"] for r in api(proof, "GET", "/api/runs")),
+            "trains": api(proof, "GET", "/api/state")["trains"],
+            "artifacts": sorted(a["id"] for a in api(proof, "GET", "/api/biorepo/artifacts", timeout=RUN_TIMEOUT_S))}
+
+
+def step_10(proof: Proof) -> None:
+    core = registered_engines()
+    if "reference" in proof.made:
+        made = make_train(proof)
+        row = api(proof, "GET", "/api/state")["trains"].get(made) or {}
+        listed = {e["name"]: e for e in api(proof, "GET", "/api/engines")}
+        proof.check(row.get("by") == PERSON and (row.get("train") or {}).get("id") == made
+                    and any(t["id"] == made for t in (listed.get("train") or {}).get("things") or []),
+                    f"train {made} saved as the project's row, read back as {row.get('by') or 'nobody'}'s, and "
+                    "listed by the train engine")
+    listed = api(proof, "GET", "/api/engines")
+    usable = [e for e in listed if not e["error"]]
+    broken = [e for e in listed if e["error"]]
+    names = {e["name"] for e in usable}
+    missing = [n for n in core if n not in names]
+    # The engines step 10 sets values or a project for are among those it checks.
+    unchecked = sorted(n for n in {*PLACEHOLDERS, *IN_PROJECT} if n not in names)
+    # A listed engine's worker: none and `none`, or a module and a state that has not failed (registry.status_of).
+    off = [e for e in usable if (e["workerStatus"] != "none" if e["worker"] is None
+                                 else e["workerStatus"] not in WORKER_STATES)]
+    proof.check(not missing and not broken and not unchecked and not off,
+                f"the service lists {len(listed)} engine{'s' if len(listed) != 1 else ''} of the group "
+                f"openferment.engines, core/pyproject.toml's {len(core)} ({', '.join(core)}) "
+                + ("among them" if not missing else f"short of {', '.join(missing)}") + ": " + "; ".join(
+                    f"{e['name']} from {e['entryPoint']} ("
+                    + ", ".join(f"{k} {v}" for k, v in sorted(e["version"].items()))
+                    + f"), worker {e['worker'] or 'none'}, {e['workerStatus']}" for e in usable)
+                + ("; with errors: " + "; ".join(f"{e['name']}: {e['error']}" for e in broken) if broken else "")
+                + (f"; {', '.join(unchecked)}, which step 10 sets values or a project for, not listed" if unchecked
+                   else "")
+                + ("; a worker in a state it should not be in: " + ", ".join(
+                    f"{e['name']} ({e['worker'] or 'none'}, {e['workerStatus']})" for e in off) if off else ""))
+    env = environment(proof, int(proof.origin.rsplit(":", 1)[1]))
+    before = project_rows(proof)
+    for e in usable:
+        command = [sys.executable, "-m", "openferment_core.engine.conform", e["name"]]
+        if e["name"] in PLACEHOLDERS:
+            module, writer = PLACEHOLDERS[e["name"]]
+            path = proof.data_dir / f"{e['name']}-inputs.json"
+            wrote = subprocess.run([sys.executable, "-c", WRITE_PLACEHOLDERS, module, writer, str(path), PERSON,
+                                    proof.day], cwd=CORE, text=True, capture_output=True, env=env, timeout=RUN_TIMEOUT_S)
+            values = json.loads(path.read_text(encoding="utf-8")) if wrote.returncode == 0 and path.exists() else []
+            origins = {tuple((((v.get("quantity") or {}).get("origin") or {}).get(k)) for k in ("kind", "by", "at"))
+                       for v in values}
+            planted = origins == {("person-assumption", PERSON, proof.day)}
+            proof.check(wrote.returncode == 0 and planted,
+                        f"the {e['name']} engine's placeholders written by {module}.{writer}: {len(values)} values, "
+                        + (f"each {PERSON}'s assumption, dated {proof.day}, the proof's day" if planted else
+                           "with the origins " + "; ".join(f"{k} by {b}, dated {a}" for k, b, a in sorted(
+                               origins, key=str)))
+                        if values else
+                        f"the {e['name']} engine's placeholders could not be written: {wrote.stderr.strip()[-300:]}")
+            command += ["--inputs", str(path)]
+        if e["name"] in IN_PROJECT:
+            command += ["--project", proof.project]
+        t0 = time.monotonic()
+        done = conformed(command, env)
+        took = time.monotonic() - t0
+        rows = [line for line in done.stdout.splitlines() if line.startswith(("✓", "✗"))]
+        failed = [line for line in rows if line.startswith("✗")]
+        said = (done.stdout.strip().splitlines() or [done.stderr.strip()[-300:]])[0]
+        proof.check(done.returncode == 0 and len(rows) == 8 and not failed and took < CONFORM_TIMEOUT_S,
+                    f"conform {e['name']}: {len(rows) - len(failed)} of {len(rows)} checks hold in {took:.0f} s of "
+                    f"its {CONFORM_TIMEOUT_S:.0f}"
+                    + (f" ({said})" if not failed and rows else "")
+                    + (": " + "; ".join(failed) if failed else "")
+                    + ("" if rows else f": {done.stderr.strip()[-300:] or said}"))
+        # What ran, and the branch each run check and the refusal check took, in the checks' own words.
+        words = said_lines(done.stdout)
+        for n in SAID_CHECKS:
+            if n in words:
+                print(f"      check {n}: {words[n]}")
+    after = project_rows(proof)
+    proof.check(after == before,
+                f"the proof's project as it was before the checks: its {len(before['runs'])} runs, "
+                f"{len(before['trains'])} train{'s' if len(before['trains']) != 1 else ''} and "
+                f"{len(before['artifacts'])} artifacts, the checks having written their verdicts alone"
+                if after == before else
+                "the checks wrote into the proof's project: " + "; ".join(
+                    f"{k} {sorted(set(after[k]) - set(before[k]))[:5]} new, {sorted(set(before[k]) - set(after[k]))[:5]} gone"
+                    if k != "trains" else "its trains changed" for k in before if after[k] != before[k]))
+    again = {e["name"]: e for e in api(proof, "GET", "/api/engines")}
+    kept = {n: (again[n].get("conformance") or {}) for n in (e["name"] for e in usable)}
+    proof.check(bool(kept) and all(v.get("ok") for v in kept.values()) and all(n in kept for n in core),
+                "each verdict kept and listed by GET /api/engines: " + "; ".join(
+                    f"{n} {'holds' if v.get('ok') else 'fails' if v else 'never checked'}"
+                    + (f" at {v['version']}" if v.get("version") else "") for n, v in kept.items())
+                + "".join(f"; {n} not checked" for n in core if n not in kept))
 
 
 def step_7(proof: Proof) -> None:
@@ -735,6 +1403,13 @@ def step_8(proof: Proof) -> None:
         locks = api(proof, "GET", "/api/state")["runbookLocks"]
         proof.check(b.get("lockedAt") == at and b.get("lockHash") == digest and locks.get(rid, {}).get("lockHash") == digest,
                     f"runbook {rid} reloads locked under {digest}")
+    if "measuredRun" in m:
+        held = {d["id"] for d in api(proof, "GET", "/api/state")["depositions"]}
+        run = api(proof, "GET", f"/api/runs/{m['measuredRun']}")["run"]
+        kinds = {i["quantity"]["origin"]["kind"] for i in run["inputs"]}
+        proof.check(m["deposition"] in held and run["provenance"] == "measured" and "measurement" in kinds,
+                    f"deposition {m['deposition']} reloads, and run {m['measuredRun']} with it, measured, its reading a "
+                    "measurement")
     records = {f["id"] for f in api(proof, "GET", "/api/flowsheets")}
     want = [m["flowsheetRecord"]] if "flowsheetRecord" in m else []
     want += [f"run-{m[k]}" for k in ("reference", "flowsheet") if k in m]
@@ -748,7 +1423,7 @@ def step_8(proof: Proof) -> None:
 
 
 RUNNERS: dict[int, Callable[[Proof], None]] = {1: step_1, 2: step_2, 3: step_3, 4: step_4, 5: step_5, 6: step_6,
-                                               7: step_7, 8: step_8, 9: step_9}
+                                               7: step_7, 8: step_8, 9: step_9, 10: step_10}
 
 
 def spent(proof: Proof) -> None:
@@ -812,12 +1487,22 @@ def main(argv: list[str]) -> int:
     if unknown:
         parser.error(f"this build proves steps {', '.join(map(str, STEPS))}; not {', '.join(map(str, unknown))}")
     proof = Proof(database=f"openferment_proof_{os.urandom(4).hex()}", data_dir=Path(tempfile.mkdtemp(prefix="openferment-proof-")),
-                  live=args.live)
+                  live=args.live, day=time.strftime("%Y-%m-%d", time.gmtime()))
     proof.log = proof.data_dir / "service.log"
     print(f"openFerment proof{' (live)' if proof.live else ''}: steps {', '.join(map(str, order(asked)))} "
           f"on database {proof.database}\n")
     started = time.monotonic()
+
+    def ended(signum: int, _frame: Any) -> None:
+        # SIGTERM ends the proof as Ctrl-C does: the finally below stops the service, drops the database and leaves
+        # core's environment as the proof found it.
+        raise SystemExit(128 + signum)
+
+    previous = signal.signal(signal.SIGTERM, ended)
     try:
+        print("── the engines under examples/engines/, installed before the service starts")
+        proof.made["examples"] = install_examples(proof)
+        print()
         for n in order(asked):
             print(f"── {n}  {TITLES[n]}")
             t0 = time.monotonic()
@@ -835,7 +1520,8 @@ def main(argv: list[str]) -> int:
             spent(proof)
             print()
     finally:
-        if args.keep and proof.service is not None and proof.service.poll() is None:
+        kept = args.keep and proof.service is not None and proof.service.poll() is None
+        if kept:
             print(f"kept: the service at {proof.origin} (project {proof.project}), database {proof.database}, "
                   f"data {proof.data_dir}; stop it with kill -TERM -{proof.service.pid}")
         else:
@@ -843,8 +1529,12 @@ def main(argv: list[str]) -> int:
             dropped = migrations("drop", proof.database)
             if dropped.returncode != 0:
                 print(f"(database {proof.database} was left behind: {(dropped.stderr or dropped.stdout).strip()[-200:]})")
-            if not proof.failed:
-                shutil.rmtree(proof.data_dir, ignore_errors=True)
+        if proof.installed:
+            print("── core's environment as the proof found it")
+            leave_as_found(proof, kept=kept)
+        if not kept and not proof.failed:
+            shutil.rmtree(proof.data_dir, ignore_errors=True)
+        signal.signal(signal.SIGTERM, previous)
     print(f"{proof.passed + proof.failed} checks in {time.monotonic() - started:.0f} s: "
           + (f"{proof.failed} failed. The service's log: {proof.log}" if proof.failed else "every one holds."))
     return 1 if proof.failed else 0

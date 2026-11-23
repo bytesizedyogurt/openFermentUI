@@ -1,0 +1,48 @@
+EXPECTED: the strip under Guild's 'Papers the service can keep' box names the rule the filter applies,
+EXPECTED: records on documents the project does not hold, the rule paperHeld and biorepo.write's 'paper' share
+EXPECTED: (docs/PROGRESS.md:601, paid at 5287542; core/openferment_core/biorepo.py:26).
+== the contract
+601:The client's review path kept alpha 1.0's curated-record machinery
+601:its committed file's rule that a decision needs a PMCID, DOI or PMID | alpha 2.0, 8.5 | `5287542`
+26:  paper      the record's paper is not a document the project holds — a
+1210:      such records were hidden from the default queue, though `biorepo.write` keeps a decision on
+1212:      service's now (`paperHeld`). The review card's co
+== the strip's words and the filter they describe
+627:                  {hiddenByFilter === 1 ? '' : 's'} on papers with no PMCID, DOI or PMID, which{' '}
+628:                  <code className="font-mono">biorepo.write</code> refuses
+Guild.tsx:   const keepable = useCallback(
+Guild.tsx:     (r: ExtractionRecord) => paperHeld(papers.find((p) => p.id === r.paperId)),
+Guild.tsx:     [papers],
+Guild.tsx:   );
+Guild.tsx: 
+Guild.tsx:   const waiting = useMemo(() => records.filter((r) => r.status === 'unverified'), [records]);
+Guild.tsx:   const hiddenByFilter = useMemo(
+Guild.tsx:     () => (keepableOnly ? waiting.filter((r) => !keepable(r)).length : 0),
+Guild.tsx:     [keepableOnly, waiting, keepable],
+== the rule the filter applies
+215:export function paperHeld(paper: Paper | undefined): boolean {
+216-  return paper !== undefined;
+217-}
+318:            f"{decision.recordId} is on {paper_id}, which is not a document this project holds; a decision "
+== the comments that kept the old rule
+224: * a paper with no identifier can still be decided here — the Durable tier
+310:    // A paper with no identifier is still reviewable here; everything else stops the action.
+== live: a project holding two uploads with no PMCID, DOI or PMID; a decision through biorepo.write
+NOTICE:  database "bh_r_p_03_svc" does not exist, skipping
+upload anaerobic-digestion-primer.md 200 ingested
+upload central-valley-residue-policy.md 200 ingested
+extract 2d895d5eaa8247a4a6304951285aa4cb candidates 1
+extract 77309b1f54ca446199fa3d69c17707a9 candidates 1
+DECISION: biorepo.write on cl1-2d895d5eaa8247a4a6304951285aa4cb-e51fc53a (paper doi=None pmcid=None) answered HTTP 200 {"status":"verified","provenance":"verified","gold":null,"corrected":null,"rejectReason":null,"reviewer":"Ada Moreno","recordId":"cl1-2d895d5eaa8247a4a630495128
+HELD: 2d895d5eaa8247a4a6304951285aa4cb doi=None pmcid=None (OverlayPaper carries no pmid field)
+HELD: 77309b1f54ca446199fa3d69c17707a9 doi=None pmcid=None (OverlayPaper carries no pmid field)
+== live: Guild's filter (Guild.tsx:208-216) over the project's overlay, with the tree's paperHeld
+WAITING: cl1-77309b1f54ca446199fa3d69c17707a9-e2a41535 on 77309b1f54ca446199fa3d69c17707a9 doi=null pmcid=null (held) -> shown
+WAITING: cl1-PMC0000001-0123abcd on PMC0000001 doi=10.1000/held-nowhere pmcid=PMC0000001 (not in this project) -> HIDDEN
+FILTER: hiddenByFilter=1; shown with no PMCID or DOI=1; hidden though it has a DOI and PMCID=1
+OBSERVED: src/screens/Guild.tsx:627 says hidden records sit on papers with no PMCID, DOI or PMID (1 line),
+OBSERVED: and paperHeld (src/lib/review.ts:215-217) is 'return paper !== undefined;' (1 line), reading no identifier (0 lines name one).
+OBSERVED: the project holds 2 documents with no DOI or PMCID; biorepo.write kept a decision on one (1 answered HTTP 200);
+OBSERVED: the filter shows 1 waiting record(s) on such a document and hides 1 on a paper with a DOI and PMCID the project does not hold;
+OBSERVED: review.ts still speaks of 'a paper with no identifier' in 2 comment(s) (:224, :310).
+RESULT: DEFECT

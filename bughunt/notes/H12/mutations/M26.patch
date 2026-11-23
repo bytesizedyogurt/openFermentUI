@@ -1,0 +1,11 @@
+--- a/core/openferment_core/api.py
++++ b/core/openferment_core/api.py
+@@ -367,7 +367,7 @@
+         project = projects.current()
+     except projects.ProjectRequired:
+         project = None
+-    if project is not None:
++    if False:
+         await db.arun(audit.add(project, agent="person", who="the request's sender", module="home",
+                                 action="key_override", state="done", target=f"{request.method} {request.url.path}",
+                                 detail={"override": True}))

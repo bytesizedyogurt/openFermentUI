@@ -1,9 +1,9 @@
 """The coverage pass (OF-BLD-015 §7.1): before Postdoc's first turn, code
 sweeps every module store for what the question names.
 
-The module rows come from a small projection written here: a fictional
-runbook, protocol and host (alpha 2.0 deleted the seed that modules.json was
-projected from, ADR-010). The service's own stores are stand-ins, so nothing
+The module rows come from small stand-ins written here: fictional runbooks
+and a protocol through their own doors, and a host through the projection
+(alpha 2.0 deleted the seed that modules.json was projected from, ADR-010). The service's own stores are stand-ins, so nothing
 here reads a key, the network or this machine's data.
 """
 from __future__ import annotations
@@ -18,17 +18,14 @@ from test_postdoc_agent import Script, plan
 from test_tools import pool  # noqa: F401  (the stand-in pool fixture)
 
 # Fictional names, chosen to be found by whole words and by nothing else.
+RUNBOOKS = [{"id": "rb-zeta", "title": "Zetase — pilot process", "kind": "research", "status": "needs_review",
+             "lockedAt": None, "productId": None, "strainId": None, "predictions": []},
+            {"id": "rb-omega", "title": "Omegase — bench trial", "kind": "research", "status": "ready",
+             "lockedAt": "2026-10-01T00:00:00Z", "productId": None, "strainId": None, "predictions": []}]
+PROTOCOLS = [{"id": "PR-ZETA-01", "title": "Zetase seed train", "category": "upstream", "purpose": "",
+              "organisms": [], "currentVersion": 1, "versions": [1]}]
 PROJECTION = {
-    "runbooks": {
-        "runbooks": [{"id": "rb-zeta", "title": "Zetase — pilot process", "kind": "research", "status": "needs_review",
-                      "lockedAt": None, "productId": None, "strainId": None, "predictions": []},
-                     {"id": "rb-omega", "title": "Omegase — bench trial", "kind": "research", "status": "ready",
-                      "lockedAt": "2026-10-01T00:00:00Z", "productId": None, "strainId": None, "predictions": []}],
-        "protocols": [{"id": "PR-ZETA-01", "title": "Zetase seed train", "category": "upstream", "purpose": "",
-                       "organisms": [], "currentVersion": 1, "versions": [1]}],
-    },
-    "geneos": {"hosts": [{"id": "h-zeta", "name": "Zetamyces testii Z1", "badges": [], "bsl": 1}], "pathways": []},
-    "proforma": {"scenarios": []},
+    "geneos": {"hosts": [{"id": "h-zeta", "name": "Zetamyces testii Z1", "badges": [], "bsl": 1}]},
     "primer": {"lessons": []},
 }
 
@@ -36,7 +33,8 @@ PROJECTION = {
 def stores(pool_):  # noqa: F811
     sources = module_stores.Sources(projection=lambda: json.loads(json.dumps(PROJECTION)), pool=lambda: pool_,
                                     artifacts=list, guild=Guild, checks=Checks, intake=dict, shelf=list,
-                                    strain_aliases=dict)
+                                    strain_aliases=dict, runbooks=lambda: json.loads(json.dumps(RUNBOOKS)),
+                                    protocols=lambda: json.loads(json.dumps(PROTOCOLS)))
     return module_stores.Stores(sources)
 
 

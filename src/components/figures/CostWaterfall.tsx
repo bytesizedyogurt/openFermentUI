@@ -4,12 +4,14 @@
 // variable cost, fixed operating with labour, capital recovery, co-product
 // credits), each per unit of the price's basis. The rows stack from zero: a
 // bar starts where the line before it ended, and a credit runs back. The last
-// row is the price the run solved, read from the run, never a sum the browser
-// made; the lines sum to it by construction in the service. A line with no
+// row is the product price the breakdown was read at (`TeaBreakdown.productPrice`),
+// read from the run, never a sum the browser made; the lines sum to it by
+// construction in the service. A run whose TEA solved another price says so
+// beside the figure (`priceNote`). A line with no
 // per-unit value draws no bar and says so. Bars take the stroke the run's
 // provenance gives them, so a run that rests on an assumption reads as
 // modeled.
-import type { ComputedBasis, Provenance } from '@/data/types';
+import type { ComputedBasis, Provenance } from '@/lib/studies';
 import { fmt } from '@/engine/units';
 import { DASH_ARRAY, ENCODING, markColor } from './encoding';
 import { FigureFrame, type FigureTable } from './FigureFrame';
@@ -27,7 +29,7 @@ export interface WaterfallLine {
 export interface CostWaterfallProps {
   title: string;
   lines: WaterfallLine[];
-  /** The price the run solved, on the lines' basis: the last row. Null when the run has none. */
+  /** The product price the lines are read at, on their basis: the last row. Null when the run has none. */
   total: { label: string; value: number } | null;
   /** The per-unit basis, e.g. "USD per gallon of ethanol". */
   unit: string;
@@ -63,6 +65,32 @@ export function bars(props: Pick<CostWaterfallProps, 'lines' | 'total'>): Waterf
   return out;
 }
 
+/** Whether two prices are one: equal to a millionth of the larger. */
+const samePrice = (a: number, b: number) => Math.abs(a - b) <= 1e-6 * Math.max(Math.abs(a), Math.abs(b), 1e-12);
+
+/**
+ * The last row: the product price the run's breakdown was read at, and the
+ * run's own price when the breakdown names none. A run whose TEA solved
+ * another price labels the row by what it is (`priceNote` says the rest).
+ */
+export function waterfallTotal(
+  linesPrice: number | null | undefined,
+  runPrice: number | null | undefined,
+  label = 'Base-case price',
+): { label: string; value: number } | null {
+  const lines = linesPrice != null && Number.isFinite(linesPrice) ? linesPrice : null;
+  const run = runPrice != null && Number.isFinite(runPrice) ? runPrice : null;
+  if (lines == null) return run == null ? null : { label, value: run };
+  return { label: run == null || samePrice(lines, run) ? label : 'Price the lines are read at', value: lines };
+}
+
+/** Words for a run whose TEA solved a price other than the one its breakdown was read at; null when the two are one. */
+export function priceNote(linesPrice: number | null | undefined, solvedPrice: number | null | undefined, unit: string): string | null {
+  if (linesPrice == null || solvedPrice == null || !Number.isFinite(linesPrice) || !Number.isFinite(solvedPrice)) return null;
+  if (samePrice(linesPrice, solvedPrice)) return null;
+  return `The breakdown is read at the product's set price, ${fmt(linesPrice, 4)} ${unit}, and its lines sum to that price. The TEA solves the price at its internal rate of return to ${fmt(solvedPrice, 4)} ${unit}, the run's base-case price.`;
+}
+
 const money = (v: number) => (Math.abs(v) >= 1000 ? Math.round(v).toLocaleString('en-US') : fmt(v, 2));
 
 export function toTable(props: CostWaterfallProps): FigureTable {
@@ -73,7 +101,7 @@ export function toTable(props: CostWaterfallProps): FigureTable {
     l.reads,
     props.provenance,
   ]);
-  if (props.total) rows.push([props.total.label, fmt(props.total.value, 4), '', "the price the run solved", props.provenance]);
+  if (props.total) rows.push([props.total.label, fmt(props.total.value, 4), '', 'the product price the lines are read at', props.provenance]);
   return { headers: ['Line', `Per unit (${props.unit})`, `Per year (${props.annualUnit})`, 'Read from', 'Provenance'], rows };
 }
 
@@ -91,12 +119,16 @@ export function CostWaterfall(props: CostWaterfallProps) {
   const x = (v: number) => L + ((v - lo) / (hi - lo || 1)) * (W - L - R);
   const color = markColor(props.provenance);
   const dash = DASH_ARRAY[ENCODING[props.provenance].line.dash];
-  const rows = [...props.lines.map((l) => ({ line: l, bar: drawn.find((b) => !b.total && b.key === l.key) ?? null })), ...(props.total ? [{ line: null, bar: drawn.find((b) => b.total) ?? null }] : [])];
+  // Each row with its label and the number at its end: a line's per-unit value, or the price the lines are read at.
+  const rows = [
+    ...props.lines.map((l) => ({ line: l, label: l.label, value: l.perUnit, bar: drawn.find((b) => !b.total && b.key === l.key) ?? null })),
+    ...(props.total ? [{ line: null, label: props.total.label, value: props.total.value, bar: drawn.find((b) => b.total) ?? null }] : []),
+  ];
   const H = T * 2 + rows.length * ROW;
   return (
     <FigureFrame
       title={props.title}
-      drawn={`One row per line of the run's TEA breakdown, per unit of the price's basis, each starting where the line before it ended; the last row is the price the run solved. Drawn as ${props.provenance} (${ENCODING[props.provenance].words}).`}
+      drawn={`One row per line of the run's TEA breakdown, per unit of the price's basis, each starting where the line before it ended; the last row is the product price the lines are read at. Drawn as ${props.provenance} (${ENCODING[props.provenance].words}).`}
       axes={[props.unit]}
       table={toTable(props)}
       csvName={props.csvName ?? 'cost-breakdown'}
@@ -104,11 +136,10 @@ export function CostWaterfall(props: CostWaterfallProps) {
       notes={props.notes}
       empty={props.lines.length ? null : (props.empty ?? { what: 'this run kept no TEA breakdown.', where: 'A flowsheet with a TEA keeps its breakdown with every run; run the scenario again to make one.' })}
     >
-      <svg viewBox={`0 0 ${W} ${H}`} className="w-full h-auto" role="img" aria-label={props.title} data-testid="waterfall">
+      <svg viewBox={`0 0 ${W} ${H}`} className="w-full h-auto" style={{ maxWidth: W }} role="img" aria-label={props.title} data-testid="waterfall">
         <line x1={x(0)} x2={x(0)} y1={T} y2={H - T} stroke="currentColor" strokeOpacity={0.4} />
-        {rows.map(({ line, bar }, i) => {
+        {rows.map(({ line, label, value, bar }, i) => {
           const y0 = T + i * ROW;
-          const label = line ? line.label : props.total!.label;
           return (
             <g key={line?.key ?? 'total'} data-testid={line ? 'waterfall-row' : 'waterfall-total'} data-line={line?.key ?? 'total'}>
               <text x={L - 6} y={y0 + ROW / 2 + 4} fontSize={11} textAnchor="end" fill="currentColor" fontWeight={line ? undefined : 600}>
@@ -132,7 +163,7 @@ export function CostWaterfall(props: CostWaterfallProps) {
               )}
               {bar && (
                 <text x={W - R + 6} y={y0 + ROW / 2 + 4} fontSize={10} fill="currentColor" opacity={0.8} className="font-num">
-                  {fmt(line ? (line.perUnit as number) : props.total!.value, 4)}
+                  {value != null && Number.isFinite(value) ? fmt(value, 4) : '—'}
                 </text>
               )}
             </g>

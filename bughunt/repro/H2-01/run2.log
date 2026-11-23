@@ -1,0 +1,9 @@
+service: http://127.0.0.1:9600  database: bh_r_h2_01_cmp (fresh)
+fits: 83ed58452467d751 (g L-1), 0bd8a32500de6902 (mg L-1); forecast runs: 77b2c4bb17cb986b, e123b1d660888267
+GET /api/runs/77b2c4bb17cb986b: finals.product = 19.533849398401337 g L-1
+GET /api/runs/e123b1d660888267: finals.product = 19533.8458971344 mg L-1
+export study.md: | values.finals.product | g L-1 | 19.5338494 | 19533.8459 | +99899.98% |
+comparison row: key values.finals.product  unit 'g L-1'  values [19.533849398401337, 19533.8458971344]  change [0.0, 998.9998207589879]
+EXPECTED: the two runs' values stay in their own units (a row a unit) or are held to one unit before the change: run 2's 19533.8458971344 mg L-1 is 19.5338 g L-1, a change of -0.0000 from run 1's 19.533849398401337 g L-1
+OBSERVED: one row in 'g L-1' holds run 2's 19533.8458971344 (stated mg L-1), its change +998.9998 (+99899.98 %)
+RESULT: DEFECT

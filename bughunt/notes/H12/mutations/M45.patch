@@ -1,0 +1,10 @@
+--- a/core/openferment_core/spend.py
++++ b/core/openferment_core/spend.py
+@@ -153,7 +153,6 @@
+ async def _reserve(role: str, projected_usd: float, project_id: str | None) -> str:
+     day = date.fromisoformat(today())
+     async with _session() as s:
+-        await db.lock(s, "spend", day.isoformat())
+         now = datetime.now(timezone.utc)
+         # An abandoned reservation holds nothing; its row goes.
+         await s.execute(delete(t.spend).where(t.spend.c.state == "reserved", t.spend.c.expires_at <= now))

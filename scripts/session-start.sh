@@ -11,7 +11,10 @@
 #      service under the name the service reads. Mode 600, confirmed ignored
 #      by git, and the value is never printed.
 #   2. pnpm install --frozen-lockfile
-#   3. uv sync --all-extras, in core/
+#   3. uv sync --all-extras, in core/, then each engine core/engines.local
+#      names installed again (scripts/engines-local.sh, every package the
+#      lock pins held at its locked version), since a sync keeps only what
+#      core/uv.lock names; whatever it exits with
 #   4. the database (ADR-001): when PostgreSQL answers on 127.0.0.1 and
 #      core/.env names none, the development address (compose.yaml's) joins
 #      core/.env; then pnpm db:migrate, whatever it exits with
@@ -51,6 +54,9 @@ pnpm install --frozen-lockfile || die "pnpm install failed"
 
 say "uv sync --all-extras"
 (cd core && uv sync --all-extras) || die "uv sync failed"
+
+say "the engines core/engines.local names"
+bash scripts/engines-local.sh || echo "an engine core/engines.local names did not install; the lines above say which"
 
 say "the database"
 if [ -e core/.env ] && ! grep -q '^OPENFERMENT_DATABASE_URL=' core/.env && command -v pg_isready >/dev/null && pg_isready -q -h 127.0.0.1; then

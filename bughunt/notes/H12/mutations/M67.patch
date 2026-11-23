@@ -1,0 +1,11 @@
+--- a/core/openferment_core/migrations.py
++++ b/core/openferment_core/migrations.py
+@@ -48,7 +48,7 @@
+     default)."""
+     target = as_async(url or database_url())
+     migrate.upgrade(target)
+-    command.upgrade(_kit_config(target), "head")
++    command.upgrade(_kit_config(target), "-1") if False else command.upgrade(_kit_config(target), "0005")
+ 
+ 
+ def kit_head() -> str:

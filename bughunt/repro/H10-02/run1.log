@@ -1,0 +1,57 @@
+tree: d06e5c8; core/ src/ scripts/ examples/ as at 2047f5a: yes
+service on http://127.0.0.1:9960 over fresh database bh_r_h10_02_svc
+project r1: {"id":"r1","name":"r1","description":"","createdBy":"bughunt","createdAt":"2026-
+
+-- controls: the doors that answer a NUL id in words, and a plain missing id
+  GET  /api/studies/runbooks/a%00b                                                    404 words '{"detail":"the project holds no runbook a\\\\x00b"}'
+  GET  /api/biorepo/artifacts/a%00b                                                   404 words '{"detail":"no artifact \'a\\\\x00b\'"}'
+  GET  /api/catalogues/strain/a%00b                                                   404 words '{"detail":"the project\'s strain catalogue holds no a\\\\x00b"}'
+  GET  /api/runs/no-such-run                                                          404 words '{"detail":"the project holds no run no-such-run"}'
+  GET  /api/projects/no-such-project                                                  404 words '{"detail":"no project named \'no-such-project\'"}'
+-- /api doors over text columns: the same NUL value
+  GET  /api/projects/a%00b                                                            500 BARE  'Internal Server Error'
+  GET  /api/runs/a%00b                                                                500 BARE  'Internal Server Error'
+  GET  /api/flowsheets/a%00b                                                          500 BARE  'Internal Server Error'
+  GET  /api/flowsheets/a%00b/file                                                     500 BARE  'Internal Server Error'
+  GET  /api/protocols/a%00b                                                           500 BARE  'Internal Server Error'
+  GET  /api/conversations/a%00b                                                       500 BARE  'Internal Server Error'
+  GET  /api/conversations/a%00b/turns/t/calls                                         500 BARE  'Internal Server Error'
+  GET  /api/studies/scenarios/a%00b                                                   500 BARE  'Internal Server Error'
+  GET  /api/studies/comparisons/a%00b                                                 500 BARE  'Internal Server Error'
+  GET  /api/audit?who=a%00b                                                           500 BARE  'Internal Server Error'
+  GET  /api/audit?action=a%00b                                                        500 BARE  'Internal Server Error'
+  GET  /api/audit?target=a%00b                                                        500 BARE  'Internal Server Error'
+  GET  /api/runs?engine=a%00b                                                         500 BARE  'Internal Server Error'
+  GET  /api/biorepo/artifacts?tool=a%00b                                              500 BARE  'Internal Server Error'
+  GET  /api/proposals?state=a%00b                                                     500 BARE  'Internal Server Error'
+  POST /api/projects {"id": "nul-name", "name": "a\u0000b", "by": "bughunt"}          500 BARE  'Internal Server Error'
+  POST /api/projects {"id": "nul-by", "name": "ab", "by": "bug\u0000hunt"}            500 BARE  'Internal Server Error'
+  POST /api/projects {"id": "nul-desc", "name": "ab", "by": "bughunt", "description": 500 BARE  'Internal Server Error'
+  POST /api/studies/scenarios/a%00b/run {"by": "bughunt"}                             500 BARE  'Internal Server Error'
+  POST /api/practice/record {"sessionId": "a\u0000b"}                                 500 BARE  'Internal Server Error'
+-- /rag doors (the kit), with the mount's key
+  GET  /rag/v1/documents/a%00b                                                        500 words "title='Internal server error' detail='DBAPIError (see server logs, request_id=753680c24c024e33)'"
+  GET  /rag/v1/documents?search=a%00b                                                 500 words "title='Internal server error' detail='DBAPIError (see server logs, request_id=b808e3818d974ec5)'"
+
+-- after the probe (what the 500s left behind)
+  GET /api/projects/r1        200
+  GET /api/projects/nul-name  404
+  GET /api/projects/nul-by    404
+  GET /api/projects/nul-desc  404
+
+-- the service's log
+  lines naming asyncpg's CharacterNotInRepertoireError: 22
+  first: asyncpg.exceptions.CharacterNotInRepertoireError: invalid byte sequence for encoding "UTF8": 0x00
+  what the handlers map (core/openferment_core/api.py:424-426):
+    @app.exception_handler(OperationalError)
+    @app.exception_handler(InterfaceError)
+    @app.exception_handler(ConnectionRefusedError)
+
+-- the contract
+  core/openferment_core/api.py:208:     "A refusal is a status with its reason in `detail`, in words.")
+  CLAUDE.md:87:- C: REST: FastAPI routes in `core/openferment_core/api.py`; `docs/api/openapi.json` is generated and marks each operation's project scope (`x-openferment-scope`); a refusal is a 422 in words.
+  openapi.json GET /api/runs/{run_id} 404: The project holds no run of that id, in words. A
+
+EXPECTED: a NUL-bearing id the project does not hold answers a 404 in words and a NUL-bearing filter or text field a 422 in words at every door (api.py:208 'A refusal is a status with its reason in `detail`, in words.'), as the five controls answer: 404, 404, 404, 404, 404, each with a detail in words
+OBSERVED: 20 of 20 /api doors answer 500 with the bare body 'Internal Server Error' (bare text at each: True); 2 of 2 /rag doors answer 500; the service log names CharacterNotInRepertoireError 22 times; the controls answer in words: True
+RESULT: DEFECT

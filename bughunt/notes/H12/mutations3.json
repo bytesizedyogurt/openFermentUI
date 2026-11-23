@@ -1,0 +1,102 @@
+[
+ {
+  "id": "N09",
+  "target": "the worker boundary (a service module importing biorefineries)",
+  "file": "openferment_core/proforma.py",
+  "old": "    if art.tool == REFERENCE:\n        entry = str(_named(art.inputs, \"flowsheet\")",
+  "new": "    if art.tool == REFERENCE:\n        import biorefineries  # noqa: F401  (the retired entries are the library's plants)\n\n        entry = str(_named(art.inputs, \"flowsheet\")",
+  "tests": [
+   "tests/test_workers.py",
+   "tests/test_boundaries.py",
+   "tests/test_proforma.py",
+   "tests/test_proforma_runs.py",
+   "tests/test_engines.py",
+   "-k",
+   "not sigterm_ends_the_command"
+  ],
+  "why": "a service module imports biorefineries (and BioSTEAM with it) in the service process"
+ },
+ {
+  "id": "N10",
+  "target": "units.to_canonical",
+  "file": "openferment_core/units.py",
+  "old": "    if f[\"categorical\"]:\n        raise UnitError(f\"{field_id} is categorical; it has no unit to convert to\")\n",
+  "new": "",
+  "tests": [
+   "tests/test_units.py",
+   "tests/test_units_minus.py",
+   "tests/test_biorepo.py",
+   "tests/test_anchor.py",
+   "tests/test_extract.py"
+  ],
+  "why": "a categorical field's value is converted as a number"
+ },
+ {
+  "id": "N11",
+  "target": "biorepo.write",
+  "file": "openferment_core/biorepo.py",
+  "old": "    if _is_gold(decision) and decision.status != \"verified\":",
+  "new": "    if False:",
+  "tests": [
+   "tests/test_biorepo.py",
+   "tests/test_writes.py",
+   "tests/test_estimates.py",
+   "tests/test_evidence_pool.py"
+  ],
+  "why": "a gold value on a decision that is not verified is kept"
+ },
+ {
+  "id": "N12",
+  "target": "measurements.unnamed",
+  "file": "openferment_core/measurements.py",
+  "old": "    why = reviewer_refusal(name)\n    return f\"was kept under the name {name!r}, which names nobody: {why}\" if why else None",
+  "new": "    return None",
+  "tests": [
+   "tests/test_measurements.py",
+   "tests/test_basis.py",
+   "tests/test_project_state.py"
+  ],
+  "why": "a reading kept under a placeholder name is taken as a person's"
+ },
+ {
+  "id": "N13",
+  "target": "tools.numbers_in",
+  "file": "openferment_core/tools/__init__.py",
+  "old": "            if k in COUNT_FIELDS and isinstance(v, int) and not isinstance(v, bool) and not path:",
+  "new": "            if k in COUNT_FIELDS and isinstance(v, int) and not isinstance(v, bool):",
+  "tests": [
+   "tests/test_tools.py",
+   "tests/test_module_tools.py",
+   "tests/test_finite_inputs.py",
+   "tests/test_mcp.py",
+   "tests/test_tools_study.py"
+  ],
+  "why": "a count field nested inside a tool input's object passes as a number"
+ },
+ {
+  "id": "N14",
+  "target": "project_state.put refusal (kinds)",
+  "file": "openferment_core/project_state.py",
+  "old": "RECORD_KINDS = (\"depositions\", \"measuredEvidence\")",
+  "new": "RECORD_KINDS = (\"depositions\",)",
+  "tests": [
+   "tests/test_estimates.py",
+   "tests/test_project_state.py",
+   "tests/test_measurements.py"
+  ],
+  "why": "measured evidence keeps an estimate"
+ },
+ {
+  "id": "N15",
+  "target": "basis.override_of",
+  "file": "openferment_core/basis.py",
+  "old": "    if q.basis is not None:\n        raise InputRefused(",
+  "new": "    if False:\n        raise InputRefused(",
+  "tests": [
+   "tests/test_basis.py",
+   "tests/test_finite_inputs.py",
+   "tests/test_params.py"
+  ],
+  "why": "a value carrying a basis of its own is taken"
+ }
+]

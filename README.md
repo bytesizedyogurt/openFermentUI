@@ -10,20 +10,26 @@ The repository holds software alone. The science arrives at run time through the
 own doors: documents through Intake, plants and their numbers through the library, values
 through people and models, each value carrying where it came from.
 
+**Alpha 2.2** seals the base. Engines register behind one written contract and its eight checks,
+and every run of every engine is one row of one shape. A reading deposited at the bench enters a
+scenario as a `measurement`, and a run resting on readings and the package's defaults reads `measured`.
+The screens read the types the service generates, and a project's catalogues have a screen of their own.
+Two builders who read the contract pages alone added an engine and an agent with no edit to the base: [`docs/BASE.md`](docs/BASE.md).
+
 ## What it is made of
 
 | Part | What it does |
 |---|---|
 | **PostgreSQL** with pgvector | the one store: projects, records, decisions, runs, artifacts, studies, conversations, the audit and the spend |
 | **Sci RAG Kit** | the literature layer: documents chunked, embedded locally, searched, cited and answered |
-| **BioSTEAM** | the engine: any library plant or openFerment flowsheet runs in a worker through one adapter, every parameter read back with its origin |
+| **The engines** | one contract, each engine a registered Python entry point checked by eight conformance checks (`docs/api/engines.md`): `biosteam` runs any library plant, openFerment's flowsheet or a Proforma scenario in its worker, every parameter read back with its origin; `kinetics` runs fermOS's fermentation families, forecasts and vessel designs; `train` runs pureOS's separation trains. Every run is one row with its basis, its outputs and its provenance |
 | **SFF** | the flowsheet record: every run exports a validated, scored file, and files import as records |
 | **Postdoc** | one loop over one typed tool registry, by REST, server-sent events and MCP, with its conversations kept on the server |
 | **The app** | React, wired to the service for every record; each project at its own address |
 
 A project's path: Intake collects papers, reports, uploads and pasted text into the kit;
 extraction anchors candidate values to the stored words and a reviewer decides on them in
-BioRepo; the engine runs plants and flowsheets; studies keep scenarios, comparisons, runbooks
+BioRepo; the engines run plants, flowsheets, fermentations and trains; studies keep scenarios, comparisons, runbooks
 and an export package; Postdoc reads all of it through its tools and states each number with
 its origin, an estimate marked as one.
 
@@ -31,14 +37,14 @@ its origin, an estimate marked as one.
 
 ```
 pnpm install --frozen-lockfile
-cd core && uv sync --all-extras && cd ..
+cd core && uv sync --frozen --all-extras && cd ..
 pnpm db:up && pnpm db:migrate     # PostgreSQL 16 or later with pgvector; or name a server in core/.env
 pnpm prototype:up                 # the service on 127.0.0.1:8000, the app on 127.0.0.1:4173
 ```
 
-The model key goes in `core/.env` (gitignored; `core/.env.example` lists every setting). The
-service binds `127.0.0.1` alone. Without a key the app runs whole, and the steps that need a
-model say so.
+The model key goes in `core/.env` (gitignored; `core/.env.example` shows the key's line and the
+settings an install sets most). The service binds `127.0.0.1` alone. Without a key the app runs
+whole, and the steps that need a model say so.
 
 ## Test it
 
@@ -52,10 +58,11 @@ pnpm build && pnpm prove      # the end-to-end proof, offline, on a database of 
 
 ## Read further
 
+- [`docs/BASE.md`](docs/BASE.md): the base, what a module is, the two handoff tests and the pinned versions.
 - [`docs/PROGRESS.md`](docs/PROGRESS.md): where things stand, how to resume, the debts and the blockers.
 - [`CLAUDE.md`](CLAUDE.md): the working guidance, every line labelled.
-- [`docs/decisions/`](docs/decisions/): the decision records, ADR-000 to ADR-014.
-- [`docs/api/`](docs/api/): the contracts (OpenAPI, events, workers, runs, SFF, studies, Intake);
+- [`docs/decisions/`](docs/decisions/): the decision records, ADR-000 to ADR-018.
+- [`docs/api/`](docs/api/): the contracts (OpenAPI, events, engines, workers, runs, SFF, studies, Intake);
   [`docs/TOOLS.md`](docs/TOOLS.md): the tool registry; [`COMPONENTS.md`](COMPONENTS.md): the package map.
 - [`docs/history/`](docs/history/): the guidance written before alpha 2.0, kept as evidence.
 

@@ -17,7 +17,6 @@ import {
   Undo2,
   AlertTriangle,
 } from 'lucide-react';
-import type { DecisionCheck, ExtractionRecord } from '@/data/types';
 import { ONTOLOGY_BY_ID, fieldName } from '@/data/ontology';
 import { useStore, provenanceOf, reviewerName } from '@/store';
 import {
@@ -25,14 +24,19 @@ import {
   decisionToCheck,
   locateQuote,
   paperHeld,
+  publishedOf,
   refusalOf,
+  unsignedRefusal,
   writeRefusal,
   type Refusal,
+  type DecisionCheck,
+  type ExtractionRecord,
 } from '@/lib/review';
 import { useRoute, href } from '@/router';
 import { checkDecision } from '@/lib/intake';
 import { fmt, toSI } from '@/engine/units';
 import { CitationChip } from '@/components/Chip';
+import { idTail } from '@/lib/cite';
 import { ProvenanceBadge, Tick, type ProvKind } from '@/components/Provenance';
 import { QuantityField, type QuantityValue } from '@/components/QuantityField';
 import {
@@ -298,8 +302,8 @@ export default function Guild() {
     : '';
   const [checked, setChecked] = useState<{ key: string; accept: DecisionCheck; gold: DecisionCheck }>({
     key: '',
-    accept: { ok: true },
-    gold: { ok: true },
+    accept: { ok: true, rule: null, why: null },
+    gold: { ok: true, rule: null, why: null },
   });
   // Read inside the effect rather than depended on: these change identity on
   // every store update, and the question only changes when gateKey does.
@@ -366,11 +370,18 @@ export default function Guild() {
     // glycan_species) are corrected by rejecting with a reason, not by typing
     // a number into a unit-aware field.
     if (typeof target.value !== 'number') return;
+    // A correction is signed like every decision (OF-BLD-012.1 F2): with no
+    // reviewer name the editor stays shut and the reviewer hears why.
+    const unsigned = unsignedRefusal(reviewerName());
+    if (unsigned) {
+      toast({ text: unsigned.why, kind: 'error' });
+      return;
+    }
     setEditBase({ value: target.value, unit: target.unit });
     setDraft({ value: target.value, unit: target.unit });
     setRejecting(false);
     setEditing(true);
-  }, []);
+  }, [toast]);
 
   const saveEdit = useCallback(
     (thenAccept: boolean) => {
@@ -379,7 +390,9 @@ export default function Guild() {
       if (!id || !draft) return;
       const before = state.records.find((r) => r.id === id);
       const changed = !before || before.value !== draft.value || before.unit !== draft.unit;
-      if (changed) editRecord(id, draft.value, draft.unit);
+      // A refused correction leaves the record as it was and the editor open:
+      // nothing is accepted on a value the reviewer did not mean.
+      if (changed && !editRecord(id, draft.value, draft.unit)) return;
       if (thenAccept) {
         recordTiming();
         reviewDecide(id, 'accept');
@@ -503,10 +516,11 @@ export default function Guild() {
       '--- Records -------------------------------------------------------',
     ];
     for (const r of queueRecords) {
+      const published = publishedOf(r);
       lines.push('');
       lines.push(`[${r.id}] ${fieldName(r.field)} — ${r.paperId} §${r.sectionId}`);
       lines.push(
-        `  as published: ${fmt(r.value)} ${r.unit}    SI: ${fmt(r.si.value)} ${r.si.unit}    confidence ${r.confidence.toFixed(2)}`,
+        `  as published: ${fmt(published.value)} ${published.unit}    SI: ${fmt(published.si.value)} ${published.si.unit}    confidence ${r.confidence.toFixed(2)}`,
       );
       lines.push(
         `  status: ${r.gold ? 'verified · gold set' : r.status}${r.reviewer ? ` (reviewer ${r.reviewer})` : ''}${
@@ -543,7 +557,7 @@ export default function Guild() {
     return (
       <>
         <PageHeader
-          eyebrow="Who may verify"
+          eyebrow="Guild"
           title="Guild"
           subtitle="The Guild of Applied Life is who may verify. Accept, correct, or reject each extraction against the span it came from."
         />
@@ -552,7 +566,11 @@ export default function Guild() {
           <EmptyState
             icon={<ClipboardCheck size={22} />}
             title="Nothing waiting for review"
-            body="Every extraction in this session has already been decided. Queue a new batch from the Extract table — filter it first and only those rows enter the queue."
+            body={
+              records.length === 0
+                ? 'The project holds no extraction yet: bring a document in through Intake and run the extractor on it, and each value it reads can be queued here from the Extract table.'
+                : 'Every extraction the project holds has been decided. Queue a new batch from the Extract table — filter it first and only those rows enter the queue.'
+            }
             action={
               <div className="flex gap-2">
                 <LinkButton to="/intake" variant="primary">
@@ -602,7 +620,7 @@ export default function Guild() {
           <div className="text-caption text-ink-soft">
             {origin === 'extract'
               ? 'Queued from the Extract table as it was filtered.'
-              : 'Auto-filled with every unverified record in this session.'}
+              : 'Auto-filled with every unverified record the box below lets in.'}
           </div>
           <label className="mt-1.5 flex items-start gap-2 text-caption">
             <input
@@ -675,7 +693,7 @@ export default function Guild() {
     return (
       <>
         <PageHeader
-          eyebrow="Who may verify"
+          eyebrow="Guild"
           title="Guild — queue complete"
           subtitle="Every record in this queue has been through the reviewer. The tallies below separate what you did from where the records ended up."
         />
@@ -821,9 +839,10 @@ export default function Guild() {
         <Card className="p-4 max-w-2xl">
           <Callout kind="warn" title="This queue entry no longer resolves">
             <p className="mb-2">
-              <span className="font-num">{queue[index]}</span> is in the queue but not in this
-              session&rsquo;s records. The queue itself is session-only — your decisions persist,
-              but a queue built before a reset can outlive the rows it points at.
+              <span className="font-num">{queue[index]}</span> is in the queue, and the project&rsquo;s
+              records, as this page read them, hold none by that id. The queue lives on this page alone,
+              and the decisions made in it are kept; a queue built before a reset can outlive the rows
+              it points at.
             </p>
             <Button size="sm" onClick={() => advanceReview(1)}>
               Skip past it <ChevronRight size={13} />
@@ -841,6 +860,8 @@ export default function Guild() {
   const section = paper?.sections.find((s) => s.id === record.sectionId);
   const ctx = section ? spanContext(section.text, record.quote) : null;
   const prov = provOf(record);
+  // What the paper published, which a correction leaves as it stands; the correction shows beside it.
+  const published = publishedOf(record);
   const draftSI = draft ? toSI(draft.value, draft.unit) : null;
 
   // §2.3 — what the service would refuse. The predicate in review.ts is the
@@ -853,6 +874,8 @@ export default function Guild() {
   const acceptBlocked = asked ? refusalOf(asked.accept, localAccept) : localAccept;
   const goldBlocked = asked ? refusalOf(asked.gold, localGold) : localGold;
   blocked.current = { accept: acceptBlocked, reject: rejectBlocked, gold: goldBlocked };
+  // A correction is refused with no reviewer name whether the service answers or not (`editRecord`).
+  const editBlocked = unsignedRefusal(reviewer);
 
   return (
     <>
@@ -896,7 +919,9 @@ export default function Guild() {
         {/* ── centre card ────────────────────────────────────────────── */}
         <Card className="p-4">
           <div className="flex flex-wrap items-center justify-between gap-2 mb-3">
-            <span className="font-num text-caption text-ink-soft">{record.id}</span>
+            <span className="font-num text-caption text-ink-soft" title={record.id}>
+              Record {idTail(record.id)}
+            </span>
             <ProvenanceBadge
               p={prov}
               confidence={record.status === 'unverified' ? record.confidence : undefined}
@@ -911,22 +936,37 @@ export default function Guild() {
 
           {/* value block */}
           <div className="grid sm:grid-cols-3 gap-3 mt-4">
-            <div className="rounded-card border border-line p-3">
+            <div className="rounded-card border border-line p-3" data-testid="review-as-published">
               <div className="text-caption uppercase tracking-wide text-ink-soft">As published</div>
               <div className="font-num text-display leading-tight">
-                {fmt(record.value)}
-                {record.unit && <span className="text-section-title text-ink-soft ml-1">{record.unit}</span>}
+                {fmt(published.value)}
+                {published.unit && <span className="text-section-title text-ink-soft ml-1">{published.unit}</span>}
               </div>
             </div>
-            <div className="rounded-card border border-line p-3">
-              <div className="text-caption uppercase tracking-wide text-ink-soft">SI twin</div>
-              <div className="font-num text-display leading-tight">
-                {fmt(record.si.value)}
-                {record.si.unit && (
-                  <span className="text-section-title text-ink-soft ml-1">{record.si.unit}</span>
-                )}
+            {record.corrected && (
+              <div className="rounded-card border border-accent/45 p-3" data-testid="review-corrected">
+                <div className="text-caption uppercase tracking-wide text-ink-soft">Corrected to</div>
+                <div className="font-num text-display leading-tight">
+                  {fmt(record.corrected.value)}
+                  {record.corrected.unit && (
+                    <span className="text-section-title text-ink-soft ml-1">{record.corrected.unit}</span>
+                  )}
+                </div>
               </div>
-            </div>
+            )}
+            {record.si.unit !== record.unit && (
+              <div className="rounded-card border border-line p-3">
+                <div className="text-caption uppercase tracking-wide text-ink-soft">
+                  {record.corrected ? 'Corrected, in the field’s unit' : 'In the field’s unit'}
+                </div>
+                <div className="font-num text-display leading-tight">
+                  {fmt(record.si.value)}
+                  {record.si.unit && (
+                    <span className="text-section-title text-ink-soft ml-1">{record.si.unit}</span>
+                  )}
+                </div>
+              </div>
+            )}
             <div className="rounded-card border border-line p-3">
               <div className="text-caption uppercase tracking-wide text-ink-soft">Confidence</div>
               <div className="font-num text-display leading-tight">
@@ -946,7 +986,7 @@ export default function Guild() {
 
           {record.corrected && (
             <div className="mt-3">
-              <Callout kind="info" title="Already corrected in this session">
+              <Callout kind="info" title="Already corrected">
                 Original extraction is preserved in the audit trail; the current value is{' '}
                 <span className="font-num">
                   {fmt(record.corrected.value)} {record.corrected.unit}
@@ -989,7 +1029,7 @@ export default function Guild() {
               <p className="text-caption text-ink-soft mt-2">
                 Saving keeps the original extraction —{' '}
                 <span className="font-num">
-                  {fmt(record.value)} {record.unit}
+                  {fmt(published.value)} {published.unit}
                 </span>{' '}
                 — as a from/to entry in the audit trail.
               </p>
@@ -1171,7 +1211,11 @@ export default function Guild() {
                 <Ban size={14} /> Reject
                 <Hint k="r" faded={usedKeyboard} />
               </Button>
-              <Button onClick={openEdit} title="Correct the value inline — shortcut e">
+              <Button
+                onClick={openEdit}
+                disabled={blocks(editBlocked)}
+                title={editBlocked?.why ?? 'Correct the value inline — shortcut e'}
+              >
                 <Pencil size={14} /> Edit value
                 <Hint k="e" faded={usedKeyboard} />
               </Button>

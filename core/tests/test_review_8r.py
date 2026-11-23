@@ -28,6 +28,7 @@ from openferment_core.models import (
     ParamResolveRequest,
     SimulationRequest,
 )
+from standins import as_inputs, family_units, vessel_request
 
 BY = "openFerment test fixture"
 AT = "2026-10-21"
@@ -47,6 +48,11 @@ def typed(scope=f"fermos:family:{BATCH}", **values):
     return [Override(scope=scope, key=k, value=v, by=BY, at=AT, note="a STAND-IN for a test") for k, v in values.items()]
 
 
+def typed_in(**values):
+    """`typed`'s values as the typed inputs a batch_v1 request takes, each in its parameter's unit (alpha 2.2 D2)."""
+    return as_inputs(typed(**values), family_units(BATCH))
+
+
 @pytest.fixture()
 def store(monkeypatch, tmp_path):
     monkeypatch.setattr(intake, "DATA_DIR", tmp_path)
@@ -57,7 +63,7 @@ def store(monkeypatch, tmp_path):
 
 def simulate(product="ethanol", **over):
     return fermos.simulate(SimulationRequest(family=BATCH, product=product, sugar="glucose",
-                                             overrides=typed(**{**TYPED, **over})), by_pool=EMPTY)
+                                             inputs=typed_in(**{**TYPED, **over})), by_pool=EMPTY)
 
 
 # ── findings 0, 4, 5, 10, 11: a simulation is called a simulation ───────
@@ -154,9 +160,7 @@ def test_a_design_names_what_it_read_a_nameless_product_as_in_its_basis(store, m
     monkeypatch.setattr(proforma, "call", StandInWorker())
     monkeypatch.setattr(vessel, "_SPECS", {})
     sim = _standin_sim("c0c0c0c0c0c0c0c5", YEAST_STRAIN, product=None)
-    from openferment_core.models import VesselRequest
-
-    got = vessel.design(VesselRequest(simulation=sim.id, overrides=[
+    got = vessel.design(vessel_request(simulation=sim.id, overrides=[
         Override(scope=f"fermos:vessel:{sim.id}", key="plant_scale", value=50000.0, by=BY, at=AT)]))
     basis = {i.name: i for i in artifacts.get(got.artifactId).inputs}
     assert basis["product read as"].value == "ethanol" and basis["product read as"].source.kind == "convention"
@@ -189,7 +193,7 @@ def _logistic_fit_with_negative_p0() -> str:
 def test_a_start_value_below_zero_holds_simulate_and_names_its_key_and_source(store):
     fit_id = _logistic_fit_with_negative_p0()
     req = SimulationRequest(family=BATCH, product="ethanol", sugar="glucose", startFrom="fit", fitArtifact=fit_id,
-                            overrides=typed(**{k: v for k, v in TYPED.items() if k not in ("x0", "s0", "p0")}))
+                            inputs=typed_in(**{k: v for k, v in TYPED.items() if k not in ("x0", "s0", "p0")}))
     bound = fermos.bind(req, pool=EMPTY)
     assert bound.waiting == [] and bound.refused, bound
     assert "p0" in bound.refused and fit_id in bound.refused and "cannot be negative" in bound.refused
@@ -204,13 +208,13 @@ def test_the_family_panel_refuses_what_the_run_refuses(store):
                               ("x0", -1.0, "x0 is -1"), ("t_end", 0.0, "run length")):
         with pytest.raises(params.ParamRefused, match=words):
             params.resolve_scope(scope, ParamResolveRequest(product="ethanol", sugar="glucose",
-                                                            overrides=typed(**{**TYPED, key: value})))
+                                                            inputs=typed_in(**{**TYPED, key: value})))
         got = fermos.bind(SimulationRequest(family=BATCH, product="ethanol", sugar="glucose",
-                                            overrides=typed(**{**TYPED, key: value})), pool=EMPTY)
+                                            inputs=typed_in(**{**TYPED, key: value})), pool=EMPTY)
         assert got.waiting == [] and got.refused and words in got.refused, (key, got.refused)
-    ok = params.resolve_scope(scope, ParamResolveRequest(product="ethanol", sugar="glucose", overrides=typed(**TYPED)))
+    ok = params.resolve_scope(scope, ParamResolveRequest(product="ethanol", sugar="glucose", inputs=typed_in(**TYPED)))
     assert ok.waiting == []
-    assert fermos.bind(SimulationRequest(family=BATCH, product="ethanol", sugar="glucose", overrides=typed(**TYPED)),
+    assert fermos.bind(SimulationRequest(family=BATCH, product="ethanol", sugar="glucose", inputs=typed_in(**TYPED)),
                        pool=EMPTY).refused is None
 
 
@@ -226,7 +230,8 @@ def test_the_vessel_panel_refuses_n_beside_v_max_and_both_scales(store, monkeypa
         return Override(scope=scope, key=key, value=value, by=BY, at=AT)
 
     with pytest.raises(params.ParamRefused, match="give N or V_max, not both"):
-        params.resolve_scope(scope, ParamResolveRequest(overrides=[o("plant_scale", 1000.0), o("N", 3.0),
-                                                                   o("V_max", 500.0)]))
+        params.resolve_scope(scope, ParamResolveRequest(inputs=as_inputs([o("plant_scale", 1000.0), o("N", 3.0),
+                                                                          o("V_max", 500.0)], vessel.UNITS)))
     with pytest.raises(params.ParamRefused, match="give plant_scale or batch_volume, not both"):
-        params.resolve_scope(scope, ParamResolveRequest(overrides=[o("plant_scale", 1000.0), o("batch_volume", 50.0)]))
+        params.resolve_scope(scope, ParamResolveRequest(inputs=as_inputs([o("plant_scale", 1000.0),
+                                                                          o("batch_volume", 50.0)], vessel.UNITS)))

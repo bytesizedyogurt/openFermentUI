@@ -1,4 +1,4 @@
-"""What a model's build does to a train, as data (OF-BLD-020 §5.4; D9, D13).
+"""What a model's build does to a train, as data (D9, D13).
 
 `pureos_build` and `pureos_write` (tools/writes.py) build a train a step at a
 time from ids and words: a product and the artifact its inlet is read from,
@@ -17,8 +17,10 @@ THE INLET a model names (`inletRef`):
                                                flow read from the design
     `<artifact id>/<stream id>`                a stream of a kept run
                                                (`proforma.run`,
-                                               `proforma.reference`,
-                                               `pureos.train_run`)
+                                               `library.run`,
+                                               `pureos.train_run`, or a
+                                               `proforma.reference` kept
+                                               from a retired entry)
 
 THE CHEMICAL SET a model's train builds on is the one pureOS holds, said so
 (its `program`, the set's key, until stage 4 reads the set from the run's
@@ -317,7 +319,7 @@ def _cut(line: str) -> str:
 
 def to_run(spec: TrainSpec) -> tuple[list[str], str | None]:
     """What a run of the train would refuse now, in the run's own words
-    (`train_spec.check_train`, OF-BLD-020 §5.R, finding 20): the validation's
+    (`train_spec.check_train`): the validation's
     refusals, then every value that waits and every need a unit has, as a
     model's run would meet them (no person's value: the service holds none).
     Runs no train and keeps nothing. When the simulator, where the classes'

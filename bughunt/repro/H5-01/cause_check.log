@@ -1,0 +1,6 @@
+# One run, 2026-11-10, over bh_r_h5_01_cause (dropped after): the service made projects bh-a and bh-b and the
+# shared seed (A ingested it, B linked it), the service stopped, then cause_check.py ran in process.
+B's scope read first: sources ('project:bh-a:paste',) excluded 0
+A pastes: ingested cb87cf931d7a4b388ca1c01f6fe6f229
+retrieval with the scope read before A's paste: ['cb87cf931d7a4b388ca1c01f6fe6f229', '1bfc24c9f10144c9a2bfbbd7e92cc5c4']
+retrieval with a scope read after: ['1bfc24c9f10144c9a2bfbbd7e92cc5c4']

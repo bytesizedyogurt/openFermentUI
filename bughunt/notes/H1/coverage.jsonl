@@ -1,0 +1,57 @@
+{"kind": "file", "item": "core/openferment_core/engine/__init__.py", "method": "read", "findings": [], "note": "EngineBroken and EngineRefused as raised and caught at the routes; lazy WorkerEngine import held"}
+{"kind": "file", "item": "core/openferment_core/engine/biosteam.py", "method": "executed", "findings": ["H1-05", "H1-10"], "note": "run route, parameters route, unready, default_configuration; unlisted configuration and plant run"}
+{"kind": "file", "item": "core/openferment_core/engine/conform.py", "method": "executed", "findings": ["H1-03"], "note": "run on mirror, biosteam, kinetics --inputs, train --project, probe; every refusal path and exit code"}
+{"kind": "file", "item": "core/openferment_core/engine/contract.py", "method": "fuzzed", "findings": ["H1-06", "H1-07", "H1-09"], "note": "stand-in worker answering garbage, NaN, extra keys, infinite precision, duplicate things"}
+{"kind": "file", "item": "core/openferment_core/engine/library.py", "method": "executed", "findings": ["H1-05"], "note": "_runnable against shelf configurations; library runs and kills mid-run"}
+{"kind": "file", "item": "core/openferment_core/engine/registry.py", "method": "fuzzed", "findings": ["H1-02"], "note": "eleven stand-in entry points: duplicate names, failed imports, SystemExit, misnamed, missing method, heavy imports, registry asked during import"}
+{"kind": "file", "item": "core/openferment_core/engine/runs.py", "method": "fuzzed", "findings": ["H1-01", "H1-06", "H1-07", "H1-08"], "note": "keep_run, run_engine, compute_kept, check_inputs, thing_of under concurrency and boundary values"}
+{"kind": "file", "item": "core/openferment_core/engine/sample.py", "method": "executed", "findings": [], "note": "the sample worker's environment op used to check withheld variables"}
+{"kind": "file", "item": "core/openferment_core/engine/sff.py", "method": "read", "findings": [], "note": "keep_run_file and export read; the not-an-object and refusal paths run through badsff and the mirror"}
+{"kind": "file", "item": "core/openferment_core/engine/simulator.py", "method": "executed", "findings": ["H1-10"], "note": "status after the Proforma worker was killed"}
+{"kind": "file", "item": "core/openferment_core/fermos_engine.py", "method": "executed", "findings": ["H1-01"], "note": "conform kinetics --inputs; engine route boundary cases; concurrent identical runs"}
+{"kind": "file", "item": "core/openferment_core/pureos/engine.py", "method": "executed", "findings": ["H1-10"], "note": "conform train --project on a train made through the API; run route refusals"}
+{"kind": "file", "item": "core/openferment_core/workers/__init__.py", "method": "fuzzed", "findings": [], "note": "SimWorker against a stand-in worker: no-JSON line, another request's id, timeout, exit mid-run, oversized line; withheld names"}
+{"kind": "file", "item": "core/openferment_core/workers/dot_names.py", "method": "read", "findings": [], "note": "pure text renaming; not exercised"}
+{"kind": "file", "item": "core/openferment_core/workers/echo_worker.py", "method": "read", "findings": [], "note": "test worker; its ops mirror the protocol cases run with the probe"}
+{"kind": "file", "item": "core/openferment_core/workers/geneos_worker.py", "method": "read", "findings": [], "note": "dispatch table read; geneOS ops belong to another hunt"}
+{"kind": "file", "item": "core/openferment_core/workers/kept_references.py", "method": "read", "findings": [], "note": "head read; replay of retired reference runs not exercised"}
+{"kind": "file", "item": "core/openferment_core/workers/library_plants.py", "method": "read", "findings": [], "note": "run and NPV rounding read; library runs exercised through the engine route"}
+{"kind": "file", "item": "core/openferment_core/workers/proforma_worker.py", "method": "executed", "findings": ["H1-04"], "note": "built() cache and run(): base case against samples of one flowsheet"}
+{"kind": "file", "item": "core/openferment_core/workers/sample_worker.py", "method": "executed", "findings": [], "note": "environment op: withheld names held"}
+{"kind": "file", "item": "core/openferment_core/workers/sff_toolkit.py", "method": "read", "findings": [], "note": "op paths read; validation and scoring reached through train and biosteam runs"}
+{"kind": "file", "item": "examples/agents/record-reader/README.md", "method": "read", "findings": [], "note": "an MCP client outside the engine contract; read and left unrun"}
+{"kind": "file", "item": "examples/agents/record-reader/record_reader.py", "method": "read", "findings": [], "note": "structure read; not run (needs a running service's MCP server)"}
+{"kind": "file", "item": "examples/engines/openferment-engine-mirror/README.md", "method": "executed", "findings": [], "note": "install line and test command followed in a worktree"}
+{"kind": "file", "item": "examples/engines/openferment-engine-mirror/openferment_engine_mirror/__init__.py", "method": "read", "findings": []}
+{"kind": "file", "item": "examples/engines/openferment-engine-mirror/openferment_engine_mirror/engine.py", "method": "executed", "findings": [], "note": "loaded by discovery; conform check 6 held"}
+{"kind": "file", "item": "examples/engines/openferment-engine-mirror/openferment_engine_mirror/worker.py", "method": "fuzzed", "findings": ["H1-01"], "note": "door battery, concurrency, conform eight checks held"}
+{"kind": "file", "item": "examples/engines/openferment-engine-mirror/pyproject.toml", "method": "executed", "findings": [], "note": "editable install held to the lock"}
+{"kind": "file", "item": "examples/engines/openferment-engine-mirror/tests/test_engine.py", "method": "executed", "findings": [], "note": "30 passed with the worktree's interpreter"}
+{"kind": "file", "item": "examples/engines/openferment-engine-mirror/tests/test_worker.py", "method": "executed", "findings": [], "note": "30 passed with the worktree's interpreter"}
+{"kind": "operation", "item": "GET /api/engines", "method": "fuzzed", "findings": ["H1-02", "H1-06", "H1-07", "H1-10"], "note": "with broken, duplicate and set-aside engines installed"}
+{"kind": "operation", "item": "GET /api/engines/{name}/parameters", "method": "fuzzed", "findings": ["H1-05", "H1-08"]}
+{"kind": "operation", "item": "POST /api/engines/{name}/run", "method": "fuzzed", "findings": ["H1-01", "H1-05", "H1-06", "H1-07", "H1-08", "H1-09"], "note": "about sixty malformed and boundary bodies, concurrency, worker kills"}
+{"kind": "operation", "item": "GET /api/proforma/runs", "method": "executed", "findings": [], "note": "no scenarioId 422 in words; an unknown scenario answers artifact null"}
+{"kind": "operation", "item": "GET /api/runs", "method": "executed", "findings": ["H1-01"], "note": "?engine= with spaces, unknown, empty; no project header 422; another project's list empty"}
+{"kind": "operation", "item": "GET /api/runs/{run_id}", "method": "executed", "findings": [], "note": "unknown id 404; another project's run 404; an uninstalled engine's run read"}
+{"kind": "operation", "item": "GET /api/witness/runs", "method": "executed", "findings": [], "note": "answers [] on a project with no extraction; not an engine route"}
+{"kind": "operation", "item": "POST /api/biorepo/artifacts/{artifact_id}/replay", "method": "executed", "findings": ["H1-04"], "note": "contract, kinetics and scenario runs; version moved; tool uninstalled 409"}
+{"kind": "operation", "item": "POST /api/tools/{name}", "method": "executed", "findings": ["H1-08"], "note": "engine_run, engine_parameters, engine_plants, engine_report with ?by= and the assistant header"}
+{"kind": "operation", "item": "GET /api/audit", "method": "executed", "findings": [], "note": "engine_run audit rows read"}
+{"kind": "engine", "item": "biosteam", "method": "executed", "findings": ["H1-03", "H1-04", "H1-05", "H1-10"], "note": "conform with no --thing held; with --thing ethanol_glucose_v0 fails"}
+{"kind": "engine", "item": "kinetics", "method": "executed", "findings": ["H1-01"], "note": "conform --inputs held"}
+{"kind": "engine", "item": "train", "method": "executed", "findings": ["H1-10"], "note": "conform --project held"}
+{"kind": "engine", "item": "mirror", "method": "fuzzed", "findings": ["H1-01"], "note": "conform held; the door battery"}
+{"kind": "tool", "item": "engine_run", "method": "executed", "findings": ["H1-08"]}
+{"kind": "tool", "item": "engine_parameters", "method": "executed", "findings": []}
+{"kind": "tool", "item": "engine_plants", "method": "executed", "findings": [], "note": "lists an uninstalled engine's runs with its words"}
+{"kind": "tool", "item": "engine_report", "method": "executed", "findings": [], "note": "names diagnostics; refuses a run of another engine named"}
+{"kind": "file", "item": "docs/api/engines.md", "method": "read", "findings": ["H1-01", "H1-02", "H1-03", "H1-04", "H1-05", "H1-06"], "note": "every claim of What the service does with an engine and Conformance checked"}
+{"kind": "file", "item": "docs/api/workers.md", "method": "read", "findings": ["H1-06", "H1-09"], "note": "Lines and Engine ops checked against a stand-in worker"}
+{"kind": "file", "item": "docs/api/runs.md", "method": "read", "findings": [], "note": "read for the run's shape"}
+{"kind": "file", "item": "docs/BASE.md", "method": "read", "findings": ["H1-03"], "note": "install line and conform commands followed"}
+{"kind": "file", "item": "core/openferment_core/tools/engine.py", "method": "executed", "findings": [], "note": "the four engine tools exercised"}
+{"kind": "file", "item": "core/openferment_core/tools/writes.py", "method": "executed", "findings": [], "note": "run_engine exercised through engine_run"}
+{"kind": "file", "item": "core/openferment_core/db/rows.py", "method": "read", "findings": ["H1-01"], "note": "put's upsert read for H1-01"}
+{"kind": "file", "item": "core/openferment_core/artifacts.py", "method": "executed", "findings": ["H1-06"], "note": "artifact_id, compute, replay exercised"}
+{"kind": "file", "item": "core/openferment_core/flowsheets/ethanol_glucose_v0.py", "method": "executed", "findings": ["H1-04"], "note": "simulate and evaluate read for H1-04"}

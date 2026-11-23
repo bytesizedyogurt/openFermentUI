@@ -1,0 +1,11 @@
+--- a/core/openferment_core/ready.py
++++ b/core/openferment_core/ready.py
+@@ -203,7 +203,7 @@
+         return Check("literature", "fail", "the database has no vector extension. As its owner or a superuser, run "
+                      "CREATE EXTENSION vector; (pgvector: brew install pgvector, or the pgvector/pgvector image), "
+                      "then pnpm db:migrate")
+-    if at != head or width is None:
++    if width is None:
+         return Check("literature", "fail", f"Sci RAG Kit's schema is at revision {at or 'none'} of {head}. Run: pnpm db:migrate")
+     if width != EMBEDDING_DIM:
+         return Check("literature", "fail", f"the kit's vector column holds {width} dimensions and FastEmbed gives "

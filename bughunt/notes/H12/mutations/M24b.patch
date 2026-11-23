@@ -1,0 +1,11 @@
+--- a/core/openferment_core/engine/runs.py
++++ b/core/openferment_core/engine/runs.py
+@@ -474,7 +474,7 @@
+         db.run(_put(project_id, receipt, first))
+         events.publish("job.failed", {**job, "status": "refused", "words": refused}, project=project_id)
+         return _report(receipt, None, None)
+-    reported = (held.diagnostics if held is not None and held.diagnostics else
++    reported = (None if False else
+                 [RunDiagnostic.model_validate(d) for d in diagnostics or []])
+     kept = EngineRun(**base, status="done", provenance=art.provenance, artifactId=art.id, outputs=_outputs(art),
+                      durationMs=art.durationMs, sffRefused=sff_refused, diagnostics=reported,

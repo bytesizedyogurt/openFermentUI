@@ -1,0 +1,19 @@
+NOTICE:  database "bh_r_h1_10_svc" does not exist, skipping
+== the service on http://127.0.0.1:10360 over bh_r_h1_10_svc, OPENFERMENT_WARM_PROFORMA=1
+== wait for the warm start: GET /api/proforma/status until ready (up to 300 s)
+GET /api/proforma/status: ready after 15 s
+== before the kill
+Proforma workers alive under the service: 1
+GET /api/engines workerStatus: biosteam=ready train=ready
+== SIGKILL the Proforma worker (pid 28549)
+== after the kill
+Proforma workers alive under the service: 0
+GET /api/engines workerStatus: biosteam=ready train=ready
+GET /api/proforma/status: ready
+Proforma workers alive after both reads (the reads start none): 0
+== control: a WorkerEngine over the tree's echo worker, read through registry.status_of as the listing reads it
+WorkerEngine: before first use=cold after an answer=ready after its worker was killed=cold
+
+EXPECTED: workerStatus says where the worker is: contract.py:104-106 gives a WorkerEngine "ready" while the worker's process answers and "cold" before its first use, and simulator.py:7-8 says status() "says where it is: cold, starting, ready or failed"; so with no Proforma worker alive biosteam and train read cold (or failed), as the WorkerEngine control reads cold after its worker is killed
+OBSERVED: before the kill 1 worker alive, listing [biosteam=ready train=ready]; after the kill 0 alive, listing [biosteam=ready train=ready], /api/proforma/status ready, and 0 alive after the reads; control [before first use=cold after an answer=ready after its worker was killed=cold]
+RESULT: DEFECT

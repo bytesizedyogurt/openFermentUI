@@ -12,7 +12,7 @@ Three tables of the project (migration 0005 split the conversations the page kep
 | Table | A row is | Its body |
 |---|---|---|
 | `conversations` | One conversation | `{id, title, startedAt, by}`: its first question as its title (at most 120 characters), when it began, who began it |
-| `turns` | One question, in its place (`seq`) in its conversation | `LiveTurn` (`models.py`, paired with `types.ts` by `check:plan`): the question, when it was asked, who asked, the loop's steps as they completed, the validated plan or the failure in words (`error`: message and remedy), the status, and `artifactIds`, the artifacts its tool calls produced and its plan cites |
+| `turns` | One question, in its place (`seq`) in its conversation | `LiveTurn` (`models.py`; the browser reads its generated twin in `src/lib/postdoc.ts`): the question, when it was asked, who asked, the loop's steps as they completed, the validated plan or the failure in words (`error`: message and remedy), the status, and `artifactIds`, the artifacts its tool calls produced and its plan cites |
 | `tool_calls` | One tool call of a turn, in order | `ToolCallRecord`: the tool, its input, what it answered the model (`summary`, `error`) and what it offered to cite (`evidenceIds`, `recordIds`, `passageIds`, `artifactIds`), who asked and when |
 
 A turn's status is one of:
@@ -49,7 +49,7 @@ value read from a computed value names its evidence id in `source` and carries o
 (the evidence's artifact); one read from a record names the record and carries origin `record`;
 the answering model's estimate carries origin `model-estimate` with the model's id, the moment
 and what it rests on, and the claim stating it is `assumed`. A value's evidence or record is
-cited by its claim. The browser's `ClaimValue` mirrors it (`check:plan`).
+cited by its claim. The browser reads it as the generated `ClaimValue` (`src/lib/postdoc.ts`).
 
 ## The page's writes
 
@@ -78,13 +78,49 @@ score as JSON:
 | `bareNumbers` | 1 when no claim was dropped for a number in its text; `droppedForNumbers` keeps the count |
 
 Two suites (alpha 2.1): `default`, the proof's two questions, and `ethanol`, the owner's twelve
-real questions of `docs/reports/live-questions-2026-11.md`, each with what a good answer does in
-words (`expects`). `pnpm eval seed --suite ethanol` keeps them; `pnpm eval run --live --suite
+real questions of `docs/reports/live-questions-2026-11.md` and the two the alpha 2.2 prompt's §5
+adds for the base's seams, each with what a good answer does in words (`expects`):
+
+| Question | What a good answer does |
+|---|---|
+| `eq-eth-13` Which engines are registered here, what does each take and give, and which of this project's runs came from each? | The engine reads (`engine_plants`, whose `engines` names every engine registered here with the ids of the project's runs it made; `engine_parameters`; then `engine_report`, which names a run's engine and tool, or a module read) set out as one table with a row for each engine registered here when the suite is seeded (the registry's names, `evaluate.engines_here`: the core's three, `biosteam`, `kinetics` and `train`, which `ENGINES_EXPECTED` holds, and any engine installed beside them), each run cited by its evidence id or module row; no estimate |
+| `eq-eth-14` Take the ethanol yield measured in this project's most recent deposition, set it as the glucose-only scenario's yield, run it, and say what changed and what the value rests on. | Asked in question 5's conversation: the reading read with `runbooks_read` (kind `reading`), set as the scenario's value with the origin `{"kind": "measurement", "ref": "<the reading's id>"}`, run with `engine_run`, set beside the glucose-only run with `study_compare` and the comparison cited; the run's provenance `measured`, or `assumed` with the reason; where no deposition holds such a reading, said in words |
+
+A question that follows another is asked in that one's conversation: question 4 ("that plant")
+follows question 3, question 7 question 6, and questions 8 and 14 question 5, so a seed keeps each
+follow as the code holds it.
+
+`pnpm eval seed --suite ethanol` keeps the fourteen; `pnpm eval run --live --suite
 ethanol --tag <name> [--judge]` asks them on the routing table the environment sets and keeps each
-run under the tag, with the seconds it took. `--judge` has the first model on the `judge` route
-read each answer as it is kept: the question, what a good answer does, every claim with what it
-cites (the evidence's values, each record's quote, each passage's words), the gaps and the tools
-called, and score it from 0 to 1:
+run under the tag. Beside the code's scores, a run keeps how its answer went (alpha 2.2 F.2a):
+
+| Field | What it is |
+|---|---|
+| `seconds` | From the question asked to the answer kept, to the millisecond |
+| `firstStepSeconds` | To the loop's first step, the code's module sweep (kind `coverage`), timed through the answer path's `on_step` |
+| `firstModelSeconds` | To the loop's first step of another kind: the model's first, a tool it called, a restart or the answer; a tool's step lands when the tool returns, so the first tool's own time is in it (an engine run or a worker's cold start among it) |
+| `stopped` | Why the loop stopped (`AnswerPlan.stopped`): `done`, `rounds`, `calls`, `cost` or `time` |
+| `restarts` | Each restart step's words: a model declined or was unavailable, and the question was asked again on the next model of the route |
+| `dropReasons` | The validator's reason for each thing it dropped (`AnswerPlan.rejectionReasons`), a gap or a decline dropped for a number among them |
+
+A run kept before F.2a reads with the five fields after `seconds` empty (`null`, or an empty list),
+and its judgements with `tried`, `route` and `refused` empty.
+
+`--only <id,id>` asks the questions it names alone, under the run's tag, the rest left as they
+stand: a follow-up among them whose question it leaves out is asked in the conversation of that
+question's newest run under the tag, so a table stopped part way is finished where it stopped.
+That conversation holds what a full asking of the suite has the follow-up read before it: the
+question it follows, and each other follow-up of that question ahead of it (question 14 reads questions
+5 and 8), less those the same command asks there first. A follow-up asked again alone would find
+its own earlier asking there, and one asked ahead of a question a full asking puts before it would
+miss that question; each is refused in words that name the questions to ask with it, so they are
+asked again together in a new conversation, as is a follow-up whose question no model of the plan
+route answered in its newest run there. A name the suite lacks, or a follow-up whose question has
+no run under the tag, is refused in words too. Each refusal exits 2 before anything is asked.
+
+`--judge` has the first model on the `judge` route read each answer as it is kept: the question,
+what a good answer does, every claim with what it cites (the evidence's values, each record's
+quote, each passage's words), the gaps and the tools called, and score it from 0 to 1:
 
 | Judge's score | What it is |
 |---|---|
@@ -93,16 +129,103 @@ called, and score it from 0 to 1:
 | `labelled` | Every value's origin said, every estimate labelled as the model's |
 | `coverage` | How much of what a good answer covers this one covers |
 
-A judgement keeps the judge model's id, its faults in words and its cost, beside the code's scores
-and never in their place. `pnpm eval judge --suite ethanol --tag <name>` has the judge route as it
-now stands read the newest kept answers again and adds its judgement, so a second judge reads the
-same answers; `pnpm eval summary --suite ethanol` sets each tag's newest runs side by side.
+A judgement may write 32,000 tokens, its thinking included (`evaluate.JUDGE_TOKENS`, the plan's turn
+ceiling at effort high, set by the measurement in ADR-008, Implementation 15); one that runs out of room is kept
+with no score, its `declined` reading "The judge's answer did not arrive whole (it ran out of room)".
+
+A judgement keeps the judge model's id, its faults in words and its cost, beside the code's scores,
+with `tried`, the models the route asked in order (the last of them gave the judgement, named in
+`model` by the id the API served; a refusal names each model that declined), `refused`, those of
+them the safety classifier declined (`llm.Result.refused`), and `route`, the judge route's chain
+when the answer was judged. A judgement Sonnet gave after Opus declined on the Opus-then-Sonnet
+route reads `model` Sonnet, `tried` Opus then Sonnet and `refused` Opus; one Sonnet gave after Opus
+gave no answer (a status such as 529 after the SDK's retries, a model the key cannot reach) reads
+the same `tried` with `refused` empty, and the command's log line says why (`… answered 529;
+trying …`). `pnpm eval judge --suite ethanol --tag <name> [--only <id,id>]` has the judge route as it
+now stands read the newest kept answers again (those of the questions named, with `--only`) and
+adds its judgement, so a second judge reads the same answers. It reads `core/.env` as `run` does,
+through the service module's own loader (`api.py`; a setting the environment holds stands over the file's), so
+the key, the routes and the budgets a judge's call reads are there.
+
+A judge none of whose route's models answers (no key, the account's usage limit, the day's cap)
+stops `run --judge` and `judge` in words with exit 1: the JSON names what was kept or judged before
+the stop, `stopped` says where and why, with the commands that go on (`--only` with the questions
+left), and `spentAtStopUsd` is what the judge route spent on the call it stopped at (a refusal
+billed on the first model before the next met the stop; the words name it too, and the day's spend
+table holds it; 0 on a command that ran to its end). The answer the run was to judge is kept
+unjudged, and the run the pass was judging gains no judgement, so each judgement a pass keeps is
+one a judge model gave. A run's stop words say to judge that answer and ask the rest. Where no
+model of the plan route answered the question either (the limit most often lands on one of an
+answer's plan calls first: the plan holds no claim, its final step reads `No answer: …` and its
+decline is in words `evaluate.REFUSAL` leaves unmatched), the words say to ask that question again with the rest, beside the
+questions a full asking asks in its conversation before it when it is a follow-up, so its
+follow-ups read a conversation of the new asking. A judge that declines is kept as a judgement
+with no score.
+
+`pnpm eval summary --suite ethanol [--rows]` sets each tag's newest runs side by side, `{suite,
+tags, judgesDisagree}`, each run counted once for each judge model, by that model's newest
+judgement of it. Under `tags`, each tag:
+
+| Key | What it holds |
+|---|---|
+| `questions`, `models` | `questions`, the count of questions with a run under the tag; `models`, every model that answered them |
+| `code` | The mean of each of the code's four scores |
+| `judges` | For each judge model: its mean of each judge score over the answers it scored, `answersJudged`, `declined` (the questions whose newest judgement it took part in holds no score of its own, for any reason: it declined, its route passed the answer on to a later model, or its answer did not arrive whole), `refused` (those of them the safety classifier declined on it, from each judgement's `refused`; a pass-over for a status or a model the key cannot reach stands in `declined` alone) and `costUsd`, what the judgements charged to it cost, every one kept (a judgement is charged to the model that gave it, or to the first its route tried when each model declined) |
+| `judgeRoutes` | For each judge route, named by its models in order (`<a> then <b>`): its newest judgement of each run counted, `judgements`, `fellBack` (given by a later model of the route after the first passed the answer on, for any reason; `judges.<model>.refused` names the refusals) and `declined` (with no score). A judgement kept before F.2a names no route and is left out |
+| `judgesDisagree` | For each two judge models, `judges`, the mean absolute difference between their newest judgements of each answer both scored, score by score, over `pairs` answers; `unpaired` counts the answers either took part in that lack a score from one of them, which the means leave out |
+| `declined`, `restarts`, `restartCount` | The questions whose plan declined; each question's restart steps, by question; and the restarts counted by kind, as the loop writes them: `declined` ("<model> declined; asked again on <next>", a refusal) and `unavailable` ("<model> was unavailable; asked again on <next>", any other failure), with `other` beside them for a restart in other words |
+| `claims` | `kept`, `dropped`, `droppedForNumbers`, and `dropReasons`, the validator's reasons counted by kind (a number in a claim's words, a number in a gap or the decline, a typed value, a quote, a row cited as evidence, a citation no tool returned, a claim citing nothing, an empty claim, other) |
+| `toolCalls` | The mean and the median of the tool calls an answer made |
+| `seconds` | The medians of `firstStep`, `firstModelStep` and `answer` |
+| `stops` | The runs by why their loop stopped, each of the five reasons named |
+| `cost` | `perQuestion`, the mean and the median of an answer's cost; `answersUsd`; `judgesUsd`, every judgement the runs hold; `totalUsd`, the two together. Each covers the tag's newest runs and the judgements they hold: a run an `--only` re-ask replaced stays in `eval_runs` beside the newer one, and a stop's `spentAtStopUsd` names what the call it stopped at spent; the day's spend table holds every call, both of those among them |
+
+The top level's `judgesDisagree` pools every tag's answers. `--rows` adds `rows`: one row for each
+tag's newest run of each question, with its models, the code's scores, tool calls, claims kept and
+dropped, stop, restarts, decline, seconds to the first step, to the model's first step and to the
+answer, cost, and for each judge model its four scores by its newest judgement of the run (each
+`null` where it gave none, `declined` saying why: the judgement Sonnet gave reads "<sonnet> gave the
+judgement after <opus> declined", or "… gave no answer" for a pass-over of another kind), its
+verdict cut to 200 characters (`note`) and the cost of its judgements of the run.
+
+## The routing table
+
+Every model call names a family, and `llm.ROUTES` (`core/openferment_core/llm.py`) gives each family
+its default route: the models tried in order, each after the one before it declines or is
+unavailable, and the effort they think at (ADR-008, Implementation 17;
+`docs/reports/model-routing-2026-11.md`).
+
+| Family | Its calls | Models, in order | Effort |
+|---|---|---|---|
+| `plan` | Postdoc's loop | `claude-opus-5-5`, `claude-sonnet-5-5` | high |
+| `explain` | an answer in one call; the kit's cited answers | `claude-opus-5-5`, `claude-sonnet-5-5` | high |
+| `extract` | a document's extraction | `claude-opus-5-5`, `claude-sonnet-5-5` | high |
+| `index` | the bulk chores: a concept graph's batches, HyDE's passage, a question's entity names, `pnpm ready --probe` | `claude-haiku-5-5` | low |
+| `judge` | the evaluation's grading; the kit's judgements | `claude-opus-5-5`, `claude-sonnet-5-5` | max |
+
+The settings lay over the defaults where the environment or `core/.env` sets them, a setting written
+empty standing unset: `OPENFERMENT_MODEL` with `OPENFERMENT_FALLBACK_MODEL` (several models,
+comma-separated, tried in order) over the models of `plan`, `explain` and `extract`
+(`llm.ANSWERING`), `OPENFERMENT_EFFORT` (`low`, `medium`, `high`, `xhigh` or `max`) over their effort,
+`OPENFERMENT_INDEX_MODEL` over index's first model, and then `OPENFERMENT_ROUTES`, a JSON table
+`{"<family>": {"models": [...], "effort": "<effort>"}}`, over any family it names. `judge` and
+index's effort keep their defaults under the plain settings; `OPENFERMENT_ROUTES` moves them. A
+comparison names its table in `OPENFERMENT_ROUTES` on the command line. `GET /api/health` names the
+plan route's models, and `pnpm ready`'s model row the plan route's models and effort.
+
+The room each call has, in output tokens, thinking included:
+
+- A plan turn: `plan.ceiling(effort)`, 32,000 at high and below, 64,000 at xhigh, 128,000 at max
+  (Implementation 16).
+- A judgement of the evaluation: 32,000 at every effort, `evaluate.JUDGE_TOKENS` (Implementation 15).
+- A kit call: the larger of the kit's own ceiling and `llm.KIT_ROOM` at its route's effort, low 0,
+  medium 4,096, high 8,192, xhigh 12,000, max 32,000 (Implementation 18).
 
 ## A key the request names
 
 A request may name its own Anthropic key in the `X-OpenFerment-Key` header (owner question 10;
 ADR-008, Implementation 10): every model call it makes, Postdoc's, extraction's and the kit's, runs
-on that key in place of `core/.env`'s, and a request that names none runs on `core/.env`'s. The key
+on that key, and a request that names none runs on `core/.env`'s. The key
 is never stored, logged or echoed; the project's audit table keeps a `key_override` row that says
 an override was used. A request through Tailscale Funnel, or under a name the service does not
 answer to, is refused with a 403 in words; an empty header with a 422.
@@ -123,9 +246,9 @@ answer to, is refused with a 403 in words; an empty header with a 422.
 
 | Type | Said when | `data` |
 |---|---|---|
-| `job.queued`, `job.running` | An engine run begins (`engine/runs.py`) | `{id, kind: "engine.run", plant, configuration, scenarioId, by}`, `id` the run's |
+| `job.queued`, `job.running` | An engine run begins (`engine/runs.py`) | `{id, kind: "engine.run", engine, plant, configuration, scenarioId, by}`, `id` the run's and `engine` the registered name of the engine that runs it (`biosteam` for a library run) |
 | `job.done` | The run is kept | the job, `status: "done"`, `provenance`, `artifactId`, `sffRecordId` |
-| `job.failed` | The plant refused the values, or the run failed | the job, `status` `refused` or `failed`, `words` (the plant's own, for a refusal) |
+| `job.failed` | The engine refused the values, or the run failed | the job, `status` `refused` or `failed`, `words` (the engine's own, for a refusal) |
 | `artifact.kept` | A computed artifact is kept (`artifacts.compute`) | `{id, tool, toolVersion, provenance, durationMs}` |
 | `turn.started` | A question is kept as a turn | `{conversationId, turnId, seq, question, by}` |
 | `tool.call` | The loop calls a tool | `{conversationId, turnId, tool, input}` |

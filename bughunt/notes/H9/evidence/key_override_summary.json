@@ -1,0 +1,108 @@
+[
+ {
+  "route": "ask",
+  "status": 200,
+  "seconds": 1.8,
+  "modelRequests": 2,
+  "keysUsed": [
+   "SENTINEL"
+  ],
+  "sentinelInResponse": false,
+  "answerHead": "{\"question\":\"Which sugars does the yeast ferment?\",\"claims\":[],\"gaps\":[],\"declined\":\"The Anthropic API refused the request as malformed: Error code: 400 - {'type': 'error', 'error': {'type': 'invalid_request_error', 'message': 'the bughunt stand-in answers no model call'}}\",\"usage\":{\"inputTokens\":0,"
+ },
+ {
+  "route": "ask-stream",
+  "status": 200,
+  "seconds": 2.4,
+  "modelRequests": 2,
+  "keysUsed": [
+   "SENTINEL"
+  ],
+  "sentinelInResponse": false,
+  "answerHead": "event: turn\ndata: {\"conversationId\": \"lc-e69857b93170\", \"turnId\": \"turn-1c00c844df4b\", \"seq\": 1}\n\nevent: step\ndata: {\"n\": 1, \"kind\": \"coverage\", \"tool\": null, \"input\": {\"modules\": [\"Runbooks \u00b7 0\", \"geneOS \u00b7 0\", \"fermOS \u00b7 0\", \"pureOS \u00b7 0\", \"Proforma \u00b7 0\", \"BioRepo \u00b7 0 \u00b7 read in part\", \"Guild \u00b7 0\", \"P"
+ },
+ {
+  "route": "extract",
+  "status": 503,
+  "seconds": 1.6,
+  "modelRequests": 1,
+  "keysUsed": [
+   "SENTINEL"
+  ],
+  "sentinelInResponse": false,
+  "answerHead": "{\"detail\":\"The Anthropic API refused the request as malformed: Error code: 400 - {'type': 'error', 'error': {'type': 'invalid_request_error', 'message': 'the bughunt stand-in answers no model call'}}\"}"
+ },
+ {
+  "route": "literature-answer",
+  "status": 200,
+  "seconds": 1.6,
+  "modelRequests": 1,
+  "keysUsed": [
+   "ENVKEY"
+  ],
+  "sentinelInResponse": false,
+  "answerHead": "event: retrieval_started\ndata: {\"profile\": \"interactive\"}\n\nevent: retrieval_done\ndata: {\"item_count\": 1, \"degraded_stages\": [], \"traces\": [{\"stage\": \"vector\", \"status\": \"success\", \"duration_ms\": 30, \"candidates\": 1}, {\"stage\": \"keyword\", \"status\": \"empty\", \"duration_ms\": 18, \"candidates\": 0}, {\"stag"
+ },
+ {
+  "route": "literature-search-deep",
+  "status": 200,
+  "seconds": 1.6,
+  "modelRequests": 2,
+  "keysUsed": [
+   "SENTINEL"
+  ],
+  "sentinelInResponse": false,
+  "answerHead": "{\"query\":\"xylose uptake\",\"profile\":\"deep\",\"hits\":[{\"documentId\":\"3a49c7f19fff4ac39cac8d169829d446\",\"passageId\":\"p0\",\"title\":\"Ethanol fermentation notes\",\"text\":\"Saccharomyces cerevisiae ferments glucose to ethanol under anaerobic conditions. Xylose is not consumed by the wild type strain.\",\"sectionP"
+ },
+ {
+  "route": "rag-answer",
+  "status": 200,
+  "seconds": 1.7,
+  "modelRequests": 3,
+  "keysUsed": [
+   "SENTINEL"
+  ],
+  "sentinelInResponse": false,
+  "answerHead": "event: retrieval_started\r\ndata: {\"profile\": \"deep\"}\r\n\r\nevent: retrieval_done\r\ndata: {\"item_count\": 1, \"degraded_stages\": [], \"traces\": [{\"stage\": \"vector\", \"status\": \"success\", \"duration_ms\": 50, \"candidates\": 1}, {\"stage\": \"keyword\", \"status\": \"empty\", \"duration_ms\": 32, \"candidates\": 0}, {\"stage\":"
+ },
+ {
+  "route": "rag-query-deep",
+  "status": 200,
+  "seconds": 1.6,
+  "modelRequests": 2,
+  "keysUsed": [
+   "SENTINEL"
+  ],
+  "sentinelInResponse": false,
+  "answerHead": "{\"request_id\":\"d7c2154959ab4ead\",\"profile\":\"deep\",\"items\":[{\"kind\":\"chunk\",\"id\":\"e969c29381b1462b875c246262d60250\",\"score\":0.02459016393442623,\"layers\":[\"vector\"],\"title\":\"Ethanol fermentation notes\",\"content\":\"Ethanol fermentation notes\\n\\nSaccharomyces cerevisiae ferments glucose to ethanol under "
+ },
+ {
+  "route": "tool-intake-extract",
+  "status": 200,
+  "seconds": 1.6,
+  "modelRequests": 1,
+  "keysUsed": [
+   "SENTINEL"
+  ],
+  "sentinelInResponse": false,
+  "answerHead": "{\"summary\":{},\"evidence\":[],\"recordIds\":[],\"passages\":[],\"error\":\"intake_write could not extract 3a49c7f19fff4ac39cac8d169829d446: The Anthropic API refused the request as malformed: Error code: 400 - {'type': 'error', 'error': {'type': 'invalid_request_error', 'message': 'the bughunt stand-in answe"
+ },
+ {
+  "route": "tool-search-passages",
+  "status": 200,
+  "seconds": 1.5,
+  "modelRequests": 0,
+  "keysUsed": [],
+  "sentinelInResponse": false,
+  "answerHead": "{\"summary\":{\"query\":\"glucose\",\"engine\":\"sci-rag-kit\",\"count\":1,\"passages\":[{\"passageId\":\"3a49c7f19fff4ac39cac8d169829d446:p0:0\",\"paperId\":\"3a49c7f19fff4ac39cac8d169829d446\",\"paperTitle\":\"Ethanol fermentation notes\",\"year\":null,\"heading\":\"Ethanol fermentation notes\",\"text\":\"Saccharomyces cerevisiae f"
+ },
+ {
+  "route": "health",
+  "status": 200,
+  "seconds": 1.5,
+  "modelRequests": 0,
+  "keysUsed": [],
+  "sentinelInResponse": false,
+  "answerHead": "{\"ok\":true,\"service\":\"openferment-core\",\"model\":\"claude-opus-5-5\",\"fallbackModel\":\"claude-sonnet-5-5\",\"hasKey\":true}"
+ }
+]

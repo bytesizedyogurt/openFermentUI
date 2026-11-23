@@ -17,7 +17,7 @@
 import type { ComponentName } from '@/components/ComponentTag';
 
 /** The destinations on the rail. Home is not one of them. */
-export type Destination =
+type Destination =
   | 'Intake'
   | 'BioRepo'
   | 'Postdoc'
@@ -27,9 +27,10 @@ export type Destination =
   | 'Proforma'
   | 'Runbooks'
   | 'Primer'
-  | 'Guild';
+  | 'Guild'
+  | 'Catalogues';
 
-export type ComponentLayer =
+type ComponentLayer =
   | 'The agent'
   | 'Evidence in'
   | 'Computing'
@@ -64,7 +65,7 @@ export interface ComponentDef {
 export const LAYERS: { id: ComponentLayer; blurb: string }[] = [
   {
     id: 'The agent',
-    blurb: 'The thing you talk to. It plans, retrieves, and shows its working rather than handing back a paragraph you have to trust.',
+    blurb: 'The thing you talk to. It plans, retrieves, and shows its working with every answer.',
   },
   {
     id: 'Evidence in',
@@ -149,10 +150,18 @@ export const COMPONENTS: ComponentDef[] = [
     role: 'The project\u2019s records and the decisions on them, what was computed from them, and search over its documents',
   },
   {
+    // alpha 2.2 E.8 — the catalogues screen over the project's catalogue rows.
+    name: 'Catalogues',
+    owner: 'Catalogues',
+    layer: 'Evidence in',
+    livesIn: ['src/screens/Catalogues.tsx', 'src/lib/catalogues.ts', 'core/openferment_core/catalogues.py'],
+    surfacedAs: 'the rail, /catalogues',
+    role: 'The strains and their other names, the products, the skills and the lessons a project keeps, each entry in its keeper\u2019s name, read by geneOS, pureOS, ProtParam, Guild and Primer',
+  },
+  {
     // OF-BLD-011 §2 — the first of the three stages. The strain catalogue and
     // its pages moved here from fermOS, because choosing a chassis is a
-    // genetic design decision; genus enumeration came with them, being a
-    // sequence-space search.
+    // genetic design decision.
     name: 'geneOS',
     owner: 'geneOS',
     layer: 'Computing',
@@ -160,7 +169,6 @@ export const COMPONENTS: ComponentDef[] = [
       'src/screens/GeneOS.tsx',
       'src/screens/Organisms.tsx',
       'src/screens/StrainPage.tsx',
-      'src/engine/geneos/enumeration.ts',
       // OF-BLD-014 §6.2–§6.4 — flux balance analysis on a shelf of published models.
       'src/screens/GeneOSModel.tsx',
       'core/openferment_core/geneos.py',

@@ -1,0 +1,20 @@
+service http://127.0.0.1:9190 over fresh database bh_r_h14_09_held, no key
+step 1: project h14-09 made
+step 2: POST /api/library/cornstover/run by "Person One" took 33 s: run bfda026530692adc, status done, by Person One, at 2026-11-11T00:04:35.499802Z
+step 3: GET /api/runs holds 1 run(s)
+step 4: Studies as "Person Two", Run it on the plant answered in 0.1 s
+  the card: "Ran cornstover. Run bfda026530692adc Computed · basis attached · its SFF file run-bfda026530692adc" (data-run bfda026530692adc, data-status done)
+  runs table row: bfda026530692adc | biosteam | cornstover | done | Computed · basis attached | — | Person One | 2026-11-11 00:04 UTC
+step 5: GET /api/runs holds 1 run(s); run bfda026530692adc by Person One, at 2026-11-11T00:04:35.499802Z
+step 6: the contract and the card's source at 2047f5a:
+  docs/api/runs.md: A call outside these rules is refused (`ValueError`) and keeps nothing. The same run kept twice
+  docs/api/runs.md: is one row, answered as it was first kept: when the project holds the row already, done with its
+  docs/api/runs.md: SFF record or its words, or as a receipt, keep_run answers it from the store, writes nothing and
+  docs/api/runs.md: says nothing on the event stream, so its `by`, `at` and `scenarioId` stay the first asker's. The
+  src/screens/ProformaStudies.tsx:90: {ran.run.status === 'done' ? 'Ran' : 'Refused'} {ranWhat(ran.run, titles)}
+  no document at 2047f5a asks the Studies card to name who kept a held run or when:
+    grep for 'already ran|ran already|held already|kept already' in docs/api, docs/decisions, src/screens: 0 hit(s) about runs
+EXPECTED: (docs/api/runs.md:186-189) the second ask is answered from the held row as it was first kept, writing nothing, so the row's by and at stay the first asker's ("Person One", 2026-11-11T00:04:35.499802Z); the card answers that run and links to its page, and the runs list shows it by "Person One"
+OBSERVED: the card answers run bfda026530692adc with "Ran cornstover. Run bfda026530692adc Computed · basis attached · its SFF file run-bfda026530692adc" (names "Person One": 0, names "Person Two": 0); the store holds 1 run(s) after (it held 1), run bfda026530692adc by Person One, at 2026-11-11T00:04:35.499802Z; a table row by "Person Two": 0
+the card says "Ran" for the held row and names no keeper or time, as the candidate saw; the contract governs the store's answer, which holds, and the card claims nothing it contradicts
+RESULT: NO-DEFECT

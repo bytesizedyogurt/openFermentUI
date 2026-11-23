@@ -1,0 +1,11 @@
+--- a/core/openferment_core/project_state.py
++++ b/core/openferment_core/project_state.py
+@@ -279,7 +279,7 @@
+     if missing:
+         return (f"{item_id} keeps every {what} it was given, and this write leaves out {', '.join(missing)}; a "
+                 f"{what} is corrected by a new one")
+-    if sent[: len(held)] != held:
++    if False:
+         return f"{item_id} keeps its {what}s in the order they were taken, and this write moves them"
+     for old, new in zip(before, after):
+         for f in fields:

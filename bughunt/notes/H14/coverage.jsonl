@@ -1,0 +1,85 @@
+{"kind": "rail", "item": "Home", "method": "browser", "findings": ["H14-05", "H14-06", "H14-08"], "note": "fresh service and full copy: new project from Home, vitals and destination tiles"}
+{"kind": "rail", "item": "Intake", "method": "browser", "findings": [], "note": "collect OSTI, Europe PMC, SGD, a bare number, a DOI with no open text, a paste; Extract with no key; review session started"}
+{"kind": "rail", "item": "BioRepo", "method": "browser", "findings": ["H14-03", "H14-04"], "note": "Papers, Search, reader at a passage, Answer with no key, Artifacts, Witness, Compare"}
+{"kind": "rail", "item": "Postdoc", "method": "browser", "findings": [], "note": "no-key card and a question asked with no key: the answer says so in words"}
+{"kind": "rail", "item": "geneOS", "method": "browser", "findings": ["H14-02"], "note": "Hosts after keeping a strain, the strain page, Model tab"}
+{"kind": "rail", "item": "fermOS", "method": "browser", "findings": [], "note": "Fits, Simulate, Vessel, Forecast read; titre records offered for properties"}
+{"kind": "rail", "item": "pureOS", "method": "browser", "findings": ["H14-08"], "note": "Trains read from runs, Builder, a train from a run, the proposer card"}
+{"kind": "rail", "item": "Proforma", "method": "browser", "findings": ["H14-01", "H14-09"], "note": "Studies: run corn and cornstover, compare two runs, scenarios, export; reference page; New scenario and reload"}
+{"kind": "rail", "item": "Runbooks", "method": "browser", "findings": ["H14-07"], "note": "runbook from a run, lock, deposition with the readings alone, read-back, reload, ledger"}
+{"kind": "rail", "item": "Primer", "method": "browser", "findings": [], "note": "Lessons, My path, Practice with an empty ledger and no lessons; a missing lesson id"}
+{"kind": "rail", "item": "Guild", "method": "browser", "findings": [], "note": "review queue: accept, reject with a reason, skip, gold; Matrix, People, Skills, Checks"}
+{"kind": "rail", "item": "Catalogues", "method": "browser", "findings": ["H14-02"], "note": "kept a strain with aliases, a product, a skill with a policy; read back elsewhere"}
+{"kind": "screen", "item": "src/screens/Home.tsx", "method": "browser", "findings": ["H14-05", "H14-06", "H14-08"]}
+{"kind": "screen", "item": "src/screens/ProjectHome.tsx", "method": "browser", "findings": []}
+{"kind": "screen", "item": "src/screens/Intake.tsx", "method": "browser", "findings": [], "note": "facets, Start review session"}
+{"kind": "screen", "item": "src/screens/IntakeIngest.tsx", "method": "browser", "findings": [], "note": "collect, paste, Extract with no key (toast names the missing key)"}
+{"kind": "screen", "item": "src/screens/BioRepo.tsx", "method": "browser", "findings": []}
+{"kind": "screen", "item": "src/screens/BioRepoSearch.tsx", "method": "browser", "findings": ["H14-03"], "note": "Search and Answer with no key"}
+{"kind": "screen", "item": "src/screens/PaperReader.tsx", "method": "browser", "findings": [], "note": "opened at a found passage"}
+{"kind": "screen", "item": "src/screens/BioRepoArtifacts.tsx", "method": "browser", "findings": []}
+{"kind": "screen", "item": "src/screens/Witness.tsx", "method": "browser", "findings": ["H14-04"]}
+{"kind": "screen", "item": "src/screens/Compare.tsx", "method": "browser", "findings": []}
+{"kind": "screen", "item": "src/screens/Postdoc.tsx", "method": "browser", "findings": [], "note": "no key said in words; ?q= cleared from the address after an ask (read)"}
+{"kind": "screen", "item": "src/screens/GeneOS.tsx", "method": "browser", "findings": ["H14-02"]}
+{"kind": "screen", "item": "src/screens/Organisms.tsx", "method": "browser", "findings": ["H14-02"], "note": "geneOS Hosts view: coverage 0 for a kept strain whose alias the records name"}
+{"kind": "screen", "item": "src/screens/StrainPage.tsx", "method": "browser", "findings": ["H14-02"]}
+{"kind": "screen", "item": "src/screens/GeneOSModel.tsx", "method": "browser", "findings": [], "note": "opened; its worker calls were cut off by the tour's navigation"}
+{"kind": "screen", "item": "src/screens/FermOS.tsx", "method": "browser", "findings": []}
+{"kind": "screen", "item": "src/screens/FermOSSimulate.tsx", "method": "browser", "findings": []}
+{"kind": "screen", "item": "src/screens/FermOSVessel.tsx", "method": "browser", "findings": []}
+{"kind": "screen", "item": "src/screens/FermOSForecast.tsx", "method": "browser", "findings": []}
+{"kind": "screen", "item": "src/screens/PureOS.tsx", "method": "browser", "findings": ["H14-08"], "note": "recovery of 100.0% checked against the train: 0.99983"}
+{"kind": "screen", "item": "src/screens/PureOSBuilder.tsx", "method": "browser", "findings": [], "note": "opened empty; no train run made"}
+{"kind": "screen", "item": "src/screens/PureOSTrain.tsx", "method": "browser", "findings": []}
+{"kind": "screen", "item": "src/screens/PureOSPropose.tsx", "method": "read", "findings": [], "note": "the proposer card on pureOS's page; not run"}
+{"kind": "screen", "item": "src/screens/Proforma.tsx", "method": "browser", "findings": []}
+{"kind": "screen", "item": "src/screens/ProformaStudies.tsx", "method": "browser", "findings": ["H14-01", "H14-09"]}
+{"kind": "screen", "item": "src/screens/ProformaRun.tsx", "method": "browser", "findings": [], "note": "runbook made here; scenario on a reading made here"}
+{"kind": "screen", "item": "src/screens/ProformaComparison.tsx", "method": "browser", "findings": ["H14-01"], "note": "numbers agree with the two runs' pages"}
+{"kind": "screen", "item": "src/screens/ProformaScenario.tsx", "method": "browser", "findings": [], "note": "made from New scenario, kept across reload"}
+{"kind": "screen", "item": "src/screens/ProformaReference.tsx", "method": "browser", "findings": []}
+{"kind": "screen", "item": "src/screens/ProformaBiosteam.tsx", "method": "read", "findings": [], "note": "its cells render inside the run, scenario and reference pages"}
+{"kind": "screen", "item": "src/screens/Runbooks.tsx", "method": "browser", "findings": []}
+{"kind": "screen", "item": "src/screens/RunbookDetail.tsx", "method": "browser", "findings": [], "note": "made, locked, lock kept across reload"}
+{"kind": "screen", "item": "src/screens/RunbookLedger.tsx", "method": "browser", "findings": []}
+{"kind": "screen", "item": "src/screens/Depositions.tsx", "method": "browser", "findings": []}
+{"kind": "screen", "item": "src/screens/Deposition.tsx", "method": "browser", "findings": ["H14-07"], "note": "DepositionBench: staged, begin, record, read back, reload"}
+{"kind": "screen", "item": "src/screens/DepositionDetail.tsx", "method": "browser", "findings": [], "note": "the not-found state alone"}
+{"kind": "screen", "item": "src/screens/Protocols.tsx", "method": "browser", "findings": [], "note": "empty state"}
+{"kind": "screen", "item": "src/screens/ProtocolDetail.tsx", "method": "left", "findings": [], "note": "no protocol in the project; none made"}
+{"kind": "screen", "item": "src/screens/ProtocolEditor.tsx", "method": "browser", "findings": [], "note": "the not-found state for a missing id alone"}
+{"kind": "screen", "item": "src/screens/Primer.tsx", "method": "browser", "findings": []}
+{"kind": "screen", "item": "src/screens/PrimerLesson.tsx", "method": "browser", "findings": [], "note": "the not-found state alone; no lesson kept"}
+{"kind": "screen", "item": "src/screens/PrimerPath.tsx", "method": "browser", "findings": []}
+{"kind": "screen", "item": "src/screens/PrimerPractice.tsx", "method": "browser", "findings": []}
+{"kind": "screen", "item": "src/screens/Guild.tsx", "method": "browser", "findings": [], "note": "accept, reject, skip, gold by keyboard; decisions kept across reload"}
+{"kind": "screen", "item": "src/screens/GuildMatrix.tsx", "method": "browser", "findings": [], "note": "empty ledger"}
+{"kind": "screen", "item": "src/screens/GuildPeople.tsx", "method": "browser", "findings": [], "note": "empty ledger"}
+{"kind": "screen", "item": "src/screens/GuildSkills.tsx", "method": "browser", "findings": [], "note": "a skill kept on Catalogues shows here"}
+{"kind": "screen", "item": "src/screens/GuildChecks.tsx", "method": "browser", "findings": [], "note": "empty ledger"}
+{"kind": "screen", "item": "src/screens/BenchCheck.tsx", "method": "left", "findings": [], "note": "needs a ledger and a scheduled check; the address of a missing check drew nothing in the main region"}
+{"kind": "screen", "item": "src/screens/Catalogues.tsx", "method": "browser", "findings": ["H14-02"]}
+{"kind": "screen", "item": "src/screens/Settings.tsx", "method": "browser", "findings": [], "note": "reviewer name set; About read"}
+{"kind": "screen", "item": "src/screens/SettingsFigures.tsx", "method": "browser", "findings": []}
+{"kind": "screen", "item": "src/screens/Architecture.tsx", "method": "browser", "findings": []}
+{"kind": "screen", "item": "src/screens/Flowsheets.tsx", "method": "browser", "findings": []}
+{"kind": "screen", "item": "src/screens/FlowsheetPage.tsx", "method": "browser", "findings": []}
+{"kind": "file", "item": "core/openferment_core/studies/comparisons.py", "method": "read", "findings": ["H14-01"]}
+{"kind": "file", "item": "core/openferment_core/validate.py", "method": "executed", "findings": ["H14-02"]}
+{"kind": "file", "item": "core/openferment_core/catalogues.py", "method": "executed", "findings": ["H14-02"]}
+{"kind": "file", "item": "core/openferment_core/literature/kit.py", "method": "executed", "findings": ["H14-03"]}
+{"kind": "file", "item": "src/engine/capture.ts", "method": "executed", "findings": ["H14-07"]}
+{"kind": "operation", "item": "POST /api/studies/comparisons", "method": "executed", "findings": ["H14-01"]}
+{"kind": "operation", "item": "GET /api/studies/comparisons", "method": "executed", "findings": ["H14-01"]}
+{"kind": "operation", "item": "POST /api/literature/answer", "method": "executed", "findings": ["H14-03"]}
+{"kind": "operation", "item": "GET /api/witness/runs", "method": "executed", "findings": ["H14-04"]}
+{"kind": "operation", "item": "POST /api/catalogues/{kind}", "method": "executed", "findings": ["H14-02"]}
+{"kind": "operation", "item": "POST /api/tools/{name}", "method": "executed", "findings": ["H14-02"]}
+{"kind": "operation", "item": "GET /api/fermos/bind", "method": "executed", "findings": ["H14-02"]}
+{"kind": "operation", "item": "POST /api/library/{plant}/run", "method": "executed", "findings": ["H14-09"]}
+{"kind": "operation", "item": "POST /api/intake/collect", "method": "executed", "findings": []}
+{"kind": "operation", "item": "POST /api/intake/paste", "method": "executed", "findings": []}
+{"kind": "operation", "item": "POST /api/biorepo/decisions", "method": "executed", "findings": []}
+{"kind": "tool", "item": "biorepo_write", "method": "executed", "findings": ["H14-02"], "note": "the candidate action through the tool door, ?by= a person"}
+{"kind": "tool", "item": "geneos_read", "method": "executed", "findings": [], "note": "host kind read back for a kept strain"}

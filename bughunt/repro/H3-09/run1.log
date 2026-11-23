@@ -1,0 +1,64 @@
+== the table rows (core/openferment_core/schema/units.json) ==
+124:   "family": "percent",
+128:  "% DW": {
+129:   "family": "percent",
+133:  "% v/v": {
+134:   "family": "percent",
+286:  "% of native sites": {
+287:   "family": "percent",
+291:  "% sedimentable": {
+292:   "family": "percent",
+296:  "% of total expressed": {
+297:   "family": "percent",
+301:  "% of total protein": {
+302:   "family": "percent",
+558:   "because": "Both are percentages but of different denominators — % of total soluble protein is not % of dry weight or % of native phosphorylation sites. Comparing them directly is a category error."
+
+database: bh_r_h3_09_units (fresh, migrated to head)
+== Part A: the table and the unit engine ==
+refusal row proteinShare / percent: 'Both are percentages but of different denominators — % of total soluble protein is not % of dry weight or % of native phosphorylation sites. Comparing them directly is a category error.'
+family 'percent' holds 7 units: '%' (factor 1), '% DW' (factor 1), '% v/v' (factor 1), '% of native sites' (factor 1), '% sedimentable' (factor 1), '% of total expressed' (factor 1), '% of total protein' (factor 1)
+control  convert(5, '% TSP', '% DW') raises UnitError, reason 'Both are percentages but of different denominators — % of total soluble protein is not % of dry weight or % of native phosphorylation sites. Comparing them directly is a category error.'
+probe    convert(5, '% DW', '% of native sites') = 5.0; explain_refusal = None
+probe    convert(5, '% v/v', '% DW') = 5.0; explain_refusal = None
+probe    convert(5, '% DW', '% of total protein') = 5.0; explain_refusal = None
+probe    convert(5, '% of native sites', '% of total protein') = 5.0; explain_refusal = None
+probe    convert(5, '% sedimentable', '% v/v') = 5.0; explain_refusal = None
+probe    convert(5, '% v/v', '% of total expressed') = 5.0; explain_refusal = None
+probe    quantity_equals((5, '% DW'), (5, '% of native sites')) = True (witness.py:85 and :117 read this)
+
+== Part B: validate.anchor_candidate, field disruption_protein_yield ==
+disruption_protein_yield: canonicalUnit '% of total protein'; definition 'Protein released as a percentage of total cellular protein, by a stated disruption method.'
+42 '% of total protein'   ANCHORED as 42.0 % of total protein, valueBasis 'exact'
+42 '% DW'                 ANCHORED as 42.0 % DW, valueBasis 'exact'
+42 '% v/v'                ANCHORED as 42.0 % v/v, valueBasis 'exact'
+42 '% of native sites'    ANCHORED as 42.0 % of native sites, valueBasis 'exact'
+42 '% TSP'                refused on rule 'unit': unit '% TSP' is not in the family of '% of total protein': Both are percentages but of different denominators — % of total soluble protein is not % of dry weight or % of native phosphorylation sites. Comparing them directly is a category error.
+
+== Part C: biorepo.write in a fresh database, the '% DW' candidate ==
+accept cl1-R1-00000002: stored, provenance 'verified'
+BioRepo: cl1-R1-00000002  field disruption_protein_yield  value 42.0 % DW  quote 'Bead milling for 10 min gave a value of 42 % DW in the lysate.'
+to_canonical(42.0, '% DW', 'disruption_protein_yield') = 42.0 % of total protein
+
+== Part D: the wt% alias (recorded as an open debt, docs/PROGRESS.md:614) ==
+normalize('wt%') = '% CDW', family 'percentCdw'
+normalize('% (w/w)') = '% CDW', family 'percentCdw'
+convert(35, 'wt%', '% DW') raises UnitError: Incompatible units: wt% (percentCdw) vs % DW (percent) | reason None
+
+the records row the accept left (openferment.records):
+cl1-R1-00000002 | disruption_protein_yield | 42 | % DW | verified | Bead milling for 10 min gave a value of 42 % DW in the lysate.
+
+== Part E: the browser's engine (src/engine/units.ts) ==
+BROWSER control convert(5, "% TSP", "% DW") throws; explainRefusal = "Both are percentages but of different denominators — % of total soluble protein is not % of dry weight or % of native phosphorylation sites. Comparing them directly is a category error."
+BROWSER probe   convert(5, "% DW", "% of native sites") = 5; explainRefusal = null
+BROWSER probe   convert(5, "% v/v", "% DW") = 5; explainRefusal = null
+BROWSER probe   convert(5, "% DW", "% of total protein") = 5; explainRefusal = null
+BROWSER probe   convert(5, "% of native sites", "% of total protein") = 5; explainRefusal = null
+BROWSER probe   convert(5, "% sedimentable", "% v/v") = 5; explainRefusal = null
+BROWSER probe   convert(5, "% v/v", "% of total expressed") = 5; explainRefusal = null
+BROWSER probe   quantityEquals({5, "% DW"}, {5, "% of native sites"}) = true
+
+EXPECTED: by the table's own refusal row (units.json:558, 'Both are percentages but of different denominators ... Comparing them directly is a category error'), convert raises UnitError with a reason for % DW against % of native sites, % v/v against % DW and the other pairs of different denominators, as it does for % TSP against % DW; quantity_equals((5, '% DW'), (5, '% of native sites')) is False; anchoring refuses 42 '% DW', '% v/v' and '% of native sites' for disruption_protein_yield ('% of total protein') on rule 'unit', as it refuses 42 '% TSP'
+OBSERVED: control % TSP -> % DW refused with the category-error reason; 6 of 6 pairs of different denominators convert 1:1 with no reason (% DW -> % of native sites; % v/v -> % DW; % DW -> % of total protein; % of native sites -> % of total protein; % sedimentable -> % v/v; % v/v -> % of total expressed); quantity_equals((5, '% DW'), (5, '% of native sites')) = True; disruption_protein_yield anchored 42 in '% of total protein', '% DW', '% v/v', '% of native sites' and refused '% TSP'; biorepo.write stored the % DW record with provenance 'verified', and to_canonical reads it as 42.0 % of total protein
+OBSERVED: the browser's convert gives a number for 6 of 6 of the same pairs (src/engine/units.ts:51-53 and :87-90, the same rows)
+RESULT: DEFECT

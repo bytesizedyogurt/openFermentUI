@@ -9,7 +9,7 @@ import {
   Database,
   Download,
   Info,
-  KeyRound,
+  Layers,
   Moon,
   Palette,
   RotateCcw,
@@ -43,12 +43,15 @@ import {
 import { DataTable, type Column } from '@/components/DataTable';
 import { FiguresSection } from './SettingsFigures';
 import { QuantityField, Quantity, type QuantityValue } from '@/components/QuantityField';
-import { ONTOLOGY, ONTOLOGY_BY_ID, fieldName } from '@/data/ontology';
-import type { FieldId, GateMode, GuildPolicy, ParameterDef } from '@/data/types';
+import { ONTOLOGY, ONTOLOGY_BY_ID, fieldName, isFieldId, type FieldId, type ParameterDef } from '@/data/ontology';
+import type { GateMode, GuildPolicy } from '@/lib/guild';
 import { convert, fmt, toSI } from '@/engine/units';
 import { DISCLOSURE, exportCSV } from '@/lib/csv';
+import { href } from '@/router';
 
 const APP_VERSION = '0.1.0';
+// The release this tree builds, named once for the About page.
+const RELEASE = 'alpha 2.2';
 
 interface SectionDef {
   id: string;
@@ -61,7 +64,7 @@ const SECTIONS: SectionDef[] = [
   {
     id: 'appearance',
     label: 'Appearance',
-    blurb: 'Theme, density, motion and the rehearsal clock. Changes apply immediately.',
+    blurb: 'Theme, density and motion. Changes apply immediately.',
   },
   {
     id: 'units',
@@ -97,7 +100,7 @@ const SECTIONS: SectionDef[] = [
   {
     id: 'export',
     label: 'Export center',
-    blurb: 'Everything you have exported this session, and what is deliberately not wired up.',
+    blurb: 'Everything you have exported this session, and the header every file carries.',
   },
   {
     id: 'about',
@@ -328,7 +331,7 @@ function AppearanceSection() {
             <div className="text-caption uppercase tracking-wide text-ink-soft px-1 pb-1">
               Live preview — real records
             </div>
-            <table className="w-full" style={{ fontSize: 'var(--table-fs)' }}>
+            <table className="w-full table-fixed" style={{ fontSize: 'var(--table-fs)' }}>
               <tbody>
                 {previewRecords.length === 0 ? (
                   <tr>
@@ -345,7 +348,9 @@ function AppearanceSection() {
                     <tr key={r.id} className="border-b border-line/70 last:border-0">
                       <td className="px-1" style={{ height: 'var(--row-h)' }}>
                         <Tick p={provenanceOf(r)}>
-                          <span className="font-num">{r.id}</span>
+                          <span className="block truncate" title={r.id}>
+                            {fieldName(r.field)}
+                          </span>
                         </Tick>
                       </td>
                       <td className="px-1 font-num text-right whitespace-nowrap">
@@ -519,7 +524,9 @@ function UnitsSection() {
                 className="input"
                 value={field}
                 onChange={(e) => {
-                  const next = e.target.value as FieldId;
+                  // Each option is a field the ontology names; a value naming no field leaves the field as it stands.
+                  const next = e.target.value;
+                  if (!isFieldId(next)) return;
                   setField(next);
                   setQty(defaultFor(ONTOLOGY_BY_ID[next]));
                 }}
@@ -789,8 +796,8 @@ function CorpusSection() {
         <SectionTitle>This browser&rsquo;s data</SectionTitle>
         <Card className="p-3">
           <p className="text-body text-ink-soft max-w-3xl">
-            Depositions, review decisions, runbook locks, lessons finished, Postdoc&rsquo;s conversations
-            and Guild entries the service has not stored yet are kept in this browser (the Durable tier).
+            Depositions, review decisions, runbook locks, Postdoc&rsquo;s conversations and Guild entries
+            the service has not stored yet are kept in this browser (the Durable tier).
             Clearing them leaves what the service keeps untouched.
           </p>
           <div className="mt-3">
@@ -803,23 +810,22 @@ function CorpusSection() {
 
       <Modal open={confirm} onClose={() => setConfirm(false)} title="Clear this browser’s data">
         <p className="text-body">
-          Returns this browser to the state it starts in, with no records, protocols or scenarios of its
-          own; what the service keeps is laid back on at once. Exports you&rsquo;ve downloaded are
+          Returns this browser to the state it starts in, holding none of the project&rsquo;s rows; what
+          the service keeps is laid back on at once. Exports you&rsquo;ve downloaded are
           unaffected.
         </p>
         <p className="text-body mt-2">
-          This also clears the durable store in this browser, so{' '}
-          <span className="font-num">{depositions.length}</span> deposition
-          {depositions.length === 1 ? '' : 's'}, every review decision, every runbook lock, every
-          lesson finished here, and any Guild entry the service has not yet stored are discarded —
-          including the ones that would otherwise survive a refresh. A reset that left them behind
-          would restore itself on the next reload.
+          This also clears the durable store in this browser: every deposition, review decision,
+          runbook lock, Postdoc conversation and Guild entry the service has not yet stored is
+          discarded, including the ones that would otherwise survive a refresh. A reset that left them
+          behind would restore itself on the next reload.
         </p>
         <div className="text-caption text-ink-soft mt-2">
-          Currently in session: <span className="font-num">{records.length}</span> records,{' '}
-          <span className="font-num">{protocols.length}</span> protocols,{' '}
-          <span className="font-num">{scenarios.length}</span> scenarios,{' '}
-          <span className="font-num">{depositions.length}</span> depositions.
+          Currently in session: <span className="font-num">{records.length}</span> record
+          {records.length === 1 ? '' : 's'}, <span className="font-num">{protocols.length}</span> protocol
+          {protocols.length === 1 ? '' : 's'}, <span className="font-num">{scenarios.length}</span> scenario
+          {scenarios.length === 1 ? '' : 's'}, <span className="font-num">{depositions.length}</span> deposition
+          {depositions.length === 1 ? '' : 's'}.
         </div>
         <div className="flex items-center justify-end gap-2 mt-4">
           <Button onClick={() => setConfirm(false)}>Cancel</Button>
@@ -910,56 +916,11 @@ function ExportSection() {
           disclosure header. It names the literature entries as real, then defines each provenance
           class that can appear in the file — including that an unverified row is the extractor&rsquo;s
           reading no reviewer has checked against its sentence, that an industry estimate
-          has no source document behind it, and that simulation outputs are modeled rather than
-          measured. The text and markdown exports — run logs, review sessions, materials
+          has no source document behind it, and that simulation outputs are marked as modeled. The text and markdown exports — run logs, review sessions, materials
           checklists, agent answers — carry their own headers saying the same thing in the shape
           their format allows. Nothing leaves here unweighted, so a file cannot quietly become
           evidence in someone else's analysis.
         </Callout>
-      </section>
-
-      <section>
-        <SectionTitle
-          right={
-            <span className="chip text-signal-warn border-signal-warn/40">
-              Not active in this build
-            </span>
-          }
-        >
-          API keys
-        </SectionTitle>
-        <Card className="p-3">
-          <div className="flex items-start gap-2.5">
-            <KeyRound size={16} className="mt-1 shrink-0 text-ink-soft" aria-hidden />
-            <div className="min-w-0 flex-1">
-              <label htmlFor="api-key" className="block text-caption text-ink-soft mb-1">
-                Personal access key
-              </label>
-              <input
-                id="api-key"
-                className="input font-num max-w-[420px] opacity-60"
-                value="of_live_—————————————— (none issued)"
-                disabled
-                readOnly
-                aria-describedby="api-key-note"
-              />
-              <div className="mt-2 flex flex-wrap gap-2">
-                <Button size="sm" disabled title="Not active in this build">
-                  Generate key
-                </Button>
-                <Button size="sm" disabled title="Not active in this build">
-                  Revoke all
-                </Button>
-              </div>
-              <p id="api-key-note" className="text-body text-ink-soft mt-2 max-w-3xl">
-                These controls are deliberately dead and shown disabled rather than hidden. There is
-                no server, no account and no key issuance in this build: nothing here would
-                authenticate against anything. In the product this panel would mint scoped tokens
-                for the extraction and retrieval endpoints and list their last use.
-              </p>
-            </div>
-          </div>
-        </Card>
       </section>
     </div>
   );
@@ -1076,18 +1037,18 @@ const FIDELITY_ROWS: { feature: string; fidelity: string; notes: string }[] = [
     feature: 'Learn lessons and checkpoints',
     fidelity: 'Full',
     notes:
-      'No lesson ships with this build. Navigation, live embeds, checkpoint grading and progress tracking work for any lesson the store holds.',
+      'No lesson ships with this build. Navigation, live embeds, checkpoint grading and progress tracking work for any lesson the project’s lesson catalogue keeps; passing one writes its entries on the ledger.',
   },
   {
     feature: 'Guided tour',
     fidelity: 'Full',
-    notes: 'Six stops that drive the actual screens rather than screenshots.',
+    notes: 'Six stops that drive the live screens.',
   },
   {
     feature: 'Jobs tray',
     fidelity: 'Full for fetches and extractions',
     notes:
-      'A fetch or an extraction moves only on the service\u2019s answer, and its failure is the service\u2019s reason. Any other job advances on stage durations set in the browser, not on work done.',
+      'A fetch or an extraction moves only on the service\u2019s answer, and its failure is the service\u2019s reason. Any other job advances on stage durations the browser sets.',
   },
   {
     feature: 'Authentication, API keys, sharing',
@@ -1109,7 +1070,8 @@ const FIDELITY_STYLE: Record<Fidelity, string> = {
 };
 
 function fidelityKind(f: string): Fidelity {
-  if (f.startsWith('Full')) return 'Full';
+  // A feature that runs for real (a model call, the service's own metrics) is Full, however its label begins.
+  if (f.startsWith('Full') || f.startsWith('Real')) return 'Full';
   if (f.startsWith('Authored')) return 'Authored';
   return 'Visual';
 }
@@ -1209,12 +1171,12 @@ function AboutSection() {
           </span>
           <span className="inline-flex items-center gap-1.5">
             <span className="chip text-signal-info border-signal-info/45">Authored</span>
-            is written into the build by hand, not computed —{' '}
+            is written into the build by hand —{' '}
             <span className="font-num">{counts.Authored}</span>
           </span>
           <span className="inline-flex items-center gap-1.5">
             <span className="chip text-signal-warn border-signal-warn/45">Visual</span>
-            the surface exists, the mechanism does not —{' '}
+            a surface with no mechanism behind it yet —{' '}
             <span className="font-num">{counts.Visual}</span>
           </span>
         </div>
@@ -1266,8 +1228,7 @@ function AboutSection() {
         </SectionTitle>
         <Card className="p-3">
           <Row label="App version">
-            <span className="font-num">openFerment {APP_VERSION}</span> — alpha 2.0, the foundation
-            build
+            <span className="font-num">openFerment {APP_VERSION}</span> — {RELEASE}, the base
           </Row>
           <Row label="Project">
             <span className="font-num">{papers.length}</span> documents held,{' '}
@@ -1306,7 +1267,7 @@ function AboutSection() {
                 }}
                 aria-hidden
               />
-              alpha 2.0: a working platform, run on one machine, on loopback, by its owner.
+              {RELEASE}: a working platform, run on one machine, on loopback, by its owner.
             </span>
           </Row>
         </Card>
@@ -1325,7 +1286,7 @@ export default function Settings({ section }: { section: string }) {
     <div>
       <PageHeader eyebrow="Settings" title={def.label} subtitle={def.blurb} />
 
-      <div className="grid grid-cols-1 gap-6 md:grid-cols-[184px_minmax(0,1fr)] items-start">
+      <div className="grid grid-cols-1 gap-6 md:grid-cols-[208px_minmax(0,1fr)] items-start">
         <nav aria-label="Settings sections" className="min-w-0">
           <ul className="flex md:flex-col gap-1 overflow-x-auto pb-1 md:pb-0">
             {SECTIONS.map((s) => {
@@ -1333,7 +1294,7 @@ export default function Settings({ section }: { section: string }) {
               return (
                 <li key={s.id}>
                   <a
-                    href={`#/settings/${s.id}`}
+                    href={href(`/settings/${s.id}`)}
                     aria-current={on ? 'page' : undefined}
                     className={cx(
                       'flex items-center gap-2 rounded-btn px-2.5 py-1.5 text-body whitespace-nowrap transition-colors',
@@ -1349,6 +1310,7 @@ export default function Settings({ section }: { section: string }) {
                     {s.id === 'figures' && <ChartScatter size={14} aria-hidden />}
                     {s.id === 'export' && <Download size={14} aria-hidden />}
                     {s.id === 'about' && <Moon size={14} aria-hidden />}
+                    {s.id === 'architecture' && <Layers size={14} aria-hidden />}
                     <span className="truncate">{s.label}</span>
                     {s.owner && (
                       <span className="text-[10px] uppercase tracking-wide text-ink-soft border border-line rounded-input px-1">

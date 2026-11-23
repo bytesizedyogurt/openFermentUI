@@ -1,0 +1,18 @@
+ok  200 guild person POST /api/guild/people (0.0s)
+ok  200 guild person 2 POST /api/guild/people (0.0s)
+ok  200 guild policy POST /api/guild/policy (0.0s)
+NO  422 guild evidence POST /api/guild/evidence (0.0s): {'detail': "duplicate: 'ev-1' is not an entry id (e- and 4 to 64 letters, digits or hyphens)"}
+NO  422 guild check request POST /api/guild/checks/request (0.0s): {'detail': 'authority: a check is asked for by the person, or by an assessor on one of its skills'}
+ok  200 fermos fit POST /api/fermos/fit (0.0s)
+fit keys: {'depositionId': ('str', None), 'growth': ('dict', None), 'kinetic': ('dict', None), 'growthArtifactId': ('str', None), 'kineticArtifactId': ('str', None), 'confirmedShare': ('float', None), 'sample': ('bool', None), 'notes': ('list', None)}
+ok  200 fermos simulate POST /api/fermos/simulate (0.0s)
+sim keys: ['artifactId', 'provenance', 'family', 'title', 'strain', 'product', 'sugar', 'parameters', 'start', 'series', 'units', 'our']
+ok  200 state overrides PUT /api/state/overrides/proforma:sc-h6-glucose (0.0s)
+ok  200 proforma run POST /api/proforma/run (0.6s)
+run keys: ['scenarioId', 'artifactId', 'provenance', 'inputs', 'basePrice', 'baseCostLines', 'baseInfeasible', 'quantiles', 'histogram', 'sensitivity', 'samples', 'feasible', 'infeasible', 'grid', 'readBack', 'leavesOut', 'priceBasis', 'evidence', 'flowsheet', 'tablesSource', 'tea', 'streams', 'units', 'utilities', 'diagram', 'diagramNote', 'unitOrder', 'tableUnits']
+ok  200 proforma run (assumptions) POST /api/proforma/run (3.6s)
+ok  200 proforma run (an estimate) POST /api/proforma/run (0.6s)
+NO  422 pureos from-run (benchmark) POST /api/pureos/train/from-run (0.0s): {'detail': 'artifact 35e708d122a6b4fc is a proforma_benchmark artifact; a train is read from a run (proforma.run, proforma.reference, pureos.train_run)'}
+NO  422 state conversations PUT /api/state/conversations/lc-page-1 (0.0s): {'detail': 'a conversation row is a Live conversation: 1 validation error for LiveConversation'}
+ok  200 state conversations PUT /api/state/conversations/lc-page-1 (0.0s)
+{"pasted": null, "collected": [{"identifier": "PMC9999999", "outcome": {"status": "ingested", "documentId": "c9403e72c34b408697f8886f3f653955", "collector": "europepmc", "identifier": "PMC9999999", "title": "A structural fixture for the Intake parser", "licenceClass": "open_commercial", "licence": {"href": "https://creativecommons.org/licenses/by/4.0/", "text": "This is an open access article distributed under a placeholder licence."}, "sections": 7, "tables": 1, "chunks": 7, "reason": null, "transient": false}}, {"identifier": "SGD:S000203483", "outcome": {"status": "ingested", "documentId": "c0f02ad64b06480197b358009da7fa78", "collector": "sgd", "identifier": "https://www.yeastgenome.org/backend/strain/S000203483", "title": "S288C (Saccharomyces Genome Database)", "licenceClass": "open_commercial", "licence": {"href": "http://creativecommons.org/licenses/by/4.0/", "text": "Creative Commons License"}, "sections": 3, "tables": 0, "chunks": 3, "reason": null, "transient": false}}], "catalogue": [["strain", "ethanol-red"], ["product", "ethanol"], ["product", "cellulase"], ["skill", "aseptic-sampling"], ["lesson", "sampling-101"], ["strain", "sc-h6"]], "state": {"runbook": "rb-page-1", "deposition": "dep-h6-1", "measured": "me-1"}, "simulation": null, "proformaRun": null, "proformaRunAssumptions": null, "benchmark": "35e708d122a6b4fc", "reference": null, "sffUpload": "sff-f9d0ac8162d24c6f", "live": "lc-page-1", "fit": {}, "proformaRunEstimate": null}

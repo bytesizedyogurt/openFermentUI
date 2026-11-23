@@ -1,0 +1,103 @@
+NOTICE:  database "bh_h3_a" does not exist, skipping
+=== bench_doors.py
+[runbook] 422 {"detail": "this runbooks row does not read as a runbook: kind: Input should be 'industrial' or 'research'; nothing was kept"}
+[deposit dep1] 200 {"kind": "depositions", "id": "dep1", "value": {"id": "dep1", "runbookId": "rb1", "protocolId": null, "operatorId": null, "startedAt": "2026-11-09T10:00:00Z", "closedAt": null, "state": "running", "observations": [], "reconciliation": null, "sampleTimes": {}, "entries": [{"id": "e1", "measureId": "m1", "stepId": "readings", "at": "2026-11-09T10:00:00Z", "value": 40.0, "unit": "g/L", "raw": "40.0 g/L", "confirmed": true}, {"id": "e2", "measureId": "m2", "stepId": "readings", "at": "2026-11-09T10:00:00Z", "value": 41.0, "unit": "g/L", "raw": "41.0 g/L", "confirmed": false}, {"id": "e3", "measureId": "m2", "stepId": "readings", "at": "2026-11-09T10:00:00Z", "value": 300.0, "unit": "K", "raw": "
+
+== the readings list, by the parameter's unit ==
+[readings unit='g L-1'] 200 []
+[readings unit='g/L'] 200 []
+[readings unit='°C'] 200 [{"ref": "dep1/e3", "depositionId": "dep1", "entryId": "e3", "runbookId": "rb1", "runbook": null, "measureId": "m2", "measure": null, "value": 300.0, "unit": "K", "at": "2026-11-09T10:00:00Z", "by": "Ada Lovelace", "hours": null, "inUnit": 26.850000000000023, "note": "300 K as deposited, 26.85 °C in the parameter's unit"}]
+[readings unit='K'] 200 [{"ref": "dep1/e3", "depositionId": "dep1", "entryId": "e3", "runbookId": "rb1", "runbook": null, "measureId": "m2", "measure": null, "value": 300.0, "unit": "K", "at": "2026-11-09T10:00:00Z", "by": "Ada Lovelace", "hours": null, "inUnit": 300.0, "note": null}]
+[readings unit='kg m-3'] 200 []
+[readings unit=''] 200 []
+[readings unit=None] 200 [{"ref": "dep1/e3", "depositionId": "dep1", "entryId": "e3", "runbookId": "rb1", "runbook": null, "measureId": "m2", "measure": null, "value": 300.0, "unit": "K", "at": "2026-11-09T10:00:00Z", "by": "Ada Lovelace", "hours": null, "inUnit": null, "note": null}, {"ref": "dep1/e5", "depositionId": "dep1", "entryId": "e5", "runbookId": "rb1", "runbook": null, "measureId": "m1", "measure": null, "value": 12.0, "unit": "%", "at": "2026-11-09T10:00:00Z", "by": "Ada Lovelace", "hours": null, "inUnit": null, "note": null}]
+
+== another project's reading ==
+[readings in p2] 200 []
+
+== a correction, then a sample time moved while the deposition is open ==
+[correct e1 by e6] 200 {"kind": "depositions", "id": "dep1", "value": {"id": "dep1", "runbookId": "rb1", "protocolId": null, "operatorId": null, "startedAt": "2026-11-09T10:00:00Z", "closedAt": null, "state": "running", "observations": [], "reconciliation": null, "sampleTimes": {}, "entries": [{"id": "e1", "measureId": "m1", "stepId": "readings", "at": "2026-11-09T10:00:00Z", "value": 40.0, "unit": "g/L", "raw": "40.0 g/L", "confirmed": true}, {"id": "e2", "measureId": "m2", "stepId": "readings", "at": "2026-11-09T10:00:00Z", "value": 41.0, "unit": "g/L", "raw": "41.0 g/L", "confirmed": false}, {"id": "e3", "measureId": "m2", "stepId": "readings", "at": "2026-11-09T10:00:00Z", "value": 300.0, "unit": "K", "raw": "
+[readings after correction] 200 [{"ref": "dep1/e6", "depositionId": "dep1", "entryId": "e6", "runbookId": "rb1", "runbook": null, "measureId": "m1", "measure": null, "value": 42.0, "unit": "g/L", "at": "2026-11-09T10:00:00Z", "by": "Ada Lovelace", "hours": null, "inUnit": 42.0, "note": "42 g/L as deposited, 42 g L-1 in the parameter's unit"}]
+[give e6 a sample time after it corrected e1] 200 {"kind": "depositions", "id": "dep1", "value": {"id": "dep1", "runbookId": "rb1", "protocolId": null, "operatorId": null, "startedAt": "2026-11-09T10:00:00Z", "closedAt": null, "state": "running", "observations": [], "reconciliation": null, "sampleTimes": {"e6": 5.0}, "entries": [{"id": "e1", "measureId": "m1", "stepId": "readings", "at": "2026-11-09T10:00:00Z", "value": 40.0, "unit": "g/L", "raw": "40.0 g/L", "confirmed": true}, {"id": "e2", "measureId": "m2", "stepId": "readings", "at": "2026-11-09T10:00:00Z", "value": 41.0, "unit": "g/L", "raw": "41.0 g/L", "confirmed": false}, {"id": "e3", "measureId": "m2", "stepId": "readings", "at": "2026-11-09T10:00:00Z", "value": 300.0, "unit": "K",
+[readings after the sample time] 200 [{"ref": "dep1/e6", "depositionId": "dep1", "entryId": "e6", "runbookId": "rb1", "runbook": null, "measureId": "m1", "measure": null, "value": 42.0, "unit": "g/L", "at": "2026-11-09T10:00:00Z", "by": "Ada Lovelace", "hours": 5.0, "inUnit": 42.0, "note": "42 g/L as deposited, 42 g L-1 in the parameter's unit"}]
+standing refs: ['dep1/e6']
+[move e6's sample time again] 200 {"kind": "depositions", "id": "dep1", "value": {"id": "dep1", "runbookId": "rb1", "protocolId": null, "operatorId": null, "startedAt": "2026-11-09T10:00:00Z", "closedAt": null, "state": "running", "observations": [], "reconciliation": null, "sampleTimes": {"e6": 7.5}, "entries": [{"id": "e1", "measureId": "m1", "stepId": "readings", "at": "2026-11-09T10:00:00Z", "value": 40.0, "unit": "g/L", "raw": "40.0 g/L", "confirmed": true}, {"id": "e2", "measureId": "m2", "stepId": "readings", "at": "2026-11-09T10:00:00Z", "value": 41.0, "unit": "g/L", "raw": "41.0 g/L", "confirmed": false}, {"id": "e3", "measureId": "m2", "stepId": "readings", "at": "2026-11-09T10:00:00Z", "value": 300.0, "unit": "K",
+
+== measured evidence: overwrite a released value, write one for no deposition ==
+[release me1] 200 {"kind": "measuredEvidence", "id": "me1", "value": {"id": "me1", "depositionId": "dep1", "runbookId": "rb1", "productId": null, "predictionId": "p1", "label": "Ethanol titre", "value": 40.0, "unit": "g/L", "provenance": "measured", "conditions": {"protocolId": null, "scale": 1, "strainId": null}, "deviations": [], "confirmed": true, "at": "2026-11-09T10:00:00Z"}}
+[overwrite me1 value 400] 200 {"kind": "measuredEvidence", "id": "me1", "value": {"id": "me1", "depositionId": "dep1", "runbookId": "rb1", "productId": null, "predictionId": "p1", "label": "Ethanol titre", "value": 400.0, "unit": "g/L", "provenance": "measured", "conditions": {"protocolId": null, "scale": 1, "strainId": null}, "deviations": [], "confirmed": true, "at": "2026-11-09T10:00:00Z"}}
+[measured evidence for a deposition the project lacks] 200 {"kind": "measuredEvidence", "id": "me2", "value": {"id": "me2", "depositionId": "nope", "runbookId": "rb1", "productId": null, "predictionId": "p1", "label": "Ethanol titre", "value": 999.0, "unit": "g/L", "provenance": "measured", "conditions": {"protocolId": null, "scale": 1, "strainId": null}, "deviations": [], "confirmed": true, "at": "2026-11-09T10:00:00Z"}}
+measuredEvidence kept: [('me1', 400.0, 'measured', True, 'dep1'), ('me2', 999.0, 'measured', True, 'nope')]
+[delete me1] 422 {"detail": "a measuredEvidence is kept as it was made, and never taken back"}
+
+== the module read (runbooks) through the HTTP tool door ==
+[runbooks_read] 200 {"summary": {}, "evidence": [], "recordIds": [], "passages": [], "error": "runbooks_read refused its input: ids: Field required; words: Field required; kind: Field required; state: Field required; limit: Field required", "usage": {"inputTokens": 0, "outputTokens": 0, "cacheReadTokens": 0, "cacheWriteTokens": 0, "costUsd": 0.0, "models": []}, "draft": null, "rows": [], "data": null, "auditIds": []}
+
+== an estimate offered to each bench record ==
+[deposition entry with an estimate origin] 422 {"detail": "a project's depositions keeps records, and entries[6].origin is a model's estimate or rests on an assumption: an estimate may reach a scenario or a run, never a record (ADR-006)"}
+[measured evidence saying assumed] 422 {"detail": "a project's measuredEvidence keeps records, and provenance is a model's estimate or rests on an assumption: an estimate may reach a scenario or a run, never a record (ADR-006)"}
+[measured evidence with an estimate in deviations] 422 {"detail": "a project's measuredEvidence keeps records, and basis is a model's estimate or rests on an assumption: an estimate may reach a scenario or a run, never a record (ADR-006)"}
+=== bench_doors2.py
+== every origin kind at the Proforma resolve ==
+[resolve person-assumption] 200 {"scope": "proforma:sc-h3", "values": [{"key": "feed_glucose_conc", "value": null, "low": null, "high": null, "source": null, "origin": "waiting", "identified": null, "overriddenBy": null, "libraryDefault": null, "recordIds": [], "detail": "waits for a source: a record of medium_component_conc throu
+    titre -> 42.0 origin assumption source {'kind': 'assumption', 'id': None, 'note': 'typed on 2026-11-09T10:00:00Z', 'by': 'Ada Lovelace'}
+    basisInputs: [('titre', 42.0, 'assumption'), ('titre low', 42.0, 'assumption'), ('titre high', 42.0, 'assumption')]
+[resolve model-estimate] 200 {"scope": "proforma:sc-h3", "values": [{"key": "feed_glucose_conc", "value": null, "low": null, "high": null, "source": null, "origin": "waiting", "identified": null, "overriddenBy": null, "libraryDefault": null, "recordIds": [], "detail": "waits for a source: a record of medium_component_conc throu
+    titre -> 42.0 origin model-estimate source {'kind': 'model-estimate', 'id': None, 'note': 'estimated on 2026-11-09T10:00:00Z', 'by': 'claude-x'}
+    basisInputs: [('titre', 42.0, 'model-estimate'), ('titre low', 42.0, 'model-estimate'), ('titre high', 42.0, 'model-estimate')]
+[resolve measurement] 200 {"scope": "proforma:sc-h3", "values": [{"key": "feed_glucose_conc", "value": null, "low": null, "high": null, "source": null, "origin": "waiting", "identified": null, "overriddenBy": null, "libraryDefault": null, "recordIds": [], "detail": "waits for a source: a record of medium_component_conc throu
+    titre -> 42.0 origin measurement source {'kind': 'deposition', 'id': 'dep1/e6', 'note': "measured on 2026-11-09T10:00:00Z: 42 g/L as deposited, 42 g L-1 in the parameter's unit", 'by': 'Ada Lovelace'}
+    basisInputs: [('titre', 42.0, 'deposition'), ('titre low', 42.0, 'deposition'), ('titre high', 42.0, 'deposition')]
+[resolve record] 422 {"detail": [{"type": "value_error", "loc": ["body", "inputs", 0], "msg": "Value error, titre: a value a run sets is a person's assumption or a model's estimate, its origin naming who set it (person-assumption or model-estimate, with by), or a deposition's reading, its origin naming the reading (meas
+[resolve artifact] 422 {"detail": [{"type": "value_error", "loc": ["body", "inputs", 0], "msg": "Value error, titre: a value a run sets is a person's assumption or a model's estimate, its origin naming who set it (person-assumption or model-estimate, with by), or a deposition's reading, its origin naming the reading (meas
+[resolve library-default] 422 {"detail": [{"type": "value_error", "loc": ["body", "inputs", 0], "msg": "Value error, titre: a value a run sets is a person's assumption or a model's estimate, its origin naming who set it (person-assumption or model-estimate, with by), or a deposition's reading, its origin naming the reading (meas
+[resolve convention] 422 {"detail": [{"type": "value_error", "loc": ["body", "inputs", 0], "msg": "Value error, titre: a value a run sets is a person's assumption or a model's estimate, its origin naming who set it (person-assumption or model-estimate, with by), or a deposition's reading, its origin naming the reading (meas
+
+== a measurement sent with a different value or unit, a low/high, a depositor named ==
+[value differs] 422 {"detail": "titre: reading dep1/e6 is 42 g/L, and the value sent is 40.0 g/L: a measurement carries its reading's own value and unit"}
+[unit differs] 422 {"detail": "titre: reading dep1/e6 is 42 g/L, and the value sent is 42.0 g L-1: a measurement carries its reading's own value and unit"}
+[with a high] 422 {"detail": "titre: a measurement is its reading's one value, and this quantity also carries high"}
+[another depositor] 422 {"detail": "titre: reading dep1/e6 was deposited by Ada Lovelace, and the value sent names Someone Else"}
+[unconfirmed reading e2] 422 {"detail": "titre: reading dep1/e2 waits for a person to confirm its number at the bench, and an unconfirmed number is no measurement"}
+[corrected reading e1] 422 {"detail": "titre: reading dep1/e1 was corrected by dep1/e5, the reading that stands for its measure now"}
+[a reading in K for a titre] 422 {"detail": "titre is denominated in g L-1, and reading dep1/e3 is in K, which does not convert into it: Incompatible units: K (temp) vs g L-1 (massConc)"}
+
+== another project's reading (p2 names p1's dep1/e6) ==
+[p2 resolve] 422 {"detail": "titre: the project holds no deposition dep1, so it holds no reading dep1/e6"}
+
+== a series correction undone by moving a sample time ==
+[deposit s1 at 5 h (a mis-read 4 g/L)] 200 {"kind": "depositions", "id": "dep9", "value": {"id": "dep9", "runbookId": "rb1", "protocolId": null, "operatorId": null
+[correct s1 by s2 at the same 5 h] 200 {"kind": "depositions", "id": "dep9", "value": {"id": "dep9", "runbookId": "rb1", "protocolId": null, "operatorId": null
+[resolve on s1 (corrected)] 422 {"detail": "titre: reading dep9/s1 was corrected by dep9/s2, the reading that stands for its measure now"}
+[move s2 to 6 h] 200 {"kind": "depositions", "id": "dep9", "value": {"id": "dep9", "runbookId": "rb1", "protocolId": null, "operatorId": null
+[resolve on s1 again] 200 {"scope": "proforma:sc-h3", "values": [{"key": "feed_glucose_conc", "value": null, "low": null, "high": null, "source": null, "origin": "waiting", "identified": null, "overriddenBy": null, "libraryDefault": null, "recordIds": [], "detail": "waits for a source: a record of medium_component_conc throu
+readings offered for a titre now: [('dep1/e6', 42.0, 7.5), ('dep9/s1', 4.0, 5.0), ('dep9/s2', 40.0, 6.0)]
+[take s1's sample time away] 200 {"kind": "depositions", "id": "dep9", "value": {"id": "dep9", "runbookId": "rb1", "protocolId": null, "operatorId": null
+=== kinetics_provenance.py
+deposit 200
+[every value a reading] report measured | GET /api/runs None | origins []
+[readings and one estimate] report assumed | GET /api/runs None | origins []
+[readings and one person's value] report assumed | GET /api/runs None | origins []
+[every value a person's] report assumed | GET /api/runs None | origins []
+[every value a model's] report assumed | GET /api/runs None | origins []
+runs list: [('58b68da2f718cff0', 'kinetics', 'assumed'), ('4761432844ab40cd', 'kinetics', 'assumed'), ('d740cb2b96bf533e', 'kinetics', 'assumed'), ('3ed7d97a69c777e5', 'kinetics', 'assumed'), ('90e308503f0ddc1c', 'kinetics', 'measured')]
+=== kinetics_corrected.py
+correct depK/k0: 200
+the kept run on depK/k0: measured
+the same reading at a door now: 422 {"detail":"titre: reading depK/k0 was corrected by depK/k0fix, the reading that stands for its measure now"}
+=== dup_id.py
+first 200
+a second entry under d1 (99 g/L, another measure): 200
+entries kept: [('d1', 10.0, 'mz'), ('d1', 99.0, 'other')]
+readings offered: [('depD/d1', 10.0, 'mz')]
+=== catalogue_doors.py
+person's keep with an estimate field no kind takes: 200 False
+a lesson whose answer is 2 Mg (read as milligrams): 200
+catalogue_write in the model's lane: 200 None
+   kept: {"name": "Strain making 45 g/L", "summary": "reaches a titre of 45 g/L at 30 °C in 48 h", "note": "read from a paper: 0.45 g/g yield", "agent": "model", "via": "http"}
+=== deposition_screen.cjs
+runbook 200
+measured evidence me5 (confirmed false) 200
+module read of me5: [ 'runbooks/measured-evidence/me5 unverified' ]
+evidence band text: Released to BioRepo 2 Measured · first-party Measured · first-party. Ethanol titre 400 g/L with no protocol’s steps Measured · first-party. Unread titre 55 g/L with no protocol’s steps · unconfirmed Evidence, not an override These are records with their conditions attached, and they pass the same aggregation gate as everything else. One result under one set of conditions does not silently shift a global parameter — a titre measured once in a run with logged deviations is a fact about that run, not a correction to every model that mentions titre.
+measured ticks in the band: 2

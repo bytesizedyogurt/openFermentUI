@@ -1,0 +1,182 @@
+{
+  "candidates": [
+    {
+      "id": "H7-01",
+      "title": "Two tabs, service away: one tab's queued reading is erased from the browser and never sent",
+      "severity": "S1",
+      "kind": "Broken use",
+      "area": "client store: the Durable tier's pending-writes queue (src/lib/durable.ts, src/store.ts)",
+      "statement": "With two tabs open on one project while the service does not answer, each tab saves its own queue over the browser's single IndexedDB snapshot, so a reading recorded in tab A is erased when tab B saves, and after tab A reloads that reading never reaches the service.",
+      "contract": "docs/decisions/ADR-014-durable-write-queue.md:20-22 \"a write the service has not yet acknowledged is, so a decision made while the service is away survives a reload and is sent when the service answers\"; src/lib/projectState.ts:10-12 \"an outbox, saved with the preferences (durable.ts), so a deposition at the bench survives a reload while the service is away and is sent when it answers again\"",
+      "reproCommand": "bash bughunt/notes/H7/scripts/repro.sh twotabs",
+      "expected": "Tab A's reading (5.5 USD/kg) stays in the browser's queue through tab B's save and tab A's reload, and the service holds it once it answers.",
+      "observed": "The IndexedDB outbox held tab A's deposition after A wrote, held only tab B's after B wrote, and held only B's after A reloaded; once /api answered and the page reloaded, the service held A's deposition with 0 entries and B's with 6.6 USD/kg. Neither page said a reading was dropped.",
+      "cause": "src/lib/durable.ts:50 (one key, 'snapshot', for the whole browser) with src/store.ts:3669 saveDurable(snapshotOf(s)), which writes this tab's stateOutbox whole (src/store.ts:3539) and reads nothing another tab stored",
+      "confidence": "high",
+      "fixSize": "medium",
+      "evidence": "scripts/outbox.mjs twotabs on a copy of openferment_dev seeded with a locked runbook (port 8872), then again from a fresh copy through repro.sh (port 8873): the same sequence both times."
+    },
+    {
+      "id": "H7-02",
+      "title": "After a reload while the service is away, the bench says the deposition is not found, and the queue waits for a second reload",
+      "severity": "S2",
+      "kind": "Contract break",
+      "area": "client store hydration and the Deposition bench (src/store.ts, src/screens/Deposition.tsx)",
+      "statement": "A reload while the service does not answer leaves the project's rows unloaded, so the bench says the project holds no such deposition while its readings sit in the browser's queue, and once the service answers again nothing is sent until the page is reloaded a second time; during the outage the bench never says its readings wait for the service.",
+      "contract": "docs/decisions/ADR-014-durable-write-queue.md:20-22 \"so a decision made while the service is away survives a reload and is sent when the service answers\"; src/screens/Deposition.tsx:1086-1088 \"The deposition is the record, kept on the service as it changes, so the bench resumes after a reload\"",
+      "reproCommand": "bash bughunt/notes/H7/scripts/repro.sh reload",
+      "expected": "After the reload the bench shows the deposition with its queued readings laid over it and says they wait for the service; when the service answers, the queue is sent.",
+      "observed": "After the reload with /api refused: data-state=missing, \"Deposition not found This project holds no deposition dep-mwb7zows-1, or its rows have not loaded from the service yet\", while the IndexedDB outbox still held that deposition with 1 entry and 1 observation; its runbook's page said \"Runbook not found ... the link may be from another project\". With /api answering for 40 s and no reload the service held 0 entries; within 30 s of a second reload it held 4.4 USD/kg and the observation. In the stop scenario the bench read \"3 measured · 1 observed\" with the service stopped and no word that the three writes were waiting.",
+      "cause": "src/store.ts:1043-1051 hydrateProjectState sets stateProblem and returns when GET /api/state fails, and nothing calls it again; the queue is laid over held rows only after a successful load (src/store.ts:1073); src/store.ts:3634 skips every change while stateSeen is null, so flushProjectState is not called again before the next page load",
+      "confidence": "high",
+      "fixSize": "medium",
+      "evidence": "scripts/outbox.mjs reload and stop on port 8872; the outbox read from IndexedDB in the page at each step; the service's rows read from GET /api/state."
+    },
+    {
+      "id": "H7-03",
+      "title": "Two tabs on one deposition: the second tab's reading is refused, dropped, and still listed as recorded",
+      "severity": "S2",
+      "kind": "Broken use",
+      "area": "client store: rows sent whole from a stale view (src/lib/projectState.ts, src/store.ts, src/components/DepositionPanel.tsx)",
+      "statement": "When two tabs hold one running deposition, a reading recorded in the tab whose view is older is sent as the whole row as that tab holds it, the service refuses it for leaving out the other tab's reading, the queue drops it, and that tab's bench goes on listing the reading as recorded until a reload removes it.",
+      "contract": "src/screens/Deposition.tsx:1086-1087 \"The deposition is the record, kept on the service as it changes\"; docs/decisions/ADR-014-durable-write-queue.md:20-22 (a write survives until the service answers)",
+      "reproCommand": "bash bughunt/notes/H7/scripts/repro.sh sameonline",
+      "expected": "Tab B's 8.8 USD/kg is kept beside tab A's 7.7 USD/kg (the row read again and the entry appended), or tab B's bench takes the reading back and says it was not kept.",
+      "observed": "Both PUT /api/state/depositions/<id> writes from tab B answered 422 \"dep-... keeps every reading it was given, and this write leaves out de-...-2; a reading is corrected by a new one\", shown as two toasts; the service held 7.7 USD/kg alone; tab B's measures list kept \"8.8 USD/kg\"; after a reload tab B showed 1 measured, tab A's.",
+      "cause": "src/lib/projectState.ts:96-104 changes() sends each row as this page holds it; src/lib/projectState.ts:180-183 drops a refused row from the queue and leaves the page's copy as it was; no page reads again a row another tab changed",
+      "confidence": "high",
+      "fixSize": "medium",
+      "evidence": "scripts/outbox.mjs sameonline on port 8872, run three times; tab B's PUT answers and toasts captured."
+    },
+    {
+      "id": "H7-04",
+      "title": "Two tabs on one scenario's parameter panel: one person's override erases the other's, with no word",
+      "severity": "S2",
+      "kind": "Broken use",
+      "area": "client store: the parameter panel's overrides (src/store.ts setOverride, src/lib/projectState.ts)",
+      "statement": "A scope's overrides travel as one row holding the whole list, so when two tabs on one Proforma scenario each set a different parameter, the second write replaces the first tab's override on the service, with no refusal and no word on either page.",
+      "contract": "src/store.ts:2391 \"A person's change, under their name, by scope and key: one a parameter.\"; docs/decisions/ADR-014-durable-write-queue.md:20-22",
+      "reproCommand": "bash bughunt/notes/H7/scripts/repro.sh overrides",
+      "expected": "The service keeps feed_glucose_conc=1.234 (tab A) and titre=5.678 (tab B).",
+      "observed": "After tab A wrote, the scope held [feed_glucose_conc=1.234]; after tab B wrote, it held [titre=5.678]; tab A after a reload showed feed_glucose_conc at 9.45 g L-1, its source value.",
+      "cause": "src/lib/projectState.ts:78 (overrides keyed by scope, the row's value the scope's whole list) with src/store.ts:2393-2400 setOverride writing the list from this tab's view",
+      "confidence": "high",
+      "fixSize": "medium",
+      "evidence": "scripts/overrides_twotabs.mjs on port 8872: a scenario made on ethanol_glucose_v0 through New scenario, both tabs on its panel, each value typed in a row's value box; the service's overrides read from GET /api/state."
+    },
+    {
+      "id": "H7-05",
+      "title": "An address naming a project the service does not hold reloads the page without end",
+      "severity": "S2",
+      "kind": "Broken use",
+      "area": "client routing and project opening (src/App.tsx, src/store.ts)",
+      "statement": "Opening /#/p/<id>/... for an id the service holds no project under makes the page reload about 19 times a second, each load asking GET /api/projects, and it never settles on a screen.",
+      "contract": "docs/decisions/ADR-009-ui.md:21-22 \"an address naming another project opens it (the page reloads in it, as a project switch does)\"",
+      "reproCommand": "bash bughunt/notes/H7/scripts/repro.sh unknown",
+      "expected": "One reload at most, then a screen that says the service holds no project of that id and lists the projects it holds.",
+      "observed": "285 and 274 page loads, with as many GET /api/projects, in 15 s on two runs; localStorage openferment.project left as 'nosuchproject'.",
+      "cause": "src/App.tsx:141 opens route.project whenever it differs from the store's projectId; src/store.ts:1017 loadProjects replaces an open id the list lacks with the only project held (or null), so the two differ on every load and openProject reloads again (src/store.ts:1023-1027)",
+      "confidence": "high",
+      "fixSize": "small",
+      "evidence": "scripts/unknown_project.mjs against the full project's service (8871) and from a fresh copy through repro.sh (8873), counting load events and /api/projects requests."
+    },
+    {
+      "id": "H7-06",
+      "title": "With the service stopped, five detail pages say the project holds no such row",
+      "severity": "S3",
+      "kind": "Inconsistency",
+      "area": "client screens' service-down words (RunbookDetail, DepositionDetail, PaperReader, GuildSkills, Postdoc)",
+      "statement": "When the service does not answer, the runbook, deposition, paper, Guild skill and Postdoc conversation pages say the project keeps no such row, while the protocol, strain, lesson, run, comparison and flowsheet pages say the service is not running.",
+      "contract": "src/lib/http.ts:3-4 \"`ServiceDown`: nothing answered ... the remedy names the command that starts the service\"; the strain page answers the same state with \"The project's strain catalogue could not be read: The service is not running\"",
+      "reproCommand": "bash bughunt/notes/H7/scripts/repro.sh stopped-words",
+      "expected": "Each page says the service is not running and how to start it.",
+      "observed": "Refused: /runbooks/<id> \"The project keeps no runbook of that id; the link may be from another project\"; /runbooks/depositions/<id> \"This project holds no deposition with this id\"; /biorepo/paper/<id> \"<id> is not a document this project holds\"; /guild/skills/<id> \"The project's skill catalogue holds no skill h7-skill\"; /postdoc/<id> \"No conversation yet: a person asks the first question\". Each of these opens the row with the service up.",
+      "cause": "src/screens/RunbookDetail.tsx:596, src/screens/DepositionDetail.tsx:255, src/screens/PaperReader.tsx:260, src/screens/GuildSkills.tsx:88, src/screens/Postdoc.tsx:397 draw the empty state from the store's lists without reading stateProblem, cataloguesProblem or the failed call",
+      "confidence": "high",
+      "fixSize": "small",
+      "evidence": "scripts/stopped_words.mjs: 18 pages read with the service up and again with every /api request refused, the main region's text compared."
+    },
+    {
+      "id": "H7-07",
+      "title": "Deposition at 810 px: Next step is 43 px wide, and a staged run's runbook link is 18 px tall with its underline on hover alone",
+      "severity": "S3",
+      "kind": "Contract break",
+      "area": "src/screens/Deposition.tsx, the bench takeover",
+      "statement": "At 810x1080 the run's Next step button measures 43 x 56 px on every step, and the staged protocol run's link to its runbook measures 151.7 x 18 px and shows its underline only on hover.",
+      "contract": "CLAUDE.md:59 \"src/screens/Deposition.tsx is a glove-tolerant full-screen takeover (810 px portrait, 44 px targets, 7:1 step-text contrast, no hover affordance)\"; src/screens/Deposition.tsx:9-12 \"touch targets ≥ 44px ... no hover-dependent affordance anywhere\"",
+      "reproCommand": "bash bughunt/notes/H7/scripts/repro.sh a11y",
+      "expected": "Every target at least 44 x 44 px, and no affordance that appears on hover alone.",
+      "observed": "Next step 43 x 56 px (staged, step, timed step, step list and skip views); the staged run's runbook link 151.7 x 18 px, styled .hover:underline. Held: step text 14.9:1, no horizontal scroll at 810 px, the readings-alone bench with no target under 44 px. Texts below 7:1 beside the step: the primary buttons' labels 6.30:1, the capture preview \"kept as an observation\" 6.07:1, the read-back note 5.31:1, the close modal's unconfirmed warning 5.00:1, while src/components/DepositionPanel.tsx:4-6 says its primary text stays on ink.",
+      "cause": "src/screens/Deposition.tsx:954-958 (minHeight 56, no minWidth, an icon alone) and src/screens/Deposition.tsx:351 (className 'text-accent hover:underline', no min-h-[44px])",
+      "confidence": "high",
+      "fixSize": "small",
+      "evidence": "scripts/deposition_a11y.mjs at viewport 810x1080 with touch: getBoundingClientRect of every visible control, WCAG contrast of every visible text against its blended background, every stylesheet :hover rule matched against the view."
+    },
+    {
+      "id": "H7-08",
+      "title": "The rail's logo link drops the project from the address",
+      "severity": "S3",
+      "kind": "Contract break",
+      "area": "src/App.tsx shell",
+      "statement": "Inside a project, the rail's logo links to #/, which opens Home with no project in the address, and every rail link on that screen is then a plain path, so the address stops naming the open project.",
+      "contract": "docs/decisions/ADR-009-ui.md:21 \"a navigation or a link from inside a project stays inside it (`inProject`)\"",
+      "reproCommand": "bash bughunt/notes/H7/scripts/repro.sh logo",
+      "expected": "The logo opens #/p/<project> (or keeps the prefix), and the links after it keep /p/<project>/.",
+      "observed": "From #/p/ethanol/runbooks the logo opened #/ (Home, \"Bioprocess literature you can operate on\"), the top bar still named Ethanol, the rail links read #/ #/intake #/biorepo ..., and following Intake gave #/intake. On the 74 walked addresses in three states this was the one in-app anchor leaving the project. Home's activity links are written from raw '#/...' strings (src/screens/Home.tsx:932-935).",
+      "cause": "src/App.tsx:498 <a href=\"#/\"> written by hand, where every other rail link uses href()",
+      "confidence": "high",
+      "fixSize": "small",
+      "evidence": "scripts/logo.mjs on the full project (8871); scripts/walk_all.mjs collected every anchor's href on every page."
+    },
+    {
+      "id": "H7-09",
+      "title": "Settings says a deposition with timers running survives a reload; a protocol's run, its timers and deviation notes end on reload",
+      "severity": "S4",
+      "kind": "Inconsistency",
+      "area": "src/screens/Settings.tsx, src/lib/durable.ts, the protocol run",
+      "statement": "Settings' Storage row and durable.ts's header say a deposition at hour 14 with timers running cannot be lost to a reload, while a protocol's run keeps its step completions, timers and deviation notes in page memory, and a reload ends the run and loses them.",
+      "contract": "src/screens/Settings.tsx:1255-1256 \"in IndexedDB, because a deposition at hour 14 with timers running cannot be lost to a page reload\"; src/lib/durable.ts:6-8 \"A fermentation at hour 14 with timers running and deviations logged cannot be lost to a page reload\"",
+      "reproCommand": "bash bughunt/notes/H7/scripts/repro.sh runreload",
+      "expected": "One account: either the run and its deviation notes survive a reload, or Settings and durable.ts say a run lives for the session, as the protocol page does.",
+      "observed": "A run with a deviation note and a running timer, reloaded with the leave-page prompt accepted: \"This run is no longer active A run at the bench lives in this page's memory, so a reload ends it\"; the note is gone. src/screens/ProtocolDetail.tsx:1264 says \"Deposition records step completions, deviations and timers for this session only.\"",
+      "cause": "src/store.ts:1506-1527 startRun and src/store.ts:1575-1580 addDeviation keep the run in s.runs, which snapshotOf (src/store.ts:3504) leaves out",
+      "confidence": "high",
+      "fixSize": "small",
+      "evidence": "scripts/run_reload.mjs at 810x1080 on port 8872."
+    }
+  ],
+  "suspected": [
+    {
+      "title": "One row the service answers with a 500 holds every later write in the queue behind it, retried every 15 s without end",
+      "tried": "Read src/lib/projectState.ts flush: a ServiceDown stops the flush and keeps everything from that row on; a 500 with health up becomes ServiceDown (src/lib/http.ts:86). Found no way to make the service answer 500 on a row without editing the service."
+    },
+    {
+      "title": "A protocol run's id restarts at run-1 on each page load, so an address of a run from before a reload opens a run started after it",
+      "tried": "Observed run-1 and run-2 ids from nextId('run') (src/store.ts:205) across loads; did not start two runs across a reload of different protocols to show a mismatched version."
+    },
+    {
+      "title": "Two tabs that both load the same queue send each queued row twice",
+      "tried": "Read applyDurable (src/store.ts:2544): every tab takes the stored outbox at load and flushes it; a deposition PUT twice with the same value is accepted, so no harm was shown."
+    }
+  ],
+  "needsLiveModel": [
+    "Postdoc's conversations written through the queue while the service is away (a turn needs a model call)",
+    "Two tabs following one Postdoc turn as it streams"
+  ],
+  "held": [
+    "74 addresses (12 rail entries, every sub-view in nav.ts and every address case in Screen(), detail pages with real and missing ids, the three takeovers) opened in the empty, full and stopped states with no uncaught error, no unhandled rejection, no screen boundary and no not-found page",
+    "Every in-app anchor on those pages kept #/p/<project>/ except the rail's logo",
+    "49 GET answers of the full project held to docs/api/openapi.json: no required field absent, no non-null field null; the exclude_unset rows of /api/state keep their optional fields optional in the types",
+    "On a live page, writes made with the service stopped were kept in IndexedDB, retried, and sent once and in order within 15 s of the service starting again, with no reload",
+    "A refused write is named in a toast with the service's words",
+    "The open project is held per tab in memory, so two tabs on two projects each send their own X-OpenFerment-Project",
+    "Row ids (deposition, entry, observation, scenario, runbook, train) carry the time and stay unique across reloads",
+    "The non-null assertions that read a Map or a find are each guarded by a preceding check",
+    "Deposition at 810x1080: step text on ink at 14.9:1, no horizontal scroll, the readings-alone bench with no target under 44 px"
+  ],
+  "unexamined": [
+    {"item": "Review decisions and Guild ledger writes made while the service is away", "reason": "the full project holds candidates and no extraction records to decide, and no Guild entries; the queue for them was read, not driven"},
+    {"item": "Components, figures and engine modules line by line", "reason": "exercised by rendering on the walked screens; read only where a finding or a cast led"},
+    {"item": "Casts of untyped artifact output for artifacts written by older tools", "reason": "the full project holds only current artifacts, each of which rendered"}
+  ]
+}

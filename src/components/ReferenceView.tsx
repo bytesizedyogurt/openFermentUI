@@ -15,7 +15,7 @@ import { Card, EmptyState } from './ui';
 const slug = (s: string) => s.toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/(^-|-$)/g, '');
 
 /** One unbuilt subsystem: its name, and what is true of its code. */
-export function SubsystemBlock({
+function SubsystemBlock({
   label,
   state,
   id,

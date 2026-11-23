@@ -1,0 +1,52 @@
+service: http://127.0.0.1:9120 over a fresh bh_r_h5_06_noproj (keyless)
+commit: 573f040; core/ as at 2047f5a: yes
+setup: project bh-a: 201
+  kept product product-a in bh-a: 200
+  kept strain strain-a in bh-a: 200
+  kept skill SK-A in bh-a: 200
+
+GET /api/audit
+  naming bh-a: 200 [{"at": "2026-11-10T23:47:33.142382+00:00", "agent": "person", "who": "alice", "module": "home", "action": "create_project", "state": "created", "target": "bh-a", "detail": {}, "id": "1"}, {"at": "202
+  naming none: 422 This names no project. A request sends the X-OpenFerment-Project header (or ?project= on an event stream); a command sets OPENFERMENT_PROJECT.
+  as the contract says (422 naming X-OpenFerment-Project): yes
+GET /api/catalogues/product
+  naming bh-a: 200 [{"kind": "product", "id": "product-a", "name": "Product A", "species": null, "program": null, "aliases": [], "category": "industrial_enzyme", "location": null, "sequence": "MKTAYIAKQR", "sequenceSour
+  naming none: 422 This names no project. A request sends the X-OpenFerment-Project header (or ?project= on an event stream); a command sets OPENFERMENT_PROJECT.
+  as the contract says (422 naming X-OpenFerment-Project): yes
+GET /api/protparam?product=product-a
+  naming bh-a: 200 {"artifact": null}
+  naming none: 404 there is no product 'product-a' in the products catalogue, so it carries no sequence to compute from
+  as the contract says (422 naming X-OpenFerment-Project): no
+POST /api/pureos/propose
+  naming bh-a: 200 {"product": "product-a", "host": "strain-a", "program": "yeast", "productClass": "protein", "train": null, "reasons": [], "missing": [{"property": "location", "why": "product product-a's products cata
+  naming none: 404 there is no product 'product-a' in the products catalogue or among the chemicals thermosteam's library is asked about here (ethanol)
+  as the contract says (422 naming X-OpenFerment-Project): no
+POST /api/guild/check
+  naming bh-a: 200 Primer has no lesson lesson-a
+  naming none: 200 'SK-A' is not a skill Guild holds (none ship with alpha 2.0)
+  as the contract says (422 naming X-OpenFerment-Project): no
+POST /api/guild/evidence
+  naming none: 422 skill: 'SK-A' is not a skill Guild holds (none ship with alpha 2.0)
+  as the contract says (422 naming X-OpenFerment-Project): no
+POST /api/tools/catalogue_read?by=bob
+  naming bh-a: 200 {"summary": {"kind": "product", "matched": 1, "entries": [{"kind": "product", "id": "product-a", "name": "Product A", "aliases": [], "category": "industrial_enzyme", "sequence": "MKTAYIAKQR", "sequenc
+  naming none: 200 catalogue_read failed: ProjectRequired: This names no project. A request sends the X-OpenFerment-Project header (or ?project= on an event stream); a command sets OPENFERMENT_PROJECT.
+  as the contract says (422 naming X-OpenFerment-Project): no
+POST /api/tools/literature_document?by=bob
+  naming bh-a: 200 literature_document refused: the project holds no readable document '0123456789abcdef0123456789abcdef' (ApiError)
+  naming none: 200 literature_document refused: the project holds no readable document '0123456789abcdef0123456789abcdef' (ProjectRequired)
+  as the contract says (422 naming X-OpenFerment-Project): no
+
+
+where the empty answers come from (core/openferment_core at 2047f5a):
+  /home/user/openFermentUI/core/openferment_core/catalogues.py:589:    except projects.ProjectRequired:
+  /home/user/openFermentUI/core/openferment_core/catalogues.py-590-        return []
+  --
+  /home/user/openFermentUI/core/openferment_core/protocols.py:295:    except projects.ProjectRequired:
+  /home/user/openFermentUI/core/openferment_core/protocols.py-296-        return []
+  558:        return ToolResult(error=f"{name} failed: {type(e).__name__}: {e}", auditIds=standing)
+  55:        return ToolResult(error=f"literature_document refused: the project holds no readable document {did!r} "
+
+EXPECTED: every request naming no project, once it reaches a store read, answers 422 in words naming X-OpenFerment-Project (ADR-005 Implementation; api.py DESCRIPTION), as GET /api/audit does
+OBSERVED: 6 of 8 answer otherwise: GET /api/protparam?product=product-a 404; POST /api/pureos/propose 404; POST /api/guild/check 200; POST /api/guild/evidence 422; POST /api/tools/catalogue_read?by=bob 200; POST /api/tools/literature_document?by=bob 200. Answering as the contract says: GET /api/audit, GET /api/catalogues/product
+RESULT: DEFECT

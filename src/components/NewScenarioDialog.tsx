@@ -2,9 +2,9 @@
 // service's shelf, name the scenario, and it opens.
 //
 // The shelf is the service's (`GET /api/proforma/shelf`): every flowsheet a
-// scenario can name, and the toy never. A reference biorefinery runs whole on its
-// package's own defaults, so it is not offered here: a scenario is made on a
-// flowsheet whose inputs bind to records or to a named person's assumption.
+// scenario can name, each one whose inputs bind to records or to a named
+// person's assumption, and the toy never. The reference plants are the
+// library shelf's, run whole from their reference page or from Studies.
 // What is made is a `biosteam` scenario and nothing else (D5), kept in the
 // open project's rows under a time-based id (D6; lib/projectState.ts); it
 // carries no input value of its own.
@@ -23,11 +23,28 @@
 // nothing is silent. The scenario keeps both ids in its row (`vessel`,
 // `trainRun`). fermOS → Vessel's **Price this in Proforma** opens
 // this with its design chosen (`initialVessel`).
-import { useEffect, useMemo, useState } from 'react';
-import type { FlowsheetInfo, TrainSummary, VesselSummary } from '@/data/types';
+//
+// NEW SCENARIO FROM A RUN (alpha 2.1 stage B; alpha 2.2 C.5). Opened with
+// `fromRun`, an engine run's report, the dialog makes a study scenario on the
+// run's plant and configuration (POST /api/studies/scenarios) and runs it in
+// the person's name (…/{id}/run); the new run's page opens. The person finds
+// parameters of the run by words and sets each one, and every parameter left
+// alone stays the package's own. A value is either the person's own, typed
+// as their assumption with what it rests on, or a reading a person deposited
+// at the bench: beside the typed value, the dialog lists the project's
+// confirmed readings whose unit is the parameter's or converts into it, as
+// the service's lookup answers them (GET /api/depositions/readings?unit=),
+// each with its runbook, measure, value, unit, time and person. Choosing one
+// sends `{value, unit, origin: {kind: 'measurement', ref}}`, the reading's
+// own value and unit; the service fills the depositor and the time, converts
+// the unit, and looks the reading up again when the scenario runs, so a run
+// resting on readings and the package's defaults alone is `measured`.
+import { useEffect, useMemo, useRef, useState } from 'react';
+import { Play } from 'lucide-react';
 import { useStore } from '@/store';
 import { href, navigate } from '@/router';
-import { Button, Modal } from './ui';
+import { Button, Modal, cx } from './ui';
+import { ReadingChoice } from './ReadingOrigin';
 import {
   ProformaDown,
   builtFromParts,
@@ -37,20 +54,32 @@ import {
   sendFitPath,
   trainRunWords,
   vesselWords,
+  type FlowsheetInfo,
+  type TrainSummary,
+  type VesselSummary,
 } from '@/lib/proforma';
+import {
+  StudiesDown,
+  depositionReadings,
+  makeScenario,
+  runScenario,
+  type DepositionReading,
+  type RunReport,
+  type ScenarioValue,
+} from '@/lib/studies';
 
 /** The line a shelf with nothing to start a scenario from shows, here and on the index. */
 export function NoFlowsheetLine() {
   return (
     <span data-testid="no-flowsheet">
       No flowsheet is on this service&rsquo;s shelf yet, so there is nothing to start a scenario from. The reference
-      biorefineries run whole on their package&rsquo;s defaults and are not a starting point.
+      plants are the library shelf&rsquo;s, run whole from Proforma&rsquo;s Reference runs row or from Studies.
     </span>
   );
 }
 
 /** What a flowsheet built from kept artifacts is built from, in words. */
-export const BUILT_FROM_WORDS: Record<string, string> = {
+const BUILT_FROM_WORDS: Record<string, string> = {
   'fermos.vessel': 'a vessel design kept in fermOS',
   'pureos.train_run': 'a train run kept in pureOS',
 };
@@ -62,14 +91,7 @@ export function inputSourceWords(i: FlowsheetInfo['inputs'][number]): string {
   return "a named person's assumption";
 }
 
-export function NewScenarioDialog({
-  open,
-  onClose,
-  initialFlowsheet = null,
-  attachFit = null,
-  initialVessel = null,
-  initialTrainRun = null,
-}: {
+interface ShelfProps {
   open: boolean;
   onClose: () => void;
   /** The flowsheet chosen when it opens ("New scenario from this"). */
@@ -80,7 +102,17 @@ export function NewScenarioDialog({
   initialVessel?: string | null;
   /** The train run chosen when it opens. */
   initialTrainRun?: string | null;
-}) {
+}
+
+/**
+ * A new scenario: with `fromRun`, a study scenario on that engine run's plant, each value the person's own or a
+ * deposition's reading, made and run in their name; else a Proforma scenario on a flowsheet from the shelf.
+ */
+export function NewScenarioDialog({ fromRun = null, ...shelf }: ShelfProps & { fromRun?: RunReport | null }) {
+  return fromRun ? <ScenarioFromRun open={shelf.open} onClose={shelf.onClose} report={fromRun} /> : <ShelfScenario {...shelf} />;
+}
+
+function ShelfScenario({ open, onClose, initialFlowsheet = null, attachFit = null, initialVessel = null, initialTrainRun = null }: ShelfProps) {
   const createScenario = useStore((s) => s.createScenario);
   const toast = useStore((s) => s.toast);
   const [shelf, setShelf] = useState<FlowsheetInfo[] | null>(null);
@@ -117,7 +149,8 @@ export function NewScenarioDialog({
     setTrainRun(initialTrainRun);
   }, [open, initialFlowsheet, initialVessel, initialTrainRun]);
 
-  const choices = useMemo(() => (shelf ?? []).filter((f) => !f.reference), [shelf]);
+  // Every flowsheet on the shelf is one a scenario runs (alpha 2.2 D8).
+  const choices = useMemo(() => shelf ?? [], [shelf]);
   const composite = useMemo(() => choices.some((f) => builtFromParts(f)), [choices]);
 
   // The kept parts, asked for when the shelf holds a flowsheet built from them.
@@ -322,6 +355,275 @@ export function NewScenarioDialog({
             </Button>
           )}
         </div>
+      </div>
+    </Modal>
+  );
+}
+
+// ── a scenario from a run (alpha 2.1 stage B; alpha 2.2 C.5) ───────────
+
+/** How many matching parameters the finder lists at once. */
+const FOUND_ROWS = 12;
+
+const problemOf = (e: unknown) =>
+  e instanceof StudiesDown || e instanceof ProformaDown ? `${e.message} ${e.remedy ?? ''}`.trim() : e instanceof Error ? e.message : String(e);
+
+/** One parameter a person sets: their own typed value, or a deposition's reading. */
+interface Setting {
+  key: string;
+  label: string;
+  unit: string;
+  /** Where its value comes from. */
+  source: 'typed' | 'reading';
+  /** As the person typed it; read as a number when the scenario is made. */
+  value: string;
+  /** What the typed value rests on, in the person's words. */
+  note: string;
+  /** The reading chosen, by its ref (`<deposition id>/<entry id>`). */
+  reading: string | null;
+  /** Why the chosen reading stands for the parameter, in the person's words: its own note, apart from the typed value's. */
+  readingNote: string;
+}
+
+/** The readings of one unit as the service listed them: null while it is asked, with its words when it could not answer. */
+type Listed = { readings: DepositionReading[] | null; problem: string | null };
+
+/**
+ * A study scenario from an engine run (the module's header): parameters found by words, each set to the person's
+ * own value or to a deposition's reading, the scenario made and run in their name, and the new run's page opened.
+ */
+function ScenarioFromRun({ open, onClose, report }: { open: boolean; onClose: () => void; report: RunReport }) {
+  const reviewer = useStore((s) => s.reviewer).trim();
+  const run = report.run;
+  const scope = report.parameters;
+  const [words, setWords] = useState('');
+  const [settings, setSettings] = useState<Setting[]>([]);
+  const [title, setTitle] = useState('');
+  const [note, setNote] = useState('');
+  const [busy, setBusy] = useState(false);
+  const [problem, setProblem] = useState<string | null>(null);
+  const [made, setMade] = useState<string | null>(null);
+  // The readings each unit takes, asked of the service once a setting asks for a reading in that unit.
+  const [listed, setListed] = useState<Record<string, Listed>>({});
+  const asked = useRef(new Set<string>());
+
+  // A fresh dialog each time it opens, its readings asked again: a reading deposited since stands among them.
+  useEffect(() => {
+    if (!open) return;
+    setWords('');
+    setSettings([]);
+    setTitle('');
+    setNote('');
+    setProblem(null);
+    setMade(null);
+    setListed({});
+    asked.current = new Set();
+  }, [open]);
+
+  useEffect(() => {
+    for (const s of settings) {
+      if (s.source !== 'reading' || asked.current.has(s.unit)) continue;
+      const unit = s.unit;
+      asked.current.add(unit);
+      setListed((l) => ({ ...l, [unit]: { readings: null, problem: null } }));
+      depositionReadings(unit).then(
+        (readings) => setListed((l) => ({ ...l, [unit]: { readings, problem: null } })),
+        (e: unknown) => setListed((l) => ({ ...l, [unit]: { readings: [], problem: problemOf(e) } })),
+      );
+    }
+  }, [settings]);
+
+  const valueOf = new Map((scope?.values ?? []).map((v) => [v.key, v.value]));
+  const numeric = (scope?.specs ?? []).filter((s) => !s.choices && typeof valueOf.get(s.key) === 'number');
+  const wanted = words.toLowerCase().split(/\s+/).filter(Boolean);
+  const taken = new Set(settings.map((s) => s.key));
+  const found = wanted.length ? numeric.filter((s) => !taken.has(s.key) && wanted.every((w) => `${s.key} ${s.label}`.toLowerCase().includes(w))) : [];
+  const add = (key: string) => {
+    const spec = numeric.find((s) => s.key === key);
+    if (!spec) return;
+    setSettings((list) => [
+      ...list,
+      { key, label: spec.label, unit: spec.unit, source: 'typed', value: String(valueOf.get(key) ?? ''), note: '', reading: null, readingNote: '' },
+    ]);
+  };
+  const change = (key: string, patch: Partial<Setting>) => setSettings((list) => list.map((s) => (s.key === key ? { ...s, ...patch } : s)));
+  // The reading a setting rests on, while its source is a reading.
+  const chosenOf = (s: Setting) =>
+    s.source === 'reading' && s.reading ? (listed[s.unit]?.readings?.find((r) => r.ref === s.reading) ?? null) : null;
+
+  const make = () => {
+    const at = new Date().toISOString();
+    const bad = settings.find((s) => s.source === 'typed' && (s.value.trim() === '' || !Number.isFinite(Number(s.value))));
+    if (bad) {
+      setProblem(`${bad.label}: a value is one number, in ${bad.unit || 'the parameter’s own terms'}.`);
+      return;
+    }
+    const unread = settings.find((s) => s.source === 'reading' && !chosenOf(s));
+    if (unread) {
+      setProblem(`${unread.label}: choose the reading it rests on, or type your own value.`);
+      return;
+    }
+    const values: ScenarioValue[] = settings.map((s) => {
+      const r = chosenOf(s);
+      return r
+        ? { key: s.key, quantity: { value: r.value, unit: r.unit, origin: { kind: 'measurement', ref: r.ref, note: s.readingNote.trim() || null } } }
+        : {
+            key: s.key,
+            quantity: { value: Number(s.value), unit: s.unit, origin: { kind: 'person-assumption', by: reviewer, at, note: s.note.trim() || note.trim() || null } },
+          };
+    });
+    setBusy(true);
+    setProblem(null);
+    makeScenario({ title: title.trim(), plant: run.plant, configuration: run.configuration ?? null, values, note: note.trim() || null, by: reviewer })
+      .then((scenario) => {
+        setMade(scenario.id);
+        return runScenario(scenario.id, reviewer);
+      })
+      .then((rep) => {
+        onClose();
+        navigate(`/proforma/runs/${rep.run.id}`);
+      })
+      .catch((e: unknown) => setProblem(problemOf(e)))
+      .finally(() => setBusy(false));
+  };
+
+  const where = `${run.plant}${run.configuration ? ` (${run.configuration})` : ''}`;
+  return (
+    <Modal open={open} onClose={onClose} title="New scenario from this run" width={780}>
+      <div className="max-h-[78vh] overflow-y-auto pr-1" data-testid="run-make-scenario-dialog">
+        <p className="text-caption text-ink-soft mb-2">
+          The scenario runs {where} with the values you set, and every parameter you leave alone stays the package&rsquo;s own. Find a parameter by its
+          words and set it: to your own value, typed as your assumption, or to a reading a person deposited at the bench and confirmed, which the
+          service looks up in the project&rsquo;s depositions when the scenario is made and again when it runs.
+        </p>
+        <input
+          className="input text-body w-full mb-2"
+          aria-label="Find a parameter"
+          placeholder="Words of a parameter: xylose ethanol, moisture, price…"
+          value={words}
+          onChange={(e) => setWords(e.target.value)}
+          data-testid="scenario-find"
+        />
+        {found.length > 0 && (
+          <ul className="space-y-0.5 mb-2 text-caption" data-testid="scenario-found">
+            {found.slice(0, FOUND_ROWS).map((s) => (
+              <li key={s.key} className="flex flex-wrap items-center gap-2" data-testid="scenario-found-row" data-key={s.key}>
+                <button className="chip" onClick={() => add(s.key)} aria-label={`Set ${s.label}`}>
+                  Set
+                </button>
+                <span>{s.label}</span>
+                <span className="font-num text-ink-soft">
+                  {String(valueOf.get(s.key))} {s.unit}
+                </span>
+              </li>
+            ))}
+            {found.length > FOUND_ROWS && <li className="text-ink-soft">and {found.length - FOUND_ROWS} more: add words to narrow them.</li>}
+          </ul>
+        )}
+        {wanted.length > 0 && found.length === 0 && <p className="text-caption text-ink-soft mb-2">No parameter of this run left to set matches those words.</p>}
+        {settings.length > 0 && (
+          <ul className="space-y-2 mb-3" data-testid="scenario-settings">
+            {settings.map((s) => {
+              const held = listed[s.unit];
+              return (
+                <li key={s.key} className="border-t border-line/50 pt-2 text-caption" data-testid="scenario-setting" data-key={s.key} data-source={s.source}>
+                  <div className="flex flex-wrap items-center justify-between gap-2">
+                    <span className="text-body">
+                      {s.label} <span className="font-num text-ink-soft">({s.unit || 'no unit'})</span>
+                    </span>
+                    <span className="flex flex-wrap items-center gap-1.5" role="group" aria-label={`Where ${s.label} comes from`}>
+                      <button className={cx('chip', s.source === 'typed' && 'border-accent text-accent')} aria-pressed={s.source === 'typed'} onClick={() => change(s.key, { source: 'typed' })} data-testid="scenario-source-typed">
+                        Your value
+                      </button>
+                      <button className={cx('chip', s.source === 'reading' && 'border-accent text-accent')} aria-pressed={s.source === 'reading'} onClick={() => change(s.key, { source: 'reading' })} data-testid="scenario-source-reading">
+                        A reading
+                      </button>
+                      <button className="chip" onClick={() => setSettings((list) => list.filter((x) => x.key !== s.key))} aria-label={`Leave ${s.label} as the run's`}>
+                        Leave
+                      </button>
+                    </span>
+                  </div>
+                  {s.source === 'typed' ? (
+                    <div className="flex flex-wrap items-center gap-2 mt-1">
+                      <input
+                        className="input text-caption font-num w-28"
+                        inputMode="decimal"
+                        aria-label={`Your value for ${s.label}`}
+                        value={s.value}
+                        onChange={(e) => change(s.key, { value: e.target.value })}
+                      />
+                      <span className="font-num text-ink-soft">{s.unit}</span>
+                      <input
+                        className="input text-caption flex-1 min-w-48"
+                        aria-label={`What ${s.label} rests on`}
+                        placeholder="What it rests on (optional)"
+                        value={s.note}
+                        onChange={(e) => change(s.key, { note: e.target.value })}
+                      />
+                    </div>
+                  ) : (
+                    <div className="mt-1 space-y-1" data-testid="scenario-readings" data-unit={s.unit}>
+                      {!held || held.readings === null ? (
+                        <p className="text-ink-soft">Asking the service for the project&rsquo;s readings in {s.unit || 'no unit'}…</p>
+                      ) : held.problem ? (
+                        <p className="text-signal-warn">{held.problem}</p>
+                      ) : held.readings.length === 0 ? (
+                        <p className="text-ink-soft" data-testid="scenario-no-reading">
+                          No confirmed reading of this project is in {s.unit || 'no unit'} or in a unit that converts into it. A reading is deposited at the
+                          bench on a locked runbook, from its page, and read back there.
+                        </p>
+                      ) : (
+                        held.readings.map((r) => (
+                          <ReadingChoice
+                            key={r.ref}
+                            reading={r}
+                            label={s.label}
+                            unit={s.unit}
+                            name={`scenario-reading-${s.key}`}
+                            chosen={s.reading === r.ref}
+                            onChoose={() => change(s.key, { reading: r.ref })}
+                            testid="scenario-reading"
+                          />
+                        ))
+                      )}
+                      <input
+                        className="input text-caption w-full"
+                        aria-label={`What the reading for ${s.label} rests on`}
+                        placeholder="Why this reading stands for it (optional)"
+                        value={s.readingNote}
+                        onChange={(e) => change(s.key, { readingNote: e.target.value })}
+                      />
+                    </div>
+                  )}
+                </li>
+              );
+            })}
+          </ul>
+        )}
+        <div className="flex flex-wrap items-center gap-2">
+          <input className="input text-body" aria-label="The scenario's title" placeholder="What the scenario asks" value={title} onChange={(e) => setTitle(e.target.value)} />
+          <input className="input text-body flex-1 min-w-48" aria-label="What the scenario rests on" placeholder="What it rests on, in words" value={note} onChange={(e) => setNote(e.target.value)} />
+          <Button variant="primary" disabled={busy || !reviewer || settings.length === 0 || !title.trim()} onClick={make} data-testid="run-make-scenario-go">
+            <Play size={14} /> {busy ? 'Running…' : 'Make the scenario and run it'}
+          </Button>
+          <Button onClick={onClose}>Cancel</Button>
+        </div>
+        {!reviewer && <p className="text-caption text-ink-soft mt-1">A scenario is made in a person&rsquo;s name: set yours in Settings first.</p>}
+        {problem && (
+          <p className="text-caption text-signal-warn mt-1" data-testid="run-make-scenario-problem">
+            {problem}
+            {made && (
+              <>
+                {' '}
+                The scenario <span className="font-num">{made}</span> is kept;{' '}
+                <a className="underline underline-offset-2" href={href('/proforma/studies')}>
+                  Studies
+                </a>{' '}
+                lists it.
+              </>
+            )}
+          </p>
+        )}
       </div>
     </Modal>
   );

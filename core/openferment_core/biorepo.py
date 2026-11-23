@@ -1,4 +1,4 @@
-"""BioRepo — one write function for a project's review decisions (OF-BLD-012 §2.3, §7.1).
+"""BioRepo — one write function for a project's review decisions.
 
 Every review decision goes through `write(decision)`. There is no second
 path: not the API, not a script, not a test helper. A project's decisions
@@ -22,7 +22,9 @@ that stand.
              anchoring; or a gold decision has no quote that anchors at all,
              its own or the record's, because gold means "this sentence in
              this paper says this number" and a gold record without a
-             sentence is a typed value wearing a badge
+             sentence is a typed value wearing a badge; or a plain accept on
+             a record whose number anchoring read as converted from another
+             unit, when that number no longer anchors on the record's quote
   paper      the record's paper is not a document the project holds — a
              decision stands on a text a reader can look up (§7.4)
   unit       a typed value — corrected or gold — is not a number, or its unit
@@ -47,7 +49,7 @@ from __future__ import annotations
 
 import logging
 import re
-from typing import Any
+from typing import Any, get_args
 
 from sqlalchemy import func, insert, select
 
@@ -55,13 +57,14 @@ from . import db, extract, projects
 from .basis import EstimateRefused, refuse_estimates
 from .literature import kit
 from .db import models as t
-from .models import BioRepo, Candidate, Quantity, ReviewDecision
+from .models import BioRepo, Candidate, DecisionRule, Quantity, ReviewDecision
 from .units import UnitError, field as ontology_field, to_canonical
 from .validate import anchor_candidate
 
 log = logging.getLogger("openferment.biorepo")
 
-RULES = ("record", "reviewer", "fulltext", "quote", "paper", "unit", "status", "estimate")
+# The rules a decision is refused under, in order: the API answers each by name (models.DecisionRule).
+RULES: tuple[str, ...] = get_args(DecisionRule)
 
 # Names that are not a person (OF-BLD-012.1 F2). The README says a verified
 # record is one a NAMED reviewer promoted; a decision signed 'you' is signed
@@ -253,7 +256,9 @@ def _is_promotion(d: ReviewDecision) -> bool:
 
 
 def _is_gold(d: ReviewDecision) -> bool:
-    return d.provenance == "gold" or d.gold is not None
+    """A decision that sets a gold value: the value alone makes a record gold,
+    whatever label the request carried (ADR-006; bug hunt P-02)."""
+    return d.gold is not None
 
 
 def _is_withdrawal(d: ReviewDecision) -> bool:
@@ -287,7 +292,7 @@ def write(decision: ReviewDecision, *, dry_run: bool = False) -> ReviewDecision:
 
     `dry_run` runs every rule and writes nothing — the question the browser
     asks through `POST /api/biorepo/check` before the reviewer presses the
-    key (OF-BLD-012.1 F1.5). There is still only one place the rules live;
+    key. There is still only one place the rules live;
     asking and deciding cannot drift apart because they are the same code.
     """
     reviewer = (decision.reviewer or "").strip()
@@ -365,7 +370,15 @@ def write(decision: ReviewDecision, *, dry_run: bool = False) -> ReviewDecision:
         section_id = decision.sectionId or rec.sectionId
         if quote is None and (_is_gold(decision) or typed):
             quote = rec.quote
-        if quote is not None:
+        # A plain accept places the record's own number, anchored on the
+        # record's own quote again under today's rules, so a record kept while
+        # rule 3 compared a number in a unit that does not convert bare
+        # (H3-01: '$2.15/gal' kept as 'exact' on 2.15 USD kg⁻¹, or one kept as
+        # 'converted') is refused here. The decision is kept as sent.
+        anchored_on = quote
+        if anchored_on is None and rec.quote:
+            anchored_on = rec.quote
+        if anchored_on is not None:
             # Every value the promoted record will carry has to sit in the
             # quote: the correction (which becomes the record's value) and
             # the gold value, or the record's own when neither was typed.
@@ -379,7 +392,7 @@ def write(decision: ReviewDecision, *, dry_run: bool = False) -> ReviewDecision:
                     "field": rec.field,
                     "value": value_unit.value,
                     "unit": value_unit.unit,
-                    "quote": quote,
+                    "quote": anchored_on,
                     "method": rec.method,
                     # What the record carries about the value (F1.3). A
                     # gold decision on a record whose source states a range
@@ -396,6 +409,7 @@ def write(decision: ReviewDecision, *, dry_run: bool = False) -> ReviewDecision:
                         "quote",
                         f"the quote for {decision.recordId} fails anchoring on rule '{rule}': {detail}",
                     )
+        if quote is not None:
             stored.quote = quote
             stored.sectionId = section_id
 

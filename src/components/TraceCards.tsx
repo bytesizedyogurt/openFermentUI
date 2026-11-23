@@ -7,8 +7,8 @@
 // marks are the service's.
 import { useEffect, useMemo, useState } from 'react';
 import { Box, Cpu, MessageSquare } from 'lucide-react';
-import type { Provenance } from '@/data/types';
 import { watchEvents, type ServiceEvent } from '@/lib/events';
+import type { Provenance } from '@/lib/studies';
 import { href } from '@/router';
 import { ProvenanceBadge } from './Provenance';
 import { Card, cx } from './ui';
@@ -51,13 +51,13 @@ interface ArtifactCard {
   since: number;
 }
 
-export type TraceCard = JobCard | TurnCard | ArtifactCard;
+type TraceCard = JobCard | TurnCard | ArtifactCard;
 
 const str = (v: unknown): string => (typeof v === 'string' ? v : '');
 const when = (e: ServiceEvent) => Date.parse(e.at) || Date.now();
 
 /** The cards after one event: a new card, or the card the event is about brought up to date. */
-export function withEvent(cards: TraceCard[], e: ServiceEvent): TraceCard[] {
+function withEvent(cards: TraceCard[], e: ServiceEvent): TraceCard[] {
   const d = e.data;
   const replace = (key: string, make: (old: TraceCard | undefined) => TraceCard | null): TraceCard[] => {
     const old = cards.find((c) => c.key === key);

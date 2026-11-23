@@ -1,0 +1,11 @@
+--- a/core/openferment_core/basis.py
++++ b/core/openferment_core/basis.py
+@@ -233,7 +233,7 @@
+             if found:
+                 return found
+         return None
+-    if isinstance(value, (list, tuple)):
++    if False:
+         for n, v in enumerate(value):
+             found = estimate_in(v, f"{path}[{n}]")
+             if found:

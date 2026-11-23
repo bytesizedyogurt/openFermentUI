@@ -1,0 +1,23 @@
+EXPECTED: a fed-batch with mu_max 0 and no maintenance or product terms takes up no sugar; its series meets the
+EXPECTED: closed form (V = V0 + F t, every concentration diluted) to the integrator's 1e-6, so massBalance is ok
+EXPECTED: and no 'does not close' flag is raised (kinetics.py:88-94: the check catches a wrong right-hand side,
+EXPECTED: never integrator error); a fed-batch with growth closes as a control.
+NOTICE:  database "bh_r_h4_04_svc" does not exist, skipping
+noUptakeSugar: series against the closed form, worst relative error V 6.28e-16, X 1.07e-06, S 1.20e-06, P 1.07e-06
+noUptakeSugar: massBalance closure 1 ok False
+noUptakeSugar: note: Sugar consumed, 8.45561e-05 g, against the consumption states and against what the cells, product and store say through the yields: within 1 of it, outside the 1% closure, so the rate laws or their parameters do not hold together. The check catches a wrong rate law, not the integrator's error, which the tests hold.
+noUptakeSugar: flags ['The mass balance does not close: 1 against 1%.']
+noUptakeWater: series against the closed form, worst relative error V 1.93e-15, X 1.33e-06, S 1.33e-06, P 1.33e-06
+noUptakeWater: massBalance closure 1.5 ok False
+noUptakeWater: note: Sugar consumed, -1.5429e-05 g, against the consumption states and against what the cells, product and store say through the yields: within 1.5 of it, outside the 1% closure, so the rate laws or their parameters do not hold together. The check catches a wrong rate law, not the integrator's error, which the tests hold.
+noUptakeWater: flags ['The mass balance does not close: 1.5 against 1%.']
+control: massBalance closure 2.13e-07 ok True
+control: note: Sugar consumed, 108.71 g, against the consumption states and against what the cells, product and store say through the yields: within 2.1e-07 of it. The check catches a wrong rate law, not the integrator's error, which the tests hold.
+control: flags []
+VERDICT {"noUptakeSugar": {"closure": 1.0, "ok": false, "flags": ["The mass balance does not close: 1 against 1%."], "consumedG": 8.45561e-05, "inventoryG": 120.0, "worstRel": {"V": 6.28428127146315e-16, "X": 1.0657027020993806e-06, "S": 1.1986814562766508e-06, "P": 1.0657027020262907e-06}}, "noUptakeWater": {"closure": 1.4999999999424345, "ok": false, "flags": ["The mass balance does not close: 1.5 against 1%."], "consumedG": -1.5429e-05, "inventoryG": 20.0, "worstRel": {"V": 1.9308226515220117e-15, "X": 1.329444091271448e-06, "S": 1.3294440915068153e-06, "P": 1.3294440915068153e-06}}, "control": {"closure": 2.130408941385338e-07, "ok": true, "flags": [], "consumedG": 108.71, "inventoryG": 110.0}}
+OBSERVED: noUptakeSugar: series meets the closed form within 1.20e-06; massBalance closure 1, ok False; flags ['The mass balance does not close: 1 against 1%.']
+OBSERVED: noUptakeSugar: the 'sugar consumed' the closure divides by is 8.456e-05 g, 7.0e-07 of the 120 g the vessel held and was fed (the integrator's rtol is 1e-6), and the true figure is 0 g
+OBSERVED: noUptakeWater: series meets the closed form within 1.33e-06; massBalance closure 1.5, ok False; flags ['The mass balance does not close: 1.5 against 1%.']
+OBSERVED: noUptakeWater: the 'sugar consumed' the closure divides by is -1.543e-05 g, 7.7e-07 of the 20 g the vessel held and was fed (the integrator's rtol is 1e-6), and the true figure is 0 g
+OBSERVED: control (growth): massBalance closure 2.13e-07, ok True
+RESULT: DEFECT

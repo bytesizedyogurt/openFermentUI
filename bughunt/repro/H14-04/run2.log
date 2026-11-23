@@ -1,0 +1,12 @@
+service http://127.0.0.1:9084 over fresh database bh_r_h14_04_wit, fixture mode, no key
+step 1: pasted document 590a0fa5790f4190a21b80c698568408
+step 2: its passage p0
+step 3: extracted through the service (fixture response): 3 candidates anchored: cl1-590a0fa5790f4190a21b80c698568408-aff43a3b cl1-590a0fa5790f4190a21b80c698568408-36ae2aa7 cl1-590a0fa5790f4190a21b80c698568408-8cfb552a
+step 4: accepted as written: cl1-590a0fa5790f4190a21b80c698568408-aff43a3b verified gold None corrected None
+step 4: accepted as written: cl1-590a0fa5790f4190a21b80c698568408-36ae2aa7 verified gold None corrected None
+step 5: rejected: cl1-590a0fa5790f4190a21b80c698568408-8cfb552a rejected wrong value
+step 6: GET /api/witness/runs: run claude-1, results (values reviewers typed, scored) 0, falsePositives 1
+step 7: the Witness screen at /p/h14-04/biorepo/witness: {"callout":["No gold annotations yet","Precision and recall are undefined without a gold set. Flag records for gold in the review queue and this screen fills in."],"counts":["tp 0 · fp 1 · fn 0. A value or unit mismatch is counted twice — once as a false positive for the wrong record produced, once as a false negative for the gold record missed — which is why F1 falls faster than a raw error count suggests. The same gold set is used for every run, so its size and paper coverage only move when you promote a record in the review queue."],"precision":{"value":"0.0%","tickClass":"tick-gold","label":"Gold · a value a reviewer typed."},"recall":{"value":"—","tickClass":"tick-gold","label":"Gold · a value a reviewer typed."}}
+EXPECTED: with no gold value (results 0) the callout says precision and recall are undefined without a gold set, and the precision tile says undefined (—), as the recall tile does
+OBSERVED: callout "No gold annotations yet / Precision and recall are undefined without a gold set. Flag records for gold in the review queue and this screen fills in."; precision tile "0.0%" on tick-gold ("Gold · a value a reviewer typed."); recall tile "—"; "tp 0 · fp 1 · fn 0"; API results 0, falsePositives 1 after two acceptances and one rejection
+RESULT: DEFECT

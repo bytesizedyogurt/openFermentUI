@@ -16,6 +16,12 @@
 // view opens on the first product the shelf computes for. When the shelf
 // names no product, the view says so.
 //
+// OPENING THE TAB KEEPS. Each computation the tab asks for (POST
+// /api/geneos/ceiling per model, /frontier and /mix) is kept as an artifact
+// (lib/geneos.ts), so a first open with a new product, sugar or model writes
+// artifacts to the project; an artifact is kept once per tool, version and
+// inputs, so a later open reads the same ones back. The tab says so.
+//
 // SCENARIOS ABOVE A CEILING (OF-BLD-019 §5.2, D11). Under the chosen model
 // and sugar, each Proforma scenario in view whose yield, as it binds it, is
 // above that model's newest stored ceiling is listed with a link to it. The
@@ -24,7 +30,7 @@
 // and clamps nothing.
 import { useEffect, useMemo, useState } from 'react';
 import { Calculator } from 'lucide-react';
-import type { CeilingCheck, ExtractionRecord, GeneosModelInfo, GeneosResult, Scenario } from '@/data/types';
+import type { CeilingCheck, FlowsheetInfo, Scenario } from '@/lib/proforma';
 import { proformaScope, useStore } from '@/store';
 import { href, navigate, useRoute } from '@/router';
 import { Callout, EmptyState } from '@/components/ui';
@@ -41,14 +47,16 @@ import {
   geneosMix,
   geneosModels,
   type FrontierPointOut,
+  type GeneosModelInfo,
+  type GeneosResult,
   type MixPointOut,
 } from '@/lib/geneos';
-import { ceilingCheck } from '@/lib/proforma';
+import { ceilingCheck, proformaShelf } from '@/lib/proforma';
 
 const UNIT = 'g g⁻¹';
 
 /** The one line the geneOS callout says, repeated where a ceiling is drawn. */
-export const NOT_A_VESSEL = 'Nothing on this screen predicts what a vessel will produce: a ceiling has no time axis and no vessel.';
+const NOT_A_VESSEL = 'Nothing on this screen predicts what a vessel will produce: a ceiling has no time axis and no vessel.';
 
 interface Loaded {
   ceilings: GeneosResult[];
@@ -73,11 +81,12 @@ export default function GeneOSModel() {
   const [loaded, setLoaded] = useState<Loaded | null>(null);
   const [busy, setBusy] = useState(false);
   const scenarios = useStore((s) => s.scenarios);
-  const createdScenarioIds = useStore((s) => s.createdScenarioIds);
   // OF-BLD-020 §2.2: a person's changes to a scenario's inputs are its scope's overrides.
   const parameterOverrides = useStore((s) => s.parameterOverrides);
   const proformaFits = useStore((s) => s.proformaFits);
   const [aboveCeiling, setAboveCeiling] = useState<{ scenario: Scenario; check: CeilingCheck }[]>([]);
+  // Proforma's shelf, which names the unit a scenario's typed yield is sent in (alpha 2.2 D2).
+  const [flowsheets, setFlowsheets] = useState<FlowsheetInfo[] | null>(null);
 
   const substrate = route.query.get('substrate') ?? 'glucose';
   const modelId = route.query.get('model') ?? '';
@@ -97,6 +106,8 @@ export default function GeneOSModel() {
     geneosModels(ctrl.signal).then(setShelf, (e: unknown) => {
       if (!ctrl.signal.aborted) setDown(e instanceof GeneosDown ? `${e.message} ${e.remedy}` : String(e));
     });
+    // A shelf that cannot be read leaves a typed yield with no unit, which the service refuses in words.
+    proformaShelf(ctrl.signal).then(setFlowsheets, () => !ctrl.signal.aborted && setFlowsheets([]));
     return () => ctrl.abort();
   }, []);
 
@@ -149,8 +160,9 @@ export default function GeneOSModel() {
 
   // OF-BLD-019 §5.2 — the Proforma scenarios, each asked of the
   // service once the ceilings above are computed and kept: the yield as the
-  // scenario binds it (its flowsheet when made here, its fermOS fits, the
-  // yield's override when typed), against the newest stored ceilings.
+  // scenario binds it (its flowsheet named, so one this browser has not yet
+  // saved binds as a kept one does, ADR-014; its fermOS fits; the yield's
+  // override when typed), against the newest stored ceilings.
   const scenarioAsks = useMemo(
     () =>
       scenarios
@@ -159,18 +171,21 @@ export default function GeneOSModel() {
           scenario: s,
           ask: {
             scenarioId: s.id,
-            flowsheet: createdScenarioIds.includes(s.id) ? (s.flowsheetId ?? s.modelId) : null,
+            flowsheet: s.flowsheetId ?? s.modelId,
             host: null,
             fits: proformaFits[s.id] ?? {},
             overrides: (parameterOverrides[proformaScope(s.id)] ?? []).filter((o) => o.key === 'yield'),
+            // A person's yield is sent in its input's unit, as the shelf states it for the scenario's flowsheet; a
+            // reading set as the yield goes in its own value and unit, which the ceiling door sets in the input's.
+            specs: (flowsheets ?? []).find((f) => f.id === (s.flowsheetId ?? s.modelId))?.inputs ?? [],
           },
         })),
-    [scenarios, createdScenarioIds, proformaFits, parameterOverrides],
+    [scenarios, proformaFits, parameterOverrides, flowsheets],
   );
   const asksKey = JSON.stringify(scenarioAsks.map((x) => x.ask));
   useEffect(() => {
     setAboveCeiling([]);
-    if (!loaded || !chosen) return;
+    if (!loaded || !chosen || flowsheets === null) return;
     const ctrl = new AbortController();
     Promise.allSettled(scenarioAsks.map(({ scenario, ask }) => ceilingCheck(ask, ctrl.signal).then((check) => ({ scenario, check })))).then(
       (results) => {
@@ -188,22 +203,17 @@ export default function GeneOSModel() {
     );
     return () => ctrl.abort();
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [loaded, chosen?.id, substrate, product, asksKey]);
+  }, [loaded, chosen?.id, substrate, product, asksKey, flowsheets === null]);
 
   // Only the yields of this product measured on this sugar are held against its ceilings.
   const { on: yields, elsewhere } = useMemo(
-    () => yieldsOnSugar(records as ExtractionRecord[], substrate, product),
+    () => yieldsOnSugar(records, substrate, product),
     [records, substrate, product],
   );
   const known = yieldFieldKnown(product);
-  const ceilings: Ceiling[] = (loaded?.ceilings ?? [])
-    .filter((c) => c.evidence)
-    .map((c) => ({
-      value: Number(c.evidence!.value),
-      model: `${c.modelId} ceiling`,
-      basis: c.evidence!.basis,
-      provenance: c.evidence!.provenance,
-    }));
+  const ceilings: Ceiling[] = (loaded?.ceilings ?? []).flatMap((c) =>
+    c.evidence ? [{ value: Number(c.evidence.value), model: `${c.modelId} ceiling`, basis: c.evidence.basis, provenance: c.evidence.provenance }] : [],
+  );
   const findings = [
     ...(loaded?.ceilings ?? []).filter((c) => c.finding).map((c) => `${c.modelId}: ${c.finding}`),
     ...(loaded?.failed ?? []),
@@ -219,7 +229,7 @@ export default function GeneOSModel() {
     // The shelf names no product to compute a ceiling for.
     return (
       <div className="space-y-4" data-testid="geneos-model">
-        <Callout kind="info" title="Stoichiometry, not a forecast">
+        <Callout kind="info" title="Stoichiometry: the cell's ceiling">
           {NOT_A_VESSEL}
         </Callout>
         <EmptyState
@@ -237,9 +247,14 @@ export default function GeneOSModel() {
 
   return (
     <div className="space-y-4" data-testid="geneos-model">
-      <Callout kind="info" title="Stoichiometry, not a forecast">
+      <Callout kind="info" title="Stoichiometry: the cell's ceiling">
         {NOT_A_VESSEL}
       </Callout>
+      <p className="text-caption text-ink-soft" data-testid="model-keeps">
+        Opening this tab asks the service for each model&rsquo;s ceiling and the chosen model&rsquo;s envelope and sugar mix, and
+        the service keeps each as an artifact of the project, once for each model, product and sugar; opening it again reads
+        the same artifacts back.
+      </p>
 
       <div className="flex flex-wrap items-end gap-3">
         <label className="text-caption text-ink-soft">

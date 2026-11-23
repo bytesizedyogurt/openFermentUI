@@ -1,4 +1,4 @@
-"""One tool registry, three callers (OF-BLD-014 §3.4, E.6).
+"""One tool registry, three callers.
 
 Postdoc's loop, the HTTP endpoints (`GET /api/tools`, `POST /api/tools/{name}`)
 and the MCP server all run a tool through `run`, so a rule enforced here is
@@ -7,14 +7,13 @@ enforced for every caller.
 The whitelist is closed, added phase by phase: `search_records` and
 `convert_units` (OF-BLD-014 Phase 3), `search_passages` (5), `yield_ceiling`
 (6), `growth_forecast` (7), `selling_price` (8), `draft_runbook` (9); then one
-read tool per module (OF-BLD-015 §7.2), written `<module>_read` because the
+read tool per module, written `<module>_read` because the
 Messages API refuses a dot in a tool name, and its write pair (§7.3); then
-`thermo_props` (OF-BLD-019 §4.2), a read offered loose; then Proforma's two
-(OF-BLD-019 §6.1): `run_flowsheet`, a free write through `proforma.run`, and
-`stream_table`, a read of a kept run's streams; then fermOS's two (OF-BLD-020):
+`thermo_props`, a read offered loose; then Proforma's two: `run_flowsheet`, a free write through `proforma.run`, and
+`stream_table`, a read of a kept run's streams; then fermOS's two:
 `fermos_simulate` (§3.4), a free write through `fermos.simulate`, and
 `fermos_vessel` (§4.2), a free write through `fermos_write`'s `design_vessel`;
-then pureOS's `pureos_build` (OF-BLD-020 §5.4), a free write through
+then pureOS's `pureos_build`, a free write through
 `pureos_write`'s train actions that builds and runs a train from unit type
 names and record ids; then `pureos_propose` (§7.2), a read: a train proposed
 by written rules, each naming the property it read; then the study tools of
@@ -46,6 +45,22 @@ alone is kept. A quantity nobody can be named for is refused.
 EVERY TOOL ACTS IN ONE PROJECT (ADR-005): the request's, the question's, or
 the one the MCP server was started in (`ToolContext.project`).
 
+AN ASSISTANT IS NAMED AS IT DECLARES ITSELF (alpha 2.2 D.0). Over MCP a
+client's `clientInfo` names it; at the HTTP endpoint the
+`X-OpenFerment-Assistant` header (ASSISTANT_HEADER) does, which the MCP
+server sends when it acts through a running service. Either way the call runs
+in the model's lane under that name, the name as `caller_name` writes it, and
+the context records the door it came in by (`ToolContext(model=<name>,
+via="mcp")` in the MCP server's own process, `via="http"` at the endpoint):
+its audit rows name that door and record no effort, since no model of the
+service ran, and a catalogue entry it keeps is replaced only by an outside
+assistant of the same name (catalogues.py).
+
+A WRITE'S ANSWER NAMES ITS AUDIT ROWS (alpha 2.2 E.16). `run` collects the id
+of every audit row the call's writes leave, a gated write's proposal among
+them (`audit.written`), and hands them back on the result's `auditIds`, oldest
+first, so a caller reads its write's row at `GET /api/audit` by that id.
+
 TOOL OUTPUT DISCIPLINE. A tool summarises in code before a model reads
 anything. `summary` is at most `MAX_SUMMARY_CHARS` as JSON; a tool that
 returns more is a defect in the tool, and the result says so in place of the
@@ -60,14 +75,14 @@ import functools
 import json
 import math
 import re
+import unicodedata
 from dataclasses import dataclass, field
 from datetime import datetime, timezone
-from typing import Any, Callable
+from typing import Annotated, Any, Callable
 
-from pydantic import BaseModel, ConfigDict, Field, ValidationError, field_validator
-from pydantic.json_schema import SkipJsonSchema
+from pydantic import BaseModel, ConfigDict, Field, ValidationError, ValidationInfo, WithJsonSchema, field_validator
 
-from ..models import Origin, Quantity, ToolInfo, ToolResult
+from ..models import READING_TO_FILL, Origin, Quantity, ToolInfo, ToolResult
 
 # The names E.6, OF-BLD-015, OF-BLD-019 §6.1 and OF-BLD-020 allow, whichever have been built.
 WHITELIST = (
@@ -146,6 +161,24 @@ COUNT_FIELDS = frozenset({"k", "limit"})
 # The fields a number may stand in inside a quantity (ADR-006): its value and its range.
 QUANTITY_FIELDS = frozenset({"value", "low", "high"})
 MAX_SUMMARY_CHARS = 9_000
+# The header an assistant names itself in at `POST /api/tools/{name}`, as
+# `<name>/<version>`, its value UTF-8 text; the MCP server's --service mode
+# sends its client's declared name in it.
+ASSISTANT_HEADER = "X-OpenFerment-Assistant"
+# The longest name an assistant's writes and typed numbers are marked with.
+MAX_CALLER = 200
+# The characters a name keeps none of: controls, format characters (a bidi
+# override among them, which would make an audit row read as another name)
+# and surrogates, which UTF-8 text holds none of.
+_UNNAMED = frozenset({"Cc", "Cf", "Cs"})
+
+
+def caller_name(raw: str) -> str:
+    """A name an assistant declared, as its writes and its typed numbers are
+    marked: control, format and surrogate characters dropped, whitespace
+    collapsed to one space, at most MAX_CALLER characters."""
+    kept = "".join(c for c in str(raw or "") if c.isspace() or unicodedata.category(c) not in _UNNAMED)
+    return " ".join(kept.split())[:MAX_CALLER]
 
 
 @dataclass
@@ -176,6 +209,23 @@ class ToolContext:
     # The project the call acts in; None acts in the current one (the
     # request's or the command's, projects.current).
     project: str | None = None
+    # The door an outside assistant's call came in by, its `model` the name
+    # the assistant declared: "mcp" for the MCP server in its own process,
+    # "http" for the HTTP endpoint's ASSISTANT_HEADER (which the MCP server
+    # started with --service sends). Empty for Postdoc's loop and for a
+    # person named with `?by=`.
+    via: str = ""
+
+    def door(self) -> str | None:
+        """The door a call in the model's lane came in by, as its audit row
+        and a catalogue entry it keeps record it: `postdoc` for Postdoc's
+        loop, `mcp` or `http` for an outside assistant; None for a call a
+        person makes."""
+        if self.via:
+            return self.via
+        if self.person.strip() and not self.model.strip():
+            return None
+        return "postdoc"
 
     def author(self) -> Origin | None:
         """The origin of a number this call types into a tool (ADR-006): the
@@ -233,11 +283,32 @@ class Tool:
         return ToolInfo(name=self.name, description=self.description, inputSchema=self.input_model.model_json_schema())
 
 
+# What a caller may name as a quantity's origin: a deposition's reading the
+# value is (ADR-006's measurement), which the service looks up; every other
+# origin the registry writes from who called (`stamped`).
+READING_ORIGIN = {
+    "type": "object",
+    "additionalProperties": False,
+    "required": ["kind", "ref"],
+    "properties": {
+        "kind": {"type": "string", "enum": ["measurement"]},
+        "ref": {"type": "string", "maxLength": 401, "description": (
+            "The reading, <deposition id>/<entry id>: a confirmed reading a person deposited at the bench, the one "
+            "that stands for its measure.")},
+    },
+}
+
+
 # A number as a caller types it into a tool (ADR-006). The registry writes
-# its origin from who called (`stamped`), so the caller's own is never read.
+# each quantity's origin from who called (`stamped`), keeping of the caller's
+# own origin a deposition's reading alone (its kind, ref and note), which the
+# service looks up.
 class QuantityIn(BaseModel):
     """A number you type: a value in a unit, and in words what it rests on.
-    The service marks it with who typed it."""
+    The service marks it with who typed it. A value that is a reading a
+    person deposited names the reading in `origin`, its value and unit the
+    reading's own: the service looks the reading up and marks the value with
+    the reading's depositor and time."""
 
     # A range or any other field is refused in words, never dropped unread.
     model_config = ConfigDict(extra="forbid")
@@ -245,7 +316,9 @@ class QuantityIn(BaseModel):
     value: float
     unit: str = Field(max_length=40, description="The value's unit, as the tool names it.")
     note: str = Field(default="", max_length=600, description="What the value rests on, in words.")
-    origin: SkipJsonSchema[Origin | None] = None
+    origin: Annotated[Origin | None, WithJsonSchema({"anyOf": [READING_ORIGIN, {"type": "null"}], "description": (
+        "Leave it out for a value you type. For a deposition's reading: {\"kind\": \"measurement\", \"ref\": "
+        "\"<deposition id>/<entry id>\"}, the value and unit then the reading's own, which the service checks.")})] = None
 
     @field_validator("value", mode="before")
     @classmethod
@@ -254,8 +327,19 @@ class QuantityIn(BaseModel):
             raise ValueError("a quantity's value is a number, never true or false")
         return v
 
+    @field_validator("origin", mode="wrap")
+    @classmethod
+    def _a_reading_waits_for_its_time(cls, v: Any, handler: Any, info: ValidationInfo) -> Any:
+        # A reading the caller names carries no depositor or time until the
+        # service looks it up (measurements.py).
+        if isinstance(v, dict) and v.get("kind") == "measurement":
+            return Origin.model_validate(v, context={**(info.context or {}), READING_TO_FILL: True})
+        return handler(v)
+
     def quantity(self) -> Quantity:
-        return Quantity(value=self.value, unit=self.unit, origin=self.origin)
+        # A reading's origin waits for the service to fill its depositor and time.
+        return Quantity.model_validate({"value": self.value, "unit": self.unit, "origin": self.origin},
+                                       context={READING_TO_FILL: True})
 
 
 REGISTRY: dict[str, Tool] = {}
@@ -338,6 +422,19 @@ def numbers_in(value: Any, path: str = "", quantities: frozenset[str] = frozense
     return found
 
 
+def non_finite_in(value: Any, path: str = "") -> list[str]:
+    """Where a number that is NaN or infinite stands in `value`, anywhere in
+    it (alpha 2.2 D0.6: every door that takes a run's values refuses one
+    before anything runs)."""
+    if isinstance(value, float) and not math.isfinite(value):
+        return [path or "input"]
+    if isinstance(value, dict):
+        return [p for k, v in value.items() for p in non_finite_in(v, f"{path}.{k}" if path else str(k))]
+    if isinstance(value, list):
+        return [p for n, v in enumerate(value) for p in non_finite_in(v, f"{path}[{n}]")]
+    return []
+
+
 def quantities_in(value: Any, quantities: frozenset[str], path: str = "") -> bool:
     """Whether a quantity stands in `value` where the tool asks for one."""
     if _shape(path) in quantities and is_quantity(value):
@@ -349,11 +446,39 @@ def quantities_in(value: Any, quantities: frozenset[str], path: str = "") -> boo
     return False
 
 
+# What a caller may write in a reading's origin: the reading (READING_ORIGIN),
+# and the note `stamped` reads beside every quantity's value.
+READING_FIELDS = frozenset({"kind", "ref", "note"})
+
+
+def reading_extras(value: Any, quantities: frozenset[str], path: str = "") -> list[str]:
+    """Where a quantity standing where the tool asks for one names a
+    deposition's reading as its origin and writes more than the reading
+    there (READING_FIELDS): each such field's path. The reading's depositor
+    and the time it was taken are the deposition's, which the service fills
+    from it, so a caller naming them is refused in words."""
+    found: list[str] = []
+    if isinstance(value, list):
+        for n, v in enumerate(value):
+            found += reading_extras(v, quantities, f"{path}[{n}]")
+    elif isinstance(value, dict):
+        wrote = value.get("origin")
+        if _shape(path) in quantities and is_quantity(value) and isinstance(wrote, dict) \
+                and wrote.get("kind") == "measurement":
+            found += [f"{path}.origin.{k}" if path else f"origin.{k}" for k in wrote if k not in READING_FIELDS]
+        for k, v in value.items():
+            found += reading_extras(v, quantities, f"{path}.{k}" if path else str(k))
+    return found
+
+
 def stamped(value: Any, origin: Origin, quantities: frozenset[str], path: str = "") -> Any:
     """`value` with the origin of every quantity standing where the tool asks
     for one written by the service: `origin`, with the note the caller wrote
     beside the value (or in its origin), and nothing else the caller wrote
-    there (ADR-006)."""
+    there (ADR-006). A quantity whose origin the caller named a deposition's
+    reading keeps that kind and the reading's ref, with the note, and nothing
+    else: the service looks the reading up and fills its depositor and its
+    time from the deposition (measurements.py)."""
     if isinstance(value, list):
         return [stamped(v, origin, quantities, f"{path}[{n}]") for n, v in enumerate(value)]
     if not isinstance(value, dict):
@@ -363,6 +488,10 @@ def stamped(value: Any, origin: Origin, quantities: frozenset[str], path: str = 
         wrote = value.get("origin")
         note = value.get("note") if isinstance(value.get("note"), str) else (
             wrote.get("note") if isinstance(wrote, dict) and isinstance(wrote.get("note"), str) else None)
+        if isinstance(wrote, dict) and wrote.get("kind") == "measurement":
+            out["origin"] = {"kind": "measurement", "ref": wrote.get("ref"),
+                             **({"note": note.strip()} if (note or "").strip() else {})}
+            return out
         out["origin"] = origin.model_copy(update={"note": (note or "").strip() or None}).model_dump(
             mode="json", exclude_none=True)
     return out
@@ -378,6 +507,11 @@ def run(name: str, raw: Any, ctx: ToolContext | None = None) -> ToolResult:
         return ToolResult(error=f"There is no tool named {name!r}. The tools are: {', '.join(sorted(REGISTRY))}.")
     if not isinstance(raw, dict):
         return ToolResult(error=f"{name} takes an object of named fields.")
+    infinite = non_finite_in(raw)
+    if infinite:
+        held = "holds a number that is" if len(infinite) == 1 else "hold numbers that are"
+        return ToolResult(error=f"{name} refused: {', '.join(infinite)} {held} NaN or infinite, and a number a tool "
+                                "takes is finite; nothing ran")
     quantities = _quantity_paths_of(name)
     numbers = numbers_in(raw, quantities=quantities)
     if numbers:
@@ -389,6 +523,12 @@ def run(name: str, raw: Any, ctx: ToolContext | None = None) -> ToolResult:
                 "for one, and k and limit are counts."
             )
         )
+    extras = reading_extras(raw, quantities)
+    if extras:
+        return ToolResult(error=(
+            f"{name} refused: a reading's origin names the reading alone, {{\"kind\": \"measurement\", \"ref\": "
+            f"\"<deposition id>/<entry id>\"}}; {', '.join(extras)} {'is' if len(extras) == 1 else 'are'} the "
+            "deposition's to say, and the service fills each from it"))
     if quantities_in(raw, quantities):
         author = ctx.author()
         if author is None:
@@ -400,18 +540,28 @@ def run(name: str, raw: Any, ctx: ToolContext | None = None) -> ToolResult:
     except ValidationError as e:
         problems = "; ".join(f"{'.'.join(str(p) for p in err['loc']) or 'input'}: {err['msg']}" for err in e.errors())
         return ToolResult(error=f"{name} refused its input: {problems}")
-    try:
-        from .. import projects
+    from .. import audit, projects
 
-        with projects.using(ctx.project) if ctx.project else contextlib.nullcontext():
+    # The ids of the audit rows the call adds, filled while it runs (audit.written).
+    audited: list[str] = []
+    try:
+        acting = projects.using(ctx.project) if ctx.project else contextlib.nullcontext()
+        with audit.written() as audited, acting:
             result = tool.run(parsed, ctx)
     except Exception as e:  # a defect or an outage, said in words to the caller
-        return ToolResult(error=f"{name} failed: {type(e).__name__}: {e}")
+        # A write that committed before the call raised stands, and its row is named; a row added inside a
+        # transaction the failure rolled back is gone, and none is named for it (audit.standing).
+        try:
+            standing = audit.standing(audited, ctx.project) if audited else []
+        except Exception:  # the store that failed the call may fail this read too: name no row
+            standing = []
+        return ToolResult(error=f"{name} failed: {type(e).__name__}: {e}", auditIds=standing)
     size = len(json.dumps(result.summary, ensure_ascii=False, default=str))
     if size > MAX_SUMMARY_CHARS:
         # Nothing the model never read may become citable (§5.R): the ids go
-        # with the summary. What the tool spent stays.
-        return result.model_copy(
+        # with the summary. What the tool spent stays, and so do the audit
+        # rows its writes left.
+        result = result.model_copy(
             update={
                 "summary": {},
                 "recordIds": [],
@@ -422,7 +572,8 @@ def run(name: str, raw: Any, ctx: ToolContext | None = None) -> ToolResult:
                 "error": f"{name} returned a summary of {size} characters, over the {MAX_SUMMARY_CHARS} a model may read.",
             }
         )
-    return result
+    # The answer names each audit row the call's writes left (alpha 2.2 E.16).
+    return result.model_copy(update={"auditIds": list(audited)}) if audited else result
 
 
 def infos() -> list[ToolInfo]:

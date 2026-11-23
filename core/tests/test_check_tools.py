@@ -1,4 +1,4 @@
-"""`pnpm check:tools` rule 2b and rule 6 (E.4‴), negative-tested (OF-BLD-019
+"""`pnpm check:tools` rule 2b and rule 6 (ADR-006, E.4‴), negative-tested (OF-BLD-019
 §6.R, review finding 17; OF-BLD-020 §3.4).
 
 Rule 2b holds every tool file other than `tools/writes.py` away from what
@@ -59,6 +59,14 @@ PLANTED = {
     "plant_keep_train.py": 'from ..pureos.kept import keep_train\n\n\ndef f(spec):\n    return keep_train(None, lambda _: spec, "m")\n',
     # The same, the store module aliased.
     "plant_kept_alias.py": 'from ..pureos import kept as k\n\n\ndef f(spec):\n    return k.keep_train(None, lambda _: spec, "m")\n',
+    # Alpha 2.2 D3: a kept forecast is a run of the kinetics engine, past writes.run_forecast.
+    "plant_forecast.py": "from .. import fermos\n\n\ndef f(fit):\n    return fermos.forecast_run(fit_artifact=fit)\n",
+    # The kinetics engine's keeper of a simulation, and the keeper of any run computed in the service's process.
+    "plant_keep_simulation.py": ('from .. import fermos_engine\n\n\ndef f(basis):\n'
+                                 '    return fermos_engine.keep_simulation("batch_v1", basis)\n'),
+    "plant_compute_kept.py": ("from ..engine import runs\n\n\ndef f(engine, basis):\n"
+                              '    return runs.compute_kept(engine, "a-thing", None, tool="a-tool", basis=basis, '
+                              'refusal=ValueError, sff_refused="words")\n'),
     # The store's private writer, which keep_train calls.
     "plant_kept_persist.py": ("from ..pureos import kept\n\n\ndef f(spec):\n"
                               '    return kept._keep("p", None, lambda _: spec, "m", effort=None, ask_id=None)\n'),
@@ -155,31 +163,46 @@ def test_the_copy_the_negative_test_plants_in_passes_as_the_tree_does(tmp_path):
     assert out.stdout.startswith("✓ check:tools")
 
 
-# Rule 6 (E.4‴): a number field planted in fermos_simulate's input, at the
-# top and nested; each must be named, and nothing else.
+# Rule 6 (E.4‴): a number field planted in a fermOS or a pureOS tool's input,
+# at the top and nested; each must be named, and nothing else. The fermOS
+# tools take ids and words through alpha 2.2 (the plan's amendment to D2): a
+# person sets a fermOS value at the routes the screens use.
+PROPOSE_CLASS = 'class PureosProposeInput(BaseModel):\n    model_config = ConfigDict(extra="forbid")\n'
 SIM_CLASS = 'class FermosSimulateInput(BaseModel):\n    model_config = ConfigDict(extra="forbid")\n'
 PLANTED_FIELDS = ('    hours: float = Field(0.0, description="a STAND-IN numeric field, planted")\n'
                   '    byKey: dict[str, list[int]] = Field(default_factory=dict, description="a STAND-IN, planted")\n'
                   '    limit: dict[str, int] = Field(default_factory=dict, description="a count name, planted nested")\n')
+PLANTED_AT = ["byKey.additionalProperties.items", "hours", "limit.additionalProperties"]
 
 
-def test_rule_6_names_a_numeric_field_in_a_fermos_tools_input_and_lets_the_top_level_counts_stand(tmp_path):
+def _planted_errors(tmp_path, module: str, header: str) -> list[str]:
+    """check:tools' errors with PLANTED_FIELDS planted under `header` in tools/<module>, the stale TOOLS.md aside."""
     root = _copy(tmp_path)
-    source = root / "core" / "openferment_core" / "tools" / "fermos.py"
+    source = root / "core" / "openferment_core" / "tools" / module
     text = source.read_text(encoding="utf-8")
-    assert text.count(SIM_CLASS) == 1, "fermos_simulate's input class moved; plant the fields where it is"
-    source.write_text(text.replace(SIM_CLASS, SIM_CLASS + PLANTED_FIELDS), encoding="utf-8")
+    assert text.count(header) == 1, f"the input class moved out of tools/{module}; plant the fields where it is"
+    source.write_text(text.replace(header, header + PLANTED_FIELDS), encoding="utf-8")
     out = _check(root)
     assert out.returncode == 1, out.stdout + out.stderr
     errors = [line.strip()[2:] for line in out.stdout.splitlines() if line.strip().startswith("- ")]
     # A field planted in a tool's input is a schema docs/TOOLS.md does not hold yet (rule 5).
     stale = [e for e in errors if e.startswith("docs/TOOLS.md differs from what the registry writes")]
-    errors = [e for e in errors if e not in stale]
     assert len(stale) == 1, out.stdout
-    where = sorted(e.split(" at ", 1)[1].split(":", 1)[0] for e in errors)
-    assert where == ["byKey.additionalProperties.items", "hours", "limit.additionalProperties"], out.stdout
+    return [e for e in errors if e not in stale]
+
+
+def test_rule_6_names_a_numeric_field_in_a_pureos_tools_input_and_lets_the_top_level_counts_stand(tmp_path):
+    errors = _planted_errors(tmp_path, "pureos.py", PROPOSE_CLASS)
+    assert sorted(e.split(" at ", 1)[1].split(":", 1)[0] for e in errors) == PLANTED_AT, errors
+    assert all(e.startswith("pureos_propose's input schema holds a numeric field at ") and "(E.4‴)" in e
+               for e in errors), errors
+
+
+def test_rule_6_names_a_numeric_field_in_a_fermos_tools_input_and_lets_the_top_level_counts_stand(tmp_path):
+    errors = _planted_errors(tmp_path, "fermos.py", SIM_CLASS)
+    assert sorted(e.split(" at ", 1)[1].split(":", 1)[0] for e in errors) == PLANTED_AT, errors
     assert all(e.startswith("fermos_simulate's input schema holds a numeric field at ") and "(E.4‴)" in e
-               for e in errors), out.stdout
+               for e in errors), errors
 
 
 

@@ -1,0 +1,165 @@
+{
+  "candidates": [
+    {
+      "id": "H13-01",
+      "title": "A keyless fresh clone following README's Run it gets no database: db:migrate refuses, and prototype:up's session-start never writes the address",
+      "severity": "S2",
+      "kind": "Broken use",
+      "area": "README.md Run it; scripts/session-start.sh; scripts/prototype-up.sh",
+      "statement": "On a fresh clone with no key, README's Run it block fails: `pnpm db:migrate` refuses because no OPENFERMENT_DATABASE_URL is named, and `pnpm prototype:up` runs session-start.sh, whose database step adds the development address only when core/.env already exists, so the service starts, /api/health says ok, the app is served and every project route answers 503.",
+      "contract": "README.md:46-47 \"Without a key the app runs whole, and the steps that need a model say so.\"; README.md:41 \"pnpm db:up && pnpm db:migrate     # PostgreSQL 16 or later with pgvector; or name a server in core/.env\"; scripts/session-start.sh:18-20 \"4. the database (ADR-001): when PostgreSQL answers on 127.0.0.1 and core/.env names none, the development address (compose.yaml's) joins core/.env; then pnpm db:migrate\"",
+      "reproCommand": "bash bughunt/notes/H13/scripts/h13_01_keyless.sh <a clean worktree at 2047f5a with core/.venv and dist/, no core/.env> 8932",
+      "expected": "With PostgreSQL answering on 127.0.0.1, no key and no core/.env, session-start's database step writes the development address, db:migrate migrates it, and Home lists and makes projects.",
+      "observed": "The step, read from session-start.sh and run on a clone with no core/.env, writes nothing (the same step on a clone whose core/.env holds a key line writes the address). The service started as prototype:up starts it there answers GET /api/health {\"ok\":true,...,\"hasKey\":false}, GET / 200, and GET and POST /api/projects 503 \"OPENFERMENT_DATABASE_URL is not set. Put it in core/.env: ...\"; database_url(), which db:migrate reads, refuses in the same words, so README line 41 stops there.",
+      "cause": "scripts/session-start.sh:62 (`if [ -e core/.env ] && ...` guards the write, so an absent file is never given the address); README.md:41 runs db:migrate with no step naming a database; core/openferment_core/db/engine.py:51-58 has no default address; core/openferment_core/api.py:467 health reports ok with no database",
+      "confidence": "high",
+      "fixSize": "small",
+      "evidence": "scripts/session_start_db.sh runs the step as the script holds it in two scratch clones (stand-in pnpm): case 'no key: no core/.env' leaves core/.env absent; case 'a key' adds OPENFERMENT_DATABASE_URL. h13_01_keyless.sh then starts the worktree's service on 8932 with OPENFERMENT_DATABASE_URL empty and the built app: health ok, / 200, /api/projects 503 (GET and POST). The same refusal came from `uv run python -m openferment_core.engine.conform mirror` in the clean worktree."
+    },
+    {
+      "id": "H13-02",
+      "title": "`pnpm lit:report` erases the hand-written sections of the committed retrieval report",
+      "severity": "S3",
+      "kind": "Drift",
+      "area": "docs/reports/literature-retrieval.md; core/openferment_core/literature/report.py",
+      "statement": "The committed docs/reports/literature-retrieval.md says it is written by `pnpm lit:report` and not to be edited, yet holds 37 lines added by hand (the sections 'What this run measured' and 'What waits on the account', with the graph dry run's measured passages, batches and costs); the documented demo command, run offline and keyless, rewrites the file and drops them, and no project render writes them back, since render() has no such sections.",
+      "contract": "docs/reports/literature-retrieval.md:1 \"Written by `pnpm lit:report` (core/openferment_core/literature/report.py); regenerate, do not edit.\"; docs/reports/literature-retrieval.md:91 \"the next `pnpm lit:report --project ethanol ... --render` writes this project's part whole from its own run, these two sections with it\"; CLAUDE.md:106 \"`pnpm lit:report` measures retrieval against the kit's seed questions\"",
+      "reproCommand": "bash bughunt/notes/H13/scripts/h13_02_lit_report.sh <a disposable worktree at 2047f5a with core/.venv> (runs lit:report through lit_report_bh.py, which names its scratch database bh_h13_lit_report_*, then restores the two files)",
+      "expected": "Regenerating the report moves only what its generator owns (the dates and the commit) and keeps every section of the committed record, or the committed file holds generated text alone.",
+      "observed": "126 lines before, 89 after. The demo's numbers reproduce exactly (only generated_at, git_commit, latest_ingested_at and the date move); the comment at line 91 and the sections '### What this run measured' and '### What waits on the account' are deleted (bughunt/notes/H13/logs/lit-report.diff).",
+      "cause": "core/openferment_core/literature/report.py:195-199 (_save rewrites the whole Markdown: the demo text, PROJECTS_MARK, then render() of each part kept in the JSON); report.py:732 render() writes The corpus, The ground truth, Retrieval, The judge's relevance, Answers, Routes and Cost alone, so text added by hand after a part has no source to come back from",
+      "confidence": "high",
+      "fixSize": "small",
+      "evidence": "Ran `python -m openferment_core.literature_live report` (the pnpm lit:report entry) in the H13 worktree with OPENFERMENT_TEST_DATABASE_URL on the hunt's server and the scratch name prefixed bh_h13_: exit 0 in 6 s; `git diff --stat` 2 files, 4 insertions, 41 deletions; the project part above the hand-added text came back byte for byte."
+    },
+    {
+      "id": "H13-03",
+      "title": "`pnpm ready`'s model rows check the plan and index routes alone; moved explain, extract and judge routes pass unchecked",
+      "severity": "S3",
+      "kind": "Contract break",
+      "area": "core/openferment_core/ready.py; docs/runbooks/live-host-install.md step 4",
+      "statement": "The `model` row asks the Models API about the plan route's chain and the `roles` row about the plan and index chains (llm.ROLES is answer and index), so an OPENFERMENT_ROUTES that moves explain, extract or judge to models the key may not use reads ✓ on both rows, and the live loop finds out at the first extraction or judgement.",
+      "contract": "docs/runbooks/live-host-install.md:170-171 \"`model` and `roles`, the routes' models through the Models API\"; CLAUDE.md:29 \"`pnpm ready` ... says in rows whether the service can run: the database, both schemas, pgvector, the embedder, the workers, each registered engine, the model routes and the key\"",
+      "reproCommand": "cd core && OPENFERMENT_DATABASE_URL=<a migrated bh_ database> .venv/bin/python ../bughunt/notes/H13/scripts/ready_routes.py",
+      "expected": "The rows name every route's models and warn that claude-extract-unlisted and claude-judge-unlisted, which the stand-in Models API does not list for the key, cannot serve explain, extract and judge.",
+      "observed": "\"✓ model: the key is accepted; claude-opus-5-5 then claude-sonnet-5-5 on the plan route, effort high\" and \"✓ roles: answer: claude-opus-5-5 → claude-sonnet-5-5; index: claude-haiku-5-5; every model listed for this key\"; the Models API was asked about claude-haiku-5-5, claude-opus-5-5 and claude-sonnet-5-5 alone, and never about the two models the moved routes name.",
+      "cause": "core/openferment_core/llm.py:139 ROLES = (\"answer\", \"index\") with :152 ROLE_FAMILIES mapping answer to plan; core/openferment_core/ready.py:433 (check_model iterates llm.chain(), the plan route) and ready.py:499 (check_roles iterates llm.ROLES)",
+      "confidence": "high",
+      "fixSize": "small",
+      "evidence": "ready_routes.py sets OPENFERMENT_ROUTES moving judge, extract and explain to two names, calls ready.check_model(True, ...) and ready.check_roles(True, ...) as ready.run does with a key, with a stand-in client whose models.retrieve raises anthropic.NotFoundError for those two names; no network, no key. The routing table read back shows the moved routes; both rows print ✓. docs/reports/model-routing-2026-11.md:113 shows the build's own method moving the judge route this way."
+    },
+    {
+      "id": "H13-04",
+      "title": "`pnpm eval` answers a missing or unknown project with tracebacks or an empty summary, where lit:graph and conform refuse in words",
+      "severity": "S4",
+      "kind": "Inconsistency",
+      "area": "core/openferment_core/evaluation.py",
+      "statement": "Asked with no OPENFERMENT_PROJECT, `pnpm eval seed` prints a Python traceback ending in ProjectRequired; asked with a project the database lacks it prints an asyncpg ForeignKeyViolationError traceback with the SQL insert, and `pnpm eval summary` answers an empty summary with exit 0, where `pnpm lit:graph` and `conform` say in words that the store holds no such project and exit 2.",
+      "contract": "core/openferment_core/evaluation.py:38-39 \"A command asked of questions the suite cannot ask as named exits 2 in words, having asked nothing.\"; the other doors for the same case: `pnpm lit:graph --project nope --dry-run` answers \"The store holds no project 'nope'.\" (exit 2), and conform \"✗ database ... holds no project 'nope': name a project it holds\" (exit 2)",
+      "reproCommand": "bash bughunt/notes/H13/scripts/h13_04_eval_project.sh <checkout> <a migrated bh_ database>",
+      "expected": "Exit 2 with words naming the project, nothing written, as the other commands answer.",
+      "observed": "eval seed, no project: traceback, `openferment_core.projects.ProjectRequired: This names no project...`, exit 1. eval seed, project nope: traceback, `asyncpg.exceptions.ForeignKeyViolationError: insert or update on table \"eval_questions\" violates foreign key constraint \"fk_eval_questions_project_id\"` with the insert's parameters, exit 1. eval summary, project nope: {\"suite\": \"default\", \"tags\": {}, \"judgesDisagree\": []}, exit 0.",
+      "cause": "core/openferment_core/evaluation.py:98-110 (main catches neither ProjectRequired nor checks the project is held before seed and summary); core/openferment_core/postdoc/evaluate.py:383 seed and :1221 summary",
+      "confidence": "high",
+      "fixSize": "small",
+      "evidence": "Ran the four commands in the H13 worktree over bh_h13_svc (which holds projects h13 and stranger-project); the foreign key kept the database clean."
+    },
+    {
+      "id": "H13-05",
+      "title": "The example READMEs leave a stranger stuck: the mirror's check line fails from the directory its previous line names, and neither page names the database, the service or the project",
+      "severity": "S4",
+      "kind": "Drift",
+      "area": "examples/engines/openferment-engine-mirror/README.md; examples/agents/record-reader/README.md",
+      "statement": "Followed line by line, the mirror README puts the reader in the package's directory for its test line and then gives `cd core && ...`, which fails there; the check needs OPENFERMENT_DATABASE_URL naming a migrated database, which the page never names; 'then restart the service' names no way to start it; and the record-reader page's `--project proof` exists only behind `pnpm prove --keep`, which only docs/BASE.md names.",
+      "contract": "examples/engines/openferment-engine-mirror/README.md:9-10 \"Test from this directory, with no database: `../../../core/.venv/bin/python -m pytest`\" / \"Check it against the contract on a PostgreSQL server: `cd core && uv run python -m openferment_core.engine.conform mirror`\"; README.md:8 \"... from the repository's `core/` in bash or zsh, then restart the service\"; examples/agents/record-reader/README.md:2",
+      "reproCommand": "bash bughunt/notes/H13/scripts/h13_05_stranger.sh <a clean checkout with core/.venv and the mirror installed>",
+      "expected": "Each line runs from where the page leaves the reader, and the page names what its next command needs (a migrated database named by OPENFERMENT_DATABASE_URL, the service's start command, a project id).",
+      "observed": "Line 9: 30 passed. Line 10 from the same directory: `bash: line 1: cd: core: No such file or directory`. From the repository root with no database named: `✗ the checks run on a database of their own ... OPENFERMENT_DATABASE_URL is not set. Put it in core/.env: ...`. With a database named (bh_h13_cfg) every check holds; with prove --keep's service and project `proof`, record_reader.py exits 0.",
+      "cause": "examples/engines/openferment-engine-mirror/README.md:10 (written for the repository root after a line that leaves the reader in the package); both READMEs name none of the setup docs/BASE.md and docs/api/engines.md hold",
+      "confidence": "high",
+      "fixSize": "small",
+      "evidence": "Followed both pages from a clean worktree; the refusal words point the way, so a stranger recovers after one failed command each."
+    },
+    {
+      "id": "H13-06",
+      "title": "The CI workflow's comment names smoke.mjs; the smoke is scripts/smoke.ts",
+      "severity": "S4",
+      "kind": "Drift",
+      "area": ".github/workflows/verify.yml",
+      "statement": "verify.yml's header says 'smoke.mjs also honours CHROMIUM_PATH'; the tree holds scripts/smoke.ts, which reads CHROMIUM_PATH at line 167, and no smoke.mjs.",
+      "contract": ".github/workflows/verify.yml:15 \"(smoke.mjs also honours CHROMIUM_PATH)\"; package.json \"smoke\": \"tsx scripts/smoke.ts\"",
+      "reproCommand": "bash bughunt/notes/H13/scripts/h13_06_ci_comment.sh",
+      "expected": "The comment names scripts/smoke.ts.",
+      "observed": "verify.yml:15 names smoke.mjs; `ls scripts/smoke.*` lists scripts/smoke.ts alone; smoke.ts:167 reads CHROMIUM_PATH.",
+      "cause": ".github/workflows/verify.yml:15",
+      "confidence": "high",
+      "fixSize": "small",
+      "evidence": "grep and ls in the tree."
+    }
+  ],
+  "suspected": [
+    {
+      "title": "`pnpm eval run --suite ethanol` offline asks nothing and says nothing",
+      "tried": "Ran `pnpm eval run --suite ethanol --only eq-eth-01` offline: {\"runs\": [], ...} exit 0 with no words. postdoc/evaluate.py:911 says offline a question with no stand-in script is passed over; evaluation.py's usage text and docs/api/postdoc.md do not say so. Left as suspected: the code's docstring states the behaviour."
+    },
+    {
+      "title": "/api/health reports ok with no database configured, so prototype:up's, install.sh's and deploy.sh's health waits pass on a service that serves no project",
+      "tried": "Observed in H13-01's run (health {\"ok\":true} while /api/projects answers 503). The health docstring says 'Liveness, and what the service can actually do right now'; no contract names the database there, so it stays a suspicion folded into H13-01's evidence."
+    },
+    {
+      "title": "GET /api/audit?limit=0 answers one row",
+      "tried": "docs/TOOLS.md says the newest `limit` rows (200 unless asked, at most 500); limit=0 returned 1 row and limit=600 every row of an 11-row project, so the upper clamp could not be seen at this size."
+    },
+    {
+      "title": "CLAUDE.md's first line says an R line names its source; eight do not",
+      "tried": "awk over CLAUDE.md: lines 50, 57, 58, 113, 114, 136, 137, 140 name no source in the line (the stop conditions inherit their heading's §11.1); test_guidance checks labels, not sources. Wording only."
+    },
+    {
+      "title": "verify's time is stated two ways",
+      "tried": "CLAUDE.md: nine to eighteen minutes, 12 min 11 s at the close; the runbook's deploy --verify row: about twenty minutes in this build's container. Not measured (the hunt does not run verify whole)."
+    },
+    {
+      "title": "A non-superuser restore of the nightly dump exits 1",
+      "tried": "pg_dump --format=custom of bh_h13_svc then the runbook's createdb and pg_restore into bh_h13_restored as the role openferment: data and both schemas restored, but pg_restore exits 1 on `COMMENT ON EXTENSION vector` (must be owner). On the Mini the restoring user owns the cluster, so the runbook's line should hold there; not provable here."
+    }
+  ],
+  "needsLiveModel": [
+    "pnpm ready --probe, and the model and roles rows against the real Models API with a key (H13-03 with Anthropic's own answers)",
+    "pnpm eval run --live [--judge] and pnpm eval judge with a key",
+    "pnpm lit:graph --project <id> --by <name> (a build) and pnpm lit:report --project <id> --by <name> --judge",
+    "pnpm prove --live",
+    "ask_postdoc over the openferment MCP server"
+  ],
+  "held": [
+    "pnpm gen:api, gen:tools, gen:components and the three fixture exports regenerate byte-identical in a clean worktree at 2047f5a; the --check stages, check:tools and check:licences hold with the mirror engine installed too",
+    "Twelve verify stages run one by one in the worktree pass (check:secrets, gen:api/components/tools --check, check:plan, check:tools, check:licences, check:guild, check:state, check:figures, typecheck, test:reconcile); pnpm build in 18 s, dist identical to the tree's; verify's sixteen stages equal ADR-011 Implementation 8",
+    "Every backticked path in CLAUDE.md, README.md, docs/BASE.md, the runbook, docs/api/*.md, docs/TOOLS.md, COMPONENTS.md, THIRD_PARTY.md, the ADRs and the example READMEs resolves, besides files a person makes (core/.env, core/engines.local) and history; every route they name matches an operation of openapi.json, and all 133 operations carry x-openferment-scope",
+    "Every pnpm script and every python -m module the documents name exists; every worker op workers.md heads is in a HANDLERS table",
+    "Versions: BASE.md's and CLAUDE.md's pins equal core/uv.lock (BioSTEAM 2.54.0, thermosteam 0.54.2, biorefineries 2.35.1, cobra 0.32.1, sci-rag-kit 0.5.0, fastembed 0.9.0, fastapi 0.141.1, mcp 2.3.0, anthropic 1.0.0); every Python row of THIRD_PARTY.md equals the lock; SFF schema 0.2.4; Python 3.13.17 here",
+    "llm.ROUTES, plan.ceiling (32,000/64,000/128,000), KIT_ROOM, JUDGE_TOKENS, the 25 USD daily cap and 0.75 USD ask cap equal CLAUDE.md, postdoc.md and core/.env.example",
+    "Mirror engine from its README and BASE.md: editable install held to the lock, pytest 30 passed, conform's eight checks hold, GET /api/engines lists it, a REST run keeps one row, and its id recomputes from engines.md's recipe (3c401f682fe3c6f5); uv run keeps the editable install",
+    "record_reader.py exits 0 against the worktree's service and against prove --keep's (project proof), both naming example-agent/0.1, agent model, door http",
+    "TOOLS.md's MCP recipes: a nameless client is 'an assistant over MCP' on both doors, source words per door, four bad origins and a missing project refused in words, audit filters by action, target and who",
+    "db:migrate, db:reset <name>, db:reset openferment (refused before any connection), migrations revision, db:import-alpha1 (committed file; a bad --data refused in words)",
+    "ready --offline and ready with fixtures list the runbook's rows in its order; conform verdicts read back as ✓ on each engine row",
+    "conform kinetics --inputs with write_placeholder_inputs' file and conform biosteam: every check holds (7 s and 37 s)",
+    "prove --steps 3,8 (40 s) and prove --keep --steps 2: every check holds, and --keep prints the service's address, its project and its database",
+    "eval seed (2), seed --suite ethanol (14), run offline, run --only --tag, run --judge refused without --live, judge stops in words with exit 1 keyless, summary --rows",
+    "lit:graph --dry-run; lit:report's demo numbers reproduce exactly",
+    "geneos:fetch over cached files fetches nothing and checks both hashes; engines-local.sh installs, names a missing directory and exits 1 as its header says",
+    "The runbook's .env sed (mode 600, database line dropped) and its grep (an export or spaced line among them, no key printed); the launchd labels the runbook names equal scripts/host; bash -n passes on every shell script; the commits the tag push names exist",
+    "Targeted pytest: test_guidance, test_host, test_ready, test_prove_examples, test_licences, test_openapi, test_check_tools: 172 passed"
+  ],
+  "unexamined": [
+    {"item": "pnpm verify whole; pnpm test:core, test:sim, test:lit, test:slow, test:live whole", "reason": "the hunt's resource rule (4 CPUs shared); stages and targeted files run instead"},
+    {"item": "pnpm smoke", "reason": "it binds a kernel-chosen port and makes an openferment_smoke_* database, outside the hunt's port and name rules"},
+    {"item": "pnpm dev", "reason": "Vite's port 5173 is outside 8930-8939; vite.config.ts read"},
+    {"item": "pnpm prototype:up whole", "reason": "ports 8000 and 4173 are outside the hunt's range; its session-start database step and its service start were run in parts (H13-01)"},
+    {"item": "pnpm db:up", "reason": "Docker compose would bind 127.0.0.1:5432, held by the hunt's server; compose.yaml read"},
+    {"item": "pnpm prove steps 4, 5, 6, 7, 9 and 10", "reason": "CPU share; step 10's conform subprocesses would name openferment_conform_* databases; the baseline ran the full proof"},
+    {"item": "conform train --project", "reason": "needs a project holding a saved train; prove step 10 makes one; its refusal for a missing project was run"},
+    {"item": "install.sh, deploy.sh, nightly.sh, brew, pmset, launchctl, tailscale, the tag push", "reason": "macOS-only, sudo, or a write to the remote; bash -n and reading only"},
+    {"item": "docs/PROGRESS.md and docs/reports/handoff-2026-11.md", "reason": "the brief forbids opening them"},
+    {"item": "the mirror run on the Runs screen in a browser", "reason": "prove step 9's walk covers it and the screens belong to other hunts; the run was read through GET /api/runs"}
+  ]
+}

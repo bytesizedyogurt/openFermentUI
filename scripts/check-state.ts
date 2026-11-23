@@ -4,11 +4,54 @@
  * wait in, the rows laid over a load, and a flush that drops a refusal and
  * keeps everything from the first write the service did not answer; and the
  * overlay a project's pages load (src/lib/intake.ts), where a service that
- * answers and refuses is running and says why; the configurations a plant
- * is offered in (src/lib/library.ts), and the refusals an SFF import answers
- * in the service's words (src/lib/http.ts). Run by `pnpm check:state`,
- * offline: the service is a stand-in for `fetch`.
+ * answers and refuses is running and says why, and a candidate it brings
+ * enters the store as a record when the ontology names its field
+ * (src/lib/review.ts, `recordOf`); the configurations a plant
+ * is offered in (src/lib/library.ts), and those a thing of another engine is
+ * offered in on Studies' run card, each by the engine's title for it beside
+ * its name (src/lib/studies.ts, `offeredConfigurations`), as the card's line
+ * for the run it made names it (src/lib/pureos.ts, `ranWhat`; alpha 2.2
+ * E.18); the refusals an SFF import answers
+ * in the service's words (src/lib/http.ts), a refusal of a request's own
+ * fields among them; and the unit each person's change is sent in
+ * (src/lib/params.ts, `inputsOf`), a panel that shows part of its scope
+ * among them, a deposition's reading sent as the reading it names, in its own
+ * value and unit where its row keeps them (alpha 2.2 E.17), and a change kept
+ * with no origin sent as a person's assumption; the
+ * bench's readings as the service's lookup reads them (src/engine/readings.ts:
+ * a correction, the numbers that wait to be read back, a series); a
+ * train's changes named by their place (src/lib/pureos.ts,
+ * `trainInputs`), a Proforma scenario's run carrying its changes as typed
+ * inputs (src/lib/proforma.ts, `runBody`) and its ceiling check its typed
+ * yield (`ceilingQuery`), a reading among them in its own value and unit, the
+ * scenario page's binding with a person's value and a reading laid on
+ * (`laidOn`) and the questions it asks (`modellerQuestions`), the Proforma
+ * assumptions an older build reads holding a person's values alone
+ * (src/store.ts, `assumptionOfOverride`), a scenario card's counts (`inputCounts`, an input
+ * the vessel design binds apart from a chosen fit), the reference run a
+ * plant's page reads in its default configuration (`referenceRunOf`) and the
+ * runs kept from the retired reference entries it lists (`keptRunsOf`), and a
+ * run's grid read where it holds a dimension at one value
+ * (src/engine/interp.ts); and the runbooks a page makes (src/store.ts): a
+ * draft's predictions and measures kept as the service wrote them, the lock
+ * taken over them, and a runbook adopted, revised or promoted on the page
+ * among the rows the page sends; and the words every screen, component and
+ * module shows, which put a project's rows with the service and keep in this
+ * browser its preferences and the writes that wait for the service (ADR-014;
+ * alpha 2.2 E.19); and a reader's link to a record, which moves the page once,
+ * to the record's words, and brings its rail row into view inside the rail
+ * (src/screens/PaperReader.tsx, `revealInList`); and a corrected record, which reads as published the paper's
+ * value with the correction beside it on the review card and in Intake, its trail rebuilt from the service's
+ * decision on a reload, and a correction with no reviewer name, refused in words with nothing kept
+ * (src/lib/review.ts `publishedOf`; src/store.ts `editRecord`); and the fits fermOS → Forecast offers after a reload,
+ * the project's kept fits read from the service beside the session's (src/lib/fermos.ts `keptFits`, `forecastFits`;
+ * src/screens/FermOSForecast.tsx). Run by `pnpm check:state`, offline: the
+ * service is a stand-in for `fetch`. A fixture of a shape the service's
+ * models define is a whole value of its generated type (src/api/types.gen.ts).
  */
+import { readdirSync, readFileSync } from 'node:fs';
+import { join, relative } from 'node:path';
+import ts from 'typescript';
 import {
   EMPTY_STATE,
   applyEntries,
@@ -16,13 +59,63 @@ import {
   conversationsHeld,
   enqueue,
   flush,
+  sameOverrides,
   type OutboxEntry,
   type ProjectState,
 } from '../src/lib/projectState';
-import type { Deposition, LiveConversation, Scenario } from '../src/data/types';
+import type { Override, ParameterSpec } from '../src/lib/params';
+import type { LiveConversation, RunbookDraft } from '../src/lib/postdoc';
+import type { FlowsheetInfo, ProformaScenarioInfo, Scenario, ScenarioInput } from '../src/lib/proforma';
+import type { Artifact, BasisSource, Deposition, EngineRun, EngineThing, Prediction, Runbook } from '../src/lib/studies';
+import { offeredConfigurations } from '../src/lib/studies';
 import { loadOverlay } from '../src/lib/intake';
-import { ServiceDown, ServiceRefused, call } from '../src/lib/http';
+import { publishedOf, recordOf, type Candidate, type Overlay, type ReviewDecision } from '../src/lib/review';
+import { ONTOLOGY } from '../src/data/ontology';
+import { bodyWords, edited, type CatalogueEntry } from '../src/lib/catalogues';
+import { ServiceDown, ServiceRefused, call, detailWords } from '../src/lib/http';
 import { runnable, type LibraryPlant } from '../src/lib/library';
+import { inputsOf, readingLeftTheList } from '../src/lib/params';
+import { ranWhat, trainInputs, unitScope, type TrainSpec } from '../src/lib/pureos';
+import {
+  ceilingQuery,
+  inputCounts,
+  isReading,
+  keptRunsOf,
+  laidOn,
+  modellerQuestions,
+  readBackRows,
+  referenceRunOf,
+  retiredEntryOf,
+  runBody,
+  plainNote,
+  runSpecs,
+  stampsIn,
+} from '../src/lib/proforma';
+import { RAIL } from '../src/data/nav';
+import { COMPONENTS } from '../src/data/components';
+import { stubsFor, type SubsystemOwner } from '../src/data/subsystems';
+import { idTail, shortCite } from '../src/lib/cite';
+import { fmt } from '../src/engine/units';
+import { interpolate } from '../src/engine/interp';
+import { awaitingReadBack, correctedBy, correctionOf } from '../src/engine/readings';
+import { lockIntact, runbookLockHash } from '../src/engine/lock';
+import { assumptionOfOverride, byMakers, projectStateOf, queueOwed, snapshotOf, useStore } from '../src/store';
+import {
+  EMPTY_SNAPSHOT,
+  decisionKey,
+  decisionsIn,
+  emptyHeld,
+  foldParting,
+  hold,
+  holdLoaded,
+  mergeSnapshot,
+  owedGuild,
+  partingOf,
+  type DurableReviewDecision,
+  type DurableSnapshot,
+  type GuildOwed,
+} from '../src/lib/durable';
+import type { Guild, GuildPerson, GuildWithdrawal } from '../src/lib/guild';
 
 let fails = 0;
 const check = (label: string, ok: boolean, extra = '') => {
@@ -30,16 +123,43 @@ const check = (label: string, ok: boolean, extra = '') => {
   if (!ok) fails++;
 };
 
-const dep = { id: 'dep-1', runbookId: 'rb-1' } as unknown as Deposition;
-const scenario = { id: 'sc-1', name: 'S', pinned: false } as unknown as Scenario;
-const talk = { id: 'lc-1', turns: [] } as unknown as LiveConversation;
+// ── whole values of the service's shapes (src/api/types.gen.ts) ────────
+// A fixture of a shape the service's models define is a whole value of its
+// generated type, each field a placeholder, so the typecheck holds every
+// fixture to the service's shape; a check reads the fields it names.
+
+const AT = '2026-11-03T00:00:00Z';
+const aScenario = (id: string, more: Partial<Scenario> = {}): Scenario => ({
+  id, modelId: 'placeholder-flowsheet', kind: 'biosteam', name: 'S', description: '', product: '', pinned: false, ...more,
+});
+const aSpec = (key: string, unit: string, group = 'parameters'): ParameterSpec => ({
+  key, label: key, symbol: '', gloss: '', dimension: '', unit, min: null, max: null, step: null, scale: 'linear', group,
+  sourceRule: ['assumption'], note: null, boundsReason: 'a placeholder bound', choices: null, convention: null,
+});
+const anOverride = (scope: string, key: string, value: number | string, more: Partial<Override> = {}): Override => ({
+  scope, key, value, by: 'Ada', at: AT, origin: 'person-assumption', ...more,
+});
+const aShelfInput = (key: string, unit: string): FlowsheetInfo['inputs'][number] => ({ key, name: key, unit, dimension: '', kind: 'process', fields: [], note: '' });
+const aFlowsheet = (inputs: FlowsheetInfo['inputs']): FlowsheetInfo => ({
+  id: 'placeholder-flowsheet', title: 'A placeholder flowsheet', description: '', source: '', inputs, outputs: [], gridInputs: [],
+  leavesOut: [], priceBasis: null, priceOutput: null, program: null, brothStream: null, builtFrom: [],
+});
+const aConversation = (id: string): LiveConversation => ({ id, title: 'A placeholder conversation', startedAt: AT, turns: [] });
+const aDeposition = (id: string, more: Partial<Deposition> = {}): Deposition => ({
+  id, runbookId: 'rb-1', protocolId: null, operatorId: null, startedAt: AT, closedAt: null, state: 'running', entries: [],
+  observations: [], reconciliation: null, ...more,
+});
+
+const dep = aDeposition('dep-1');
+const scenario = aScenario('sc-1');
+const talk = aConversation('lc-1');
 const before: ProjectState = { ...EMPTY_STATE, depositions: [dep], scenarios: [scenario], conversations: [talk], fits: { 'sc-1': { mu: 'a'.repeat(16) } } };
 
 // ── changes ────────────────────────────────────────────────────────────
 
 check('nothing changed is nothing to send', changes(before, { ...before }, 'p', 'Ada').length === 0);
-const moved = { ...dep, entries: [] } as unknown as Deposition;
-const pinned = { ...scenario, pinned: true } as Scenario;
+const moved: Deposition = { ...dep, state: 'closed', closedAt: AT };
+const pinned: Scenario = { ...scenario, pinned: true };
 const after: ProjectState = { ...before, depositions: [moved], scenarios: [pinned], fits: {} };
 const sent = changes(before, after, 'p', 'Ada');
 check(
@@ -57,8 +177,8 @@ check('a deposition and a conversation that leave the page are never taken back'
 // the 30 newest, so stage C's 31 evaluation runs left every earlier answer
 // unreachable, and a link to one opened an empty pane.
 
-const kept = Array.from({ length: 51 }, (_, i) => ({ id: `lc-${i}`, turns: [] }) as unknown as LiveConversation);
-const begun = { id: 'lc-new', turns: [] } as unknown as LiveConversation;
+const kept = Array.from({ length: 51 }, (_, i) => aConversation(`lc-${i}`));
+const begun = aConversation('lc-new');
 const held = conversationsHeld(kept, [begun]);
 check(
   'every conversation the service keeps is held, newest first, after those the page began: a link to the oldest finds it',
@@ -75,6 +195,12 @@ check('a later write of a row replaces the one still unsent, and goes last', JSO
 check('the same row in another project is another write', enqueue([e('sc-1', 1, 'a')], [e('sc-1', 2, 'b')]).length === 2);
 const laid = applyEntries(before, [{ ...e('sc-1', null) }, { ...e('sc-9', pinned) }]);
 check('an owed write is laid over the loaded rows, a take-back removes', laid.scenarios.length === 1 && laid.scenarios[0] === pinned);
+const answered = { ...before, depositedBy: { 'dep-1': 'Ada' }, refused: [{ kind: 'runbooks', id: 'rb-old', why: 'a placeholder reason' }] };
+const answeredLaid = applyEntries(answered, [e('sc-9', pinned)]);
+check(
+  'what the service answers beside the rows, who deposited each deposition and the rows it cannot read, stays as it answered',
+  answeredLaid.depositedBy === answered.depositedBy && answeredLaid.refused === answered.refused && EMPTY_STATE.refused.length === 0,
+);
 
 // ── the flush ──────────────────────────────────────────────────────────
 
@@ -112,6 +238,564 @@ const three = [e('sc-1', { id: 'sc-1' }), e('sc-2', null, 'q'), e('sc-3', { id: 
     result.left.length === 2 && result.left[0] === three[1], `${result.left.length} left`);
 }
 
+// ── the browser's one snapshot, two tabs (H7-01) ──────────────────────
+//
+// Two tabs on one project while the service is away, each saving under the one key every tab shares
+// (src/lib/durable.ts). A save merges: what the tab owes now, beside every owed write in the stored snapshot it has
+// never held.
+{
+  const at = (n: number) => `2026-11-11T10:00:0${n}.000Z`;
+  const deposition = (id: string, reading: string, n: number): OutboxEntry =>
+    ({ project: 'p', kind: 'depositions', id, value: { id, entries: [reading] }, by: 'Ada', at: at(n) });
+  const snap = (outbox: OutboxEntry[], extra: Partial<DurableSnapshot> = {}): DurableSnapshot =>
+    ({ ...EMPTY_SNAPSHOT, savedAt: at(9), outbox, ...extra });
+  const save = (held: ReturnType<typeof emptyHeld>, mine: DurableSnapshot, stored: DurableSnapshot | null) => {
+    hold(held, mine);
+    return mergeSnapshot(mine, stored, held);
+  };
+  const ids = (x: DurableSnapshot) => JSON.stringify((x.outbox ?? []).map((e) => `${e.id}@${e.at.slice(18, 19)}`));
+  const tabA = emptyHeld();
+  const tabB = emptyHeld();
+  const fromA = deposition('dep-a', '5.5 USD/kg', 1);
+  const fromB = deposition('dep-b', '6.6 USD/kg', 2);
+  let stored = save(tabA, snap([fromA]), null);
+  stored = save(tabB, snap([fromB]), stored);
+  check('a tab that saves last keeps the other tab’s queued write beside its own, oldest first', ids(stored) === '["dep-a@1","dep-b@2"]', ids(stored));
+  {
+    const { result, asked } = await flushAgainst([{ status: 200 }, { status: 200 }], stored.outbox ?? []);
+    check('once both tabs have closed, the page that opens next sends both tabs’ writes', result.sent === 2 &&
+      asked[0] === 'PUT /api/state/depositions/dep-a p' && asked[1] === 'PUT /api/state/depositions/dep-b p', asked.join('; '));
+  }
+  const afterAnswer = save(tabA, snap([]), stored);
+  check('a write the tab held and the service answered leaves the store, and the other tab’s stays', ids(afterAnswer) === '["dep-b@2"]', ids(afterAnswer));
+  const againB = save(tabB, snap([fromB]), afterAnswer);
+  check('a tab that saves again over its own earlier save keeps the write it still owes, once', ids(againB) === '["dep-b@2"]', ids(againB));
+  const later = deposition('dep-a', '7.7 USD/kg', 3);
+  const rewritten = save(tabB, snap([fromB, later]), stored);
+  check('two writes of one row from tabs that never saw each other’s both stay, oldest first, for the service to rule on in order',
+    ids(rewritten) === '["dep-a@1","dep-b@2","dep-a@3"]', ids(rewritten));
+  const olderMine = save(tabA, snap([fromA]), rewritten);
+  check('a stored write later than the tab’s own write of the row stays beside it, oldest first',
+    ids(olderMine) === '["dep-a@1","dep-b@2","dep-a@3"]' && (olderMine.outbox ?? [])[2] === later, ids(olderMine));
+  {
+    // A page that loads the snapshot takes its writes as its own, then writes the row again: its later write
+    // replaces the one it took, so the one it took leaves with it.
+    const tabC = emptyHeld();
+    holdLoaded(tabC, stored, 'p');
+    const replaced = save(tabC, snap([fromB, deposition('dep-a', '8.8 USD/kg', 4)]), stored);
+    check('a page that took a write at load and wrote the row again keeps its own write alone',
+      ids(replaced) === '["dep-b@2","dep-a@4"]', ids(replaced));
+  }
+
+  const decision = (status: DurableReviewDecision['status'], n: number): DurableReviewDecision =>
+    ({ status, provenance: 'unverified', reviewer: 'Ada', at: at(n) });
+  const decA = emptyHeld();
+  const decB = emptyHeld();
+  let decided = save(decA, snap([], { reviewDecisions: { 'rec-1': decision('verified', 1) } }), null);
+  decided = save(decB, snap([], { reviewDecisions: { 'rec-2': decision('rejected', 2) } }), decided);
+  check('each tab’s review decision stays in the one snapshot', JSON.stringify(Object.keys(decided.reviewDecisions).sort()) === '["rec-1","rec-2"]');
+  decided = save(decB, snap([], { reviewDecisions: { 'rec-1': decision('rejected', 3), 'rec-2': decision('rejected', 2) } }), decided);
+  check('of two decisions on one record from two tabs, the later stands', decided.reviewDecisions['rec-1']?.status === 'rejected' &&
+    decided.reviewDecisions['rec-1']?.at === at(3) && 'rec-2' in decided.reviewDecisions, JSON.stringify(decided.reviewDecisions));
+  const answeredDecision = save(decA, snap([], { reviewDecisions: {} }), snap([], { reviewDecisions: { 'rec-1': decision('verified', 1), 'rec-3': decision('verified', 4) } }));
+  check('a decision the tab held and the service answered leaves the store, and another tab’s stays',
+    JSON.stringify(Object.keys(answeredDecision.reviewDecisions)) === '["rec-3"]', JSON.stringify(answeredDecision.reviewDecisions));
+  {
+    // A page that loads a decision on a record it has not loaded (another project's) leaves it in the store.
+    const tabQ = emptyHeld();
+    const loaded = snap([], { reviewDecisions: { 'rec-9': decision('verified', 5) } });
+    holdLoaded(tabQ, loaded, 'p');
+    const kept = save(tabQ, snap([], { reviewDecisions: {} }), loaded);
+    check('a loaded decision on a record the page has not loaded stays in the store', 'rec-9' in kept.reviewDecisions, JSON.stringify(kept.reviewDecisions));
+    const old = { ...loaded, savedAt: at(6), reviewDecisions: { 'rec-8': { status: 'verified', provenance: 'unverified', reviewer: 'Ada' } as DurableReviewDecision } };
+    const carried = save(emptyHeld(), snap([], { reviewDecisions: {} }), old);
+    check('a decision from before decisions carried their own time keeps its snapshot’s time when carried',
+      carried.reviewDecisions['rec-8']?.at === at(6), JSON.stringify(carried.reviewDecisions));
+  }
+  {
+    // Two projects hold one paper, so a record id may be both projects': each project's offline decision on it stays.
+    const inA = (n: number): DurableReviewDecision => ({ ...decision('verified', n), project: 'a', recordId: 'rec-x' });
+    const inB = (n: number): DurableReviewDecision => ({ ...decision('rejected', n), project: 'b', recordId: 'rec-x' });
+    let both = save(emptyHeld(), snap([], { reviewDecisions: { [decisionKey('b', 'rec-x')]: inB(1) } }), null);
+    both = save(emptyHeld(), snap([], { reviewDecisions: { [decisionKey('a', 'rec-x')]: inA(2) } }), both);
+    check('two projects’ offline decisions on a record of one id both stay, whichever is later',
+      Object.keys(both.reviewDecisions).length === 2 && decisionsIn(both, 'b')['rec-x']?.status === 'rejected' &&
+      decisionsIn(both, 'a')['rec-x']?.status === 'verified', JSON.stringify(both.reviewDecisions));
+    const legacy = snap([], { reviewDecisions: { 'rec-y': decision('verified', 3), 'rec-z': { ...decision('verified', 4), project: 'b' } } });
+    check('a page reads a decision saved before decisions named their project as its own, and another project’s as that project’s',
+      'rec-y' in decisionsIn(legacy, 'a') && !('rec-z' in decisionsIn(legacy, 'a')) && 'rec-z' in decisionsIn(legacy, 'b'));
+    const rekeyed = save(emptyHeld(), snap([], { reviewDecisions: { [decisionKey('a', 'rec-y')]: { ...decision('verified', 3), project: 'a', recordId: 'rec-y' } } }), legacy);
+    check('a decision kept by its record alone leaves once the page saves it under its project',
+      !('rec-y' in rekeyed.reviewDecisions) && decisionKey('a', 'rec-y') in rekeyed.reviewDecisions && 'rec-z' in rekeyed.reviewDecisions,
+      JSON.stringify(Object.keys(rekeyed.reviewDecisions)));
+  }
+  {
+    // A tab going away cannot read before it writes: it leaves its last snapshot and what it held under its own key,
+    // and the next page to load lays them in as the tab's own save would have.
+    const tabT = emptyHeld();
+    const tabU = emptyHeld();
+    const fromT = deposition('dep-t', '1.1 USD/kg', 1);
+    const answered = deposition('dep-done', '2.2 USD/kg', 2);
+    const fromU = deposition('dep-u', '3.3 USD/kg', 3);
+    let main = save(tabT, snap([fromT, answered]), null);
+    main = save(tabU, snap([fromU]), main);
+    // T's last change: the service answered dep-done, and T owes a new reading, then T closes before its save lands.
+    const fromT2 = deposition('dep-t2', '4.4 USD/kg', 4);
+    const lastOfT = snap([fromT, fromT2]);
+    hold(tabT, lastOfT);
+    const folded = foldParting(main, [partingOf(lastOfT, tabT)]);
+    check('a parting tab’s last writes are laid in, the other tab’s stay, and the write the service answered leaves',
+      ids(folded!) === '["dep-t@1","dep-u@3","dep-t2@4"]', ids(folded!));
+    check('a page with nothing stored lays in what a parting tab left', ids(foldParting(null, [partingOf(lastOfT, tabT)])!) === '["dep-t@1","dep-t2@4"]');
+    check('a snapshot no tab left anything beside stays as it is', foldParting(main, []) === main);
+    // A closed tab's choice of reviewer and of the person acted as stands only when its record is the later.
+    const owingOf = (_: string[]): GuildOwed =>
+      ({ ledger: { version: 1, people: [], evidence: [], policy: {} } as unknown as Guild, pending: [], withdrawals: [], actingId: null });
+    const closedEarly = { ...snap([fromT]), savedAt: at(1), reviewerName: 'Ada',
+      guildOwed: { p: { ...owingOf([]), actingId: 'p-ada' } } } as DurableSnapshot;
+    const savedSince = { ...main, savedAt: at(5), reviewerName: 'Bea', guildOwed: { p: { ...owingOf([]), actingId: 'p-bea' } } } as DurableSnapshot;
+    const byTime = foldParting(savedSince, [partingOf(closedEarly, emptyHeld())])!;
+    check('a closed tab’s older reviewer and acting person do not stand over a later save, and its owed writes are laid in',
+      byTime.reviewerName === 'Bea' && byTime.guildOwed?.p?.actingId === 'p-bea' && byTime.savedAt === at(5) && ids(byTime).includes('dep-t@1'),
+      JSON.stringify([byTime.reviewerName, byTime.guildOwed?.p?.actingId, byTime.savedAt]));
+    const closedLate = { ...closedEarly, savedAt: at(9), reviewerName: 'Cy' } as DurableSnapshot;
+    check('a closed tab’s later reviewer stands', foldParting(savedSince, [partingOf(closedLate, emptyHeld())])!.reviewerName === 'Cy');
+    // A later save by a tab in another project carries this project's block as it was; the closed tab's newer choice
+    // in its own project stands.
+    const inY = (actingId: string, when: string): GuildOwed => ({ ...owingOf([]), actingId, at: when });
+    const closedInY = { ...snap([]), savedAt: at(2), guildOwed: { y: inY('p-two', at(2)) } } as DurableSnapshot;
+    const laterInX = { ...snap([]), savedAt: at(3), guildOwed: { y: inY('p-one', at(1)), x: inY('p-x', at(3)) } } as DurableSnapshot;
+    const perProject = foldParting(laterInX, [partingOf(closedInY, emptyHeld())])!;
+    check('a closed tab’s newer choice of who it acts as in its project stands over that project’s older block',
+      perProject.guildOwed?.y?.actingId === 'p-two' && perProject.guildOwed?.x?.actingId === 'p-x',
+      JSON.stringify([perProject.guildOwed?.y?.actingId, perProject.guildOwed?.x?.actingId]));
+  }
+  {
+    // A person goes after the people who added and changed them, so a lead added offline is on the ledger first.
+    const person = (id: string, addedBy: string | null, updatedBy: string | null = null) => ({ id, addedBy, updatedBy }) as unknown as GuildPerson;
+    const order = byMakers([person('p-ann', 'p-lead', 'p-lead2'), person('p-lead2', 'p-lead'), person('p-lead', null), person('p-bo', 'p-lead')]);
+    check('people are sent after the people who added and changed them',
+      JSON.stringify(order.map((p) => p.id)) === '["p-lead","p-lead2","p-ann","p-bo"]', JSON.stringify(order.map((p) => p.id)));
+  }
+
+  const ledger = (people: [string, string][], evidence: string[]) =>
+    ({ version: 1, people: people.map(([id, when]) => ({ id, addedAt: when })), evidence: evidence.map((id) => ({ id })), policy: {} }) as unknown as Guild;
+  const owing = (people: [string, string][], evidence: string[], withdrawals: GuildWithdrawal[] = []): GuildOwed =>
+    ({ ledger: ledger(people, evidence), pending: [...people.map(([id]) => id), ...evidence], withdrawals, actingId: null });
+  const guildA = emptyHeld();
+  const guildB = emptyHeld();
+  let guilded = save(guildA, snap([], { guildOwed: { p: owing([['p-ada', at(1)]], []) } }), null);
+  guilded = save(guildB, snap([], { guildOwed: { p: owing([], ['ev-b']) } }), guilded);
+  check('each tab’s owed Guild writes stay in the project’s block, each with its ledger row',
+    JSON.stringify(guilded.guildOwed?.p?.pending) === '["ev-b","p-ada"]' &&
+    JSON.stringify(guilded.guildOwed?.p?.ledger.people.map((x) => x.id)) === '["p-ada"]' &&
+    JSON.stringify(guilded.guildOwed?.p?.ledger.evidence.map((x) => x.id)) === '["ev-b"]', JSON.stringify(guilded.guildOwed));
+  const guildAnswered = save(guildA, snap([], { guildOwed: { p: owing([], []) } }), guilded);
+  check('a Guild write the tab held and the service answered leaves the store, and the other tab’s stays',
+    JSON.stringify(guildAnswered.guildOwed?.p?.pending) === '["ev-b"]' && guildAnswered.guildOwed?.p?.ledger.people.length === 0,
+    JSON.stringify(guildAnswered.guildOwed?.p));
+  const changedLater = save(guildB, snap([], { guildOwed: { p: owing([['p-ada', at(5)]], ['ev-b']) } }), guildAnswered);
+  const answeredAgain = save(guildA, snap([], { guildOwed: { p: owing([], []) } }), changedLater);
+  check('a later change of a person another tab once owed is another write, and stays',
+    JSON.stringify([...(answeredAgain.guildOwed?.p?.pending ?? [])].sort()) === '["ev-b","p-ada"]', JSON.stringify(answeredAgain.guildOwed?.p?.pending));
+  const withdrawal = (by: string): GuildWithdrawal => ({ evidenceId: 'ev-x', by, at: '2026-11-11', reason: `a placeholder reason of ${by}` });
+  let withdrawn = save(emptyHeld(), snap([], { guildOwed: { p: owing([], [], [withdrawal('p-ada')]) } }), null);
+  withdrawn = save(emptyHeld(), snap([], { guildOwed: { p: owing([], [], [withdrawal('p-bo')]) } }), withdrawn);
+  check('two withdrawals of one entry on one day by two people are two writes, and both stay',
+    withdrawn.guildOwed?.p?.withdrawals.length === 2, JSON.stringify(withdrawn.guildOwed?.p?.withdrawals));
+  const otherProject = save(emptyHeld(), snap([], { guildOwed: { q: owing([['p-cy', at(1)]], []) } }), guilded);
+  check('another project’s owed Guild writes stay in its own block, and this project’s stay in theirs',
+    JSON.stringify(otherProject.guildOwed?.q?.pending) === '["p-cy"]' && JSON.stringify(otherProject.guildOwed?.p?.pending) === '["ev-b","p-ada"]',
+    JSON.stringify(otherProject.guildOwed));
+  check('a page reads the Guild block of the project it has open, and another project’s stays out of it',
+    JSON.stringify(owedGuild(otherProject, 'q')?.pending) === '["p-cy"]' && JSON.stringify(owedGuild(otherProject, 'p')?.pending) === '["ev-b","p-ada"]');
+  {
+    // Two tabs both owe one person: the later change stands, whichever tab saves.
+    const mineA = emptyHeld();
+    const theirsB = snap([], { guildOwed: { p: { ...owing([['p-ada', at(1)]], []),
+      ledger: ({ version: 1, people: [{ id: 'p-ada', addedAt: at(1), updatedAt: at(4), title: 'later' }], evidence: [], policy: {} }) as unknown as Guild } } });
+    const ownA: GuildOwed = { ...owing([['p-ada', at(1)]], []),
+      ledger: ({ version: 1, people: [{ id: 'p-ada', addedAt: at(1), updatedAt: at(2), title: 'earlier' }], evidence: [], policy: {} }) as unknown as Guild };
+    const settled = save(mineA, snap([], { guildOwed: { p: ownA } }), theirsB);
+    check('of two tabs’ owed changes of one person, the later stands whichever tab saves',
+      (settled.guildOwed?.p?.ledger.people[0] as unknown as { title: string })?.title === 'later', JSON.stringify(settled.guildOwed?.p?.ledger.people));
+  }
+  {
+    // A page that took two tabs' writes of one row and writes the row again replaces the one its view stood on.
+    const row = (n: number): OutboxEntry => ({ project: 'p', kind: 'scenarios', id: 'sc-1', value: n, by: 'Ada', at: at(n) });
+    const queuedTwice = enqueue([row(1), row(3)], [row(5)]);
+    check('a new write of a row replaces the row’s last queued write, and another tab’s earlier write of it stays',
+      JSON.stringify(queuedTwice.map((x) => x.value)) === '[1,5]', JSON.stringify(queuedTwice.map((x) => x.value)));
+    // A flush the service did not answer leaves the row's write owed; a change made while it ran replaces that write
+    // (store.ts `flushProjectState`), so the page owes the row once, at its latest.
+    const leftOver = [row(1)];
+    const madeMeanwhile = [row(7)];
+    const owedAfter = enqueue(leftOver, madeMeanwhile);
+    check('a change made while an unanswered flush ran leaves one write of the row, the later',
+      JSON.stringify(owedAfter.map((x) => x.value)) === '[7]', JSON.stringify(owedAfter.map((x) => x.value)));
+  }
+  {
+    // The store's own flush (store.ts `flushProjectState`) against a stand-in service.
+    const real = globalThis.fetch;
+    const asked: string[] = [];
+    const row = (id: string, n: number): OutboxEntry => ({ project: 'p', kind: 'scenarios', id, value: { id }, by: 'Ada', at: at(n) });
+    try {
+      // Every write of the round is refused, and a change is made while it runs: the change is sent.
+      let calls = 0;
+      globalThis.fetch = (async (url: string, init?: RequestInit) => {
+        asked.push(`${init?.method} ${url}`);
+        if (calls++ === 0) {
+          useStore.setState((x) => ({ stateOutbox: enqueue(x.stateOutbox, [row('sc-made', 2)]) }));
+          return new Response(JSON.stringify({ detail: 'refused in words' }), { status: 422 });
+        }
+        return new Response('{}', { status: 200 });
+      }) as typeof fetch;
+      useStore.setState({ stateOutbox: [row('sc-refused', 1)] });
+      await useStore.getState().flushProjectState();
+      check('a flush whose every write is refused sends a change made while it ran',
+        asked.some((x) => x.includes('/sc-made')) && useStore.getState().stateOutbox.length === 0, asked.join('; '));
+      // The browser's data is cleared while a flush is out, and the service never answers: nothing is put back.
+      asked.length = 0;
+      let cleared = false;
+      globalThis.fetch = (async (url: string, init?: RequestInit) => {
+        asked.push(`${init?.method} ${url}`);
+        if (!cleared) {
+          cleared = true;
+          useStore.getState().clearBrowserData();
+        }
+        throw new TypeError('fetch failed');
+      }) as typeof fetch;
+      useStore.setState({ stateOutbox: [row('sc-cleared', 3)] });
+      await useStore.getState().flushProjectState();
+      check('a flush out when the browser’s data is cleared puts back nothing it took',
+        cleared && useStore.getState().stateOutbox.length === 0, JSON.stringify(useStore.getState().stateOutbox.map((x) => x.id)));
+      // Cleared while the first of two writes is out, and answered: the second, unsent at the clear, is not sent.
+      asked.length = 0;
+      let clearedTwo = false;
+      globalThis.fetch = (async (url: string, init?: RequestInit) => {
+        asked.push(`${init?.method} ${url}`);
+        if (!clearedTwo && url.includes('/sc-first')) {
+          clearedTwo = true;
+          useStore.getState().clearBrowserData();
+        }
+        return new Response('{}', { status: 200 });
+      }) as typeof fetch;
+      useStore.setState({ stateOutbox: [row('sc-first', 4), row('sc-second', 5)] });
+      await useStore.getState().flushProjectState();
+      check('a write still unsent when the browser’s data is cleared is not sent after it',
+        clearedTwo && !asked.some((x) => x.includes('/sc-second')), asked.join('; '));
+    } finally {
+      globalThis.fetch = real;
+    }
+  }
+  {
+    // An undo back to undecided, made after a decision the service holds, is owed to the service (snapshotOf).
+    const base = useStore.getState();
+    const record = { id: 'rec-undone', status: 'unverified', provenance: 'unverified', paperId: 'P-1' } as unknown as (typeof base.records)[number];
+    const overlay = { ...(base.overlay ?? {}), records: { 'rec-undone': { recordId: 'rec-undone', at: at(1) } } } as unknown as NonNullable<typeof base.overlay>;
+    const undoneLater = snapshotOf({ ...base, projectId: 'p', records: [record], overlay, decisionAt: { 'rec-undone': at(2) } });
+    const notUndone = snapshotOf({ ...base, projectId: 'p', records: [record], overlay, decisionAt: { 'rec-undone': at(1) } });
+    const neverDecided = snapshotOf({ ...base, projectId: 'p', records: [record], overlay: { ...overlay, records: {} }, decisionAt: {} });
+    const key = decisionKey('p', 'rec-undone');
+    check('an undo to undecided after a decision the service holds is kept until it is sent, and an untouched record is not',
+      undoneLater.reviewDecisions[key]?.status === 'unverified' && !(key in notUndone.reviewDecisions) && !(key in neverDecided.reviewDecisions),
+      JSON.stringify(Object.keys(undoneLater.reviewDecisions)));
+  }
+  {
+    const legacySnap = snap([], { guild: owing([['p-old', at(1)]], []) });
+    check('a page takes a snapshot’s legacy Guild block as the open project’s, and none when no project is open',
+      JSON.stringify(owedGuild(legacySnap, 'p')?.pending) === '["p-old"]' && owedGuild(legacySnap, null) === undefined);
+    const took = emptyHeld();
+    holdLoaded(took, legacySnap, 'p');
+    const afterTaking = save(took, snap([], { guildOwed: { p: owing([['p-old', at(1)]], []) } }), legacySnap);
+    const untouched = save(emptyHeld(), snap([], { guildOwed: { q: owing([], []) } }), legacySnap);
+    check('the legacy block leaves once the page that took it saves, and stays for a page that did not',
+      afterTaking.guild === undefined && JSON.stringify(afterTaking.guildOwed?.p?.pending) === '["p-old"]' &&
+      JSON.stringify(untouched.guild?.pending) === '["p-old"]');
+  }
+}
+
+// ── a scope's overrides from two pages (bug hunt H7-04) ───────────────
+// Two tabs on one Proforma scenario's panel, each from the scope as it loaded. A write of a scope's overrides names
+// the rows the page's view stood on (`base`), so the service lays it on what it keeps key by key and another page's
+// key stays (project_state.py `_merged`); the page takes the scope back as the service answered it.
+{
+  const scope = 'proforma:sc-h704';
+  const a = anOverride(scope, 'titre', 5.678);
+  const b = anOverride(scope, 'price', 1.25, { by: 'Ben' });
+  const read: ProjectState = { ...before, overrides: { [scope]: [a] } };
+  const made = changes(read, { ...read, overrides: { [scope]: [a, b] } }, 'p', 'Ada');
+  check('a scope’s overrides changed carry the rows the scope held before the change',
+    made.length === 1 && made[0].base === read.overrides[scope], JSON.stringify(made));
+  const fresh = changes(before, { ...before, overrides: { [scope]: [b] } }, 'p', 'Ada');
+  check('a scope’s first overrides carry no rows read, an empty list',
+    fresh.length === 1 && JSON.stringify(fresh[0].base) === '[]', JSON.stringify(fresh));
+  check('a write of another kind carries no rows read', sent.every((x) => !('base' in x)));
+  const w = (value: Override[] | null, at: string, base?: Override[]): OutboxEntry =>
+    ({ project: 'p', kind: 'overrides', id: scope, value, by: 'Ada', at, ...(base ? { base } : {}) });
+  const queuedOnce = enqueue([w([a], '1', [])], [w([a, b], '2', [a])]);
+  check('a later write of a scope, replacing one never sent, stands on what that write stood on',
+    queuedOnce.length === 1 && JSON.stringify(queuedOnce[0].base) === '[]' && queuedOnce[0].value !== null,
+    JSON.stringify(queuedOnce));
+  const olderPage = enqueue([w([a], '1')], [w([a, b], '2', [a])]);
+  check('a later write replacing one an older page queued with no rows read replaces the scope whole, as that one did',
+    olderPage.length === 1 && !('base' in olderPage[0]), JSON.stringify(olderPage));
+  const mayHave = enqueue([w([a], '1', [])], [w([a, b], '2', [a])], () => true);
+  check('a later write of a scope whose last write may have reached the service follows it, on the rows it was made from',
+    mayHave.length === 2 && JSON.stringify(mayHave[1].base) === JSON.stringify([a]), JSON.stringify(mayHave));
+  check('a scenario’s later write replaces its last queued write, sent or not',
+    enqueue([e('sc-1', 1)], [e('sc-1', 2)], () => true).length === 1);
+  check('two lists of a scope’s overrides read alike in any order, a field’s place and a null aside',
+    sameOverrides([a, { ...b, note: null }], [{ ...b }, { origin: a.origin, at: a.at, by: a.by, value: a.value, key: a.key, scope: a.scope }]) &&
+      !sameOverrides([a], [{ ...a, value: 6 }]) && !sameOverrides([a], [a, b]));
+
+  // The service stands in, laying each write on what it keeps key by key as project_state._merged does, and answering
+  // the scope as it then holds; a key both a write and another page changed refuses the write in words.
+  const real = globalThis.fetch;
+  type Body = { base?: Override[]; value: Override[] };
+  const bodies: Body[] = [];
+  let held: Record<string, Override[]> = {};
+  let loseNext = 0;
+  let getHeld: (() => void) | null = null;
+  let deferGets = false;
+  const like = (x?: Override, y?: Override) => (x === undefined || y === undefined ? x === y : sameOverrides([x], [y]));
+  const service = () => {
+    bodies.length = 0;
+    held = {};
+    loseNext = 0;
+    deferGets = false;
+    globalThis.fetch = (async (url: string, init?: RequestInit) => {
+      const id = decodeURIComponent(String(url).split('/api/state/overrides/')[1] ?? '');
+      if (!init?.method || init.method === 'GET') {
+        const answer = () => new Response(JSON.stringify({ ...EMPTY_STATE, overrides: structuredClone(held) }), { status: 200 });
+        if (!deferGets) return answer();
+        const now = structuredClone(held);
+        return new Promise<Response>((resolve) => {
+          getHeld = () => resolve(new Response(JSON.stringify({ ...EMPTY_STATE, overrides: now }), { status: 200 }));
+        });
+      }
+      const body = JSON.parse(String(init.body)) as Body;
+      bodies.push(body);
+      if (!id) return new Response('{}', { status: 200 });
+      const kept = new Map((held[id] ?? []).map((o) => [o.key, o]));
+      let rows = body.value;
+      if (body.base !== undefined) {
+        const read = new Map(body.base.map((o) => [o.key, o]));
+        const sentRows = new Map(body.value.map((o) => [o.key, o]));
+        const out = new Map(kept);
+        const clashes: string[] = [];
+        for (const key of [...read.keys(), ...[...sentRows.keys()].filter((k) => !read.has(k))]) {
+          const was = read.get(key);
+          const now = sentRows.get(key);
+          if (like(was, now)) continue;
+          const there = kept.get(key);
+          if (like(there, was)) {
+            if (now) out.set(key, now);
+            else out.delete(key);
+          } else if (!like(there, now)) clashes.push(key);
+        }
+        if (clashes.length)
+          return new Response(JSON.stringify({ detail: `the overrides of ${id} changed since this page read them: ${clashes.join(', ')}` }), { status: 422 });
+        rows = [...out.values()];
+      }
+      held = { ...held, [id]: rows };
+      if (loseNext > 0) {
+        loseNext -= 1;
+        throw new TypeError('fetch failed');
+      }
+      return new Response(JSON.stringify({ kind: 'overrides', id, value: rows }), { status: 200 });
+    }) as typeof fetch;
+  };
+  const settle = async () => {
+    for (let i = 0; i < 5; i++) await new Promise((r) => setTimeout(r, 0));
+  };
+  // The page's view of the project's overrides, and a person's change as the store's subscription queues it.
+  const page = (overrides: Record<string, Override[]>) => {
+    useStore.setState({ projectId: 'p', parameterOverrides: overrides, stateOutbox: [], activity: [] });
+    useStore.setState({ stateSeen: projectStateOf(useStore.getState()) });
+  };
+  const change = (id: string, rows: Override[]) =>
+    useStore.setState((x) => {
+      const next = { ...x, parameterOverrides: { ...x.parameterOverrides, [id]: rows } };
+      return {
+        parameterOverrides: next.parameterOverrides,
+        stateOutbox: queueOwed(x.stateOutbox, changes(x.stateSeen!, projectStateOf(next), 'p', 'Ada')),
+        stateSeen: projectStateOf(next),
+      };
+    });
+  const view = (id = scope) => JSON.stringify(useStore.getState().parameterOverrides[id] ?? null);
+  const kept = (id = scope) => JSON.stringify(held[id] ?? null);
+  try {
+    service();
+    held = { [scope]: [a] };
+    const flushed = await flush([w([b], '3', [])]);
+    check('an overrides write sends the rows it read beside the rows it keeps, and takes back the scope as answered',
+      JSON.stringify(bodies[0]?.base) === '[]' && JSON.stringify(flushed.kept[0]?.value) === JSON.stringify([a, b]),
+      JSON.stringify({ bodies, kept: flushed.kept }));
+    const scenarioFlush = await flush([e('sc-1', { id: 'sc-1' })]);
+    check('a write of another kind sends no rows read', bodies.length === 2 && !('base' in bodies[1]) && scenarioFlush.sent === 1,
+      JSON.stringify(bodies));
+
+    // Tab A kept titre; this page, whose view of the scope held nothing, sets price: the service keeps both, and the
+    // page shows tab A's key beside its own.
+    service();
+    held = { [scope]: [a] };
+    page({});
+    change(scope, [b]);
+    await useStore.getState().flushProjectState();
+    const laid = useStore.getState();
+    check('the page shows the scope as the service answered it, another page’s key beside its own',
+      kept() === JSON.stringify([a, b]) && view() === JSON.stringify([a, b]) &&
+        laid.stateSeen?.overrides[scope] === laid.parameterOverrides[scope] && laid.stateOutbox.length === 0 &&
+        (laid.proformaAssumptions['sc-h704'] ?? []).length === 2,
+      JSON.stringify({ view: view(), kept: kept(), owed: laid.stateOutbox.length }));
+    check('the scope laid in is no new write', laid.stateSeen !== null && changes(laid.stateSeen, projectStateOf(laid), 'p', 'Ada').length === 0);
+    const own = useStore.getState().parameterOverrides[scope];
+    change(scope, [...own.filter((o) => o.key !== 'price'), { ...b, value: 2.5 }]);
+    const sentRows = useStore.getState().parameterOverrides[scope];
+    await useStore.getState().flushProjectState();
+    check('an answer holding the rows the page sent leaves the page’s rows as they stand',
+      useStore.getState().parameterOverrides[scope] === sentRows && kept() === JSON.stringify([a, { ...b, value: 2.5 }]), view());
+
+    // A change made while the scope's write is out, to the key the write set: it follows that write, on the rows the
+    // write sent, so the service reads it as this page's own second change.
+    service();
+    const titreOne = anOverride(scope, 'titre', 1);
+    const titreTwo = anOverride(scope, 'titre', 2);
+    page({});
+    change(scope, [titreOne]);
+    let typed = false;
+    const plain = globalThis.fetch;
+    globalThis.fetch = (async (url: string, init?: RequestInit) => {
+      if (!typed && init?.method === 'PUT') {
+        typed = true;
+        change(scope, [titreTwo]);
+      }
+      return plain(url, init);
+    }) as typeof fetch;
+    await useStore.getState().flushProjectState();
+    check('a change made while its scope’s write was out follows that write, on the rows it sent',
+      bodies.length === 2 && JSON.stringify(bodies[1].base) === JSON.stringify([titreOne]) &&
+        view() === JSON.stringify([titreTwo]) && kept() === JSON.stringify([titreTwo]) && useStore.getState().stateOutbox.length === 0,
+      JSON.stringify({ bodies, kept: kept() }));
+
+    // The service keeps a write and its answer is lost; the person then takes the key back before the page sends
+    // again. The write the service kept goes again first, changing nothing, and the take-back follows it.
+    service();
+    page({});
+    change(scope, [anOverride(scope, 'titre', 5)]);
+    loseNext = 1;
+    await useStore.getState().flushProjectState();
+    const leftAfterLoss = useStore.getState().stateOutbox.length;
+    change(scope, []);
+    await useStore.getState().flushProjectState();
+    check('a key taken back after a write whose answer was lost is taken back on the service and on the page',
+      leftAfterLoss === 1 && kept() === '[]' && view() === '[]' && useStore.getState().stateOutbox.length === 0,
+      JSON.stringify({ leftAfterLoss, kept: kept(), view: view(), bodies }));
+    // The same with a value changed: the page's second value stands, and nothing is refused.
+    service();
+    page({});
+    change(scope, [anOverride(scope, 'titre', 6)]);
+    loseNext = 1;
+    await useStore.getState().flushProjectState();
+    change(scope, [anOverride(scope, 'titre', 7)]);
+    await useStore.getState().flushProjectState();
+    check('a value changed after a write whose answer was lost stands, and the page’s own write is never refused as another page’s',
+      kept() === JSON.stringify([anOverride(scope, 'titre', 7)]) && useStore.getState().activity.length === 0,
+      JSON.stringify({ kept: kept(), activity: useStore.getState().activity.map((x) => x.text) }));
+
+    // The service is away: the first write's request goes out and gets no answer, and the person types on. Each later
+    // write replaces the last one the flush never reached, so the page owes the scope twice at most.
+    service();
+    page({});
+    globalThis.fetch = (async () => {
+      throw new TypeError('fetch failed');
+    }) as typeof fetch;
+    change(scope, [anOverride(scope, 'titre', 1)]);
+    await useStore.getState().flushProjectState();
+    for (let n = 2; n <= 6; n++) {
+      change(scope, [anOverride(scope, 'titre', n)]);
+      await useStore.getState().flushProjectState();
+    }
+    const owedAway = useStore.getState().stateOutbox;
+    check('while the service is away a scope’s writes stay two at most: the one that went out, and the latest',
+      owedAway.length === 2 && JSON.stringify((owedAway[1].value as Override[])[0]?.value) === '6',
+      JSON.stringify(owedAway.map((x) => (x.value as Override[])[0]?.value)));
+
+    // Two tabs' queued writes of one scope, taken at load (another tab's may have been sent): Ada's titre lands, Ben's
+    // is refused, and a price the person adds while the round is out lands without Ben's titre.
+    service();
+    page({});
+    const titreAda = anOverride(scope, 'titre', 5);
+    const titreBen = anOverride(scope, 'titre', 6, { by: 'Ben' });
+    const loadedA = w([titreAda], '6', []);
+    const loadedB = w([titreBen], '7', []);
+    useStore.setState({ parameterOverrides: { [scope]: loadedB.value as Override[] }, stateOutbox: [loadedA, loadedB] });
+    useStore.setState({ stateSeen: projectStateOf(useStore.getState()) });
+    const price = anOverride(scope, 'price', 1.25);
+    let added = false;
+    const plainTwo = globalThis.fetch;
+    globalThis.fetch = (async (url: string, init?: RequestInit) => {
+      if (!added && init?.method === 'PUT') {
+        added = true;
+        change(scope, [titreBen, price]);
+      }
+      return plainTwo(url, init);
+    }) as typeof fetch;
+    await useStore.getState().flushProjectState();
+    await settle();
+    check('a refused write’s value stays refused when a change made while it was out follows it',
+      kept() === JSON.stringify([titreAda, price]) && view() === JSON.stringify([titreAda, price]) &&
+        useStore.getState().activity.some((x) => x.text.includes('changed since this page read them')),
+      JSON.stringify({ kept: kept(), view: view(), bases: bodies.map((x) => x.base) }));
+
+    // The service refuses a write in words: the page says so and reads the project's overrides again.
+    service();
+    held = { [scope]: [a] };
+    page({});
+    change(scope, [{ ...a, value: 9 }]);
+    held = { [scope]: [{ ...a, value: 8 }] };
+    await useStore.getState().flushProjectState();
+    await settle();
+    check('a refused write of a scope is said in the service’s words, and the page shows the scope as the service keeps it',
+      useStore.getState().activity.some((x) => x.text.includes('changed since this page read them')) &&
+        view() === JSON.stringify([{ ...a, value: 8 }]) && useStore.getState().stateSeen?.overrides === useStore.getState().parameterOverrides,
+      JSON.stringify({ view: view(), activity: useStore.getState().activity.map((x) => x.text) }));
+
+    // The read after a refusal is out while another scope's write is kept: the read predates that write, and the page
+    // keeps the scope as the service answered it.
+    service();
+    const other = 'proforma:sc-h704-other';
+    const j = anOverride(other, 'j', 5);
+    held = { [scope]: [a] };
+    page({});
+    change(scope, [{ ...a, value: 9 }]);
+    held = { [scope]: [{ ...a, value: 8 }] };
+    deferGets = true;
+    let madeOther = false;
+    const plainThree = globalThis.fetch;
+    globalThis.fetch = (async (url: string, init?: RequestInit) => {
+      if (!madeOther && init?.method === 'PUT') {
+        madeOther = true;
+        change(other, [j]);
+      }
+      return plainThree(url, init);
+    }) as typeof fetch;
+    await useStore.getState().flushProjectState();
+    await settle();
+    const before704 = view(other);
+    (getHeld as (() => void) | null)?.();
+    await settle();
+    check('a read of the overrides that predates a write the service answered leaves that scope as answered',
+      before704 === JSON.stringify([j]) && view(other) === JSON.stringify([j]) && view() === JSON.stringify([{ ...a, value: 8 }]) &&
+        useStore.getState().stateSeen?.overrides === useStore.getState().parameterOverrides,
+      JSON.stringify({ before704, after: view(other), view: view(), kept: kept(other) }));
+  } finally {
+    globalThis.fetch = real;
+    useStore.setState({ projectId: null, parameterOverrides: {}, proformaAssumptions: {}, stateSeen: null, stateOutbox: [], activity: [] });
+  }
+}
+
 // ── the overlay a project's pages load ───────────────────────────────
 
 async function overlayAgainst(health: Answer, overlay: Answer) {
@@ -141,6 +825,26 @@ async function overlayAgainst(health: Answer, overlay: Answer) {
   check('an overlay that loads is the overlay', 'overlay' in got, JSON.stringify(got));
 }
 
+// A candidate the overlay brings enters the store as a record when its field
+// is one the ontology names (src/lib/review.ts, `recordOf`).
+const aCandidate = (id: string, field: string): Candidate => ({
+  id, paperId: 'placeholder-paper', sectionId: 's1', quote: 'a placeholder sentence', field,
+  value: 1, unit: 'placeholder-unit', si: { value: 1, unit: 'placeholder-unit' }, confidence: 0,
+  status: 'unverified', provenance: 'unverified', extractorRun: 'claude-1', isPrimary: true,
+  carbonSource: null, citesRecordId: null, comparativeBaseline: null, componentTag: null, curationRef: null,
+  goldOnly: null, method: null, negativeResult: null, numbering: null, organism: null, organismText: null,
+  range: null, rejectReason: null, valueBasis: null,
+});
+{
+  const named = ONTOLOGY[0].id;
+  const entered = recordOf(aCandidate('c-1', named));
+  check('a candidate on a field the ontology names enters the store as a record of its values, its audit trail empty',
+    entered !== null && entered.field === named && entered.value === 1 && entered.unit === 'placeholder-unit' && entered.audit.length === 0,
+    JSON.stringify(entered && { field: entered.field, audit: entered.audit }));
+  check('a candidate on a field the ontology does not name stays out of the records',
+    recordOf(aCandidate('c-2', 'placeholder_field')) === null);
+}
+
 // ── what a person may run, and what an import's refusal says (alpha 2.1 stage B) ──
 
 {
@@ -161,6 +865,51 @@ async function overlayAgainst(health: Answer, overlay: Answer) {
   const own = runnable(plant([{ configuration: null, ok: true }]));
   check('a plant that takes no configuration runs in its own', JSON.stringify(own.configurations) === '[null]', JSON.stringify(own));
   check('a plant that never built is offered in none', runnable(plant([{ ok: false, error: 'no' }])).configurations.length === 0);
+}
+
+// ── the configurations a thing of another engine is offered in (alpha 2.2 E.18; src/lib/studies.ts) ──
+
+{
+  const aThing = (configurations: string[], defaultConfiguration: string | null, configurationTitles: Record<string, string> = {}): EngineThing => ({
+    id: 'a-thing',
+    title: 'A placeholder thing',
+    kind: 'placeholder',
+    configurations,
+    defaultConfiguration,
+    configurationTitles,
+    precision: { rtol: 0, atol: 0 },
+  });
+  const shown = (t: EngineThing | null) => JSON.stringify(offeredConfigurations(t).map((o) => [o.configuration, o.words]));
+  const titled = aThing(['one way', 'another way', 'a third way'], 'another way', { 'a third way': 'A placeholder way, in words' });
+  check(
+    'a thing of another engine is offered in its default first, then the rest in the engine’s order',
+    JSON.stringify(offeredConfigurations(titled).map((o) => o.configuration)) === '["another way","one way","a third way"]',
+    shown(titled),
+  );
+  check(
+    'a configuration the engine titles reads its title beside its name, and one it titles none reads its name',
+    shown(titled) === '[["another way","another way"],["one way","one way"],["a third way","A placeholder way, in words · a third way"]]',
+    shown(titled),
+  );
+  const newestFirst = aThing(['a newer placeholder', 'an older placeholder'], null, {
+    'a newer placeholder': 'A placeholder kind, kept at a placeholder time',
+    'an older placeholder': 'Another placeholder kind, kept at a placeholder time',
+  });
+  check(
+    'a thing with no default is offered in the engine’s order (the kinetics engine’s, newest first)',
+    shown(newestFirst) ===
+      '[["a newer placeholder","A placeholder kind, kept at a placeholder time · a newer placeholder"],["an older placeholder","Another placeholder kind, kept at a placeholder time · an older placeholder"]]',
+    shown(newestFirst),
+  );
+  check('a thing that takes no configuration runs in its own', shown(aThing([], null)) === '[[null,"its own"]]', shown(aThing([], null)));
+  const ran = { engine: 'a-placeholder-engine', plant: 'a-thing', configuration: 'a third way', inputs: [] };
+  check(
+    'the card’s line for a run it made names the configuration as the chooser does, and by its name where it holds no title',
+    ranWhat(ran, titled.configurationTitles) === 'a-thing (A placeholder way, in words · a third way)' &&
+      ranWhat({ ...ran, configuration: 'one way' }, titled.configurationTitles) === 'a-thing (one way)' &&
+      ranWhat(ran) === 'a-thing (a third way)',
+    ranWhat(ran, titled.configurationTitles),
+  );
 }
 
 async function callAgainst(answer: { status: number; body?: unknown }, healthy = true): Promise<unknown> {
@@ -187,6 +936,1334 @@ async function callAgainst(answer: { status: number; body?: unknown }, healthy =
   check('a source the service could not fetch is its refusal, in its words', unfetched instanceof ServiceRefused && unfetched.status === 502, String(unfetched));
   const proxy = await callAgainst({ status: 502 }, false);
   check('a 502 with no words and no health is the service down', proxy instanceof ServiceDown, String(proxy));
+}
+
+// ── a request's own fields refused, and a page older than the service (alpha 2.2 C.2) ──
+
+{
+  // FastAPI's 422 for a field the request does not hold: a page loaded before the service took inputs.
+  const stale = await callAgainst({
+    status: 422,
+    body: { detail: [{ type: 'extra_forbidden', loc: ['body', 'overrides'], msg: 'Extra inputs are not permitted', input: [] }] },
+  });
+  check(
+    'a refusal of the request’s own fields is said field by field, with what to do when the page is older than the service',
+    stale instanceof ServiceRefused &&
+      stale.message ===
+        "The service refused the request's fields: overrides: Extra inputs are not permitted. This page was loaded before the service changed what it takes: reload the page." &&
+      !stale.message.includes('[object Object]'),
+    String(stale),
+  );
+  const missing = detailWords([{ type: 'missing', loc: ['body', 'inputs', 0, 'quantity'], msg: 'Field required' }]);
+  check('a field the request lacks is named where it stands, and no reload is asked for', missing === "The service refused the request's fields: inputs.0.quantity: Field required.", missing);
+  check('the service’s own words stand as they are', detailWords('a placeholder refusal') === 'a placeholder refusal');
+  // alpha 2.2 E.8: a catalogue entry's own refusal reaches the page as a field error, which Pydantic writes after "Value error, ".
+  const own = detailWords([{ type: 'value_error', loc: ['body', 'entry'], msg: 'Value error, a placeholder refusal of the entry' }]);
+  check('a model’s own refusal of a field is said in its own words', own === "The service refused the request's fields: entry: a placeholder refusal of the entry.", own);
+}
+
+// ── the unit each change is sent in (alpha 2.2 D2; src/lib/params.ts) ──
+
+{
+  const scope: ParameterSpec[] = [aSpec('x0', 'placeholder-unit-a', 'Start values'), aSpec('mu_max', 'placeholder-unit-b', 'Kinetics')];
+  const shownOnly = scope.filter((s) => s.group === 'Start values');
+  const typed = (key: string): Override => anOverride('a-scope', key, 1);
+  const changes = [typed('x0'), typed('mu_max')];
+  const units = (specs: ParameterSpec[]) => inputsOf(changes, specs).map((i) => `${i.name} ${i.quantity.unit}`).join(', ');
+  // FermOSForecast's batch fit shows part of its family's scope and resolves with all of it (ParameterPanel's unitSpecs).
+  check('a panel that shows part of its scope sends each change in the unit its scope’s every spec names', units(scope) === 'x0 placeholder-unit-a, mu_max placeholder-unit-b', units(scope));
+  check('the shown specs alone would send a change typed elsewhere on the scope with no unit', units(shownOnly) === 'x0 placeholder-unit-a, mu_max ', units(shownOnly));
+  const expanded = inputsOf([typed('split.Water')], [aSpec('split', 'placeholder-share', 'Separation')]);
+  check('a key expanded per item is sent in its template’s unit', expanded[0]?.quantity.unit === 'placeholder-share', JSON.stringify(expanded));
+  // alpha 2.2 C.5: a deposition's reading travels as the reading it is, its ref beside its depositor and its time.
+  const reading: Override = { ...typed('x0'), origin: 'measurement', ref: 'dep-1/de-1' };
+  const [sentReading, sentTyped] = inputsOf([reading, typed('mu_max')], scope);
+  check(
+    'a reading is sent as a measurement naming its reading; a typed value is sent as a person’s assumption',
+    sentReading?.quantity.origin?.kind === 'measurement' &&
+      sentReading.quantity.origin.ref === 'dep-1/de-1' &&
+      sentReading.quantity.origin.by === 'Ada' &&
+      sentTyped?.quantity.origin?.kind === 'person-assumption' &&
+      !('ref' in (sentTyped.quantity.origin ?? {})),
+    JSON.stringify([sentReading, sentTyped]),
+  );
+  // alpha 2.2 E.1: the service serves a change as the page kept it, so a change kept before the page wrote its origin
+  // comes back with none, and the generated type names an origin on every change.
+  const keptBefore = { scope: 'a-scope', key: 'x0', value: 1, by: 'Ada', at: AT } as Override;
+  const [sentKept] = inputsOf([keptBefore], scope);
+  check('a change kept with no origin is sent as a person’s assumption, as the service reads it', sentKept?.quantity.origin?.kind === 'person-assumption', JSON.stringify(sentKept));
+  // alpha 2.2 E.17: a reading Proforma's panel keeps holds the reading's own value and unit, which go as they are.
+  const own: Override = { ...typed('x0'), value: 1000, unit: 'placeholder-unit-c', by: 'Grace', at: AT, origin: 'measurement', ref: 'dep-1/de-1' };
+  const [sentOwn, sentBeside] = inputsOf([own, typed('mu_max')], scope);
+  check(
+    'a reading kept in its own unit goes in that value and unit, its ref, depositor and time beside it and no low or high; a person’s change beside it goes in its parameter’s unit',
+    sentOwn?.quantity.value === 1000 &&
+      sentOwn.quantity.unit === 'placeholder-unit-c' &&
+      sentOwn.quantity.origin?.kind === 'measurement' &&
+      sentOwn.quantity.origin.ref === 'dep-1/de-1' &&
+      sentOwn.quantity.origin.by === 'Grace' &&
+      sentOwn.quantity.origin.at === AT &&
+      !('low' in sentOwn.quantity) &&
+      !('high' in sentOwn.quantity) &&
+      sentBeside?.quantity.unit === 'placeholder-unit-b',
+    JSON.stringify([sentOwn, sentBeside]),
+  );
+}
+
+// ── the bench's readings, read as the service's lookup reads them (alpha 2.2 C.5; src/engine/readings.ts) ──
+
+{
+  const entry = (id: string, value: number, confirmed = false) =>
+    ({ id, measureId: 'm-1', stepId: 'readings', at: '2026-11-03T09:00:00Z', value, unit: 'placeholder-unit', raw: `came in at ${value}`, confirmed });
+  // "came in at 3", fixed to 2 at the bench: the correction appended, the 3 kept with its words.
+  const first = entry('de-1', 3);
+  const fixed = correctionOf(first, 'de-2', 2, '2026-11-03T11:30:00Z');
+  const bench = aDeposition('dep-1', { entries: [first, fixed], sampleTimes: {} });
+  check(
+    'a correction keeps the time its reading was taken, says when it was typed, and stands confirmed',
+    fixed.at === first.at && fixed.correctedAt === '2026-11-03T11:30:00Z' && fixed.confirmed && fixed.value === 2,
+    JSON.stringify(fixed),
+  );
+  check(
+    'after a correction, only the newest number waits to be read back, and the corrected one waits for nothing',
+    correctedBy(bench, first) === 'de-2' && correctedBy(bench, fixed) === null && awaitingReadBack(bench).length === 0,
+    JSON.stringify(awaitingReadBack(bench)),
+  );
+  // Then "came in at 5" and "came in at 7": the 7 alone waits, the number the person said last.
+  const later: Deposition = { ...bench, entries: [first, fixed, entry('de-3', 5), entry('de-4', 7)] };
+  check(
+    'of several numbers on one measure, the read-back box holds the newest alone',
+    JSON.stringify(awaitingReadBack(later).map((e) => e.id)) === '["de-4"]',
+    JSON.stringify(awaitingReadBack(later).map((e) => e.id)),
+  );
+  // A series: each reading at its own hour stands, and a later one at the same hour corrects it.
+  const series: Deposition = {
+    ...bench,
+    entries: [entry('de-5', 1), entry('de-6', 2), entry('de-7', 1.5)],
+    sampleTimes: { 'de-5': 1, 'de-6': 2, 'de-7': 1 },
+  };
+  check(
+    'a reading in a series is its own, corrected by a later one at its hour alone',
+    correctedBy(series, series.entries[0]) === 'de-7' && correctedBy(series, series.entries[1]) === null,
+    JSON.stringify(series.entries.map((e) => [e.id, correctedBy(series, e)])),
+  );
+  check(
+    'a basis source is a reading where it names one reading and when it was measured, and a series is no reading',
+    isReading({ kind: 'deposition', id: 'dep-1/de-2', note: 'measured on 2026-11-03T09:00:00Z', by: 'Ada' }) &&
+      !isReading({ kind: 'deposition', id: 'dep-1', note: 'the readings as the browser sent them', by: null }),
+  );
+}
+
+// ── a train's changes, each named by its place (alpha 2.2 D2; src/lib/pureos.ts) ──
+
+{
+  const train = { id: 'tr-1', units: [{ id: 'U1' }, { id: 'U2' }] } as unknown as TrainSpec;
+  const typed = (place: string, key: string, trainId = 'tr-1'): Override => anOverride(unitScope(trainId, place), key, 1);
+  const overrides = [typed('U2', 'b'), typed('inlet', 'a'), typed('U1', 'c'), typed('U1', 'a', 'tr-2')];
+  const read = {
+    [unitScope('tr-1', 'inlet')]: [aSpec('a', 'placeholder-unit-a')],
+    [unitScope('tr-1', 'U2')]: [aSpec('b', 'placeholder-unit-b')],
+  };
+  const named = trainInputs(train, overrides, read).map((i) => `${i.name} ${i.quantity.unit}`).join(', ');
+  check(
+    'a train’s changes are named <place>.<key>, the inlet first and then each unit in order, each in its spec’s unit; a place whose specs are unread sends none yet, and another train’s change none',
+    named === 'inlet.a placeholder-unit-a, U2.b placeholder-unit-b',
+    named,
+  );
+  check('a train with nothing read sends nothing', trainInputs(train, overrides, {}).length === 0);
+}
+
+// ── a Proforma scenario's run, its changes sent as typed inputs (alpha 2.2 D2; src/lib/proforma.ts) ──
+
+{
+  const typed = (key: string, value: number, low?: number): Override => anOverride('proforma:sc-1', key, value, low != null ? { low } : {});
+  const changes = [typed('a', 1, 0.5), typed('b', 2)];
+  const panel = { specs: [aSpec('a', 'placeholder-unit-a'), aSpec('b', 'placeholder-unit-b')] };
+  const shelfOnly = aFlowsheet([aShelfInput('a', 'placeholder-unit-c')]);
+  const ask = { scenarioId: 'sc-1', overrides: changes, by: 'Ada', host: null };
+  const body = runBody({ ...ask, specs: runSpecs(panel, shelfOnly) }) as unknown as Record<string, unknown>;
+  const sent = (body.inputs as { name: string; quantity: { unit: string; low?: number } }[]) ?? [];
+  check(
+    'a scenario’s run sends each change as a typed input in its panel spec’s unit, with its range, by the person asking, and neither older field',
+    sent.map((i) => `${i.name} ${i.quantity.unit}`).join(', ') === 'a placeholder-unit-a, b placeholder-unit-b' &&
+      sent[0]?.quantity.low === 0.5 && body.by === 'Ada' && !('overrides' in body) && !('assumptions' in body),
+    JSON.stringify(body),
+  );
+  const early = (runBody({ ...ask, specs: runSpecs(null, shelfOnly) }).inputs ?? []).map((i) => `${i.name} ${i.quantity.unit}`).join(', ');
+  check('before the panel answers, the shelf’s inputs name each unit, and a key they lack goes with none for the service to refuse', early === 'a placeholder-unit-c, b ', early);
+  // Before the panel answers, the inputs as the service bound them name each unit, the shelf's a key they lack.
+  const bound = { inputs: [{ key: 'a', unit: 'placeholder-unit-e' }, { key: 'b', unit: 'placeholder-unit-d' }] };
+  const boundFirst = (runBody({ ...ask, specs: runSpecs(null, shelfOnly, bound) }).inputs ?? []).map((i) => `${i.name} ${i.quantity.unit}`).join(', ');
+  check('before the panel answers, the inputs as bound name each unit, the shelf’s only a key they lack', boundFirst === 'a placeholder-unit-e, b placeholder-unit-d', boundFirst);
+  const partly = (runBody({ ...ask, specs: runSpecs(null, shelfOnly, { inputs: [bound.inputs[1]] }) }).inputs ?? []).map((i) => `${i.name} ${i.quantity.unit}`).join(', ');
+  check('a key the binding lacks takes the shelf’s unit', partly === 'a placeholder-unit-c, b placeholder-unit-d', partly);
+  const neither = (runBody({ ...ask, specs: runSpecs(null, null, { inputs: [bound.inputs[1]] }) }).inputs ?? []).map((i) => `${i.name} ${i.quantity.unit}`).join(', ');
+  check('with no shelf yet, the inputs as bound still name theirs', neither === 'a , b placeholder-unit-d', neither);
+  // A composite's Finance value goes in the unit its panel names (OF-BLD-020 §6.1).
+  const composite = { specs: [aSpec('a', 'placeholder-unit-a'), aSpec('fin', 'placeholder-unit-per-year')] };
+  const fin = runBody({ ...ask, overrides: [typed('a', 1), typed('fin', 3)], specs: runSpecs(composite, shelfOnly, bound) });
+  const finSent = (fin.inputs ?? []).map((i) => `${i.name} ${i.quantity.unit}`).join(', ');
+  check('a composite’s Finance value goes in the unit its panel names', finSent === 'a placeholder-unit-a, fin placeholder-unit-per-year', finSent);
+  // The ceiling check sends the yield's change as a typed input in its unit, and neither older field.
+  const q = ceilingQuery({ scenarioId: 'sc-1', host: null, overrides: [typed('yield', 0.4)], specs: [{ key: 'yield', unit: 'placeholder-share' }] });
+  const asked = JSON.parse(q.get('inputs') ?? '[]') as { name: string; quantity: { value: number; unit: string } }[];
+  check(
+    'the ceiling check sends the yield as a typed input in its unit, and neither older field',
+    asked.length === 1 && asked[0].name === 'yield' && asked[0].quantity.unit === 'placeholder-share' && !q.has('overrides') && !q.has('assumptions'),
+    q.toString(),
+  );
+  check('a ceiling check with no typed yield sends no inputs', !ceilingQuery({ scenarioId: 'sc-1', host: null }).has('inputs'));
+  // alpha 2.2 E.17: a reading chosen on the panel goes in its own value and unit from the run and the ceiling check alike.
+  const reading = anOverride('proforma:sc-1', 'yield', 0.5, { unit: 'placeholder-share-b', origin: 'measurement', ref: 'dep-1/de-1' });
+  const ran = (runBody({ ...ask, overrides: [reading, typed('b', 2)], specs: runSpecs(panel, shelfOnly) }).inputs ?? []).map(
+    (i) => `${i.name} ${i.quantity.value} ${i.quantity.unit} ${i.quantity.origin?.ref ?? ''}`.trim(),
+  );
+  check('a scenario’s run sends a reading in its own value and unit, with its ref', ran.join(', ') === 'yield 0.5 placeholder-share-b dep-1/de-1, b 2 placeholder-unit-b', ran.join(', '));
+  const checked = JSON.parse(
+    ceilingQuery({ scenarioId: 'sc-1', host: null, overrides: [reading], specs: [{ key: 'yield', unit: 'placeholder-share' }] }).get('inputs') ?? '[]',
+  ) as { name: string; quantity: { value: number; unit: string; origin?: { ref?: string } } }[];
+  check(
+    'the ceiling check sends a yield set to a reading in the reading’s own value and unit',
+    checked.length === 1 && checked[0].quantity.value === 0.5 && checked[0].quantity.unit === 'placeholder-share-b' && checked[0].quantity.origin?.ref === 'dep-1/de-1',
+    JSON.stringify(checked),
+  );
+}
+
+// ── the scenario page's binding with its overrides laid on (alpha 2.2 E.17; src/lib/proforma.ts `laidOn`) ──
+
+{
+  const input = (key: string, unit: string): ScenarioInput => ({
+    key, label: key, unit, binding: 'waiting', value: null, low: null, high: null, sampling: null, source: null,
+    recordIds: [], records: [], leftOutNoCarbon: 0, leftOutOtherCarbon: 0, flags: [],
+  });
+  const inputs = [input('a', 'placeholder-unit-a'), input('b', 'placeholder-unit-b'), input('c', 'placeholder-unit-c'), input('d', 'placeholder-unit-d')];
+  const person = anOverride('proforma:sc-1', 'a', 2, { low: 1, note: 'a placeholder' });
+  const inItsUnit = anOverride('proforma:sc-1', 'b', 3, { unit: 'placeholder-unit-b', origin: 'measurement', ref: 'dep-1/de-1', by: 'Grace' });
+  const inAnother = anOverride('proforma:sc-1', 'c', 4, { unit: 'placeholder-unit-e', origin: 'measurement', ref: 'dep-1/de-2', by: 'Grace' });
+  const [a, b, c, d] = laidOn(inputs, [person, inItsUnit, inAnother]);
+  check(
+    'a person’s value binds as their assumption with its interval',
+    a.binding === 'assumption' && a.value === 2 && a.low === 1 && a.high === 2 && a.sampling === 'uniform' && a.source?.kind === 'assumption' && a.source.by === 'Ada' &&
+      a.source.note === `typed on ${AT}: a placeholder`,
+    JSON.stringify(a),
+  );
+  check(
+    'a reading in the input’s unit binds as the reading it is: one value held fixed, its source the reading',
+    b.binding === 'assumption' && b.value === 3 && b.low === 3 && b.high === 3 && b.sampling === 'fixed' && isReading(b.source) && b.source?.id === 'dep-1/de-1' && b.source.by === 'Grace',
+    JSON.stringify(b),
+  );
+  check(
+    'a reading in another unit binds as the reading with no value, which the service sets in the input’s unit',
+    c.binding === 'assumption' && c.value === null && c.sampling === 'fixed' && isReading(c.source) && c.source?.id === 'dep-1/de-2',
+    JSON.stringify(c),
+  );
+  check('an input no override names stands as the service bound it', d === inputs[3]);
+  const asked = modellerQuestions([a, b, c, d], null, null).map((q) => q.key);
+  check('the questions for a modeller ask of a person’s value and an input that waits, and of no reading', asked.join() === 'a,d', asked.join());
+  check(
+    'a Proforma assumption an older build reads holds a person’s value, and none for a reading',
+    assumptionOfOverride(inItsUnit) === null && assumptionOfOverride(person)?.value === 2,
+    JSON.stringify([assumptionOfOverride(inItsUnit), assumptionOfOverride(person)]),
+  );
+}
+
+// ── a reading a panel row is set to, against the listing the service gave (alpha 2.2 E.debts; src/lib/params.ts) ──
+
+{
+  const set = anOverride('proforma:sc-1', 'yield', 0.5, { unit: 'placeholder-share-b', origin: 'measurement', ref: 'dep-1/de-1' });
+  check('a reading the service’s listing names stands on the row', !readingLeftTheList(set, { readings: [{ ref: 'dep-1/de-1' }], problem: null }));
+  check('a reading a listing that answered names nowhere has left it', readingLeftTheList(set, { readings: [{ ref: 'dep-1/de-2' }], problem: null }));
+  check(
+    'a listing the service could not give, or one still asked for, says nothing of the reading',
+    !readingLeftTheList(set, { readings: [], problem: 'The service is not running.' }) && !readingLeftTheList(set, { readings: null, problem: null }),
+  );
+  // A composite's Finance value set to a reading is credited to its depositor as a reading, a person's as theirs.
+  const composite = { ...aFlowsheet([]), id: 'custom_train_v1' };
+  const rows = readBackRows({ 'finance.a': 1, 'finance.b': 2 }, composite, [
+    { name: 'finance.a', value: 1, unit: '', source: { kind: 'deposition', id: 'dep-1/de-1', by: 'Grace', note: null } },
+    { name: 'finance.b', value: 2, unit: '', source: { kind: 'assumption', id: null, by: 'Ada', note: null } },
+  ]);
+  check(
+    'a run’s read-back credits a reading a person chose to its depositor as a reading, and a person’s value to them',
+    JSON.stringify(rows.map((r) => [r.key, r.origin, r.by, r.reading ?? false])) === '[["finance.a","person","Grace",true],["finance.b","person","Ada",false]]',
+    JSON.stringify(rows),
+  );
+}
+
+// ── a scenario card's counts, the reference runs a page reads (src/lib/proforma.ts) ──
+
+{
+  // A custom_train_v1 scenario's plant scale, bound from the vessel design it names, is counted by what binds it;
+  // an input with a fit chosen is counted as a fit (alpha 2.2 C.6, the screens' review).
+  const scenario = aScenario('sc-2', { modelId: 'custom_train_v1' });
+  const fromArtifact = (id: string, note: string): BasisSource => ({ kind: 'artifact', id, note, by: null });
+  const input = (key: string, binding: ScenarioInput['binding'], source: BasisSource | null): ScenarioInput => ({
+    key, label: key, unit: '', binding, value: null, low: null, high: null, sampling: null, source,
+    recordIds: [], records: [], leftOutNoCarbon: 0, leftOutOtherCarbon: 0, flags: [],
+  });
+  const info: ProformaScenarioInfo = {
+    id: 'sc-2', name: 'S', product: '', flowsheet: 'custom_train_v1', host: null, hosts: [], waiting: [], leavesOut: [],
+    priceBasis: '', refused: null,
+    inputs: [
+      input('plant_scale', 'artifact', fromArtifact('v'.repeat(16), 'the plant scale vessel design vvvv was designed at')),
+      input('titre', 'artifact', fromArtifact('f'.repeat(16), 'a fit')),
+      input('glucose_price', 'assumption', null),
+    ],
+  };
+  const c = inputCounts(scenario, info, [], [], { titre: 'f'.repeat(16) });
+  check(
+    'a plant scale the vessel design binds is counted by what binds it, and a chosen fit as a fit',
+    !!c && c.kept === 1 && c.keptBy.join() === 'the vessel design' && c.computed === 1 && c.assumed === 1,
+    JSON.stringify(c),
+  );
+  const none = inputCounts(scenario, { ...info, inputs: [info.inputs[0]] }, [], [], {});
+  check('with no fit chosen, no input is counted as a fit', !!none && none.computed === 0 && none.kept === 1, JSON.stringify(none));
+
+  // A plant that takes configurations is run in its default, and its page finds that run on a reload.
+  const run = (configuration: string | null, plant = 'placeholder-plant'): EngineRun => ({
+    id: `run-${configuration}`, engine: 'biosteam', tool: 'library.run', toolVersion: '', plant, configuration, status: 'done',
+    artifactId: 'a'.repeat(16), inputs: [], outputs: {}, provenance: null, refused: null, scenarioId: null, sff: null,
+    sffRefused: null, versions: {}, diagnostics: [], by: 'Ada', at: AT, durationMs: null,
+  });
+  const runs = [run('S2'), run('S1'), run(null, 'other')];
+  check('a plant’s reference run is its run in the default configuration', referenceRunOf('placeholder-plant', runs, 'S1')?.id === 'run-S1');
+  check('and a plant that takes none is found with none', referenceRunOf('other', runs)?.id === 'run-null' && referenceRunOf('placeholder-plant', runs) === null);
+
+  // The runs kept from the retired reference entries map to the library plant each entry built.
+  const art = (tool: string, flowsheet?: string): Artifact => ({
+    id: `${tool}-${flowsheet ?? ''}`, tool, toolVersion: '', output: {}, outputHash: '', provenance: 'assumed', createdAt: AT,
+    durationMs: 0, seed: null,
+    inputs: flowsheet ? [{ name: 'flowsheet', value: flowsheet, unit: '', source: { kind: 'convention', id: null, note: null, by: null } }] : [],
+  });
+  const kept = [art('proforma.reference', 'corn_drygrind'), art('proforma_benchmark'), art('proforma.reference', 'cornstover_benchmark'), art('library.run')];
+  check('a kept reference run names its retired entry, the benchmark the corn stover entry', retiredEntryOf(kept[0]) === 'corn_drygrind' && retiredEntryOf(kept[1]) === 'cornstover_benchmark' && retiredEntryOf(kept[3]) === null);
+  check(
+    'and each plant’s page lists the runs kept from its entry alone',
+    keptRunsOf('corn', kept).map((a) => a.id).join() === 'proforma.reference-corn_drygrind' &&
+      keptRunsOf('cornstover', kept).map((a) => a.id).join() === 'proforma_benchmark-,proforma.reference-cornstover_benchmark',
+  );
+}
+
+// ── the runbooks a page makes (alpha 2.2 E.11; src/store.ts) ───────────
+// A runbook is the generated Runbook, served as kept: a draft's prediction may
+// hold its kind, interval, artifact and records as null or leave them out, and
+// a measure may leave its prediction out. lock.ts and runbook_lock.py read the
+// two apart, so the page keeps each as the service wrote it. Every runbook the
+// page makes is one of the project's rows: adopted from a draft, opened to
+// revise a locked one, or promoted from a research one.
+
+{
+  const S = () => useStore.getState();
+  const aPrediction = (id: string, more: Partial<Prediction> = {}): Prediction => ({
+    id, label: `A placeholder claim ${id}`, value: 1, unit: 'placeholder-unit', confidence: 'medium', basis: 'a placeholder basis', ...more,
+  });
+  const draft: RunbookDraft = {
+    title: 'A placeholder draft',
+    productId: '',
+    strainId: '',
+    predictions: [aPrediction('p1', { kind: null, interval: null, artifactId: null, recordIds: null }), aPrediction('p2')],
+    measures: [
+      { id: 'm1', label: 'A placeholder measure', unit: 'placeholder-unit', timepoint: 'harvest', predictionId: 'p1' },
+      { id: 'm2', label: 'A placeholder context', unit: 'placeholder-unit', timepoint: 'harvest' },
+    ],
+  };
+  const drafted = S().adoptRunbookDraft(draft);
+  const adopted = S().runbooks.find((r) => r.id === drafted);
+  check(
+    'a draft’s predictions and measures enter the runbook as the service wrote them, each null and each field left out kept',
+    JSON.stringify(adopted?.predictions) === JSON.stringify(draft.predictions) &&
+      JSON.stringify(adopted?.measurementSchema) === JSON.stringify(draft.measures) &&
+      adopted?.predictions?.[0].kind === null && !('kind' in (adopted?.predictions?.[1] ?? {})) &&
+      !('predictionId' in (adopted?.measurementSchema?.[1] ?? {})),
+    JSON.stringify(adopted?.predictions),
+  );
+  S().lockRunbook(drafted);
+  const locked = S().runbooks.find((r) => r.id === drafted);
+  check(
+    'its lock is taken over the values as they arrived, and reads as intact',
+    locked?.lockHash === runbookLockHash(draft.predictions, draft.measures) && locked !== undefined && lockIntact(locked) &&
+      locked.lockHash !== runbookLockHash([aPrediction('p1'), aPrediction('p2')], draft.measures),
+    String(locked?.lockHash),
+  );
+  const revised = S().supersedeRunbook(drafted);
+  useStore.setState((x) => ({ runbooks: x.runbooks.map((r) => (r.id === drafted ? { ...r, status: 'complete' as const } : r)) }));
+  const promoted = S().promoteRunbook(drafted);
+  const sent = new Set(projectStateOf(S()).runbooks.map((r) => r.id));
+  check(
+    'a runbook adopted, revised or promoted on the page is among the rows the page sends, each under an id that holds across reloads',
+    revised !== null && promoted !== null && sent.has(drafted) && sent.has(revised) && sent.has(promoted) &&
+      [revised, promoted].every((id) => /^rb-[0-9a-z]+-\d+$/.test(id ?? '')),
+    JSON.stringify([...sent]),
+  );
+  const revision = S().runbooks.find((r) => r.id === revised);
+  check(
+    'the revision keeps the locked runbook’s values as they were and is open to change; the original keeps its lock',
+    JSON.stringify(revision?.predictions) === JSON.stringify(draft.predictions) && revision?.lockedAt === null &&
+      S().runbooks.find((r) => r.id === drafted)?.lockHash === locked?.lockHash,
+  );
+  useStore.setState({ runbooks: [], adoptedRunbookIds: [] });
+}
+
+// ── where a runbook stands (src/lib/studies.ts `runbookStatusOf`; RunbookDetail, Runbooks) ──
+// A runbook a study or Postdoc makes keeps `draft` in its row, and the bench moves it on: locked, it waits for the
+// bench; a deposition staged against it runs it; closed, the deposition holds it for a person's reconciliation; and
+// reconciled, it is complete. The runbook's page heads with where it stands, and the board files it in that column.
+
+{
+  const S = () => useStore.getState();
+  const was = { depositions: S().depositions, measuredEvidence: S().measuredEvidence, depositedBy: S().depositedBy, reviewer: S().reviewer };
+  const { createElement } = await import('react');
+  const { renderToStaticMarkup } = await import('react-dom/server');
+  const { default: RunbookDetail } = await import('../src/screens/RunbookDetail');
+  const { default: Runbooks } = await import('../src/screens/Runbooks');
+  const studies = await import('../src/lib/studies');
+  const derives = typeof studies.runbookStatusOf === 'function';
+  S().setReviewerName('Ada');
+  const id = S().adoptRunbookDraft({
+    title: 'A placeholder study runbook',
+    productId: '',
+    strainId: '',
+    predictions: [{ id: 'p1', label: 'A placeholder claim', value: 1, unit: 'placeholder-unit', confidence: 'low', basis: 'a placeholder basis' }],
+    measures: [{ id: 'm1', label: 'A placeholder claim', unit: 'placeholder-unit', timepoint: 'harvest', predictionId: 'p1' }],
+  });
+  // A render in Node reads the store's first state (zustand's server snapshot), so each render lays the store's
+  // present state over that first one and puts it back after.
+  const rendered = (el: Parameters<typeof renderToStaticMarkup>[0]) => {
+    const first = useStore.getInitialState();
+    const kept = { ...first };
+    Object.assign(first, S());
+    try {
+      return renderToStaticMarkup(el);
+    } finally {
+      Object.assign(first, kept);
+    }
+  };
+  const page = () => rendered(createElement(RunbookDetail, { runbookId: id }));
+  // The header's status chip, the page's first chip that carries an icon beside its words.
+  const heading = (html: string) =>
+    (html.match(/class="chip inline-flex items-center gap-1\.5"[^>]*>([\s\S]*?)<\/span>/)?.[1] ?? '').replace(/<[^>]+>/g, '');
+  // The board's tabs read the address, so its render stands on an address of the board's own.
+  const columns = () => {
+    const g = globalThis as { window?: unknown };
+    g.window = { location: { hash: '#/runbooks' } };
+    try {
+      return [...rendered(createElement(Runbooks)).matchAll(/id="col-([a-z_]+)"/g)].map((m) => m[1]).join();
+    } finally {
+      delete g.window;
+    }
+  };
+  const seen: string[] = [];
+  const look = () => seen.push(`${heading(page())} in ${columns()}`);
+  look();
+  S().lockRunbook(id);
+  look();
+  const started = S().openDeposition(id, null, 1);
+  look();
+  if (started) S().closeDeposition(started.depositionId);
+  const held = page();
+  look();
+  if (started) S().reconcileDeposition(started.depositionId, 'confirmed', 'a placeholder note');
+  const reconciled = page();
+  look();
+  check(
+    'a runbook made from a study leaves Draft as the bench takes it: running with a deposition open, held for a person once it is closed, complete once a person records the reconciliation, on its page and on the board',
+    JSON.stringify(seen) ===
+      JSON.stringify(['Draft in draft', 'Draft in draft', 'Running in running', 'Held for review in needs_review', 'Complete in complete']),
+    JSON.stringify(seen),
+  );
+  check(
+    'a closed deposition’s page panel sends the person to reconcile it, and offers no ruling on a boundary map',
+    started !== null && held.includes(`/runbooks/depositions/${started.depositionId}`) && held.includes('Reconcile the deposition') &&
+      !held.includes('Accept the boundary map'),
+  );
+  check(
+    'once reconciled the page says the outcome a person recorded, and the locked draft no longer reads as scoped only',
+    reconciled.includes('Reconciled · confirmed') && !reconciled.includes('Scoped only'),
+  );
+  const at = (state: Deposition['state'], reconciliation: Deposition['reconciliation'] = null) => aDeposition(`dep-${state}`, { runbookId: 'rb-s', state, reconciliation });
+  const recorded = { at: AT, outcome: 'refuted' as const, deltas: [], note: '' };
+  const lockedRow: Pick<Runbook, 'id' | 'status' | 'lockedAt'> = { id: 'rb-s', status: 'draft', lockedAt: AT };
+  const read = (r: Pick<Runbook, 'id' | 'status' | 'lockedAt'>, ds: Deposition[]): string =>
+    derives ? studies.runbookStatusOf(r, ds) : 'src/lib/studies.ts exports no runbookStatusOf';
+  const got = JSON.stringify([
+    read(lockedRow, [at('running'), at('closed')]),
+    read(lockedRow, [at('staged'), { ...at('closed', recorded), id: 'dep-r' }]),
+    read({ ...lockedRow, lockedAt: null }, [at('running')]),
+    read({ ...lockedRow, status: 'awaiting_budget' }, [at('closed', recorded)]),
+    read(lockedRow, [{ ...at('closed', recorded), runbookId: 'rb-other' }]),
+  ]);
+  check(
+    'a closed deposition waiting for its reconciliation outranks an open one, an open one beside a reconciled one still runs, an unlocked row stays a draft, a status a stage set stands, and another runbook’s deposition moves nothing',
+    got === JSON.stringify(['needs_review', 'running', 'draft', 'awaiting_budget', 'draft']),
+    got,
+  );
+  useStore.setState({ runbooks: [], adoptedRunbookIds: [], ...was });
+}
+
+// ── a run's grid with a dimension of one value (src/engine/interp.ts) ──
+
+{
+  // Two dimensions held at one value each and one swept over three: the base point reads the grid's own number.
+  const grid = {
+    dims: [
+      { key: 'held-a', values: [45] },
+      { key: 'held-b', values: [0.45] },
+      { key: 'swept', values: [0.3, 0.4, 0.5] },
+    ],
+    data: [1.0, 1.5, 2.0],
+  };
+  const base = interpolate(grid, { 'held-a': 45, 'held-b': 0.45, swept: 0.4 });
+  const between = interpolate(grid, { 'held-a': 45, 'held-b': 0.45, swept: 0.45 });
+  check('a grid holding a dimension at one value reads its own number at the base point', base === 1.5, String(base));
+  check('and interpolates along the dimension it sweeps', Math.abs(between - 1.75) < 1e-12, String(between));
+  check('a point off a held dimension is held to its one value', interpolate(grid, { 'held-a': 50, 'held-b': 0.45, swept: 0.3 }) === 1.0);
+}
+
+// ── a catalogue entry as the catalogues screen's form keeps it (alpha 2.2 E.gate) ──
+
+{
+  // A lesson taken in from a file with its body (ADR-018), every word and number a placeholder.
+  const lesson: CatalogueEntry = {
+    kind: 'lesson',
+    id: 'placeholder-lesson',
+    name: 'A placeholder lesson',
+    skills: ['placeholder-skill'],
+    minutes: 5,
+    blocks: [{ kind: 'prose', md: 'A placeholder paragraph.' }, { kind: 'embed', embed: 'mini-queue', arg: null }],
+    checkpoint: [{ id: 'q1', prompt: 'A placeholder choice?', kind: 'mc', options: ['One', 'Two'], answerIndex: 1, explanation: '' }],
+    by: 'Placeholder Keeper',
+    at: '2026-11-01T00:00:00+00:00',
+    agent: 'person',
+    via: null,
+  };
+  const sent = edited(lesson, { name: 'A placeholder lesson, renamed', skills: [] });
+  check(
+    'a lesson edited on the catalogues form sends its minutes, its blocks and its checkpoint as it holds them',
+    sent.minutes === 5 && JSON.stringify(sent.blocks) === JSON.stringify(lesson.blocks) && JSON.stringify(sent.checkpoint) === JSON.stringify(lesson.checkpoint),
+    JSON.stringify(sent),
+  );
+  check('with the fields the form holds laid over them', sent.name === 'A placeholder lesson, renamed' && (sent.skills ?? []).length === 0 && sent.kind === 'lesson');
+  check('and leaves its keeper, lane, door and time for the service to write', sent.by === '' && sent.at === '' && sent.agent === null && sent.via === null);
+  check(
+    "a lesson's body is said in words, and one with none says so",
+    bodyWords(lesson) === '5 min, 2 blocks, 1 checkpoint question' && bodyWords({ minutes: null, blocks: [], checkpoint: [] }) === 'no body yet',
+    bodyWords(lesson),
+  );
+}
+
+// ── where the screens say a project's rows are kept (alpha 2.2 E.19; ADR-014) ──
+// The service keeps every row a project holds, for every page that opens the project: its conversations,
+// depositions, runbooks and their locks, scenarios, trains, overrides and fits, its ledger, records and decisions,
+// catalogues and protocols. This browser keeps its preferences and the writes the service has not yet acknowledged
+// (src/lib/durable.ts). The words a person reads say so: a sentence that keeps something in this browser names a
+// write that waits for the service or a preference, a browser owns no row, and a session holds what it loaded and
+// what lives on the page alone (a run at the bench, an export, a proposal, an undo). A sentence here is a string or
+// a template, a JSX attribute's words, or one JSX element's text with the strings of its expressions; the words of
+// comments are the code's own.
+
+{
+  const SRC = join(import.meta.dirname, '..', 'src');
+  /** Every source file under `dir` with words a person may read; the generated types hold the service's own. */
+  const sourcesUnder = (dir: string): string[] =>
+    readdirSync(dir, { withFileTypes: true }).flatMap((d) => {
+      const path = join(dir, d.name);
+      if (d.isDirectory()) return sourcesUnder(path);
+      return /\.tsx?$/.test(d.name) && !d.name.endsWith('.gen.ts') ? [path] : [];
+    });
+  const ENTITIES: Record<string, string> = {
+    rsquo: '’', lsquo: '‘', ldquo: '“', rdquo: '”', mdash: '—', ndash: '–', amp: '&', nbsp: ' ', hellip: '…', middot: '·', rarr: '→', larr: '←', times: '×',
+  };
+  const plain = (text: string) =>
+    text
+      .replace(/&(#\d+|[a-z]+);/g, (whole, name: string) => (name.startsWith('#') ? String.fromCharCode(Number(name.slice(1))) : (ENTITIES[name] ?? whole)))
+      .replace(/\s+/g, ' ')
+      .trim();
+  /** The sentences a file shows, each with its line and the test id of the element that draws it. */
+  const sentencesOf = (path: string): { line: number; text: string; testid: string | null }[] => {
+    const file = ts.createSourceFile(path, readFileSync(path, 'utf8'), ts.ScriptTarget.Latest, true, path.endsWith('.tsx') ? ts.ScriptKind.TSX : ts.ScriptKind.TS);
+    const joined = new Map<ts.Node, string[]>();
+    // A string joins the JSX attribute or element that shows it, or else the strings it is joined or chosen with.
+    const sentenceOf = (node: ts.Node): ts.Node => {
+      let words: ts.Node = node;
+      let joining = true;
+      for (let at = node.parent; at && !ts.isSourceFile(at); at = at.parent) {
+        if (ts.isJsxAttribute(at) || ts.isJsxElement(at) || ts.isJsxFragment(at)) return at;
+        const joins =
+          ts.isTemplateExpression(at) || ts.isTemplateSpan(at) || ts.isConditionalExpression(at) || ts.isParenthesizedExpression(at) ||
+          (ts.isBinaryExpression(at) && at.operatorToken.kind === ts.SyntaxKind.PlusToken);
+        if (joining && joins) words = at;
+        else joining = false;
+      }
+      return words;
+    };
+    const visit = (node: ts.Node) => {
+      const text =
+        ts.isJsxText(node) || ts.isStringLiteral(node) || ts.isNoSubstitutionTemplateLiteral(node) || ts.isTemplateHead(node) ||
+        ts.isTemplateMiddle(node) || ts.isTemplateTail(node)
+          ? node.text
+          : null;
+      if (text && text.trim()) {
+        const at = sentenceOf(node);
+        joined.set(at, [...(joined.get(at) ?? []), text]);
+      }
+      ts.forEachChild(node, visit);
+    };
+    visit(file);
+    const testidOf = (node: ts.Node): string | null => {
+      const opening = ts.isJsxElement(node) ? node.openingElement : null;
+      const id = opening?.attributes.properties.find((p) => ts.isJsxAttribute(p) && p.name.getText(file) === 'data-testid');
+      return id && ts.isJsxAttribute(id) && id.initializer && ts.isStringLiteral(id.initializer) ? id.initializer.text : null;
+    };
+    return [...joined].map(([node, parts]) => ({
+      line: file.getLineAndCharacterOfPosition(node.getStart(file)).line + 1,
+      text: plain(parts.join(' ')),
+      testid: testidOf(node),
+    }));
+  };
+
+  /** A sentence that keeps something in this browser, or has this browser hold it. */
+  const KEPT_IN_THIS_BROWSER =
+    /\b(?:kept|keeps|held|holds|stored|stores|saved|saves|lives|waits)\b[^.;]{0,40}\bin (?:this|the) browser\b|\bthis browser (?:keeps|holds|stores|saves|kept|held|stored|saved)\b|\bthe store (?:keeps|holds)\b/i;
+  /** What this browser keeps (ADR-014): a write the service has not yet acknowledged, or a preference (the reviewer's name, the person it acts as). */
+  const WAITS_OR_PREFERS =
+    /\buntil\b|\bnot yet\b|\bhas not\b|\bhad not\b|\bis away\b|\bwas away\b|\bstopped answering\b|\bsent when\b|\bbeing sent\b|\bsent only with\b|\bwould refuse\b|\bpreferences\b|\b(?:the|your|reviewer['’]s) name\b|\bacts as\b/i;
+  /** A row as one browser's own, or as made in another: a project's rows are the project's on every page. */
+  const A_BROWSERS_OWN = /\bof (?:this|that|another|each) browser\b|\b(?:in|from|by) (?:another|other|a different) browser\b|\banother browser['’]s\b/i;
+  /** A session holding what the service keeps. */
+  const KEPT_IN_THIS_SESSION =
+    /\b(?:records?|extract(?:ed|ions?)|decisions?|decided|corrected|gold(?: set| annotations?)?|versions?|conversations?|trains?|ledger|depositions?|scenarios?|protocols?|lessons?)\b[^.;]*\b(?:in|of|from) this session\b|\bthis session['’]s (?:records?|extractions?|decisions?|gold set|ledger|conversations?|trains?|scenarios?|protocols?|versions?)\b/i;
+  /** What a session holds of them: what it loaded. */
+  const LOADED = /\bloaded\b/i;
+
+  /**
+   * A browser shown where a person's name stands: a row's maker drawn as `x || 'this browser'` (or `??`) on a screen.
+   * The service's own word for a row kept with no reviewer name set (project_state.UNNAMED, src/store.ts `decidedBy`)
+   * is a value it reads, and a screen names such a row's maker as nobody named.
+   */
+  const browserNamed = (path: string): number[] => {
+    const file = ts.createSourceFile(path, readFileSync(path, 'utf8'), ts.ScriptTarget.Latest, true, path.endsWith('.tsx') ? ts.ScriptKind.TSX : ts.ScriptKind.TS);
+    const lines: number[] = [];
+    const shown = (node: ts.Node): boolean => {
+      for (let at = node.parent; at && !ts.isSourceFile(at); at = at.parent) {
+        if (ts.isJsxExpression(at) || ts.isTemplateSpan(at)) return true;
+        if (ts.isFunctionLike(at)) return false;
+      }
+      return false;
+    };
+    const visit = (node: ts.Node) => {
+      const p = node.parent;
+      if (
+        (ts.isStringLiteral(node) || ts.isNoSubstitutionTemplateLiteral(node)) &&
+        /^this browser$/i.test(node.text.trim()) &&
+        p && ts.isBinaryExpression(p) && p.right === node &&
+        (p.operatorToken.kind === ts.SyntaxKind.BarBarToken || p.operatorToken.kind === ts.SyntaxKind.QuestionQuestionToken) &&
+        shown(node)
+      )
+        lines.push(file.getLineAndCharacterOfPosition(node.getStart(file)).line + 1);
+      ts.forEachChild(node, visit);
+    };
+    visit(file);
+    return lines;
+  };
+
+  const misplaced: string[] = [];
+  let read = 0;
+  for (const path of sourcesUnder(SRC)) {
+    for (const { line, text } of sentencesOf(path)) {
+      read++;
+      const where = `${relative(join(SRC, '..'), path)}:${line}`;
+      if (A_BROWSERS_OWN.test(text)) misplaced.push(`${where} gives a browser a row the project keeps: “${text}”`);
+      else if (KEPT_IN_THIS_BROWSER.test(text) && !WAITS_OR_PREFERS.test(text)) misplaced.push(`${where} keeps in this browser what the service keeps: “${text}”`);
+      else if (KEPT_IN_THIS_SESSION.test(text) && !LOADED.test(text)) misplaced.push(`${where} keeps in this session what the service keeps: “${text}”`);
+    }
+    for (const line of browserNamed(path)) misplaced.push(`${relative(join(SRC, '..'), path)}:${line} names this browser where a person’s name stands`);
+  }
+  check(
+    'the words on every screen put a project’s rows with the service, and in this browser its preferences and the writes that wait for the service',
+    misplaced.length === 0,
+    misplaced.length ? misplaced.map((m) => `\n    ${m}`).join('') : `${read} sentences read`,
+  );
+  const none = sentencesOf(join(SRC, 'screens', 'Postdoc.tsx')).find((s) => s.testid === 'live-conversations-none');
+  check(
+    'Postdoc’s empty list says the service keeps each conversation with the project, for every page that opens it',
+    !!none && /\bThe service keeps each conversation with the project\b/.test(none.text) && /\bevery page that opens the project\b/.test(none.text),
+    none?.text ?? 'no live-conversations-none words in src/screens/Postdoc.tsx',
+  );
+}
+
+// H.0, the sweep on the final tree: what a person reads where an address,
+// a time, a document or a number stood raw.
+{
+  // Every link inside a project keeps the project in its address (router.tsx `href`): a link written as a bare
+  // hash drops it. Home's own `#/`, and a link naming a project's address (`#/p/<id>`), are the plain ones.
+  const SRC = join(import.meta.dirname, '..', 'src');
+  const sourcesUnder = (dir: string): string[] =>
+    readdirSync(dir, { withFileTypes: true }).flatMap((d) => {
+      const path = join(dir, d.name);
+      if (d.isDirectory()) return sourcesUnder(path);
+      return /\.tsx?$/.test(d.name) && !d.name.endsWith('.gen.ts') ? [path] : [];
+    });
+  const bare: string[] = [];
+  for (const path of sourcesUnder(SRC)) {
+    const text = readFileSync(path, 'utf8');
+    text.split('\n').forEach((line, i) => {
+      if (/href=\{`#\$\{|href=\{`#\/(?!p\/)|href="#\/[^"]/.test(line)) bare.push(`${relative(join(SRC, '..'), path)}:${i + 1}`);
+    });
+  }
+  check('every link inside a project goes through the router, so the address keeps the project', bare.length === 0, bare.map((b) => `\n    ${b}`).join(''));
+  check(
+    'an ISO time in a basis note reads as the page writes a time, the day and the minute in UTC',
+    stampsIn('estimated on 2026-11-08T03:23:03.514708Z: a value') === 'estimated on 2026-11-08 03:23 UTC: a value' &&
+      stampsIn('no time here') === 'no time here',
+    stampsIn('estimated on 2026-11-08T03:23:03.514708Z: a value'),
+  );
+  const paper = { id: '2fc3d2a2a57446a6b9f1090a2a236bc6', title: 'A placeholder title', authors: ['Doe, Jane', 'Roe, Rick', 'Poe, Paul'], year: 2014 };
+  check(
+    'a document is named by its first author and year, and a long id by its last characters',
+    shortCite(paper) === 'Doe et al. 2014' && shortCite({ ...paper, authors: [] }) === 'A placeholder title 2014' && idTail(paper.id) === '…2a236bc6',
+    `${shortCite(paper)} · ${idTail(paper.id)}`,
+  );
+  check('a power of ten is written in superscript, never with a caret', fmt(88467389.96) === '8.85×10⁷' && fmt(6.88e-6) === '6.88×10⁻⁶', `${fmt(88467389.96)} · ${fmt(6.88e-6)}`);
+}
+
+// H.0's second sweep: the names a screen reads, held to the rail, the service and the build's own words.
+{
+  // A note the service keeps whole in a basis (its id hashes the words) reads on a screen with the build's decision
+  // tags dropped: a decision, a build document, a rule's constant. A parenthesis of plain words stays.
+  const said = [
+    plainNote('No death or decay term: zero when absent, said so (D5).'),
+    plainNote('Until the sugar runs out (Appendix 2 §A): the first hour (kinetics.RUN_OUT_SHARE). A run stops.'),
+    plainNote('Absent: anaerobic. A record of biomass_yield_oxygen (OF-BLD-020 §3.2 added the field) binds it.'),
+    plainNote('D8: the medium belongs to the experimenter (STRAIN_FREE).'),
+    plainNote('Off when absent, said so, never Ki = 0 (D5 as built, 4). Left out (CARBON_RULE).'),
+  ];
+  check(
+    'a kept note reads on a screen with its decision tags, build documents and constants dropped, its plain parentheses kept',
+    said.join(' | ') ===
+      'No death or decay term: zero when absent, said so. | Until the sugar runs out: the first hour. A run stops. | ' +
+        'Absent: anaerobic. A record of biomass_yield_oxygen binds it. | the medium belongs to the experimenter. | ' +
+        'Off when absent, said so, never Ki = 0. Left out.' &&
+      plainNote('the Haldane term (Haldane) and 2026-11-08T03:23:03Z') === 'the Haldane term (Haldane) and 2026-11-08 03:23 UTC',
+    said.join(' | '),
+  );
+
+  // Every destination on the rail is named on Settings → Architecture, read at its rail address.
+  const unmapped = RAIL.filter((r) => r.to !== '/' && !COMPONENTS.some((c) => c.owner === r.label && (c.surfacedAs ?? '').includes(r.to)));
+  check('every destination on the rail is a named component, read at its rail address', unmapped.length === 0, unmapped.map((r) => r.label).join(', '));
+
+  // A link back to a rail destination names it by its rail label (the reader's crumb said "Library" for BioRepo).
+  const SRC = join(import.meta.dirname, '..', 'src');
+  const filesUnder = (dir: string): string[] =>
+    readdirSync(dir, { withFileTypes: true }).flatMap((d) => {
+      const path = join(dir, d.name);
+      if (d.isDirectory()) return filesUnder(path);
+      return /\.tsx$/.test(d.name) ? [path] : [];
+    });
+  const labelOf = new Map(RAIL.map((r) => [r.to, r.label]));
+  const misnamed: string[] = [];
+  const backFromTab: string[] = [];
+  for (const path of filesUnder(SRC)) {
+    const text = readFileSync(path, 'utf8');
+    for (const m of text.matchAll(/<a href=\{href\('(\/[a-z-]+)'\)\}[^>]*>\s*<ArrowLeft[^>]*\/>\s*([^<{]+?)\s*<\/a>/g)) {
+      const label = labelOf.get(m[1]);
+      if (label && m[2] !== label) misnamed.push(`${relative(SRC, path)}: ${m[2]} for ${label}`);
+    }
+    // A tab of a destination sits beside its siblings; its header sends nobody back elsewhere.
+    if (text.includes('<OwnerTabs') && /actions=\{<LinkButton[^>]*>Back to /.test(text)) backFromTab.push(relative(SRC, path));
+  }
+  check('a link back to a rail destination names it as the rail does', misnamed.length === 0, misnamed.join('; '));
+  check("a destination's tab carries no link back to another destination in its header", backFromTab.length === 0, backFromTab.join(', '));
+
+  // A subsystem the shelf lists as not built has no route of its own on the service (the shelf once called Audit unbuilt
+  // while GET /api/audit served the trail).
+  const served = new Set(Object.keys((JSON.parse(readFileSync(join(SRC, '..', 'docs', 'api', 'openapi.json'), 'utf8')) as { paths: Record<string, unknown> }).paths));
+  const OWNERS: SubsystemOwner[] = ['Intake', 'BioRepo', 'geneOS', 'fermOS', 'pureOS', 'Proforma', 'Guild'];
+  const builtAfterAll = OWNERS.flatMap((o) => stubsFor(o)).filter((st) => {
+    const [owner, part] = st.id.split('.');
+    return served.has(`/api/${part}`) || served.has(`/api/${owner}/${part}`);
+  });
+  check('no subsystem the shelf calls unbuilt has a route the service serves', builtAfterAll.length === 0, builtAfterAll.map((st) => st.id).join(', '));
+}
+
+// The reader's link to a record (src/screens/PaperReader.tsx): the page moves once, to the record's words, and the
+// rail's row comes into view inside the rail's own list. The link scrolled the text to the span and then the row into
+// view, and the row's scroll moved the page too: beside the sticky rail it stopped the text's scroll at the paper's top,
+// and where the rail sits beneath the text it carried the page down to the rail.
+{
+  const READER = join(import.meta.dirname, '..', 'src', 'screens', 'PaperReader.tsx');
+  const file = ts.createSourceFile(READER, readFileSync(READER, 'utf8'), ts.ScriptTarget.Latest, true, ts.ScriptKind.TSX);
+  const twice: string[] = [];
+  const visit = (node: ts.Node) => {
+    if (ts.isFunctionLike(node)) {
+      let calls = 0;
+      const count = (n: ts.Node) => {
+        if (ts.isFunctionLike(n)) return;
+        if (ts.isCallExpression(n) && ts.isPropertyAccessExpression(n.expression) && n.expression.name.text === 'scrollIntoView') calls++;
+        ts.forEachChild(n, count);
+      };
+      ts.forEachChild(node, count);
+      if (calls > 1) twice.push(`src/screens/PaperReader.tsx:${file.getLineAndCharacterOfPosition(node.getStart(file)).line + 1}`);
+    }
+    ts.forEachChild(node, visit);
+  };
+  visit(file);
+  check('a function in the reader scrolls the page once: none calls scrollIntoView twice', twice.length === 0, twice.join(', '));
+
+  const { revealInList } = await import('../src/screens/PaperReader');
+  const listAt = (top: number, bottom: number, scrollTop: number) => ({ scrollTop, getBoundingClientRect: () => ({ top, bottom }) });
+  const rowAt = (top: number, bottom: number) => ({ getBoundingClientRect: () => ({ top, bottom }) });
+  const below = listAt(100, 400, 50);
+  const above = listAt(100, 400, 200);
+  const inside = listAt(100, 400, 70);
+  const shown = typeof revealInList === 'function';
+  if (shown) {
+    revealInList(below, rowAt(420, 460));
+    revealInList(above, rowAt(60, 90));
+    revealInList(inside, rowAt(150, 190));
+    revealInList(null, rowAt(0, 10));
+    revealInList(inside, undefined);
+  }
+  check(
+    "a rail row comes into view inside the rail's own list the nearest way, and a row in view moves nothing",
+    shown && below.scrollTop === 110 && above.scrollTop === 160 && inside.scrollTop === 70,
+    shown ? `${below.scrollTop} · ${above.scrollTop} · ${inside.scrollTop}` : 'src/screens/PaperReader.tsx exports no revealInList',
+  );
+}
+
+// A corrected record on the review card and in the Intake table (src/lib/review.ts `publishedOf`; src/store.ts
+// `applyDecision`, `editRecord`). The card labelled "As published" and Intake's "Value (as published)" column showed
+// the correction, and after a reload the trail read that nothing had happened beyond the extraction; an edit with no
+// reviewer name was kept, and sent later under the name set by then.
+{
+  const real = globalThis.fetch;
+  const asked: string[] = [];
+  globalThis.fetch = (async (url: string, init?: RequestInit) => {
+    asked.push(`${init?.method ?? 'GET'} ${url}`);
+    return new Response(typeof init?.body === 'string' ? init.body : '{}', { status: 200 });
+  }) as typeof fetch;
+  const id = 'rec-mesp';
+  const mine = () => useStore.getState().records.find((r) => r.id === id);
+  try {
+    const candidate: Candidate = {
+      ...aCandidate(id, 'ethanol_mesp'), paperId: 'P-held', value: 2.32, unit: 'USD gal⁻¹', si: { value: 2.32, unit: 'USD gal⁻¹' },
+    };
+    // The service's decision as POST /api/biorepo/decisions keeps it and the overlay serves it, its quantity carrying
+    // the fields the service adds.
+    const corrected: ReviewDecision = {
+      recordId: id, status: 'unverified', provenance: 'unverified', reviewer: 'Ada', at: '2026-11-20T10:00:00Z',
+      corrected: { value: 2.5, unit: 'USD gal⁻¹', basis: null, high: null, low: null, origin: null },
+      gold: null, rejectReason: null, quote: null, sectionId: null,
+    };
+    const held: Overlay['papers'][string] = {
+      authors: [], doi: null, extraction: null, fetchedAt: null, ingest: '', journal: null, licenceClass: null, license: null,
+      pmcid: null, reason: null, sections: [], source: 'upload', textSource: 'full-text', title: null, url: null, year: null,
+    };
+    const overlay: Overlay = { papers: { 'P-held': held }, records: { [id]: corrected }, candidates: [candidate], runs: [] };
+    const fresh = {
+      projectId: 'p', records: [], overlay: null, decisionAt: {}, durableReview: null, refusedDecisions: {},
+      reviewQueue: [], reviewIndex: 0, undoStack: [], toasts: [], activity: [],
+    };
+    useStore.setState(fresh);
+    useStore.getState().applyOverlay(overlay);
+    const loaded = mine();
+    const paper = loaded && publishedOf(loaded);
+    check(
+      'a corrected record loaded from the service reads as published the paper’s value, and carries the correction beside it',
+      !!loaded && paper?.value === 2.32 && paper.unit === 'USD gal⁻¹' && paper.si?.value === 2.32 &&
+        loaded.corrected?.value === 2.5 && loaded.value === 2.5,
+      JSON.stringify(loaded && { published: paper, value: loaded.value, corrected: loaded.corrected }),
+    );
+    const edit = loaded?.audit.find((a) => a.action === 'edited value');
+    check(
+      'a reload rebuilds the trail from the service’s decision: who corrected, when, from the paper’s value to the correction',
+      loaded?.audit.length === 1 && edit?.who === 'Ada' && edit.from === '2.32 USD gal⁻¹' && edit.to === '2.5 USD gal⁻¹' &&
+        /^\d{4}-\d\d-\d\d \d\d:\d\d$/.test(edit.at),
+      JSON.stringify(loaded?.audit),
+    );
+    useStore.getState().applyOverlay(overlay);
+    check('the same decision loaded again adds nothing to the trail', mine()?.audit.length === 1, JSON.stringify(mine()?.audit));
+    const accepted: ReviewDecision = { ...corrected, status: 'verified', provenance: 'verified', reviewer: 'Ben', at: '2026-11-21T10:00:00Z' };
+    useStore.getState().applyOverlay({ ...overlay, records: { [id]: accepted } });
+    const trail = (mine()?.audit ?? []).map((a) => `${a.who} ${a.action}`).join('; ');
+    check('a later decision on the record adds its own line, signed by its reviewer', trail === 'Ada edited value; Ben verified', trail);
+
+    // The screens read the paper's value where they say "as published".
+    const parse = (path: string) => ts.createSourceFile(path, readFileSync(path, 'utf8'), ts.ScriptTarget.Latest, true, ts.ScriptKind.TSX);
+    const reads = (node: ts.Node): string[] => {
+      const out: string[] = [];
+      const visit = (n: ts.Node) => {
+        if (ts.isPropertyAccessExpression(n)) out.push(n.getText());
+        ts.forEachChild(n, visit);
+      };
+      visit(node);
+      return out;
+    };
+    const find = (root: ts.Node, test: (n: ts.Node) => boolean): ts.Node[] => {
+      const out: ts.Node[] = [];
+      const visit = (n: ts.Node) => {
+        if (test(n)) out.push(n);
+        ts.forEachChild(n, visit);
+      };
+      visit(root);
+      return out;
+    };
+    const guild = parse(join(import.meta.dirname, '..', 'src', 'screens', 'Guild.tsx'));
+    const card = find(guild, (n) => ts.isJsxElement(n) && n.children.some((c) => ts.isJsxText(c) && c.text.trim() === 'As published'))[0]?.parent;
+    const cardReads = card ? reads(card) : [];
+    const logLine = find(guild, (n) => ts.isTemplateExpression(n) && n.head.text.trim().startsWith('as published:'))[0];
+    const logReads = logLine ? reads(logLine) : [];
+    check(
+      'Guild’s “As published” card and its session log read the paper’s value (publishedOf), the record’s own value nowhere',
+      cardReads.includes('published.value') && !cardReads.some((x) => /^record\.(value|unit)$/.test(x)) &&
+        logReads.includes('published.value') && !logReads.some((x) => /^r\.(value|unit)$/.test(x)),
+      JSON.stringify({ card: cardReads, log: logReads }),
+    );
+    const intake = parse(join(import.meta.dirname, '..', 'src', 'screens', 'Intake.tsx'));
+    const column = find(intake, (n) =>
+      ts.isObjectLiteralExpression(n) &&
+      n.properties.some((p) => ts.isPropertyAssignment(p) && p.name.getText() === 'key' && p.initializer.getText() === "'value'"),
+    )[0];
+    const columnReads = column ? reads(column) : [];
+    const csv = find(intake, (n) => ts.isCallExpression(n) && n.expression.getText() === 'exportCSV')[0] as ts.CallExpression | undefined;
+    const headers = csv && ts.isArrayLiteralExpression(csv.arguments[1]) ? csv.arguments[1].elements.map((e) => (ts.isStringLiteral(e) ? e.text : '')) : [];
+    const rowOf = csv && ts.isCallExpression(csv.arguments[2]) ? csv.arguments[2].arguments[0] : undefined;
+    const row = rowOf && ts.isArrowFunction(rowOf) && ts.isArrayLiteralExpression(rowOf.body) ? rowOf.body.elements.map((e) => e.getText()) : [];
+    const at = (header: string) => row[headers.indexOf(header)];
+    check(
+      'Intake’s “Value (as published)” column and its export read the paper’s value, and the export carries the correction in its own columns',
+      columnReads.includes('published.value') && !columnReads.some((x) => /^rec\.(value|unit)$/.test(x)) &&
+        at('Value (as published)') === 'published.value' && at('Unit (as published)') === 'published.unit' &&
+        at('Corrected value')?.startsWith('rec.corrected') === true,
+      JSON.stringify({ column: columnReads, published: at('Value (as published)'), corrected: at('Corrected value') }),
+    );
+
+    // An edit with no reviewer name is refused in words, whether the service answers or not, and keeps nothing.
+    for (const serviceUp of [true, false]) {
+      useStore.setState({ ...fresh, reviewer: '', serviceUp });
+      useStore.getState().applyOverlay({ ...overlay, records: {} });
+      asked.length = 0;
+      const kept = useStore.getState().editRecord(id, 2.5, 'USD gal⁻¹');
+      const after = mine();
+      const said = useStore.getState().toasts.map((t) => t.text).join(' | ');
+      const owed = snapshotOf(useStore.getState()).reviewDecisions;
+      check(
+        `an edit with no reviewer name is refused in words and keeps nothing (service ${serviceUp ? 'answering' : 'away'})`,
+        kept === false && after?.value === 2.32 && !after.corrected && after.audit.length === 0 &&
+          !(id in useStore.getState().decisionAt) && Object.keys(owed).length === 0 && /reviewer name/.test(said) && asked.length === 0,
+        JSON.stringify({ kept, value: after?.value, corrected: after?.corrected, audit: after?.audit, owed, said, asked }),
+      );
+    }
+    // A name set after the refusal, on the page the snapshot reloads into, finds nothing to send under it.
+    const saved = snapshotOf(useStore.getState());
+    useStore.setState({ reviewer: 'Ben', serviceUp: true, durableReview: { savedAt: saved.savedAt, decisions: decisionsIn(saved, 'p') } });
+    asked.length = 0;
+    await useStore.getState().syncDecisions();
+    check('a reviewer name set after a refused edit signs nothing', asked.length === 0 && mine()?.value === 2.32, asked.join('; '));
+    // With a name the correction stands under it, and the paper's value stays as published.
+    useStore.setState({ ...fresh, reviewer: 'Ada', serviceUp: false });
+    useStore.getState().applyOverlay({ ...overlay, records: {} });
+    const keptNamed = useStore.getState().editRecord(id, 2.5, 'USD gal⁻¹');
+    const named = mine();
+    check(
+      'an edit under a reviewer name stands, signed by that name, and the record still reads as published the paper’s value',
+      keptNamed && named?.corrected?.value === 2.5 && named.reviewer === 'Ada' && named.audit[0]?.who === 'Ada' &&
+        named.audit[0]?.from === '2.32 USD gal⁻¹' && publishedOf(named).value === 2.32,
+      JSON.stringify(named && { corrected: named.corrected, reviewer: named.reviewer, audit: named.audit }),
+    );
+
+    // A decision the browser held is signed by the reviewer who made it (round 2's check of this fix): a correction
+    // an older page held with no reviewer on it is never sent under a name set since, and the page says so in words;
+    // one held under Ada is sent under Ada while Ben is reviewing.
+    const heldAt = '2026-11-20T10:00:00.000Z';
+    const heldAs = (reviewer: string | undefined) => ({
+      [id]: { status: 'unverified', provenance: 'unverified', corrected: { value: 2.5, unit: 'USD gal⁻¹' }, rejectReason: null,
+        reviewer, at: heldAt, project: 'p' } as DurableReviewDecision,
+    });
+    const sentBodies: ReviewDecision[] = [];
+    globalThis.fetch = (async (url: string, init?: RequestInit) => {
+      asked.push(`${init?.method ?? 'GET'} ${url}`);
+      if (init?.method === 'POST' && typeof init.body === 'string') sentBodies.push(JSON.parse(init.body) as ReviewDecision);
+      return new Response(typeof init?.body === 'string' ? init.body : '{}', { status: 200 });
+    }) as typeof fetch;
+    for (const [reviewer, want] of [[undefined, null], ['Ada', 'Ada']] as const) {
+      useStore.setState({ ...fresh, reviewer: 'Ben', serviceUp: true, durableReview: { savedAt: heldAt, decisions: heldAs(reviewer) } });
+      asked.length = 0;
+      sentBodies.length = 0;
+      useStore.getState().applyOverlay({ ...overlay, records: {} });
+      await useStore.getState().syncDecisions();
+      const said = useStore.getState().toasts.map((t) => t.text).join(' | ');
+      const signers = sentBodies.map((b) => b.reviewer);
+      check(
+        want === null
+          ? 'a correction an older page held unsigned is never sent under a name set since, and the page says it keeps it unsent'
+          : 'a held decision is sent under the reviewer who made it, the name set since signing nothing',
+        want === null ? signers.length === 0 && /no reviewer name/.test(said) : signers.length === 1 && signers[0] === want,
+        JSON.stringify({ asked, signers, said }),
+      );
+    }
+  } finally {
+    globalThis.fetch = real;
+    useStore.setState({ records: [], overlay: null, decisionAt: {}, durableReview: null, reviewer: '', toasts: [] });
+  }
+}
+
+// The fits fermOS → Forecast offers (src/lib/fermos.ts `keptFits`, `forecastFits`; src/screens/FermOSForecast.tsx).
+// Forecast read the session's fits alone, so after a reload it said "No fit to forecast from yet" while the service
+// kept the project's fits and fermOS → Vessel listed them.
+{
+  type KineticFit = import('../src/lib/fermos').KineticFit;
+  const fermos = await import('../src/lib/fermos');
+  const shown = typeof fermos.keptFits === 'function' && typeof fermos.forecastFits === 'function';
+  const param = (name: string, value: number) => ({ name, value, low: value / 2, high: value * 2, unit: 'placeholder-unit' });
+  const fitted = (model: string): KineticFit => ({ model, params: [param('X0', 0.1), param('mu', 0.3), param('Xmax', 5)] });
+  const unfitted: KineticFit = { model: 'logistic_v0', reason: 'a placeholder reason a run gives no fit' };
+  const kept = (id: string, dep: string, output: KineticFit, tool = 'kinetic_fit'): Artifact => ({
+    id,
+    tool,
+    toolVersion: 'placeholder-version',
+    inputs: [{ name: 'biomass series: placeholder', value: '{}', unit: 'placeholder-unit', source: { kind: 'deposition', id: dep, note: null, by: null } }],
+    output,
+    outputHash: 'placeholder-hash',
+    provenance: 'computed',
+    createdAt: AT,
+    durationMs: 1,
+    seed: null,
+  });
+  // The service answers newest first; a stand-in that ignored the filter would send a forecast among them.
+  const served = [
+    kept('b000000000000002', 'dep-2', fitted('batch_v1')),
+    kept('a000000000000001', 'dep-1', fitted('logistic_v0')),
+    kept('c000000000000003', 'dep-3', unfitted),
+    kept('d000000000000004', 'dep-1', fitted('logistic_v0'), 'growth_forecast'),
+  ];
+  const real = globalThis.fetch;
+  const asked: string[] = [];
+  const answering = (status: number, body: unknown, healthy = true) =>
+    (async (input: RequestInfo | URL) => {
+      if (String(input).startsWith('/api/health')) {
+        if (!healthy) throw new TypeError('fetch failed');
+        return new Response(JSON.stringify({ ok: true }), { status: 200 });
+      }
+      asked.push(String(input));
+      return new Response(JSON.stringify(body), { status });
+    }) as typeof fetch;
+  try {
+    globalThis.fetch = answering(200, served);
+    const read = shown ? await fermos.keptFits() : [];
+    check(
+      'Forecast reads the project’s kept kinetic fits from the service, each with its run and the artifact it is kept as, newest first',
+      shown &&
+        asked.join(' ') === '/api/biorepo/artifacts?tool=kinetic_fit' &&
+        JSON.stringify(read.map((f) => [f.kineticArtifactId, f.depositionId, f.kinetic?.model])) ===
+          '[["b000000000000002","dep-2","batch_v1"],["a000000000000001","dep-1","logistic_v0"],["c000000000000003","dep-3","logistic_v0"]]',
+      shown ? `${asked.join(' ')} → ${JSON.stringify(read.map((f) => f.kineticArtifactId))}` : 'src/lib/fermos.ts exports no keptFits',
+    );
+    const reloaded = shown ? fermos.forecastFits({}, read) : [];
+    check(
+      'after a reload, with no fit in the session, Forecast offers every kept fit with fitted parameters, by its artifact id',
+      JSON.stringify(reloaded.map(([key]) => key)) === '["b000000000000002","a000000000000001"]',
+      JSON.stringify(reloaded.map(([key]) => key)),
+    );
+    const session = { 'dep-1': { depositionId: 'dep-1', kinetic: fitted('logistic_v0'), kineticArtifactId: 'a000000000000001' } };
+    const both = shown ? fermos.forecastFits(session, read) : [];
+    check(
+      'a fit the session holds is offered once, under the session’s key, and the kept fits it lacks follow',
+      JSON.stringify(both.map(([key]) => key)) === '["dep-1","b000000000000002"]',
+      JSON.stringify(both.map(([key]) => key)),
+    );
+    globalThis.fetch = answering(502, 'Bad Gateway', false);
+    const down = shown ? await fermos.keptFits().catch((e: unknown) => e) : null;
+    check('a service that does not answer is said as down, for Forecast to say in words', down instanceof ServiceDown, String(down));
+  } finally {
+    globalThis.fetch = real;
+  }
+  // The first paint, before the service answers: the page says it reads the kept fits and never that there are none.
+  const { default: FermOSForecast } = await import('../src/screens/FermOSForecast');
+  const { createElement } = await import('react');
+  const { renderToStaticMarkup } = await import('react-dom/server');
+  const first = renderToStaticMarkup(createElement(FermOSForecast));
+  check(
+    'Forecast with no fit in the session says it reads the project’s kept fits, and keeps "No fit to forecast from yet" for after the read',
+    first.includes('data-testid="forecast-reading"') && !first.includes('No fit to forecast from yet'),
+    first.slice(0, 200),
+  );
+}
+
+// ── the jobs tray (src/store.ts `loadProjects`, `jobsAfterEvent`; src/components/JobsTray.tsx) ──
+// The service says each engine run on the project's event stream as it starts and as it ends (`job.*`,
+// core/openferment_core/engine/runs.py), whichever screen asked for it: a Proforma scenario, a library plant or a
+// reference rerun on Studies, a pureOS train. The page opens the stream once its project settles, and the tray
+// lists each run while it runs and ends it as the stream says it ended. The stream here is a stand-in for
+// EventSource, and the project list a stand-in for `fetch`.
+{
+  type Heard = (m: { data: string }) => void;
+  const opened: string[] = [];
+  const sources: { heard: Record<string, Heard[]> }[] = [];
+  class StandInSource {
+    heard: Record<string, Heard[]> = {};
+    onopen: (() => void) | null = null;
+    onerror: (() => void) | null = null;
+    constructor(url: string) {
+      opened.push(url);
+      sources.push(this);
+    }
+    addEventListener(type: string, f: Heard) {
+      (this.heard[type] ??= []).push(f);
+    }
+    close() {}
+  }
+  let said = 0;
+  const say = (type: string, data: Record<string, unknown>) => {
+    const event = { id: ++said, type, at: AT, project: 'p', data };
+    for (const s of sources) for (const f of s.heard[type] ?? []) f({ data: JSON.stringify(event) });
+  };
+  const scenarioJob = { id: 'r-scenario', kind: 'engine.run', engine: 'biosteam', plant: 'placeholder-flowsheet', configuration: null, scenarioId: 'sc-tray', by: 'Ada' };
+  const trainJob = { id: 'r-train', kind: 'engine.run', engine: 'train', plant: 'train-1', configuration: null, scenarioId: null, by: 'Ada' };
+  const plantJob = { id: 'r-plant', kind: 'engine.run', engine: 'biosteam', plant: 'cornstover', configuration: 'default', scenarioId: null, by: 'Ada' };
+  const g = globalThis as { EventSource?: unknown };
+  const realSource = g.EventSource;
+  const realFetch = globalThis.fetch;
+  const listed = [{ id: 'p', name: 'P', description: '', createdBy: 'Ada', createdAt: AT }];
+  g.EventSource = StandInSource;
+  globalThis.fetch = (async () => new Response(JSON.stringify(listed), { status: 200 })) as typeof fetch;
+  try {
+    const was = useStore.getState();
+    useStore.setState({ projectId: 'p', jobs: [], activeRunId: null, scenarios: [...was.scenarios, aScenario('sc-tray', { name: 'Stover at a placeholder price' })] });
+    await useStore.getState().loadProjects();
+    check('the page opens its project’s event stream once the project settles', opened.join(' ') === '/api/events?project=p', opened.join(' ') || 'no stream opened');
+    const { componentOf } = await import('../src/components/JobsTray');
+    const jobs = () => useStore.getState().jobs.map((j) => [j.id, j.status, j.title, j.engine ?? null]);
+    say('job.queued', scenarioJob);
+    say('job.running', scenarioJob);
+    say('job.running', trainJob);
+    say('job.running', plantJob);
+    const running = useStore.getState().jobs;
+    check(
+      'a Proforma scenario run, a train run and a library plant run the service says running are each one running job, by its run id, named by its scenario where the page holds it',
+      JSON.stringify(jobs()) ===
+        JSON.stringify([
+          ['run-r-scenario', 'running', 'Engine run · Stover at a placeholder price', 'biosteam'],
+          ['run-r-train', 'running', 'Engine run · train-1', 'train'],
+          ['run-r-plant', 'running', 'Engine run · cornstover (default)', 'biosteam'],
+        ]),
+      JSON.stringify(jobs()),
+    );
+    check(
+      'the tray counts the three as running, each under the component whose engine runs it, an extraction under Intake',
+      running.filter((j) => j.status === 'running').length === 3 &&
+        JSON.stringify(running.map(componentOf)) === '["Proforma","pureOS","Proforma"]' &&
+        componentOf({ kind: 'simulation', engine: 'kinetics' }) === 'fermOS' &&
+        componentOf({ kind: 'simulation', engine: 'mirror' }) === 'Proforma' &&
+        componentOf({ kind: 'simulation', engine: 'constructor' }) === 'Proforma' &&
+        componentOf({ kind: 'ingest' }) === 'Intake',
+      JSON.stringify(running.map(componentOf)),
+    );
+    say('job.done', { ...scenarioJob, status: 'done', provenance: 'assumed', artifactId: 'r-scenario', sffRecordId: 'run-r-scenario' });
+    say('job.failed', { ...trainJob, status: 'refused', words: 'a unit did not converge' });
+    say('job.failed', { ...plantJob, status: 'failed', words: 'WorkerCrashed: the worker stopped' });
+    const ended = useStore.getState().jobs;
+    check(
+      'each run leaves the running jobs when the stream says it ended: done with its run’s page to view, or failed in the service’s words',
+      ended.every((j) => j.status !== 'running') &&
+        ended.find((j) => j.id === 'run-r-scenario')?.href === '#/proforma/runs/r-scenario' &&
+        ended.find((j) => j.id === 'run-r-scenario')?.status === 'done' &&
+        ended.find((j) => j.id === 'run-r-train')?.failReason === 'The engine refused the values: a unit did not converge' &&
+        ended.find((j) => j.id === 'run-r-plant')?.failReason === 'WorkerCrashed: the worker stopped',
+      JSON.stringify(ended.map((j) => [j.id, j.status, j.href, j.failReason])),
+    );
+    say('job.running', plantJob);
+    say('job.done', { ...trainJob, status: 'done' });
+    say('job.running', { id: 'r-other', kind: 'engine.run' });
+    say('artifact.kept', { id: 'r-other', tool: 'library.run', provenance: 'assumed' });
+    say('job.done', { id: 'r-unseen', status: 'done' });
+    check(
+      'a run asked again after it failed is running again, an end for a run that already ended or never started here changes nothing, and an event of another kind adds no job',
+      JSON.stringify(useStore.getState().jobs.map((j) => [j.id, j.status])) ===
+        '[["run-r-scenario","done"],["run-r-train","failed"],["run-r-plant","running"],["run-r-other","running"]]',
+      JSON.stringify(useStore.getState().jobs.map((j) => [j.id, j.status])),
+    );
+  } finally {
+    g.EventSource = realSource;
+    globalThis.fetch = realFetch;
+    useStore.setState({ jobs: [] });
+  }
+}
+
+// ── one stream a page (src/lib/events.ts `watchEvents`) ──
+// The service is plain HTTP/1.1, and a browser keeps six connections to one address across all its tabs; an open
+// stream holds one for as long as it is open. A tab held a stream per reader (the store's jobs and Home's trace
+// cards) and kept them while hidden, so a few tabs filled the pool and every request of every tab waited with no
+// word (round 2's check of the jobs fix). A page now holds one stream a project, shared by its readers, and none
+// while hidden; shown again, it opens from the last event it read.
+{
+  type Heard = (m: { data: string }) => void;
+  const opened: string[] = [];
+  const sources: { heard: Record<string, Heard[]>; closed: boolean; url: string }[] = [];
+  class StandInSource {
+    heard: Record<string, Heard[]> = {};
+    closed = false;
+    onopen: (() => void) | null = null;
+    onerror: (() => void) | null = null;
+    url: string;
+    constructor(url: string) {
+      this.url = url;
+      // The jobs tray's stream on project p, read by the store, opens and closes with the page too.
+      if (url.includes('project=q')) {
+        opened.push(url);
+        sources.push(this);
+      }
+    }
+    addEventListener(type: string, f: Heard) {
+      (this.heard[type] ??= []).push(f);
+    }
+    close() {
+      this.closed = true;
+    }
+  }
+  let said = 100;
+  const say = (type: string) => {
+    const event = { id: ++said, type, at: AT, project: 'q', data: { id: `r-${said}` } };
+    for (const src of sources) if (!src.closed) for (const f of src.heard[type] ?? []) f({ data: JSON.stringify(event) });
+    return event.id;
+  };
+  const g = globalThis as { EventSource?: unknown; document?: unknown };
+  const realSource = g.EventSource;
+  const realDocument = g.document;
+  const page = Object.assign(new EventTarget(), { visibilityState: 'visible' });
+  g.EventSource = StandInSource;
+  g.document = page;
+  try {
+    const { watchEvents } = await import('../src/lib/events');
+    const a: number[] = [];
+    const b: number[] = [];
+    const stopA = watchEvents('q', (e) => a.push(e.id));
+    const stopB = watchEvents('q', (e) => b.push(e.id));
+    const first = say('job.running');
+    check(
+      'two readers of a project on one page share one stream, and each hears every event',
+      opened.length === 1 && opened[0] === '/api/events?project=q' && a.join() === String(first) && b.join() === String(first),
+      JSON.stringify({ opened, a, b }),
+    );
+    page.visibilityState = 'hidden';
+    page.dispatchEvent(new Event('visibilitychange'));
+    const meanwhile = say('job.done');
+    check('a hidden page holds no stream', sources.every((src) => src.closed) && a.length === 1, JSON.stringify({ closed: sources.map((src) => src.closed), a }));
+    page.visibilityState = 'visible';
+    page.dispatchEvent(new Event('visibilitychange'));
+    check(
+      'shown again, the page opens one stream from the last event it read',
+      opened.length === 2 && opened[1] === `/api/events?project=q&after=${first}`,
+      JSON.stringify(opened),
+    );
+    const next = say('job.running');
+    stopA();
+    const after = say('job.done');
+    check(
+      'a reader that stops hears nothing more and the stream stays open for the other; the last to stop closes it',
+      a.join() === `${first},${next}` && b.join() === `${first},${next},${after}` && !sources[1].closed &&
+        (stopB(), sources[1].closed) && meanwhile > first,
+      JSON.stringify({ a, b, closed: sources.map((src) => src.closed) }),
+    );
+  } finally {
+    g.EventSource = realSource;
+    g.document = realDocument;
+  }
+}
+
+// ── one stream a browser (src/lib/events.ts, shared mode) ──
+// Where the browser has Web Locks and BroadcastChannel, one tab holds a project's stream for every tab: the tab
+// holding the lock named for the project opens it and passes each event on, and a tab waiting for the lock hears
+// the events from the channel with no stream of its own. Holding the lock later, it opens the stream from the last
+// event it heard. The lock here is a stand-in the check grants by hand, the other tab a channel of the same name.
+{
+  type Heard = (m: { data: string }) => void;
+  const opened: string[] = [];
+  const sources: { heard: Record<string, Heard[]>; closed: boolean }[] = [];
+  class StandInSource {
+    heard: Record<string, Heard[]> = {};
+    closed = false;
+    onopen: (() => void) | null = null;
+    onerror: (() => void) | null = null;
+    constructor(url: string) {
+      if (url.includes('project=r')) {
+        opened.push(url);
+        sources.push(this);
+      }
+    }
+    addEventListener(type: string, f: Heard) {
+      (this.heard[type] ??= []).push(f);
+    }
+    close() {
+      this.closed = true;
+    }
+  }
+  const waits: { name: string; grant: () => Promise<unknown> }[] = [];
+  let released = 0;
+  const locks = {
+    request(name: string, _options: unknown, cb: () => unknown) {
+      return new Promise((done) => {
+        waits.push({
+          name,
+          grant: async () => {
+            const held = cb();
+            await held;
+            released++;
+            done(undefined);
+          },
+        });
+      });
+    },
+  };
+  const g = globalThis as { EventSource?: unknown };
+  const realSource = g.EventSource;
+  // Node 21 and later have a global navigator; Node 20 (CI's) has none, so the check brings its own.
+  const hadNavigator = typeof globalThis.navigator === 'object' && globalThis.navigator !== null;
+  if (!hadNavigator) Object.defineProperty(globalThis, 'navigator', { value: {}, configurable: true, writable: true });
+  const nav = globalThis.navigator as unknown as Record<string, unknown>;
+  Object.defineProperty(nav, 'locks', { value: locks, configurable: true });
+  g.EventSource = StandInSource;
+  const other = new BroadcastChannel('openferment-events:r');
+  const relayed: unknown[] = [];
+  other.onmessage = (m) => relayed.push(m.data);
+  const tick = () => new Promise((r) => setTimeout(r, 20));
+  try {
+    const { watchEvents } = await import('../src/lib/events');
+    const heard: number[] = [];
+    const stop = watchEvents('r', (e) => heard.push(e.id));
+    await tick();
+    check(
+      'a tab that waits for the project’s lock opens no stream and asks the tab holding it how the stream stands',
+      opened.length === 0 && waits.length === 1 && waits[0].name === 'openferment-events:r' &&
+        relayed.some((d) => (d as { type?: string }).type === 'hello'),
+      JSON.stringify({ opened, waits: waits.map((w) => w.name), relayed }),
+    );
+    other.postMessage({ type: 'event', event: { id: 5, type: 'job.running', at: AT, project: 'r', data: {} } });
+    await tick();
+    check('it hears each event the tab holding the stream passes on', heard.join() === '5', JSON.stringify(heard));
+    const held = waits[0].grant();
+    await tick();
+    check(
+      'holding the lock, it opens the project’s one stream from the last event it heard',
+      opened.length === 1 && opened[0] === '/api/events?project=r&after=5',
+      JSON.stringify(opened),
+    );
+    relayed.length = 0;
+    for (const f of sources[0].heard['job.done'] ?? []) f({ data: JSON.stringify({ id: 6, type: 'job.done', at: AT, project: 'r', data: {} }) });
+    await tick();
+    check(
+      'it reads each event itself and passes it on to the other tabs',
+      heard.join() === '5,6' && relayed.some((d) => (d as { event?: { id?: number } }).event?.id === 6),
+      JSON.stringify({ heard, relayed }),
+    );
+    stop();
+    await held;
+    check('its last reader stopping closes the stream and gives the lock up', sources[0].closed && released === 1, JSON.stringify({ closed: sources[0].closed, released }));
+  } finally {
+    other.close();
+    g.EventSource = realSource;
+    delete nav.locks;
+    if (!hadNavigator) delete (globalThis as { navigator?: unknown }).navigator;
+  }
 }
 
 console.log(fails ? `\n✗ ${fails} check(s) failed` : '\n✓ The project rows are sent as the page changes them, and kept until the service answers; a refusal is never an outage.');

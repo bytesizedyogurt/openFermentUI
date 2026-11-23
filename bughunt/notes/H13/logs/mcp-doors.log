@@ -1,0 +1,37 @@
+== nameless client through the service
+   is_error=False structured=False
+   {"summary":{"state":"open","kind":"skill","id":"h13-nameless-svc","name":"A placeholder skill","aliases":[],"summary":"A placeholder.","mastery":[],"prerequisites":[],"skills":[],"blocks":[],"checkpoint":[],"note":"A placeholder; stands for nothing.","source":"an assistant over MCP, at the HTTP endpoint","by":"an assistant over MCP","agent":"model","via":"http","at":"2026-11-10T23:00:00.761214+00:00","meaning":"kept in the project's catalogue, marked as yours: a person may replace it, and so may a later write of yours through the same kind of door under the same name."},"evidence":[],"recordId
+   by: an assistant over MCP | source: an assistant over MCP, at the HTTP endpoint
+== nameless client in the server's own process
+   is_error=False structured=False
+   {"summary":{"state":"open","kind":"skill","id":"h13-nameless-own","name":"A placeholder skill","aliases":[],"summary":"A placeholder.","mastery":[],"prerequisites":[],"skills":[],"blocks":[],"checkpoint":[],"note":"A placeholder; stands for nothing.","source":"an assistant over MCP, over MCP","by":"an assistant over MCP","agent":"model","via":"mcp","at":"2026-11-10T23:00:03.434295+00:00","meaning":"kept in the project's catalogue, marked as yours: a person may replace it, and so may a later write of yours through the same kind of door under the same name."},"evidence":[],"recordIds":[],"passag
+   by: an assistant over MCP | source: an assistant over MCP, over MCP
+== named client in its own process
+   is_error=False structured=False
+   {"summary":{"state":"open","kind":"skill","id":"h13-named-own","name":"A placeholder skill","aliases":[],"summary":"A placeholder.","mastery":[],"prerequisites":[],"skills":[],"blocks":[],"checkpoint":[],"note":"A placeholder; stands for nothing.","source":"h13-probe/0.1, over MCP","by":"h13-probe/0.1","agent":"model","via":"mcp","at":"2026-11-10T23:00:06.233351+00:00","meaning":"kept in the project's catalogue, marked as yours: a person may replace it, and so may a later write of yours through the same kind of door under the same name."},"evidence":[],"recordIds":[],"passages":[],"usage":{"in
+   by: h13-probe/0.1 | via: mcp | source: h13-probe/0.1, over MCP | auditIds: ['11']
+openferment: --service 'http://127.0.0.1' names no port: give the port the service listens on, as http://127.0.0.1:<port>, the address of the running service.
+== origin http://127.0.0.1
+   is_error=False structured=False
+   {"error": "--service 'http://127.0.0.1' names no port: give the port the service listens on, as http://127.0.0.1:<port>, the address of the running service."}
+openferment: --service 'http://example.org:80' names the host 'example.org'. The service binds loopback, and this server sends to 127.0.0.1, [::1] or localhost alone.
+== origin http://example.org:80
+   is_error=False structured=False
+   {"error": "--service 'http://example.org:80' names the host 'example.org'. The service binds loopback, and this server sends to 127.0.0.1, [::1] or localhost alone."}
+openferment: --service 'http://127.0.0.1:8930/api' holds more than an origin: give the scheme, the host and the port alone, http://127.0.0.1:8930.
+== origin http://127.0.0.1:8930/api
+   is_error=False structured=False
+   {"error": "--service 'http://127.0.0.1:8930/api' holds more than an origin: give the scheme, the host and the port alone, http://127.0.0.1:8930."}
+openferment: --service 'ftp://127.0.0.1:8930' is no http:// or https:// address: give it as http://127.0.0.1:<port>, the address of the running service.
+== origin ftp://127.0.0.1:8930
+   is_error=False structured=False
+   {"error": "--service 'ftp://127.0.0.1:8930' is no http:// or https:// address: give it as http://127.0.0.1:<port>, the address of the running service."}
+openferment: This openFerment server acts in no project. Start it with --project <id>, or set OPENFERMENT_PROJECT (in the environment or core/.env) to the project's id.
+== no project, through the service
+   is_error=False structured=False
+   {"error": "This openFerment server acts in no project. Start it with --project <id>, or set OPENFERMENT_PROJECT (in the environment or core/.env) to the project's id."}
+== audit: rows 11 newest last: ['0670677d562f3d03', 'skill/h13-nameless-svc', 'skill/h13-nameless-own', 'skill/h13-named-own']
+== audit?action=catalogue_write&target=skill/h13-named-own&who=h13-probe/0.1: 1 rows [('h13-probe/0.1', 'skill/h13-named-own')]
+== audit?limit=1: 1 rows [('h13-probe/0.1', 'skill/h13-named-own')]
+== audit?limit=600: 11 rows [('hunter', 'h13'), ('example-agent/0.1', 'skill/example-agent.0.1-a-skill'), ('openFerment evaluation', 'lc-eval-0cac579ef009')]
+== audit?limit=0: 1 rows [('h13-probe/0.1', 'skill/h13-named-own')]

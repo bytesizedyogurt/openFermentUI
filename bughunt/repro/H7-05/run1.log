@@ -1,0 +1,5 @@
+EXPECTED: opening /#/p/nosuchproject/runbooks, a project the service does not hold, reloads the page once at most and then settles on one screen, as opening the held project's address does (ADR-009 7.1: an address naming another project opens it, the page reloading in it as a project switch does).
+SETUP: the service holds the projects [h7-05]
+OBSERVED: held project 'h7-05': 2 page loads and 2 GET /api/projects in 10.2 s from the first navigation; 0 more loads in the 2 s after; address #/p/h7-05/runbooks; localStorage openferment.project 'h7-05'; 'Opening project' shown: 0; main: "RUNBOOKS Runbooks A runbook is a synthesised, followable answer to a question about making something"
+OBSERVED: unknown project 'nosuchproject': 108 page loads and 108 GET /api/projects in 10.2 s from the first navigation; 22 more loads in the 2 s after; address #/p/nosuchproject/runbooks; localStorage openferment.project 'nosuchproject'; 'Opening project' shown: 0; main: "RUNBOOKS Runbooks A runbook is a synthesised, followable answer to a question about making something"
+RESULT: DEFECT

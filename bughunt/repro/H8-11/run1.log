@@ -1,0 +1,10 @@
+EXPECTED: POST /api/intake/catalogue (kind strain) with the JSON file rows.json holding S6 (a row with
+EXPECTED: source "a row's own words") and S7 (a row with no source) keeps every row that is an entry
+EXPECTED: "with the file as its source" (docs/api/intake.md:104): both entries' source names the file rows.json
+NOTICE:  database "bh_r_h8_11_svc" does not exist, skipping
+OBSERVED: HTTP 200, answer {"kind": "strain", "kept": ["S6", "S7"], "refused": []}
+OBSERVED: GET /api/catalogues/strain/S6 source: "a row's own words"
+OBSERVED: GET /api/catalogues/strain/S7 source: "the file rows.json"
+OBSERVED: keep_catalogue audit on strain/S6, detail [{'kind': 'strain', 'file': 'rows.json'}]
+OBSERVED: keep_catalogue audit on strain/S7, detail [{'kind': 'strain', 'file': 'rows.json'}]
+RESULT: DEFECT

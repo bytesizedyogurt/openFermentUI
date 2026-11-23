@@ -1,0 +1,17 @@
+NOTICE:  database "bh_r_h1_04_svc" does not exist, skipping
+service http://127.0.0.1:9000 over fresh database bh_r_h1_04_svc
+stated precision of biosteam/ethanol_glucose_v0 (GET /api/engines): {'rtol': 0.0, 'atol': 0.0}
+POST /api/engines/biosteam/run -> HTTP 200 in 32 s
+POST /api/biorepo/artifacts/4f2ccc41f73b2f66/replay -> HTTP 200 in 14 s
+after a restart, POST /api/biorepo/artifacts/4f2ccc41f73b2f66/replay -> HTTP 200 in 32 s
+run 4f2ccc41f73b2f66 done | artifact 4f2ccc41f73b2f66 | samples 500 feasible 500
+specs: every input fixed: [('feed_glucose_conc', 100.0), ('glucose_price', 0.5), ('plant_scale', 1000.0), ('productivity', 1.0), ('titre', 50.0), ('yield', 0.4)]
+price.solvedPrice (basePrice): 6.196322154766292 USD/kg
+quantiles of the 500 samples of the same inputs: {'p5': 6.196322154766292, 'p25': 6.196322154766292, 'p50': 6.196322154766292, 'p75': 6.196322154766292, 'p95': 6.196322154766292}
+replay: identical True | withinTolerance True | tolerance None | differences 0
+replay basePrice stored -> replayed: (same)
+first differences: []
+replay in a freshly started worker: identical True | withinTolerance True | differences 0 | basePrice the same | []
+EXPECTED: every sample of the same six fixed inputs prices as the base case does (each quantile equal to basePrice), and the replay is identical (precision rtol 0, atol 0)
+OBSERVED: basePrice 6.196322154766292; 0 of 5 quantiles differ from it (6.196322154766292); replay identical True, withinTolerance True, 0 differences
+RESULT: NO-DEFECT

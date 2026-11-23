@@ -1,0 +1,11 @@
+--- a/core/openferment_core/events.py
++++ b/core/openferment_core/events.py
+@@ -109,7 +109,7 @@
+     inbox: queue.Queue = queue.Queue()
+     with _lock:
+         rid = next(_reader_ids)
+-        _readers[rid] = (project, inbox)
++        _readers[rid] = (None, inbox)
+     try:
+         yield inbox
+     finally:

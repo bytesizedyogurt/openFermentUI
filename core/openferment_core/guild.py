@@ -1,4 +1,4 @@
-"""Guild — the competence ledger, and the only functions that write it (OF-BLD-013 §1.2, §2.1, §3.1).
+"""Guild — the competence ledger, and the only functions that write it.
 
 A project's ledger is its rows in `guild_people` and `guild_evidence`, with
 the lead's policy in the project's settings: the people on the team and
@@ -55,9 +55,17 @@ The rules, by name:
   policy      a check rate outside none to twelve a quarter
 
 Nothing is repaired on the way through. The skills, the protocol steps that
-need them and the lessons that count toward them come from `projection()`;
-no store holds a skills catalogue yet, so there are none, and the tests hand
-in a frozen fixture.
+need them and the lessons that count toward them come from `projection()`:
+the skills and the lessons from the project's catalogues (catalogues.py),
+each skill with the policy its entry holds, and the steps from the project's
+protocols (protocols.py), each step with the skills a keep held to the skill
+catalogue; most tests hand in a frozen fixture in its place. A skill kept
+with no policy is left out of every level (competence.unrated): nobody holds
+it, so a run of it alone and a cosign of it are refused in words that say
+so. The projection is read before a transaction begins, and a write inside
+one takes what its caller read (`write_check_entries_in`): a store's read
+goes through `db.run`, which refuses to run on the database's own thread,
+where a transaction's coroutine runs.
 """
 from __future__ import annotations
 
@@ -65,17 +73,17 @@ import copy
 import logging
 import re
 from datetime import date, datetime, timedelta, timezone
-from typing import TYPE_CHECKING, Any
+from typing import TYPE_CHECKING, Any, get_args
 
 from sqlalchemy import select, update
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from . import db, projects
 from .biorepo import MIN_REVIEWER_CHARS, PLACEHOLDER_REVIEWERS
-from .competence import Competence
+from .competence import Competence, unrated
 from .db import models as t
 from .db import rows
-from .models import Guild, GuildEvidence, GuildPerson, GuildPolicy, GuildWithdrawal
+from .models import Guild, GuildEvidence, GuildPerson, GuildPolicy, GuildRule, GuildWithdrawal
 
 if TYPE_CHECKING:
     from .models import Check
@@ -85,22 +93,8 @@ log = logging.getLogger("openferment.guild")
 # Where the lead's policy sits in the project's settings.
 POLICY_KEY = "guildPolicy"
 
-RULES = (
-    "name",
-    "role",
-    "added",
-    "duplicate",
-    "person",
-    "skill",
-    "source",
-    "observer",
-    "authority",
-    "outcome",
-    "note",
-    "date",
-    "evidence",
-    "policy",
-)
+# The rules an entry is refused under, in order: the check route answers each by name (models.GuildRule).
+RULES: tuple[str, ...] = get_args(GuildRule)
 
 # What the ledger accepts, kind by kind, and from which sources (OF-BLD-013
 # §1, §2, §3). A sign-off is an assessor's; a designation is the lead's; a run
@@ -138,21 +132,27 @@ class GuildRefused(ValueError):
 
 
 # alpha 2.0 deleted the TypeScript skills, protocols and lessons these were
-# projected from (ADR-010), and no store holds them yet: a lab has defined no
-# skill, and every list is empty. Tests hand in alpha 1.0's frozen export in
-# place of `projection`.
+# projected from (ADR-010); a project keeps its own (catalogues.py,
+# protocols.py), and a project that keeps none, like no project open, reads
+# every list empty. Most tests hand in alpha 1.0's frozen export in place of
+# `projection`.
 EMPTY_PROJECTION: dict[str, Any] = {"skills": [], "steps": [], "lessons": [], "protocols": []}
 
 
 def projection() -> dict[str, Any]:
     """The skills and the lessons that count toward them, from the open
-    project's catalogues (catalogues.py), a copy of its own for each caller;
-    no store holds protocol steps' skills yet, so a step needs none."""
-    from . import catalogues
+    project's catalogues (catalogues.py), and the steps that need a skill,
+    from its protocols (protocols.py): every version's steps with their
+    skills, and the current version of each protocol a step of which needs
+    one, as Practice quotes it. A copy of its own for each caller."""
+    from . import catalogues, protocols
 
     out = copy.deepcopy(EMPTY_PROJECTION)
     out["skills"] = catalogues.as_skills()
     out["lessons"] = [{"lessonId": lesson["lessonId"], "skills": lesson["skills"]} for lesson in catalogues.as_lessons()]
+    held = protocols.held()
+    out["steps"] = protocols.as_steps(held)
+    out["protocols"] = protocols.as_quoted(held)
     return out
 
 
@@ -232,6 +232,34 @@ def _now() -> str:
     return datetime.now(timezone.utc).isoformat(timespec="seconds").replace("+00:00", "Z")
 
 
+#: How far ahead of the service's clock a page's own time for a change may run.
+CLOCK_ALLOWANCE = timedelta(minutes=5)
+
+
+def _instant(value: str | None) -> datetime | None:
+    """The instant an ISO time with a zone names, or None."""
+    if not value:
+        return None
+    try:
+        at = datetime.fromisoformat(value.replace("Z", "+00:00"))
+    except ValueError:
+        return None
+    return at if at.tzinfo is not None else None
+
+
+def _change_time(asked: str | None) -> str:
+    """The time a change to a person was made, as the page that made it stamped
+    it, so the ledger can tell which of two changes made while the service was
+    away is the later (`_write_person` keeps that one, and the browser's
+    `syncGuild` compares against it); the service's own time when the page names
+    none, names one that is not a time with a zone, or names one further ahead
+    of the service's clock than `CLOCK_ALLOWANCE`."""
+    at = _instant(asked)
+    if asked and at is not None and at <= datetime.now(timezone.utc) + CLOCK_ALLOWANCE:
+        return asked
+    return _now()
+
+
 def _day(value: str) -> date | None:
     """The calendar day an `at` names, or None when it names none."""
     try:
@@ -304,7 +332,10 @@ def write_person(person: GuildPerson, *, dry_run: bool = False) -> GuildPerson:
     after is added by an active lead. A change names who made it in
     `updatedBy`, also an active lead, and may change the title, role and
     active flag; the name is held to the same rule as on the way in, and the
-    dates and the person who added them are kept as first written.
+    dates and the person who added them are kept as first written. A change
+    keeps the time it was made (`_change_time`), and a change made before the
+    one the ledger holds leaves the ledger as it is: the later change stands,
+    and the person comes back as the ledger holds them.
     """
     _check_name(person.name)
     if not PERSON_ID.match(person.id):
@@ -313,7 +344,9 @@ def write_person(person: GuildPerson, *, dry_run: bool = False) -> GuildPerson:
         raise GuildRefused("date", f"joinedAt {person.joinedAt!r} is not a date")
     stored, existing = db.run(_write_person(projects.current(), person, dry_run))
     if not dry_run:
-        log.info("guild: person %s (%s) %s", stored.id, stored.role, "changed" if existing else "added")
+        kept = existing is not None and stored is existing
+        log.info("guild: person %s (%s) %s", stored.id, stored.role,
+                 "kept: a later change stands" if kept else "changed" if existing else "added")
     return stored
 
 
@@ -337,7 +370,21 @@ async def _write_person(project_id: str, person: GuildPerson, dry_run: bool) -> 
                     raise GuildRefused("added", "the first person on the ledger is added by nobody")
             elif not _active_lead(ledger, person.addedBy):
                 raise GuildRefused("added", f"{person.addedBy!r} is not an active lead; only a lead adds people")
-            stored = person.model_copy(update={"addedAt": _now(), "updatedBy": None, "updatedAt": None})
+            # A person added and changed while the service was away arrives as one add that carries the change: the
+            # change keeps who made it and when, so a later change sent by another page is read against it, and an
+            # earlier one is kept back (below).
+            changed_by = person.updatedBy if person.updatedBy and (
+                _active_lead(ledger, person.updatedBy) or (not ledger.people and person.updatedBy == person.id)
+            ) else None
+            stored = person.model_copy(update={
+                "addedAt": _now(),
+                "updatedBy": changed_by,
+                "updatedAt": _change_time(person.updatedAt) if changed_by else None,
+            })
+            if not ledger.people and not person.active:
+                # The ledger's first person is its lead, and a change made offline that leaves them inactive would
+                # leave the ledger with no active lead and no way to add one: as online, that change is not taken.
+                stored = stored.model_copy(update={"active": True, "updatedBy": None, "updatedAt": None})
         else:
             if not _active_lead(ledger, person.updatedBy):
                 raise GuildRefused("added", f"{person.updatedBy!r} is not an active lead; only a lead changes a person")
@@ -347,6 +394,12 @@ async def _write_person(project_id: str, person: GuildPerson, dry_run: bool) -> 
             ] + ([person] if person.active and person.role == "lead" else [])
             if not leads_after:
                 raise GuildRefused("role", "this change would leave the ledger with no active lead")
+            made = _change_time(person.updatedAt)
+            held_at, made_at = _instant(existing.updatedAt), _instant(made)
+            if held_at is not None and made_at is not None and made_at < held_at:
+                # A change made before the one the ledger holds, sent late (two pages syncing at once): the later
+                # change stands, and the page takes it with the ledger.
+                return existing, existing
             stored = existing.model_copy(
                 update={
                     "name": person.name.strip(),
@@ -354,7 +407,7 @@ async def _write_person(project_id: str, person: GuildPerson, dry_run: bool) -> 
                     "role": person.role,
                     "active": person.active,
                     "updatedBy": person.updatedBy,
-                    "updatedAt": _now(),
+                    "updatedAt": made,
                 }
             )
         if not dry_run:
@@ -372,7 +425,7 @@ def write_evidence(entry: GuildEvidence, *, dry_run: bool = False) -> GuildEvide
     every rule runs and nothing is written, so asking and deciding are the
     same code. An entry with a check as its source is refused here: it is
     written by running the check (`checks.record`), which calls every
-    criterion first (OF-BLD-013 §5.5).
+    criterion first.
     """
     return _write_entries([entry], dry_run=dry_run, from_check=None)[0]
 
@@ -482,11 +535,12 @@ async def _write_prechecked(
 
 
 async def write_check_entries_in(
-    s: AsyncSession, project_id: str, entries: list[GuildEvidence], check: Check, *, dry_run: bool = False
+    s: AsyncSession, project_id: str, entries: list[GuildEvidence], check: Check, known: dict[str, dict[str, Any]],
+    *, dry_run: bool = False
 ) -> list[GuildEvidence]:
     """`write_check_entries` inside the run's own transaction, so the entries
-    and the check they close commit together (`checks.record`)."""
-    known = skills()
+    and the check they close commit together (`checks.record`), against the
+    skills its caller read before the transaction began (`skills()`)."""
     days = [_precheck(e, known, check.id, check) for e in entries]
     return await _admit_and_keep(s, project_id, entries, days, known, dry_run)
 
@@ -544,6 +598,8 @@ def _admit(
     if person.role == "auditor":
         raise GuildRefused("role", f"{person.name} is an auditor; an auditor reads the ledger and holds no skills")
     skill_name = known[entry.skillId]["name"]
+    # Why nobody holds the skill whatever the ledger says, when its catalogue entry holds no policy.
+    no_policy = unrated(known[entry.skillId])
 
     def holds(person_id: str) -> bool:
         # Judged on the day the step was run, from what the ledger held
@@ -574,6 +630,8 @@ def _admit(
         if kind == "independent" and not holds(person.id):
             raise GuildRefused(
                 "authority",
+                f"{no_policy}: nobody holds it, and a run of it alone is a deviation until its catalogue entry "
+                "holds its policy" if no_policy else
                 f"{person.name} does not hold {skill_name} today, so a run of it alone is a deviation, "
                 "or a supervised run with a cosigner",
             )
@@ -596,7 +654,8 @@ def _admit(
             if not holds(observer.id):
                 raise GuildRefused(
                     "authority",
-                    f"{observer.name} does not hold {skill_name} today, so cannot cosign it",
+                    f"{no_policy}: nobody holds it, and nobody cosigns it until its catalogue entry holds its "
+                    "policy" if no_policy else f"{observer.name} does not hold {skill_name} today, so cannot cosign it",
                 )
         elif not _assessor_on(ledger, observer.id, entry.skillId):
             raise GuildRefused(

@@ -9,7 +9,14 @@ records by the train's product and step; `run_train` keeps one
 `pureos.train_run` artifact on a stand-in worker, its basis naming every unit's
 type, class and id and every value's source; `train_of` reads a train run by
 pass, as it reads a Proforma run; the endpoints answer 422, 409 and 503 in
-words.
+words. Alpha 2.2 C.3 (D2, D3, D5): a request's values are typed inputs named
+`<unit id>.<key>` or `inlet.<key>`, converted at pureOS's door into each
+place's Override and refused together by place; each run is one `runs` row of
+the engine `train`, created by its `by`, its outputs the values pureOS reads
+and its SFF file the record `run-<id>` or the toolkit's words; the worker's
+refusal is a receipt, a value that waits keeps nothing, and a worker that
+fails while writing the file keeps no row; a train run replays to BioSTEAM's
+precision; and a train stands on a library run's stream.
 
 Marked `sim` (the real Proforma worker): a three-unit train (solids
 centrifuge, flash, drum dryer) on a stand-in yeast broth converges with each
@@ -19,7 +26,9 @@ BioSTEAM's words; a simulation's harvest takes its broth flow from a vessel
 design; and the ethanol train built from the catalogue on the beer of
 `ethanol_glucose_v0` (beer column and rectifier as `BinaryDistillation`, the
 molecular sieve, each reading its values from the package's own unit) gives
-the package's own ethanol purity on the same inlet.
+the package's own ethanol purity on the same inlet; and a real train's run is
+one row with its outputs, the toolkit's words for its file and a replay
+within its precision.
 
 Every STAND-IN here is an `assumption` of this test, typed under the
 fixture's name and noted STAND-IN; none is a measurement, a published value
@@ -37,17 +46,21 @@ import pytest
 from fastapi.testclient import TestClient
 
 from openferment_core import artifacts, fermos, intake, params, proforma, pureos
+from openferment_core.engine import runs as engine_runs
 from openferment_core.models import (
     BasisSource,
+    EngineInput,
     InputAssumption,
+    Origin,
     Override,
     ParamResolveRequest,
-    SimulationRequest,
+    Quantity,
     TrainParam,
     TrainSpec,
     TrainUnitSpec,
 )
 from openferment_core.pureos import catalogue, train_spec
+from standins import as_input, resolve_request, simulation_request, train_inputs, vessel_request
 from test_catalogue import StandInWorker
 
 CORE = Path(__file__).resolve().parent.parent
@@ -87,16 +100,26 @@ VERSIONS = {"biosteam": "0.0-standin", "thermosteam": "0.0-standin", "biorefiner
 STREAM_T, STREAM_P = 298.15, 101325.0
 # The share of the product a stand-in unit sends off its path.
 LOSS = 0.1
+# The chemical a stand-in unit loses LOSS of: every train these tests run
+# traces ethanol, and the train_run request names no product (its handler
+# reads none; the product stream is the last unit's onward outlet).
+TRACED = "Ethanol"
 # A STAND-IN of a class's own split table, by component (as PressureFilter
 # fills one when none is given): invented for the test, none a result.
 TABLE = {"Water": 0.04, "Ethanol": 0.04, "Glucose": 0.03, "Yeast": 0.98, "Octane": 0.04}
+# A STAND-IN of the toolkit's verdict on a train's SFF file: one that
+# validates, so a run's file reads as valid and scored (conformance check 5).
+VALID = {"valid": True, "schemaVersion": "0.2.4", "summary": {"error": {"pass": 1}}, "findings": []}
 
 
 class TrainWorker(StandInWorker):
     """Answers `catalogue_specs` as test_catalogue's stand-in does, and
     `train_specs`, `flowsheet_unit_values` and `train_run` with STAND-IN
     tables: each unit sends everything on but LOSS of the product, which
-    leaves by its first other outlet; no BioSTEAM runs."""
+    leaves by its first other outlet; and `sff_export` for a train run's
+    file, test_sff's small plant written where it is told with the
+    metadata block it was given, and a STAND-IN verdict that validates
+    (`VALID`); no BioSTEAM runs."""
 
     def __init__(self, fail: str | None = None):
         super().__init__()
@@ -133,7 +156,22 @@ class TrainWorker(StandInWorker):
 
                 raise WorkerError(self.fail)
             return self.run(args)
+        if op == "sff_export":
+            return self.export(args)
         raise AssertionError(f"the stand-in worker has no op {op}")
+
+    @staticmethod
+    def export(args):
+        from test_sff import COMPLETENESS, TAGS, as_bytes, small_doc
+
+        assert isinstance(args.get("train"), dict), "a train run's SFF file is written from its train"
+        path = Path(args["path"])
+        doc = small_doc(process_title=args.get("title") or "")
+        doc["metadata"]["openferment"] = args["metadata"]
+        path.write_bytes(as_bytes(doc))
+        return {"path": str(path), "sha256": "x", "bytes": path.stat().st_size, "validation": VALID,
+                "completeness": COMPLETENESS, "tags": TAGS, "toolkit": "pisces_sff 0.2.4",
+                "simulator": "BioSTEAM 0.0-standin"}
 
     @staticmethod
     def run(args):
@@ -141,7 +179,7 @@ class TrainWorker(StandInWorker):
         flows = dict(inlet["flows"] or {k: v * inlet["brothFlow"] for k, v in inlet["concentrations"].items()})
         if inlet.get("balance"):
             flows[inlet["balance"]] = 1000.0 * inlet["brothFlow"]  # a STAND-IN balance
-        product = args["product"]
+        product = TRACED
         streams = [{"id": "inlet", "source": None, "sink": args["units"][0]["id"], "phase": "l", "T": inlet["T"],
                     "P": inlet["P"], "massFlow": sum(flows.values()), "massFlows": flows, "price": None}]
         units, outlets, costs, current = [], {}, [], flows
@@ -234,7 +272,7 @@ def test_validate_names_every_refusal_at_once_in_words():
         "inlet names the train's inlet, not a unit",
         "unit inlet's outlet outlet goes onward, to waste or to recycle:<an earlier unit>; 'somewhere' is none of them",
         "unit S1's outlet regenerate recycles to M1 (flash), whose inlet takes one stream",
-        "unit S1 reads from corn_drygrind, a reference biorefinery",
+        "unit S1 reads from 'corn_drygrind': there is no flowsheet corn_drygrind on the shelf",
         "unit S1: approx_duty binds from no record field, so no record can be named for it",
     ]
     for words in expected:
@@ -290,7 +328,7 @@ def real_simulation(**more):
     on STAND-IN overrides."""
     values = {**SIM_STANDIN, **more}
     scope = "fermos:family:batch_v1"
-    return fermos.simulate(SimulationRequest(family="batch_v1", product="ethanol", sugar="glucose", overrides=[
+    return fermos.simulate(simulation_request(family="batch_v1", product="ethanol", sugar="glucose", overrides=[
         Override(scope=scope, key=k, value=v, by=BY, at=AT, note=STANDIN) for k, v in values.items()]))
 
 
@@ -445,8 +483,18 @@ def test_the_scope_names_its_train_its_unit_and_its_inlet(store, worker, no_pool
     # The panel's resolve refuses what the run refuses, in the unit's needs.
     flash = "pureos:unit:t1:F1"
     with pytest.raises(params.ParamRefused, match="Flash drum waits for"):
-        params.resolve_scope(flash, ParamResolveRequest(train=spec, overrides=[
+        params.resolve_scope(flash, resolve_request(flash, train=spec, overrides=[
             Override(scope=flash, key="P", value=101325.0, by=BY, at=AT)]))
+    # A key the unit lacks is refused naming the unit's parameters as its scope expands them, beside a key it has.
+    centrifuge = "pureos:unit:t1:C1"
+    keys = ", ".join(s.key for s in params.scope(centrifuge, ParamResolveRequest(train=spec)).specs)
+    stray = as_input(Override(scope=centrifuge, key="no_such_key", value=1.0, by=BY, at=AT), "placeholder-unit")
+    for given in ([stray], [stray, *resolve_request(centrifuge, train=spec, overrides=[
+            Override(scope=centrifuge, key="split.Water", value=0.5, by=BY, at=AT)]).inputs]):
+        with pytest.raises(params.ParamRefused) as refused:
+            params.resolve_scope(centrifuge, ParamResolveRequest(train=spec, inputs=given))
+        assert str(refused.value) == f"there is no parameter no_such_key here; the parameters are {keys}"
+    assert "split.Water" in keys and "moisture_content" in keys
 
 
 def test_the_get_scope_takes_the_train_as_json(client, store, worker, no_pool):
@@ -462,8 +510,8 @@ def test_the_get_scope_takes_the_train_as_json(client, store, worker, no_pool):
 
 def test_a_run_keeps_one_artifact_whose_basis_names_every_unit_and_source(store, worker, no_pool):
     spec = spec_of()
-    run = pureos.run_train(spec, [Override(scope="pureos:unit:t1:F1", key="V", value=0.2, by="Another Person", at=AT,
-                                           note=STANDIN)])
+    changed = [Override(scope="pureos:unit:t1:F1", key="V", value=0.2, by="Another Person", at=AT, note=STANDIN)]
+    run = pureos.run_train(spec, train_inputs(spec, changed))
     art = artifacts.get(run.artifactId)
     assert art.tool == "pureos.train_run" and run.provenance == "assumed" == art.provenance
     by = {b.name: b for b in art.inputs}
@@ -472,19 +520,20 @@ def test_a_run_keeps_one_artifact_whose_basis_names_every_unit_and_source(store,
                                                 note="BioSTEAM's SolidsCentrifuge, built as unit C1")
     assert (by["C1 outlet cake"].value, by["C1 outlet liquid"].value) == ("waste", "onward")
     assert by["C1.split.Yeast"].source.kind == "assumption" and by["C1.split.Yeast"].source.by == BY
-    # The request's override replaces the train's typed value of its key.
+    # The request's input replaces the train's typed value of its key.
     assert by["F1.V"].value == 0.2 and by["F1.V"].source.by == "Another Person"
     assert by["F1.vessel_material"].source.kind == "model" and by["F1.vessel_material"].source.id.startswith("biosteam@")
     assert {"biosteam", "thermosteam", "biorefineries", "utility prices and cost index", "diagram"} <= set(by)
     assert json.loads(by["train"].value)["units"][0]["id"] == "C1"
     # A class's own default is left to the class; every other value is passed.
     [(_, sent)] = [c for c in worker.calls if c[0] == "train_run"]
+    # D11: the request holds what the handler reads; the chemical the train traces stays in the basis.
+    assert set(sent) == {"system", "inlet", "units", "diagram"} and by["product chemical"].value == "Ethanol"
     assert sent["units"][1]["values"] == {"P": 101325.0, "V": 0.2}
     assert sent["units"][0]["outlets"] == {"cake": "waste", "liquid": "onward"}
     assert sent["inlet"]["concentrations"] == {"Ethanol": 50.0, "Glucose": 5.0, "Yeast": 10.0}
     # The same train again is the same artifact, and the worker is not asked twice.
-    again = pureos.run_train(spec, [Override(scope="pureos:unit:t1:F1", key="V", value=0.2, by="Another Person",
-                                             at=AT, note=STANDIN)])
+    again = pureos.run_train(spec, train_inputs(spec, changed))
     assert again.artifactId == run.artifactId and len([c for c in worker.calls if c[0] == "train_run"]) == 1
     # Every reader reads the one artifact.
     assert run.train.productStream == "F1_liquid" and run.purity.productStream == "F1_liquid"
@@ -525,7 +574,7 @@ def test_train_of_reads_a_train_run_by_pass(store, worker, no_pool):
 
 
 def test_the_endpoints_run_list_and_open_a_train(client, store, worker, no_pool):
-    body = {"train": spec_of().model_dump(mode="json"), "overrides": [], "by": None}
+    body = {"train": spec_of().model_dump(mode="json"), "inputs": [], "by": "Ada Moreno"}
     r = client.post("/api/pureos/train/run", json=body)
     assert r.status_code == 200, r.text
     aid = r.json()["artifactId"]
@@ -543,7 +592,7 @@ def test_the_run_endpoint_answers_422_409_and_503_in_words(client, store, worker
     waiting = spec_of(units=[{"id": "D1", "type": "distillation"}])
     detail = client.post("/api/pureos/train/run", json={"train": waiting.model_dump(mode="json")}).json()["detail"]
     for words in ("unit D1 (distillation): light_key waits", "unit D1 (distillation): k waits",
-                  "unit D1: BinaryDistillation waits for Light key and Heavy key"):
+                  "unit D1: Distillation column waits for Light key and Heavy key"):
         assert words in detail, detail
     # A damaged inlet artifact is a 409.
     from standins import plant_damaged
@@ -551,15 +600,291 @@ def test_the_run_endpoint_answers_422_409_and_503_in_words(client, store, worker
     plant_damaged("b" * 16)
     damaged = spec_of(inlet={"kind": "simulation", "ref": "b" * 16, "params": {"broth_flow": typed(1.0)}})
     r = client.post("/api/pureos/train/run", json={"train": damaged.model_dump(mode="json")})
-    assert r.status_code == 409 and "damaged on disk" in r.json()["detail"]
-    # The worker's refusal is a 422 in its words; a worker that cannot answer, a 503.
+    assert r.status_code == 409 and "damaged in its row" in r.json()["detail"]
+    # The worker's refusal is a 422 in its words, kept as a receipt; a worker that cannot answer, a 503 keeping nothing.
     monkeypatch.setattr(proforma, "call", TrainWorker(fail="Refused: unit F1 (flash, Flash) did not converge: BioSTEAM "
                                                            "said: STAND-IN"))
     r = client.post("/api/pureos/train/run", json={"train": spec_of().model_dump(mode="json")})
     assert r.status_code == 422 and r.json()["detail"] == "unit F1 (flash, Flash) did not converge: BioSTEAM said: STAND-IN"
     monkeypatch.setattr(proforma, "call", TrainWorker(fail="WorkerCrashed: STAND-IN"))
-    r = client.post("/api/pureos/train/run", json={"train": spec_of().model_dump(mode="json")})
+    other = spec_of(name="Another test train")
+    r = client.post("/api/pureos/train/run", json={"train": other.model_dump(mode="json")})
     assert r.status_code == 503 and "could not run the train" in r.json()["detail"]
+    assert [x.status for x in engine_runs.listed("train")] == ["refused"], "the receipt alone is kept"
+
+
+# ── a request's inputs and the run's row (alpha 2.2 D2, D3, D5) ─────────
+
+
+def _given(name, value, unit):
+    """A value a request sets on a train: typed under the fixture's name, a STAND-IN."""
+    return EngineInput(name=name, quantity=Quantity(value=value, unit=unit, origin=Origin(
+        kind="person-assumption", by=BY, at=AT, note=STANDIN)))
+
+
+def test_an_input_is_named_by_its_place_and_converted_into_the_override_of_the_places_scope(store, worker, no_pool):
+    spec = spec_of()
+    got = train_spec.overrides_of(spec, [_given("F1.V", 0.2, ""), _given("inlet.broth_flow", 1.0, "m³ h⁻¹"),
+                                         _given("C1.split.Yeast", 0.9, ""), _given("inlet.conc.Ethanol", 50.0, "g L⁻¹")])
+    assert got == [Override(scope="pureos:unit:t1:F1", key="V", value=0.2, by=BY, at=AT, note=STANDIN),
+                   Override(scope="pureos:unit:t1:inlet", key="broth_flow", value=1.0, by=BY, at=AT, note=STANDIN),
+                   Override(scope="pureos:unit:t1:C1", key="split.Yeast", value=0.9, by=BY, at=AT, note=STANDIN),
+                   Override(scope="pureos:unit:t1:inlet", key="conc.Ethanol", value=50.0, by=BY, at=AT, note=STANDIN)]
+    # The browser's units, read from each place's scope, are the ones the service converts in.
+    changed = [Override(scope="pureos:unit:t1:F1", key="P", value=STREAM_P, by=BY, at=AT, note=STANDIN),
+               Override(scope="pureos:unit:t1:inlet", key="T", value=STREAM_T, by=BY, at=AT, note=STANDIN)]
+    sent = train_inputs(spec, changed)
+    assert [(i.name, i.quantity.unit) for i in sent] == [("F1.P", "Pa"), ("inlet.T", "K")]
+    assert train_spec.overrides_of(spec, sent) == changed
+
+
+def test_an_input_that_cannot_stand_is_refused_in_words_by_its_place_and_nothing_runs(client, store, worker, no_pool):
+    spec = spec_of()
+    got = pureos.check_train(spec, [_given("V", 0.2, ""), _given("F9.V", 0.2, ""), _given("F1.Vee", 0.2, ""),
+                                    _given("F1.P", 1.0, "bar"), _given("inlet.harvest_hour", 1.0, "h")])
+    assert not got.ok
+    assert got.places["train"] == [
+        "V: a value a train's run sets is named <unit id>.<key> or inlet.<key>",
+        "F9.V names 'F9', which is no unit of train t1 and not its inlet; its places are inlet, C1, F1"]
+    assert got.places["F1"][0].startswith("unit F1 (flash) has no parameter 'Vee'; its parameters are P, T, V")
+    assert got.places["F1"][1] == "unit F1: P is set in 'bar', and the parameter's unit is 'Pa'"
+    assert got.places["inlet"] == ["the inlet (typed) has no parameter 'harvest_hour'; its parameters are broth_flow, "
+                                   "T, P, conc.<chemical>"]
+    r = client.post("/api/pureos/train/run", json={"train": spec.model_dump(mode="json"), "by": "Ada Moreno",
+                                                   "inputs": [_given("F1.P", 1.0, "bar").model_dump(mode="json")]})
+    assert r.status_code == 422 and r.json()["detail"] == "unit F1: P is set in 'bar', and the parameter's unit is 'Pa'"
+    # A request holds its own fields alone: an override is no field of it.
+    r = client.post("/api/pureos/train/run", json={"train": spec.model_dump(mode="json"), "overrides": []})
+    assert r.status_code == 422
+    assert not [c for c in worker.calls if c[0] == "train_run"] and engine_runs.listed("train") == []
+
+
+def test_an_input_that_cannot_stand_is_said_beside_every_other_refusal_of_the_train(client, store, worker, no_pool):
+    """A bad input hides none of the train's own refusals: the check and the
+    run say both at once, the inputs' first, each by its place (OF-BLD-020
+    §5.3: the Builder holds Run on the whole list)."""
+    spec = spec_of(units=[{"id": "C1", "type": "centrifugation", "params": {"split.Yeast": typed(0.9)}},
+                          {"id": "D1", "type": "distillation"}])
+    alone = pureos.check_train(spec)
+    assert not alone.ok and set(alone.places) == {"D1"}
+    with_bad = pureos.check_train(spec, [_given("C1.Vee", 0.2, "")])
+    assert not with_bad.ok
+    assert with_bad.places["C1"] == [p for p in with_bad.refusals if p.startswith("unit C1 (centrifugation) has no "
+                                                                                  "parameter 'Vee'")]
+    assert with_bad.places["D1"] == alone.places["D1"]
+    assert with_bad.refusals == [*with_bad.places["C1"], *alone.refusals], "the input's refusal first, then the train's"
+    r = client.post("/api/pureos/train/run", json={"train": spec.model_dump(mode="json"), "by": "Ada Moreno",
+                                                   "inputs": [_given("C1.Vee", 0.2, "").model_dump(mode="json")]})
+    assert r.status_code == 422
+    assert "has no parameter 'Vee'" in r.json()["detail"] and "light_key waits" in r.json()["detail"]
+    assert not [c for c in worker.calls if c[0] == "train_run"] and engine_runs.listed("train") == []
+
+
+def test_a_key_set_twice_is_refused_in_the_words_every_engines_door_says_it_in(client, store, worker, no_pool):
+    spec = spec_of()
+    twice = [_given("F1.V", 0.2, ""), _given("F1.V", 0.1, ""), _given("inlet.broth_flow", 1.0, "m³ h⁻¹")]
+    got = pureos.check_train(spec, twice)
+    assert not got.ok and got.places == {"F1": ["F1.V is set twice"]}
+    with pytest.raises(train_spec.TrainRefused, match="F1.V is set twice"):
+        train_spec.overrides_of(spec, twice)
+    r = client.post("/api/pureos/train/run", json={"train": spec.model_dump(mode="json"), "by": "Ada Moreno",
+                                                   "inputs": [i.model_dump(mode="json") for i in twice]})
+    assert r.status_code == 422 and r.json()["detail"] == "F1.V is set twice"
+    assert not [c for c in worker.calls if c[0] == "train_run"] and engine_runs.listed("train") == []
+
+
+def test_a_run_keeps_one_row_of_the_train_engine_with_its_sff_file_and_its_outputs(client, store, worker, no_pool):
+    from openferment_core.engine import conform
+
+    spec = spec_of()
+    changed = [Override(scope="pureos:unit:t1:F1", key="V", value=0.2, by="Another Person", at=AT, note=STANDIN)]
+    body = {"train": spec.model_dump(mode="json"), "by": "Ada Moreno",
+            "inputs": [i.model_dump(mode="json", exclude_none=True) for i in train_inputs(spec, changed)]}
+    r = client.post("/api/pureos/train/run", json=body)
+    assert r.status_code == 200, r.text
+    aid = r.json()["artifactId"]
+    (row,) = client.get("/api/runs", params={"engine": "train"}).json()
+    assert (row["id"], row["engine"], row["plant"], row["configuration"], row["tool"], row["status"], row["provenance"],
+            row["by"]) == (aid, "train", "t1", None, train_spec.TRAIN_RUN, "done", "assumed", "Ada Moreno")
+    assert conform._created_by(aid) == "Ada Moreno"
+    assert row["versions"] == VERSIONS and row["sffRefused"] is None
+    assert (row["sff"]["recordId"], row["sff"]["valid"], row["sff"]["score"]) == (f"run-{aid}", True, 0.5)
+    typed = next(i["quantity"] for i in row["inputs"] if i["name"] == "F1.V")
+    assert (typed["value"], typed["origin"]["kind"], typed["origin"]["by"], typed["origin"]["at"]) == (
+        0.2, "person-assumption", "Another Person", AT)
+    values = {v["name"]: v["quantity"] for v in row["outputs"]["values"]}
+    assert values["recovery.C1"]["value"] == pytest.approx(1 - LOSS) and values["recovery.C1"]["unit"] == ""
+    assert values["overallRecovery"]["value"] == pytest.approx((1 - LOSS) ** 2)
+    assert values["massFlow.inlet"]["unit"] == "kg/hr" and "purity.F1_liquid" in values and "productOut" in values
+    assert all(q["origin"] == {"kind": "artifact", "ref": aid} for q in values.values())
+    # The file is the run's own record, written from its train, its metadata naming the train.
+    report = client.get(f"/api/runs/{aid}").json()
+    assert report["artifact"]["tool"] == train_spec.TRAIN_RUN and report["parameters"] is None
+    assert (report["flowsheet"]["id"], report["flowsheet"]["origin"]) == (f"run-{aid}", "run")
+    assert report["flowsheet"]["source"] == f"exported from run {aid} of train t1"
+    [(_, exported)] = [c for c in worker.calls if c[0] == "sff_export"]
+    assert exported["metadata"]["train"] == "t1" and exported["title"] == "A test train"
+    assert set(exported["train"]) == {"system", "inlet", "units"}
+    # The same request again is that one row: nothing runs or is written again.
+    assert client.post("/api/pureos/train/run", json={**body, "by": "Grace Hopper"}).json()["artifactId"] == aid
+    assert [(x.id, x.by) for x in engine_runs.listed("train")] == [(aid, "Ada Moreno")]
+    assert len([c for c in worker.calls if c[0] in ("train_run", "sff_export")]) == 2
+
+
+def test_the_workers_refusal_is_a_receipt_and_a_value_that_waits_keeps_nothing(store, worker, no_pool, monkeypatch):
+    with pytest.raises(train_spec.TrainRefused, match="light_key waits"):
+        pureos.run_train(spec_of(units=[{"id": "D1", "type": "distillation"}]), by="Ada Moreno")
+    assert engine_runs.listed("train") == [] and not [c for c in worker.calls if c[0] == "train_run"]
+    refusing = TrainWorker(fail="Refused: unit F1 (flash, Flash) did not converge: BioSTEAM said: STAND-IN")
+    monkeypatch.setattr(proforma, "call", refusing)
+    with pytest.raises(train_spec.TrainRefused, match="did not converge") as refused:
+        pureos.run_train(spec_of(), by="Ada Moreno")
+    receipt = engine_runs.get(refused.value.run_id)
+    assert (receipt.engine, receipt.status, receipt.artifactId, receipt.plant, receipt.by, receipt.sff,
+            receipt.sffRefused) == ("train", "refused", None, "t1", "Ada Moreno", None, None)
+    assert receipt.refused == "unit F1 (flash, Flash) did not converge: BioSTEAM said: STAND-IN"
+    asked = len([c for c in refusing.calls if c[0] == "train_run"])
+    with pytest.raises(train_spec.TrainRefused, match="did not converge"):
+        pureos.run_train(spec_of(), by="Grace Hopper")
+    assert len([c for c in refusing.calls if c[0] == "train_run"]) == asked, "the receipt answers; the worker is not asked"
+    assert [x.id for x in engine_runs.listed("train")] == [receipt.id]
+
+
+def test_a_file_the_toolkit_refuses_is_kept_as_its_words_and_a_worker_that_fails_keeps_no_row(store, worker, no_pool,
+                                                                                              monkeypatch):
+    from openferment_core.workers import WorkerCrashed, WorkerError
+
+    def refuses(args):
+        raise WorkerError("Refused: the toolkit could not write the train's SFF file: STAND-IN")
+
+    monkeypatch.setattr(worker, "export", refuses)
+    run = pureos.run_train(spec_of(), by="Ada Moreno")
+    row = engine_runs.get(run.artifactId)
+    assert (row.status, row.sff, row.sffRefused) == ("done", None, "the toolkit could not write the train's SFF file: "
+                                                                   "STAND-IN")
+
+    def crashes(args):
+        raise WorkerCrashed("openferment_core.workers.proforma_worker ended while answering 'sff_export'", "")
+
+    other = spec_of(name="Another test train")
+    monkeypatch.setattr(worker, "export", crashes)
+    with pytest.raises(WorkerCrashed):
+        pureos.run_train(other, by="Ada Moreno")
+    assert [x.id for x in engine_runs.listed("train")] == [row.id], "a file step that fails keeps no row"
+    # Mended, the next ask answers the computation from its artifact and writes the file.
+    monkeypatch.setattr(worker, "export", TrainWorker.export)
+    again = pureos.run_train(other, by="Ada Moreno")
+    assert engine_runs.get(again.artifactId).sff is not None
+    assert len([c for c in worker.calls if c[0] == "train_run"]) == 2
+
+
+def test_the_export_route_answers_a_train_runs_refused_file_in_the_workers_own_words(client, store, worker, no_pool,
+                                                                                      monkeypatch):
+    """POST /api/flowsheets/export of a train run whose file the toolkit
+    refuses is a 409 in the worker's words, its protocol's `Refused: ` lead
+    left out as a run's `sffRefused` leaves it out (engine/runs.py)."""
+    from openferment_core.workers import WorkerError
+
+    def refuses(args):
+        raise WorkerError("Refused: a train carries no TEA: STAND-IN")
+
+    monkeypatch.setattr(worker, "export", refuses)
+    run = pureos.run_train(spec_of(), by="Ada Moreno")
+    assert engine_runs.get(run.artifactId).sffRefused == "a train carries no TEA: STAND-IN"
+    r = client.post("/api/flowsheets/export", json={"artifactId": run.artifactId, "by": "Ada Moreno"})
+    assert r.status_code == 409, r.text
+    assert r.json()["detail"] == "the toolkit wrote no SFF file for the train run: a train carries no TEA: STAND-IN"
+
+
+def test_a_train_run_replays_identically_and_registers_no_tolerance(store, worker, no_pool):
+    """A train run keeps every digit BioSTEAM gives and states no precision,
+    so the library run's last-kept-digit rule holds it exactly: its replay is
+    identical, no tolerance is registered for the tool, and the train
+    engine's things state rtol 0, atol 0 (docs/api/runs.md, Replay)."""
+    from openferment_core.pureos import engine as train_engine
+
+    run = pureos.run_train(spec_of(), by="Ada Moreno")
+    r = artifacts.replay(run.artifactId)
+    assert r.identical and r.withinTolerance and r.tolerance is None
+    assert artifacts.registered(train_spec.TRAIN_RUN).tolerance_of is None
+    assert train_spec.replay_precision() == (0.0, 0.0)
+    assert (train_engine.precision().rtol, train_engine.precision().atol) == (0.0, 0.0)
+
+
+def test_a_streams_product_share_is_an_output_where_the_stream_carries_product(store, worker, no_pool):
+    art = artifacts.get(pureos.run_train(spec_of(), by="Ada Moreno").artifactId)
+    held = {n for n, _, _ in train_spec.output_values(art) if n.startswith("purity.")}
+    assert held, "the stand-in's streams each carry some of the product"
+    first = sorted(held)[0].removeprefix("purity.")
+    purity = dict(art.output["purity"])
+    purity["streams"] = [{**x, "productFraction": 0.0} if x.get("stream") == first else x for x in purity["streams"]]
+    none_here = art.model_copy(update={"output": {**art.output, "purity": purity}})
+    names = {n for n, _, _ in train_spec.output_values(none_here)}
+    assert f"purity.{first}" not in names and f"massFlow.{first}" in names
+    assert held - {f"purity.{first}"} <= names
+
+
+def test_a_train_stands_on_a_library_plants_run(client, store, worker, no_pool):
+    """D8's part a train needs (alpha 2.2 C.3): a library plant's run, its
+    tables as the worker reads any run's, is a run the Builder reads a train
+    from, a stream a train's inlet takes and a table stream_table reads. Its
+    train names no program and builds on the one chemical set pureOS holds.
+    The library run here is a STAND-IN: test_train's own stand-in run's
+    tables, kept as a `library.run` artifact with a STAND-IN TEA naming its
+    product stream."""
+    from openferment_core import tools
+    from test_vessel import keep
+
+    made = artifacts.get(pureos.run_train(spec_of()).artifactId).output
+    product = made["productStream"]
+    flow = next(s for s in made["streams"] if s["id"] == product)["massFlows"][TRACED]
+    tea = {"teaClass": STANDIN, "product": product, "basisFlow": flow, **{k: 1.0 for k in (
+        "operatingHours", "sales", "materialCost", "otherMaterialCost", "utilityCost", "purchaseCost",
+        "installedEquipmentCost", "FCI", "TCI", "FOC", "capitalRecovery", "coproductCredits")}}
+    aid = "00000000000000cc"
+    keep(aid, {"tablesSource": STANDIN, "tea": tea, **{k: made[k] for k in ("streams", "units", "tableUnits",
+                                                                            "unitOrder")}}, tool="library.run")
+    got = client.post("/api/pureos/train/from-run", json={"artifactId": aid})
+    assert got.status_code == 200, got.text
+    train = got.json()["train"]
+    assert [u["id"] for u in train["units"]] == ["C1", "F1"] and train["program"] == ""
+    assert (train["inlet"]["kind"], train["inlet"]["ref"], train["inlet"]["streamId"]) == ("run-stream", aid, "inlet")
+    on_it = pureos.run_train(spec_of(inlet={"kind": "run-stream", "ref": aid, "streamId": "C1_liquid"}))
+    assert (on_it.inlet.refTool, on_it.inlet.streamId) == ("library.run", "C1_liquid")
+    read = tools.run("stream_table", {"artifactId": aid}, tools.ToolContext())
+    assert read.error is None and read.summary["tool"] == "library.run"
+    assert read.summary["streamCount"] == len(made["streams"]) and read.evidence == []
+
+
+def test_a_train_is_read_from_a_run_kept_from_a_retired_reference_entry_on_the_set_its_entry_named(client, store, worker,
+                                                                                                    no_pool):
+    """A dry-grind corn reference run a person kept before the shelf's
+    hand-written entries retired (alpha 2.2 D8) reads into a train through
+    the route, as it did when the entry stood: its train builds on the
+    chemical set the entry named (`proforma.RETIRED`). A kept corn stover
+    reference run names no set, as its entry named none, and is refused in
+    words. Each kept run is a STAND-IN: test_train's own stand-in run's
+    tables, kept as a `proforma.reference` artifact naming its entry."""
+    from test_vessel import keep
+
+    made = artifacts.get(pureos.run_train(spec_of()).artifactId).output
+    product = made["productStream"]
+    flow = next(s for s in made["streams"] if s["id"] == product)["massFlows"][TRACED]
+    tea = {"teaClass": STANDIN, "product": product, "basisFlow": flow, **{k: 1.0 for k in (
+        "operatingHours", "sales", "materialCost", "otherMaterialCost", "utilityCost", "purchaseCost",
+        "installedEquipmentCost", "FCI", "TCI", "FOC", "capitalRecovery", "coproductCredits")}}
+    tables = {"tablesSource": STANDIN, "tea": tea, **{k: made[k] for k in ("streams", "units", "tableUnits",
+                                                                           "unitOrder")}}
+    corn = keep("00000000000000cd", {"flowsheet": "corn_drygrind", **tables}, tool=proforma.REFERENCE)
+    got = client.post("/api/pureos/train/from-run", json={"artifactId": corn.id})
+    assert got.status_code == 200, got.text
+    train = got.json()["train"]
+    assert train["program"] == proforma.RETIRED["corn_drygrind"].program == "yeast"
+    assert [u["id"] for u in train["units"]] == ["C1", "F1"]
+    assert (train["inlet"]["kind"], train["inlet"]["ref"], train["inlet"]["streamId"]) == ("run-stream", corn.id, "inlet")
+    stover = keep("00000000000000ce", {"flowsheet": "cornstover_benchmark", **tables}, tool=proforma.REFERENCE)
+    refused = client.post("/api/pureos/train/from-run", json={"artifactId": stover.id})
+    assert refused.status_code == 422 and "belongs to no program" in refused.json()["detail"]
 
 
 def test_a_train_naming_no_chemical_set_or_an_unknown_one_builds_on_the_one_pureos_holds(client, store, worker,
@@ -609,7 +934,7 @@ def _values_of(spec, unit_id, overrides=()):
     scope = f"pureos:unit:{spec.id}:{unit_id}"
     unit = next(u for u in spec.units if u.id == unit_id)
     typed_ = [Override(scope=scope, key=k, **p.model_dump()) for k, p in unit.params.items()]
-    got = params.resolve_scope(scope, ParamResolveRequest(train=spec, overrides=[*typed_, *overrides])).values
+    got = params.resolve_scope(scope, resolve_request(scope, train=spec, overrides=[*typed_, *overrides])).values
     return {x.key: x for x in got}
 
 
@@ -923,10 +1248,9 @@ def test_a_unit_that_cannot_run_refuses_the_train_naming_it_and_biosteams_words(
 @pytest.mark.sim
 def test_a_simulations_harvest_takes_its_broth_flow_from_a_vessel_design(real):
     from openferment_core import vessel
-    from openferment_core.models import VesselRequest
 
     sim = real_simulation()
-    d = vessel.design(VesselRequest(simulation=sim.artifactId, overrides=[Override(
+    d = vessel.design(vessel_request(simulation=sim.artifactId, overrides=[Override(
         scope=f"fermos:vessel:{sim.artifactId}", key="plant_scale", value=50000.0, by=BY, at=AT, note=STANDIN)]))
     rows = {r.label: r.value for r in d.design}
     spec = three_units(kind="simulation", ref=sim.artifactId, vessel=d.artifactId)
@@ -995,3 +1319,71 @@ def test_the_ethanol_train_from_the_catalogue_gives_the_packages_own_purity_on_t
         assert by[key].source.kind == "model" and by[key].source.id.startswith("biorefineries@"), key
     assert not [b for b in inputs if b.source.kind == "assumption" and b.name.startswith(("D1.", "D2.", "U1."))]
     assert by["inlet"].source.id == run.id and by["inlet stream"].value == "beer"
+
+
+@pytest.mark.sim
+def test_a_real_trains_run_is_a_row_of_the_train_engine_and_its_sff_file_is_asked_of_the_toolkit(real):
+    """D5 on the real worker: the run is one row of the train engine, its
+    outputs pureOS's reading of its tables and its versions the worker's;
+    its SFF file is asked of the toolkit in the worker. A train carries no
+    TEA, and the schema the toolkit ships at e236e32 requires every file's
+    TEA year, which its exporter reads from the system's TEA, so the run
+    keeps those words as its sffRefused, the reason first (docs/api/sff.md);
+    the row stands, and its replay is identical."""
+    from openferment_core.engine import library
+
+    run = pureos.run_train(three_units(), by="Ada Moreno")
+    row = engine_runs.get(run.artifactId)
+    assert (row.engine, row.plant, row.tool, row.status, row.by) == ("train", "t1", train_spec.TRAIN_RUN, "done",
+                                                                     "Ada Moreno")
+    assert row.versions == {d: library._installed(d) for d in ("biorefineries", "biosteam", "thermosteam")}
+    values = {v["name"]: v["quantity"]["value"] for v in row.outputs["values"]}
+    assert values["overallRecovery"] == pytest.approx(run.train.overallRecovery)
+    assert values["recovery.C1"] == pytest.approx(next(u.recovery for u in run.train.units if u.id == "C1"))
+    assert all(v > 0 for k, v in values.items() if k.startswith("purity."))
+    assert row.sff is None and row.sffRefused.startswith("a train carries no TEA, and the SFF schema the toolkit ships (")
+    assert "requires every file's metadata.TEA_year" in row.sffRefused and "Error" not in row.sffRefused
+    replayed = artifacts.replay(run.artifactId)
+    assert replayed.identical and replayed.tolerance is None
+
+
+@pytest.mark.sim
+def test_the_workers_train_file_builds_nothing_while_the_toolkits_schema_requires_a_tea_year(real):
+    """The Proforma worker's sff_export of a train, in a process of its own:
+    while the schema the toolkit ships requires every file's TEA year, the
+    train is refused in words before anything is built (no second build for
+    a file the toolkit cannot write). With that requirement taken out of what
+    the worker reads (as a later schema might leave the year to the file),
+    the train is rebuilt from its run's own request and simulated, and the
+    toolkit's exporter at e236e32 then fails on the system's missing TEA,
+    its own words quoted after the worker's."""
+    import os
+    import subprocess
+    import sys
+
+    run = pureos.run_train(three_units(), by="Ada Moreno")
+    plant = train_spec.plant_of(artifacts.get(run.artifactId))
+    code = ("import json, sys, tempfile, warnings\n"
+            "warnings.simplefilter('ignore')\n"
+            "from openferment_core.workers import proforma_worker as w, sff_toolkit\n"
+            "req = json.loads(sys.stdin.read())\n"
+            "built = []\n"
+            "real = w._simulated_train\n"
+            "w._simulated_train = lambda spec: (built.append(spec['system']), real(spec))[1]\n"
+            "path = tempfile.mkdtemp() + '/t.sff.json'\n"
+            "for opened in (False, True):\n"
+            "    if opened:\n"
+            "        sff_toolkit.metadata_required = lambda: []\n"
+            "    try:\n"
+            "        w._op_sff_export({'train': req, 'path': path, 'metadata': {}, 'title': 'a test train'})\n"
+            "        print(json.dumps({'opened': opened, 'built': len(built), 'said': 'wrote'}))\n"
+            "    except w.Refused as e:\n"
+            "        print(json.dumps({'opened': opened, 'built': len(built), 'said': str(e)}))\n")
+    env = {**os.environ, "PYTHONPATH": str(CORE), "PYTHONBREAKPOINT": "0"}
+    r = subprocess.run([sys.executable, "-c", code], input=json.dumps(plant["train"]), cwd=CORE, env=env,
+                       capture_output=True, text=True, timeout=600)
+    assert r.returncode == 0, r.stderr[-2000:]
+    gated, opened = [json.loads(line) for line in r.stdout.splitlines() if line.startswith("{")]
+    assert gated["built"] == 0 and gated["said"].startswith("a train carries no TEA, and the SFF schema the toolkit ships")
+    assert opened["built"] == 1 and opened["said"].startswith("the toolkit's exporter could not write the train's file (")
+    assert "'NoneType' object has no attribute 'duration'" in opened["said"]

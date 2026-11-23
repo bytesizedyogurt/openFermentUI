@@ -1,0 +1,21 @@
+EXPECTED: with OPENFERMENT_LOCAL_BASE_URL naming a local OpenAI-compatible endpoint and the explain route
+EXPECTED: naming openai-compatible:local-stub alone, llm.call(family='explain') is answered by the local
+EXPECTED: endpoint at no charge whatever ANTHROPIC_API_KEY holds (CLAUDE.md:104 'a local model ... which
+EXPECTED: answers single calls through the kit's adapter'; core/openferment_core/llm.py:160-165).
+--- arm 1: ANTHROPIC_API_KEY empty (a deployment with a local model alone)
+route explain: ['openai-compatible:local-stub'] | served: ('anthropic', 'openai-compatible') | ANTHROPIC_API_KEY set: False
+RAISED ModelUnavailable: ANTHROPIC_API_KEY is not set. Put it in core/.env (gitignored) and restart the service.
+stub saw: 0 POST /v1/chat/completions, 0 POST /v1/messages
+--- arm 2 (control): ANTHROPIC_API_KEY a placeholder that is never sent anywhere
+route explain: ['openai-compatible:local-stub'] | served: ('anthropic', 'openai-compatible') | ANTHROPIC_API_KEY set: True
+ANSWERED openai-compatible:local-stub cost=0.0 tried=['openai-compatible:local-stub'] text={"claims": [], "gaps": [], "declined": null}
+stub saw: 1 POST /v1/chat/completions, 0 POST /v1/messages
+--- where the order is set, and the test that pays the row
+844:    client = (client_factory or _default_client)()
+867:        if provider == LOCAL:
+719:            "ANTHROPIC_API_KEY is not set. Put it in core/.env (gitignored) and restart the service."
+900:    got = llm.call(system="s", user="u", schema=SCHEMA, max_tokens=100, client_factory=lambda: unasked, family="explain")
+a caller that names no client_factory: extract.py:328:        result = llm.call(
+OBSERVED: keyless arm: RAISED ModelUnavailable: ANTHROPIC_API_KEY is not set. Put it in core/.env (gitignored) and restart the service.; the stub was asked 0 time(s)
+OBSERVED: placeholder arm: ANSWERED openai-compatible:local-stub cost=0.0 tried=['openai-compatible:local-stub'] text={"claims": [], "gaps": [], "declined": null}; the stub was asked 1 time(s), Anthropic path 0
+RESULT: DEFECT

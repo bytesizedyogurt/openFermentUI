@@ -3,13 +3,14 @@
 // its provenance attached. This is the screen that makes the corpus auditable.
 import { useCallback, useMemo, useState } from 'react';
 import { ClipboardCheck, Download, Gauge, Table2 } from 'lucide-react';
-import type { ExtractionRecord } from '@/data/types';
+import { publishedOf, type ExtractionRecord } from '@/lib/review';
 import { fieldName } from '@/data/ontology';
 import { useStore, provenanceOf } from '@/store';
 import { href, navigate, useRoute } from '@/router';
 import { unitFamily } from '@/engine/units';
 import { DataTable, type Column, type FacetDef } from '@/components/DataTable';
 import { CitationChip } from '@/components/Chip';
+import { idTail, shortTitle } from '@/lib/cite';
 import { ProvenanceLegend, type ProvKind } from '@/components/Provenance';
 import { Quantity } from '@/components/QuantityField';
 import {
@@ -31,6 +32,8 @@ import { SubsystemShelf } from '@/components/ReferenceView';
 
 interface ExRow {
   rec: ExtractionRecord;
+  /** What the paper published, which a correction leaves as it stands (`publishedOf`). */
+  published: ReturnType<typeof publishedOf>;
   prov: ProvKind;
   family: string;
   band: string;
@@ -62,6 +65,7 @@ const FAMILY_LABEL: Record<string, string> = {
   rpm: 'Agitation (rpm)',
   length: 'Length (m)',
   costUSDVolume: 'Price per volume (USD gal⁻¹)',
+  fold: 'Fold change (×)',
   unrecognised: 'Unrecognised unit',
 };
 
@@ -152,6 +156,7 @@ export default function Intake() {
         .filter((rec) => !paperParam || rec.paperId === paperParam)
         .map((rec) => ({
         rec,
+        published: publishedOf(rec),
         prov: provOf(rec),
         family: unitFamily(rec.unit) ?? 'unrecognised',
         band: bandOf(rec.confidence),
@@ -214,6 +219,8 @@ export default function Intake() {
         'Unit (as published)',
         'Value (SI)',
         'Unit (SI)',
+        'Corrected value',
+        'Corrected unit',
         'Unit family',
         'Confidence',
         'Confidence band',
@@ -228,7 +235,7 @@ export default function Intake() {
         'Section ID',
         'Last updated',
       ],
-      source.map(({ rec, prov, family, band, updated }) => [
+      source.map(({ rec, prov, family, band, updated, published }) => [
         rec.id,
         rec.paperId,
         papers.find((p) => p.id === rec.paperId)?.title ?? '',
@@ -236,10 +243,12 @@ export default function Intake() {
         fieldName(rec.field),
         rec.organism ?? '',
         rec.componentTag ?? '',
-        rec.value,
-        rec.unit,
-        rec.si.value,
-        rec.si.unit,
+        published.value,
+        published.unit,
+        published.si.value,
+        published.si.unit,
+        rec.corrected?.value ?? '',
+        rec.corrected?.unit ?? '',
         FAMILY_LABEL[family] ?? family,
         rec.confidence,
         band,
@@ -270,11 +279,11 @@ export default function Intake() {
       render: ({ rec }) => (
         <a
           href={href(`/biorepo/paper/${rec.paperId}?span=${rec.id}`)}
-          className="font-num text-accent hover:underline"
+          className="font-num text-accent hover:underline whitespace-nowrap"
           title={`Open ${rec.id} anchored in ${rec.paperId}`}
           onClick={(e) => e.stopPropagation()}
         >
-          {rec.id}
+          {idTail(rec.id)}
         </a>
       ),
       value: ({ rec }) => rec.id,
@@ -297,29 +306,37 @@ export default function Intake() {
       width: '110px',
       numeric: true,
       priority: 1,
-      // Always converts from the stored pair, never from a displayed string.
-      render: ({ rec }) => (
-        <Quantity value={rec.value} unit="" si={{ value: rec.si.value, unit: '' }} mode={unitMode} />
+      // Always converts from the stored pair, never from a displayed string. The paper's value stands in the
+      // cell, and a reviewer's correction shows beneath it in the same unit mode.
+      render: ({ rec, published }) => (
+        <span className="inline-flex flex-col items-end">
+          <Quantity value={published.value} unit="" si={{ value: published.si.value, unit: '' }} mode={unitMode} />
+          {rec.corrected && (
+            <span className="text-caption text-accent whitespace-nowrap" data-testid="intake-corrected" title="A reviewer’s correction">
+              → <Quantity value={rec.corrected.value} unit={rec.corrected.unit} si={rec.si} mode={unitMode} />
+            </span>
+          )}
+        </span>
       ),
-      value: ({ rec }) => (si ? rec.si.value : rec.value),
+      value: ({ published }) => (si ? published.si.value : published.value),
     },
     {
       key: 'unit',
       header: 'Unit',
       width: '116px',
       priority: 1,
-      render: ({ rec }) => (
-        <span className="font-num text-ink-soft">{(si ? rec.si.unit : rec.unit) || '—'}</span>
+      render: ({ published }) => (
+        <span className="font-num text-ink-soft whitespace-nowrap">{(si ? published.si.unit : published.unit) || '—'}</span>
       ),
-      value: ({ rec }) => (si ? rec.si.unit : rec.unit) || '—',
+      value: ({ published }) => (si ? published.si.unit : published.unit) || '—',
     },
     {
       key: 'paper',
       header: 'Source',
-      width: '92px',
+      width: '132px',
       priority: 1,
       render: ({ rec }) => (
-        <span onClick={(e) => e.stopPropagation()}>
+        <span className="whitespace-nowrap" onClick={(e) => e.stopPropagation()}>
           <CitationChip paperId={rec.paperId} />
         </span>
       ),
@@ -422,7 +439,12 @@ export default function Intake() {
       valuesOf: ({ rec }) => (rec.gold ? [rec.status, 'gold'] : [rec.status]),
       labelOf: (v) => STATUS_FACET_LABEL[v] ?? v,
     },
-    { key: 'paper', label: 'Paper', valuesOf: ({ rec }) => [rec.paperId] },
+    {
+      key: 'paper',
+      label: 'Paper',
+      valuesOf: ({ rec }) => [rec.paperId],
+      labelOf: (v) => shortTitle(papers.find((p) => p.id === v)?.title ?? v, 40),
+    },
     { key: 'band', label: 'Confidence', valuesOf: ({ band }) => [band] },
     {
       key: 'family',
@@ -473,7 +495,7 @@ export default function Intake() {
 
       {paperParam && (
         <span className="chip chip-active">
-          Scoped to <span className="font-num">{paperParam}</span>
+          Scoped to <span title={paperParam}>{scopedPaper ? shortTitle(scopedPaper.title, 40) : paperParam}</span>
           <button
             className="text-ink-soft hover:text-ink ml-1"
             onClick={() => navigate('/intake')}
@@ -532,7 +554,7 @@ export default function Intake() {
             body={
               paperParam
                 ? scopedPaper
-                  ? `${scopedPaper.title} is in the corpus but nothing has been extracted from it in this session. Run the extractor from the paper reader to stage candidate records.`
+                  ? `${scopedPaper.title} is in the corpus, and the project holds no record extracted from it yet. Run the extractor from the paper reader to stage candidate records.`
                   : `${paperParam} is not a document this project holds.`
                 : 'Documents arrive through Intake. Fetch a paper from the ingest queue, then run the extractor to stage candidate records here.'
             }
@@ -585,7 +607,7 @@ export default function Intake() {
 
       {scopedPaper && (
         <div className="mb-3">
-          <Callout kind="info" title={`Scoped to ${scopedPaper.id}`}>
+          <Callout kind="info" title={`Scoped to ${shortTitle(scopedPaper.title, 60)}`}>
             Showing only records extracted from{' '}
             <span className="font-serif">{scopedPaper.title}</span>. Facet counts below describe this
             subset.{' '}

@@ -12,7 +12,7 @@
 import { CircleDashed } from 'lucide-react';
 import { Card, SectionTitle } from './ui';
 
-export interface UnbuiltItem {
+interface UnbuiltItem {
   what: string;
   why: string;
 }

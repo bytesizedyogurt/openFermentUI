@@ -5,7 +5,7 @@
 // allowed side shaded. The observed value, once reconciled, is a filled
 // diamond: a run's reading is a measurement. Held and missed differ by a mark
 // beside the row (a tick, a cross) and by the word.
-import type { Prediction } from '@/data/types';
+import type { Prediction } from '@/lib/studies';
 import { fmt } from '@/engine/units';
 import { CONFIRM_BAND_PCT, kindOf } from '@/engine/reconcile';
 import { FigureFrame, Mark, type FigureTable } from './FigureFrame';

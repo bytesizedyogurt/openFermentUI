@@ -1,5 +1,4 @@
-"""Glucose to ethanol, version 0: a flowsheet of our own (OF-BLD-019 §2.3;
-D3, D4).
+"""Glucose to ethanol, version 0: a flowsheet of our own (D3, D4).
 
     glucose ──────┐
                   ├─ M1 ── R1 batch fermenter ── beer ── the ethanol purification
@@ -25,7 +24,7 @@ ethanol plant's (`biorefineries.corn.create_chemicals`, `corn.create_tea`
 with its `default_tea_parameters`), cited with the package's version in the
 basis; equipment and thermodynamics are BioSTEAM's own, and so are the
 utility prices and the plant cost index: BioSTEAM's defaults, set at the
-start of every case (OF-BLD-019 §2.R; not the corn plant's own settings,
+start of every case (not the corn plant's own settings,
 which its package loads only when it builds the corn plant).
 
 WHAT IT LEAVES OUT (`LEAVES_OUT`): where the glucose comes from; cell mass
@@ -41,6 +40,8 @@ included) so the screen can name its source.
 """
 from __future__ import annotations
 
+import math
+import sys
 from typing import Any
 
 import biosteam as bst
@@ -109,7 +110,7 @@ def create_chemicals() -> Any:
     """The yeast program's chemicals, as this flowsheet builds on them: the
     dry-grind corn plant's (`biorefineries.corn.create_chemicals`), whose cells
     are thermosteam's `Yeast`. pureOS's unit catalogue builds every unit type
-    on this set in the worker (OF-BLD-020 §5.1), and the vessel's chemicals are
+    on this set in the worker, and the vessel's chemicals are
     the same. No number here: the package's own set."""
     from biorefineries import corn
 
@@ -224,6 +225,21 @@ def simulate(b: Built, values: dict[str, float]) -> None:
     # (measured: carried over, the same case moved its price in the fourth
     # digit; emptied, what remains is BioSTEAM's own last-digit noise).
     b.system.empty_recycles()
+    # Each loop (the beer column's heat integration and the sieves'
+    # recycle) then iterates until a pass moves its recycle by less than the
+    # square root of a float's epsilon (about 1.5e-8, half the digits a
+    # float carries), in kmol an hour or as a share of the flow, and in
+    # kelvin or as a share of the temperature. BioSTEAM's defaults stop a
+    # loop once a pass moves its recycle by less than one kmol an hour or
+    # one per cent; at a plant of 1000 t/yr the sieves' whole recycle is
+    # about one kmol an hour, so the loop stopped after one pass or two, and
+    # a run's base case and its later cases of the same inputs priced apart,
+    # each on an unconverged recycle (H1-04). Held this tight, every loop
+    # ran to its converged recycle in two passes or three at every scale
+    # measured, 10 to 1,000,000 t/yr; what remains between cases is the
+    # last-digit noise named above.
+    tight = math.sqrt(sys.float_info.epsilon)
+    b.system.set_tolerance(mol=tight, rmol=tight, T=tight, rT=tight, subsystems=True)
     try:
         b.system.simulate()
     except Exception as e:
@@ -292,8 +308,7 @@ def evaluate(b: Built, values: dict[str, float]) -> dict[str, Any]:
 
 
 def parts(b: Built) -> dict[str, Any]:
-    """What the worker reads the run's tables from after the base case
-    (OF-BLD-019 §2.1): the system, the corn plant's TEA, the ethanol product,
+    """What the worker reads the run's tables from after the base case: the system, the corn plant's TEA, the ethanol product,
     the glucose as the main feedstock, the price the TEA solved for the
     product, and the product's own flow as the flow the price is per."""
     return {"system": b.system, "tea": b.tea, "product": b.product, "feedstock": b.glucose, "price": b.price,

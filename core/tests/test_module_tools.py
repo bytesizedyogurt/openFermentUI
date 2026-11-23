@@ -1,8 +1,8 @@
 """One read tool per module (OF-BLD-015 §7.2), through `tools.run`.
 
-The module rows come from a small projection written here: fictional
-runbooks, a host and a lesson, handed in as a catalogue no store holds yet
-would be. The service's stores are stand-ins, so nothing here reads a key,
+The module rows come from small stand-ins written here: fictional runbooks
+through the runbooks door, and a host and a lesson through the projection,
+as the project's catalogues hand them. The service's stores are stand-ins, so nothing here reads a key,
 the network or this machine's data; the last test reads the project's own
 rows (project_state.py).
 """
@@ -21,19 +21,14 @@ STATES = {"open", "fenced", "approved", "locked", "proposed", "retired"}
 
 
 # Fictional rows, chosen to be found by whole words and heads and by nothing else.
+RUNBOOKS = [{"id": "rb-zeta", "title": "Zetase — pilot process", "kind": "research", "status": "needs_review",
+             "lockedAt": None, "productId": None, "strainId": None, "predictions": []},
+            {"id": "rb-omega", "title": "Omegase — bench trial", "kind": "research", "status": "ready",
+             "lockedAt": "2026-10-01T00:00:00Z", "productId": None, "strainId": None, "predictions": []}]
 PROJECTION = {
-    "runbooks": {
-        "runbooks": [{"id": "rb-zeta", "title": "Zetase — pilot process", "kind": "research", "status": "needs_review",
-                      "lockedAt": None, "productId": None, "strainId": None, "predictions": []},
-                     {"id": "rb-omega", "title": "Omegase — bench trial", "kind": "research", "status": "ready",
-                      "lockedAt": "2026-10-01T00:00:00Z", "productId": None, "strainId": None, "predictions": []}],
-        "protocols": [],
-    },
     "geneos": {"hosts": [{"id": "h-zeta", "name": "Zetamyces testii Z1", "badges": [], "bsl": 1},
                          {"id": "s-cerevisiae-cenpk113-7d", "name": "Saccharomyces cerevisiae CEN.PK113-7D",
-                          "badges": [], "bsl": 1}],
-               "pathways": []},
-    "proforma": {"scenarios": []},
+                          "badges": [], "bsl": 1}]},
     "primer": {"lessons": [{"id": "l-ster", "title": "Sterilising and releasing a vessel",
                             "moduleTitle": "Why extraction comes first", "blurb": "", "skills": []}]},
 }
@@ -45,6 +40,7 @@ def ctx_for(pool_, **over):  # noqa: F811
     def make():
         src = module_stores.fixture_sources(lambda: pool_)
         src.projection = lambda: json.loads(json.dumps(PROJECTION))
+        src.runbooks = lambda: json.loads(json.dumps(RUNBOOKS))
         for k, v in over.items():
             setattr(src, k, v)
         return module_stores.Stores(src)
@@ -176,19 +172,22 @@ def test_an_artifact_row_carries_its_headline_values(pool):  # noqa: F811
     """A Proforma read said the benchmark row named its tool and date and
     nothing else (live, 2026-10-20). The top-level scalars of the output
     ride on the row, with the inputs' names, so a read says what was
-    computed; a value is still cited through the tool that computes it."""
+    computed; a value is still cited through the tool that computes it. The
+    row is a library plant's run, the reference runs Proforma's rows list
+    since the shelf's hand-written entries retired (alpha 2.2 D8); its
+    numbers are PLACEHOLDERS."""
     from openferment_core.models import Artifact, BasisInput, BasisSource
 
-    art = Artifact(id="0123456789abcdef", tool="proforma_benchmark", toolVersion="1", provenance="computed",
+    art = Artifact(id="0123456789abcdef", tool="library.run", toolVersion="1", provenance="computed",
                    createdAt="2026-10-20T00:00:00Z", outputHash="x", durationMs=1,
-                   inputs=[BasisInput(name="package", value="biorefineries.cornstover@2.35.1", unit="",
+                   inputs=[BasisInput(name="plant", value="cornstover", unit="",
                                       source=BasisSource(kind="model", id="x"))],
-                   output={"mespUsdPerGal": 1.9677, "package": "biorefineries.cornstover@2.35.1", "nested": {"a": 1},
+                   output={"plant": "cornstover", "simulator": "biosteam 2.54.0", "nested": {"a": 1},
                            "quantiles": [1, 2, 3]})
     r = read("proforma", ctx_for(pool, artifacts=lambda: [art]), kind="artifact")
     [row] = r.rows
-    assert row.detail["output"] == {"mespUsdPerGal": 1.9677, "package": "biorefineries.cornstover@2.35.1"}
-    assert row.detail["inputs"] == ["package=biorefineries.cornstover@2.35.1"]
+    assert row.detail["output"] == {"plant": "cornstover", "simulator": "biosteam 2.54.0"}
+    assert row.detail["inputs"] == ["plant=cornstover"]
     assert read("proforma", ctx_for(pool, artifacts=lambda: [art]), words="cornstover").summary["count"] == 1
 
 
@@ -263,11 +262,11 @@ def _kept_simulation(tmp_path, monkeypatch):
     in a throwaway store: test_fermos_bind's typed values, none a result."""
     from openferment_core import artifacts, fermos, intake
     from openferment_core.models import SimulationRequest
-    from test_fermos_bind import TYPED, pool_of, typed
+    from test_fermos_bind import TYPED, pool_of, typed_in
 
     monkeypatch.setattr(intake, "DATA_DIR", tmp_path)
     r = fermos.simulate(SimulationRequest(family="batch_v1", strain="s-cerevisiae-cenpk113-7d", product="ethanol",
-                                          sugar="glucose", overrides=typed(ks=0.2, yxs=0.12, yps=0.45, mu_max=0.3,
+                                          sugar="glucose", inputs=typed_in(ks=0.2, yxs=0.12, yps=0.45, mu_max=0.3,
                                                                            s0=50.0, **TYPED)), by_pool=pool_of())
     return artifacts.get(r.artifactId)
 

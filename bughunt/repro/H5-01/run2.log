@@ -1,0 +1,11 @@
+NOTICE:  database "bh_r_h5_01_race" does not exist, skipping
+service: http://127.0.0.1:10200 over a fresh bh_r_h5_01_race (keyless)
+step: bh-a pastes the seed -> ingested 93b26882c7044ae5adb8d6e783ba6678
+step: bh-b pastes the seed -> linked 93b26882c7044ae5adb8d6e783ba6678
+step: B holds 1 document(s), kit source(s): ['project:bh-a:paste']
+step: A pasted 1 private notes while B searched 17 times (0.5 s)
+leak: {"documentId": "d8bfbfb2c463492f9f5c341a92154481", "passageId": "p0", "title": "A private note 0", "text": "RACEMARKH501 appears in A's private race note number 0 with token RACEMARKH501N0.", "heldByA": true, "heldByB": false}
+step: one search from B after A stopped returns 0 of A's notes (1 hits)
+EXPECTED: every hit B's /api/literature/search returns is a passage of a document B holds; none of A's private notes, during A's ingestion or after it
+OBSERVED: 1 distinct A-only document(s) came back in B's hits while A ingested (1 held by A, 0 held by B), each with a passage id: 'A private note 0' p0; after A stopped, B's search returns 0
+RESULT: DEFECT

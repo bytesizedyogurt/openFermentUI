@@ -1,0 +1,11 @@
+{"case": "exactly at the cap, nothing spent", "reserve_1_00": "aa1c1b126"}
+{"case": "a cent under", "reserve_0_99": "41eabe551"}
+{"case": "a cent over", "reserve_1_01": "refused: today $0.00 spent and $0.00 reserved of the $1.00 cap"}
+{"case": "spent 0.60, then 0.40 (to the cap) and 0.41 (a cent past)", "at_cap": "a069a2c93", "past": "refused: today $0.60 spent and $0.40 reserved of the $1.00 cap"}
+{"case": "twenty concurrent reservations of 0.10, cap 1.00", "held": 10, "refused": 10, "reservedUsd": 1.0}
+{"case": "a call reserved before midnight and settled after it", "second_reservation": "406d2460f", "dayAfterSpentUsd": 1.8, "cap": 1.0, "pastTheCap": true}
+{"case": "OPENFERMENT_DAILY_BUDGET_USD=nan", "cap": "nan", "reserve_1000": "2a65182e2fde"}
+{"case": "OPENFERMENT_DAILY_BUDGET_USD=NaN", "cap": "nan", "reserve_1000": "28b3026e84b3"}
+{"case": "OPENFERMENT_DAILY_BUDGET_USD=inf", "cap": "inf", "reserve_1000": "f19b8b29addd"}
+{"case": "OPENFERMENT_DAILY_BUDGET_USD=1e999", "cap": "inf", "reserve_1000": "4cb70aec7b48"}
+{"case": "OPENFERMENT_DAILY_BUDGET_USD=-0", "cap": "-0.0", "reserve_1000": "refused: today $0.00 spent and $0.00 res"}

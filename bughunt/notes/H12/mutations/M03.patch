@@ -1,0 +1,10 @@
+--- a/core/openferment_core/basis.py
++++ b/core/openferment_core/basis.py
+@@ -280,6 +280,6 @@
+             classes.append(_provenance_of(artifacts_by_id.get(i.source.id or "")))
+         # `model` and `convention` change nothing.
+     found = weakest_provenance(classes)
+-    if found != "assumed" and any(is_measurement(i.source) for i in basis.inputs):
++    if found == "computed" and any(is_measurement(i.source) for i in basis.inputs):
+         return "measured"
+     return found

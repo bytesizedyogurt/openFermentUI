@@ -1,35 +1,52 @@
 """The one place openFerment calls a Claude model (Postdoc, Extract).
 
-    PRIMARY   claude-opus-5-5     every call starts here
-    FALLBACK  claude-sonnet-5-5   when the primary declines or is unavailable
+Each task family has a default route in `ROUTES`, its models tried in order
+and the effort they run at (ADR-008, Implementation 17):
 
-Override with OPENFERMENT_MODEL and OPENFERMENT_FALLBACK_MODEL in core/.env
-(the fallback may be a comma-separated list, tried in order);
-thinking depth with OPENFERMENT_EFFORT (low, medium, high, xhigh, max;
-default medium).
+    plan     claude-opus-5-5 then claude-sonnet-5-5   effort high
+    explain  claude-opus-5-5 then claude-sonnet-5-5   effort high
+    extract  claude-opus-5-5 then claude-sonnet-5-5   effort high
+    index    claude-haiku-5-5                         effort low
+    judge    claude-opus-5-5 then claude-sonnet-5-5   effort max
+
+The plain settings in core/.env lay over those defaults, each when it is
+set: OPENFERMENT_MODEL with OPENFERMENT_FALLBACK_MODEL (a comma-separated
+list, tried in order) is the chain of the answering families, plan, explain
+and extract, and OPENFERMENT_EFFORT (low, medium, high, xhigh, max) their
+thinking depth; OPENFERMENT_INDEX_MODEL is index's model. judge, the
+evaluation's grader, and index's effort keep their defaults under every plain
+setting, and OPENFERMENT_ROUTES moves them.
 
 THE ROUTING TABLE (execution prompt §4.8; ADR-008). A call names its task
 family, and `routes()` gives the family's models, tried in order, and the
 effort they run at: `plan` (Postdoc's loop of tools), `explain` (an answer in
 one call, the literature layer's cited answers), `extract` (a document read
-into candidates), `index` (bulk helper work, OPENFERMENT_INDEX_MODEL first,
-default claude-haiku-5-5) and `judge` (an evaluation's grading). `ROUTES` is
-the table core/.env leaves alone; OPENFERMENT_ROUTES lays a JSON object of
+into candidates), `index` (bulk helper work, its model OPENFERMENT_INDEX_MODEL,
+default claude-haiku-5-5) and `judge` (an evaluation's grading). `ROUTES`
+holds each family's default; OPENFERMENT_ROUTES lays a JSON object of
 family to `{"models": [...], "effort": ...}` over it. A model is a spec in
 Sci RAG Kit's syntax, `provider:model` (a bare id is Anthropic's), so every
 provider routes the same way; the service serves Anthropic's models itself,
 and a route naming another provider waits, said in words, for the owner's
 decision on how its key is read (execution prompt §11.1). The day's spend is
 charged under two roles, `answer` and `index` (`SPEND_ROLES`); `role=` names
-a family as it did before (`answer` reads `plan`'s route).
+a family as it did before (`answer` reads `plan`'s route). Sci RAG Kit's
+calls read the routes by its roles (`KIT_ROLES`), each with the room for its
+thinking that its route's effort sets (`KIT_ROOM`).
 
 ONE DAILY CAP. Every response is charged to `spend.py` under its role, and a
 call whose worst case could take the UTC day past `OPENFERMENT_DAILY_BUDGET_USD`
 is refused before it is sent (`BudgetExhausted`).
 
+A RUN'S OWN COUNT (alpha 2.2 F.5; ADR-008, Implementation 18). Within `tally()`, every `call` adds one
+`Spent` to the list the tally yields, an answer, a refusal and an outage
+alike: its family and effort, the model that answered, the models asked and
+those that declined, its tokens and USD, how the answer stopped, and a
+refusal or an outage in words. A command that reports what one run spent
+opens a tally around the run; outside every tally nothing is kept.
+
 TOOL TURNS. `converse` runs one turn of a conversation the caller owns, each
-tool strict unless the registry marks it loose (the module tools, OF-BLD-015
-§7.2), `tool_choice` `auto` or `none` and nothing else, the answer schema in
+tool strict unless the registry marks it loose (the module tools), `tool_choice` `auto` or `none` and nothing else, the answer schema in
 `output_config.format`, and top-level `cache_control`. It falls back
 nowhere; the loop that owns the conversation decides (§5.2).
 
@@ -95,7 +112,9 @@ log = logging.getLogger("openferment.llm")
 
 DEFAULT_PRIMARY = "claude-opus-5-5"
 DEFAULT_FALLBACK = "claude-sonnet-5-5"
-DEFAULT_EFFORT = "medium"
+# The plan route's effort (`ROUTES`), which the single setting reads when
+# core/.env names none.
+DEFAULT_EFFORT = "high"
 # What `output_config.effort` accepts; anything else is a 400 on every call,
 # which `pnpm ready` reports before the first one.
 EFFORTS = ("low", "medium", "high", "xhigh", "max")
@@ -173,13 +192,35 @@ class Route:
 
 
 _DEFAULT_CHAIN = (DEFAULT_PRIMARY, DEFAULT_FALLBACK)
+# Each family's default, and the measure it rests on (ADR-008, Implementation
+# 17; docs/reports/model-routing-2026-11.md, the section of 8 November 2026).
+# A second model stands behind Opus for a refusal in plan, explain, extract
+# and judge (stage B's lesson: the `bio` classifier declines yeast literature
+# on Opus).
 ROUTES: dict[str, Route] = {
+    # The model comparison: the opus-high table, its answers above haiku's and
+    # sonnet's by more than the judge's own noise on answering and coverage.
     "plan": Route(_DEFAULT_CHAIN, DEFAULT_EFFORT),
-    "explain": Route(_DEFAULT_CHAIN, DEFAULT_EFFORT),
-    "extract": Route(_DEFAULT_CHAIN, DEFAULT_EFFORT),
-    "index": Route((DEFAULT_INDEX, *_DEFAULT_CHAIN), DEFAULT_EFFORT),
-    "judge": Route(_DEFAULT_CHAIN, DEFAULT_EFFORT),
+    # Held at extract's route until the retrieval report's answer lane
+    # measures it (`pnpm lit:report --project <id> --by <name> --judge`, the
+    # kit's answers graded for grounding; ADR-008, Implementation 18); none
+    # of the fourteen questions reaches this family.
+    "explain": Route(_DEFAULT_CHAIN, "high"),
+    # The rebuild's extraction (F.1): Sonnet answered each of the nine
+    # documents Opus declined in `bio`.
+    "extract": Route(_DEFAULT_CHAIN, "high"),
+    # F.0's probe, its one call on Haiku at low; every table of the
+    # comparison held index there, and none of the fourteen's calls reached
+    # it. Haiku alone, so a graph build's batch costs Haiku's price.
+    "index": Route((DEFAULT_INDEX,), "low"),
+    # The comparison's method, its room `evaluate.JUDGE_TOKENS` (Implementation 15).
+    "judge": Route(_DEFAULT_CHAIN, "max"),
 }
+# The families OPENFERMENT_MODEL with its fallback, and OPENFERMENT_EFFORT,
+# lay over. judge keeps the comparison's method and index its own effort under
+# every plain setting, so a setting chosen for answers leaves the grader and
+# the bulk chores at their defaults; OPENFERMENT_ROUTES moves either.
+ANSWERING = ("plan", "explain", "extract")
 
 
 def spec(text: str) -> tuple[str, str]:
@@ -196,14 +237,35 @@ def spec(text: str) -> tuple[str, str]:
     return provider, model.strip()
 
 
+def _named(setting: str) -> bool:
+    """Whether the environment (core/.env among it) sets a plain setting."""
+    return bool(os.environ.get(setting, "").strip())
+
+
+def plain_chain() -> tuple[str, ...]:
+    """OPENFERMENT_MODEL, then each model its fallback names, in order and
+    without repeats, each setting's default where it is unset."""
+    return tuple(dict.fromkeys(m for m in (primary(), *(x.strip() for x in fallback().split(","))) if m))
+
+
 def routes() -> dict[str, Route]:
-    """The routing table a call reads, when it is made: `ROUTES` with the
-    models and the effort core/.env names (OPENFERMENT_MODEL, its fallback,
-    OPENFERMENT_INDEX_MODEL, OPENFERMENT_EFFORT), then OPENFERMENT_ROUTES laid
-    over it family by family. Raises RoutesInvalid in words."""
-    answer = tuple(dict.fromkeys(m for m in (primary(), *(x.strip() for x in fallback().split(","))) if m))
-    table = {family: Route(answer, effort()) for family in FAMILIES}
-    table["index"] = Route(tuple(dict.fromkeys((index_model(), *answer))), effort())
+    """The routing table a call reads, when it is made: `ROUTES`, each family
+    with its own default; then each plain setting the environment names, laid
+    over the families it covers (OPENFERMENT_MODEL with its fallback over the
+    models of plan, explain and extract, OPENFERMENT_EFFORT over their effort,
+    OPENFERMENT_INDEX_MODEL over index's first model), a setting left unset
+    leaving the defaults as they stand; then OPENFERMENT_ROUTES laid over it
+    family by family, the one setting that moves judge and index's effort.
+    Raises RoutesInvalid in words."""
+    table = dict(ROUTES)
+    if _named("OPENFERMENT_MODEL") or _named("OPENFERMENT_FALLBACK_MODEL"):
+        answer = plain_chain()
+        table.update({family: Route(answer, table[family].effort) for family in ANSWERING})
+    if _named("OPENFERMENT_INDEX_MODEL"):
+        index = table["index"]
+        table["index"] = Route(tuple(dict.fromkeys((index_model(), *index.models[1:]))), index.effort)
+    if _named("OPENFERMENT_EFFORT"):
+        table.update({family: Route(table[family].models, effort()) for family in ANSWERING})
     raw = os.environ.get(ROUTES_SETTING, "").strip()
     if not raw:
         return table
@@ -335,15 +397,30 @@ class UsageLimitReached(ModelUnavailable):
     """The Anthropic account's own usage limit is reached: no model answers."""
 
 
+def regains(said: str) -> str:
+    """The date the API names for the account's access to return, as it wrote
+    it (" until 2026-12-01 at 00:00 UTC"), or nothing when it names none."""
+    import re
+
+    m = re.search(r"regain access on ([0-9]{4}-[0-9]{2}-[0-9]{2}(?: at [0-9]{2}:[0-9]{2} UTC)?)", said)
+    return f" until {m.group(1)}" if m else ""
+
+
 def _bad_request(e: Any, usage: Usage | None = None) -> ModelUnavailable:
     """A 400 in words: the account's usage limit, a grammar too large, or a
-    request the API could not take."""
+    request the API could not take. The usage limit is said from the date the
+    API names alone; the API's own message, its body and request id with it,
+    goes to the log."""
     message = str(getattr(e, "message", e))
     low = message.lower()
     if USAGE_LIMIT in low:
-        return UsageLimitReached(
-            f"The Anthropic account's usage limit is reached, so no model can answer: {message} The account's "
-            "owner raises the limit in the Anthropic console; openFerment's daily cap is a separate limit.", usage)
+        log.warning("the Anthropic account's usage limit answered a call: %s", message)
+        until = regains(message)
+        reached = UsageLimitReached(
+            f"The Anthropic account's usage limit is reached{until}, so no model can answer; the account's "
+            "owner raises it in the Anthropic console, a limit separate from openFerment's daily cap.", usage)
+        reached.until = until  # " until <date>" as the API named it, or "": ready's probe row names it the same way
+        return reached
     kind = GrammarTooLarge if GRAMMAR_TOO_LARGE in low else ModelUnavailable
     return kind(f"The Anthropic API refused the request as malformed: {message}", usage)
 
@@ -382,7 +459,12 @@ class ModelRefused(RuntimeError):
 class Result:
     """What one call produced. `data` is the parsed JSON, or None when the
     response stopped at max_tokens or held no parseable JSON; `text` is the
-    response's words as written, for a call that asked for prose."""
+    response's words as written, for a call that asked for prose. `tried`
+    names the models asked, in order, and `refused` those of them the
+    safety classifier declined before one answered, by the ids they were
+    asked by; a model tried and passed over for another reason (a status
+    such as 529, a model this key cannot reach) stands in `tried` alone,
+    and the log line names why."""
 
     data: dict[str, Any] | None
     model: str
@@ -391,6 +473,7 @@ class Result:
     fell_back: bool = False
     tried: list[str] = field(default_factory=list)
     text: str = ""
+    refused: list[str] = field(default_factory=list)
 
     @property
     def truncated(self) -> bool:
@@ -400,7 +483,8 @@ class Result:
 def chain(name: str = "plan") -> list[str]:
     """The model specs a call in a family tries, in order, without repeats
     (`routes()`). The fallback may name several, comma-separated, each tried
-    in turn; `index` tries its own model first, then the answer chain (E.7)."""
+    in turn; `index` runs on its own model alone unless a route names more
+    (ADR-008, Implementation 17)."""
     return list(routes()[family_of(name)].models)
 
 
@@ -517,7 +601,7 @@ def strict_schema(schema: dict[str, Any], *, keep_maps: bool = False) -> dict[st
     """A tool-style JSON schema made acceptable to structured outputs: every
     object closed (`additionalProperties: false`) and the keywords it rejects
     moved into the description. The input is left untouched. With
-    `keep_maps` (a loose tool's input, OF-BLD-020 §3.4) an object whose
+    `keep_maps` (a loose tool's input) an object whose
     `additionalProperties` is a schema stays a map, that schema kept and
     walked, so a model reads `recordsByParam` as keys to record ids and a
     write's `fields` as names to words, not as objects that take nothing."""
@@ -637,6 +721,68 @@ def _default_client() -> Any:
     return make_client(api_key=key)
 
 
+# ── a run's own count (alpha 2.2 F.5) ──────────────────────────────────
+
+
+@dataclass(frozen=True)
+class Spent:
+    """One `call` as a tally counts it. `family` and `effort` are its route as
+    it stood when the call was made, and `max_tokens` the ceiling the call
+    asked. `outcome` is `answered`, `refused` (every model asked declined) or
+    `unavailable` (no model answered: the key, the network, the daily cap, or
+    every model passed over), and `failure` says why in the words the caller
+    was given, for the last two. `model` is the model that answered, None when
+    none did; `tried` names the models asked, in order, and `refused` those of
+    them the safety classifier declined, by the ids they were asked by.
+    `usage` is what the call spent, a billed refusal before the answer or the
+    outage included; `stop_reason` is how the answer stopped, and `fell_back`
+    whether a model after the route's first gave it."""
+
+    family: str
+    effort: str
+    max_tokens: int
+    outcome: str
+    tried: tuple[str, ...]
+    refused: tuple[str, ...]
+    usage: Usage
+    model: str | None = None
+    stop_reason: str | None = None
+    fell_back: bool = False
+    failure: str | None = None
+
+    @property
+    def truncated(self) -> bool:
+        return self.stop_reason == "max_tokens"
+
+
+#: The tallies open in this context, the outermost first (`tally`).
+_TALLIES: contextvars.ContextVar[tuple[list[Spent], ...]] = contextvars.ContextVar("openferment_tallies", default=())
+
+
+@contextlib.contextmanager
+def tally() -> Iterator[list[Spent]]:
+    """Count the calls made within it: every `call` adds its `Spent` to the
+    list this yields, in the order the calls end. Tallies nest, and a call is
+    counted in every tally open around it. A context copied from this one
+    carries it: a thread `asyncio.to_thread` starts (the kit's calls arrive
+    so), a task begun within it, a coroutine `db.run` hands to the database
+    loop. A thread `threading.Thread` starts begins with an empty context on
+    Python 3.12 and 3.13, and its calls reach a tally only when it runs them
+    in a copy (`contextvars.copy_context().run`). Outside every tally nothing
+    is kept; the day's spend is charged to `spend.py` either way."""
+    spent: list[Spent] = []
+    token = _TALLIES.set((*_TALLIES.get(), spent))
+    try:
+        yield spent
+    finally:
+        _TALLIES.reset(token)
+
+
+def _keep(spent: Spent) -> None:
+    for kept in _TALLIES.get():
+        kept.append(spent)
+
+
 def call(
     *,
     system: str,
@@ -652,9 +798,48 @@ def call(
     `schema` is None), by the first model in the family's route that will
     (`role` names one as before: `answer` is `explain` here, an answer in one
     call). Raises ModelRefused or ModelUnavailable (BudgetExhausted among
-    them) otherwise."""
+    them) otherwise. Every tally open around the call counts it, an answer, a
+    refusal and an outage alike (`tally`)."""
     family = family_of(family or ("explain" if role == "answer" else role))
     route = routes()[family]
+    tried: list[str] = []
+    declined: list[str] = []
+
+    def counted(outcome: str, usage: Usage, **how: Any) -> Spent:
+        return Spent(family=family, effort=route.effort, max_tokens=max_tokens, outcome=outcome, tried=tuple(tried),
+                     refused=tuple(declined), usage=usage, **how)
+
+    try:
+        result = _call(system=system, user=user, schema=schema, max_tokens=max_tokens, client_factory=client_factory,
+                       label=label, family=family, route=route, tried=tried, declined=declined)
+    except ModelRefused as e:
+        _keep(counted("refused", e.usage, failure=str(e)))
+        raise
+    except ModelUnavailable as e:
+        _keep(counted("unavailable", e.usage, failure=str(e)))
+        raise
+    _keep(counted("answered", result.usage, model=result.model, stop_reason=result.stop_reason,
+                  fell_back=result.fell_back))
+    return result
+
+
+def _call(
+    *,
+    system: str,
+    user: str,
+    schema: dict[str, Any] | None,
+    max_tokens: int,
+    client_factory: Callable[[], Any] | None,
+    label: str,
+    family: str,
+    route: Route,
+    tried: list[str],
+    declined: list[str],
+) -> Result:
+    """`call`'s work: the route's models asked in turn. `tried` gains each
+    model as it is asked and `declined` each one that declines, by the id it
+    was asked by (`Result.tried` and `Result.refused`), so a call that raises
+    still says which were."""
     role = SPEND_ROLES[family]
     client = (client_factory or _default_client)()
     output: dict[str, Any] = {"effort": route.effort}
@@ -669,7 +854,6 @@ def call(
         request["system"] = system
     models = list(route.models)
     spent = Usage()
-    tried: list[str] = []
     refusal: str | None = None
     refused_by: list[str] = []
     for i, named in enumerate(models):
@@ -700,9 +884,9 @@ def call(
                     data = None
             spent = add(spent, Usage(models=[named]))
             return Result(data=data, model=named, usage=spent, stop_reason="end_turn", fell_back=i > 0, tried=tried,
-                          text=text)
-        tried.append(model)
+                          text=text, refused=declined)
         held = _reserve(model, request, max_tokens, spent, role)
+        tried.append(model)
         cost = 0.0
         try:
             try:
@@ -742,6 +926,7 @@ def call(
                 details = _get(response, "stop_details")
                 refusal = _get(details, "category") or refusal
                 refused_by.append(str(_get(response, "model") or model))
+                declined.append(model)
                 if last or refusal in NO_FALLBACK_REFUSALS:
                     raise ModelRefused(refusal, refused_by, spent)
                 log.warning("%s%s declined (%s); trying %s", label, model, refusal or "no category", models[i + 1])
@@ -755,6 +940,7 @@ def call(
                 fell_back=i > 0,
                 tried=tried,
                 text=_text_of(response),
+                refused=declined,
             )
         finally:
             spend.settle(held, role, cost)
@@ -830,7 +1016,7 @@ def converse(
     when a tool is not; `tool_param` is applied here. A tool goes out strict
     unless its registry entry says otherwise: the API compiles one grammar
     for every strict tool in a request and refused eighteen as too large
-    (OF-BLD-015 §7.2, 2026-10-19), so the module read tools go out loose and
+    (2026-10-19), so the module read tools go out loose and
     `tools.run` validates their input as it validates every tool's. `ask` stands in for
     the API in offline tests: it receives the request and returns a message.
     """
@@ -921,17 +1107,34 @@ def _converse_once(request: dict[str, Any], ask: Callable[[dict[str, Any]], Any]
 
 
 #: The kit's roles, as our families: its answers with citations explain, its
-#: high-volume extraction (a document's graph, HyDE's passage) is an index
-#: chore, and its judge judges.
+#: high-volume extraction (a document's graph, HyDE's passage, a question's
+#: entity names) is an index chore, and its judge judges.
 KIT_ROLES = {"answer": "explain", "extraction": "index", "judge": "judge"}
+
+#: The room a kit call has for thinking, in output tokens, by its route's
+#: effort (ADR-008, Implementation 18). The kit sizes each call for a model
+#: that writes its answer at once (a judgement in 1,024 tokens, a graph batch
+#: in 8,192, HyDE's passage in 512), and a model's output tokens include its
+#: thinking, so at a high effort the thinking may spend the ceiling before the
+#: answer is written. A kit call asks the larger of the kit's ceiling and this
+#: room; at effort low the kit's ceiling stands. At max the room is
+#: openFerment's own judge's, 32,000 (`postdoc.evaluate.JUDGE_TOKENS`), where
+#: Implementation 15 measured 16,000 too small for a judgement at max; the
+#: judge route runs at max (Implementation 17), so every kit judgement asks
+#: it. The kit's own judgements at max are measured by the retrieval report's
+#: run, its truncated count (`literature/report.py`).
+KIT_ROOM = {"low": 0, "medium": 4096, "high": 8192, "xhigh": 12000, "max": 32000}
 
 
 def kit_client(kit_role: str = "answer") -> Any:
-    """The model client Sci RAG Kit generates with, for one of its roles:
-    answers with citations, HyDE's hypothetical passage, a document's graph.
-    Every call goes through `call` here, so the kit's calls are capped by the
-    day's spend, read the key in this one place, and fall back along the
-    role's chain like any other. Built on demand: the kit is the `lit` extra."""
+    """The model client Sci RAG Kit generates with, for one of its roles
+    (`KIT_ROLES`): answers with citations, HyDE's hypothetical passage, a
+    question's entity names, a document's graph, a judgement. Every call
+    goes through `call` here, so the kit's calls are capped by the day's
+    spend, read the key in this one place, fall back along the role's route
+    like any other, and are counted by each tally open around them; each
+    asks at least the room its route's effort sets for thinking
+    (`KIT_ROOM`). Built on demand: the kit is the `lit` extra."""
     import asyncio
 
     from sci_rag.llm.client import LLMClient
@@ -943,8 +1146,9 @@ def kit_client(kit_role: str = "answer") -> Any:
 
         async def generate(self, prompt: str, *, system: str | None = None, temperature: float = 0.2,
                            max_tokens: int = 2048, json_mode: bool = False) -> str:
+            room = KIT_ROOM[routes()[family].effort]
             result = await asyncio.to_thread(
-                call, system=system or "", user=prompt, schema=None, max_tokens=max_tokens,
+                call, system=system or "", user=prompt, schema=None, max_tokens=max(max_tokens, room),
                 family=family, label="sci-rag-kit: ",
             )
             return result.text

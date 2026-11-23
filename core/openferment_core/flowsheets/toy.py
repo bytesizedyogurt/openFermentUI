@@ -1,4 +1,4 @@
-"""The toy flowsheet (OF-BLD-014 §8.1): two units whose mass balance is worked
+"""The toy flowsheet: two units whose mass balance is worked
 by hand. A STAND-IN for tests and fixtures, not a process.
 
     water (kg/h) ─┐
@@ -20,7 +20,6 @@ INPUTS = {
     "ethanol": ("ethanol fed", "kg h-1", 50.0),
     "split": ("share to the top", "", 0.6),
 }
-OUTPUTS = {"topEthanol": "kg h-1", "topWater": "kg h-1", "bottomTotal": "kg h-1"}
 
 
 def build() -> Any:

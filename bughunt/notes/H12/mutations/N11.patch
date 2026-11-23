@@ -1,0 +1,11 @@
+--- a/core/openferment_core/biorepo.py
++++ b/core/openferment_core/biorepo.py
+@@ -318,7 +318,7 @@
+             f"{decision.recordId} is on {paper_id}, which is not a document this project holds; a decision "
+             "stands on a text a reader can look up (§7.4)",
+         )
+-    if _is_gold(decision) and decision.status != "verified":
++    if False:
+         raise WriteRefused("status", f"a gold decision is a verified one; this one says {decision.status!r}")
+ 
+     # What a reviewer typed is held to §2.4 rule 4 like what the model
